@@ -266,11 +266,11 @@ func (e *engine) prependChrome(insertAt int, boxNode *box, sty ResolvedStyle, po
 	}
 
 	var chrome []Op
-	radii := usedBorderRadii(sty, width, height)
+	radii, radiiY := usedBorderRadiiXY(sty, width, height)
 	radius := uniformRadius(radii)
 	// Outset box-shadow paints behind the background so blur rings do not
 	// cover the border box.
-	chrome = e.appendBoxShadow(chrome, sty, posX, posY, width, height)
+	chrome = e.appendBoxShadow(chrome, sty, posX, posY, width, height, radii, radiiY)
 	if sty.BGColor[3] > 0 && e.opts.Background {
 		chrome = append(chrome, Op{ //nolint:exhaustruct // intentional zero fields
 			Kind: OpFillRect, X: posX, Y: posY, W: width, H: height,
@@ -289,7 +289,7 @@ func (e *engine) prependChrome(insertAt int, boxNode *box, sty ResolvedStyle, po
 		chrome = append(chrome, e.collapsedOrFullBorderOps(boxNode, sty, posX, posY, width, height)...)
 	}
 	chrome = append(chrome, e.outlineOps(sty, posX, posY, width, height)...)
-	stampOpRadiiY(chrome, usedBorderRadiiY(sty, width, height))
+	stampOpRadiiY(chrome, radiiY)
 	if len(chrome) == 0 {
 		return
 	}
@@ -351,88 +351,6 @@ func isNeutralFrameSection(node *html.Node, sty ResolvedStyle) bool {
 	}
 
 	return nearlyEqual(sty.BorderTop.Width, sty.BorderBottom.Width)
-}
-
-func usedBorderRadius(sty ResolvedStyle, width, height float64) float64 {
-	return uniformRadius(usedBorderRadii(sty, width, height))
-}
-
-func usedBorderRadii(sty ResolvedStyle, width, height float64) [4]float64 {
-	radii := borderRadiusValues(sty, width, height)
-	clampBorderRadii(radii[:], width, height)
-	scaleBorderRadii(radii[:], width, height)
-
-	return radii
-}
-
-const (
-	borderRadiusPercentBasis = 100.0
-	borderRadiusHalf         = 2.0
-)
-
-func borderRadiusValues(sty ResolvedStyle, width, height float64) [4]float64 {
-	var radii [4]float64
-
-	switch {
-	case sty.BorderRadiusPercent >= 0:
-		radius := math.Min(width, height) * sty.BorderRadiusPercent / borderRadiusPercentBasis
-		for i := range radii {
-			radii[i] = radius
-		}
-	case sty.BorderRadiusTopLeft != 0 || sty.BorderRadiusTopRight != 0 ||
-		sty.BorderRadiusBottomRight != 0 || sty.BorderRadiusBottomLeft != 0:
-		radii = [4]float64{
-			sty.BorderRadiusTopLeft, sty.BorderRadiusTopRight,
-			sty.BorderRadiusBottomRight, sty.BorderRadiusBottomLeft,
-		}
-	default:
-		for i := range radii {
-			radii[i] = sty.BorderRadius
-		}
-	}
-
-	return radii
-}
-
-//nolint:wsl // CSS radius clamping is a compact geometry loop
-func clampBorderRadii(radii []float64, width, height float64) {
-	short := math.Min(width, height)
-
-	for i := range radii {
-		if radii[i] < 0 {
-			radii[i] = 0
-		}
-		if radii[i] > short/borderRadiusHalf {
-			radii[i] = short / borderRadiusHalf
-		}
-	}
-}
-
-//nolint:wsl,mnd // CSS adjacent-radius scaling is expressed as four edge sums
-func scaleBorderRadii(radii []float64, width, height float64) {
-	if len(radii) < 4 {
-		return
-	}
-
-	scale := 1.0
-	for _, edge := range []struct {
-		sum   float64
-		limit float64
-	}{
-		{sum: radii[0] + radii[1], limit: width},
-		{sum: radii[3] + radii[2], limit: width},
-		{sum: radii[0] + radii[3], limit: height},
-		{sum: radii[1] + radii[2], limit: height},
-	} {
-		if edge.sum > edge.limit && edge.sum > 0 && edge.limit/edge.sum < scale {
-			scale = edge.limit / edge.sum
-		}
-	}
-	if scale < 1 {
-		for i := range radii {
-			radii[i] *= scale
-		}
-	}
 }
 
 func uniformRadius(radii [4]float64) float64 {

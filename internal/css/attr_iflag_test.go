@@ -45,10 +45,10 @@ func checkAttrIFlagParse(t *testing.T) {
 		{sel: `[lang|="en" i]`, op: "|=", value: "en", ignoreCase: true, wantOK: true},
 		{sel: "[type=foo]", op: "=", value: "foo", ignoreCase: false, wantOK: true},
 		{sel: "[id]", op: "", value: "", ignoreCase: false, wantOK: true},
-		// unknown flag: keep current behavior (do not invent s).
-		{sel: "[type=foo s]", op: "=", value: "foo s", ignoreCase: false, wantOK: true},
-		{sel: `[type="foo" s]`, op: "=", value: `"foo" s`, ignoreCase: false, wantOK: true},
-		{sel: "[attr i]", wantOK: false},
+		// The Selectors 4 s flag requests the default exact comparison.
+		{sel: "[type=foo s]", op: "=", value: "foo", ignoreCase: false, wantOK: true},
+		{sel: `[type="foo" s]`, op: "=", value: "foo", ignoreCase: false, wantOK: true},
+		{sel: "[attr i]", op: "", value: "", ignoreCase: false, wantOK: false},
 	}
 
 	for _, testCase := range cases {
@@ -86,13 +86,13 @@ func checkAttrIFlagMatch(t *testing.T) {
 	ids := []string{"up", "low", "pdf", "png", "cls", "en", "fr"}
 	nodes := make(map[string]*html.Node, len(ids))
 
-	for _, id := range ids {
-		node := byID(root, id)
+	for _, attrID := range ids {
+		node := byID(root, attrID)
 		if node == nil {
-			t.Fatalf("missing #%s", id)
+			t.Fatalf("missing #%s", attrID)
 		}
 
-		nodes[id] = node
+		nodes[attrID] = node
 	}
 
 	cases := []struct {
@@ -117,7 +117,7 @@ func checkAttrIFlagMatch(t *testing.T) {
 		{`[lang|="en" i]`, "en", true},
 		{`[lang|="en" i]`, "fr", false},
 		{`[lang|="en"]`, "en", false},
-		{`[type=foo s]`, "low", false},
+		{`[type=foo s]`, "low", true},
 	}
 
 	checkSelectorMatchIDs(t, nodes, cases)

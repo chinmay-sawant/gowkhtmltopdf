@@ -1,6 +1,9 @@
 package convert
 
-import "github.com/chinmay-sawant/gowkhtmltopdf/internal/layout"
+import (
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/layout"
+)
 
 // hfGeom is the page geometry of one object, in points. contentW/contentH
 // are the content-area dimensions the object's layout was paginated with.
@@ -17,7 +20,9 @@ type hfGeom struct {
 	left  *hfPageMargins `exhaustruct:"optional"`
 	right *hfPageMargins `exhaustruct:"optional"`
 	// named maps lower-case page names from @page ident { margin }.
-	named map[string]*hfPageMargins `exhaustruct:"optional"`
+	named     map[string]*hfPageMargins `exhaustruct:"optional"`
+	pageBoxes css.PageMarginBoxes
+	pageNames []string `exhaustruct:"optional"`
 }
 
 // hfPageMargins is one page-box margin set in points.
@@ -36,27 +41,66 @@ func (g *hfGeom) recomputeContent() {
 	}
 }
 
-// pageMargins returns the page-box left and top margins for locPage.
-// Cascade: unnamed, then :left/:right by page side, then :first on page 1.
-// Named @page margins are applied at paint (layout.PaintOptions); link
-// destinations here use the side/:first cascade only.
+// pageMargins returns the page-box left and top margins for locPage using the
+// same cascade as layout painting, including the used named page.
 func (g *hfGeom) pageMargins(locPage int) (float64, float64) {
-	left, top := g.marginLeft, g.marginTop
-	pageNum := locPage + 1
+	margins := paintOptions(*g).PageMarginsForPage(locPage, g.pageNames)
 
-	if pageNum%2 == 0 && g.left != nil {
-		left, top = g.left.left, g.left.top
+	return margins.Left, margins.Top
+}
+
+// paintOptions converts page geometry into the layout paint geometry used by
+// pagination, page painting, link annotations, and outlines.
+func paintOptions(geom hfGeom) layout.PaintOptions {
+	opts := layout.PaintOptions{
+		PageWidth:    geom.pageW,
+		PageHeight:   geom.pageH,
+		MarginTop:    geom.marginTop,
+		MarginBottom: geom.marginBottom,
+		MarginLeft:   geom.marginLeft,
+		MarginRight:  geom.marginRight,
 	}
 
-	if pageNum%2 == 1 && g.right != nil {
-		left, top = g.right.left, g.right.top
+	opts.First = layoutPageMargins(geom.first)
+	opts.Left = layoutPageMargins(geom.left)
+	opts.Right = layoutPageMargins(geom.right)
+	opts.Named = layoutNamedPageMargins(geom.named)
+
+	return opts
+}
+
+func layoutPageMargins(src *hfPageMargins) *layout.PageMargins {
+	if src == nil {
+		return nil
 	}
 
-	if locPage == 0 && g.first != nil {
-		return g.first.left, g.first.top
+	return &layout.PageMargins{
+		Top: src.top, Right: src.right, Bottom: src.bottom, Left: src.left,
+	}
+}
+
+func layoutNamedPageMargins(src map[string]*hfPageMargins) map[string]layout.PageMargins {
+	if len(src) == 0 {
+		return nil
 	}
 
-	return left, top
+	out := make(map[string]layout.PageMargins, len(src))
+
+	for name, margins := range src {
+		if margins == nil {
+			continue
+		}
+
+		out[name] = layout.PageMargins{
+			Top: margins.top, Right: margins.right, Bottom: margins.bottom, Left: margins.left,
+		}
+	}
+
+	if len(out) == 0 {
+		return nil
+	}
+
+	return out
 }
 
 // pdfY converts a y-down canvas coordinate on object-local page locPage into

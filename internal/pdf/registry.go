@@ -2,11 +2,13 @@ package pdf
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/line"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
@@ -23,6 +25,25 @@ func NewRegistry() *Registry {
 	return &Registry{ //nolint:exhaustruct // intentional zero-value mu field
 		byFamily: map[string][]*Font{},
 	}
+}
+
+// LogFontRegistryScan emits the shared font-path scan notice after a registry
+// has been built by a PDF or image request.
+func LogFontRegistryScan(global settings.PdfGlobal, log io.Writer) {
+	if log == nil || log == io.Discard || global.Quiet {
+		return
+	}
+
+	if len(global.FontPaths) == 0 && !global.UseSystemFonts {
+		return
+	}
+
+	count := len(global.FontPaths)
+	if global.UseSystemFonts {
+		count += len(DefaultSystemFontDirs())
+	}
+
+	line.Emit(log, line.Info, "scanned %d font path(s)", count)
 }
 
 func (r *Registry) registerFaceLocked(fnt *Font) {

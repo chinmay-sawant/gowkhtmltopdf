@@ -229,6 +229,7 @@ func (e *engine) flowFlexRow(
 
 		yStart := curY
 		cross := lineCross
+
 		if stretchCross != nil {
 			cross = stretchCross[lidx]
 		}
@@ -1433,34 +1434,8 @@ func justifyColumnStart(justify string, contentH, curY, totalH, sumH, gap float6
 		case fxCenter:
 			return curY + (contentH-totalH)/two, gap
 		case fxBetween, fxAround, fxEvenly:
-			return justifyColumnDistributed(justify, curY, contentH, sumH, gap, count)
+			return justifyDistributed(justify, curY, contentH, sumH, gap, count)
 		}
-	}
-
-	return curY, gap
-}
-
-func justifyColumnDistributed(justify string, curY, contentH, sumH, gap float64, count int) (float64, float64) {
-	rem := contentH - sumH
-	if rem < 0 {
-		rem = 0
-	}
-
-	switch justify {
-	case fxBetween:
-		if count > 1 && rem > 0 {
-			return curY, rem / float64(count-1)
-		}
-
-		return curY, gap
-	case fxAround:
-		unit := rem / float64(two*count)
-
-		return curY + unit, two * unit
-	case fxEvenly:
-		unit := rem / float64(count+1)
-
-		return curY + unit, unit
 	}
 
 	return curY, gap

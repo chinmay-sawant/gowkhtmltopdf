@@ -447,49 +447,15 @@ func applyColumnRuleProps(style *ResolvedStyle, prop, value string, fsize float6
 }
 
 func applyColumnRuleShorthand(style *ResolvedStyle, value string, fsize float64) {
-	value = strings.TrimSpace(value)
-	if value == "" {
+	width, ruleStyle, color, ok := parseRuleShorthand(value, fsize, style.Color)
+	if !ok {
 		return
 	}
 
-	style.ColumnRuleWidth = borderWidth(mediumKeyword, fsize)
-	style.ColumnRuleStyle = cssDisplayNone
-	style.ColumnRuleColor = style.Color
+	style.ColumnRuleWidth = width
+	style.ColumnRuleStyle = ruleStyle
+	style.ColumnRuleColor = color
 	style.ColumnRuleColorSet = true
-
-	if strings.EqualFold(value, cssDisplayNone) {
-		return
-	}
-
-	for start := 0; ; {
-		token, next, ok := nextSpaceToken(value, start)
-		if !ok {
-			return
-		}
-
-		applyColumnRuleToken(style, token, fsize)
-
-		start = next
-	}
-}
-
-func applyColumnRuleToken(style *ResolvedStyle, token string, fsize float64) {
-	if ruleStyle, ok := parseOutlineStyle(token); ok {
-		style.ColumnRuleStyle = ruleStyle
-
-		return
-	}
-
-	if width, ok := parseOutlineWidth(token, fsize); ok {
-		style.ColumnRuleWidth = width
-
-		return
-	}
-
-	if color, ok := parseUsedColor(token, style.Color); ok {
-		style.ColumnRuleColor = color
-		style.ColumnRuleColorSet = true
-	}
 }
 
 func applyColumnCountWidthProps(style *ResolvedStyle, prop, value string, fsize, viewportW float64) bool {

@@ -1,7 +1,7 @@
 # Phase 51: Template box, table, text
 
 > **Parent:** `../48-canonical-0.2.6-css-coverage.md` Phase 51
-> **Status:** in progress (word-spacing, visibility, caption-side, pre-wrap, table-layout test landed; full gates open)
+> **Status:** complete (template, table, and text rows plus full gates verified 2026-08-28)
 > **Estimated effort:** 4-6 days
 > **Owner:** `internal/layout`
 > **Depends on:** Phase 50 for lengths if `word-spacing` uses `marginLen`
@@ -11,7 +11,7 @@
 
 ## Overview
 
-These properties show up in invoices, contracts, and tables. They have no apply arm today, or they lie.
+These properties show up in invoices, contracts, and tables. The layout cascade now stores and consumes the supported subset.
 
 - `word-spacing`: matrix §2.3 Not implemented. Absent from `applyTextGroup`.
 - `visibility`: no field. `hidden` should skip paint and keep the box.
@@ -56,7 +56,7 @@ Land the missing text/box/table properties reports already write. Fix the matrix
 
 ### 51.6 gates
 
-- [x] 51.6.1 Mapping `--check`. `make lint`/`test`/`golden` green 2026-08-27.
+- [x] 51.6.1 Mapping `--check`. `make lint`/`test`/`golden` green 2026-08-28.
 
 ## Dependencies
 

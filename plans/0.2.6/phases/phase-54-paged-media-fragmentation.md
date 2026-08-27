@@ -3,7 +3,7 @@
 > **Parent:** `../48-canonical-0.2.6-css-coverage.md` Phase 54
 > **Status:** complete (lite leftovers documented in 54.1.3 / 54.3)
 > **Estimated effort:** 1 week
-> **Owner:** `internal/css` `@page`, `internal/convert` `applyCSSPageMargins`, `internal/layout` `page_named.go`
+> **Owner:** `internal/css` `@page`, `internal/convert` `applyCSSPageMargins` and `page_margin_boxes.go`, `internal/layout` `page_named.go`
 > **Depends on:** existing unnamed `@page` margin/size
 > **Unblocks:** reports that change first-page, side, or named-page margins
 
@@ -11,9 +11,9 @@
 
 ## Overview
 
-`parsePageRule` (`internal/css/css.go`) stores every `@page` on `Stylesheet.Pages`. Selectors are `""`, `:first`, `:left`, `:right`, or a page name ident. Nested `@top-*` / `@bottom-*` quoted `content` strings land on `PageRule.Boxes` (`internal/css/page_margin.go`).
+`parsePageRule` (`internal/css/css.go`) stores supported `@page` rules on `Stylesheet.Pages`. Selectors are `""`, `:first`, `:left`, `:right`, or a page name ident. Nested `@top-*` / `@bottom-*` quoted `content` strings land on `PageRule.Boxes` only for unnamed rules (`internal/css/page_margin.go`).
 
-Convert applies unnamed margin/size, then stores `:first` / `:left` / `:right` / named margin overrides (`applyCSSPageMargins` in `internal/convert/convert_helpers.go`). Paint cascade is unnamed, then named ident, then `:left`/`:right` by page side, then `:first` on page 1 (`layout.PaintOptions.forPage` in `page_named.go`). Size stays unnamed-only.
+Convert applies unnamed margin/size, then stores `:first` / `:left` / `:right` / named margin overrides (`applyCSSPageMargins` in `internal/convert/convert_helpers.go`). One page-box walk also stores unnamed margin-box content. Paint and link geometry use the same cascade: unnamed, named ident, side, then `:first` on page 1 (`layout.PaintOptions.forPage` in `page_named.go`). Size stays unnamed-only.
 
 LTR print, not duplex: page 1 is `:right` (recto), even pages `:left`, odd pages `:right`. `break-before: left` still aliases to `always` (54.2).
 
@@ -33,7 +33,7 @@ CLI `--header-*` / `--footer-*` remain the repeating chrome path. Unnamed `@page
 
 - [x] 54.1.1 Parse `@page` selectors. Proof: `TestParsePageSelectors`.
 - [x] 54.1.2 `:first` / `:left` / `:right` margins. Size unnamed-only. Page 1 is `:right`; `:first` wins on page 1. Proof: `TestPageFirstMargins`, `TestPageLeftRightMargins`, `TestPageFirstWinsOverLeftRight`.
-- [x] 54.1.3 `page: ident` used-value inherit; sibling name change forces `break-before: always`; named `@page` margin on pages that overlap a box with that name. Size unnamed-only. Continuation pages with no overlapping named box keep unnamed/`:left`/`:right`/`:first`. Link/outline `hfGeom.pageMargins` uses the side/`:first` cascade only (no per-page name list). Proof: `TestPageNameInherits`, `TestPageNameBreak`, `TestPageNamedMargins`. `go test ./internal/css ./internal/convert ./internal/layout -count=1` exit 0.
+- [x] 54.1.3 `page: ident` used-value inherit; sibling name change forces `break-before: always`; named `@page` margin on pages that overlap a box with that name. Size unnamed-only. Continuation pages with no overlapping named box keep unnamed/`:left`/`:right`/`:first`. Link and outline geometry use the same named-page cascade after layout records page names. Proof: `TestPageNameInherits`, `TestPageNameBreak`, `TestPageNamedMargins`, `TestPageMarginsSharePaintCascade`. `go test ./internal/css ./internal/convert ./internal/layout -count=1` exit 0.
 
 ### 54.2 break values
 
@@ -42,12 +42,12 @@ CLI `--header-*` / `--footer-*` remain the repeating chrome path. Unnamed `@page
 
 ### 54.3 margin boxes
 
-- [x] 54.3.1 `@top-left/center/right` and `@bottom-left/center/right` quoted `content` parse. Proof: `TestParsePageMarginBoxes`.
-- [x] 54.3.2 Unnamed `@page` boxes map onto CLI header/footer empty slots (repeat every page). Occupied CLI slots and HTMLURL win. `counter()` / `running()` drop. `:first`/`:left`/`:right`/named boxes parse onto `PageRule.Boxes` but do not change per-page chrome. Proof: `TestPageMarginBoxes`, `TestPageMarginBoxesCLIWins`. Leftover: no CSS page-margin formatting context, no corners, no GCPM.
+- [x] 54.3.1 `@top-left/center/right` and `@bottom-left/center/right` quoted `content` parse for unnamed `@page` rules. Named and page-pseudo rules keep empty boxes. Proof: `TestParsePageMarginBoxes`, `TestParsePageMarginBoxesNamedPage`.
+- [x] 54.3.2 Unnamed `@page` boxes map onto CLI header/footer empty slots (repeat every page). Occupied CLI slots and HTMLURL win. `counter()` / `running()` drop. Named and page-pseudo rules reject leftover selectors before storage, so they do not create misleading chrome state. Proof: `TestPageMarginBoxes`, `TestPageMarginBoxesCLIWins`, `TestParsePageMarginBoxesNamedPage`. Leftover: no CSS page-margin formatting context, no corners, no GCPM.
 
 ### 54.4 gates
 
-- [x] 54.4.1 Matrix @page rows. Targeted proof `go test ./internal/css ./internal/convert ./internal/layout -count=1` exit 0 (2026-08-27). Prior `make lint`/`test`/`golden` remain the 2026-08-27 session-end gate (not re-run in this leftover pass).
+- [x] 54.4.1 Matrix @page rows. Targeted proof and final `make test`, `make lint`, `make golden`, and `make claim-scan` exit 0 on 2026-08-28.
 
 ## Dependencies
 

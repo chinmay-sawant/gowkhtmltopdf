@@ -41,8 +41,8 @@ func chLengthPt(val, fsize float64) (float64, bool) {
 }
 
 var (
-	chFaceOnce sync.Once
-	chFace     *pdf.Font
+	chFaceOnce sync.Once //nolint:gochecknoglobals // one immutable default-face cache
+	chFace     *pdf.Font //nolint:gochecknoglobals // one immutable default-face cache
 )
 
 func defaultChFace() *pdf.Font {

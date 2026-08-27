@@ -108,6 +108,47 @@ func TestZIndexPaintOrder(t *testing.T) { //nolint:cyclop
 	if !res.Ops[highI].ZIndexSet || res.Ops[highI].ZIndex != 5 {
 		t.Fatalf("high z-index = %v/%d", res.Ops[highI].ZIndexSet, res.Ops[highI].ZIndex)
 	}
+
+	ordered := PaintOrder(res.Ops)
+
+	lowOrder, highOrder := -1, -1
+
+	for order, idx := range ordered {
+		switch idx {
+		case lowI:
+			lowOrder = order
+		case highI:
+			highOrder = order
+		}
+	}
+
+	if highOrder <= lowOrder {
+		t.Fatalf("paint order low=%d high=%d, want high after low", lowOrder, highOrder)
+	}
+}
+
+func TestFlexWrapReverse(t *testing.T) {
+	t.Parallel()
+
+	cssSheet := sheet(t, `
+.row { display:flex; flex-wrap:wrap-reverse; width:100pt; gap:0 }
+.item { width:60pt; height:20pt }
+`)
+	res := layoutHTML(t, `<html><body><div class="row">
+	<div class="item">A</div><div class="item">B</div>
+</div></body></html>`, cssSheet)
+
+	positions := map[string]float64{}
+
+	for _, op := range res.Ops {
+		if op.Kind == OpText {
+			positions[op.Text] = op.Y
+		}
+	}
+
+	if positions["B"] >= positions["A"] {
+		t.Fatalf("wrap-reverse line positions A=%.1f B=%.1f, want B above A", positions["A"], positions["B"])
+	}
 }
 
 func TestFlexRowLayout(t *testing.T) {
@@ -464,7 +505,9 @@ func TestFlexAlignItemsStretchRow(t *testing.T) { //nolint:cyclop
 
 // TestAlignContentStretch grows wrapped flex lines into leftover cross space
 // (and stretch items with auto height). Height:auto still packs at start.
-func TestAlignContentStretch(t *testing.T) { //nolint:cyclop
+//
+//nolint:cyclop,funlen // integration proof covers multiple align-content cases
+func TestAlignContentStretch(t *testing.T) {
 	t.Parallel()
 
 	cssSheet := sheet(t, `

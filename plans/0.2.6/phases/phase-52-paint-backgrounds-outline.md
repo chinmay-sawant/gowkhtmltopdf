@@ -1,7 +1,7 @@
 # Phase 52: Paint, backgrounds, outline, overflow clip
 
 > **Parent:** `../48-canonical-0.2.6-css-coverage.md` Phase 52
-> **Status:** in progress (background-image, outline, radius longhands + slash, overflow clip, box-shadow blur lite landed)
+> **Status:** complete (background, outline, radius, overflow, and shadow proofs plus full gates verified 2026-08-28)
 > **Estimated effort:** 1-2 weeks
 > **Owner:** `internal/layout` paint/chrome, `internal/convert` image fetch
 > **Depends on:** Phase 51 not strictly required
@@ -11,11 +11,11 @@
 
 ## Overview
 
-`background` shorthand takes the first color token only (`firstBackgroundColor`, `style_properties.go:965`). `background-image` has no field. Logos and watermarks in CSS never show.
+`background` shorthand keeps the first supported color and image layer. `background-image` stores a URL and paints it at the box origin through the shared image path.
 
-`border-radius` shorthand is Partial. Longhands `border-top-left-radius` etc. parse then ignore.
+`border-radius` shorthand and longhands support the documented circular and elliptical subset.
 
-`overflow` is a sticky scrollport keyword. It does not clip paint (`style.go:128`).
+`overflow` also clips the supported paint operations for hidden, clip, auto, and scroll values.
 
 Outline is a common focus/section ring in templates. No field.
 
@@ -62,7 +62,7 @@ Watch the 2000-line file cap. If `paint.go` or `layout_chrome.go` is near the li
 
 ### 52.6 gates
 
-- [x] 52.6.1 Mapping `--check`. `make lint`/`test`/`golden` green 2026-08-27.
+- [x] 52.6.1 Mapping `--check`. `make lint`/`test`/`golden` green 2026-08-28.
 
 ## Dependencies
 

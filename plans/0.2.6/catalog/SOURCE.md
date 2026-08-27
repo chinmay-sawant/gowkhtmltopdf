@@ -16,8 +16,8 @@ W3C also publishes a process-status index: every property, every spec that defin
 | `w3c-all-properties.json` | Maturity overlay: property + spec URL + REC/CR/WD/ED | `https://www.w3.org/Style/CSS/all-properties.en.json` |
 | `mdn-properties.json` | Overlay: `mdn_url`, `groups`, `status` (standard / experimental / obsolete) | `https://raw.githubusercontent.com/mdn/data/master/css/properties.json` |
 | `mdn-units.json` | Units. Webref has none. | `https://raw.githubusercontent.com/mdn/data/master/css/units.json` |
-| `mapping.json` | Ours: each name mapped to engine status against `internal/layout` + `internal/css` | generated 2026-08-27 |
-| `coverage-summary.json` | Counts from that mapping | generated 2026-08-27 |
+| `mapping.json` | Ours: each name mapped to engine status against `internal/layout` + `internal/css` | generated 2026-08-28 |
+| `coverage-summary.json` | Counts from that mapping | generated 2026-08-28 |
 
 Human index: `README.md`.
 
@@ -28,8 +28,8 @@ b26a0501c6ee972ca343d2f91be620aaef0c719ec5602a2a70f317fd22135d75  webref-css.jso
 b5afe6f4c6e3e670bf5e27564e216fe2092579e4872fe49eaade5f970c96825d  w3c-all-properties.json
 c03b7ea3c22cb3aa6b7a154b22ff4fb8d34ada743e754fe749399cba6bc31c74  mdn-properties.json
 4034c340172ce697ef6d8f7246d788486146e8eb35735cbd9c57e6175bb8f81d  mdn-units.json
-d923b259384c7983b3bdb68c783c82ca6913f31f588df99714569cae1f1f6b6e  mapping.json
-d21051aef1cd1b5d2ee92bc39a94c52625e4067717632f068b37b3619ce7e3f2  coverage-summary.json
+2811941d27ba42913bfb0b3067f9d1c340218016dd7e61d25f47336a17e53057  mapping.json
+38048e84ef5350e405854c1393efb340d12af167137768c38897365919b893a2  coverage-summary.json
 ```
 
 ## License

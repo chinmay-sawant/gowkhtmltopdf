@@ -1,10 +1,10 @@
 # Catalog snapshot for v0.2.6 CSS coverage
 
-Counts from `coverage-summary.json`, generated 2026-08-27 by walking `webref-css.json` plus the apply handlers in `internal/layout/style_properties.go` and `internal/layout/style_cascade.go`. Phase 48.2 reclassified print-noop UI and SVG fill/stroke.
+Counts from `coverage-summary.json`, generated 2026-08-28 by walking `webref-css.json` plus the apply handlers in `internal/layout/style_properties.go` and `internal/layout/style_cascade.go`. Phase 48.2 reclassified print-noop UI and SVG fill/stroke.
 
 | Kind | Total | implemented | partial | unsupported | ignored |
 |------|------:|------------:|--------:|------------:|--------:|
-| Properties | 818 | 75 | 100 | 396 | 247 |
+| Properties | 818 | 75 | 99 | 397 | 247 |
 | At-rules | 55 | 0 | 4 | 41 | 10 |
 | Selectors | 158 | 12 | 5 | 120 | 21 |
 | Functions | 162 | 3 | 7 | 128 | 24 |
@@ -14,7 +14,7 @@ Counts from `coverage-summary.json`, generated 2026-08-27 by walking `webref-css
 
 `unsupported` is the work list. `goal: implement` is 571 properties after Phase 48.2 (was 608 on the first pass; 37 print-noop and SVG rows moved to `ignored`).
 
-Engine apply handlers: 157 named properties after phases 48-56. Custom properties (`--*`) are a separate map.
+Engine apply handlers: 147 named properties after phases 48-56. Custom properties (`--*`) are a separate map.
 
 Check the mapping against apply arms: `python3 scripts/css-catalog-map.py --check`. After a reclassify, rewrite mapping counts with `--write`.
 

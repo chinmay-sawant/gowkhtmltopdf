@@ -253,6 +253,21 @@ func TestParsePageSelectors(t *testing.T) {
 	})
 }
 
+func TestParsePageSelectorRejectsTrailingTokens(t *testing.T) {
+	t.Parallel()
+
+	for _, src := range []string{
+		`@page chapter:first { margin: 40mm }`,
+		`@page chapter, appendix { margin: 40mm }`,
+		`@page :first later { margin: 40mm }`,
+	} {
+		str := mustSheet(t, src)
+		if len(str.Pages) != 0 || str.Page != nil {
+			t.Fatalf("%q parsed invalid page selector: Pages=%+v Page=%+v", src, str.Pages, str.Page)
+		}
+	}
+}
+
 func checkPageSelectorCase(t *testing.T, testCase pageSelectorCase) {
 	t.Helper()
 

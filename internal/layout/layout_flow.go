@@ -62,6 +62,8 @@ func (e *engine) resolveImage(src string) *imageRef {
 }
 
 // isInlineChild reports whether n participates in an inline formatting context.
+//
+//nolint:cyclop // inline classification follows display and replaced-content rules
 func (e *engine) isInlineChild(node *html.Node) bool {
 	if node.Type == html.TextNode {
 		return true

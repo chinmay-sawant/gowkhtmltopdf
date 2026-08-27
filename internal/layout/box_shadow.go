@@ -91,6 +91,7 @@ func boxShadowFromLengths(
 // decreasing alpha. Layout size is unchanged. Inset and spread stay ignored.
 func (e *engine) appendBoxShadow(
 	dst []Op, sty ResolvedStyle, posX, posY, width, height float64,
+	radiusX, radiusY [4]float64,
 ) []Op {
 	if e == nil || !sty.BoxShadowSet || width <= 0 || height <= 0 {
 		return dst
@@ -99,19 +100,24 @@ func (e *engine) appendBoxShadow(
 	originX := posX + e.scalePt(sty.BoxShadowX)
 	originY := posY + e.scalePt(sty.BoxShadowY)
 	dst = appendBoxShadowBlur(
-		dst, originX, originY, width, height, e.scalePt(sty.BoxShadowBlur), sty.BoxShadowColor,
+		dst, originX, originY, width, height, e.scalePt(sty.BoxShadowBlur), sty.BoxShadowColor, radiusX, radiusY,
 	)
 
-	return append(dst, Op{ //nolint:exhaustruct // intentional zero fields
-		Kind: OpFillRect,
-		X:    originX,
-		Y:    originY,
-		W:    width,
-		H:    height,
-		R:    sty.BoxShadowColor[0],
-		G:    sty.BoxShadowColor[1],
-		B:    sty.BoxShadowColor[2],
-	})
+	return append(dst, shadowFillOp(originX, originY, width, height, sty.BoxShadowColor, radiusX, radiusY))
+}
+
+func shadowFillOp(
+	x, y, width, height float64, color [3]float64, radiusX, radiusY [4]float64,
+) Op {
+	return Op{ //nolint:exhaustruct // intentional zero fields
+		Kind: OpFillRect, X: x, Y: y, W: width, H: height,
+		R: color[0], G: color[1], B: color[2],
+		Radius: uniformRadius(radiusX), RadiusY: uniformRadius(radiusY),
+		RadiusTopLeft: radiusX[0], RadiusTopRight: radiusX[1],
+		RadiusBottomRight: radiusX[2], RadiusBottomLeft: radiusX[3],
+		RadiusTopLeftY: radiusY[0], RadiusTopRightY: radiusY[1],
+		RadiusBottomRightY: radiusY[2], RadiusBottomLeftY: radiusY[3],
+	}
 }
 
 // appendBoxShadowBlur approximates CSS blur with expanding rects. Outer rings
@@ -120,6 +126,7 @@ func (e *engine) appendBoxShadow(
 // stepped gray. This is not a Gaussian raster of descendants.
 func appendBoxShadowBlur(
 	dst []Op, originX, originY, width, height, blur float64, color [3]float64,
+	radiusX, radiusY [4]float64,
 ) []Op {
 	if blur <= 0 {
 		return dst
@@ -128,17 +135,11 @@ func appendBoxShadowBlur(
 	for step := boxShadowBlurSteps; step >= 1; step-- {
 		expand := blur * float64(step) / float64(boxShadowBlurSteps)
 		alpha := float64(boxShadowBlurSteps-step+1) / float64(boxShadowBlurSteps+1)
-		dst = append(dst, Op{ //nolint:exhaustruct // intentional zero fields
-			Kind:  OpFillRect,
-			X:     originX - expand,
-			Y:     originY - expand,
-			W:     width + expand*two,
-			H:     height + expand*two,
-			R:     color[0],
-			G:     color[1],
-			B:     color[2],
-			Alpha: alpha,
-		})
+		op := shadowFillOp(
+			originX-expand, originY-expand, width+expand*two, height+expand*two, color, radiusX, radiusY,
+		)
+		op.Alpha = alpha
+		dst = append(dst, op)
 	}
 
 	return dst

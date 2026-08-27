@@ -1593,7 +1593,7 @@ func RunRequest(ctx context.Context, req *Request, log io.Writer) error {
 	}
 
 	registry := pdf.RegistryFromGlobal(req.Global)
-	logFontRegistryScan(req.Global, log)
+	pdf.LogFontRegistryScan(req.Global, log)
 
 	pipeline := &imagePipeline{ //nolint:exhaustruct // image is populated during RenderObjects
 		req:      req,
@@ -1793,25 +1793,6 @@ func makeImageFetcher(
 
 		return res.Body, nil
 	}
-}
-
-// logFontRegistryScan emits the shared font-path scan notice after
-// pdf.RegistryFromGlobal.
-func logFontRegistryScan(global settings.PdfGlobal, log io.Writer) {
-	if log == nil || log == io.Discard || global.Quiet {
-		return
-	}
-
-	if len(global.FontPaths) == 0 && !global.UseSystemFonts {
-		return
-	}
-
-	count := len(global.FontPaths)
-	if global.UseSystemFonts {
-		count += len(pdf.DefaultSystemFontDirs())
-	}
-
-	line.Emit(log, line.Info, "scanned %d font path(s)", count)
 }
 
 // imageLoadGlobal resolves the shared and image-owned load settings before

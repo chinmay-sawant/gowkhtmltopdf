@@ -57,6 +57,7 @@ func TestBoxShadowPaints(t *testing.T) {
 
 	t.Run("offset-fill", testBoxShadowOffsetFill)
 	t.Run("layout-size-unchanged", testBoxShadowLayoutSizeUnchanged)
+	t.Run("rounded-fill", testBoxShadowRoundedFill)
 }
 
 func TestBoxShadowBlurPaints(t *testing.T) {
@@ -171,6 +172,33 @@ body { margin: 0 }
 	if !hasOffsetShadowFill(res.Ops, boxNode.x+2, boxNode.y+2, boxNode.w, boxNode.height) {
 		t.Fatalf("missing shadow fill at offset of box %+v in ops", boxNode)
 	}
+}
+
+func testBoxShadowRoundedFill(t *testing.T) {
+	t.Parallel()
+
+	eng := &engine{scale: 1, opts: Options{Background: true}} //nolint:exhaustruct // chrome probe
+	sty := ResolvedStyle{                                     //nolint:exhaustruct // rounded shadow fields under test
+		BoxShadowX: 2, BoxShadowY: 2, BoxShadowColor: [3]float64{0, 0, 0}, BoxShadowSet: true,
+		BorderRadius: 8, BorderRadiusPercent: -1,
+	}
+	boxNode := &box{style: &sty, w: 100, height: 50} //nolint:exhaustruct // geometry probe
+	eng.prependChrome(0, boxNode, sty, 10, 20, 100, 50)
+
+	for _, op := range eng.deferredChrome[0].ops {
+		if op.Kind != OpFillRect || !near(op.X, 12) || !near(op.Y, 22) {
+			continue
+		}
+
+		radiusX, radiusY := opRadiiXY(&op)
+		if !near(radiusX[0], 8) || !near(radiusY[0], 8) {
+			t.Fatalf("rounded shadow radii = X %.1f Y %.1f, want 8/8", radiusX[0], radiusY[0])
+		}
+
+		return
+	}
+
+	t.Fatal("rounded core shadow fill missing")
 }
 
 func assertBoxShadow(t *testing.T, sty *ResolvedStyle, offsetX, offsetY, blur float64, color [3]float64, set bool) {

@@ -1,11 +1,11 @@
 {
-  "generated": "2026-08-27",
+  "generated": "2026-08-28",
   "sources": {
     "webref": "@webref/css (css.json via unpkg, captured 2026-08-27)",
     "all_properties": "https://www.w3.org/Style/CSS/all-properties.en.json",
     "mdn_units": "mdn/data css/units.json",
     "mdn_properties": "mdn/data css/properties.json (overlay for mdn_url/groups)",
-    "engine": "internal/layout/style_properties.go apply groups + applyFontProps + css.go at-rules, inventory 2026-08-27"
+    "engine": "internal/layout/style_properties.go apply groups + applyFontProps + css.go at-rules, inventory 2026-08-28"
   },
   "counts": {
     "webref_properties": 818,
@@ -13,23 +13,23 @@
     "properties_by_engine_status": {
       "ignored": 247,
       "implemented": 75,
-      "partial": 100,
-      "unsupported": 396
+      "partial": 99,
+      "unsupported": 397
     },
     "properties_print_relevant": 571,
     "properties_goal_implement": 571,
     "atrules": 55,
     "atrules_by_engine_status": {
       "ignored": 10,
-      "unsupported": 41,
-      "partial": 4
+      "unsupported": 32,
+      "partial": 13
     },
     "selectors": 158,
     "selectors_by_engine_status": {
       "partial": 5,
-      "unsupported": 120,
+      "unsupported": 118,
       "ignored": 21,
-      "implemented": 12
+      "implemented": 14
     },
     "functions": 162,
     "functions_by_engine_status": {

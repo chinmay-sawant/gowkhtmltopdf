@@ -19,6 +19,7 @@ const pageNamedCSS = `@page { margin: 10mm; size: A4 }
 body, p { margin: 0; padding: 0; }
 .ch { page: chapter }`
 
+//nolint:cyclop,funlen // integration proof checks parse, layout, and PDF origins
 func TestPageNamedMargins(t *testing.T) {
 	t.Parallel()
 
@@ -35,13 +36,13 @@ func TestPageNamedMargins(t *testing.T) {
 		t.Fatal("expected named @page chapter margins")
 	}
 
-	ch, ok := geom.named["chapter"]
-	if !ok || ch == nil {
+	chapterMargins, ok := geom.named["chapter"]
+	if !ok || chapterMargins == nil {
 		t.Fatalf("named map = %v, want chapter", geom.named)
 	}
 
-	if math.Abs(ch.top-namedPt) > 0.05 || math.Abs(ch.left-namedPt) > 0.05 {
-		t.Errorf("chapter margins = top %v left %v, want %v", ch.top, ch.left, namedPt)
+	if math.Abs(chapterMargins.top-namedPt) > 0.05 || math.Abs(chapterMargins.left-namedPt) > 0.05 {
+		t.Errorf("chapter margins = top %v left %v, want %v", chapterMargins.top, chapterMargins.left, namedPt)
 	}
 
 	html := `<!DOCTYPE html>
@@ -87,6 +88,41 @@ func TestPageNamedMargins(t *testing.T) {
 	if math.Abs((page2X-page1X)-delta) > 2 {
 		t.Errorf("left origin delta = %.3f, want ~%.3f; x1=%.3f x2=%.3f",
 			page2X-page1X, delta, page1X, page2X)
+	}
+}
+
+func TestPageMarginsSharePaintCascade(t *testing.T) {
+	t.Parallel()
+
+	sheet, err := css.Parse(pageNamedCSS)
+	if err != nil {
+		t.Fatalf("css.Parse: %v", err)
+	}
+
+	geom := applyCSSPageMargins(sideInitGeom(10*mmToPt), []*css.Stylesheet{sheet})
+	geom.pageNames = []string{"chapter"}
+	paintMargins := paintOptions(geom).PageMarginsForPage(0, geom.pageNames)
+	linkLeft, linkTop := geom.pageMargins(0)
+
+	if math.Abs(linkLeft-paintMargins.Left) > 0.05 || math.Abs(linkTop-paintMargins.Top) > 0.05 {
+		t.Fatalf("link margins = %.3f, %.3f, paint margins = %.3f, %.3f",
+			linkLeft, linkTop, paintMargins.Left, paintMargins.Top)
+	}
+}
+
+func TestPageSelectorLeftoverDoesNotApply(t *testing.T) {
+	t.Parallel()
+
+	sheet, err := css.Parse(`@page { margin: 10mm }
+@page chapter:first { margin: 40mm }
+@page chapter, cover { margin: 50mm }`)
+	if err != nil {
+		t.Fatalf("css.Parse: %v", err)
+	}
+
+	geom := applyCSSPageMargins(sideInitGeom(10*mmToPt), []*css.Stylesheet{sheet})
+	if math.Abs(geom.marginTop-10*mmToPt) > 0.05 || geom.named != nil {
+		t.Fatalf("leftover page selector changed geometry: top=%.3f named=%v", geom.marginTop, geom.named)
 	}
 }
 

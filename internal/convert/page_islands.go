@@ -120,6 +120,8 @@ func (island pageIslandRenderContext) render(ctx context.Context, section *html.
 	}
 
 	pageOffset := before - island.start
+	mergePageNames(&island.state.geom.pageNames, layout.PageNames(res, island.state.geom.contentH), pageOffset)
+
 	for _, heading := range collectObjectHeadings(
 		islandRoot,
 		res,
@@ -140,6 +142,19 @@ func (island pageIslandRenderContext) render(ctx context.Context, section *html.
 	)
 
 	return nil
+}
+
+func mergePageNames(dst *[]string, src []string, offset int) {
+	if dst == nil || len(src) == 0 || offset < 0 {
+		return
+	}
+
+	need := offset + len(src)
+	if len(*dst) < need {
+		*dst = append(*dst, make([]string, need-len(*dst))...)
+	}
+
+	copy((*dst)[offset:], src)
 }
 
 func benchmarkIslandRoot(root, section *html.Node) *html.Node {

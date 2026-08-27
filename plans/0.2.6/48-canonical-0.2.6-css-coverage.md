@@ -220,7 +220,7 @@ Candidates already known:
 
 ## Phase 56: Docs, mapping sync, closure
 
-- [x] 56.1 mapping `--check` green (157 apply arms).
+- [x] 56.1 mapping `--check` green (147 apply arms).
 - [x] 56.2 matrix + fidelity. `make claim-scan` clean.
 - [x] 56.3 `make lint`, `make test`, `make golden` exit 0 2026-08-27. VERSION 0.2.5.
 - [x] 56.4 plans/README.md + KB updated.

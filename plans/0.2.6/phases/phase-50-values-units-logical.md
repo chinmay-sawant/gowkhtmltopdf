@@ -1,7 +1,7 @@
 # Phase 50: Values, units, logical properties
 
 > **Parent:** `../48-canonical-0.2.6-css-coverage.md` Phase 50
-> **Status:** in progress (clamp, hsl, logical box landed; currentColor and vmin/vmax still open)
+> **Status:** complete (clamp, hsl, logical box, currentColor, and viewport-unit proofs verified 2026-08-28)
 > **Estimated effort:** 5-8 days
 > **Owner:** `internal/css/values.go`, `internal/layout/style_values.go`, `style_properties.go`
 > **Depends on:** Phase 49 not strictly required; can overlap after 48
@@ -11,7 +11,7 @@
 
 ## Overview
 
-`calcLength` only accepts `calc(A + B)`, `calc(A - B)`, `calc(A * N)` with exactly three tokens (`internal/layout/style_values.go:593-636`). `clamp(` is stripped in `supportedDeclaration` (`style_cascade.go:517-529`) so a fallback can win. `ParseColor` has hex, rgb/rgba, transparent, and a short name table. No `hsl()`. Logical properties parse then ignore.
+`calcLength` handles the supported arithmetic forms, and `clampLength` resolves a bounded length before layout (`internal/layout/style_values.go`). `ParseColor` handles `hsl()` and `hsla()` alongside the existing RGB forms. Logical properties map to physical fields for horizontal writing mode; vertical writing remains partial.
 
 Modern report CSS uses `clamp()` for type scale and `margin-inline` for horizontal page padding. Those should resolve for `writing-mode: horizontal-tb`. Vertical logical mapping waits on real vertical layout, which stays Partial.
 
@@ -53,7 +53,7 @@ Modern report CSS uses `clamp()` for type scale and `margin-inline` for horizont
 ### 50.5 gates
 
 - [x] 50.5.1 Mapping flipped via `--write`. Proof: `--check` exit 0.
-- [~] 50.5.2 Full `make lint`/`make test` not run. `go test ./internal/layout` exit 0. Fixture-56 golden 21 pages.
+- [x] 50.5.2 Full `make lint`/`make test`/`make golden`/`make claim-scan` and `make build` exit 0 on 2026-08-28. Fixture-56 golden remains 21 pages.
 
 ## Dependencies
 

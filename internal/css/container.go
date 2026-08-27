@@ -6,13 +6,14 @@ import (
 )
 
 const (
-	condKindFeat   = "feat"
-	condKindAnd    = "and"
-	condKindOr     = "or"
-	condKindNot    = "not"
-	featInlineSize = "inline-size"
-	featWidth      = "width"
-	unitRem        = "rem"
+	condKindFeat         = "feat"
+	condKindAnd          = "and"
+	condKindOr           = "or"
+	condKindNot          = "not"
+	containerNoneKeyword = "none"
+	featInlineSize       = "inline-size"
+	featWidth            = "width"
+	unitRem              = "rem"
 )
 
 // ContainerQuery is the prelude of an @container rule: optional name plus a
@@ -170,7 +171,7 @@ func absoluteLengthToPt(val float64, unit string) (float64, bool) {
 // call sites change together.
 func ParseContainerNameValue(value string) string {
 	value = strings.TrimSpace(value)
-	if value == "" || strings.EqualFold(value, "none") {
+	if value == "" || strings.EqualFold(value, containerNoneKeyword) {
 		return ""
 	}
 
@@ -180,7 +181,7 @@ func ParseContainerNameValue(value string) string {
 
 	for _, tok := range fields {
 		low := strings.ToLower(tok)
-		if low == "none" || low == condKindAnd || low == condKindOr || low == condKindNot || low == "default" {
+		if low == containerNoneKeyword || low == condKindAnd || low == condKindOr || low == condKindNot || low == "default" {
 			continue
 		}
 
@@ -228,7 +229,7 @@ func parseContainerPrelude(prelude string) (ContainerQuery, bool) {
 		ident, rem, ok := readIdent(rest)
 		if ok {
 			low := strings.ToLower(ident)
-			if low != condKindAnd && low != condKindOr && low != condKindNot && low != "none" {
+			if low != condKindAnd && low != condKindOr && low != condKindNot && low != containerNoneKeyword {
 				name = low
 				rest = strings.TrimSpace(rem)
 			}

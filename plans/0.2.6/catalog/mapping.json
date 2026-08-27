@@ -4,8 +4,8 @@
     "all_properties": "https://www.w3.org/Style/CSS/all-properties.en.json",
     "mdn_units": "mdn/data css/units.json",
     "mdn_properties": "mdn/data css/properties.json (overlay for mdn_url/groups)",
-    "engine": "internal/layout/style_properties.go apply groups + applyFontProps + css.go at-rules, inventory 2026-08-27",
-    "generated": "2026-08-27"
+    "engine": "internal/layout/style_properties.go apply groups + applyFontProps + css.go at-rules, inventory 2026-08-28",
+    "generated": "2026-08-28"
   },
   "summary": {
     "webref_properties": 818,
@@ -21,15 +21,15 @@
     "atrules": 55,
     "atrules_by_engine_status": {
       "ignored": 10,
-      "unsupported": 41,
-      "partial": 4
+      "unsupported": 32,
+      "partial": 13
     },
     "selectors": 158,
     "selectors_by_engine_status": {
       "partial": 5,
-      "unsupported": 124,
+      "unsupported": 118,
       "ignored": 21,
-      "implemented": 8
+      "implemented": 14
     },
     "functions": 162,
     "functions_by_engine_status": {
@@ -19042,9 +19042,9 @@
       "descriptors": [],
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "partial",
+      "code_path": "internal/css/page_margin.go; internal/convert/page_margin_boxes.go",
+      "notes": "Quoted content on unnamed @page rules fills empty CLI header slots; counters, running(), corners, and named or pseudo-page chrome are not consumed."
     },
     {
       "name": "@bottom-left",
@@ -19053,9 +19053,9 @@
       "descriptors": [],
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "partial",
+      "code_path": "internal/css/page_margin.go; internal/convert/page_margin_boxes.go",
+      "notes": "Quoted content on unnamed @page rules fills empty CLI footer slots; counters, running(), corners, and named or pseudo-page chrome are not consumed."
     },
     {
       "name": "@bottom-left-corner",
@@ -19064,9 +19064,9 @@
       "descriptors": [],
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "partial",
+      "code_path": "internal/css/page_margin.go; internal/convert/page_margin_boxes.go",
+      "notes": "Quoted content on unnamed @page rules fills empty CLI footer slots; counters, running(), corners, and named or pseudo-page chrome are not consumed."
     },
     {
       "name": "@bottom-right",
@@ -19075,9 +19075,9 @@
       "descriptors": [],
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "partial",
+      "code_path": "internal/css/page_margin.go; internal/convert/page_margin_boxes.go",
+      "notes": "Quoted content on unnamed @page rules fills empty CLI footer slots; counters, running(), corners, and named or pseudo-page chrome are not consumed."
     },
     {
       "name": "@bottom-right-corner",
@@ -19109,7 +19109,7 @@
       "print_relevant": true,
       "goal": "implement",
       "engine_status": "unsupported",
-      "code_path": "internal/css/css.go:187",
+      "code_path": "internal/css/css.go:233",
       "notes": ""
     },
     {
@@ -19307,9 +19307,9 @@
       "descriptors": [],
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
+      "engine_status": "partial",
       "code_path": "internal/css/css.go:187",
-      "notes": ""
+      "notes": "Import rules are collected by CSS parsing and fetched by convert/prepare under the shared resource ACL, with media, depth, and cycle checks."
     },
     {
       "name": "@keyframes",
@@ -19647,9 +19647,9 @@
       "descriptors": [],
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "partial",
+      "code_path": "internal/css/page_margin.go; internal/convert/page_margin_boxes.go",
+      "notes": "Quoted content on unnamed @page rules fills empty CLI header slots; counters, running(), corners, and named or pseudo-page chrome are not consumed."
     },
     {
       "name": "@top-left",
@@ -19658,9 +19658,9 @@
       "descriptors": [],
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "partial",
+      "code_path": "internal/css/page_margin.go; internal/convert/page_margin_boxes.go",
+      "notes": "Quoted content on unnamed @page rules fills empty CLI header slots; counters, running(), corners, and named or pseudo-page chrome are not consumed."
     },
     {
       "name": "@top-left-corner",
@@ -19669,9 +19669,9 @@
       "descriptors": [],
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "partial",
+      "code_path": "internal/css/page_margin.go; internal/convert/page_margin_boxes.go",
+      "notes": "Quoted content on unnamed @page rules fills empty CLI header slots; counters, running(), corners, and named or pseudo-page chrome are not consumed."
     },
     {
       "name": "@top-right",
@@ -19680,9 +19680,9 @@
       "descriptors": [],
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "partial",
+      "code_path": "internal/css/page_margin.go; internal/convert/page_margin_boxes.go",
+      "notes": "Quoted content on unnamed @page rules fills empty CLI header slots; counters, running(), corners, and named or pseudo-page chrome are not consumed."
     },
     {
       "name": "@top-right-corner",
@@ -20455,8 +20455,9 @@
       "spec_href": "https://drafts.csswg.org/selectors-4/#matches-pseudo",
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/css/css.go:1257",
+      "notes": "Strict selector-list matching with most-specific-argument specificity."
     },
     {
       "name": ":lang()",
@@ -20935,8 +20936,9 @@
       "spec_href": "https://drafts.csswg.org/selectors-4/#where-pseudo",
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/css/css.go:1257",
+      "notes": "Strict selector-list matching with zero specificity contribution."
     },
     {
       "name": ":xr-overlay",

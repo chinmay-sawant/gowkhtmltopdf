@@ -1,7 +1,7 @@
 # Phase 49: Selectors, cascade, at-rules
 
 > **Parent:** `../48-canonical-0.2.6-css-coverage.md` Phase 49
-> **Status:** in progress (`:is`/`:where`/`@import` parse+fetch done; layout consume test for `:is` still open)
+> **Status:** complete (selectors, imports, of-type matching, and attribute flags verified 2026-08-28)
 > **Estimated effort:** 4-7 days
 > **Owner:** `internal/css`, `internal/convert/prepare`
 > **Depends on:** Phase 48.2 mapping reclassify
@@ -11,7 +11,7 @@
 
 ## Overview
 
-`:is()` and `:where()` are stored as unknown pseudos and `matchPseudo` returns false (`internal/css/css.go:122`, `css.go:1431-1434`). A rule like `:is(h1, h2, h3) { ... }` never applies. `@import` is `skipAtRule` (`css.go:187`), so split stylesheets silently lose rules.
+`:is()` and `:where()` are parsed as strict selector lists by `appendIsWherePseudo` (`internal/css/css.go:1223`) and matched by the pseudo matcher. `@import` is recorded by `parseImportRule` (`internal/css/import.go:10`) and fetched by the prepare pipeline under the shared resource policy.
 
 Keep the never-match rule for `:hover` / `:focus` / `:active` / `:target`. Print has no pointer and no history. Dropping those pseudos from the compound used to style every `li` for `li:target`. Tests in `pseudo_element_drop_test.go` and `target_pseudo_test.go` stay green.
 
@@ -50,7 +50,7 @@ Keep the never-match rule for `:hover` / `:focus` / `:active` / `:target`. Print
 
 - [x] 49.5.1 never-match pseudos. Proof: `go test ./internal/css`.
 - [x] 49.5.2 Matrix `:is()` / `:where()` Implemented. `make claim-scan` clean.
-- [x] 49.5.3 `make lint`/`test`/`golden` green 2026-08-27.
+- [x] 49.5.3 `make lint`/`test`/`golden` green 2026-08-28.
 
 ## Dependencies
 

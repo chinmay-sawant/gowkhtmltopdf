@@ -133,7 +133,7 @@ Status legend (verified against `applyRestProps` in
 | `@page` unnamed `margin` / `size` | Implemented | Last unnamed `@page` still fills `Stylesheet.Page`. Convert applies that box to every page (`applyCSSPageMargins`). |
 | `@page :first` | Partial | Parsed onto `Pages` with `Sel ":first"`. Page 1 can use a different **margin**. Size stays unnamed-only (one page size per document). `:first` wins over `:left`/`:right` on page 1. Proof: `TestParsePageSelectors`, `TestPageFirstMargins`, `TestPageFirstWinsOverLeftRight`. |
 | `@page :left` / `:right` | Partial | Margins applied. Honest LTR print: page 1 is `:right` (recto), even pages `:left`, odd pages `:right`. Not a duplex sheet; `break-before: left` still aliases to `always`. Size unnamed-only. Proof: `TestPageLeftRightMargins`. |
-| `page` (`auto` / ident) | Partial | Used value stored on `ResolvedStyle.PageName`. Unspecified/`auto` keeps the parent used name. A sibling whose used name changes gets `break-before: always`. `@page ident { margin }` applies on pages that overlap a box with that name. Size unnamed-only. Proof: `TestPageNameInherits`, `TestPageNameBreak`, `TestPageNamedMargins`. |
+| `page` (`auto` / ident) | Partial | Used value stored on `ResolvedStyle.PageName`. Unspecified/`auto` keeps the parent used name. A sibling whose used name changes gets `break-before: always`. `@page ident { margin }` applies on pages that overlap a box with that name. Link and outline destinations use the same named-page, side, and first-page cascade after page names are recorded. Size unnamed-only. Proof: `TestPageNameInherits`, `TestPageNameBreak`, `TestPageNamedMargins`, `TestPageMarginsSharePaintCascade`. |
 | `@page` margin boxes (`@top-center` and friends) | Partial (lite) | Parses `@top-left/center/right` and `@bottom-left/center/right` quoted `content` strings (`css/page_margin.go`). Unnamed `@page` boxes fill empty CLI header/footer slots. Occupied CLI slots and `--header-html` win. `counter()` / `running()` drop. Proof: `TestParsePageMarginBoxes`, `TestPageMarginBoxes`, `TestPageMarginBoxesCLIWins`. |
 
 **Break aliases (54.2).** `page-break-*` and `break-*` share one store. The PDF writer has no left/right or even/odd page side (duplex is out of scope, §5). `break-before: left` does **not** force a left page; it aliases to page `always`.
@@ -199,7 +199,7 @@ Evidence: `internal/layout/grid.go`, `style.go`; fixtures 28/32/34/35; `grid_tes
 | `grid-template-columns` | [x] Implemented | Lengths, `fr`, `repeat(N, …)`, `minmax(...)`; gap subtracted before `fr` distribute |
 | `grid-template-rows` | [x] Implemented | Consumed when height definite; fixed mins on auto-height; fixture-32 |
 | `minmax()` track sizing | [x] Implemented | Lengths / `%` (definite) / `fr` / `auto` / `min-content` / `max-content` subset; `fr` keeps min floors — fixture-35 |
-| `gap` / `row-gap` / `column-gap` | [x] Implemented | Independent (`gridGaps`); `TestGridIndependentGaps` |
+| `gap` / `row-gap` / `column-gap` | [x] Implemented | Independent (`gridGaps`); `TestGridRowGapVsColumnGap` asserts the row gap is at least 8pt while column gap stays distinct |
 | `grid-column` / `grid-column-start` / `grid-column-end` / `span N` | [x] Implemented | Line numbers + span; 2D occupancy |
 | `grid-row` / `grid-row-start` / `grid-row-end` / `span N` | [x] Implemented | Row span + stretch into spanned tracks; `TestGridRowSpan*` |
 | Auto-flow placement (row / column) | [x] Implemented | Sparse row default; column major via `grid-auto-flow: column` |

@@ -113,51 +113,49 @@ func clearBoxShadow(style *ResolvedStyle) {
 	style.BoxShadowSet = false
 }
 
-func applyOutlineShorthand(style *ResolvedStyle, value string, fsize float64) {
+func parseRuleShorthand(value string, fsize float64, current [3]float64) (float64, string, [3]float64, bool) {
 	value = strings.TrimSpace(value)
 	if value == "" {
-		return
+		return 0, "", [3]float64{}, false
 	}
 
 	// Unspecified shorthand components reset to CSS initial values.
-	style.OutlineWidth = borderWidth(mediumKeyword, fsize)
-	style.OutlineStyle = cssDisplayNone
-	style.OutlineColor = style.Color
-	style.OutlineColorSet = true
+	width := borderWidth(mediumKeyword, fsize)
+	ruleStyle := cssDisplayNone
+	color := current
 
 	if strings.EqualFold(value, cssDisplayNone) {
-		return
+		return width, ruleStyle, color, true
 	}
 
 	for start := 0; ; {
 		token, next, ok := nextSpaceToken(value, start)
 		if !ok {
-			return
+			return width, ruleStyle, color, true
 		}
 
-		applyOutlineToken(style, token, fsize)
+		if parsedStyle, parsed := parseOutlineStyle(token); parsed {
+			ruleStyle = parsedStyle
+		} else if parsedWidth, parsed := parseOutlineWidth(token, fsize); parsed {
+			width = parsedWidth
+		} else if parsedColor, parsed := parseUsedColor(token, current); parsed {
+			color = parsedColor
+		}
 
 		start = next
 	}
 }
 
-func applyOutlineToken(style *ResolvedStyle, token string, fsize float64) {
-	if outlineStyle, ok := parseOutlineStyle(token); ok {
-		style.OutlineStyle = outlineStyle
-
+func applyOutlineShorthand(style *ResolvedStyle, value string, fsize float64) {
+	width, outlineStyle, color, ok := parseRuleShorthand(value, fsize, style.Color)
+	if !ok {
 		return
 	}
 
-	if width, ok := parseOutlineWidth(token, fsize); ok {
-		style.OutlineWidth = width
-
-		return
-	}
-
-	if color, ok := parseUsedColor(token, style.Color); ok {
-		style.OutlineColor = color
-		style.OutlineColorSet = true
-	}
+	style.OutlineWidth = width
+	style.OutlineStyle = outlineStyle
+	style.OutlineColor = color
+	style.OutlineColorSet = true
 }
 
 // applyRadiusLonghand sets one corner radius. Percentages store the percent

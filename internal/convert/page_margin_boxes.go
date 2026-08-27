@@ -1,20 +1,15 @@
 package convert
 
 import (
-	"strings"
-
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
-// applyPageMarginBoxes maps unnamed @page margin-box quoted strings onto the
-// existing CLI header/footer chrome. Occupied Left/Center/Right slots and
-// HTMLURL headers win. Named / :first / :left / :right boxes parse onto
-// PageRule.Boxes but do not change per-page chrome (HF repeats every page).
+// applyPageMarginBoxes maps unnamed @page margin-box strings onto the existing
+// CLI header/footer chrome. Occupied slots and HTMLURL headers win.
 func applyPageMarginBoxes(
-	header, footer settings.HeaderFooter, sheets []*css.Stylesheet,
+	header, footer settings.HeaderFooter, boxes css.PageMarginBoxes,
 ) (settings.HeaderFooter, settings.HeaderFooter) {
-	boxes := collectUnnamedPageBoxes(sheets)
 	if header.HTMLURL == "" {
 		header.Left = firstNonEmpty(header.Left, boxes.TopLeft)
 		header.Center = firstNonEmpty(header.Center, boxes.TopCenter)
@@ -28,26 +23,6 @@ func applyPageMarginBoxes(
 	}
 
 	return header, footer
-}
-
-func collectUnnamedPageBoxes(sheets []*css.Stylesheet) css.PageMarginBoxes {
-	var boxes css.PageMarginBoxes
-
-	for _, sheet := range sheets {
-		if sheet == nil {
-			continue
-		}
-
-		for _, rule := range sheet.Pages {
-			if strings.TrimSpace(rule.Sel) != "" {
-				continue
-			}
-
-			boxes = mergePageMarginBoxes(boxes, rule.Boxes)
-		}
-	}
-
-	return boxes
 }
 
 func mergePageMarginBoxes(dst, src css.PageMarginBoxes) css.PageMarginBoxes {

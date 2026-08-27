@@ -1,6 +1,7 @@
 package layout
 
 import (
+	"math"
 	"strings"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
@@ -184,21 +185,105 @@ func clearCornerRadiiY(style *ResolvedStyle) {
 	style.BorderRadiusBottomLeftY = 0
 }
 
-func usedBorderRadiiY(sty ResolvedStyle, _ float64, height float64) [4]float64 {
+const (
+	borderRadiusPercentBasis = 100.0
+	borderRadiusHalf         = 2.0
+)
+
+// usedBorderRadiiXY resolves both axes of a box's corner ellipses together.
+// Percent radii keep the existing uniform-circle behavior; an explicit
+// vertical radius is resolved only for absolute longhand or slash values.
+func usedBorderRadiiXY(sty ResolvedStyle, width, height float64) ([4]float64, [4]float64) {
+	radiusX := borderRadiusValues(sty, width, height)
+	clampBorderRadii(radiusX[:], width, height)
+	scaleBorderRadii(radiusX[:], width, height)
+
+	var radiusY [4]float64
+	if sty.BorderRadiusPercent < 0 {
+		radiusY = [4]float64{
+			sty.BorderRadiusTopLeftY, sty.BorderRadiusTopRightY,
+			sty.BorderRadiusBottomRightY, sty.BorderRadiusBottomLeftY,
+		}
+		clampBorderRadiiY(radiusY[:], height)
+		scaleBorderRadiiY(radiusY[:], height)
+	}
+
+	return radiusX, radiusY
+}
+
+func usedBorderRadii(sty ResolvedStyle, width, height float64) [4]float64 {
+	radiusX, _ := usedBorderRadiiXY(sty, width, height)
+
+	return radiusX
+}
+
+func usedBorderRadius(sty ResolvedStyle, width, height float64) float64 {
+	return uniformRadius(usedBorderRadii(sty, width, height))
+}
+
+func borderRadiusValues(sty ResolvedStyle, width, height float64) [4]float64 {
 	var radii [4]float64
 
-	if sty.BorderRadiusPercent >= 0 {
-		return radii
+	switch {
+	case sty.BorderRadiusPercent >= 0:
+		radius := math.Min(width, height) * sty.BorderRadiusPercent / borderRadiusPercentBasis
+		for i := range radii {
+			radii[i] = radius
+		}
+	case sty.BorderRadiusTopLeft != 0 || sty.BorderRadiusTopRight != 0 ||
+		sty.BorderRadiusBottomRight != 0 || sty.BorderRadiusBottomLeft != 0:
+		radii = [4]float64{
+			sty.BorderRadiusTopLeft, sty.BorderRadiusTopRight,
+			sty.BorderRadiusBottomRight, sty.BorderRadiusBottomLeft,
+		}
+	default:
+		for i := range radii {
+			radii[i] = sty.BorderRadius
+		}
 	}
-
-	radii = [4]float64{
-		sty.BorderRadiusTopLeftY, sty.BorderRadiusTopRightY,
-		sty.BorderRadiusBottomRightY, sty.BorderRadiusBottomLeftY,
-	}
-	clampBorderRadiiY(radii[:], height)
-	scaleBorderRadiiY(radii[:], height)
 
 	return radii
+}
+
+//nolint:wsl // CSS radius clamping is a compact geometry loop
+func clampBorderRadii(radii []float64, width, height float64) {
+	short := math.Min(width, height)
+
+	for i := range radii {
+		if radii[i] < 0 {
+			radii[i] = 0
+		}
+		if radii[i] > short/borderRadiusHalf {
+			radii[i] = short / borderRadiusHalf
+		}
+	}
+}
+
+//nolint:wsl,mnd // CSS adjacent-radius scaling is expressed as four edge sums
+func scaleBorderRadii(radii []float64, width, height float64) {
+	if len(radii) < 4 {
+		return
+	}
+
+	scale := 1.0
+	for _, edge := range []struct {
+		sum   float64
+		limit float64
+	}{
+		{sum: radii[0] + radii[1], limit: width},
+		{sum: radii[3] + radii[2], limit: width},
+		{sum: radii[0] + radii[3], limit: height},
+		{sum: radii[1] + radii[2], limit: height},
+	} {
+		if edge.sum > edge.limit && edge.sum > 0 && edge.limit/edge.sum < scale {
+			scale = edge.limit / edge.sum
+		}
+	}
+	if scale < 1 {
+		for i := range radii {
+			radii[i] *= scale
+		}
+	}
 }
 
 func clampBorderRadiiY(radii []float64, height float64) {

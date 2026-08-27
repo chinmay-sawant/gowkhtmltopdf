@@ -1,13 +1,10 @@
-//nolint:testpackage,wsl,varnamelen,usetesting // caption-side layout probes
+//nolint:testpackage,wsl // caption-side layout probes
 package layout
 
 import (
-	"context"
 	"testing"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
-	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
-	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
 )
 
 const captionFixture = `<html><body>
@@ -94,86 +91,8 @@ caption { caption-side: right; }
 	}
 }
 
-func layoutCaptionSide(t *testing.T, src, side string, sheets ...*css.Stylesheet) *Result {
+func layoutCaptionSide(t *testing.T, src, _ string, sheets ...*css.Stylesheet) *Result {
 	t.Helper()
 
-	res := layoutHTML(t, src, sheets...)
-	if captionSideApplied(res.root, side) {
-		return res
-	}
-
-	return layoutCaptionSideStamped(t, src, side, sheets...)
-}
-
-func captionSideApplied(root *box, side string) bool {
-	table := findNamedBox(root, "table")
-	if table != nil && table.style != nil && table.style.CaptionSide == side {
-		return true
-	}
-
-	caption := findNamedBox(root, "caption")
-
-	return caption != nil && caption.style != nil && caption.style.CaptionSide == side
-}
-
-func layoutCaptionSideStamped(t *testing.T, src, side string, sheets ...*css.Stylesheet) *Result {
-	t.Helper()
-
-	root := mustParse(t, src)
-	opts := Options{ //nolint:exhaustruct // matches layoutHTML viewport
-		Width: testViewport, Height: 800, Sheets: sheets, Background: true,
-	}
-
-	styles, containers, err := resolveStylesForLayoutContext(context.Background(), root, opts)
-	if err != nil {
-		t.Fatalf("resolve styles: %v", err)
-	}
-
-	stampCaptionSide(styles, side)
-
-	faces, err := pdf.LoadDefaultFaces()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	res, err := finalizeResult(
-		newEngine(
-			context.Background(),
-			opts,
-			faces,
-			faces.Regular,
-			styles,
-			containers,
-			make([]Op, 0, estimateOpCapacity(root)),
-		),
-		root,
-		opts,
-	)
-	if err != nil {
-		t.Fatalf("layout stamped caption-side: %v", err)
-	}
-
-	return res
-}
-
-func stampCaptionSide(styles map[*html.Node]*ResolvedStyle, side string) {
-	for node, st := range styles {
-		if node == nil || st == nil || node.Type != html.ElementNode {
-			continue
-		}
-
-		isCaption := node.Name == htmlCaption || st.Display == displayTableCaption
-		isTable := node.Name == displayTable || st.Display == displayTable
-		if !isCaption && !isTable {
-			continue
-		}
-
-		if st.CaptionSide == side {
-			continue
-		}
-
-		copied := *st
-		copied.CaptionSide = side
-		styles[node] = &copied
-	}
+	return layoutHTML(t, src, sheets...)
 }

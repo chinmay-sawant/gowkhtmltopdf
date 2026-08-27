@@ -245,7 +245,8 @@ body { margin: 0 }
 	}
 }
 
-func TestColumnRuleParse(t *testing.T) { //nolint:cyclop
+//nolint:cyclop,funlen // table-driven CSS shorthand proof
+func TestColumnRuleParse(t *testing.T) {
 	t.Parallel()
 
 	cssSheet := sheet(t, `
@@ -267,30 +268,30 @@ func TestColumnRuleParse(t *testing.T) { //nolint:cyclop
 </body></html>`)
 	styles := resolveStyles(root, []*css.Stylesheet{cssSheet}, "print", 500, 800)
 
-	a := styleByClass(t, styles, "a")
-	if !near(a.ColumnRuleWidth, 4) {
-		t.Fatalf("a width=%.3f, want 4pt", a.ColumnRuleWidth)
+	styleA := styleByClass(t, styles, "a")
+	if !near(styleA.ColumnRuleWidth, 4) {
+		t.Fatalf("a width=%.3f, want 4pt", styleA.ColumnRuleWidth)
 	}
 
-	if a.ColumnRuleStyle != borderStyleDashed {
-		t.Fatalf("a style=%q, want dashed", a.ColumnRuleStyle)
+	if styleA.ColumnRuleStyle != borderStyleDashed {
+		t.Fatalf("a style=%q, want dashed", styleA.ColumnRuleStyle)
 	}
 
-	if a.ColumnRuleColor != ([3]float64{1, 0, 0}) {
-		t.Fatalf("a color=%v, want red", a.ColumnRuleColor)
+	if styleA.ColumnRuleColor != ([3]float64{1, 0, 0}) {
+		t.Fatalf("a color=%v, want red", styleA.ColumnRuleColor)
 	}
 
-	b := styleByClass(t, styles, "b")
-	if !near(b.ColumnRuleWidth, borderWidth(mediumKeyword, defaultFontSizePt)) {
-		t.Fatalf("b width:medium = %.3f", b.ColumnRuleWidth)
+	styleB := styleByClass(t, styles, "b")
+	if !near(styleB.ColumnRuleWidth, borderWidth(mediumKeyword, defaultFontSizePt)) {
+		t.Fatalf("b width:medium = %.3f", styleB.ColumnRuleWidth)
 	}
 
-	if b.ColumnRuleStyle != solidKeyword {
-		t.Fatalf("b style=%q, want solid", b.ColumnRuleStyle)
+	if styleB.ColumnRuleStyle != solidKeyword {
+		t.Fatalf("b style=%q, want solid", styleB.ColumnRuleStyle)
 	}
 
-	if b.ColumnRuleColor != ([3]float64{0, 0, 1}) {
-		t.Fatalf("b currentColor=%v, want blue", b.ColumnRuleColor)
+	if styleB.ColumnRuleColor != ([3]float64{0, 0, 1}) {
+		t.Fatalf("b currentColor=%v, want blue", styleB.ColumnRuleColor)
 	}
 
 	if !near(styleByClass(t, styles, "c").ColumnRuleWidth, borderWidth(thinKeyword, defaultFontSizePt)) {
@@ -305,17 +306,18 @@ func TestColumnRuleParse(t *testing.T) { //nolint:cyclop
 		t.Fatalf("e style=%q, want none", styleByClass(t, styles, "e").ColumnRuleStyle)
 	}
 
-	f := styleByClass(t, styles, "f")
-	if f.ColumnRuleStyle != borderStyleDotted {
-		t.Fatalf("f shorthand style=%q, want dotted", f.ColumnRuleStyle)
+	styleF := styleByClass(t, styles, "f")
+	if styleF.ColumnRuleStyle != borderStyleDotted {
+		t.Fatalf("f shorthand style=%q, want dotted", styleF.ColumnRuleStyle)
 	}
 
-	if !near(f.ColumnRuleWidth, borderWidth(mediumKeyword, defaultFontSizePt)) {
-		t.Fatalf("f shorthand width=%.3f, want medium", f.ColumnRuleWidth)
+	if !near(styleF.ColumnRuleWidth, borderWidth(mediumKeyword, defaultFontSizePt)) {
+		t.Fatalf("f shorthand width=%.3f, want medium", styleF.ColumnRuleWidth)
 	}
 }
 
-func TestColumnRulePaints(t *testing.T) { //nolint:cyclop
+//nolint:cyclop,funlen,gocognit,gocyclo // paint operation proof covers rule variants
+func TestColumnRulePaints(t *testing.T) {
 	t.Parallel()
 
 	cssSheet := sheet(t, `
@@ -351,14 +353,14 @@ body { margin: 0 }
 
 	pos := map[string]float64{}
 
-	for _, op := range res.Ops {
-		if op.Kind != OpText {
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpText {
 			continue
 		}
 
 		for _, key := range []string{"Alpha", "Charlie"} {
-			if len(op.Text) >= len(key) && op.Text[:len(key)] == key {
-				pos[key] = op.X
+			if len(paintOp.Text) >= len(key) && paintOp.Text[:len(key)] == key {
+				pos[key] = paintOp.X
 			}
 		}
 	}
@@ -380,19 +382,19 @@ body { margin: 0 }
 
 	found := false
 
-	for _, op := range res.Ops {
-		isStroke := op.Kind == OpLine || op.Kind == OpStrokeRect || op.Kind == OpFillRect
-		if !isStroke || op.R < 0.9 || op.G > 0.2 || op.B > 0.2 {
+	for _, paintOp := range res.Ops {
+		isStroke := paintOp.Kind == OpLine || paintOp.Kind == OpStrokeRect || paintOp.Kind == OpFillRect
+		if !isStroke || paintOp.R < 0.9 || paintOp.G > 0.2 || paintOp.B > 0.2 {
 			continue
 		}
 
-		mid := op.X
-		if op.W > 0 {
-			mid += op.W / 2
+		mid := paintOp.X
+		if paintOp.W > 0 {
+			mid += paintOp.W / 2
 		}
 
-		if mid > left && mid < right && op.H > 4 {
-			rule = op
+		if mid > left && mid < right && paintOp.H > 4 {
+			rule = paintOp
 			found = true
 
 			break
@@ -411,16 +413,16 @@ body { margin: 0 }
 
 	redBetweenNogap := 0
 
-	for _, op := range res.Ops {
-		if op.Kind != OpLine && op.Kind != OpStrokeRect {
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpLine && paintOp.Kind != OpStrokeRect {
 			continue
 		}
 
-		if op.R < 0.9 || op.G > 0.2 || op.B > 0.2 {
+		if paintOp.R < 0.9 || paintOp.G > 0.2 || paintOp.B > 0.2 {
 			continue
 		}
 
-		if op.Y > rule.Y+rule.H+8 {
+		if paintOp.Y > rule.Y+rule.H+8 {
 			redBetweenNogap++
 		}
 	}

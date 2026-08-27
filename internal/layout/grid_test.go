@@ -943,6 +943,47 @@ func TestGridAutoFlowDenseFillsHole(t *testing.T) { //nolint:cyclop
 	}
 }
 
+//nolint:cyclop // placement proof checks both fills and coordinates
+func TestGridAutoFlowColumn(t *testing.T) {
+	t.Parallel()
+
+	cssSheet := sheet(t, `
+.g { display:grid; grid-template-columns:40pt 40pt; grid-template-rows:20pt 20pt; grid-auto-flow:column; gap:0 }
+.a { background:#fcc }
+.b { background:#cfc }
+`)
+	res := layoutHTML(t, `<html><body><div class="g">
+	<div class="a">A</div><div class="b">B</div>
+</div></body></html>`, cssSheet)
+
+	var firstX, firstY, secondX, secondY float64
+
+	var foundA, foundB bool
+
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpFillRect {
+			continue
+		}
+
+		if paintOp.R > 0.9 && paintOp.G < 0.9 && paintOp.B < 0.9 {
+			firstX, firstY, foundA = paintOp.X, paintOp.Y, true
+		}
+
+		if paintOp.G > 0.7 && paintOp.R < 0.9 && paintOp.B < 0.9 {
+			secondX, secondY, foundB = paintOp.X, paintOp.Y, true
+		}
+	}
+
+	if !foundA || !foundB {
+		t.Fatalf("column-flow fills A=%v B=%v", foundA, foundB)
+	}
+
+	if !near(firstX, secondX) || secondY <= firstY {
+		t.Fatalf("column-flow positions A=(%.1f,%.1f) B=(%.1f,%.1f), want same X and B below A",
+			firstX, firstY, secondX, secondY)
+	}
+}
+
 func TestParseGridTracksMinmax(t *testing.T) {
 	t.Parallel()
 
@@ -1084,6 +1125,8 @@ func TestStripMasonryKeyword(t *testing.T) {
 
 // TestInlineGridIsInlineLevel keeps display:inline-grid in the paragraph's
 // inline formatting context. display:grid still breaks to a block.
+//
+//nolint:cyclop // layout proof checks inline placement and generated ops
 func TestInlineGridIsInlineLevel(t *testing.T) {
 	t.Parallel()
 
@@ -1100,15 +1143,15 @@ p { margin: 0; font-size: 12pt }
 	posX := map[string]float64{}
 	posY := map[string]float64{}
 
-	for _, op := range res.Ops {
-		if op.Kind != OpText {
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpText {
 			continue
 		}
 
 		for _, key := range []string{"AAA", "BBB", "CCC", "DDD"} {
-			if op.Text == key || (len(op.Text) >= len(key) && op.Text[:len(key)] == key) {
-				posX[key] = op.X
-				posY[key] = op.Y
+			if paintOp.Text == key || (len(paintOp.Text) >= len(key) && paintOp.Text[:len(key)] == key) {
+				posX[key] = paintOp.X
+				posY[key] = paintOp.Y
 			}
 		}
 	}

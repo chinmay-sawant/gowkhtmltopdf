@@ -89,7 +89,10 @@ func (e *engine) layoutStandardGrid(
 	contentStart int,
 ) *box {
 	columnMajor, densePack := gridAutoFlowMode(sty.GridAutoFlow)
-	placed := placeGridItems(e, kids, areas, newGridOccupation(len(cols)), len(cols), columnMajor, densePack)
+	explicitRows := len(parseGridTrackDefs(sty.GridTemplateRows))
+	placed := placeGridItems(
+		e, kids, areas, newGridOccupation(len(cols)), len(cols), columnMajor, densePack, explicitRows,
+	)
 
 	numRows := gridRowCount(placed, areas)
 
@@ -256,10 +259,14 @@ func placeGridItems(
 	areas gridTemplateAreasMap,
 	occ *gridOccupation,
 	nCols int,
-	columnMajor, densePack bool,
+	columnMajor, densePack bool, explicitRows int,
 ) []gridCell {
 	// Implicit row band for column-major auto flow (grid-template-rows empty).
 	implicitRows := areas.rows
+	if explicitRows > implicitRows {
+		implicitRows = explicitRows
+	}
+
 	if implicitRows < 1 {
 		implicitRows = (len(kids) + nCols - 1) / nCols
 	}

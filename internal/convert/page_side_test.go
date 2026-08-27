@@ -41,6 +41,7 @@ func TestPageFirstWinsOverLeftRight(t *testing.T) {
 	assertPageSidePDFText(t, pageSideFirstCSS, firstPt, leftPt)
 }
 
+//nolint:cyclop // integration geometry assertions
 func assertPageSideGeom(t *testing.T, unnamedPt, rightPt, leftPt float64) {
 	t.Helper()
 
@@ -118,6 +119,7 @@ func sideInitGeom(unnamedPt float64) hfGeom {
 	}
 }
 
+//nolint:cyclop,funlen // PDF origin assertions
 func assertPageSidePDFText(t *testing.T, pageCSS string, page1Pt, page2Pt float64) {
 	t.Helper()
 

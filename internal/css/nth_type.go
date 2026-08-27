@@ -69,30 +69,20 @@ func ofTypeLastIndex(node *html.Node) int {
 		return 1
 	}
 
-	after := 0
-	seen := false
+	total := 0
 
 	for _, cur := range node.Parent.Children {
-		if !sameTypeElement(cur, node) {
-			continue
-		}
-
-		if cur == node {
-			seen = true
-
-			continue
-		}
-
-		if seen {
-			after++
+		if sameTypeElement(cur, node) {
+			total++
 		}
 	}
 
-	if !seen {
+	index := ofTypeIndex(node)
+	if index == 0 {
 		return 0
 	}
 
-	return after + 1
+	return total - index + 1
 }
 
 func sameTypeElement(cur, node *html.Node) bool {

@@ -247,20 +247,15 @@ func parsePageRule(src string, str *Stylesheet) (string, error) {
 		return "", err
 	}
 
-	boxes := extractPageMarginBoxes(block)
-	block = stripNestedAtRules(block)
-	sel := parsePageSelector(src[len("@page"):open])
+	prelude := src[len("@page"):open]
 
-	var margin, size string
-
-	for _, decl := range parseDeclarations(block) {
-		switch strings.ToLower(decl.Prop) {
-		case "margin":
-			margin = decl.Value
-		case "size":
-			size = decl.Value
-		}
+	sel := parsePageSelector(prelude)
+	if strings.TrimSpace(prelude) != "" && sel == "" {
+		return rest, nil
 	}
+
+	boxes, declarations := parsePageBlock(block, sel == "")
+	margin, size := pageDescriptors(declarations)
 
 	str.Pages = append(str.Pages, PageRule{
 		Sel:    sel,
@@ -270,27 +265,44 @@ func parsePageRule(src string, str *Stylesheet) (string, error) {
 	})
 
 	if sel == "" {
-		page := str.Page
-		if page == nil {
-			page = &PageStyle{} //nolint:exhaustruct // zero values represent omitted @page properties
-			str.Page = page
-		}
-
-		if margin != "" {
-			page.Margin = margin
-		}
-
-		if size != "" {
-			page.Size = size
-		}
+		applyPageDescriptors(&str.Page, margin, size)
 	}
 
 	return rest, nil
 }
 
+func pageDescriptors(declarations string) (string, string) {
+	var margin, size string
+
+	for _, decl := range parseDeclarations(declarations) {
+		switch strings.ToLower(decl.Prop) {
+		case "margin":
+			margin = decl.Value
+		case "size":
+			size = decl.Value
+		}
+	}
+
+	return margin, size
+}
+
+func applyPageDescriptors(page **PageStyle, margin, size string) {
+	if *page == nil {
+		*page = &PageStyle{} //nolint:exhaustruct // zero values represent omitted @page properties
+	}
+
+	if margin != "" {
+		(*page).Margin = margin
+	}
+
+	if size != "" {
+		(*page).Size = size
+	}
+}
+
 // parsePageSelector reads the @page prelude. Empty is unnamed; :first, :left,
-// and :right are the page pseudos (any ASCII case); any other ident is a named
-// page. Nested @margin-box rules live in the block and are not part of Sel.
+// and :right are the page pseudos (any ASCII case); any other single ident is
+// a named page. A compound, list, or unknown pseudo is invalid.
 func parsePageSelector(prelude string) string {
 	prelude = strings.TrimSpace(prelude)
 	if prelude == "" {
@@ -298,20 +310,26 @@ func parsePageSelector(prelude string) string {
 	}
 
 	if prelude[0] == ':' {
-		ident := strings.ToLower(pageIdent(strings.TrimSpace(prelude[1:])))
-		switch ident {
-		case "first", "left", "right":
-			return ":" + ident
+		pseudo := strings.TrimSpace(prelude[1:])
+		ident := strings.ToLower(pageIdent(pseudo))
+
+		if ident == "" || ident != pseudo {
+			return ""
 		}
 
-		if ident != "" {
+		switch ident {
+		case "first", "left", "right":
 			return ":" + ident
 		}
 
 		return ""
 	}
 
-	return pageIdent(prelude)
+	if !IsIdentToken(prelude) {
+		return ""
+	}
+
+	return prelude
 }
 
 // IsIdentToken reports that s is a single CSS ident with no leftover tokens.
@@ -333,49 +351,6 @@ func pageIdent(src string) string {
 	}
 
 	return src[:end]
-}
-
-// stripNestedAtRules drops at-rules inside a declaration block (margin boxes
-// such as @top-center) so following descriptors are still parsed.
-func stripNestedAtRules(block string) string {
-	var out strings.Builder
-
-	out.Grow(len(block))
-
-	for idx := 0; idx < len(block); {
-		char := block[idx]
-		if char == '"' || char == '\'' {
-			relEnd := strings.IndexByte(block[idx+1:], char)
-			if relEnd < 0 {
-				out.WriteString(block[idx:])
-
-				return out.String()
-			}
-
-			end := idx + minQuotedLen + relEnd
-			out.WriteString(block[idx:end])
-			idx = end
-
-			continue
-		}
-
-		if char == '@' {
-			rest, err := skipAtRule(block[idx:])
-			if err != nil {
-				return out.String()
-			}
-
-			idx += len(block[idx:]) - len(rest)
-
-			continue
-		}
-
-		out.WriteByte(char)
-
-		idx++
-	}
-
-	return out.String()
 }
 
 func parseMediaRule(src string, str *Stylesheet, order *int) (string, error) {

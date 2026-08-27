@@ -22,13 +22,13 @@ func ofTypeFixture(t *testing.T) map[string]*html.Node {
 	ids := []string{"box", "p1", "s1", "p2", "s2", "p3"}
 	nodes := make(map[string]*html.Node, len(ids))
 
-	for _, id := range ids {
-		node := byID(root, id)
+	for _, nodeID := range ids {
+		node := byID(root, nodeID)
 		if node == nil {
-			t.Fatalf("missing #%s", id)
+			t.Fatalf("missing #%s", nodeID)
 		}
 
-		nodes[id] = node
+		nodes[nodeID] = node
 	}
 
 	return nodes

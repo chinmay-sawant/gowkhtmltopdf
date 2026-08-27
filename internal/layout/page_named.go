@@ -29,6 +29,7 @@ func walkNamedPageBreaks(boxNode *box) {
 
 		prevName = name
 		prevSet = true
+
 		walkNamedPageBreaks(child)
 	}
 }
@@ -58,6 +59,8 @@ func forcePageBreakBefore(boxNode *box) {
 // namedPageNames maps each output page to the first in-flow box page name
 // that overlaps that page. Empty means auto / unnamed. Lite: a continuation
 // page with no overlapping named box keeps the unnamed side/:first cascade.
+//
+//nolint:cyclop // page-name extraction validates bounded pagination geometry
 func namedPageNames(res *Result, contentH float64) []string {
 	if res == nil || contentH <= 0 || len(res.Pages) == 0 {
 		return nil
@@ -71,8 +74,8 @@ func namedPageNames(res *Result, contentH float64) []string {
 			continue
 		}
 
-		start, ok := checkedFlowPageOfY(boxNode.y+layoutEpsilon, contentH)
-		if !ok {
+		start, startOK := checkedFlowPageOfY(boxNode.y+layoutEpsilon, contentH)
+		if !startOK {
 			continue
 		}
 
@@ -81,8 +84,8 @@ func namedPageNames(res *Result, contentH float64) []string {
 			endY = boxNode.y
 		}
 
-		end, ok := checkedFlowPageOfY(endY, contentH)
-		if !ok {
+		end, endOK := checkedFlowPageOfY(endY, contentH)
+		if !endOK {
 			end = start
 		}
 
@@ -94,6 +97,11 @@ func namedPageNames(res *Result, contentH float64) []string {
 	}
 
 	return names
+}
+
+// PageNames returns the page-name used by each paginated output page.
+func PageNames(res *Result, contentH float64) []string {
+	return namedPageNames(res, contentH)
 }
 
 func (opts PaintOptions) pageNameAt(pageIdx int) string {
@@ -111,6 +119,18 @@ func applyPaintMarginSet(opts PaintOptions, margins PageMargins) PaintOptions {
 	opts.MarginLeft = margins.Left
 
 	return opts
+}
+
+// PageMarginsForPage resolves one page with the same cascade used by painting.
+// pageNames contains the first in-flow page name for each output page.
+func (opts PaintOptions) PageMarginsForPage(pageIdx int, pageNames []string) PageMargins {
+	opts.pageNames = pageNames
+	resolved := opts.forPage(pageIdx)
+
+	return PageMargins{
+		Top: resolved.MarginTop, Right: resolved.MarginRight,
+		Bottom: resolved.MarginBottom, Left: resolved.MarginLeft,
+	}
 }
 
 // forPage returns geometry for one output page.

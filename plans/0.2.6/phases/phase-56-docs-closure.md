@@ -1,7 +1,7 @@
 # Phase 56: Docs, mapping sync, closure
 
 > **Parent:** `../48-canonical-0.2.6-css-coverage.md` Phase 56
-> **Status:** complete - gates 2026-08-27
+> **Status:** complete - gates 2026-08-28
 > **Estimated effort:** 2-3 days
 > **Owner:** ledger
 > **Depends on:** Phases 48-55 all `[x]` or `[~]` with pointers
@@ -26,14 +26,14 @@ Unshipped rows from 49-55 must be `[~]` with reason. Do not `[x]` this phase whi
 
 ### 56.1 mapping and contract
 
-- [x] 56.1.1 `python3 scripts/css-catalog-map.py --check` exit 0. Proof: check ok 157 apply arms.
+- [x] 56.1.1 `python3 scripts/css-catalog-map.py --check` exit 0. Proof: check ok 147 apply arms.
 - [x] 56.1.2 Matrix honesty. Proof: no `style.go:340`; `make claim-scan` clean.
 - [x] 56.1.3 fidelity.md CSS map. Proof: `make claim-scan` clean.
 - [x] 56.1.4 deferred.md points at 0.2.6 ledger.
 
 ### 56.2 gates
 
-- [x] 56.2.1 `make test` exit 0 (2026-08-27).
+- [x] 56.2.1 `make test` exit 0 (2026-08-28).
 - [x] 56.2.2 `make lint` exit 0 (golangci-lint v1.64.8 + frontend eslint).
 - [x] 56.2.3 `make golden` exit 0. TestGoldenCorpusAllFixtures PASS including fixture-56.
 - [x] 56.2.4 `make claim-scan` clean.

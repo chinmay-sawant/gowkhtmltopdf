@@ -1,4 +1,4 @@
-package css
+package css //nolint:testpackage // parser-internal helpers are part of this unit's contract
 
 import "testing"
 
@@ -64,7 +64,7 @@ func TestParsePageMarginBoxesNamedPage(t *testing.T) {
 		t.Fatalf("Pages = %+v", str.Pages)
 	}
 
-	if str.Pages[0].Boxes.TopCenter != "Ch" {
-		t.Errorf("named page TopCenter = %q, want Ch", str.Pages[0].Boxes.TopCenter)
+	if str.Pages[0].Boxes != (PageMarginBoxes{}) { //nolint:exhaustruct // compare against the empty value
+		t.Errorf("named page Boxes = %+v, want empty because only unnamed chrome is consumed", str.Pages[0].Boxes)
 	}
 }

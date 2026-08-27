@@ -145,65 +145,6 @@ func cloneResult(res *layout.Result) *layout.Result {
 	return layout.CloneResult(res)
 }
 
-// paintOptions converts an object geometry into layout paint options.
-func paintOptions(geom hfGeom) layout.PaintOptions {
-	opts := layout.PaintOptions{
-		PageWidth:    geom.pageW,
-		PageHeight:   geom.pageH,
-		MarginTop:    geom.marginTop,
-		MarginBottom: geom.marginBottom,
-		MarginLeft:   geom.marginLeft,
-		MarginRight:  geom.marginRight,
-	}
-
-	opts.First = layoutPageMargins(geom.first)
-	opts.Left = layoutPageMargins(geom.left)
-	opts.Right = layoutPageMargins(geom.right)
-	opts.Named = layoutNamedPageMargins(geom.named)
-
-	return opts
-}
-
-func layoutPageMargins(src *hfPageMargins) *layout.PageMargins {
-	if src == nil {
-		return nil
-	}
-
-	return &layout.PageMargins{
-		Top:    src.top,
-		Right:  src.right,
-		Bottom: src.bottom,
-		Left:   src.left,
-	}
-}
-
-func layoutNamedPageMargins(src map[string]*hfPageMargins) map[string]layout.PageMargins {
-	if len(src) == 0 {
-		return nil
-	}
-
-	out := make(map[string]layout.PageMargins, len(src))
-
-	for name, margins := range src {
-		if margins == nil {
-			continue
-		}
-
-		out[name] = layout.PageMargins{
-			Top:    margins.top,
-			Right:  margins.right,
-			Bottom: margins.bottom,
-			Left:   margins.left,
-		}
-	}
-
-	if len(out) == 0 {
-		return nil
-	}
-
-	return out
-}
-
 // paintCount lays the result out into a scratch document and returns its
 // page count, leaving res untouched.
 func paintCount(ctx context.Context, policy pdf.WriterPolicy, res *layout.Result, geom hfGeom) (int, error) {
@@ -327,6 +268,7 @@ func renderTOCObjects(ctx context.Context, font *pdf.Font, doc *pdf.Document, re
 			return 0, fmt.Errorf("object %d: toc: paint: %w", state.idx+1, err)
 		}
 
+		state.geom.pageNames = layout.PageNames(painted, state.geom.contentH)
 		state.tocRes = painted
 		total += state.tocPages
 	}

@@ -41,7 +41,7 @@ func (e *engine) paintColumnRules(
 	red, green, blue := columnRuleStrokeColor(sty)
 	ruleX := contentX + colW + gap/two
 
-	for col := 0; col < nCols-1; col++ {
+	for range nCols - 1 {
 		ops := appendBorderLineOps(
 			nil, ruleX, topY, 0, lineH, width, sty.ColumnRuleStyle, red, green, blue,
 		)

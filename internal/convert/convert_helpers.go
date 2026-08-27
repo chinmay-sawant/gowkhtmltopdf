@@ -2,14 +2,11 @@ package convert
 
 import (
 	"fmt"
-	"io"
 	"net/url"
 	"strings"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/layout"
-	"github.com/chinmay-sawant/gowkhtmltopdf/internal/line"
-	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
@@ -32,6 +29,7 @@ func applyCSSPageMargins(geom hfGeom, sheets []*css.Stylesheet) hfGeom {
 	geom.left = pageMarginOverride(geom, box.leftMargin)
 	geom.right = pageMarginOverride(geom, box.rightMargin)
 	geom.named = namedPageMarginOverrides(geom, box.named)
+	geom.pageBoxes = box.boxes
 
 	return geom
 }
@@ -73,6 +71,7 @@ func namedPageMarginOverrides(geom hfGeom, raw map[string]string) map[string]*hf
 type pageBoxRaw struct {
 	margin, size, firstMargin, leftMargin, rightMargin string
 	named                                              map[string]string
+	boxes                                              css.PageMarginBoxes
 }
 
 func collectPageBox(sheets []*css.Stylesheet) pageBoxRaw {
@@ -84,7 +83,9 @@ func collectPageBox(sheets []*css.Stylesheet) pageBoxRaw {
 		}
 
 		box = applyUnnamedPageBox(box, sheet.Page)
-		box = applyPageRules(box, sheet.Pages)
+		for _, rule := range sheet.Pages {
+			box = applyOnePageRule(box, rule)
+		}
 	}
 
 	return box
@@ -106,14 +107,6 @@ func applyUnnamedPageBox(box pageBoxRaw, page *css.PageStyle) pageBoxRaw {
 	return box
 }
 
-func applyPageRules(box pageBoxRaw, rules []css.PageRule) pageBoxRaw {
-	for _, rule := range rules {
-		box = applyOnePageRule(box, rule)
-	}
-
-	return box
-}
-
 func applyOnePageRule(box pageBoxRaw, rule css.PageRule) pageBoxRaw {
 	margin := strings.TrimSpace(rule.Margin)
 	size := strings.TrimSpace(rule.Size)
@@ -121,36 +114,38 @@ func applyOnePageRule(box pageBoxRaw, rule css.PageRule) pageBoxRaw {
 
 	switch sel {
 	case "":
-		if margin != "" {
-			box.margin = margin
-		}
-
-		if size != "" {
-			box.size = size
-		}
+		return applyUnnamedPageRule(box, margin, size, rule.Boxes)
 	case ":first":
-		if margin != "" {
-			box.firstMargin = margin
-		}
+		box.firstMargin = firstNonEmpty(margin, box.firstMargin)
 	case ":left":
-		if margin != "" {
-			box.leftMargin = margin
-		}
+		box.leftMargin = firstNonEmpty(margin, box.leftMargin)
 	case ":right":
-		if margin != "" {
-			box.rightMargin = margin
-		}
+		box.rightMargin = firstNonEmpty(margin, box.rightMargin)
 	default:
-		if strings.HasPrefix(sel, ":") || margin == "" {
-			return box
-		}
-
-		if box.named == nil {
-			box.named = map[string]string{}
-		}
-
-		box.named[sel] = margin
+		box = applyNamedPageRule(box, sel, margin)
 	}
+
+	return box
+}
+
+func applyUnnamedPageRule(box pageBoxRaw, margin, size string, boxes css.PageMarginBoxes) pageBoxRaw {
+	box.margin = firstNonEmpty(margin, box.margin)
+	box.size = firstNonEmpty(size, box.size)
+	box.boxes = mergePageMarginBoxes(box.boxes, boxes)
+
+	return box
+}
+
+func applyNamedPageRule(box pageBoxRaw, sel, margin string) pageBoxRaw {
+	if strings.HasPrefix(sel, ":") || margin == "" {
+		return box
+	}
+
+	if box.named == nil {
+		box.named = map[string]string{}
+	}
+
+	box.named[sel] = margin
 
 	return box
 }
@@ -361,23 +356,4 @@ func resolveRelativeLinkURI(op layout.Op, base *url.URL) (string, bool) {
 	}
 
 	return base.ResolveReference(ref).String(), true
-}
-
-// logFontRegistryScan emits the shared font-path scan notice used by PDF and
-// image callers after pdf.RegistryFromGlobal.
-func logFontRegistryScan(glob settings.PdfGlobal, log io.Writer) {
-	if log == nil || log == io.Discard || glob.Quiet {
-		return
-	}
-
-	if len(glob.FontPaths) == 0 && !glob.UseSystemFonts {
-		return
-	}
-
-	count := len(glob.FontPaths)
-	if glob.UseSystemFonts {
-		count += len(pdf.DefaultSystemFontDirs())
-	}
-
-	line.Emit(log, line.Info, "scanned %d font path(s)", count)
 }

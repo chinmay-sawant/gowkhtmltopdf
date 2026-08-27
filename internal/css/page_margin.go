@@ -9,26 +9,36 @@ type PageMarginBoxes struct {
 	BottomLeft, BottomCenter, BottomRight string
 }
 
-// extractPageMarginBoxes reads nested @top-* / @bottom-* rules out of an
-// @page block. Unknown nested at-rules are ignored. Descriptors after the
-// nested blocks stay in the source for stripNestedAtRules.
-func extractPageMarginBoxes(block string) PageMarginBoxes {
+// parsePageBlock removes nested at-rules while collecting unnamed margin-box
+// content. Named pages and page pseudos pass capture=false because convert's
+// lite header/footer consumer repeats only the unnamed page chrome.
+func parsePageBlock(block string, capture bool) (PageMarginBoxes, string) {
 	var boxes PageMarginBoxes
+
+	var declarations strings.Builder
+
+	declarations.Grow(len(block))
 
 	for idx := 0; idx < len(block); {
 		char := block[idx]
 		if char == '"' || char == '\'' {
 			relEnd := strings.IndexByte(block[idx+1:], char)
 			if relEnd < 0 {
-				return boxes
+				declarations.WriteString(block[idx:])
+
+				break
 			}
 
-			idx += minQuotedLen + relEnd
+			end := idx + minQuotedLen + relEnd
+			declarations.WriteString(block[idx:end])
+			idx = end
 
 			continue
 		}
 
 		if char != '@' {
+			declarations.WriteByte(char)
+
 			idx++
 
 			continue
@@ -36,49 +46,54 @@ func extractPageMarginBoxes(block string) PageMarginBoxes {
 
 		next, name, inner, ok := takeNestedAtRule(block, idx)
 		if !ok {
-			return boxes
+			declarations.WriteString(block[idx:])
+
+			break
 		}
 
-		if content, ok := quotedPageBoxContent(inner); ok {
-			setPageMarginBox(&boxes, name, content)
+		if capture {
+			content, contentOK := quotedPageBoxContent(inner)
+			if contentOK {
+				setPageMarginBox(&boxes, name, content)
+			}
 		}
 
 		idx = next
 	}
 
-	return boxes
+	return boxes, declarations.String()
 }
 
-func takeNestedAtRule(block string, at int) (next int, name, inner string, ok bool) {
-	if at >= len(block) || block[at] != '@' {
-		return at, "", "", false
+func takeNestedAtRule(block string, atIndex int) (int, string, string, bool) {
+	if atIndex >= len(block) || block[atIndex] != '@' {
+		return atIndex, "", "", false
 	}
 
-	ident := pageIdent(block[at+1:])
+	ident := pageIdent(block[atIndex+1:])
 	if ident == "" {
-		rest, err := skipAtRule(block[at:])
+		rest, err := skipAtRule(block[atIndex:])
 		if err != nil {
-			return at, "", "", false
+			return atIndex, "", "", false
 		}
 
-		return at + len(block[at:]) - len(rest), "", "", true
+		return atIndex + len(block[atIndex:]) - len(rest), "", "", true
 	}
 
-	openRel := strings.IndexByte(block[at+1+len(ident):], '{')
+	openRel := strings.IndexByte(block[atIndex+1+len(ident):], '{')
 	if openRel < 0 {
-		rest, err := skipAtRule(block[at:])
+		rest, err := skipAtRule(block[atIndex:])
 		if err != nil {
-			return at, "", "", false
+			return atIndex, "", "", false
 		}
 
-		return at + len(block[at:]) - len(rest), "", "", true
+		return atIndex + len(block[atIndex:]) - len(rest), "", "", true
 	}
 
-	open := at + 1 + len(ident) + openRel
+	open := atIndex + 1 + len(ident) + openRel
 
 	inner, rest, err := takeBlock(block, open)
 	if err != nil {
-		return at, "", "", false
+		return atIndex, "", "", false
 	}
 
 	return len(block) - len(rest), strings.ToLower(ident), inner, true
@@ -125,6 +140,7 @@ func quotedPageBoxContent(block string) (string, bool) {
 	return text, found && text != ""
 }
 
+//nolint:cyclop // quoted content validation follows the small CSS token grammar
 func quotedContentList(value string) (string, bool) {
 	value = strings.TrimSpace(value)
 	if value == "" {
@@ -171,6 +187,7 @@ func quotedContentList(value string) (string, bool) {
 		}
 
 		out.WriteString(decodePageBoxString(value[idx+1 : end]))
+
 		saw = true
 		idx = end + 1
 	}

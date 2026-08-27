@@ -73,6 +73,15 @@ func TestRadiusEllipticalLonghand(t *testing.T) {
 	if !near(round.BorderRadiusBottomRightY, 0) {
 		t.Fatalf("circular longhand Y = %.3f, want 0", round.BorderRadiusBottomRightY)
 	}
+
+	res := layoutHTML(t, `<html><body><div class="slash">x</div></body></html>`, sheet(t, `
+body { margin: 0 }
+.slash { width: 40pt; height: 20pt; background: #f00; border-top-left-radius: 10pt / 5pt }
+`))
+	fill := redFillOp(t, res.Ops)
+	if !near(fill.RadiusTopLeft, 10) || !near(fill.RadiusTopLeftY, 5) {
+		t.Fatalf("longhand fill radii X=%.3f Y=%.3f, want 10 / 5", fill.RadiusTopLeft, fill.RadiusTopLeftY)
+	}
 }
 
 func assertCornerRadiusXY(t *testing.T, radiusX, radiusY, wantX, wantY float64, label string) {
