@@ -25,6 +25,7 @@ func TestImportStylesheet(t *testing.T) {
 
 	loader := load.NewLoader(cmd.Global.Load)
 	root, err := html.ParseDocument([]byte(htmlDoc))
+
 	if err != nil {
 		t.Fatalf("parse html: %v", err)
 	}
@@ -44,6 +45,7 @@ func TestImportStylesheet(t *testing.T) {
 
 	got := importSheetClasses(sheets)
 	want := []string{"from-b", "from-a"}
+
 	if !slices.Equal(got, want) {
 		t.Fatalf("imported sheets = %v, want %v (%d sheets)", got, want, len(sheets))
 	}
@@ -61,10 +63,12 @@ func writeImportCSS(t *testing.T, dir, name, body string) {
 
 func importSheetClasses(sheets []*css.Stylesheet) []string {
 	out := make([]string, 0)
+
 	for _, sheet := range sheets {
 		if sheet == nil {
 			continue
 		}
+
 		for _, rule := range sheet.Rules {
 			for _, sel := range rule.Selectors {
 				for _, part := range sel.Parts {

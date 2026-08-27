@@ -147,7 +147,7 @@ func cloneResult(res *layout.Result) *layout.Result {
 
 // paintOptions converts an object geometry into layout paint options.
 func paintOptions(geom hfGeom) layout.PaintOptions {
-	return layout.PaintOptions{
+	opts := layout.PaintOptions{
 		PageWidth:    geom.pageW,
 		PageHeight:   geom.pageH,
 		MarginTop:    geom.marginTop,
@@ -155,6 +155,17 @@ func paintOptions(geom hfGeom) layout.PaintOptions {
 		MarginLeft:   geom.marginLeft,
 		MarginRight:  geom.marginRight,
 	}
+
+	if geom.first != nil {
+		opts.First = &layout.PageMargins{
+			Top:    geom.first.top,
+			Right:  geom.first.right,
+			Bottom: geom.first.bottom,
+			Left:   geom.first.left,
+		}
+	}
+
+	return opts
 }
 
 // paintCount lays the result out into a scratch document and returns its

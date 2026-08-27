@@ -1,3 +1,4 @@
+//nolint:varnamelen // clip math uses compact x/y/w/h/op geometry names
 package layout
 
 import "math"
@@ -29,7 +30,7 @@ func intersectClip(a, b clipRect) clipRect {
 	y2 := math.Min(a.y+a.h, b.y+b.h)
 
 	if x2 <= x1 || y2 <= y1 {
-		return clipRect{}
+		return clipRect{} //nolint:exhaustruct // empty intersection
 	}
 
 	return clipRect{x: x1, y: y1, w: x2 - x1, h: y2 - y1}
@@ -56,7 +57,7 @@ func (e *engine) paddingBoxRect(posX, posY, width, height float64, sty ResolvedS
 
 func (e *engine) paddingBoxOf(boxNode *box) clipRect {
 	if boxNode == nil || boxNode.style == nil {
-		return clipRect{}
+		return clipRect{} //nolint:exhaustruct // missing box
 	}
 
 	return e.paddingBoxRect(boxNode.x, boxNode.y, boxNode.w, boxNode.height, *boxNode.style)
@@ -79,6 +80,7 @@ func (e *engine) clipOverflowTree(boxNode *box, clip *clipRect) {
 	}
 
 	next := clip
+
 	if boxNode.style != nil && overflowClipsPaint(boxNode.style.Overflow) {
 		pb := e.paddingBoxOf(boxNode)
 		if clip != nil {
@@ -187,6 +189,8 @@ func (e *engine) isOwnChromeOp(op Op, boxNode *box) bool {
 		}
 
 		return e.isOwnOutlineLine(op, boxNode)
+	case OpText, OpImage, OpLinkURI, OpBullet, opKindNoop:
+		return false
 	default:
 		return false
 	}
@@ -220,24 +224,32 @@ func lineOnRectEdges(op Op, x, y, w, h float64) bool {
 		return false
 	}
 
-	horizontal := math.Abs(op.H) <= layoutSlack && op.W > 0
-	if horizontal {
-		onTop := math.Abs(op.Y-y) <= layoutSlack
-		onBot := math.Abs(op.Y-(y+h)) <= layoutSlack
-		if !onTop && !onBot {
-			return false
-		}
-
-		return op.X+op.W >= x-layoutSlack && op.X <= x+w+layoutSlack
+	if math.Abs(op.H) <= layoutSlack && op.W > 0 {
+		return horizontalOnRectEdges(op, x, y, w, h)
 	}
 
-	vertical := math.Abs(op.W) <= layoutSlack && op.H > 0
-	if !vertical {
+	if math.Abs(op.W) <= layoutSlack && op.H > 0 {
+		return verticalOnRectEdges(op, x, y, w, h)
+	}
+
+	return false
+}
+
+func horizontalOnRectEdges(op Op, x, y, w, h float64) bool {
+	onTop := math.Abs(op.Y-y) <= layoutSlack
+	onBot := math.Abs(op.Y-(y+h)) <= layoutSlack
+
+	if !onTop && !onBot {
 		return false
 	}
 
+	return op.X+op.W >= x-layoutSlack && op.X <= x+w+layoutSlack
+}
+
+func verticalOnRectEdges(op Op, x, y, w, h float64) bool {
 	onLeft := math.Abs(op.X-x) <= layoutSlack
 	onRight := math.Abs(op.X-(x+w)) <= layoutSlack
+
 	if !onLeft && !onRight {
 		return false
 	}
@@ -257,6 +269,7 @@ func clipPaintOp(op *Op, clip clipRect) {
 		clipLineOp(op, clip)
 	case OpText, OpBullet:
 		clipTextOp(op, clip)
+	case opKindNoop:
 	}
 }
 
@@ -349,12 +362,14 @@ func rectIntersects(x0, y0, x1, y1 float64, clip clipRect) bool {
 func clipTextOp(op *Op, clip clipRect) {
 	left := op.X
 	right := op.X
+
 	if op.W > 0 {
 		right = op.X + op.W
 	}
 
 	bottom := op.Y
 	top := op.Y
+
 	if op.H > 0 {
 		top = op.Y - op.H
 	} else if op.Size > 0 {
@@ -369,7 +384,8 @@ func clipTextOp(op *Op, clip clipRect) {
 		top, bottom = bottom, top
 	}
 
-	if right <= clip.x || left >= clip.x+clip.w || bottom <= clip.y || top >= clip.y+clip.h {
+	outside := right <= clip.x || left >= clip.x+clip.w || bottom <= clip.y || top >= clip.y+clip.h
+	if outside {
 		DeactivateOp(op)
 	}
 }

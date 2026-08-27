@@ -1,4 +1,4 @@
-//nolint:testpackage // tests exercise unexported cascade and style apply
+//nolint:testpackage,varnamelen,cyclop,funlen // cascade paint apply proofs
 package layout
 
 import (
@@ -264,29 +264,29 @@ func TestListStylePositionParse(t *testing.T) {
 		.type { list-style-type: decimal }
 	`)}, "print", testViewport, 800)
 
-	if got := styleByClass(t, styles, "in").ListStylePosition; got != "inside" {
+	if got := styleByClass(t, styles, "in").ListStylePosition; got != listPosInside {
 		t.Fatalf("list-style-position:inside = %q", got)
 	}
 
-	if got := styleByClass(t, styles, "out").ListStylePosition; got != "outside" {
+	if got := styleByClass(t, styles, "out").ListStylePosition; got != listPosOutside {
 		t.Fatalf("list-style-position:outside = %q", got)
 	}
 
 	sh := styleByClass(t, styles, "sh")
-	if sh.ListStylePosition != "inside" {
+	if sh.ListStylePosition != listPosInside {
 		t.Fatalf("list-style shorthand position = %q, want inside", sh.ListStylePosition)
 	}
 
-	if sh.ListStyleType != "square" {
+	if sh.ListStyleType != listStyleSquare {
 		t.Fatalf("list-style shorthand type = %q, want square", sh.ListStyleType)
 	}
 
 	inherited := styleByClass(t, styles, "type")
-	if inherited.ListStylePosition != "inside" {
+	if inherited.ListStylePosition != listPosInside {
 		t.Fatalf("list-style-position did not inherit (type-only child) = %q", inherited.ListStylePosition)
 	}
 
-	if inherited.ListStyleType != "decimal" {
+	if inherited.ListStyleType != listStyleDecimal {
 		t.Fatalf("list-style-type override = %q, want decimal", inherited.ListStyleType)
 	}
 }

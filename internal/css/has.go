@@ -400,6 +400,23 @@ func maxSelectorSpecificity(sels []Selector) (int, int, int) {
 	return maxA, maxB, maxC
 }
 
+// pseudoSpecificityDelta is the (a, b, c) contribution of one pseudo-class.
+// :has/:not/:is use the most specific argument; :where is 0; others count as a class.
+func pseudoSpecificityDelta(pseudo PseudoClass) (int, int, int) {
+	switch pseudo.Name {
+	case pseudoClassHas:
+		return maxRelativeSpecificity(pseudo.Has)
+	case condKindNot:
+		return maxSelectorSpecificity(pseudo.Not)
+	case pseudoClassIs:
+		return maxSelectorSpecificity(pseudo.Is)
+	case pseudoClassWhere:
+		return 0, 0, 0
+	default:
+		return 0, 1, 0
+	}
+}
+
 // betterSpec reports whether (a1,b1,c1) is more specific than (a2,b2,c2).
 func betterSpec(a1, b1, c1, a2, b2, c2 int) bool {
 	return a1 > a2 || (a1 == a2 && b1 > b2) || (a1 == a2 && b1 == b2 && c1 > c2)

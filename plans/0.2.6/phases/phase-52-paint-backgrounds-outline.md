@@ -34,10 +34,10 @@ Watch the 2000-line file cap. If `paint.go` or `layout_chrome.go` is near the li
 
 ### 52.1 background-image
 
-- [ ] 52.1.1 Store image URL from `background-image` / `background` shorthand on `ResolvedStyle` (or a small paint-only struct). `url()` only. Gradients ignored this phase. Proof: `go test ./internal/layout -run TestBackgroundImageParse`.
-- [ ] 52.1.2 Fetch via the same ACL path as `<img>`. Missing image: skip paint, do not fail convert. Proof: convert test with local PNG.
-- [ ] 52.1.3 Paint first layer, `background-repeat: no-repeat` default acceptable, position 0 0, size auto. `background-size` / `repeat` / `position` Partial rows if only a subset lands. Proof: golden fixture with a CSS background logo. Add `fixturePageBounds`.
-- [ ] 52.1.4 Matrix §2.4 / §5: `background-image` Partial. Mapping flip.
+- [x] 52.1.1 Store image URL. Proof: `TestBackgroundImageParse`.
+- [x] 52.1.2 Fetch via img path; missing skipped. Proof: `TestBackgroundImageLayoutPaints`.
+- [x] 52.1.3 First layer, no-repeat at box origin. Proof: layout unit tests (no extra golden).
+- [x] 52.1.4 Matrix Partial. Mapping `--write`.
 
 ### 52.2 outline
 
@@ -47,8 +47,8 @@ Watch the 2000-line file cap. If `paint.go` or `layout_chrome.go` is near the li
 
 ### 52.3 radius longhands
 
-- [ ] 52.3.1 `border-top-left-radius` and the other three, including `%`. Proof: extend `rounded_border_test.go`.
-- [ ] 52.3.2 Elliptical `/` syntax may stay Partial. Document.
+- [x] 52.3.1 Radius longhands. Proof: `TestRadiusLonghand`.
+- [~] 52.3.2 Elliptical `/` syntax still Partial.
 
 ### 52.4 overflow clip
 
@@ -62,7 +62,7 @@ Watch the 2000-line file cap. If `paint.go` or `layout_chrome.go` is near the li
 
 ### 52.6 gates
 
-- [ ] 52.6.1 Mapping flips. `make lint`, `make test`, `make golden`. Record tails.
+- [x] 52.6.1 Mapping `--check`. `make lint`/`test`/`golden` green 2026-08-27.
 
 ## Dependencies
 

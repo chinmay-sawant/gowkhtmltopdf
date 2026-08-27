@@ -71,16 +71,19 @@ func parseImportURLFunction(src string) (string, string, bool) {
 		switch src[idx] {
 		case '"', '\'':
 			idx = skipQuoted(src, idx, src[idx])
+
 			continue
 		case ')':
 			inner := stripAttrQuotes(strings.TrimSpace(src[len("url("):idx]))
 			inner = strings.TrimSpace(inner)
+
 			if inner == "" {
 				return "", src, false
 			}
 
 			return inner, src[idx+1:], true
 		}
+
 		idx++
 	}
 
@@ -90,6 +93,7 @@ func parseImportURLFunction(src string) (string, string, bool) {
 func parseQuotedImportURL(src string) (string, string, bool) {
 	q := src[0]
 	end := skipQuoted(src, 0, q)
+
 	if end < minQuotedLen || src[end-1] != q {
 		return "", src, false
 	}

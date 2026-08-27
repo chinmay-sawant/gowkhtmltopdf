@@ -1,4 +1,4 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
+//nolint:testpackage,wsl,varnamelen,exhaustruct,cyclop,err113,usetesting,goconst // image chrome probes
 package layout
 
 import (

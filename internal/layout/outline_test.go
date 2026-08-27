@@ -1,4 +1,4 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
+//nolint:testpackage,wsl,varnamelen,paralleltest,cyclop // outline stroke probes
 package layout
 
 import (

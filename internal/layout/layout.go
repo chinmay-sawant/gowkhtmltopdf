@@ -58,6 +58,13 @@ const (
 	displayFooterGroup      = "table-footer-group"
 	displayListItem         = "list-item"
 	listStyleDisc           = "disc"
+	listStyleSquare         = "square"
+	listStyleDecimal        = "decimal"
+	listPosInside           = "inside"
+	listPosOutside          = "outside"
+	htmlSection             = "section"
+	pseudoBefore            = "before"
+	pseudoAfter             = "after"
 	bulletDisc              = "\u2022"
 	borderCollapseValue     = "collapse"
 	overflowWrapAnywhere    = "anywhere"
@@ -1250,8 +1257,8 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 		e.paintValueWidget(node, style, boxNode.x, posY, boxNode.w, boxNode.height)
 	}
 
-	e.paintPositionedPseudo(node, style, boxNode, "before")
-	e.paintPositionedPseudo(node, style, boxNode, "after")
+	e.paintPositionedPseudo(node, style, boxNode, pseudoBefore)
+	e.paintPositionedPseudo(node, style, boxNode, pseudoAfter)
 
 	e.prependChrome(contentStart, boxNode, style, boxNode.x, posY, boxNode.w, boxNode.height)
 
@@ -1306,7 +1313,7 @@ func (e *engine) paintPositionedPseudo( //nolint:cyclop
 		pseudoX = contentX + contentW - e.measureTextFace(text, *style) - e.scalePt(style.Right)
 	}
 
-	staticAfter := pseudoElem == "after" && style.TopAuto && style.BottomAuto
+	staticAfter := pseudoElem == pseudoAfter && style.TopAuto && style.BottomAuto
 	pseudoY := boxNode.y + e.scalePt(host.PaddingTop) + e.scalePt(host.BorderTop.Width) +
 		e.scalePt(style.MarginTop)
 

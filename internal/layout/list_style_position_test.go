@@ -1,4 +1,4 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
+//nolint:testpackage,wsl,varnamelen,usetesting // list-style-position probes
 package layout
 
 import (
@@ -8,11 +8,6 @@ import (
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
-)
-
-const (
-	listPosInside  = "inside"
-	listPosOutside = "outside"
 )
 
 const listStylePositionFixture = `<html><body><ul><li>item</li></ul></body></html>`

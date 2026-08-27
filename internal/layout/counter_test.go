@@ -1,4 +1,4 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
+//nolint:testpackage,wsl,cyclop // counter parse and layout proofs
 package layout
 
 import (
@@ -25,14 +25,14 @@ func TestCounterResetIncrementLayout(t *testing.T) { //nolint:funlen // parse, m
 	t.Run("parseAndMap", func(t *testing.T) {
 		t.Parallel()
 
-		ops := parseCounterList("section 1 item", counterResetDefault)
-		if len(ops) != pairLen || ops[0].name != "section" || ops[0].value != 1 ||
+		ops := parseCounterList(htmlSection+" 1 item", counterResetDefault)
+		if len(ops) != pairLen || ops[0].name != htmlSection || ops[0].value != 1 ||
 			ops[1].name != "item" || ops[1].value != 0 {
 			t.Fatalf("parse reset: %+v", ops)
 		}
 
-		incs := parseCounterList("section", counterIncrementDefault)
-		if len(incs) != 1 || incs[0].name != "section" || incs[0].value != 1 {
+		incs := parseCounterList(htmlSection, counterIncrementDefault)
+		if len(incs) != 1 || incs[0].name != htmlSection || incs[0].value != 1 {
 			t.Fatalf("parse increment: %+v", incs)
 		}
 

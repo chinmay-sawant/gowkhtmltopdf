@@ -331,8 +331,6 @@ func parseRGBColor(val, low string) (int, int, int, float64, bool) {
 
 // parseHSLColor parses hsl()/hsla() with hue in degrees (optional deg suffix),
 // saturation and lightness as percentages, and optional alpha like rgba().
-//
-//nolint:cyclop // single-pass in-place channel scan, matching parseRGBColor
 func parseHSLColor(val, low string) (int, int, int, float64, bool) {
 	open := strings.IndexByte(val, '(')
 	closeIdx := strings.LastIndexByte(val, ')')
@@ -346,44 +344,8 @@ func parseHSLColor(val, low string) (int, int, int, float64, bool) {
 		channels = rgbaChannelCount
 	}
 
-	var hue, sat, light, alpha float64
-
-	alphaRaw := ""
-	idx := open + 1
-
-	for channel := range channels {
-		start := idx
-
-		for idx < closeIdx && val[idx] != ',' {
-			idx++
-		}
-
-		raw := val[start:idx]
-		if channel == rgbaChannelCount-1 {
-			alphaRaw = raw
-		}
-
-		ok := false
-
-		switch channel {
-		case 0:
-			hue, ok = parseHueChannel(raw)
-		case 1:
-			sat, ok = parsePercentUnit(raw)
-		case 2:
-			light, ok = parsePercentUnit(raw)
-		default:
-			alpha, ok = parseColorChannel(raw)
-		}
-
-		if !ok {
-			return 0, 0, 0, 0, false
-		}
-
-		idx++
-	}
-
-	if idx != closeIdx+1 {
+	hue, sat, light, alpha, alphaRaw, parsed := parseHSLChannels(val, open+1, closeIdx, channels)
+	if !parsed {
 		return 0, 0, 0, 0, false
 	}
 
@@ -398,6 +360,50 @@ func parseHSLColor(val, low string) (int, int, int, float64, bool) {
 	}
 
 	return red, green, blue, clampAlpha(alpha), true
+}
+
+func parseHSLChannels(val string, idx, closeIdx, channels int) (float64, float64, float64, float64, string, bool) {
+	var chans [rgbaChannelCount]float64
+
+	alphaRaw := ""
+
+	for channel := range channels {
+		start := idx
+
+		for idx < closeIdx && val[idx] != ',' {
+			idx++
+		}
+
+		raw := val[start:idx]
+		if channel == rgbaChannelCount-1 {
+			alphaRaw = raw
+		}
+
+		chVal, parsed := parseOneHSLChannel(channel, raw)
+		if !parsed {
+			return 0, 0, 0, 0, "", false
+		}
+
+		chans[channel] = chVal
+		idx++
+	}
+
+	if idx != closeIdx+1 {
+		return 0, 0, 0, 0, "", false
+	}
+
+	return chans[0], chans[1], chans[hslChannelCount-1], chans[rgbaChannelCount-1], alphaRaw, true
+}
+
+func parseOneHSLChannel(channel int, raw string) (float64, bool) {
+	switch channel {
+	case 0:
+		return parseHueChannel(raw)
+	case 1, hslChannelCount - 1:
+		return parsePercentUnit(raw)
+	default:
+		return parseColorChannel(raw)
+	}
 }
 
 func parseHueChannel(chVal string) (float64, bool) {
@@ -443,29 +449,31 @@ func hslToRGB(hue, sat, light float64) (int, int, int) {
 
 	chroma := (1 - math.Abs(2*light-1)) * sat
 	hSector := hue / hslSectorDeg
-	xVal := chroma * (1 - math.Abs(math.Mod(hSector, 2)-1))
-	mVal := light - chroma/2
+	xVal := chroma * (1 - math.Abs(math.Mod(hSector, hslEvenPeriod)-1))
+	mVal := light - chroma/hslChromaHalf
 
-	var red, green, blue float64
-
-	switch {
-	case hSector < 1:
-		red, green, blue = chroma, xVal, 0
-	case hSector < 2:
-		red, green, blue = xVal, chroma, 0
-	case hSector < 3:
-		red, green, blue = 0, chroma, xVal
-	case hSector < 4:
-		red, green, blue = 0, xVal, chroma
-	case hSector < 5:
-		red, green, blue = xVal, 0, chroma
-	default:
-		red, green, blue = chroma, 0, xVal
-	}
+	red, green, blue := hslSectorRGB(hSector, chroma, xVal)
 
 	return clampByte((red + mVal) * maxRGBChannel),
 		clampByte((green + mVal) * maxRGBChannel),
 		clampByte((blue + mVal) * maxRGBChannel)
+}
+
+func hslSectorRGB(hSector, chroma, xVal float64) (float64, float64, float64) {
+	switch {
+	case hSector < 1:
+		return chroma, xVal, 0
+	case hSector < hslSectorYG:
+		return xVal, chroma, 0
+	case hSector < hslSectorGC:
+		return 0, chroma, xVal
+	case hSector < hslSectorCB:
+		return 0, xVal, chroma
+	case hSector < hslSectorBM:
+		return xVal, 0, chroma
+	default:
+		return chroma, 0, xVal
+	}
 }
 
 func clampUnit(fVal float64) float64 {

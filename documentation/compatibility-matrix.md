@@ -127,8 +127,25 @@ Status legend (verified against `applyRestProps` in
 
 | Property | Status | Notes / verified by |
 |----------|--------|---------------------|
-| `page-break-before/after/inside` (`auto\|always\|avoid`) | Implemented (print pipeline) | parsed into `style.PageBreak*`; honored as canvas-Y flow shifts by the phase-5 paginator - `beforeAlways` `paint.go:203`, `afterBreaks` `paint.go:236`, `avoidInside` `paint.go:179`; tests `TestPageBreakParsing`, `TestPageBreakBeforeAlways`, `TestPageBreakInsideAvoid` |
-| `orphans`, `widows` | Partial | CSS `orphans` / `widows` **parsed** (integer ≥1, inherit, initial 2) in `applyRestProps`; Fragmentation Rule 3 enforced when line boxes are countable (`paint.go` `orphansWidows`). Geometric short-block **heuristic** remains as fallback when line counts are unavailable (fixture-30). See fixture-37. |
+| `page-break-before/after/inside` and `break-before/after/inside` | Implemented (print pipeline) with Partial aliases | Same apply arms (`applyPageBreakProps` `style_properties.go:1467`). Stored as `style.PageBreak*` `always` / `avoid` / unset. Paginator honors them as canvas-Y flow shifts: `avoidInside` `paint_flow.go:488`, `beforeAlways` `paint_flow.go:822`, `afterBreaks` `paint_flow.go:1037`. Tests `TestPageBreakParsing`, `TestPageBreakBeforeAlways`, `TestPageBreakInsideAvoid`. Alias table below. |
+| `orphans`, `widows` | Partial | CSS `orphans` / `widows` **parsed** (integer ≥1, inherit, initial 2) in `applyRestProps`; Fragmentation Rule 3 enforced when line boxes are countable (`paint_flow.go` `orphansWidows`). Geometric short-block **heuristic** remains as fallback when line counts are unavailable (fixture-30). See fixture-37. |
+| `@page` unnamed `margin` / `size` | Implemented | Last unnamed `@page` still fills `Stylesheet.Page`. Convert applies that box to every page (`applyCSSPageMargins`). |
+| `@page :first` | Partial | Parsed onto `Pages` with `Sel ":first"`. Page 1 can use a different **margin**. Size stays unnamed-only (one page size per document). Proof: `TestParsePageSelectors`, `TestPageFirstMargins`. |
+| `@page :left` / `:right` / named pages | Partial (parse only) | Stored on `Pages`. Not applied. The writer has no even/odd or named-page model. |
+| `@page` margin boxes (`@top-center` and friends) | Not implemented | No `@top-*` / `@bottom-*` / `@left-*` / `@right-*` parse. Repeating chrome is CLI `--header-*` / `--footer-*` (§7.7). |
+
+**Break aliases (54.2).** `page-break-*` and `break-*` share one store. The PDF writer has no left/right or even/odd page side (duplex is out of scope, §5). `break-before: left` does **not** force a left page; it aliases to page `always`.
+
+| Specified value | `break-before` / `page-break-before` and `*-after` | `break-inside` / `page-break-inside` |
+|-----------------|-----------------------------------------------------|--------------------------------------|
+| `always` | `always` (`style_properties.go:1486` and `:1499`) | `always` (`style_properties.go:1513`) |
+| `page` | `always` | `always` |
+| `column` | `always` (new page, which also starts a new multicol line) | ignored (not in the inside switch) |
+| `left`, `right` | `always` | ignored |
+| `avoid` | `avoid` (`style_properties.go:1488` and `:1501`) | `avoid` (`style_properties.go:1515`) |
+| `avoid-page` | `avoid` | `avoid` |
+| `avoid-column` | ignored (not mapped to page `avoid`; wiki reference lists) | ignored (`style_properties.go:1511`) |
+| `recto`, `verso`, other | ignored | ignored |
 
 ### Feature checklist (page geometry, tables, pagination)
 
@@ -138,7 +155,7 @@ Status legend (verified against `applyRestProps` in
 | `colspan` | Yes | `colSpan`; test `TestTableColspan` |
 | `rowspan` | Yes / Implemented | column occupancy + height growth (`placeTableCells`, `growRowspanRows`); tests `TestTableRowspan*` |
 | `border-collapse` | Partial | see §2.5 |
-| Pagination | Fragment + whole-op + phase-18 polish | rect-type ops (fill/stroke/line) split at page boundaries; text/images/links move wholly (line-level) (`paint.go`); `page-break-before/after: always`, `page-break-inside: avoid`, table rows never split; **`<thead>` / `table-header-group` repeat** on continuation pages (`repeatTableHeaders`, fixture-23); CSS `orphans`/`widows` parsed + Rule 3 when line boxes exist (heuristic fallback; fixtures 30/37); `--zoom` forwarded; smart-shrinking re-layouts. `Result.Locations` for outlines/links. See "Pagination" note below. |
+| Pagination | Fragment + whole-op + phase-18 polish | rect-type ops (fill/stroke/line) split at page boundaries; text/images/links move wholly (line-level) (`paint_flow.go`); `page-break-before/after: always`, `page-break-inside: avoid`, table rows never split; **`<thead>` / `table-header-group` repeat** on continuation pages (`repeatTableHeaders`, fixture-23); CSS `orphans`/`widows` parsed + Rule 3 when line boxes exist (heuristic fallback; fixtures 30/37); `--zoom` forwarded; smart-shrinking re-layouts. `Result.Locations` for outlines/links. Break aliases in §2.6. See "Pagination" note below. |
 | Floats / absolute positioning | Float lite + absolute/fixed/sticky lite | float/`clear` lite (§2.2); relative/absolute/fixed lite; sticky = print page scrollport + overflow@0 (§2.2; fixture-31) |
 | Flexbox / Grid | Partial | Stage A flex + Stage B grid (areas/dense/`minmax`) + Stage C lite — §2.7 / §2.8. Paths: `flex.go`, `grid.go`, `style.go`; fixtures 25/28/32–35; plan `plans/0.2.0/phases/subplans-tier-2/flex-grid-full.md`. **Not** Bootstrap/Tailwind / Chrome layout-test parity |
 | Multicol | Partial | Report lite: `column-count`/`column-width`/`columns`, `column-gap` (normal→1em), `column-span:none\|all`, `column-fill:balance\|auto`; column boxes do not straddle pages — §2.9; `multicol.go`; fixture-39 |
@@ -146,7 +163,7 @@ Status legend (verified against `applyRestProps` in
 | JavaScript | No | `<script>` stripped at load; no engine. `--enable-javascript` is an **unknown option** (Policy A) |
 | Image-mode text | TTF outline raster | same Liberation faces as PDF; pure-Go coverage AA (`internal/imageout/ttfraster.go`); 5×7 bitmap only if an op has no font |
 
-**Pagination (phases 5 + 18).** Box-aware fragmentation: rect-type ops crossing a page boundary are split; text, images and links move wholly (line-level). `page-break-before/after: always` and `page-break-inside: avoid` via canvas-Y flow shifts; table rows never split. **Table headers repeat** across pages (`repeatTableHeaders` in `paint.go`; fixture-23). **`--zoom`** is forwarded to `layout.Options.Zoom` (`convert.go`; `TestZoom`). **Smart-shrinking** detects over-wide content and **re-layouts** with an effective zoom (`TestRunPDFSmartShrinking`). CSS `orphans`/`widows` are parsed (initial 2) and Fragmentation Rule 3 is applied when line boxes are available; the geometric short-block heuristic remains for edge cases (fixtures 30/37). `Result.Locations` carries element boxes for outlines/links.
+**Pagination (phases 5 + 18).** Box-aware fragmentation: rect-type ops crossing a page boundary are split; text, images and links move wholly (line-level). `page-break-before/after: always` and `page-break-inside: avoid` via canvas-Y flow shifts (`paint_flow.go`); table rows never split. **Table headers repeat** across pages (`repeatTableHeaders`; fixture-23). **`--zoom`** is forwarded to `layout.Options.Zoom` (`convert.go`; `TestZoom`). **Smart-shrinking** detects over-wide content and **re-layouts** with an effective zoom (`TestRunPDFSmartShrinking`). CSS `orphans`/`widows` are parsed (initial 2) and Fragmentation Rule 3 is applied when line boxes are available; the geometric short-block heuristic remains for edge cases (fixtures 30/37). Break value aliases (`left`/`right`/`page`/`column` -> `always`, `avoid-column` ignored) are in §2.6; they do not create even/odd pages. `Result.Locations` carries element boxes for outlines/links.
 
 ### 2.7 Flexbox (Stage A — print CSS subset)
 
@@ -204,14 +221,14 @@ Evidence: `internal/layout/multicol.go`, `style_cascade.go` (`applyRestProps`) a
 | `column-span` (`none` \| `all`) | [x] Implemented | Mid-flow spanner; preceding columns balance — fixture-39 / `TestMulticolColumnSpanAll` |
 | `column-fill` (`balance` \| `auto`) | [x] Implemented | Balance packs to equal stacks; auto fills to page/definite height |
 | Column box pagination | [x] Implemented | Column boxes do not cross page boundaries; new multicol line on next page — `TestMulticolLinesDoNotStraddlePages` |
-| `break-*: column \| avoid-column` | [~] Partial | Aliased to page `always`/`avoid` (starts new multicol line via page break) |
+| `break-*: column \| avoid-column` | [~] Partial | `column` on before/after aliases to page `always` (`applyBreakBeforeProps` `style_properties.go:1486`). `avoid-column` is **ignored** (not page `avoid`). See §2.6 alias table. |
 | `column-rule*`, L2 integer spans, overflow columns | [ ] Missing | Deferred (see `plans/0.2.0/phases/tier-2-pending-3/multicol.md` out of scope) |
 
 ## 3. Supported units
 
 Status legend as in §2; resolution sites: `LengthToPt`
 `internal/css/container.go:113` (`ex`/`ch` as 0.5em at lines 133-134),
-`lengthBox` `style_values.go:521` (width/height/min/max), `marginLen`
+`lengthBox` `style_values.go:598` (width/height/min/max), `marginLen`
 `style_values.go:564` (margins/padding/letter-spacing), parse gate
 `ParseLength` `values.go:108`.
 
@@ -226,9 +243,10 @@ Status legend as in §2; resolution sites: `LengthToPt`
 | `%` | Implemented | containing block for box/margins; parent font-size for `font-size` |
 | `vw`, `vh` | Partial | resolved for width/height/min/max (`lengthBox` `style.go:662-663`) only; ignored for margins/padding/font-size |
 | `ex`, `ch` | Partial | Resolved as 0.5em (`LengthToPt` `internal/css/container.go:133-134`, `exChToEmFactor`). Not font-metric x-height or advance width. |
-| `calc()` | Partial | Three-token subset only: `calc(A + B)`, `calc(A - B)`, `calc(A * N)` (`calcLength` `style_values.go:598`), used from `lengthBox` / `marginLen`. Longer or nested calc stays invalid so a fallback can win. |
+| `calc()` | Partial | Three-token subset only: `calc(A + B)`, `calc(A - B)`, `calc(A * N)` (`calcLength` `style_values.go:763`), used from `lengthBox` / `marginLen`. Longer or nested calc stays invalid so a fallback can win. |
 | `clamp()` | Partial | `clamp(min, pref, max)` via `clampLength`; no longer dropped from cascade. Nested calc inside clamp out. Test `TestClampLength`. `color-mix(` / `light-dark(` / `oklch(` still excluded. |
-| `vmin`, `vmax`, `dpi`-style | Not implemented | rejected at parse |
+| `vmin`, `vmax` | Partial | Layout `vminVmaxPt` (`style_values.go:668`) on `lengthBox` / `marginLen`. `css.ParseLength` still rejects them; used values are parsed in layout. Test `TestVminVmax`. |
+| `dpi`-style | Not implemented | rejected at parse |
 
 ## 4. Supported selector syntax (cascade)
 
@@ -257,7 +275,7 @@ Status legend as in §2; evidence in `internal/css/css.go`.
 | `var()` / `--*` custom properties | Partial | `--*` inherit then overlay (`mergeCustomProps` `style_cascade.go:18`); `var()` expanded before apply (`resolveRawVars` `style_cascade.go:45`; `ResolveCustomProps` `values.go:514`). Cycles resolve empty. Tests `cssvar_font_test.go`, `TestResolveCustomProps*` |
 | `@container` | Partial | Size queries only (`inline-size`/`width` + `and`/`or`/`not`); named containers; two-pass style after used inline size. No style/scroll-state queries; no `cq*` units. `internal/css/container.go`; fixture-42 |
 | `container-type` / `container-name` / `container` | Partial | Parsed `applyContainerProps` (`style_properties.go:1296`). Size containers measured in `layout/container.go:43`. `container-type` honors `normal`/`size`/`inline-size` only. No `cq*` units; no style/scroll-state. Fixture-42 |
-| `@page` | Implemented | `@page { margin }` and `@page { size }` applied to page geometry (`applyCSSPageMargins`) |
+| `@page` | Partial | Unnamed `margin`/`size` on every page. `@page :first` can override **margin** on page 1 (`TestPageFirstMargins`). `:left`/`:right`/named pages parse only. Margin boxes (`@top-center`) not painted; CLI `--header-*` is repeating chrome. See §2.6. |
 | `@font-face` | Partial | Parsed; `MergeFontFaces` loads TTF/OTF/WOFF1 via `FetchSub` (local **and** `https://`) under the same ACL + `NetworkPolicy` on PDF and image paths. `.woff2` / `.eot` / `data:` skipped. See §5 |
 | `@import` | Partial | Parsed onto `Stylesheet.Imports`; `CollectSheets` fetches under the same ACL as `<link>`, depth cap 8, cycle skip, failed fetch skipped. Media prelude uses `MediaMatches`. Tests `TestParseImport`, `TestImportStylesheet` |
 

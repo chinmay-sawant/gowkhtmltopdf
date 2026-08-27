@@ -56,22 +56,31 @@ func (e *engine) buildTable(node *html.Node, style ResolvedStyle, availW, posX, 
 	// left/right are out of scope and keep the top placement.
 	captionBelow := captionSideIsBottom(style, capStyle)
 
-	var caption *box
 	tableY := posY
+
 	if !captionBelow {
-		caption = e.buildCaptionAt(capNode, tableW, posX, posY)
-		if caption != nil {
-			tableBox.children = append(tableBox.children, caption)
-			tableY += caption.height
-		}
+		tableY = e.attachCaption(tableBox, capNode, tableW, posX, posY)
 	}
 
+	e.layoutTableGrid(tableBox, style, rows, cellData, colW, spacing, nCols, posX, tableY)
+
+	if captionBelow {
+		_ = e.attachCaption(tableBox, capNode, tableW, posX, posY+tableBox.height)
+	}
+
+	return tableBox
+}
+
+func (e *engine) layoutTableGrid(
+	tableBox *box, style ResolvedStyle, rows [][]*html.Node, cellData [][]*box,
+	colW []float64, spacing float64, nCols int, posX, tableY float64,
+) {
 	padL := e.scalePt(style.PaddingLeft) + e.scalePt(style.BorderLeft.Width)
 	rowHeights, rowTops, curY := e.measureTableRows(tableBox, rows, cellData, colW, spacing, nCols, posX, tableY, padL)
 
 	tableBox.rows = cellData
 	tableHeight := curY + e.scalePt(style.PaddingBottom) + e.scalePt(style.BorderBottom.Width)
-	tableBox.height = tableY + tableHeight - posY
+	tableBox.height = tableY + tableHeight - tableBox.y
 
 	if style.BGColor[3] > 0 && e.opts.Background {
 		e.add(Op{ //nolint:exhaustruct // intentional zero fields
@@ -81,16 +90,23 @@ func (e *engine) buildTable(node *html.Node, style ResolvedStyle, availW, posX, 
 	}
 
 	e.emitTableCells(tableBox, style, posX, tableY, tableHeight, padL, colW, rowTops, rowHeights, cellData)
+}
 
-	if captionBelow {
-		caption = e.buildCaptionAt(capNode, tableW, posX, posY+tableBox.height)
-		if caption != nil {
-			tableBox.children = append(tableBox.children, caption)
-			tableBox.height += caption.height
-		}
+func (e *engine) attachCaption(tableBox *box, capNode *html.Node, tableW, posX, posY float64) float64 {
+	caption := e.buildCaptionAt(capNode, tableW, posX, posY)
+	if caption == nil {
+		return posY
 	}
 
-	return tableBox
+	tableBox.children = append(tableBox.children, caption)
+
+	if posY == tableBox.y {
+		return posY + caption.height
+	}
+
+	tableBox.height += caption.height
+
+	return posY
 }
 
 func captionSideIsBottom(tableStyle ResolvedStyle, captionStyle *ResolvedStyle) bool {

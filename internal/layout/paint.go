@@ -40,6 +40,28 @@ type PaintOptions struct {
 	MarginBottom float64
 	MarginLeft   float64
 	MarginRight  float64
+	// First, when non-nil, is the page-0 margin box from @page :first.
+	First *PageMargins `exhaustruct:"optional"`
+}
+
+// PageMargins is one page-box margin set in points.
+type PageMargins struct {
+	Top, Right, Bottom, Left float64
+}
+
+// forPage returns geometry for one output page. Page 0 uses First when set;
+// later pages keep the unnamed margins. Pagination still uses one contentH.
+func (opts PaintOptions) forPage(pageIdx int) PaintOptions {
+	if pageIdx != 0 || opts.First == nil {
+		return opts
+	}
+
+	opts.MarginTop = opts.First.Top
+	opts.MarginBottom = opts.First.Bottom
+	opts.MarginLeft = opts.First.Left
+	opts.MarginRight = opts.First.Right
+
+	return opts
 }
 
 // Paint paginates the display list across pages and paints it into doc.
@@ -344,7 +366,7 @@ func paintPages(
 			pageN:    pageIdx,
 			contentH: contentH,
 			pageH:    page.Height(),
-			opts:     opts,
+			opts:     opts.forPage(pageIdx),
 			resName:  resName,
 			nextImg:  0,
 			err:      paintErr,

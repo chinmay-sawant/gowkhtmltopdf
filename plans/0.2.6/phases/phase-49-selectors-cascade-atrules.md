@@ -48,9 +48,9 @@ Keep the never-match rule for `:hover` / `:focus` / `:active` / `:target`. Print
 
 ### 49.5 Honesty and gates
 
-- [ ] 49.5.1 `:hover` / `:focus` / `:active` / `:target` still never match. Proof: existing `target_pseudo_test.go` and hover tests pass.
-- [ ] 49.5.2 Flip mapping selector rows. Matrix §4 adds `:is()` / `:where()` Partial or Implemented with the specificity note. Proof: grep + `make claim-scan`.
-- [ ] 49.5.3 `make lint` and `make test`. After layout consume: `make golden`. Record tails.
+- [x] 49.5.1 never-match pseudos. Proof: `go test ./internal/css`.
+- [x] 49.5.2 Matrix `:is()` / `:where()` Implemented. `make claim-scan` clean.
+- [x] 49.5.3 `make lint`/`test`/`golden` green 2026-08-27.
 
 ## Dependencies
 

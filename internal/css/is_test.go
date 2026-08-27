@@ -7,8 +7,36 @@ import (
 func TestParseIs(t *testing.T) {
 	t.Parallel()
 
-	sel, ok := parseSelector(":is(h1, h2, h3)")
-	if !ok {
+	t.Run("simple list", func(t *testing.T) {
+		t.Parallel()
+
+		checkParseIsSimple(t)
+	})
+
+	t.Run("nested", func(t *testing.T) {
+		t.Parallel()
+
+		checkParseIsNested(t)
+	})
+
+	t.Run("invalid", func(t *testing.T) {
+		t.Parallel()
+
+		checkParseIsInvalid(t)
+	})
+
+	t.Run("invalid rule dropped", func(t *testing.T) {
+		t.Parallel()
+
+		checkParseIsInvalidDropped(t)
+	})
+}
+
+func checkParseIsSimple(t *testing.T) {
+	t.Helper()
+
+	sel, parsed := parseSelector(":is(h1, h2, h3)")
+	if !parsed {
 		t.Fatal("parseSelector(:is(h1, h2, h3)) failed")
 	}
 
@@ -21,14 +49,18 @@ func TestParseIs(t *testing.T) {
 		t.Fatalf("pseudo = %+v", pseudo)
 	}
 
-	for i, tag := range []string{"h1", "h2", "h3"} {
-		if got := pseudo.Is[i].Parts[0].Tag; got != tag {
-			t.Errorf("arg %d tag = %q, want %q", i, got, tag)
+	for idx, tag := range []string{"h1", "h2", "h3"} {
+		if got := pseudo.Is[idx].Parts[0].Tag; got != tag {
+			t.Errorf("arg %d tag = %q, want %q", idx, got, tag)
 		}
 	}
+}
 
-	nested, ok := parseSelector(":is(:is(.a), p)")
-	if !ok {
+func checkParseIsNested(t *testing.T) {
+	t.Helper()
+
+	nested, parsed := parseSelector(":is(:is(.a), p)")
+	if !parsed {
 		t.Fatal("nested :is failed")
 	}
 
@@ -40,6 +72,10 @@ func TestParseIs(t *testing.T) {
 	if inner.Is[0].Parts[0].Pseudos[0].Name != pseudoClassIs {
 		t.Fatalf("inner :is missing: %+v", inner.Is[0])
 	}
+}
+
+func checkParseIsInvalid(t *testing.T) {
+	t.Helper()
 
 	invalid := []string{
 		":is()",
@@ -53,6 +89,10 @@ func TestParseIs(t *testing.T) {
 			t.Errorf("parseSelector(%q) ok unexpectedly: %+v", src, got)
 		}
 	}
+}
+
+func checkParseIsInvalidDropped(t *testing.T) {
+	t.Helper()
 
 	str := mustSheet(t, `:is(span::after) { color: red } p { color: blue }`)
 	if len(str.Rules) != 1 || str.Rules[0].Selectors[0].Parts[0].Tag != "p" {
@@ -140,6 +180,28 @@ func TestIsSpecificity(t *testing.T) {
 func TestWherePseudo(t *testing.T) {
 	t.Parallel()
 
+	t.Run("match", func(t *testing.T) {
+		t.Parallel()
+
+		checkWhereMatch(t)
+	})
+
+	t.Run("specificity", func(t *testing.T) {
+		t.Parallel()
+
+		checkWhereSpecificity(t)
+	})
+
+	t.Run("type beats where id", func(t *testing.T) {
+		t.Parallel()
+
+		checkTypeBeatsWhereID(t)
+	})
+}
+
+func checkWhereMatch(t *testing.T) {
+	t.Helper()
+
 	root := treeFor(t, `<html><body>
 		<h1 id="h1">H</h1>
 		<p id="note" class="note">n</p>
@@ -157,20 +219,24 @@ func TestWherePseudo(t *testing.T) {
 		{":where(#h1, .missing)", "h1", true},
 	}
 	for _, testCase := range cases {
-		sel, ok := parseSelector(testCase.sel)
-		if !ok {
+		sel, parsed := parseSelector(testCase.sel)
+		if !parsed {
 			t.Fatalf("parseSelector(%q) failed", testCase.sel)
 		}
 
-		n := byID(root, testCase.id)
-		if n == nil {
+		node := byID(root, testCase.id)
+		if node == nil {
 			t.Fatalf("missing id %q", testCase.id)
 		}
 
-		if got := Match(sel, n); got != testCase.want {
+		if got := Match(sel, node); got != testCase.want {
 			t.Errorf("Match(%q, #%s) = %v, want %v", testCase.sel, testCase.id, got, testCase.want)
 		}
 	}
+}
+
+func checkWhereSpecificity(t *testing.T) {
+	t.Helper()
 
 	specCases := []struct {
 		sel     string
@@ -182,8 +248,8 @@ func TestWherePseudo(t *testing.T) {
 		{"p", 0, 0, 1},
 	}
 	for _, testCase := range specCases {
-		sel, ok := parseSelector(testCase.sel)
-		if !ok {
+		sel, parsed := parseSelector(testCase.sel)
+		if !parsed {
 			t.Fatalf("parseSelector(%q) failed", testCase.sel)
 		}
 
@@ -192,19 +258,24 @@ func TestWherePseudo(t *testing.T) {
 			t.Errorf("Specificity(%q) = (%d,%d,%d), want (%d,%d,%d)", testCase.sel, a, b, c, testCase.a, testCase.b, testCase.c)
 		}
 	}
+}
 
-	whereID, ok := parseSelector(":where(#h1)")
-	if !ok {
+func checkTypeBeatsWhereID(t *testing.T) {
+	t.Helper()
+
+	whereID, whereOK := parseSelector(":where(#h1)")
+	if !whereOK {
 		t.Fatal("parse :where(#h1)")
 	}
 
-	typeSel, ok := parseSelector("p")
-	if !ok {
+	typeSel, typeOK := parseSelector("p")
+	if !typeOK {
 		t.Fatal("parse p")
 	}
 
 	wa, wb, wc := Specificity(whereID)
 	ta, tb, tc := Specificity(typeSel)
+
 	if !betterSpec(ta, tb, tc, wa, wb, wc) {
 		t.Fatalf("type p %+v should beat :where(#h1) %+v", []int{ta, tb, tc}, []int{wa, wb, wc})
 	}

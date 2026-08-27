@@ -276,6 +276,7 @@ func (e *engine) prependChrome(insertAt int, boxNode *box, sty ResolvedStyle, po
 		})
 	}
 	chrome = e.appendBackgroundImage(chrome, sty, posX, posY, width, height)
+	chrome = e.appendBoxShadow(chrome, sty, posX, posY, width, height)
 
 	switch {
 	case hasRoundedRadii(radii) && roundedSolidBorder(sty):
@@ -339,7 +340,7 @@ func (e *engine) collapsedOrFullBorderOps(
 //
 //nolint:wsl // generic frame checks remain adjacent to their border gates.
 func isNeutralFrameSection(node *html.Node, sty ResolvedStyle) bool {
-	if node == nil || node.Name != "section" {
+	if node == nil || node.Name != htmlSection {
 		return false
 	}
 	if sty.BorderTop.Style != solidKeyword || sty.BorderBottom.Style != solidKeyword {

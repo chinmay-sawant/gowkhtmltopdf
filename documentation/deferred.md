@@ -3,8 +3,11 @@
 This page is the product-facing inventory of work that is **partial**,
 **not implemented**, or **not planned**. The live post-MVP ledger is
 [`plans/0.2.0/10-canonical-post-mvp-roadmap.md`](../plans/0.2.0/10-canonical-post-mvp-roadmap.md).
-Fidelity language and degrade rules: [fidelity.md](fidelity.md). The
-normative per-property contract is [compatibility-matrix.md](compatibility-matrix.md).
+Leftover print CSS is tracked in
+[`plans/0.2.6/48-canonical-0.2.6-css-coverage.md`](../plans/0.2.6/48-canonical-0.2.6-css-coverage.md)
+(phases 48-53 landed; 54-56 closing). Fidelity language and degrade rules:
+[fidelity.md](fidelity.md). The normative per-property contract is
+[compatibility-matrix.md](compatibility-matrix.md).
 
 Status here is checked against current code (CLI flag registration, load,
 layout, and PDF write). Stale “accepted + warning” wording elsewhere loses
@@ -82,10 +85,15 @@ Do not treat a public SPA URL as the acceptance bar for report work.
 | `[subject]` placeholder | Expands **empty** (no subject setting field). | Not planned |
 | HTML header / footer | **Partial** nested child layout (body CSS subset, flex/grid/images, local `@font-face`), clipped to the reserved margin band. Not a browser nested browsing context; no CSS running elements. | Browser HF out |
 | `:hover` / `:focus` / `:active` | Parsed onto the compound; `matchPseudo` **never matches** (print has no pointer/focus). | — |
-| `table-layout: fixed` | Parsed; unused (auto table layout only). | — |
+| `table-layout: fixed` | **Partial** (fixed lite): consumed when `fixed` and table width is definite (`layout_tables.go:45`). Content max-content ignored. | Matrix §2.5 |
 | `@page size` | **Consumed** via `applyCSSPageMargins` (EXT-04); unnamed `@page margin` likewise. | #EXT-04 done |
-| `background-image` / gradients | Ignored (`background-color` is painted). | — |
-| Overflow clip | `overflow` is parsed for sticky scrollport selection. **Not** a general paint clip. | — |
+| `background-image` / gradients | **Partial** first `url(...)` layer (`background_image.go`); gradients still ignored. | Phase 52 |
+| Overflow clip | **Partial**: `hidden`/`clip`/`auto`/`scroll` clip descendant paint to the padding box (`overflow_clip.go`). Sticky still uses overflow as scrollport at offset 0. | Phase 52 |
+| Leftover print CSS | Active ledger: [`plans/0.2.6/48-canonical-0.2.6-css-coverage.md`](../plans/0.2.6/48-canonical-0.2.6-css-coverage.md). Do not treat `plans/0.2.0/phases/pending-phase-items/` as the live CSS list. | 0.2.6 phases 54-56 |
+| `box-shadow` | No apply arm in `style_properties.go`. No shadow paint op. | 52.5 `[~]`; next gate is a named report fixture that needs one un-inset shadow |
+| `list-style-image` | No apply arm. List markers stay disc/decimal/alpha/roman text (`markerText`). | 53.4 `[~]` |
+| `@page :first` / `:left` / `:right` | `:first` margins apply on page 1 (`TestPageFirstMargins`). `:left`/`:right`/named pages parse onto `Pages` and are not applied. Size is unnamed-only. | 54.1.3 `page: ident` `[~]` |
+| `@page` margin boxes (`@top-center`) | Not parsed. Repeating chrome is CLI `--header-*` / `--footer-*`. | 54.3 `[~]` |
 
 ---
 

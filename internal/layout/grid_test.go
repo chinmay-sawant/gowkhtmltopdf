@@ -1068,6 +1068,8 @@ func TestIntrinsicHeightPercentCyclic(t *testing.T) {
 	}
 }
 
+const twoFrTracks = "1fr 1fr"
+
 func TestStripMasonryKeyword(t *testing.T) {
 	t.Parallel()
 
@@ -1075,7 +1077,7 @@ func TestStripMasonryKeyword(t *testing.T) {
 		t.Fatal("want empty after strip")
 	}
 
-	if stripMasonryKeyword("1fr 1fr") != "1fr 1fr" {
+	if stripMasonryKeyword(twoFrTracks) != twoFrTracks {
 		t.Fatal("non-masonry tracks must stay")
 	}
 }

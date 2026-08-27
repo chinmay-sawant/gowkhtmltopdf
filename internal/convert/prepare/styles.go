@@ -156,7 +156,7 @@ func (collector *sheetCollector) collectLink(ctx context.Context, node *html.Nod
 // addWithImports appends imported sheets (recursively) before sheet so @import
 // rules precede the importer, matching CSS cascade order.
 //
-//nolint:wsl,nlreturn // collector import flow
+//nolint:wsl // collector import flow
 func (collector *sheetCollector) addWithImports(ctx context.Context, sheet *css.Stylesheet, base string, depth int) {
 	if sheet == nil || collector.err != nil {
 		return
@@ -182,53 +182,83 @@ func (collector *sheetCollector) fetchImports(ctx context.Context, sheet *css.St
 	}
 }
 
-//nolint:wsl,nlreturn,lll // collector import flow
 func (collector *sheetCollector) fetchOneImport(ctx context.Context, rule css.ImportRule, base string, depth int) {
 	if collector.err != nil {
 		return
 	}
+
 	if err := ctx.Err(); err != nil {
 		collector.err = err
+
 		return
 	}
 
-	ref := importRef(rule.URL)
+	ref := collector.prepareImportRef(rule, base)
 	if ref == "" {
 		return
 	}
-	if rule.Media != "" && !css.MediaMatches(rule.Media, collector.opts.MediaType, collector.opts.ViewportW, collector.opts.ViewportH) {
+
+	sheet, sheetBase := collector.loadImportedSheet(ctx, base, ref)
+	if sheet == nil {
 		return
+	}
+
+	collector.addWithImports(ctx, sheet, sheetBase, depth+1)
+}
+
+func (collector *sheetCollector) prepareImportRef(rule css.ImportRule, base string) string {
+	ref := importRef(rule.URL)
+	if ref == "" {
+		return ""
+	}
+
+	if rule.Media != "" && !css.MediaMatches(
+		rule.Media,
+		collector.opts.MediaType,
+		collector.opts.ViewportW,
+		collector.opts.ViewportH,
+	) {
+		return ""
 	}
 
 	resolved := resolvedRef(base, ref)
 	if collector.seenURL(resolved) {
-		return
+		return ""
 	}
+
 	collector.noteSeen(resolved)
 
+	return ref
+}
+
+func (collector *sheetCollector) loadImportedSheet(ctx context.Context, base, ref string) (*css.Stylesheet, string) {
 	resource, err := collector.fetchRef(ctx, base, ref)
 	if err != nil {
 		collector.warn("skipping @import %q: %v", ref, err)
-		return
+
+		return nil, ""
 	}
+
 	if resource == nil || resource.Skip {
 		collector.warn("skipping @import %q: resource skipped", ref)
-		return
+
+		return nil, ""
 	}
+
 	collector.noteSeen(resource.URL)
 
 	sheet, err := css.Parse(string(resource.Body))
 	if err != nil {
 		collector.warn("skipping @import %q: %v", ref, err)
-		return
+
+		return nil, ""
 	}
-	collector.addWithImports(ctx, sheet, resourceBase(resource), depth+1)
+
+	return sheet, resourceBase(resource)
 }
 
 // fetchRef loads ref with the same ACL as <link rel=stylesheet>. Relative
 // imports resolve against the current sheet base, not the document base.
-//
-//nolint:wsl,nlreturn // collector import flow
 func (collector *sheetCollector) fetchRef(ctx context.Context, base, ref string) (*load.Resource, error) {
 	resources := collector.resources
 	if base != "" && base != resources.Base() {
@@ -237,13 +267,19 @@ func (collector *sheetCollector) fetchRef(ctx context.Context, base, ref string)
 		}
 	}
 
-	return resources.Fetch(ctx, ref)
+	resource, err := resources.Fetch(ctx, ref)
+	if err != nil {
+		return nil, fmt.Errorf("%w", err)
+	}
+
+	return resource, nil
 }
 
 func (collector *sheetCollector) seenURL(raw string) bool {
 	if raw == "" || collector.seen == nil {
 		return false
 	}
+
 	_, ok := collector.seen[raw]
 
 	return ok
@@ -253,6 +289,7 @@ func (collector *sheetCollector) noteSeen(raw string) {
 	if raw == "" {
 		return
 	}
+
 	if collector.seen == nil {
 		collector.seen = make(map[string]struct{})
 	}
@@ -264,6 +301,7 @@ func resourceBase(resource *load.Resource) string {
 	if resource == nil {
 		return ""
 	}
+
 	if resource.Base != "" {
 		return resource.Base
 	}
@@ -285,6 +323,7 @@ func resolvedRef(base, ref string) string {
 	if err != nil {
 		return strings.TrimSpace(ref)
 	}
+
 	if parsed.IsAbs() || strings.TrimSpace(base) == "" {
 		return parsed.String()
 	}

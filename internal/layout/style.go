@@ -12,23 +12,29 @@ import (
 
 // CSS keyword constants shared by the cascade (goconst).
 const (
-	inheritKeyword     = "inherit"
-	solidKeyword       = "solid"
-	clearKeyword       = "clear"
-	visibleKeyword     = "visible"
-	pageKeyword        = "page"
-	avoidKeyword       = "avoid"
-	avoidPageValue     = "avoid-page"
-	remUnit            = "rem"
-	divElementName     = "div"
-	styleElement       = "style"
-	borderWidthKeyword = "border-width"
-	borderStyleKeyword = "border-style"
-	borderColorKeyword = "border-color"
-	gapKeyword         = "gap"
-	containerKeyword   = "container"
-	flexKeyword        = "flex"
-	flexStartKeyword   = "flex-start"
+	inheritKeyword       = "inherit"
+	solidKeyword         = "solid"
+	clearKeyword         = "clear"
+	visibleKeyword       = "visible"
+	pageKeyword          = "page"
+	avoidKeyword         = "avoid"
+	avoidPageValue       = "avoid-page"
+	remUnit              = "rem"
+	divElementName       = "div"
+	styleElement         = "style"
+	borderWidthKeyword   = "border-width"
+	borderStyleKeyword   = "border-style"
+	borderColorKeyword   = "border-color"
+	gapKeyword           = "gap"
+	containerKeyword     = "container"
+	flexKeyword          = "flex"
+	flexStartKeyword     = "flex-start"
+	cssPropMarginInline  = "margin-inline"
+	cssPropMarginBlock   = "margin-block"
+	cssPropPaddingInline = "padding-inline"
+	cssPropPaddingBlock  = "padding-block"
+	cssPropInsetBlock    = "inset-block"
+	cssPropInsetInline   = "inset-inline"
 )
 
 // hashFontFamily fingerprints a CSS font-family list without allocating.
@@ -210,6 +216,12 @@ type ResolvedStyle struct {
 	QuotesClose       string
 	CounterReset      string
 	CounterIncrement  string
+	ListStyleImage    string
+	BoxShadowX        float64
+	BoxShadowY        float64
+	BoxShadowBlur     float64
+	BoxShadowColor    [3]float64
+	BoxShadowSet      bool
 	// CustomProps holds resolved CSS custom properties (--*) for this element
 	// (inherited). Shared with the parent map when the element declares none.
 	CustomProps map[string]string
@@ -667,6 +679,10 @@ type comparableResolvedStyle struct {
 	ListStylePosition                                                                          string
 	QuotesOpen, QuotesClose                                                                    string
 	CounterReset, CounterIncrement                                                             string
+	ListStyleImage                                                                             string
+	BoxShadowX, BoxShadowY, BoxShadowBlur                                                      float64
+	BoxShadowColor                                                                             [3]float64
+	BoxShadowSet                                                                               bool
 }
 
 func comparableResolvedStyleFor(style ResolvedStyle) comparableResolvedStyle {
@@ -710,16 +726,20 @@ func comparableResolvedStyleFor(style ResolvedStyle) comparableResolvedStyle {
 		TextDecoration: style.TextDecoration, LetterSpacing: style.LetterSpacing,
 		WordSpacing: style.WordSpacing, TextIndent: style.TextIndent,
 		ListStyleType: style.ListStyleType, BorderCollapse: style.BorderCollapse, BorderSpacing: style.BorderSpacing,
-		TableLayout: style.TableLayout, CaptionSide: style.CaptionSide, IsReplaced: style.IsReplaced, PageBreakBefore: style.PageBreakBefore,
-		PageBreakAfter: style.PageBreakAfter, PageBreakInside: style.PageBreakInside, Orphans: style.Orphans,
+		TableLayout: style.TableLayout, CaptionSide: style.CaptionSide, IsReplaced: style.IsReplaced,
+		PageBreakBefore: style.PageBreakBefore,
+		PageBreakAfter:  style.PageBreakAfter, PageBreakInside: style.PageBreakInside, Orphans: style.Orphans,
 		Widows: style.Widows, ContainerType: style.ContainerType, ContainerName: style.ContainerName,
 		Transform: style.Transform, HasTransform: style.HasTransform, TransformOrigin: style.TransformOrigin,
-		Opacity: style.Opacity,
+		Opacity:      style.Opacity,
 		OutlineWidth: style.OutlineWidth, OutlineStyle: style.OutlineStyle,
 		OutlineColor: style.OutlineColor, OutlineColorSet: style.OutlineColorSet,
 		OutlineOffset: style.OutlineOffset, BackgroundImage: style.BackgroundImage,
 		ListStylePosition: style.ListStylePosition, QuotesOpen: style.QuotesOpen, QuotesClose: style.QuotesClose,
 		CounterReset: style.CounterReset, CounterIncrement: style.CounterIncrement,
+		ListStyleImage: style.ListStyleImage,
+		BoxShadowX:     style.BoxShadowX, BoxShadowY: style.BoxShadowY, BoxShadowBlur: style.BoxShadowBlur,
+		BoxShadowColor: style.BoxShadowColor, BoxShadowSet: style.BoxShadowSet,
 	}
 }
 

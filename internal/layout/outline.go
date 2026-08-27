@@ -1,5 +1,7 @@
 package layout
 
+const outlineSideHint = 4 // four sides of a rectangular outline
+
 // outlinePaints reports a CSS outline that should stroke. Empty or "none"
 // OutlineStyle means no outline. Outline never changes the layout box size.
 func outlinePaints(sty ResolvedStyle) bool {
@@ -46,19 +48,19 @@ func appendOutlineOps(
 	}
 
 	inflate := outlineInflate(width, offset)
-	x := posX - inflate
-	y := posY - inflate
-	w := boxW + two*inflate
-	h := boxH + two*inflate
+	outX := posX - inflate
+	outY := posY - inflate
+	outW := boxW + two*inflate
+	outH := boxH + two*inflate
 
-	if w <= 0 || h <= 0 {
+	if outW <= 0 || outH <= 0 {
 		return dst
 	}
 
-	dst = appendBorderLineOps(dst, x, y, w, 0, width, style, red, green, blue)
-	dst = appendBorderLineOps(dst, x+w, y, 0, h, width, style, red, green, blue)
-	dst = appendBorderLineOps(dst, x, y+h, w, 0, width, style, red, green, blue)
-	dst = appendBorderLineOps(dst, x, y, 0, h, width, style, red, green, blue)
+	dst = appendBorderLineOps(dst, outX, outY, outW, 0, width, style, red, green, blue)
+	dst = appendBorderLineOps(dst, outX+outW, outY, 0, outH, width, style, red, green, blue)
+	dst = appendBorderLineOps(dst, outX, outY+outH, outW, 0, width, style, red, green, blue)
+	dst = appendBorderLineOps(dst, outX, outY, 0, outH, width, style, red, green, blue)
 
 	return dst
 }
@@ -68,9 +70,12 @@ func (e *engine) outlineOps(sty ResolvedStyle, posX, posY, width, height float64
 		return nil
 	}
 
-	ow := e.scalePt(sty.OutlineWidth)
-	off := e.scalePt(sty.OutlineOffset)
+	outlineWidth := e.scalePt(sty.OutlineWidth)
+	outlineOff := e.scalePt(sty.OutlineOffset)
 	red, green, blue := outlineStrokeColor(sty)
 
-	return appendOutlineOps(nil, posX, posY, width, height, ow, off, sty.OutlineStyle, red, green, blue)
+	return appendOutlineOps(
+		make([]Op, 0, outlineSideHint),
+		posX, posY, width, height, outlineWidth, outlineOff, sty.OutlineStyle, red, green, blue,
+	)
 }

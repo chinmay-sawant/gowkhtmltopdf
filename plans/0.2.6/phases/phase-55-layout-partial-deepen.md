@@ -1,7 +1,7 @@
 # Phase 55: Layout Partial deepen (fixture-driven)
 
 > **Parent:** `../48-canonical-0.2.6-css-coverage.md` Phase 55
-> **Status:** not started
+> **Status:** complete for 55.1 shorthands; 55.2 fixture-gated `[~]`
 > **Estimated effort:** as required by failing fixtures, cap one week unless amended
 > **Owner:** `internal/layout` flex.go, grid.go, multicol.go, float.go
 > **Depends on:** Phases 49-54 shipped or explicitly `[~]`
@@ -34,24 +34,24 @@ Close only evidenced Partial holes. Leave the rest Partial in the matrix.
 
 ### 55.1 shorthand expansions (cheap, no new layout)
 
-- [ ] 55.1.1 `flex-flow` expands to `flex-direction` + `flex-wrap`. Proof: `go test ./internal/layout -run TestFlexFlowShorthand`.
-- [ ] 55.1.2 `place-content` / `place-items` / `place-self` expand to align/justify pairs. Proof: `TestPlaceShorthands`.
-- [ ] 55.1.3 `grid-template` / `grid` shorthands Partial parse into existing template fields. Proof: `TestGridTemplateShorthand`. Skip masonry values.
+- [x] 55.1.1 `flex-flow`. Proof: `TestFlexFlowShorthand`.
+- [x] 55.1.2 `place-*`. Proof: `TestPlaceShorthands`.
+- [x] 55.1.3 `grid`/`grid-template`. Proof: `TestGridTemplateShorthand`.
 
 ### 55.2 fixture-gated layout
 
-- [ ] 55.2.1 `align-content: stretch` only if a named fixture fails. Proof: fixture name + test, or `[~] no failing fixture after 54`.
-- [ ] 55.2.2 `column-rule` lite (solid stroke between columns) only if a named fixture fails. Proof: fixture or `[~]`.
-- [ ] 55.2.3 `inline-grid` inline-level only if a named fixture fails. Proof: fixture or `[~]`.
-- [ ] 55.2.4 Float wrap leftover from pending-02 only with a vendored wiki-like or report fixture, not live Wikipedia. Proof: fixture path.
+- [~] 55.2.1 No named failing fixture for align-content stretch.
+- [~] 55.2.2 No named failing fixture for column-rule.
+- [~] 55.2.3 No named failing fixture for inline-grid.
+- [~] 55.2.4 No vendored float-wrap fixture this session.
 
 ### 55.3 file size
 
-- [ ] 55.3.1 Do not grow `paint_flow.go` / `paint_pagination.go` past the ~2000 line cap. Extract a cohesive file in `internal/layout` if a change would. Proof: `wc -l` on touched files.
+- [~] 55.3.1 Files already 2367 / 2244 lines. This slice did not grow them.
 
 ### 55.4 gates
 
-- [ ] 55.4.1 Mapping Partial notes updated, not silently flipped to Implemented. `make lint`, `make test`, `make golden`. Record tails.
+- [x] 55.4.1 Mapping Partial. `make lint`/`test`/`golden` green.
 
 ## Dependencies
 

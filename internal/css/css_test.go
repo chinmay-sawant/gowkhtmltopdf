@@ -198,6 +198,127 @@ func TestParsePageStyle(t *testing.T) {
 	}
 }
 
+type pageSelectorCase struct {
+	name    string
+	src     string
+	sel     string
+	margin  string
+	size    string
+	unnamed bool
+}
+
+func pageSelectorCases() []pageSelectorCase {
+	return []pageSelectorCase{
+		pageSelCase("unnamed", `@page { size: A4; margin: 2cm }`, "", "2cm", "A4", true),
+		pageSelCase("first", `@page :first { margin: 1cm }`, ":first", "1cm", "", false),
+		pageSelCase("left", `@page :left { margin: 3cm }`, ":left", "3cm", "", false),
+		pageSelCase("right", `@page :right { size: letter }`, ":right", "", "letter", false),
+		pageSelCase("named landscape", `@page landscape { size: landscape }`, "landscape", "", "landscape", false),
+		pageSelCase("first padded", `@page  :first  { margin: 1cm }`, ":first", "1cm", "", false),
+		pageSelCase("left no space", `@page:left { margin: 4mm }`, ":left", "4mm", "", false),
+		pageSelCase(
+			"unnamed nested margin box",
+			`@page { margin: 2cm; @top-center { content: "Header" } size: A4; }`,
+			"", "2cm", "A4", true,
+		),
+	}
+}
+
+func pageSelCase(name, src, sel, margin, size string, unnamed bool) pageSelectorCase {
+	return pageSelectorCase{
+		name:    name,
+		src:     src,
+		sel:     sel,
+		margin:  margin,
+		size:    size,
+		unnamed: unnamed,
+	}
+}
+
+func TestParsePageSelectors(t *testing.T) {
+	t.Parallel()
+
+	for _, testCase := range pageSelectorCases() {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			checkPageSelectorCase(t, testCase)
+		})
+	}
+
+	t.Run("mixed unnamed last wins", func(t *testing.T) {
+		t.Parallel()
+
+		checkMixedPageSelectors(t)
+	})
+}
+
+func checkPageSelectorCase(t *testing.T, testCase pageSelectorCase) {
+	t.Helper()
+
+	str := mustSheet(t, testCase.src)
+	if len(str.Pages) != 1 {
+		t.Errorf("%q: Pages = %+v, want 1", testCase.src, str.Pages)
+
+		return
+	}
+
+	got := str.Pages[0]
+	if got.Sel != testCase.sel || got.Margin != testCase.margin || got.Size != testCase.size {
+		t.Errorf("%q: PageRule = %+v, want sel=%q margin=%q size=%q",
+			testCase.src, got, testCase.sel, testCase.margin, testCase.size)
+	}
+
+	checkUnnamedPage(t, str, testCase)
+}
+
+func checkUnnamedPage(t *testing.T, str *Stylesheet, testCase pageSelectorCase) {
+	t.Helper()
+
+	if testCase.unnamed {
+		if str.Page == nil {
+			t.Errorf("%q: Page = nil, want unnamed style", testCase.src)
+
+			return
+		}
+
+		if str.Page.Margin != testCase.margin || str.Page.Size != testCase.size {
+			t.Errorf("%q: Page = %+v, want margin=%q size=%q",
+				testCase.src, *str.Page, testCase.margin, testCase.size)
+		}
+
+		return
+	}
+
+	if str.Page != nil {
+		t.Errorf("%q: Page = %+v, want nil for sel %q", testCase.src, *str.Page, testCase.sel)
+	}
+}
+
+func checkMixedPageSelectors(t *testing.T) {
+	t.Helper()
+
+	mixed := mustSheet(t, `
+		@page landscape { size: landscape }
+		@page { margin: 12mm; size: A4 }
+		@page :first { margin: 0 }
+	`)
+	if mixed.Page == nil || mixed.Page.Margin != "12mm" || mixed.Page.Size != "A4" {
+		t.Fatalf("mixed unnamed Page = %+v", mixed.Page)
+	}
+
+	if len(mixed.Pages) != 3 {
+		t.Fatalf("mixed Pages = %+v, want 3", mixed.Pages)
+	}
+
+	wantSel := []string{"landscape", "", ":first"}
+	for idx, sel := range wantSel {
+		if mixed.Pages[idx].Sel != sel {
+			t.Errorf("mixed Pages[%d].Sel = %q, want %q", idx, mixed.Pages[idx].Sel, sel)
+		}
+	}
+}
+
 func TestParseOrderAndNestedMediaOrder(t *testing.T) {
 	t.Parallel()
 

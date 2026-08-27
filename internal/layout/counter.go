@@ -47,27 +47,28 @@ func (m *counterMap) applyReset(spec string) []string {
 	}
 
 	names := make([]string, 0, len(ops))
-	for _, op := range ops {
-		m.byName[op.name] = append(m.byName[op.name], op.value)
-		names = append(names, op.name)
+
+	for _, item := range ops {
+		m.byName[item.name] = append(m.byName[item.name], item.value)
+		names = append(names, item.name)
 	}
 
 	return names
 }
 
 func (m *counterMap) applyIncrement(spec string) {
-	for _, op := range parseCounterList(spec, counterIncrementDefault) {
-		stack := m.byName[op.name]
+	for _, item := range parseCounterList(spec, counterIncrementDefault) {
+		stack := m.byName[item.name]
 		if len(stack) == 0 {
 			// CSS 2.1: increment of an unseen counter behaves as a 0 reset
 			// on the root, so later siblings share the same values.
-			m.byName[op.name] = []int{op.value}
+			m.byName[item.name] = []int{item.value}
 
 			continue
 		}
 
-		stack[len(stack)-1] += op.value
-		m.byName[op.name] = stack
+		stack[len(stack)-1] += item.value
+		m.byName[item.name] = stack
 	}
 }
 
@@ -75,6 +76,7 @@ func (m *counterMap) pop(names []string) {
 	for idx := len(names) - 1; idx >= 0; idx-- {
 		name := names[idx]
 		stack := m.byName[name]
+
 		if len(stack) == 0 {
 			continue
 		}
@@ -121,16 +123,17 @@ func parseCounterList(spec string, defaultValue int) []counterOp {
 			continue
 		}
 
-		op := counterOp{name: tok, value: defaultValue}
+		item := counterOp{name: tok, value: defaultValue}
+
 		if idx+1 < len(tokens) && isIntegerToken(tokens[idx+1]) {
 			val, err := strconv.Atoi(tokens[idx+1])
 			if err == nil {
-				op.value = val
+				item.value = val
 				idx++
 			}
 		}
 
-		ops = append(ops, op)
+		ops = append(ops, item)
 	}
 
 	return ops
@@ -142,6 +145,7 @@ func isIntegerToken(tok string) bool {
 	}
 
 	start := 0
+
 	if tok[0] == '+' || tok[0] == '-' {
 		if len(tok) == 1 {
 			return false
@@ -451,21 +455,21 @@ func (e *engine) walkContentEnv(
 	pushes := env.counters.applyReset(e.counterResetSpec(ctx, node))
 	env.counters.applyIncrement(e.counterIncrementSpec(ctx, node))
 
-	if node == target && pseudo == "before" {
+	if node == target && pseudo == pseudoBefore {
 		return true
 	}
 
-	applyGeneratedQuotes(ctx, node, "before", env)
+	applyGeneratedQuotes(ctx, node, pseudoBefore, env)
 
 	if e.walkContentChildren(ctx, node, target, pseudo, env) {
 		return true
 	}
 
-	if node == target && pseudo == "after" {
+	if node == target && pseudo == pseudoAfter {
 		return true
 	}
 
-	applyGeneratedQuotes(ctx, node, "after", env)
+	applyGeneratedQuotes(ctx, node, pseudoAfter, env)
 	env.counters.pop(pushes)
 
 	return false
@@ -513,6 +517,7 @@ func evalCounterFn(value string, idx int, env *contentEnv) (string, int) {
 func evalCountersFn(value string, idx int, env *contentEnv) (string, int) {
 	inner, next := cssFunctionInner(value, idx)
 	args := splitCSSArgs(inner)
+
 	if len(args) == 0 || args[0] == "" {
 		return "0", next
 	}
@@ -563,41 +568,53 @@ func splitCSSArgs(inner string) []string {
 	inQuote := byte(0)
 
 	for idx := 0; idx < len(inner); idx++ {
-		char := inner[idx]
-		if inQuote != 0 {
-			if char == '\\' && idx+1 < len(inner) {
-				idx++
+		idx, start, depth, inQuote = consumeCSSArgByte(inner, idx, start, depth, inQuote, &args)
+	}
 
-				continue
-			}
+	return append(args, strings.TrimSpace(inner[start:]))
+}
 
-			if char == inQuote {
-				inQuote = 0
-			}
+func consumeCSSArgByte(
+	inner string, idx, start, depth int, inQuote byte, args *[]string,
+) (int, int, int, byte) {
+	char := inner[idx]
+	if inQuote != 0 {
+		return consumeQuotedCSSArg(inner, idx, start, depth, inQuote, char)
+	}
 
-			continue
+	switch char {
+	case '"', '\'':
+		return idx, start, depth, char
+	case '(':
+		return idx, start, depth + 1, inQuote
+	case ')':
+		if depth > 0 {
+			depth--
 		}
 
-		switch char {
-		case '"', '\'':
-			inQuote = char
-		case '(':
-			depth++
-		case ')':
-			if depth > 0 {
-				depth--
-			}
-		case ',':
-			if depth == 0 {
-				args = append(args, strings.TrimSpace(inner[start:idx]))
-				start = idx + 1
-			}
+		return idx, start, depth, inQuote
+	case ',':
+		if depth == 0 {
+			*args = append(*args, strings.TrimSpace(inner[start:idx]))
+			start = idx + 1
 		}
 	}
 
-	args = append(args, strings.TrimSpace(inner[start:]))
+	return idx, start, depth, inQuote
+}
 
-	return args
+func consumeQuotedCSSArg(
+	inner string, idx, start, depth int, inQuote, char byte,
+) (int, int, int, byte) {
+	if char == '\\' && idx+1 < len(inner) {
+		return idx + 1, start, depth, inQuote
+	}
+
+	if char == inQuote {
+		return idx, start, depth, 0
+	}
+
+	return idx, start, depth, inQuote
 }
 
 func unquoteCSSArg(arg string) string {

@@ -28,26 +28,39 @@ func parseUsedColor(value string, current [3]float64) ([3]float64, bool) {
 }
 
 // applyOutlineProps owns outline and its longhands. Outline is painted outside
-// the border edge and must not change used Width/Height.
+// the border edge and must not change used Width/Height. box-shadow is applied
+// here so the existing applyBorderGroup dispatch can reach it.
 func applyOutlineProps(style *ResolvedStyle, prop, value string, fsize float64) bool {
-	switch prop {
-	case "outline":
+	if applyBoxShadowProp(style, prop, value, fsize) {
+		return true
+	}
+
+	if prop == "outline" {
 		applyOutlineShorthand(style, value, fsize)
+
+		return true
+	}
+
+	return applyOutlineLonghands(style, prop, value, fsize)
+}
+
+func applyOutlineLonghands(style *ResolvedStyle, prop, value string, fsize float64) bool {
+	switch prop {
 	case "outline-width":
-		if width, ok := parseOutlineWidth(value, fsize); ok {
+		if width, parsed := parseOutlineWidth(value, fsize); parsed {
 			style.OutlineWidth = width
 		}
 	case "outline-style":
-		if outlineStyle, ok := parseOutlineStyle(value); ok {
+		if outlineStyle, parsed := parseOutlineStyle(value); parsed {
 			style.OutlineStyle = outlineStyle
 		}
 	case "outline-color":
-		if color, ok := parseUsedColor(value, style.Color); ok {
+		if color, parsed := parseUsedColor(value, style.Color); parsed {
 			style.OutlineColor = color
 			style.OutlineColorSet = true
 		}
 	case "outline-offset":
-		if offset, ok := plainLength(value, fsize, 0); ok {
+		if offset, parsed := plainLength(value, fsize, 0); parsed {
 			style.OutlineOffset = offset
 		}
 	default:
@@ -55,6 +68,49 @@ func applyOutlineProps(style *ResolvedStyle, prop, value string, fsize float64) 
 	}
 
 	return true
+}
+
+func applyBoxShadowProp(style *ResolvedStyle, prop, value string, fsize float64) bool {
+	if prop != boxShadowProp {
+		return false
+	}
+
+	applyBoxShadowValue(style, value, fsize)
+
+	return true
+}
+
+func applyBoxShadowValue(style *ResolvedStyle, value string, fsize float64) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return
+	}
+
+	layer := strings.TrimSpace(firstCommaLayer(value))
+	if strings.EqualFold(layer, cssDisplayNone) {
+		clearBoxShadow(style)
+
+		return
+	}
+
+	shadow, ok := parseBoxShadowLayer(layer, style.Color, fsize)
+	if !ok {
+		return
+	}
+
+	style.BoxShadowX = shadow.x
+	style.BoxShadowY = shadow.y
+	style.BoxShadowBlur = shadow.blur
+	style.BoxShadowColor = shadow.color
+	style.BoxShadowSet = true
+}
+
+func clearBoxShadow(style *ResolvedStyle) {
+	style.BoxShadowX = 0
+	style.BoxShadowY = 0
+	style.BoxShadowBlur = 0
+	style.BoxShadowColor = [3]float64{}
+	style.BoxShadowSet = false
 }
 
 func applyOutlineShorthand(style *ResolvedStyle, value string, fsize float64) {
@@ -80,6 +136,7 @@ func applyOutlineShorthand(style *ResolvedStyle, value string, fsize float64) {
 		}
 
 		applyOutlineToken(style, token, fsize)
+
 		start = next
 	}
 }
@@ -196,9 +253,9 @@ func firstCSSUrl(value string) (string, bool) {
 func applyGeneratedContentProps(style *ResolvedStyle, prop, value string) bool {
 	switch prop {
 	case "quotes":
-		if open, close, ok := parseQuotesPair(value); ok {
-			style.QuotesOpen = open
-			style.QuotesClose = close
+		if openQuote, closeQuote, parsed := parseQuotesPair(value); parsed {
+			style.QuotesOpen = openQuote
+			style.QuotesClose = closeQuote
 		}
 	case "counter-reset":
 		if trimmed := strings.TrimSpace(value); trimmed != "" {
@@ -208,9 +265,50 @@ func applyGeneratedContentProps(style *ResolvedStyle, prop, value string) bool {
 		if trimmed := strings.TrimSpace(value); trimmed != "" {
 			style.CounterIncrement = trimmed
 		}
+	case "list-style-image":
+		applyListStyleImageValue(style, value)
 	default:
 		return false
 	}
 
 	return true
+}
+
+// applyListStyleImageValue stores the first url(...) from list-style-image or
+// the list-style shorthand. none (the whole value, or a lone none token with
+// no url) clears the image so the type marker is used instead.
+func applyListStyleImageValue(style *ResolvedStyle, value string) {
+	if url, ok := firstCSSUrl(value); ok {
+		style.ListStyleImage = url
+
+		return
+	}
+
+	if listStyleImageNone(value) {
+		style.ListStyleImage = ""
+	}
+}
+
+func listStyleImageNone(value string) bool {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return false
+	}
+
+	if strings.EqualFold(trimmed, cssDisplayNone) {
+		return true
+	}
+
+	for start := 0; ; {
+		token, next, ok := nextSpaceToken(trimmed, start)
+		if !ok {
+			return false
+		}
+
+		if strings.EqualFold(token, cssDisplayNone) {
+			return true
+		}
+
+		start = next
+	}
 }

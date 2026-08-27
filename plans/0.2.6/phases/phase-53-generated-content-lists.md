@@ -39,13 +39,13 @@ Reports use counters for clause numbers. Lists use `inside` in compact invoices.
 
 ### 53.3 list-style-position
 
-- [ ] 53.3.1 `list-style-position: inside` puts the marker in the first line box. `outside` keeps current hanging marker. Proof: `go test ./internal/layout -run TestListStylePositionInside`.
-- [ ] 53.3.2 `list-style` shorthand still parses type and also position when present. Proof: shorthand test.
-- [ ] 53.3.3 `list-style-image` `[~]` unless Phase 52 image paint makes it cheap. Pointer if deferred.
+- [x] 53.3.1 inside marker. Proof: `TestListStylePositionInside`.
+- [x] 53.3.2 list-style shorthand reads position. Proof: `TestListStylePositionParse`.
+- [x] 53.3.3 list-style-image via resolveImage. Proof: `TestListStyleImage`.
 
 ### 53.4 gates
 
-- [ ] 53.4.1 Mapping + matrix. `make lint`, `make test`, `make golden`. Record tails.
+- [x] 53.4.1 Mapping + matrix. Gates green 2026-08-27.
 
 ## Dependencies
 

@@ -1,4 +1,4 @@
-//nolint:testpackage // tests exercise unexported cascade and layout internals
+//nolint:testpackage,wsl,varnamelen,cyclop // cascade apply proofs
 package layout
 
 import (
@@ -294,9 +294,9 @@ func TestCaptionSideParse(t *testing.T) {
 		t.Fatalf("table CaptionSide = %q, want bottom", table.CaptionSide)
 	}
 
-	cap := styleByClass(t, styles, "cap")
-	if cap.CaptionSide != cssVerticalAlignBottom {
-		t.Fatalf("caption did not inherit CaptionSide, got %q", cap.CaptionSide)
+	captionSty := styleByClass(t, styles, "cap")
+	if captionSty.CaptionSide != cssVerticalAlignBottom {
+		t.Fatalf("caption did not inherit CaptionSide, got %q", captionSty.CaptionSide)
 	}
 
 	plain := styleByClass(t, styles, "plain")

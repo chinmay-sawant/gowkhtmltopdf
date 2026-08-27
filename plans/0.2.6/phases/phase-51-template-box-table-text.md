@@ -56,7 +56,7 @@ Land the missing text/box/table properties reports already write. Fix the matrix
 
 ### 51.6 gates
 
-- [~] 51.6.1 Mapping `--check` green. Full `make lint`/`make test`/`make golden` not run. `go test ./internal/layout` and fixture-56 golden exit 0.
+- [x] 51.6.1 Mapping `--check`. `make lint`/`test`/`golden` green 2026-08-27.
 
 ## Dependencies
 

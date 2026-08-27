@@ -19,8 +19,10 @@ const (
 	fxFlexEnd   = "flex-end"
 	fxFlexStart = "flex-start"
 	fxRow       = "row"
+	fxRowRev    = "row-reverse"
 	fxStart     = "start"
 	fxStretch   = "stretch"
+	fxWrap      = "wrap"
 	fxWrapRev   = "wrap-reverse"
 )
 
@@ -203,8 +205,8 @@ func (e *engine) flowFlexRow(
 		return curY
 	}
 
-	wrap := style.FlexWrap == "wrap" || style.FlexWrap == fxWrapRev
-	reverse := style.FlexDirection == "row-reverse"
+	wrap := style.FlexWrap == fxWrap || style.FlexWrap == fxWrapRev
+	reverse := style.FlexDirection == fxRowRev
 	items := e.flexRowItems(kids, contentW)
 	lines := e.flexWrapLines(items, wrap, reverse, style.FlexWrap == fxWrapRev, colGap, contentW)
 

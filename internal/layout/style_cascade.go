@@ -625,35 +625,60 @@ func applyFontProps(style *ResolvedStyle, raw map[string]string, parentSize floa
 		remBase = ctx.remBase
 	}
 
-	if v, ok := raw["font-size"]; ok {
-		containing := 0.0
-		if ctx != nil {
-			containing = ctx.viewportW
-		}
+	applyFontSizeValue(style, raw, parentSize, ctx, remBase)
+	applyFontFamilyValue(style, raw)
+	applyFontWeightValue(style, raw)
+	applyFontStyleValue(style, raw)
 
-		if pt, ok := clampLength(v, parentSize, containing); ok {
-			style.FontSize = pt
-		} else {
-			style.FontSize = fontSize(v, parentSize, remBase)
-		}
+	if val, found := raw["font"]; found {
+		parseFontShorthand(style, val, remBase)
+	}
+}
+
+func applyFontSizeValue(
+	style *ResolvedStyle, raw map[string]string, parentSize float64, ctx *styleContext, remBase float64,
+) {
+	val, found := raw["font-size"]
+	if !found {
+		return
 	}
 
-	if v, ok := raw["font-family"]; ok {
-		if fam := css.ParseFontFamily(v); len(fam) > 0 {
-			style.FontFamily = fam
-		}
+	containing := 0.0
+	if ctx != nil {
+		containing = ctx.viewportW
 	}
 
-	if val, ok := raw["font-weight"]; ok {
+	if pt, parsed := clampLength(val, parentSize, containing); parsed {
+		style.FontSize = pt
+
+		return
+	}
+
+	style.FontSize = fontSize(val, parentSize, remBase)
+}
+
+func applyFontFamilyValue(style *ResolvedStyle, raw map[string]string) {
+	val, found := raw["font-family"]
+	if !found {
+		return
+	}
+
+	if fam := css.ParseFontFamily(val); len(fam) > 0 {
+		style.FontFamily = fam
+	}
+}
+
+func applyFontWeightValue(style *ResolvedStyle, raw map[string]string) {
+	val, found := raw["font-weight"]
+	if found {
 		style.FontWeight = resolveFontWeight(style.FontWeight, val)
 	}
+}
 
-	if v, ok := raw["font-style"]; ok {
-		style.FontItalic = v == "italic" || v == "oblique"
-	}
-
-	if v, ok := raw["font"]; ok {
-		parseFontShorthand(style, v, remBase)
+func applyFontStyleValue(style *ResolvedStyle, raw map[string]string) {
+	val, found := raw["font-style"]
+	if found {
+		style.FontItalic = val == "italic" || val == "oblique"
 	}
 }
 
@@ -684,8 +709,8 @@ var restShorthandProps = [...]string{ //nolint:gochecknoglobals // static apply 
 	"margin", "padding", borderProperty, borderTopProperty, borderRightProperty, borderBottomProperty, borderLeftProperty,
 	borderWidthKeyword, borderStyleKeyword,
 	borderColorKeyword, gapKeyword, flexKeyword, containerKeyword,
-	"margin-inline", "margin-block", "padding-inline", "padding-block",
-	"inset", "inset-block", "inset-inline",
+	cssPropMarginInline, cssPropMarginBlock, cssPropPaddingInline, cssPropPaddingBlock,
+	insetKeyword, cssPropInsetBlock, cssPropInsetInline,
 }
 
 // applyRestProps resolves every non-font property once the font size is known.
@@ -720,8 +745,8 @@ func applyRestProps(
 			borderRightProperty, borderBottomProperty, borderLeftProperty,
 			borderWidthKeyword, borderStyleKeyword,
 			borderColorKeyword, gapKeyword, flexKeyword, containerKeyword,
-			"margin-inline", "margin-block", "padding-inline", "padding-block",
-			"inset", "inset-block", "inset-inline":
+			cssPropMarginInline, cssPropMarginBlock, cssPropPaddingInline, cssPropPaddingBlock,
+			insetKeyword, cssPropInsetBlock, cssPropInsetInline:
 			continue
 		}
 

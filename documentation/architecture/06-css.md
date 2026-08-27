@@ -48,7 +48,7 @@ line counts from `wc -l` (2026-08):
 
 | File | Lines | Responsibility |
 |------|------:|----------------|
-| `css.go` | 1784 | Stylesheet/rule/selector/declaration model; top-level parser; at-rule handling (`@media`, `@container`, `@page`, `@font-face`, skip-others); selector parsing; right-to-left matching; specificity; `:nth-child` arithmetic; class/attr helpers |
+| `css.go` | 1784 | Stylesheet/rule/selector/declaration model; top-level parser; at-rule handling (`@media`, `@container`, `@page`, `@font-face`, `@import`, skip-others); selector parsing; right-to-left matching; specificity; `:nth-child` arithmetic; class/attr helpers |
 | `values.go` | 621 | Declaration-block splitting (`ParseInline`); `!important`; length/number/color parsing; `var()` fallback + custom-property resolution; font-family splitting; named-color table |
 | `container.go` | 723 | `@container` prelude parsing (`ContainerQuery`), boolean condition tree (`ContainerCond`), size-feature evaluation, length→pt conversion (`LengthToPt`), container-name/shorthand sidecars, `HasContainerRules` |
 | `has.go` | 406 | Paren/quote scanning shared by `:has()`, `:not()`, media & container features; strict selector-list parsing; relative selector matching; leftmost-match combinator walk; specificity max-of-arguments helpers |
@@ -113,7 +113,7 @@ The two complementary roles are worth distinguishing early:
 
 | Symbol | Location | Why it exists |
 |--------|----------|---------------|
-| `parseAtRule` | css.go:172 | Dispatch: `@media`/`@container`/`@page`/`@font-face` parsed; `@keyframes` and anything unknown **parse-ignored** (static cascade only; there is no animation) |
+| `parseAtRule` | css.go:200 | Dispatch: `@media`/`@container`/`@page`/`@font-face`/`@import` parsed; `@keyframes` and anything unknown **parse-ignored** (static cascade only; there is no animation) |
 | `stripComments` | css.go:537 | Removes `/* */`, preserving `\n` so line numbers stay stable |
 | `findBlock`/`takeBlock` | css.go:572/614 | Brace finding with quote/paren tracking; the only source of real parse errors (`errUnbalanced`, `errNoBlock` at css.go:526) |
 | `splitTopLevel` | css.go:668 | Splits selector lists and declaration blocks on top-level `,`/`;` outside parens/brackets/quotes |

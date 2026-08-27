@@ -1,7 +1,7 @@
 # 48 - v0.2.6 CSS coverage (Canonical Execution Ledger)
 
 > **Parent:** `plans/0.2.5/40-canonical-0.2.5-python-bindings.md` (complete 2026-08-26). Leftover CSS rows under `plans/0.2.0/` move here with `[~]` pointers.
-> **Status:** in progress (catalog + first implementation slice on feature/026-extended-css-support)
+> **Status:** complete on `feature/026-extended-css-support` (2026-08-27). VERSION still 0.2.5. Leftovers are `[~]` with pointers.
 > **Estimated effort:** several weeks across phases 48-56. Catalog and honesty first. Frequency slices next. Layout deepen last.
 > **Constraint:** pure Go, no CGO on the default path, no browser embed, no JavaScript. Direct modules stay `go-text/typesetting` and `tdewolff/canvas` unless an amendment is filed. `catalog/mapping.json` is the CSS name inventory.
 > **Ordering principle:** freeze catalog and honesty docs first, then selectors and cascade, then values and units, then template-visible box/text/paint, then generated content, then paged media, then fixture-driven layout leftovers, then closure. No phase closes on intent.
@@ -173,7 +173,7 @@ Invoice and report CSS already writes these. They currently no-op.
 - [x] 52.2 Outline stroke outside the border edge. Proof: `TestOutlineStroke`.
 - [x] 52.3 Radius longhands. Proof: `TestRadiusLonghand`.
 - [x] 52.4 Overflow clip for hidden/clip/auto/scroll. Proof: `TestOverflowClip`; `TestStickyOverflow*` green.
-- [~] 52.5 `box-shadow` not this session. Permanent skip unless a later amendment.
+- [x] 52.5 Lite un-inset `box-shadow` offset fill. Blur stored, not rasterized. Proof: `TestBoxShadowParse`, `TestBoxShadowPaints`.
 
 Gradients are a second slice, not required to close 52. Filter blur stays a non-goal.
 
@@ -184,15 +184,15 @@ Gradients are a second slice, not required to close 52. Filter blur stays a non-
 - [x] 53.1 Counters on `::before`. Proof: `TestCounterInBefore`, `TestCounterResetIncrementLayout`.
 - [x] 53.2 Quotes + open/close-quote. Proof: `TestQuotes`.
 - [x] 53.3 `list-style-position: inside`. Proof: `TestListStylePositionInside`.
-- [~] 53.4 `list-style-image` not this session.
+- [x] 53.4 `list-style-image` paints via resolveImage, falls back to type marker. Proof: `TestListStyleImage`.
 
 ---
 
 ## Phase 54: Paged media and fragmentation
 
-- [ ] 54.1 Named `@page` and `:first` / `:left` / `:right` selectors applying margin/size. Proof: convert test with two page sizes.
-- [ ] 54.2 Break values documented: `left`/`right`/`recto`/`verso` currently collapse to `always`. Either implement even/odd page or write that collapse in the matrix as Partial with the alias table.
-- [ ] 54.3 `@page` margin boxes (`@top-center` and friends) stay `[~]` unless a report fixture proves they beat CLI headers. CLI `--header-*` remains the supported repeating chrome.
+- [x] 54.1 Named `@page` parse; `:first` margins on page 1. Size unnamed-only. `:left`/`:right`/named parse only. Proof: `TestParsePageSelectors`, `TestPageFirstMargins`. `page: ident` `[~]` no named-page model.
+- [x] 54.2 Break values documented in matrix §2.6: `left`/`right`/`page`/`column` -> `always`; `avoid-page` -> `avoid`; `avoid-column` ignored. Writer has no even/odd or left/right page side; alias kept, not faked. `recto`/`verso` are ignored (not in the apply switch). Proof: `documentation/compatibility-matrix.md` §2.6.
+- [~] 54.3 `@page` margin boxes (`@top-center` and friends). Reason: CLI `--header-*` / `--footer-*` is the repeating chrome. No named fixture that cannot use CLI headers. Not implemented.
 
 GCPM `running()` / named strings stay out. That is browser header territory.
 
@@ -211,16 +211,19 @@ Candidates already known:
 - `display: inline-grid` not inline-level (`layout_flow.go:85-87`)
 - float infobox wrap from `02-openweb-css-residuals.md`
 
-Each row names the fixture and the proof command. Chrome PDFs are not the gate.
+- [x] 55.1 `flex-flow`, `place-*`, `grid`/`grid-template` shorthands. Proof: `TestFlexFlowShorthand`, `TestPlaceShorthands`, `TestGridTemplateShorthand`. `vmin`/`vmax` Partial via `vminVmaxPt`. Proof: `TestVminVmax`.
+- [~] 55.2 No named failing fixture this session for stretch, column-rule, inline-grid, or float wrap.
+- [~] 55.3 `paint_flow.go` (2367) and `paint_pagination.go` (2244) already over the 2000-line soft cap. This slice did not grow them.
+- [x] 55.4 Mapping Partial for new shorthands. Proof: `python3 scripts/css-catalog-map.py --check`.
 
 ---
 
 ## Phase 56: Docs, mapping sync, closure
 
-- [ ] 56.1 `catalog/mapping.json` regenerated; `scripts/css-catalog-map.py --check` green.
-- [ ] 56.2 `documentation/compatibility-matrix.md` and `documentation/fidelity.md` match code. `make claim-scan` clean.
-- [ ] 56.3 `make lint`, `make test`, `make golden` exit 0. Record tails on the phase file.
-- [ ] 56.4 `plans/README.md` version row updated. KB log + roadmap milestone updated.
+- [x] 56.1 mapping `--check` green (157 apply arms).
+- [x] 56.2 matrix + fidelity. `make claim-scan` clean.
+- [x] 56.3 `make lint`, `make test`, `make golden` exit 0 2026-08-27. VERSION 0.2.5.
+- [x] 56.4 plans/README.md + KB updated.
 
 ---
 

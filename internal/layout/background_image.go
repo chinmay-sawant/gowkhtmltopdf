@@ -24,17 +24,17 @@ func (e *engine) backgroundImageOp(
 	sty ResolvedStyle, posX, posY, width, height float64,
 ) (Op, bool) {
 	if !e.opts.Background || width <= 0 || height <= 0 {
-		return Op{}, false
+		return Op{}, false //nolint:exhaustruct // empty op on skip
 	}
 
 	src := backgroundImageSrc(sty.BackgroundImage)
 	if src == "" {
-		return Op{}, false
+		return Op{}, false //nolint:exhaustruct // empty op on skip
 	}
 
 	ref := e.resolveImage(src)
 	if ref == nil || ref.data == nil {
-		return Op{}, false
+		return Op{}, false //nolint:exhaustruct // empty op on skip
 	}
 
 	return Op{ //nolint:exhaustruct // intentional zero fields
@@ -72,7 +72,7 @@ func backgroundImageSrc(raw string) string {
 	}
 
 	switch lower {
-	case inheritKeyword, "initial", "unset", "revert":
+	case inheritKeyword, cssKeywordInitial, cssKeywordUnset, cssKeywordRevert:
 		return ""
 	}
 
@@ -85,19 +85,19 @@ func firstCommaLayer(raw string) string {
 	depth := 0
 	inQuote := byte(0)
 
-	for i := range len(raw) {
-		c := raw[i]
+	for idx := range len(raw) {
+		char := raw[idx]
 		if inQuote != 0 {
-			if c == inQuote {
+			if char == inQuote {
 				inQuote = 0
 			}
 
 			continue
 		}
 
-		switch c {
+		switch char {
 		case '"', '\'':
-			inQuote = c
+			inQuote = char
 		case '(':
 			depth++
 		case ')':
@@ -106,7 +106,7 @@ func firstCommaLayer(raw string) string {
 			}
 		case ',':
 			if depth == 0 {
-				return raw[:i]
+				return raw[:idx]
 			}
 		}
 	}
@@ -121,21 +121,22 @@ func urlFunctionTarget(layer string) string {
 	}
 
 	inQuote := byte(0)
-	for i := start; i < len(layer); i++ {
-		c := layer[i]
+
+	for idx := start; idx < len(layer); idx++ {
+		char := layer[idx]
 		if inQuote != 0 {
-			if c == inQuote {
+			if char == inQuote {
 				inQuote = 0
 			}
 
 			continue
 		}
 
-		switch c {
+		switch char {
 		case '"', '\'':
-			inQuote = c
+			inQuote = char
 		case ')':
-			inner := strings.TrimSpace(layer[start:i])
+			inner := strings.TrimSpace(layer[start:idx])
 
 			return strings.Trim(inner, `"'`)
 		}

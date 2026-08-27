@@ -4,7 +4,7 @@ Counts from `coverage-summary.json`, generated 2026-08-27 by walking `webref-css
 
 | Kind | Total | implemented | partial | unsupported | ignored |
 |------|------:|------------:|--------:|------------:|--------:|
-| Properties | 818 | 75 | 87 | 409 | 247 |
+| Properties | 818 | 75 | 95 | 401 | 247 |
 | At-rules | 55 | 0 | 4 | 41 | 10 |
 | Selectors | 158 | 8 | 5 | 124 | 21 |
 | Functions | 162 | 3 | 7 | 128 | 24 |
@@ -14,7 +14,7 @@ Counts from `coverage-summary.json`, generated 2026-08-27 by walking `webref-css
 
 `unsupported` is the work list. `goal: implement` is 571 properties after Phase 48.2 (was 608 on the first pass; 37 print-noop and SVG rows moved to `ignored`).
 
-Engine apply handlers: 149 named properties after the paint/generated-content slice. Custom properties (`--*`) are a separate map.
+Engine apply handlers: 157 named properties after phases 48-56. Custom properties (`--*`) are a separate map.
 
 Check the mapping against apply arms: `python3 scripts/css-catalog-map.py --check`. After a reclassify, rewrite mapping counts with `--write`.
 

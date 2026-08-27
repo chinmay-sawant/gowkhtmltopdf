@@ -477,9 +477,16 @@ func (e *engine) popBFCFloats(enclose bool) {
 }
 
 // emitListMarker paints the list marker for an <li>.
-// list-style-position:inside places it at contentX (start of the first line
-// box). outside and empty hang in the gutter at contentX - gap - minW.
+// list-style-image, when it resolves, replaces the type glyph. Missing images
+// fall back to list-style-type. list-style-position:inside places the marker
+// at contentX (start of the first line box). outside and empty hang in the
+// gutter at contentX - gap - marker width.
 func (e *engine) emitListMarker(node *html.Node, style ResolvedStyle, contentX, baseline float64) {
+	size := e.scalePt(style.FontSize)
+	if e.emitListStyleImageMarker(style, contentX, baseline, size) {
+		return
+	}
+
 	typ := style.ListStyleType
 	if typ == "" {
 		typ = listStyleDisc
@@ -489,7 +496,6 @@ func (e *engine) emitListMarker(node *html.Node, style ResolvedStyle, contentX, 
 		return
 	}
 
-	size := e.scalePt(style.FontSize)
 	face := e.faceFor(style)
 
 	text := markerText(node, typ)
@@ -506,21 +512,75 @@ func (e *engine) emitListMarker(node *html.Node, style ResolvedStyle, contentX, 
 		minW = size * float64(len([]rune(text))) * halfRatio
 	}
 
-	posX := contentX
-	if style.ListStylePosition != "inside" {
-		// Outside marker: sit in the padding/margin gutter left of contentX.
-		gap := size * bulletGapRatio
-		posX = contentX - gap - minW
-		if posX < 0 {
-			posX = 0
-		}
-	}
+	posX := listMarkerX(style.ListStylePosition, contentX, size, minW)
 
 	e.add(Op{ //nolint:exhaustruct // intentional zero fields
 		Kind: OpBullet, X: posX, Y: baseline, Text: text, Font: face, Size: size,
 		InkDescent: e.fontDescentFace(face, size),
 		R:          style.Color[0], G: style.Color[1], B: style.Color[2],
 	})
+}
+
+// emitListStyleImageMarker paints a list-style-image via resolveImage. false
+// means the type marker should be used instead (no image, or fetch failed).
+func (e *engine) emitListStyleImageMarker(
+	style ResolvedStyle, contentX, baseline, size float64,
+) bool {
+	if style.ListStyleImage == "" {
+		return false
+	}
+
+	src := backgroundImageSrc(style.ListStyleImage)
+	if src == "" {
+		return false
+	}
+
+	ref := e.resolveImage(src)
+	if ref == nil || ref.data == nil {
+		return false
+	}
+
+	imgW := e.scalePt(pxToPt(float64(ref.w)))
+	imgH := e.scalePt(pxToPt(float64(ref.h)))
+
+	if imgW <= 0 {
+		imgW = size
+	}
+
+	if imgH <= 0 {
+		imgH = size
+	}
+
+	posX := listMarkerX(style.ListStylePosition, contentX, size, imgW)
+
+	e.add(Op{ //nolint:exhaustruct // intentional zero fields
+		Kind:   OpImage,
+		X:      posX,
+		Y:      baseline - imgH,
+		W:      imgW,
+		H:      imgH,
+		Image:  ref.data,
+		ImgW:   ref.w,
+		ImgH:   ref.h,
+		IsJPEG: ref.isJPEG,
+	})
+
+	return true
+}
+
+// listMarkerX is the left edge of a list marker of width markerW. inside sits
+// at the content edge; outside hangs in the gutter, clamped at 0.
+func listMarkerX(position string, contentX, emSize, markerW float64) float64 {
+	if position == listPosInside {
+		return contentX
+	}
+
+	posX := contentX - emSize*bulletGapRatio - markerW
+	if posX < 0 {
+		return 0
+	}
+
+	return posX
 }
 
 // markerText returns the glyph/string for a list-style-type keyword.
@@ -530,9 +590,9 @@ func markerText(node *html.Node, typ string) string {
 		return bulletDisc
 	case "circle":
 		return "\u25E6"
-	case "square":
+	case listStyleSquare:
 		return "\u25AA"
-	case "decimal", "decimal-leading-zero":
+	case listStyleDecimal, "decimal-leading-zero":
 		return strconv.Itoa(listItemIndex(node)) + "."
 	case "lower-alpha", "lower-latin":
 		return alphaMarker(listItemIndex(node), false) + "."

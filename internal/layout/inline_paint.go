@@ -532,6 +532,22 @@ func (e *engine) measureTextFace(cssSheet string, sty ResolvedStyle) float64 {
 		primary = e.font
 	}
 
+	total, runeCount, spaceCount := e.accumulateTextFaceWidth(cssSheet, sty, primary, size)
+
+	if lstyle != 0 && runeCount > 0 {
+		total += lstyle * float64(runeCount)
+	}
+
+	if wstyle != 0 && spaceCount > 0 {
+		total += wstyle * float64(spaceCount)
+	}
+
+	return total
+}
+
+func (e *engine) accumulateTextFaceWidth(
+	cssSheet string, sty ResolvedStyle, primary *pdf.Font, size float64,
+) (float64, int, int) {
 	var total float64
 
 	runeCount := 0
@@ -554,15 +570,7 @@ func (e *engine) measureTextFace(cssSheet string, sty ResolvedStyle) float64 {
 		}
 	}
 
-	if lstyle != 0 && runeCount > 0 {
-		total += lstyle * float64(runeCount)
-	}
-
-	if wstyle != 0 && spaceCount > 0 {
-		total += wstyle * float64(spaceCount)
-	}
-
-	return total
+	return total, runeCount, spaceCount
 }
 
 // measureRuneFace measures a single rune with the same face selection as
@@ -575,16 +583,16 @@ func (e *engine) measureRuneFace(curRune rune, sty ResolvedStyle) float64 {
 		face = e.font
 	}
 
-	w := face.GlyphAdvancePoints(curRune, size)
+	advance := face.GlyphAdvancePoints(curRune, size)
 	if sty.LetterSpacing != 0 {
-		w += sty.LetterSpacing * e.scale
+		advance += sty.LetterSpacing * e.scale
 	}
 
 	if curRune == ' ' && sty.WordSpacing != 0 {
-		w += sty.WordSpacing * e.scale
+		advance += sty.WordSpacing * e.scale
 	}
 
-	return w
+	return advance
 }
 
 type faceRun struct {

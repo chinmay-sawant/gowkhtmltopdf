@@ -10,6 +10,8 @@ import (
 const (
 	calcParts     = 3
 	mediumKeyword = "medium"
+	thinKeyword   = "thin"
+	thickKeyword  = "thick"
 )
 
 func parseColumnsShorthand(sty *ResolvedStyle, value string, fsize, viewportW float64) {
@@ -210,6 +212,78 @@ func parseFlexThree(style *ResolvedStyle, parts []string, fontSize, pctBase floa
 	flexSetBasis(style, parts[2], fontSize, pctBase)
 }
 
+// parseFlexFlow expands flex-flow to flex-direction + flex-wrap. Omitted
+// longhands reset to CSS initials (row, nowrap). Invalid tokens drop the
+// declaration.
+func parseFlexFlow(style *ResolvedStyle, value string) {
+	dir, wrap := fxRow, cssWhiteSpaceNowrap
+	found := false
+
+	for _, tok := range strings.Fields(value) {
+		switch tok {
+		case fxRow, fxCol, fxRowRev, fxColRev:
+			dir = tok
+			found = true
+		case cssWhiteSpaceNowrap, fxWrap, fxWrapRev:
+			wrap = tok
+			found = true
+		default:
+			return
+		}
+	}
+
+	if !found {
+		return
+	}
+
+	style.FlexDirection = dir
+	style.FlexWrap = wrap
+}
+
+// splitPlacePair splits a place-* shorthand: one token is copied to both
+// longhands; two tokens are align then justify.
+func splitPlacePair(value string) (string, string, bool) {
+	parts := strings.Fields(strings.TrimSpace(value))
+	switch len(parts) {
+	case 1:
+		return parts[0], parts[0], true
+	case two:
+		return parts[0], parts[1], true
+	default:
+		return "", "", false
+	}
+}
+
+func parsePlaceContent(style *ResolvedStyle, value string) {
+	align, justify, ok := splitPlacePair(value)
+	if !ok {
+		return
+	}
+
+	setAlignContentValue(style, align)
+	setJustifyContentValue(style, justify)
+}
+
+func parsePlaceItems(style *ResolvedStyle, value string) {
+	align, justify, ok := splitPlacePair(value)
+	if !ok {
+		return
+	}
+
+	setAlignItemsValue(style, align)
+	setJustifyItemsValue(style, justify)
+}
+
+func parsePlaceSelf(style *ResolvedStyle, value string) {
+	align, justify, ok := splitPlacePair(value)
+	if !ok {
+		return
+	}
+
+	setAlignSelfValue(style, align)
+	setJustifySelfValue(style, justify)
+}
+
 // setFourMargin applies a margin shorthand and tracks auto margins on all axes.
 func setFourMargin(sty *ResolvedStyle, value string, fsize, ctxW float64) {
 	var val [4]string
@@ -291,7 +365,7 @@ func parseBorder(value string, fsize float64, current [3]float64) (border, bool)
 		}
 
 		switch face {
-		case "solid", "dashed", "dotted":
+		case solidKeyword, borderStyleDashed, borderStyleDotted:
 			boxNode.Style = face
 		case cssDisplayNone, overflowHidden:
 			boxNode.Style = cssDisplayNone
@@ -367,11 +441,11 @@ func isCSSSpace(value byte) bool {
 
 func borderWidth(value string, _ float64) float64 {
 	switch value {
-	case "thin":
+	case thinKeyword:
 		return pxToPt(1)
 	case mediumKeyword:
 		return pxToPt(three)
-	case "thick":
+	case thickKeyword:
 		return pxToPt(borderWidthMediumPx)
 	}
 
@@ -384,7 +458,7 @@ func borderWidth(value string, _ float64) float64 {
 
 func borderPaintWidth(value string, fsize float64) float64 {
 	switch value {
-	case "thin", mediumKeyword, "thick":
+	case thinKeyword, mediumKeyword, thickKeyword:
 		return borderWidth(value, fsize)
 	}
 
@@ -496,7 +570,7 @@ func parseOverflowKeyword(value string) (string, bool) {
 // parseListStyleType returns a known list-style-type keyword, or "" if unknown.
 func parseListStyleType(value string) string {
 	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "disc", "circle", "square", "decimal", "decimal-leading-zero",
+	case listStyleDisc, "circle", listStyleSquare, listStyleDecimal, "decimal-leading-zero",
 		"lower-roman", "upper-roman", "lower-alpha", "lower-latin",
 		"upper-alpha", "upper-latin", cssDisplayNone:
 		return strings.ToLower(strings.TrimSpace(value))
@@ -507,7 +581,7 @@ func parseListStyleType(value string) string {
 
 func parseListStylePosition(value string) string {
 	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "inside", "outside":
+	case listPosInside, listPosOutside:
 		return strings.ToLower(strings.TrimSpace(value))
 	}
 
@@ -516,7 +590,7 @@ func parseListStylePosition(value string) string {
 
 func parseOutlineStyle(value string) (string, bool) {
 	switch strings.ToLower(strings.TrimSpace(value)) {
-	case solidKeyword, "dashed", "dotted", cssDisplayNone:
+	case solidKeyword, borderStyleDashed, borderStyleDotted, cssDisplayNone:
 		return strings.ToLower(strings.TrimSpace(value)), true
 	}
 
@@ -525,7 +599,7 @@ func parseOutlineStyle(value string) (string, bool) {
 
 func parseOutlineWidth(value string, fsize float64) (float64, bool) {
 	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "thin", mediumKeyword, "thick":
+	case thinKeyword, mediumKeyword, thickKeyword:
 		return borderWidth(value, fsize), true
 	}
 
@@ -548,17 +622,17 @@ func parseQuotesPair(value string) (string, string, bool) {
 		return "", "", true
 	}
 
-	open, next, ok := nextQuotedCSSString(value, 0)
-	if !ok {
+	openQuote, next, foundOpen := nextQuotedCSSString(value, 0)
+	if !foundOpen {
 		return "", "", false
 	}
 
-	close, _, ok := nextQuotedCSSString(value, next)
-	if !ok {
+	closeQuote, _, foundClose := nextQuotedCSSString(value, next)
+	if !foundClose {
 		return "", "", false
 	}
 
-	return open, close, true
+	return openQuote, closeQuote, true
 }
 
 func nextQuotedCSSString(value string, start int) (string, int, bool) {
@@ -592,24 +666,75 @@ func overflowCreatesStickyScrollport(overflow string) bool {
 	return false
 }
 
+// vminVmaxPt parses Nvmin / Nvmax as a percent of min/max(viewportW, viewportH).
+func vminVmaxPt(value string, viewportW, viewportH float64) (float64, bool) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return 0, false
+	}
+
+	lower := strings.ToLower(value)
+
+	var useMax bool
+
+	switch {
+	case strings.HasSuffix(lower, "vmin"):
+		value = strings.TrimSpace(value[:len(value)-len("vmin")])
+	case strings.HasSuffix(lower, "vmax"):
+		useMax = true
+		value = strings.TrimSpace(value[:len(value)-len("vmax")])
+	default:
+		return 0, false
+	}
+
+	parsed, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		return 0, false
+	}
+
+	base := viewportW
+
+	if useMax {
+		if viewportH > viewportW {
+			base = viewportH
+		}
+	} else if viewportH < viewportW {
+		base = viewportH
+	}
+
+	return base * parsed / cssPercent, true
+}
+
 // lengthBox parses a length for box-sizing properties. "auto" maps to -1,
 // "none" to -1 as well (max-*). Percentages resolve against the containing
 // block dimension (approximated by viewport at this phase).
 func lengthBox(value string, fsize, containing float64, autoValue string) (float64, bool) {
-	if value == autoValue || value == "inherit" || value == "initial" {
+	if value == autoValue || value == inheritKeyword || value == cssKeywordInitial {
 		return -1, true
 	}
 
-	if point, ok := calcLength(value, fsize, containing); ok {
+	if pt, parsed := lengthBoxResolved(value, fsize, containing); parsed {
+		return pt, true
+	}
+
+	return lengthBoxFromUnit(value, fsize, containing)
+}
+
+func lengthBoxResolved(value string, fsize, containing float64) (float64, bool) {
+	if pt, parsed := vminVmaxPt(value, containing, containing); parsed {
+		return pt, true
+	}
+
+	if point, parsed := calcLength(value, fsize, containing); parsed {
 		return point, true
 	}
 
-	if point, ok := clampLength(value, fsize, containing); ok {
-		return point, true
-	}
+	return clampLength(value, fsize, containing)
+}
 
-	val, unit, ok := css.ParseLength(value)
-	if !ok {
+func lengthBoxFromUnit(value string, fsize, containing float64) (float64, bool) {
+	val, unit, parsed := css.ParseLength(value)
+	if !parsed {
 		return 0, false
 	}
 
@@ -617,18 +742,19 @@ func lengthBox(value string, fsize, containing float64, autoValue string) (float
 	case "%", "vw", "vh":
 		return containing * val / cssPercent, true
 	default:
-		if point, ok := css.LengthToPt(val, unit, fsize); ok {
-			// rem uses LengthToPt's 16px root; keep remBase-independent path
-			// matching prior lengthBox (rem → 12pt * v via pxToPt(16)).
-			if unit == remUnit {
-				return pxToPt(cssPxRoot) * val, true
-			}
-
-			return point, true
+		point, converted := css.LengthToPt(val, unit, fsize)
+		if !converted {
+			return 0, false
 		}
-	}
 
-	return 0, false
+		// rem uses LengthToPt's 16px root; keep remBase-independent path
+		// matching prior lengthBox (rem → 12pt * v via pxToPt(16)).
+		if unit == remUnit {
+			return pxToPt(cssPxRoot) * val, true
+		}
+
+		return point, true
+	}
 }
 
 // marginLenAuto parses a horizontal margin; auto yields (0, true).
@@ -643,20 +769,32 @@ func marginLenAuto(value string, fs, ctxW float64) (float64, bool) {
 // marginLen parses a margin/padding/letter-spacing length in points; 0 when
 // unparseable. Percentages resolve against the containing width.
 func marginLen(value string, fsize, ctxW float64) float64 {
-	if value == overflowAuto || value == "inherit" || value == "initial" {
+	if value == overflowAuto || value == inheritKeyword || value == cssKeywordInitial {
 		return 0
 	}
 
-	if point, ok := calcLength(value, fsize, ctxW); ok {
-		return point
+	if pt, parsed := marginLenResolved(value, fsize, ctxW); parsed {
+		return pt
 	}
 
-	if point, ok := clampLength(value, fsize, ctxW); ok {
-		return point
+	return marginLenFromUnit(value, fsize, ctxW)
+}
+
+func marginLenResolved(value string, fsize, ctxW float64) (float64, bool) {
+	if pt, parsed := vminVmaxPt(value, ctxW, ctxW); parsed {
+		return pt, true
 	}
 
-	val, unit, ok := css.ParseLength(value)
-	if !ok {
+	if point, parsed := calcLength(value, fsize, ctxW); parsed {
+		return point, true
+	}
+
+	return clampLength(value, fsize, ctxW)
+}
+
+func marginLenFromUnit(value string, fsize, ctxW float64) float64 {
+	val, unit, parsed := css.ParseLength(value)
+	if !parsed {
 		return 0
 	}
 
@@ -664,11 +802,11 @@ func marginLen(value string, fsize, ctxW float64) float64 {
 		return ctxW * val / cssPercent
 	}
 
-	if unit == "rem" {
+	if unit == remUnit {
 		return pxToPt(cssPxRoot) * val
 	}
 
-	if pt, ok := css.LengthToPt(val, unit, fsize); ok {
+	if pt, converted := css.LengthToPt(val, unit, fsize); converted {
 		return pt
 	}
 
@@ -718,7 +856,7 @@ func splitCommaArgs(value string) []string {
 	depth := 0
 	start := 0
 
-	for idx := 0; idx < len(value); idx++ {
+	for idx := range len(value) {
 		switch value[idx] {
 		case '(':
 			depth++
@@ -853,6 +991,231 @@ func gridAutoFlowName(row, col, dense bool) string {
 	default:
 		return fxRow
 	}
+}
+
+func clearGridTemplate(style *ResolvedStyle) {
+	style.GridTemplateRows = ""
+	style.GridTemplateColumns = ""
+	style.GridTemplateAreas = ""
+}
+
+func gridValueHasMasonry(value string) bool {
+	for _, tok := range strings.Fields(strings.ToLower(value)) {
+		if strings.Trim(tok, `"'/`) == "masonry" {
+			return true
+		}
+	}
+
+	return false
+}
+
+func gridPartHasAutoFlow(part string) bool {
+	for _, tok := range strings.Fields(strings.ToLower(part)) {
+		if tok == "auto-flow" {
+			return true
+		}
+	}
+
+	return false
+}
+
+func gridPartHasAreaString(part string) bool {
+	return strings.Contains(part, `"`) || strings.Contains(part, "'")
+}
+
+// splitGridTemplateSlash splits rows/areas from columns on the first `/`
+// outside quotes. CSS grid-template has at most one such slash.
+func splitGridTemplateSlash(value string) (string, string, bool) {
+	inQuote := byte(0)
+
+	for idx := range len(value) {
+		char := value[idx]
+		if inQuote != 0 {
+			if char == inQuote {
+				inQuote = 0
+			}
+
+			continue
+		}
+
+		if char == '"' || char == '\'' {
+			inQuote = char
+
+			continue
+		}
+
+		if char == '/' {
+			return strings.TrimSpace(value[:idx]), strings.TrimSpace(value[idx+1:]), true
+		}
+	}
+
+	return strings.TrimSpace(value), "", false
+}
+
+// parseGridTemplateShorthand is a Partial expansion into the existing
+// template-rows/columns/areas fields. Masonry values are skipped.
+func parseGridTemplateShorthand(style *ResolvedStyle, value string) {
+	value = strings.TrimSpace(value)
+	if value == "" || gridValueHasMasonry(value) {
+		return
+	}
+
+	if strings.EqualFold(value, cssDisplayNone) {
+		clearGridTemplate(style)
+
+		return
+	}
+
+	before, after, hasSlash := splitGridTemplateSlash(value)
+	applyGridTemplateParts(style, before, after, hasSlash)
+}
+
+func applyGridTemplateParts(style *ResolvedStyle, before, after string, hasSlash bool) {
+	if gridPartHasAreaString(before) {
+		areas, rows := splitGridAreasAndRowSizes(before)
+		style.GridTemplateAreas = areas
+		style.GridTemplateRows = rows
+		style.GridTemplateColumns = ""
+
+		if hasSlash {
+			style.GridTemplateColumns = after
+		}
+
+		return
+	}
+
+	style.GridTemplateAreas = ""
+	style.GridTemplateRows = before
+	style.GridTemplateColumns = ""
+
+	if hasSlash {
+		style.GridTemplateColumns = after
+	}
+}
+
+// parseGridShorthand is a Partial parse of `grid`. Template forms reuse
+// parseGridTemplateShorthand and reset auto-flow to row. auto-flow forms set
+// GridAutoFlow plus the explicit template axis; masonry is skipped.
+func parseGridShorthand(style *ResolvedStyle, value string) {
+	value = strings.TrimSpace(value)
+	if value == "" || gridValueHasMasonry(value) {
+		return
+	}
+
+	if strings.EqualFold(value, cssDisplayNone) {
+		clearGridTemplate(style)
+		style.GridAutoFlow = fxRow
+
+		return
+	}
+
+	before, after, hasSlash := splitGridTemplateSlash(value)
+
+	if gridPartHasAutoFlow(before) || gridPartHasAutoFlow(after) {
+		applyGridAutoFlowShorthand(style, before, after, hasSlash)
+
+		return
+	}
+
+	parseGridTemplateShorthand(style, value)
+	style.GridAutoFlow = fxRow
+}
+
+func applyGridAutoFlowShorthand(style *ResolvedStyle, before, after string, hasSlash bool) {
+	clearGridTemplate(style)
+
+	if gridPartHasAutoFlow(before) {
+		style.GridAutoFlow = parseGridAutoFlowValue(before)
+		if hasSlash {
+			style.GridTemplateColumns = after
+		}
+
+		return
+	}
+
+	style.GridTemplateRows = before
+	style.GridAutoFlow = gridColumnAutoFlow(after)
+}
+
+func gridColumnAutoFlow(after string) string {
+	for _, tok := range strings.Fields(strings.ToLower(after)) {
+		if tok == gridFlowDense {
+			return gridFlowColumnDense
+		}
+	}
+
+	return fxCol
+}
+
+// splitGridAreasAndRowSizes pulls quoted area rows and leftover track sizes
+// out of the grid-template areas form. Line names in [] are dropped.
+func splitGridAreasAndRowSizes(part string) (string, string) {
+	var areas, rows []string
+
+	for idx := 0; idx < len(part); {
+		for idx < len(part) && isCSSSpace(part[idx]) {
+			idx++
+		}
+
+		if idx >= len(part) {
+			break
+		}
+
+		idx = takeGridTemplateToken(part, idx, &areas, &rows)
+	}
+
+	return strings.Join(areas, " "), strings.Join(rows, " ")
+}
+
+func takeGridTemplateToken(part string, pos int, areas, rows *[]string) int {
+	switch part[pos] {
+	case '"', '\'':
+		end := scanQuotedGridToken(part, pos)
+
+		*areas = append(*areas, part[pos:end])
+
+		return end
+	case '[':
+		return skipGridLineNames(part, pos)
+	default:
+		end := pos
+		for end < len(part) && !isCSSSpace(part[end]) &&
+			part[end] != '"' && part[end] != '\'' && part[end] != '[' {
+			end++
+		}
+
+		*rows = append(*rows, part[pos:end])
+
+		return end
+	}
+}
+
+func scanQuotedGridToken(part string, pos int) int {
+	quote := part[pos]
+	end := pos + 1
+
+	for end < len(part) && part[end] != quote {
+		end++
+	}
+
+	if end < len(part) {
+		end++
+	}
+
+	return end
+}
+
+func skipGridLineNames(part string, i int) int {
+	end := i + 1
+	for end < len(part) && part[end] != ']' {
+		end++
+	}
+
+	if end < len(part) {
+		end++
+	}
+
+	return end
 }
 
 // parseGridArea handles grid-area: <custom-ident> or the lite line form
@@ -1040,7 +1403,7 @@ var uaDecls = map[string][]css.Declaration{ //nolint:gochecknoglobals // static 
 	divElementName: {
 		{Prop: "display", Value: "block"}, //nolint:exhaustruct // intentional zero fields
 	},
-	"section": {
+	htmlSection: {
 		{Prop: "display", Value: "block"}, //nolint:exhaustruct // intentional zero fields
 	},
 	"article": {

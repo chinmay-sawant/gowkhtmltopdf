@@ -45,7 +45,7 @@ Pin the CSS name universe, map it onto current code, and stop the matrix from ly
 - [x] 48.2.3 Matrix honesty: `table-layout` Partial lite `layout_tables.go:45`; `ex`/`ch` 0.5em `container.go:133-134`; `applyRestProps` `style_cascade.go:666` + `style_properties.go`. Proof: matrix text; `make claim-scan` clean.
 - [x] 48.2.4 Missing matrix rows added for overflow-wrap, accent-color, border-radius, z-index, container-*, var(), calc(), :not(), :root. Proof: grep in `documentation/compatibility-matrix.md`.
 - [x] 48.2.5 Banner on `plans/0.2.0/phases/pending-phase-items/README.md`. Proof: first paragraph pointer 2026-08-27.
-- [~] 48.2.6 Full `make lint` / `make test` not run this session. Targeted packages green; `make claim-scan` clean. Next gate: full suite before PR.
+- [x] 48.2.6 `make lint`/`test`/`golden` green 2026-08-27.
 
 ## Dependencies
 

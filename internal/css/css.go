@@ -39,6 +39,12 @@ const (
 	hslChannelCount   = 3
 	hslCircleDeg      = 360
 	hslSectorDeg      = 60
+	hslEvenPeriod     = 2 // H' mod 2 in the second-largest HSL component
+	hslChromaHalf     = 2 // m = L - C/2
+	hslSectorYG       = 2 // yellow-green, H' in [1, 2)
+	hslSectorGC       = 3 // green-cyan
+	hslSectorCB       = 4 // cyan-blue
+	hslSectorBM       = 5 // blue-magenta
 )
 
 // Pseudo-class and pseudo-element names shared across selector parsing.
@@ -49,6 +55,8 @@ const (
 	pseudoElemBefore = "before"
 	pseudoElemAfter  = "after"
 	nthChildPseudo   = "nth-child"
+	firstChildPseudo = "first-child"
+	lastChildPseudo  = "last-child"
 )
 
 // Stylesheet is a parsed stylesheet. Rules keep their source order.
@@ -56,6 +64,9 @@ type Stylesheet struct {
 	Rules     []Rule
 	FontFaces []FontFace
 	Page      *PageStyle
+	// Pages holds every @page rule in source order, including :first/:left/:right
+	// and named pages. Page remains the last unnamed @page for older callers.
+	Pages []PageRule
 	// Imports are @import url/media pairs in source order. Parse fills this;
 	// convert.prepare fetches each under the same ACL as <link rel=stylesheet>.
 	Imports []ImportRule
@@ -73,6 +84,14 @@ type ImportRule struct {
 // the raw values here lets page geometry resolve physical units at the PDF
 // boundary instead of pretending they are element styles.
 type PageStyle struct {
+	Margin string
+	Size   string
+}
+
+// PageRule is one @page block. Sel is "" (unnamed), ":first", ":left",
+// ":right", or a page name ident.
+type PageRule struct {
+	Sel    string
 	Margin string
 	Size   string
 }
@@ -219,22 +238,126 @@ func parsePageRule(src string, str *Stylesheet) (string, error) {
 		return "", err
 	}
 
-	page := str.Page
-	if page == nil {
-		page = &PageStyle{} //nolint:exhaustruct // zero values represent omitted @page properties
-		str.Page = page
-	}
+	block = stripNestedAtRules(block)
+	sel := parsePageSelector(src[len("@page"):open])
+
+	var margin, size string
 
 	for _, decl := range parseDeclarations(block) {
 		switch strings.ToLower(decl.Prop) {
 		case "margin":
-			page.Margin = decl.Value
+			margin = decl.Value
 		case "size":
-			page.Size = decl.Value
+			size = decl.Value
+		}
+	}
+
+	str.Pages = append(str.Pages, PageRule{
+		Sel:    sel,
+		Margin: margin,
+		Size:   size,
+	})
+
+	if sel == "" {
+		page := str.Page
+		if page == nil {
+			page = &PageStyle{} //nolint:exhaustruct // zero values represent omitted @page properties
+			str.Page = page
+		}
+
+		if margin != "" {
+			page.Margin = margin
+		}
+
+		if size != "" {
+			page.Size = size
 		}
 	}
 
 	return rest, nil
+}
+
+// parsePageSelector reads the @page prelude. Empty is unnamed; :first, :left,
+// and :right are the page pseudos (any ASCII case); any other ident is a named
+// page. Nested @margin-box rules live in the block and are not part of Sel.
+func parsePageSelector(prelude string) string {
+	prelude = strings.TrimSpace(prelude)
+	if prelude == "" {
+		return ""
+	}
+
+	if prelude[0] == ':' {
+		ident := strings.ToLower(pageIdent(strings.TrimSpace(prelude[1:])))
+		switch ident {
+		case "first", "left", "right":
+			return ":" + ident
+		}
+
+		if ident != "" {
+			return ":" + ident
+		}
+
+		return ""
+	}
+
+	return pageIdent(prelude)
+}
+
+// pageIdent returns the leading CSS ident in src, or "" if src does not start with one.
+func pageIdent(src string) string {
+	if src == "" || !isIdentStart(src[0]) {
+		return ""
+	}
+
+	end := 1
+	for end < len(src) && isIdentChar(src[end]) {
+		end++
+	}
+
+	return src[:end]
+}
+
+// stripNestedAtRules drops at-rules inside a declaration block (margin boxes
+// such as @top-center) so following descriptors are still parsed.
+func stripNestedAtRules(block string) string {
+	var out strings.Builder
+
+	out.Grow(len(block))
+
+	for idx := 0; idx < len(block); {
+		char := block[idx]
+		if char == '"' || char == '\'' {
+			relEnd := strings.IndexByte(block[idx+1:], char)
+			if relEnd < 0 {
+				out.WriteString(block[idx:])
+
+				return out.String()
+			}
+
+			end := idx + minQuotedLen + relEnd
+			out.WriteString(block[idx:end])
+			idx = end
+
+			continue
+		}
+
+		if char == '@' {
+			rest, err := skipAtRule(block[idx:])
+			if err != nil {
+				return out.String()
+			}
+
+			idx += len(block[idx:]) - len(rest)
+
+			continue
+		}
+
+		out.WriteByte(char)
+
+		idx++
+	}
+
+	return out.String()
 }
 
 func parseMediaRule(src string, str *Stylesheet, order *int) (string, error) {
@@ -373,6 +496,7 @@ func parseOneRule(selText, block, media string, contQ *ContainerQuery, order *in
 func skipAtRule(src string) (string, error) {
 	semi := strings.IndexByte(src, ';')
 	open := strings.IndexByte(src, '{')
+
 	if open >= 0 && (semi < 0 || open < semi) {
 		_, rest, err := takeBlock(src, open)
 		if err != nil {
@@ -1131,7 +1255,7 @@ func appendIsWherePseudo(part SelectorPart, name, argRaw string, insideHas bool)
 // CSS2 single-colon pseudo-elements.
 func appendSimplePseudo(part SelectorPart, name, arg string) (SelectorPart, bool) {
 	switch name {
-	case "first-child", "last-child", nthChildPseudo:
+	case firstChildPseudo, lastChildPseudo, nthChildPseudo:
 		part.Pseudos = append(part.Pseudos, pseudoClass(name, arg, nil, nil))
 	case "link", "visited":
 		// Print semantics: both mean "a[href]" (no browsing history).
@@ -1462,14 +1586,8 @@ func containsWord(val, want string) bool {
 
 func matchPseudo(pseudo PseudoClass, node *html.Node) bool {
 	switch pseudo.Name {
-	case "first-child":
-		return previousElementSibling(node) == nil
-	case "last-child":
-		return nextElementSibling(node) == nil
-	case nthChildPseudo:
-		idx := elementIndex(node)
-
-		return matchNth(pseudo.nth, idx)
+	case firstChildPseudo, lastChildPseudo, nthChildPseudo, "root":
+		return matchTreePseudo(pseudo, node)
 	case pseudoClassHas:
 		return matchAnyRelative(pseudo.Has, node)
 	case condKindNot:
@@ -1477,15 +1595,28 @@ func matchPseudo(pseudo PseudoClass, node *html.Node) bool {
 	case pseudoClassIs, pseudoClassWhere:
 		return matchAnySelector(pseudo.Is, node)
 	case "link", "visited":
-		// Print: no link history — both match any anchor with an href.
+		// Print has no link history, so both match any anchor with an href.
 		return isLinkAnchor(node)
+	default:
+		// :hover/:active/:focus/:target never match in print. Unknown
+		// pseudo-classes never match either (kept on the compound so
+		// selectors do not degrade to the host).
+		return false
+	}
+}
+
+// matchTreePseudo handles tree-structural pseudo-classes.
+func matchTreePseudo(pseudo PseudoClass, node *html.Node) bool {
+	switch pseudo.Name {
+	case firstChildPseudo:
+		return previousElementSibling(node) == nil
+	case lastChildPseudo:
+		return nextElementSibling(node) == nil
+	case nthChildPseudo:
+		return matchNth(pseudo.nth, elementIndex(node))
 	case "root":
 		return isRootElement(node)
-	case "hover", "active", "focus", "target":
-		return false
 	default:
-		// Unknown pseudo-classes never match in print (kept on the compound
-		// so selectors do not degrade to the host).
 		return false
 	}
 }
@@ -1829,27 +1960,10 @@ func computeSpecificity(s Selector) (int, int, int) {
 		}
 
 		for _, pageSize := range page.Pseudos {
-			switch pageSize.Name {
-			case "has":
-				a2, b2, c2 := maxRelativeSpecificity(pageSize.Has)
-				idCount += a2
-				classCount += b2
-				typeCount += c2
-			case "not":
-				a2, b2, c2 := maxSelectorSpecificity(pageSize.Not)
-				idCount += a2
-				classCount += b2
-				typeCount += c2
-			case pseudoClassIs:
-				a2, b2, c2 := maxSelectorSpecificity(pageSize.Is)
-				idCount += a2
-				classCount += b2
-				typeCount += c2
-			case pseudoClassWhere:
-				continue // :where() contributes 0 specificity
-			default:
-				classCount++
-			}
+			aDelta, bDelta, cDelta := pseudoSpecificityDelta(pageSize)
+			idCount += aDelta
+			classCount += bDelta
+			typeCount += cDelta
 		}
 	}
 

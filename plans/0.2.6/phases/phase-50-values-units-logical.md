@@ -48,7 +48,7 @@ Modern report CSS uses `clamp()` for type scale and `margin-inline` for horizont
 - [x] 50.4.1 Matrix §3: `ex`/`ch` Partial, 0.5em. Proof: matrix text.
 - [~] 50.4.2 `ch` from glyph advance of `0` not done.
 - [x] 50.4.3 Matrix still says `vw`/`vh` are width/height/min/max only.
-- [ ] 50.4.4 `vmin`/`vmax` still not a matrix row of their own beyond the "Not implemented" catch-all.
+- [x] 50.4.4 `vmin`/`vmax` Partial via `vminVmaxPt`. Matrix units row. Proof: `TestVminVmax`.
 
 ### 50.5 gates
 

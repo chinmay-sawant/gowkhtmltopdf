@@ -1,4 +1,4 @@
-//nolint:testpackage // tests exercise unexported cascade and layout internals
+//nolint:testpackage,cyclop,varnamelen // :is() cascade proofs
 package layout
 
 import (

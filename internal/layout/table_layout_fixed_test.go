@@ -1,4 +1,4 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
+//nolint:testpackage,wsl,cyclop // table-layout:fixed column share proof
 package layout
 
 import (

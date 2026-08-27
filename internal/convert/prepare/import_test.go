@@ -33,6 +33,7 @@ func TestCollectSheetsImportAppliesImportedRules(t *testing.T) {
 	if hits["/a.css"] != 1 || hits["/b.css"] != 1 {
 		t.Fatalf("fetch hits = %v, want a.css and b.css once", hits)
 	}
+
 	assertSheetClasses(t, sheets, []string{"from-b", "from-a"})
 }
 
@@ -52,6 +53,7 @@ func TestCollectSheetsImportFromInlineStyle(t *testing.T) {
 	if hits["/b.css"] != 1 {
 		t.Fatalf("fetch hits = %v, want b.css once", hits)
 	}
+
 	assertSheetClasses(t, sheets, []string{"from-b", "from-style"})
 }
 
@@ -73,9 +75,11 @@ func TestCollectSheetsImportResolvesAgainstSheetBase(t *testing.T) {
 	if hits["/css/b.css"] != 1 {
 		t.Fatalf("fetch hits = %v, want /css/b.css once", hits)
 	}
+
 	if hits["/b.css"] != 0 {
 		t.Fatalf("resolved import against document base; hits = %v", hits)
 	}
+
 	assertSheetClasses(t, sheets, []string{"from-b", "from-a"})
 }
 
@@ -115,6 +119,7 @@ func TestCollectSheetsImportSkipsCycle(t *testing.T) {
 	if hits["/a.css"] != 1 || hits["/b.css"] != 1 {
 		t.Fatalf("cycle re-fetched; hits = %v", hits)
 	}
+
 	assertSheetClasses(t, sheets, []string{"from-b", "from-a"})
 }
 
@@ -134,7 +139,9 @@ func TestCollectSheetsImportFailedFetchDoesNotFail(t *testing.T) {
 	if hits["/missing.css"] != 1 {
 		t.Fatalf("missing import not fetched; hits = %v", hits)
 	}
+
 	assertSheetClasses(t, sheets, []string{"from-a"})
+
 	if !strings.Contains(logBuf.String(), `skipping @import "missing.css"`) {
 		t.Fatalf("log = %q, want skipping @import warning", logBuf.String())
 	}
@@ -159,6 +166,7 @@ func TestCollectSheetsImportMediaGate(t *testing.T) {
 	if printHits["/print.css"] != 1 || printHits["/screen.css"] != 0 {
 		t.Fatalf("print media hits = %v", printHits)
 	}
+
 	assertSheetClasses(t, printSheets, []string{"from-print", "from-a"})
 
 	screenSheets, _, screenHits := collectImportSheets(t, importFixture{
@@ -169,6 +177,7 @@ func TestCollectSheetsImportMediaGate(t *testing.T) {
 	if screenHits["/screen.css"] != 1 || screenHits["/print.css"] != 0 {
 		t.Fatalf("screen media hits = %v", screenHits)
 	}
+
 	assertSheetClasses(t, screenSheets, []string{"from-screen", "from-a"})
 }
 
@@ -176,12 +185,15 @@ func TestCollectSheetsImportDepthCap(t *testing.T) {
 	t.Parallel()
 
 	files := map[string]string{}
+
 	for idx := range maxImportDepth + 2 {
 		name := fmt.Sprintf("/l%d.css", idx)
 		body := fmt.Sprintf(".l%d { color: red }", idx)
+
 		if idx < maxImportDepth+1 {
 			body = fmt.Sprintf("@import url(\"l%d.css\");\n%s", idx+1, body)
 		}
+
 		files[name] = body
 	}
 
@@ -195,14 +207,17 @@ func TestCollectSheetsImportDepthCap(t *testing.T) {
 	for idx := maxImportDepth; idx >= 0; idx-- {
 		want = append(want, fmt.Sprintf("l%d", idx))
 	}
+
 	assertSheetClasses(t, sheets, want)
 
 	if hits["/l8.css"] != 1 {
 		t.Fatalf("depth-8 sheet not fetched; hits = %v", hits)
 	}
+
 	if hits[fmt.Sprintf("/l%d.css", maxImportDepth+1)] != 0 {
 		t.Fatalf("depth cap exceeded; hits = %v", hits)
 	}
+
 	if !strings.Contains(logBuf.String(), "depth exceeds") {
 		t.Fatalf("log = %q, want depth-cap warning", logBuf.String())
 	}
@@ -225,12 +240,14 @@ func collectImportSheets(
 	hits := map[string]int{}
 	server := httptest.NewServer(http.HandlerFunc(func(responseWriter http.ResponseWriter, request *http.Request) {
 		hits[request.URL.Path]++
+
 		body, ok := fixture.files[request.URL.Path]
 		if !ok {
 			http.NotFound(responseWriter, request)
 
 			return
 		}
+
 		responseWriter.Header().Set("Content-Type", "text/css")
 		_, _ = responseWriter.Write([]byte(body))
 	}))
@@ -242,6 +259,7 @@ func collectImportSheets(
 	}
 
 	loader := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // default HTTP loader
+
 	var logBuf bytes.Buffer
 	sheets := prepare.CollectSheets(
 		t.Context(),
@@ -269,10 +287,12 @@ func assertSheetClasses(t *testing.T, sheets []*css.Stylesheet, want []string) {
 
 func sheetClasses(sheets []*css.Stylesheet) []string {
 	out := make([]string, 0)
+
 	for _, sheet := range sheets {
 		if sheet == nil {
 			continue
 		}
+
 		for _, rule := range sheet.Rules {
 			for _, sel := range rule.Selectors {
 				for _, part := range sel.Parts {

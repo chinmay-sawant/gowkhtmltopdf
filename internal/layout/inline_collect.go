@@ -452,8 +452,8 @@ func (e *engine) collectInlineSpan(node *html.Node, sty ResolvedStyle, out *[]in
 
 	before := len(*out)
 
-	if txt := e.pseudoContent(node, "before"); txt != "" {
-		item := e.textItem(txt, e.pseudoStyle(node, "before", sty))
+	if txt := e.pseudoContent(node, pseudoBefore); txt != "" {
+		item := e.textItem(txt, e.pseudoStyle(node, pseudoBefore, sty))
 		e.enableInlineChrome(&item)
 		*out = append(*out, item)
 	}
@@ -462,8 +462,8 @@ func (e *engine) collectInlineSpan(node *html.Node, sty ResolvedStyle, out *[]in
 		e.collectInlineNode(c, out)
 	}
 
-	if txt := e.pseudoContent(node, "after"); txt != "" {
-		item := e.textItem(txt, e.pseudoStyle(node, "after", sty))
+	if txt := e.pseudoContent(node, pseudoAfter); txt != "" {
+		item := e.textItem(txt, e.pseudoStyle(node, pseudoAfter, sty))
 		e.enableInlineChrome(&item)
 		*out = append(*out, item)
 	}

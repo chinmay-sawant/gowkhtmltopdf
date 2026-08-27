@@ -15,12 +15,13 @@ const contentNormal = "normal"
 // li::after{content:"\a0 · "}; print external links use
 // a.external::after{content:' (' attr(href) ')'}.
 func (e *engine) pseudoContent(node *html.Node, pseudoEl string) string {
-	if e == nil || node == nil || (pseudoEl != "before" && pseudoEl != "after") {
+	if e == nil || node == nil || (pseudoEl != pseudoBefore && pseudoEl != pseudoAfter) {
 		return ""
 	}
 
 	ctx := e.pseudoStyleContext()
 	best := selectContentDecl(ctx, node, pseudoEl)
+
 	if best == nil {
 		return ""
 	}
@@ -206,6 +207,7 @@ func scanContentFunction(
 
 	nameEnd := skipCSSIdent(value, idx)
 	paren := skipCSSWhitespace(value, nameEnd)
+
 	if paren >= len(value) || value[paren] != '(' {
 		return 0, false
 	}

@@ -13,8 +13,8 @@
     "properties_by_engine_status": {
       "ignored": 247,
       "implemented": 75,
-      "partial": 87,
-      "unsupported": 409
+      "partial": 95,
+      "unsupported": 401
     },
     "properties_print_relevant": 571,
     "properties_goal_implement": 571,

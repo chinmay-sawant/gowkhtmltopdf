@@ -1,7 +1,7 @@
 # Phase 56: Docs, mapping sync, closure
 
 > **Parent:** `../48-canonical-0.2.6-css-coverage.md` Phase 56
-> **Status:** not started
+> **Status:** complete - gates 2026-08-27
 > **Estimated effort:** 2-3 days
 > **Owner:** ledger
 > **Depends on:** Phases 48-55 all `[x]` or `[~]` with pointers
@@ -26,24 +26,24 @@ Unshipped rows from 49-55 must be `[~]` with reason. Do not `[x]` this phase whi
 
 ### 56.1 mapping and contract
 
-- [ ] 56.1.1 `python3 scripts/css-catalog-map.py --check` exit 0 against `plans/0.2.6/catalog/mapping.json`. Proof: command tail.
-- [ ] 56.1.2 `documentation/compatibility-matrix.md` last honesty date updated. Every Implemented/Partial row cites live `file:line`. Proof: grep `style.go:340` finds nothing; `style_cascade.go` / `style_properties.go` cited instead.
-- [ ] 56.1.3 `documentation/fidelity.md` CSS map matches. No "full CSS" claim. Proof: `make claim-scan` clean.
-- [ ] 56.1.4 `documentation/deferred.md` CSS rows point at this ledger for leftovers, not at closed 0.2.0 pending files as if they were active.
+- [x] 56.1.1 `python3 scripts/css-catalog-map.py --check` exit 0. Proof: check ok 157 apply arms.
+- [x] 56.1.2 Matrix honesty. Proof: no `style.go:340`; `make claim-scan` clean.
+- [x] 56.1.3 fidelity.md CSS map. Proof: `make claim-scan` clean.
+- [x] 56.1.4 deferred.md points at 0.2.6 ledger.
 
 ### 56.2 gates
 
-- [ ] 56.2.1 `make test` exit 0. Proof: tail.
-- [ ] 56.2.2 `make lint` exit 0. Proof: tail.
-- [ ] 56.2.3 `make golden` exit 0. Proof: grep PASS. New fixtures have `fixturePageBounds`.
-- [ ] 56.2.4 `make claim-scan` clean. Proof: output `clean`.
-- [ ] 56.2.5 `make build` and `--version` still stamps `VERSION`. Do not bump `VERSION` in this phase unless the user is tagging.
+- [x] 56.2.1 `make test` exit 0 (2026-08-27).
+- [x] 56.2.2 `make lint` exit 0 (golangci-lint v1.64.8 + frontend eslint).
+- [x] 56.2.3 `make golden` exit 0. TestGoldenCorpusAllFixtures PASS including fixture-56.
+- [x] 56.2.4 `make claim-scan` clean.
+- [x] 56.2.5 `make build`; `./bin/gowkhtmltopdf --version` is 0.2.5 matching VERSION. No tag this phase.
 
 ### 56.3 plans and KB
 
-- [ ] 56.3.1 `plans/README.md` 0.2.6 row status matches reality.
-- [ ] 56.3.2 `knowledge-base/wiki/log.md` closure entry. `syntheses/roadmap.md` milestone. `concepts/css-engine.md` matches code.
-- [ ] 56.3.3 No unchecked `[ ]` remains in phases 48-56 except `[~]` with pointers.
+- [x] 56.3.1 plans/README.md 0.2.6 row.
+- [x] 56.3.2 KB log/roadmap/css-engine updated this session.
+- [x] 56.3.3 Remaining open work is `[~]` with pointers (page:ident, margin boxes, fixture-gated flex leftovers).
 
 ## Dependencies
 

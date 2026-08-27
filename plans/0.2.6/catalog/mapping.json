@@ -13,8 +13,8 @@
     "properties_by_engine_status": {
       "ignored": 247,
       "implemented": 75,
-      "partial": 87,
-      "unsupported": 409
+      "partial": 95,
+      "unsupported": 401
     },
     "properties_print_relevant": 571,
     "properties_goal_implement": 571,
@@ -5079,8 +5079,8 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -8053,8 +8053,8 @@
       "groups": [
         "CSS Flexible Box Layout"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -9146,8 +9146,8 @@
       "groups": [
         "CSS Grid Layout"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -9486,8 +9486,8 @@
       "groups": [
         "CSS Grid Layout"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -10668,8 +10668,8 @@
       "groups": [
         "CSS Lists and Counters"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -13444,8 +13444,8 @@
       "groups": [
         "CSS Box Alignment"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -13470,8 +13470,8 @@
       "groups": [
         "CSS Box Alignment"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
@@ -13496,8 +13496,8 @@
       "groups": [
         "CSS Box Alignment"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
     {
