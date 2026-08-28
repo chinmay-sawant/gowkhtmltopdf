@@ -1,7 +1,7 @@
 # 48 - v0.2.6 CSS coverage (Canonical Execution Ledger)
 
 > **Parent:** `plans/0.2.5/40-canonical-0.2.5-python-bindings.md` (complete 2026-08-26). Leftover CSS rows under `plans/0.2.0/` move here with `[~]` pointers.
-> **Status:** phases 48-56 complete on `feature/026-extended-css-support` (2026-08-27). Phases 57-67 open: promote remaining Partial properties to Implemented (near-browser print). VERSION still 0.2.5.
+> **Status:** phases 48-67 complete on `feature/026-extended-css-support` (Partial program closed: 174 Implemented / 0 Partial). Phases 68-78 open: reopen all 247 Ignored properties for browser-level print. VERSION still 0.2.5.
 > **Estimated effort:** several weeks across phases 48-56. Catalog and honesty first. Frequency slices next. Layout deepen last.
 > **Constraint:** pure Go, no CGO on the default path, no browser embed, no JavaScript. Direct modules stay `go-text/typesetting` and `tdewolff/canvas` unless an amendment is filed. `catalog/mapping.json` is the CSS name inventory.
 > **Ordering principle:** freeze catalog and honesty docs first, then selectors and cascade, then values and units, then template-visible box/text/paint, then generated content, then paged media, then fixture-driven layout leftovers, then closure. No phase closes on intent.
@@ -104,6 +104,17 @@ First-pass `goal: implement` is 608 names. That still includes print-noop UI (`c
                                   -> 65 Grid near-print
                                     -> 66 Position / transform / stacking
                                       -> 67 Mapping + matrix + golden closure
+                                        -> 68 Ignored inventory + policy amend
+                                          -> 69 Vendor-prefix aliases
+                                            -> 70 SVG presentation
+                                              -> 71 Mask, clip, filter
+                                                -> 72 Scroll UI
+                                                  -> 73 Animation / transition
+                                                    -> 74 3D transforms
+                                                      -> 75 Anchor / view timelines
+                                                        -> 76 Pointer / form UI
+                                                          -> 77 Speech / aural
+                                                            -> 78 Ignored program closure
 ```
 
 | Phase | File | Goal |
@@ -128,6 +139,19 @@ First-pass `goal: implement` is 608 names. That still includes print-noop UI (`c
 | 65 | [phases/phase-65-grid-near-print.md](phases/phase-65-grid-near-print.md) | grid track/placement near-print |
 | 66 | [phases/phase-66-position-transform.md](phases/phase-66-position-transform.md) | position, transform, display, container-type |
 | 67 | [phases/phase-67-partial-program-closure.md](phases/phase-67-partial-program-closure.md) | mapping, matrix, counts, gates |
+| 68 | [phases/phase-68-ignored-inventory-policy.md](phases/phase-68-ignored-inventory-policy.md) | Lock 247 Ignored names; amend policy; move onto work list |
+| 69 | [phases/phase-69-vendor-prefix-aliases.md](phases/phase-69-vendor-prefix-aliases.md) | Vendor-prefix aliases (70) |
+| 70 | [phases/phase-70-svg-presentation.md](phases/phase-70-svg-presentation.md) | SVG fill/stroke presentation (31) |
+| 71 | [phases/phase-71-mask-clip-filter.md](phases/phase-71-mask-clip-filter.md) | Mask, clip, filter (26) |
+| 72 | [phases/phase-72-scroll-ui.md](phases/phase-72-scroll-ui.md) | Scroll / overscroll (41) |
+| 73 | [phases/phase-73-animation-transition.md](phases/phase-73-animation-transition.md) | Animation / transition (28) |
+| 74 | [phases/phase-74-3d-transforms.md](phases/phase-74-3d-transforms.md) | 3D transform props (4) |
+| 75 | [phases/phase-75-anchor-view-timeline.md](phases/phase-75-anchor-view-timeline.md) | Anchor / offset / view timelines (21) |
+| 76 | [phases/phase-76-pointer-form-ui.md](phases/phase-76-pointer-form-ui.md) | Pointer / form UI (7) |
+| 77 | [phases/phase-77-speech-aural.md](phases/phase-77-speech-aural.md) | Speech / aural (19) |
+| 78 | [phases/phase-78-ignored-program-closure.md](phases/phase-78-ignored-program-closure.md) | Recount, matrix, gates |
+
+Name inventory for 68-78: [ignored-inventory.json](ignored-inventory.json).
 
 Older CSS ledgers: `plans/0.2.0/phases/pending-phase-items/`, `tier-2-pending-3/`, `phase-17-broader-css.md`. Those rows move here with `[~]` pointers. Do not copy the checklists.
 
@@ -293,6 +317,50 @@ See [phases/phase-66-position-transform.md](phases/phase-66-position-transform.m
 
 See [phases/phase-67-partial-program-closure.md](phases/phase-67-partial-program-closure.md).
 
+## Phase 68: Ignored inventory + policy amend
+
+See [phases/phase-68-ignored-inventory-policy.md](phases/phase-68-ignored-inventory-policy.md).
+
+## Phase 69: Vendor-prefix aliases
+
+See [phases/phase-69-vendor-prefix-aliases.md](phases/phase-69-vendor-prefix-aliases.md).
+
+## Phase 70: SVG presentation
+
+See [phases/phase-70-svg-presentation.md](phases/phase-70-svg-presentation.md).
+
+## Phase 71: Mask, clip, filter
+
+See [phases/phase-71-mask-clip-filter.md](phases/phase-71-mask-clip-filter.md).
+
+## Phase 72: Scroll UI
+
+See [phases/phase-72-scroll-ui.md](phases/phase-72-scroll-ui.md).
+
+## Phase 73: Animation / transition
+
+See [phases/phase-73-animation-transition.md](phases/phase-73-animation-transition.md).
+
+## Phase 74: 3D transforms
+
+See [phases/phase-74-3d-transforms.md](phases/phase-74-3d-transforms.md).
+
+## Phase 75: Anchor / view timelines
+
+See [phases/phase-75-anchor-view-timeline.md](phases/phase-75-anchor-view-timeline.md).
+
+## Phase 76: Pointer / form UI
+
+See [phases/phase-76-pointer-form-ui.md](phases/phase-76-pointer-form-ui.md).
+
+## Phase 77: Speech / aural
+
+See [phases/phase-77-speech-aural.md](phases/phase-77-speech-aural.md).
+
+## Phase 78: Ignored program closure
+
+See [phases/phase-78-ignored-program-closure.md](phases/phase-78-ignored-program-closure.md).
+
 ---
 
 ## Dependencies
@@ -309,9 +377,15 @@ See [phases/phase-67-partial-program-closure.md](phases/phase-67-partial-program
 
 ## Amendment (2026-08-28): Partial to Implemented program
 
-Phases **57-67** promote the remaining **Partial** property rows to **Implemented** at a near-browser **print media** bar. Flex, grid, position, and `writing-mode` may deepen for that bar. Pixel-diff Chrome goldens stay out. Animation, transition, 3D, filter blur, scroll-snap, anchor positioning, speech, and pointer UI stay ignored.
+Phases **57-67** promote the remaining **Partial** property rows to **Implemented** at a near-browser **print media** bar. Closed at **174 Implemented / 0 Partial / 397 Unsupported / 247 Ignored**. See [property-counts.md](property-counts.md).
 
-Baseline when 57 opened: see [property-counts.md](property-counts.md).
+## Amendment (2026-08-28): Ignored to browser-level print (phases 68-78)
+
+Phases **68-78** reopen **all 247 Ignored** properties for **browser-level print**. Phase 68 moves them onto the work list (`goal: implement`, `engine_status: unsupported`). Later phases implement by bucket (vendor aliases, SVG, mask/clip/filter, scroll, animation/transition, 3D, anchor/timelines, pointer UI, speech). Pixel-diff Chrome goldens stay out unless amended. Inventory: [ignored-inventory.json](ignored-inventory.json).
+
+Browser-print golden harness: `testdata/golden/fixture-57-vanguard-telemetry-audit.html` declares all **571** `goal: implement` properties once (plus Vanguard narrative). Closure row: phase 78.2.
+
+This amends the older `policy.permanent_ignore` list (animation, transition, 3D, filter blur, scroll-snap, anchor positioning, speech, print-noop UI, SVG fill/stroke). Those names are no longer permanent ignore under this program.
 
 ## Out of scope (unless this ledger is amended)
 

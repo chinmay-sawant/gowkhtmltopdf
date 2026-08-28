@@ -2,11 +2,13 @@
 
 | File / Folder | Role |
 |---------------|------|
-| [48-canonical-0.2.6-css-coverage.md](48-canonical-0.2.6-css-coverage.md) | Canonical v0.2.6 execution ledger, phases 48-56 |
+| [48-canonical-0.2.6-css-coverage.md](48-canonical-0.2.6-css-coverage.md) | Canonical v0.2.6 execution ledger, phases 48-78 |
 | [phases/](phases) | Per-phase atomic checklists |
 | [catalog/](catalog) | Frozen CSS catalogs plus `mapping.json` vs current engine |
-| [property-counts.md](property-counts.md) | Before/after property counts (implemented / partial / unsupported) |
-| [phases/phase-57-partial-to-implemented-catchup.md](phases/phase-57-partial-to-implemented-catchup.md) | Phase 57+: Partial to Implemented program (near-browser print) |
+| [property-counts.md](property-counts.md) | Property counts (implemented / partial / unsupported / ignored) |
+| [ignored-inventory.json](ignored-inventory.json) | Phase 68-78 ownership of all 247 Ignored names |
+| [phases/phase-57-partial-to-implemented-catchup.md](phases/phase-57-partial-to-implemented-catchup.md) | Phase 57-67: Partial to Implemented (closed) |
+| [phases/phase-68-ignored-inventory-policy.md](phases/phase-68-ignored-inventory-policy.md) | Phase 68-78: Ignored to browser-level print |
 | [AGENTS.md](AGENTS.md) | Agent rules for this ledger |
 | [review/](review) | Post-ship architecture + ponytail ledger for commit `48e06dbc` |
 | [agy-review/](agy-review) | Go Design Patterns and Go Code Style review ledgers |
@@ -19,7 +21,7 @@ WOFF2 sidecar: KB cites `plans/0.2.6/woff2-metric-aliases/` as complete 2026-08-
 
 ## Scope in one line
 
-Catalog-driven print CSS coverage: download the spec property list, map it onto what `internal/css` and `internal/layout` actually do, then raise how often authored templates hit Implemented, without claiming browser print.
+Catalog-driven CSS coverage: map the WebRef property list onto the engine, finish Partials (phases 57-67, done), then reopen Ignored for browser-level print (phases 68-78).
 
 ## Verification
 

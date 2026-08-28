@@ -11,7 +11,7 @@ Implementation plans and roadmaps for `gowkhtmltopdf`, partitioned by release ve
 | [0.2.3/](0.2.3/README.md) | **v0.2.3** — same engine as 0.2.2; GitHub module path / `go install` | [release notes](0.2.3/PR/release-v0.2.3.md) |
 | [0.2.4/](0.2.4/README.md) | **v0.2.4** — idiomatic Document API + CLI rethink + external benches (phases 31–39) | Complete; [release notes](0.2.4/PR/release-v0.2.4.md) |
 | [0.2.5/](0.2.5/README.md) | **v0.2.5 Python cgo c-shared bindings and PyPI** — phases 40–47 (in-process, `CGO_ENABLED=0` pure-Go default kept); font track `font/` already complete | Complete (released 2026-08-26; `VERSION` 0.2.5) |
-| [0.2.6/](0.2.6/README.md) | **v0.2.6 CSS coverage** - phases 48-56, catalog-driven print CSS mapping and remaining properties | Implementation closed on `feature/026-extended-css-support` (2026-08-27). VERSION still 0.2.5. |
+| [0.2.6/](0.2.6/README.md) | **v0.2.6 CSS coverage** - phases 48-78, catalog-driven CSS mapping; Partial program closed; Ignored reopen for browser-level print | Phases 48-67 complete on `feature/026-extended-css-support`. Phases 68-78 open (247 Ignored). VERSION still 0.2.5. |
 
 ---
 
@@ -71,9 +71,11 @@ Implementation plans and roadmaps for `gowkhtmltopdf`, partitioned by release ve
 ## 0.2.6 (CSS coverage)
 
 - [0.2.6 README](0.2.6/README.md)
-- [48-canonical-0.2.6-css-coverage.md](0.2.6/48-canonical-0.2.6-css-coverage.md) - Canonical execution ledger for print CSS coverage (phases 48-56)
-- [phases/](0.2.6/phases) - Per-phase atomic checklists 48-56
+- [48-canonical-0.2.6-css-coverage.md](0.2.6/48-canonical-0.2.6-css-coverage.md) - Canonical execution ledger (phases 48-78)
+- [phases/](0.2.6/phases) - Per-phase atomic checklists 48-78
 - [catalog/](0.2.6/catalog) - Frozen webref / W3C / MDN JSON plus `mapping.json`
+- [property-counts.md](0.2.6/property-counts.md) - Implemented / Partial / Unsupported / Ignored counts
+- [ignored-inventory.json](0.2.6/ignored-inventory.json) - Ownership map for the 247 Ignored names (phases 68-78)
 - [AGENTS.md](0.2.6/AGENTS.md) - Agent rules for this ledger
 
-Leftover CSS rows in `0.2.0/phases/pending-phase-items/` move here with `[~]` pointers. WOFF2 sidecar cited in KB is not in this worktree; this ledger does not re-open it.
+Phases 57-67 closed Partials (174 Implemented / 0 Partial). Phases 68-78 reopen all 247 Ignored for browser-level print. Leftover CSS rows in `0.2.0/phases/pending-phase-items/` move here with `[~]` pointers. WOFF2 sidecar cited in KB is not in this worktree unless amended.

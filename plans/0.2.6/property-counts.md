@@ -1,8 +1,21 @@
 # Property counts (v0.2.6)
 
-WebRef inventory size is 818 property names. That list is the classification universe, not the implement-everything target. Print-relevant `goal: implement` after Phase 48.2 is 571.
+WebRef inventory size is 818 property names.
 
-Phases 57-67 promote remaining Partial rows to Implemented (near-browser print). See `phases/phase-57-partial-to-implemented-catchup.md`.
+## Current snapshot
+
+| Status | Count |
+|--------|------:|
+| Implemented | 174 |
+| Partial | 0 |
+| Unsupported | 397 |
+| Ignored | 247 |
+
+Phases **57-67** closed the Partial set (near-browser print). Phases **68-78** reopen **all 247 Ignored** names for **browser-level print** (phase-wise checklist). See `phases/phase-68-ignored-inventory-policy.md` and `ignored-inventory.json`.
+
+After Phase 68 reclassification (planned): Ignored moves onto the work list as Unsupported, so expected counts become **174 / 0 / 644 / 0** until later phases promote names to Implemented.
+
+## Partial program history (Implemented / Partial / Unsupported)
 
 | When | Implemented | Partial | Unsupported |
 |------|------------:|--------:|------------:|
@@ -19,5 +32,4 @@ Phases 57-67 promote remaining Partial rows to Implemented (near-browser print).
 | After Phase 65 grid near-print | 170 | 4 | 397 |
 | After Phase 66 position / transform / stacking | 174 | 0 | 397 |
 
-Sources: `catalog/coverage-summary.json` at `f0cc352` for the before row; current `catalog/coverage-summary.json` / `catalog/mapping.json` for later rows. Ignored counts are out of scope for this table (210 before Phase 48.2 reclassify, 247 now).
-
+Ignored was 210 at first catalog, then 247 after Phase 48.2 print-noop / SVG reclassify. Sources: `catalog/coverage-summary.json` / `catalog/mapping.json`.
