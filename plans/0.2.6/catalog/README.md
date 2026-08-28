@@ -4,11 +4,11 @@ Counts from `coverage-summary.json`, generated 2026-08-28 by walking `webref-css
 
 | Kind | Total | implemented | partial | unsupported | ignored |
 |------|------:|------------:|--------:|------------:|--------:|
-| Properties | 818 | 75 | 99 | 397 | 247 |
-| At-rules | 55 | 0 | 4 | 41 | 10 |
-| Selectors | 158 | 12 | 5 | 120 | 21 |
-| Functions | 162 | 3 | 7 | 128 | 24 |
-| Units | 30 | 7 | 6 | 17 | 0 |
+| Properties | 818 | 89 | 85 | 397 | 247 |
+| At-rules | 55 | 0 | 11 | 34 | 10 |
+| Selectors | 158 | 14 | 10 | 113 | 21 |
+| Functions | 162 | 5 | 24 | 109 | 24 |
+| Units | 30 | 7 | 8 | 15 | 0 |
 
 `ignored` is permanent for this engine: animation, transition, 3D transforms, filter blur, scroll snap, anchor positioning, speech, vendor prefixes, print-noop UI (`cursor`, `caret-color`, `resize`, `user-select`, `pointer-events`, `touch-action`, `appearance`), and SVG presentation `fill`/`stroke` (plus `fill-*` and `stroke-*`). A PDF has no mouse pointer, caret, or drag handle, so those names stay out of the work list.
 

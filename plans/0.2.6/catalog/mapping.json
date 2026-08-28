@@ -4,7 +4,7 @@
     "all_properties": "https://www.w3.org/Style/CSS/all-properties.en.json",
     "mdn_units": "mdn/data css/units.json",
     "mdn_properties": "mdn/data css/properties.json (overlay for mdn_url/groups)",
-    "engine": "internal/layout/style_properties.go apply groups + applyFontProps + css.go at-rules, inventory 2026-08-28",
+    "engine": "internal/layout + css; Phase 57 Partial->Implemented catch-up 2026-08-28",
     "generated": "2026-08-28"
   },
   "summary": {
@@ -12,8 +12,8 @@
     "mapped_properties": 818,
     "properties_by_engine_status": {
       "ignored": 247,
-      "implemented": 75,
-      "partial": 99,
+      "implemented": 89,
+      "partial": 85,
       "unsupported": 397
     },
     "properties_print_relevant": 571,
@@ -21,27 +21,27 @@
     "atrules": 55,
     "atrules_by_engine_status": {
       "ignored": 10,
-      "unsupported": 32,
-      "partial": 13
+      "unsupported": 34,
+      "partial": 11
     },
     "selectors": 158,
     "selectors_by_engine_status": {
-      "partial": 5,
-      "unsupported": 118,
+      "partial": 10,
+      "unsupported": 113,
       "ignored": 21,
       "implemented": 14
     },
     "functions": 162,
     "functions_by_engine_status": {
       "ignored": 24,
-      "unsupported": 128,
-      "partial": 7,
-      "implemented": 3
+      "unsupported": 109,
+      "partial": 24,
+      "implemented": 5
     },
     "units": 30,
     "units_by_engine_status": {
-      "unsupported": 17,
-      "partial": 6,
+      "unsupported": 15,
+      "partial": 8,
       "implemented": 7
     }
   },
@@ -1755,9 +1755,9 @@
       "groups": [
         "CSS Cascading and Inheritance"
       ],
-      "engine_status": "partial",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "engine_status": "unsupported",
+      "code_path": "",
+      "notes": "No CSS all shorthand apply arm; only column-span:all value. Honesty demote 2026-08-28."
     },
     {
       "property": "anchor-name",
@@ -3042,9 +3042,9 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go:717",
-      "notes": ""
+      "notes": "Phase 57 catch-up: matrix already Implemented; mapping lagged."
     },
     {
       "property": "border-block",
@@ -3479,9 +3479,9 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "notes": "Phase 57 catch-up: matrix already Implemented; mapping lagged."
     },
     {
       "property": "border-bottom-clip",
@@ -4364,9 +4364,9 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "notes": "Phase 57 catch-up: matrix already Implemented; mapping lagged."
     },
     {
       "property": "border-left-clip",
@@ -4554,9 +4554,9 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "notes": "Phase 57 catch-up: matrix already Implemented; mapping lagged."
     },
     {
       "property": "border-right-clip",
@@ -4788,9 +4788,9 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "notes": "Phase 57 catch-up: matrix already Implemented; mapping lagged."
     },
     {
       "property": "border-top",
@@ -4815,9 +4815,9 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "notes": "Phase 57 catch-up: matrix already Implemented; mapping lagged."
     },
     {
       "property": "border-top-clip",
@@ -5742,9 +5742,9 @@
       "groups": [
         "CSS Multi-column Layout"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "notes": "Phase 57 catch-up: matrix already Implemented; mapping lagged."
     },
     {
       "property": "column-rule-break",
@@ -5786,9 +5786,9 @@
       "groups": [
         "CSS Multi-column Layout"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "notes": "Phase 57 catch-up: matrix already Implemented; mapping lagged."
     },
     {
       "property": "column-rule-inset",
@@ -6015,9 +6015,9 @@
       "groups": [
         "CSS Multi-column Layout"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "notes": "Phase 57 catch-up: matrix already Implemented; mapping lagged."
     },
     {
       "property": "column-rule-visibility-items",
@@ -6059,9 +6059,9 @@
       "groups": [
         "CSS Multi-column Layout"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "notes": "Phase 57 catch-up: matrix already Implemented; mapping lagged."
     },
     {
       "property": "column-span",
@@ -7310,7 +7310,7 @@
         "CSS Lists and Counters"
       ],
       "engine_status": "partial",
-      "code_path": "internal/layout/style_properties.go",
+      "code_path": "internal/layout/style_paint_props.go; internal/layout/counter.go",
       "notes": ""
     },
     {
@@ -7333,7 +7333,7 @@
         "CSS Lists and Counters"
       ],
       "engine_status": "partial",
-      "code_path": "internal/layout/style_properties.go",
+      "code_path": "internal/layout/style_paint_props.go; internal/layout/counter.go",
       "notes": ""
     },
     {
@@ -8601,9 +8601,9 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "notes": "Phase 57 catch-up: matrix already Implemented; mapping lagged."
     },
     {
       "property": "font-synthesis",
@@ -10669,7 +10669,7 @@
         "CSS Lists and Counters"
       ],
       "engine_status": "partial",
-      "code_path": "internal/layout/style_properties.go",
+      "code_path": "internal/layout/style_paint_props.go",
       "notes": ""
     },
     {
@@ -11665,9 +11665,9 @@
       "groups": [
         "CSS Box Sizing"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "notes": "Phase 57 catch-up: matrix already Implemented; mapping lagged."
     },
     {
       "property": "max-inline-size",
@@ -12264,8 +12264,8 @@
         "CSS Basic User Interface"
       ],
       "engine_status": "partial",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "code_path": "internal/layout/style_paint_props.go",
+      "notes": "Shorthand + longhands in paint props."
     },
     {
       "property": "outline-color",
@@ -12287,7 +12287,7 @@
         "CSS Basic User Interface"
       ],
       "engine_status": "partial",
-      "code_path": "internal/layout/style_properties.go",
+      "code_path": "internal/layout/style_paint_props.go",
       "notes": ""
     },
     {
@@ -12310,7 +12310,7 @@
         "CSS Basic User Interface"
       ],
       "engine_status": "partial",
-      "code_path": "internal/layout/style_properties.go",
+      "code_path": "internal/layout/style_paint_props.go",
       "notes": ""
     },
     {
@@ -12333,7 +12333,7 @@
         "CSS Basic User Interface"
       ],
       "engine_status": "partial",
-      "code_path": "internal/layout/style_properties.go",
+      "code_path": "internal/layout/style_paint_props.go",
       "notes": ""
     },
     {
@@ -12356,7 +12356,7 @@
         "CSS Basic User Interface"
       ],
       "engine_status": "partial",
-      "code_path": "internal/layout/style_properties.go",
+      "code_path": "internal/layout/style_paint_props.go",
       "notes": ""
     },
     {
@@ -13796,8 +13796,8 @@
         "CSS Generated Content"
       ],
       "engine_status": "partial",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "code_path": "internal/layout/style_paint_props.go; internal/layout/counter.go",
+      "notes": "Apply in paint props; used by quote open/close."
     },
     {
       "property": "r",
@@ -16744,9 +16744,9 @@
       "groups": [
         "CSS Text Decoration"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "notes": "Phase 57 catch-up: matrix already Implemented; mapping lagged."
     },
     {
       "property": "text-decoration-color",
@@ -18753,9 +18753,9 @@
       "groups": [
         "CSS Text"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "notes": "Phase 57 catch-up: matrix already Implemented; mapping lagged."
     },
     {
       "property": "word-wrap",
@@ -19064,9 +19064,9 @@
       "descriptors": [],
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "partial",
-      "code_path": "internal/css/page_margin.go; internal/convert/page_margin_boxes.go",
-      "notes": "Quoted content on unnamed @page rules fills empty CLI footer slots; counters, running(), corners, and named or pseudo-page chrome are not consumed."
+      "engine_status": "unsupported",
+      "code_path": "",
+      "notes": "setPageMarginBox stores only six edge boxes; corners are dropped."
     },
     {
       "name": "@bottom-right",
@@ -19669,9 +19669,9 @@
       "descriptors": [],
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "partial",
-      "code_path": "internal/css/page_margin.go; internal/convert/page_margin_boxes.go",
-      "notes": "Quoted content on unnamed @page rules fills empty CLI header slots; counters, running(), corners, and named or pseudo-page chrome are not consumed."
+      "engine_status": "unsupported",
+      "code_path": "",
+      "notes": "setPageMarginBox stores only six edge boxes; corners are dropped."
     },
     {
       "name": "@top-right",
@@ -20127,8 +20127,9 @@
       "spec_href": "https://drafts.csswg.org/css2/#selectordef-after",
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
-      "notes": ""
+      "engine_status": "partial",
+      "notes": "CSS2 single-colon alias of ::after.",
+      "code_path": "internal/css/selector_parser.go"
     },
     {
       "name": ":animated-image",
@@ -20159,8 +20160,9 @@
       "spec_href": "https://drafts.csswg.org/css2/#selectordef-before",
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
-      "notes": ""
+      "engine_status": "partial",
+      "notes": "CSS2 single-colon alias of ::before.",
+      "code_path": "internal/css/selector_parser.go"
     },
     {
       "name": ":blank",
@@ -20255,8 +20257,9 @@
       "spec_href": "https://drafts.csswg.org/css2/#selectordef-first",
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
-      "notes": ""
+      "engine_status": "partial",
+      "notes": "@page :first page pseudo, not element matcher.",
+      "code_path": "internal/css/css.go; internal/layout/page_named.go"
     },
     {
       "name": ":first-child",
@@ -20496,8 +20499,9 @@
       "spec_href": "https://drafts.csswg.org/css2/#selectordef-left",
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
-      "notes": ""
+      "engine_status": "partial",
+      "notes": "@page :left page pseudo, not element matcher.",
+      "code_path": "internal/css/css.go; internal/layout/page_named.go"
     },
     {
       "name": ":link",
@@ -20760,8 +20764,9 @@
       "spec_href": "https://drafts.csswg.org/css2/#selectordef-right",
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
-      "notes": ""
+      "engine_status": "partial",
+      "notes": "@page :right page pseudo, not element matcher.",
+      "code_path": "internal/css/css.go; internal/layout/page_named.go"
     },
     {
       "name": ":root",
@@ -21131,8 +21136,9 @@
       "spec_href": "https://drafts.csswg.org/css-values-4/#funcdef-clamp",
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
-      "notes": ""
+      "engine_status": "partial",
+      "notes": "clampLength for length contexts; not full math expressions.",
+      "code_path": "internal/layout/style_values.go"
     },
     {
       "name": "color-interpolate()",
@@ -21219,16 +21225,18 @@
       "spec_href": "https://drafts.csswg.org/css-lists-3/#funcdef-counter",
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
-      "notes": ""
+      "engine_status": "partial",
+      "notes": "Generated content counter() lite.",
+      "code_path": "internal/layout/pseudo_content.go"
     },
     {
       "name": "counters()",
       "spec_href": "https://drafts.csswg.org/css-lists-3/#funcdef-counters",
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
-      "notes": ""
+      "engine_status": "partial",
+      "notes": "Generated content counters() lite.",
+      "code_path": "internal/layout/pseudo_content.go"
     },
     {
       "name": "cross-fade()",
@@ -21379,16 +21387,18 @@
       "spec_href": "https://drafts.csswg.org/css-color-4/#funcdef-hsl",
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
-      "notes": ""
+      "engine_status": "implemented",
+      "notes": "Comma HSL; optional deg hue suffix.",
+      "code_path": "internal/css/values.go"
     },
     {
       "name": "hsla()",
       "spec_href": "https://drafts.csswg.org/css-color-4/#funcdef-hsla",
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
-      "notes": ""
+      "engine_status": "implemented",
+      "notes": "Comma HSLA; alpha number or percent.",
+      "code_path": "internal/css/values.go"
     },
     {
       "name": "hue-rotate()",
@@ -21571,8 +21581,9 @@
       "spec_href": "https://drafts.csswg.org/css-transforms-1/#funcdef-transform-matrix",
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
-      "notes": ""
+      "engine_status": "partial",
+      "notes": "Static 2D transform function; paint-time matrix.",
+      "code_path": "internal/layout/transform.go"
     },
     {
       "name": "matrix3d()",
@@ -21843,8 +21854,9 @@
       "spec_href": "https://drafts.csswg.org/css-transforms-1/#funcdef-transform-rotate",
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
-      "notes": ""
+      "engine_status": "partial",
+      "notes": "Static 2D transform function; paint-time matrix.",
+      "code_path": "internal/layout/transform.go"
     },
     {
       "name": "rotate3d()",
@@ -21907,16 +21919,18 @@
       "spec_href": "https://drafts.csswg.org/css-transforms-2/#funcdef-scale",
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
-      "notes": ""
+      "engine_status": "partial",
+      "notes": "Static 2D transform function; paint-time matrix.",
+      "code_path": "internal/layout/transform.go"
     },
     {
       "name": "scale()",
       "spec_href": "https://drafts.csswg.org/css-transforms-1/#funcdef-transform-scale",
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
-      "notes": ""
+      "engine_status": "partial",
+      "notes": "Static 2D transform function; paint-time matrix.",
+      "code_path": "internal/layout/transform.go"
     },
     {
       "name": "scale3d()",
@@ -21931,32 +21945,36 @@
       "spec_href": "https://drafts.csswg.org/css-transforms-2/#funcdef-scalex",
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
-      "notes": ""
+      "engine_status": "partial",
+      "notes": "Static 2D transform function; paint-time matrix.",
+      "code_path": "internal/layout/transform.go"
     },
     {
       "name": "scaleX()",
       "spec_href": "https://drafts.csswg.org/css-transforms-1/#funcdef-transform-scalex",
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
-      "notes": ""
+      "engine_status": "partial",
+      "notes": "Static 2D transform function; paint-time matrix.",
+      "code_path": "internal/layout/transform.go"
     },
     {
       "name": "scaleY()",
       "spec_href": "https://drafts.csswg.org/css-transforms-2/#funcdef-scaley",
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
-      "notes": ""
+      "engine_status": "partial",
+      "notes": "Static 2D transform function; paint-time matrix.",
+      "code_path": "internal/layout/transform.go"
     },
     {
       "name": "scaleY()",
       "spec_href": "https://drafts.csswg.org/css-transforms-1/#funcdef-transform-scaley",
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
-      "notes": ""
+      "engine_status": "partial",
+      "notes": "Static 2D transform function; paint-time matrix.",
+      "code_path": "internal/layout/transform.go"
     },
     {
       "name": "scaleZ()",
@@ -22027,24 +22045,27 @@
       "spec_href": "https://drafts.csswg.org/css-transforms-1/#funcdef-transform-skew",
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
-      "notes": ""
+      "engine_status": "partial",
+      "notes": "Static 2D transform function; paint-time matrix.",
+      "code_path": "internal/layout/transform.go"
     },
     {
       "name": "skewX()",
       "spec_href": "https://drafts.csswg.org/css-transforms-1/#funcdef-transform-skewx",
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
-      "notes": ""
+      "engine_status": "partial",
+      "notes": "Static 2D transform function; paint-time matrix.",
+      "code_path": "internal/layout/transform.go"
     },
     {
       "name": "skewY()",
       "spec_href": "https://drafts.csswg.org/css-transforms-1/#funcdef-transform-skewy",
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
-      "notes": ""
+      "engine_status": "partial",
+      "notes": "Static 2D transform function; paint-time matrix.",
+      "code_path": "internal/layout/transform.go"
     },
     {
       "name": "snap-block()",
@@ -22179,8 +22200,9 @@
       "spec_href": "https://drafts.csswg.org/css-transforms-1/#funcdef-transform-translate",
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
-      "notes": ""
+      "engine_status": "partial",
+      "notes": "Static 2D transform function; paint-time matrix.",
+      "code_path": "internal/layout/transform.go"
     },
     {
       "name": "translate3d()",
@@ -22195,16 +22217,18 @@
       "spec_href": "https://drafts.csswg.org/css-transforms-1/#funcdef-transform-translatex",
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
-      "notes": ""
+      "engine_status": "partial",
+      "notes": "Static 2D transform function; paint-time matrix.",
+      "code_path": "internal/layout/transform.go"
     },
     {
       "name": "translateY()",
       "spec_href": "https://drafts.csswg.org/css-transforms-1/#funcdef-transform-translatey",
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
-      "notes": ""
+      "engine_status": "partial",
+      "notes": "Static 2D transform function; paint-time matrix.",
+      "code_path": "internal/layout/transform.go"
     },
     {
       "name": "translateZ()",
@@ -22584,8 +22608,9 @@
       "status_mdn": "standard",
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
-      "notes": ""
+      "engine_status": "partial",
+      "notes": "Viewport vmax; some length paths pass containing for both axes so vmin\u2248vmax.",
+      "code_path": "internal/layout/style_values.go"
     },
     {
       "name": "vmin",
@@ -22595,8 +22620,9 @@
       "status_mdn": "standard",
       "print_relevant": true,
       "goal": "implement",
-      "engine_status": "unsupported",
-      "notes": ""
+      "engine_status": "partial",
+      "notes": "Viewport vmin; some length paths pass containing for both axes so vmin\u2248vmax.",
+      "code_path": "internal/layout/style_values.go"
     },
     {
       "name": "vw",

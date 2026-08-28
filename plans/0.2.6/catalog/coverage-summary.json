@@ -5,15 +5,15 @@
     "all_properties": "https://www.w3.org/Style/CSS/all-properties.en.json",
     "mdn_units": "mdn/data css/units.json",
     "mdn_properties": "mdn/data css/properties.json (overlay for mdn_url/groups)",
-    "engine": "internal/layout/style_properties.go apply groups + applyFontProps + css.go at-rules, inventory 2026-08-28"
+    "engine": "internal/layout + css; Phase 57 Partial->Implemented catch-up 2026-08-28"
   },
   "counts": {
     "webref_properties": 818,
     "mapped_properties": 818,
     "properties_by_engine_status": {
       "ignored": 247,
-      "implemented": 75,
-      "partial": 99,
+      "implemented": 89,
+      "partial": 85,
       "unsupported": 397
     },
     "properties_print_relevant": 571,
@@ -21,27 +21,27 @@
     "atrules": 55,
     "atrules_by_engine_status": {
       "ignored": 10,
-      "unsupported": 32,
-      "partial": 13
+      "unsupported": 34,
+      "partial": 11
     },
     "selectors": 158,
     "selectors_by_engine_status": {
-      "partial": 5,
-      "unsupported": 118,
+      "partial": 10,
+      "unsupported": 113,
       "ignored": 21,
       "implemented": 14
     },
     "functions": 162,
     "functions_by_engine_status": {
       "ignored": 24,
-      "unsupported": 128,
-      "partial": 7,
-      "implemented": 3
+      "unsupported": 109,
+      "partial": 24,
+      "implemented": 5
     },
     "units": 30,
     "units_by_engine_status": {
-      "unsupported": 17,
-      "partial": 6,
+      "unsupported": 15,
+      "partial": 8,
       "implemented": 7
     }
   },

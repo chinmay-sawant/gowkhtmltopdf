@@ -1,7 +1,7 @@
 # 48 - v0.2.6 CSS coverage (Canonical Execution Ledger)
 
 > **Parent:** `plans/0.2.5/40-canonical-0.2.5-python-bindings.md` (complete 2026-08-26). Leftover CSS rows under `plans/0.2.0/` move here with `[~]` pointers.
-> **Status:** complete on `feature/026-extended-css-support` (2026-08-27). VERSION still 0.2.5. Leftovers are `[~]` with pointers.
+> **Status:** phases 48-56 complete on `feature/026-extended-css-support` (2026-08-27). Phases 57-67 open: promote remaining Partial properties to Implemented (near-browser print). VERSION still 0.2.5.
 > **Estimated effort:** several weeks across phases 48-56. Catalog and honesty first. Frequency slices next. Layout deepen last.
 > **Constraint:** pure Go, no CGO on the default path, no browser embed, no JavaScript. Direct modules stay `go-text/typesetting` and `tdewolff/canvas` unless an amendment is filed. `catalog/mapping.json` is the CSS name inventory.
 > **Ordering principle:** freeze catalog and honesty docs first, then selectors and cascade, then values and units, then template-visible box/text/paint, then generated content, then paged media, then fixture-driven layout leftovers, then closure. No phase closes on intent.
@@ -93,6 +93,17 @@ First-pass `goal: implement` is 608 names. That still includes print-noop UI (`c
             -> 54 Paged media and fragmentation
               -> 55 Layout Partial deepen (fixture-driven)
                 -> 56 Docs, mapping sync, closure
+                  -> 57 Catalog catch-up + claim lock (Partial -> Implemented program)
+                    -> 58 Paint finishes
+                      -> 59 Logical box
+                        -> 60 Text, lists, generated content
+                          -> 61 Overflow, visibility, table
+                            -> 62 Breaks, orphans/widows, page
+                              -> 63 writing-mode vertical
+                                -> 64 Flex near-print
+                                  -> 65 Grid near-print
+                                    -> 66 Position / transform / stacking
+                                      -> 67 Mapping + matrix + golden closure
 ```
 
 | Phase | File | Goal |
@@ -106,6 +117,17 @@ First-pass `goal: implement` is 608 names. That still includes print-noop UI (`c
 | 54 | [phases/phase-54-paged-media-fragmentation.md](phases/phase-54-paged-media-fragmentation.md) | named `@page`, page selectors, break-value honesty |
 | 55 | [phases/phase-55-layout-partial-deepen.md](phases/phase-55-layout-partial-deepen.md) | Only flex/grid/multicol/float holes that fail a named fixture |
 | 56 | [phases/phase-56-docs-closure.md](phases/phase-56-docs-closure.md) | matrix, fidelity, mapping, claim-scan, lint, test, golden |
+| 57 | [phases/phase-57-partial-to-implemented-catchup.md](phases/phase-57-partial-to-implemented-catchup.md) | Promote Partial rows that already match matrix/code; lock exit criteria |
+| 58 | [phases/phase-58-paint-finishes.md](phases/phase-58-paint-finishes.md) | outline, radius %, box-shadow, background layers |
+| 59 | [phases/phase-59-logical-box-implemented.md](phases/phase-59-logical-box-implemented.md) | logical margin/padding/inset/size for horizontal-tb |
+| 60 | [phases/phase-60-text-lists-generated.md](phases/phase-60-text-lists-generated.md) | white-space, font stack, lists, quotes, counters |
+| 61 | [phases/phase-61-overflow-visibility-table.md](phases/phase-61-overflow-visibility-table.md) | overflow axes, visibility collapse, table deepen |
+| 62 | [phases/phase-62-breaks-page.md](phases/phase-62-breaks-page.md) | break values, orphans/widows, page |
+| 63 | [phases/phase-63-writing-mode-vertical.md](phases/phase-63-writing-mode-vertical.md) | true vertical-rl / vertical-lr layout |
+| 64 | [phases/phase-64-flex-near-print.md](phases/phase-64-flex-near-print.md) | flex / place / align-content near-print |
+| 65 | [phases/phase-65-grid-near-print.md](phases/phase-65-grid-near-print.md) | grid track/placement near-print |
+| 66 | [phases/phase-66-position-transform.md](phases/phase-66-position-transform.md) | position, transform, display, container-type |
+| 67 | [phases/phase-67-partial-program-closure.md](phases/phase-67-partial-program-closure.md) | mapping, matrix, counts, gates |
 
 Older CSS ledgers: `plans/0.2.0/phases/pending-phase-items/`, `tier-2-pending-3/`, `phase-17-broader-css.md`. Those rows move here with `[~]` pointers. Do not copy the checklists.
 
@@ -227,6 +249,52 @@ Candidates already known:
 
 ---
 
+## Phase 57: Catalog catch-up + claim lock
+
+See [phases/phase-57-partial-to-implemented-catchup.md](phases/phase-57-partial-to-implemented-catchup.md).
+
+## Phase 58: Paint finishes
+
+See [phases/phase-58-paint-finishes.md](phases/phase-58-paint-finishes.md).
+
+## Phase 59: Logical box Implemented
+
+See [phases/phase-59-logical-box-implemented.md](phases/phase-59-logical-box-implemented.md).
+
+## Phase 60: Text, lists, generated content
+
+See [phases/phase-60-text-lists-generated.md](phases/phase-60-text-lists-generated.md).
+
+## Phase 61: Overflow, visibility, table
+
+See [phases/phase-61-overflow-visibility-table.md](phases/phase-61-overflow-visibility-table.md).
+
+## Phase 62: Breaks and page
+
+See [phases/phase-62-breaks-page.md](phases/phase-62-breaks-page.md).
+
+## Phase 63: writing-mode vertical
+
+See [phases/phase-63-writing-mode-vertical.md](phases/phase-63-writing-mode-vertical.md).
+
+## Phase 64: Flex near-print
+
+See [phases/phase-64-flex-near-print.md](phases/phase-64-flex-near-print.md).
+
+## Phase 65: Grid near-print
+
+See [phases/phase-65-grid-near-print.md](phases/phase-65-grid-near-print.md).
+
+## Phase 66: Position / transform / stacking
+
+See [phases/phase-66-position-transform.md](phases/phase-66-position-transform.md).
+
+## Phase 67: Partial program closure
+
+See [phases/phase-67-partial-program-closure.md](phases/phase-67-partial-program-closure.md).
+
+---
+
 ## Dependencies
 
 | Depends on | Provides to |
@@ -239,12 +307,18 @@ Candidates already known:
 
 ---
 
+## Amendment (2026-08-28): Partial to Implemented program
+
+Phases **57-67** promote the remaining **Partial** property rows to **Implemented** at a near-browser **print media** bar. Flex, grid, position, and `writing-mode` may deepen for that bar. Pixel-diff Chrome goldens stay out. Animation, transition, 3D, filter blur, scroll-snap, anchor positioning, speech, and pointer UI stay ignored.
+
+Baseline when 57 opened: see [property-counts.md](property-counts.md).
+
 ## Out of scope (unless this ledger is amended)
 
 - JavaScript, SPA hydration, `--enable-javascript`
 - Chrome print parity, Wikipedia Vector/Minerva clone, pixel goldens
 - Animation, transition, 3D, filter blur, scroll-driven animation, view transitions
-- Full Grid L3, joint subgrid intrinsic, masonry-as-Chrome
+- Full Grid L3 / masonry-as-Chrome beyond what Phase 65 claims for print
 - `@supports` as a real feature-query engine (tiny false-unknown parse is a Phase 49 maybe)
 - WOFF2 / metric font aliases (sidecar; code still rejects WOFF2 here)
 - New direct Go modules
