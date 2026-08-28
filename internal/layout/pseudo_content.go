@@ -14,6 +14,18 @@ const contentNormal = "normal"
 // close-quote, and none/normal (empty). Wiki hlist separators use
 // li::after{content:"\a0 · "}; print external links use
 // a.external::after{content:' (' attr(href) ')'}.
+func contentNeedsEnv(value string) bool {
+	if value == "" {
+		return false
+	}
+
+	low := strings.ToLower(value)
+
+	return strings.Contains(low, "counter(") ||
+		strings.Contains(low, "counters(") ||
+		strings.Contains(low, "quote")
+}
+
 func (e *engine) pseudoContent(node *html.Node, pseudoEl string) string {
 	if e == nil || node == nil || (pseudoEl != pseudoBefore && pseudoEl != pseudoAfter) {
 		return ""
@@ -24,6 +36,10 @@ func (e *engine) pseudoContent(node *html.Node, pseudoEl string) string {
 
 	if best == nil {
 		return ""
+	}
+
+	if !contentNeedsEnv(best.value) {
+		return evalContentValue(best.value, node, nil)
 	}
 
 	return evalContentValue(best.value, node, e.contentEnvAt(node, pseudoEl))

@@ -420,6 +420,9 @@ var fixturePageBounds = map[string]fixtureBounds{ //nolint:gochecknoglobals // i
 		// section page breaks still dominate; page count is 21.
 		minPages: 21, maxPages: 21,
 	},
+	"fixture-57-vanguard-telemetry-audit.html": { //nolint:exhaustruct // intentional zero-value fields
+		minPages: 2, maxPages: 2, needles: []string{"VANGUARD", "TELEMETRY"},
+	},
 }
 
 // fixtureHeaderOK enforces the corpus hygiene rule: every fixture starts

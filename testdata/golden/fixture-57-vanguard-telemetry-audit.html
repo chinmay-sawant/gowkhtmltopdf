@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<!--
+  fixture-57-vanguard-telemetry-audit
+  Proves: comprehensive v0.2.6 CSS capabilities with fresh, distinct styles:
+  - Selectors & Cascade: :is(), :where(), :first-of-type, :last-of-type,
+    :nth-of-type(even), :nth-last-of-type(1), [attr=val i] case-insensitive.
+  - Values & Units & Logical Properties: clamp(), hsl()/hsla(), ch/ex/vmin/vmax units,
+    logical margin/padding/border/inset (block/inline).
+  - Text & Box & Table: word-spacing, visibility: hidden, caption-side: bottom,
+    white-space: pre-wrap, table-layout: fixed, flex-flow, place-content,
+    place-items, place-self, grid-template, display: inline-grid, column-rule.
+  - Paint, Backgrounds & Borders: background-image data URI, outline with offset,
+    box-shadow, radius longhands (top-left/bottom-right), overflow: hidden.
+  - Generated Content & Lists: CSS counters (counter-reset, counter-increment,
+    counter(), counters()), quotes (open-quote/close-quote), list-style-position: inside,
+    list-style-image data URI.
+  - Paged Media: @page :first, @page margins, @top-left and @bottom-center margin boxes.
+  Expected: 2 pages.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Vanguard Systems - Telemetry &amp; Quality Audit Digest</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 12mm;
+      @top-left {
+        content: "VANGUARD SYSTEMS · TELEMETRY DIGEST";
+      }
+      @bottom-center {
+        content: "CONFIDENTIAL · FLIGHT ENGINEERING AUDIT";
+      }
+    }
+
+    @page :first {
+      margin-top: 14mm;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: clamp(9pt, 1.6vw, 10.5pt);
+      line-height: 1.48;
+      color: hsl(220, 24%, 18%);
+      background-color: hsl(216, 28%, 97%);
+      padding: 0;
+    }
+
+    .document-container {
+      width: 100%;
+      margin-inline: auto;
+    }
+
+    /* Page container with explicit page-break-after */
+    .audit-page {
+      position: relative;
+      width: 100%;
+      min-height: 270mm;
+      padding-block: 6mm 10mm;
+      padding-inline: 4mm;
+      background-color: hsl(0, 0%, 100%);
+      page-break-after: always;
+    }
+
+    .audit-page:last-of-type {
+      page-break-after: auto;
+    }
+
+    /* Header banner with background-image data URI and logical borders */
+    .masthead-banner {
+      background-color: hsl(222, 64%, 16%);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Cpath d='M0 20 L20 0 L40 20 L20 40 Z' fill='none' stroke='%232a3f66' stroke-width='1'/%3E%3C/svg%3E");
+      color: hsl(210, 40%, 98%);
+      padding-block: 16px 14px;
+      padding-inline: 20px;
+      border-top-left-radius: 12px;
+      border-top-right-radius: 4px;
+      border-bottom-right-radius: 12px;
+      border-bottom-left-radius: 4px;
+      border-block-start: 3px solid hsl(196, 92%, 46%);
+      box-shadow: 0 4px 14px hsla(222, 50%, 10%, 0.16);
+      margin-block-end: 18px;
+    }
+
+    .masthead-top {
+      display: flex;
+      flex-flow: row wrap;
+      place-content: space-between center;
+      margin-block-end: 8px;
+    }
+
+    .system-badge {
+      font-size: 8.5pt;
+      font-weight: bold;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: hsl(196, 92%, 46%);
+      background-color: hsla(196, 92%, 46%, 0.15);
+      padding-block: 3px 2px;
+      padding-inline: 8px;
+      border-radius: 4px / 2px;
+      outline: 1px solid hsl(196, 85%, 40%);
+      outline-offset: 1px;
+    }
+
+    .document-ref {
+      font-size: 8pt;
+      color: hsl(215, 30%, 75%);
+    }
+
+    .masthead-title {
+      font-size: clamp(16pt, 3.2vw, 22pt);
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      word-spacing: 0.08em;
+      color: hsl(0, 0%, 100%);
+      margin-block-end: 6px;
+    }
+
+    .masthead-sub {
+      font-size: 9.5pt;
+      color: hsl(215, 30%, 82%);
+      max-width: 72ch;
+      line-height: 1.4;
+    }
+
+    /* Counter setup for numbered sections and requirement clauses */
+    body {
+      counter-reset: audit-section req-clause;
+    }
+
+    .section-block {
+      counter-increment: audit-section;
+      margin-block-end: 18px;
+    }
+
+    .section-heading {
+      font-size: 13pt;
+      font-weight: 700;
+      color: hsl(222, 60%, 20%);
+      padding-block-end: 5px;
+      border-block-end: 1.5px solid hsl(218, 25%, 85%);
+      margin-block-end: 12px;
+      word-spacing: 0.12em;
+    }
+
+    .section-heading::before {
+      content: "§ " counter(audit-section) " · ";
+      color: hsl(196, 90%, 38%);
+      font-weight: 600;
+    }
+
+    /* Selectors :is() and :where() */
+    :is(.spec-card, .metric-panel, .kpi-block) {
+      background-color: hsl(0, 0%, 100%);
+      border: 1px solid hsl(216, 24%, 88%);
+      padding-block: 10px 12px;
+      padding-inline: 14px;
+      margin-block-end: 10px;
+    }
+
+    :where(.callout-box, .status-pill) {
+      font-size: 8.5pt;
+      border-radius: 4px;
+    }
+
+    /* KPI Grid using flex-flow and place-content */
+    .kpi-row {
+      display: flex;
+      flex-flow: row wrap;
+      place-content: space-between stretch;
+      gap: 12px;
+      margin-block-end: 16px;
+    }
+
+    .kpi-card {
+      flex: 1 1 22%;
+      min-width: 110px;
+      background-color: hsl(216, 32%, 98%);
+      border-block-start: 3px solid hsl(222, 50%, 35%);
+      border-top-left-radius: 6px;
+      border-top-right-radius: 6px;
+      border-bottom-left-radius: 4px;
+      border-bottom-right-radius: 4px;
+      padding: 1.5ex 1.5ch;
+      box-shadow: 0 2px 6px hsla(220, 20%, 30%, 0.08);
+    }
+
+    .kpi-card:nth-of-type(2) {
+      border-block-start-color: hsl(160, 68%, 36%);
+    }
+
+    .kpi-card:nth-of-type(3) {
+      border-block-start-color: hsl(38, 92%, 46%);
+    }
+
+    .kpi-card:nth-of-type(4) {
+      border-block-start-color: hsl(196, 90%, 42%);
+    }
+
+    .kpi-label {
+      font-size: 7.5pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: hsl(215, 20%, 48%);
+      margin-block-end: 4px;
+    }
+
+    .kpi-val {
+      font-size: 14pt;
+      font-weight: 700;
+      color: hsl(222, 60%, 18%);
+    }
+
+    .kpi-delta {
+      font-size: 7.5pt;
+      font-weight: 600;
+      color: hsl(160, 68%, 32%);
+      margin-block-start: 3px;
+    }
+
+    /* Attribute selector with case-insensitive flag [data-status="certified" i] */
+    .status-tag[data-status="certified" i] {
+      background-color: hsla(160, 68%, 36%, 0.12);
+      color: hsl(160, 72%, 28%);
+      border: 1px solid hsl(160, 60%, 45%);
+      padding-inline: 6px;
+      padding-block: 2px;
+      font-weight: bold;
+      border-radius: 3px;
+      display: inline-block;
+    }
+
+    .status-tag[data-status="nominal" i] {
+      background-color: hsla(196, 90%, 42%, 0.12);
+      color: hsl(196, 92%, 30%);
+      border: 1px solid hsl(196, 75%, 50%);
+      padding-inline: 6px;
+      padding-block: 2px;
+      font-weight: bold;
+      border-radius: 3px;
+      display: inline-block;
+    }
+
+    /* Two-column layout with outline and box-shadow */
+    .grid-duo {
+      display: flex;
+      flex-flow: row wrap;
+      gap: 14px;
+      margin-block-end: 16px;
+    }
+
+    .grid-duo > .col-left {
+      flex: 1 1 58%;
+    }
+
+    .grid-duo > .col-right {
+      flex: 1 1 38%;
+    }
+
+    .panel-featured {
+      background-color: hsl(0, 0%, 100%);
+      border: 1px solid hsl(216, 20%, 84%);
+      border-radius: 8px;
+      padding: 12px 14px;
+      outline: 2px solid hsl(196, 85%, 44%);
+      outline-offset: 3px;
+      box-shadow: 0 4px 12px hsla(220, 30%, 20%, 0.08);
+      margin-block: 4px 10px;
+    }
+
+    /* Quotes and pseudo-elements */
+    q {
+      quotes: "«" "»" "‹" "›";
+      font-style: italic;
+      color: hsl(222, 50%, 24%);
+    }
+
+    q::before {
+      content: open-quote;
+      font-weight: bold;
+      color: hsl(196, 90%, 38%);
+    }
+
+    q::after {
+      content: close-quote;
+      font-weight: bold;
+      color: hsl(196, 90%, 38%);
+    }
+
+    .quote-box {
+      background-color: hsl(216, 35%, 97%);
+      border-inline-start: 4px solid hsl(196, 90%, 42%);
+      padding-block: 8px 10px;
+      padding-inline: 12px;
+      margin-block: 10px;
+      border-radius: 0 6px 6px 0;
+    }
+
+    /* Telemetry dump with white-space: pre-wrap and overflow: hidden */
+    .telemetry-dump {
+      font-family: monospace;
+      font-size: 8pt;
+      background-color: hsl(222, 45%, 12%);
+      color: hsl(160, 80%, 75%);
+      padding: 10px 12px;
+      border-radius: 6px;
+      white-space: pre-wrap;
+      overflow: hidden;
+      line-height: 1.4;
+      margin-block: 8px;
+    }
+
+    /* Lists with list-style-position: inside and list-style-image data URI */
+    .audit-list {
+      list-style-position: inside;
+      list-style-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpolygon points='1,2 8,5 1,8' fill='%230b7285'/%3E%3C/svg%3E");
+      margin-block: 8px;
+      padding-inline-start: 4px;
+    }
+
+    .audit-list li {
+      margin-block-end: 6px;
+      color: hsl(220, 25%, 25%);
+    }
+
+    /* List item counter numbering */
+    .req-list {
+      list-style-type: none;
+      margin-block: 8px;
+      padding-inline-start: 0;
+    }
+
+    .req-list li {
+      counter-increment: req-clause;
+      margin-block-end: 8px;
+      padding-block: 6px 7px;
+      padding-inline: 10px;
+      background-color: hsl(216, 30%, 97%);
+      border-radius: 4px;
+      border-inline-start: 3px solid hsl(222, 50%, 45%);
+    }
+
+    .req-list li::before {
+      content: "REQ-" counter(audit-section) "." counter(req-clause) " · ";
+      font-weight: bold;
+      color: hsl(222, 60%, 25%);
+    }
+
+    /* Table styling with table-layout: fixed and caption-side: bottom */
+    .audit-table {
+      width: 100%;
+      table-layout: fixed;
+      border-collapse: collapse;
+      margin-block: 10px 12px;
+      font-size: 8.5pt;
+    }
+
+    .audit-table caption {
+      caption-side: bottom;
+      font-size: 7.5pt;
+      color: hsl(215, 20%, 50%);
+      text-align: right;
+      padding-block-start: 6px;
+      font-style: italic;
+    }
+
+    .audit-table th,
+    .audit-table td {
+      padding-block: 6px 7px;
+      padding-inline: 8px;
+      text-align: left;
+      border-block-end: 1px solid hsl(216, 20%, 88%);
+      word-wrap: break-word;
+    }
+
+    .audit-table th {
+      background-color: hsl(222, 55%, 22%);
+      color: hsl(0, 0%, 100%);
+      font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+
+    .audit-table tr:nth-of-type(even) td {
+      background-color: hsl(216, 30%, 98%);
+    }
+
+    .audit-table tr:last-of-type td {
+      border-block-end: 2px solid hsl(222, 50%, 35%);
+      font-weight: 600;
+    }
+
+    /* Visibility hidden spacer vs visible item */
+    .spacer-cell {
+      visibility: hidden;
+    }
+
+    /* Multi-column layout with column-rule */
+    .multi-column-text {
+      column-count: 2;
+      column-gap: 20px;
+      column-rule: 1.5px solid hsl(218, 25%, 85%);
+      margin-block: 10px 14px;
+      font-size: 8.5pt;
+      text-align: justify;
+    }
+
+    .multi-column-text p {
+      margin-block-end: 8px;
+    }
+
+    /* Sign-off footer */
+    .signoff-box {
+      margin-block-start: 16px;
+      padding-block: 10px 12px;
+      padding-inline: 14px;
+      background-color: hsl(216, 32%, 97%);
+      border: 1px solid hsl(216, 20%, 85%);
+      border-radius: 6px;
+      display: flex;
+      flex-flow: row wrap;
+      place-content: space-between center;
+    }
+
+    .signoff-col {
+      flex: 1 1 45%;
+    }
+
+    .signoff-label {
+      font-size: 7.5pt;
+      font-weight: bold;
+      color: hsl(215, 20%, 45%);
+      text-transform: uppercase;
+    }
+
+    .signoff-val {
+      font-size: 9pt;
+      font-weight: bold;
+      color: hsl(222, 60%, 20%);
+    }
+  </style>
+</head>
+<body>
+
+<div class="document-container">
+
+  <!-- PAGE 1 -->
+  <div class="audit-page">
+    <header class="masthead-banner">
+      <div class="masthead-top">
+        <div class="system-badge">VANGUARD-IV ARCHITECTURE</div>
+        <div class="document-ref">DOC REF: VNG-2026-AUD-57</div>
+      </div>
+      <h1 class="masthead-title">Telemetry &amp; Quality Audit Digest</h1>
+      <p class="masthead-sub">
+        Comprehensive engineering verification report for the Vanguard deep-space telemetry pipeline,
+        orbital sub-systems, flight controller state transitions, and environmental integrity.
+      </p>
+    </header>
+
+    <div class="section-block">
+      <h2 class="section-heading">Operational Key Performance Indicators</h2>
+      <div class="kpi-row">
+        <div class="kpi-card">
+          <div class="kpi-label">Uplink Signal Rate</div>
+          <div class="kpi-val">99.984%</div>
+          <div class="kpi-delta">+0.04% nominal drift</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Channel Latency</div>
+          <div class="kpi-val">14.2 ms</div>
+          <div class="kpi-delta">-1.8 ms optimized</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Thermal Stability</div>
+          <div class="kpi-val">294.15 K</div>
+          <div class="kpi-delta">±0.2 K variance</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Buffer Saturation</div>
+          <div class="kpi-val">12.4%</div>
+          <div class="kpi-delta">peak load headroom</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-block">
+      <h2 class="section-heading">Flight Controller State &amp; Directives</h2>
+      <div class="grid-duo">
+        <div class="col-left">
+          <div class="spec-card">
+            <p style="margin-block-end: 8px;">
+              The orbital attitude stabilization sub-assembly maintained nominal locked state throughout
+              the scheduled observation window. All telemetry frames were validated against schema checksums.
+            </p>
+            <div class="quote-box">
+              <q>All primary navigational gyro clusters and star tracker vectors remain within certified operating bounds without thermal throttling.</q>
+            </div>
+            <p style="margin-block-start: 8px;">
+              Status evaluation: <span class="status-tag" data-status="certified">CERTIFIED NOMINAL</span>
+            </p>
+          </div>
+        </div>
+        <div class="col-right">
+          <div class="panel-featured">
+            <div style="font-weight: 700; color: hsl(222, 60%, 20%); margin-block-end: 6px;">Telemetry Packet Ingest</div>
+            <div class="telemetry-dump">[FRAME 0x7E3A] SEQ: 41829
+RATE: 48.0 kbps | SNR: 32.4 dB
+CRC: 0x9F4C (OK)
+CH-1: STABLE | CH-2: ACTIVE
+THERMAL: 21.4 C | VOLT: 28.2 V</div>
+            <p style="font-size: 7.5pt; color: hsl(215, 20%, 45%); margin-block-start: 4px;">
+              Direct telemetry stream capture from secondary transceiver bus.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-block">
+      <h2 class="section-heading">Pre-Flight Certification Directives</h2>
+      <ul class="audit-list">
+        <li>Dual-bus redundancy verification conducted across all transceivers with zero frame drop.</li>
+        <li>Cryogenic fluid containment pressure telemetry verified at 3.42 MPa baseline.</li>
+        <li>Autonomous failover sequence benchmarked with sub-millisecond execution envelope.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- PAGE 2 -->
+  <div class="audit-page">
+    <div class="section-block">
+      <h2 class="section-heading">Subsystem Telemetry Matrix &amp; Tolerances</h2>
+      <table class="audit-table">
+        <caption>Table 57.1 - Vanguard Subsystem Verification and Telemetry Matrix</caption>
+        <thead>
+          <tr>
+            <th style="width: 25%;">Subsystem Module</th>
+            <th style="width: 20%;">Sensor ID</th>
+            <th style="width: 20%;">Measured Val</th>
+            <th style="width: 20%;">Reference Spec</th>
+            <th style="width: 15%;">Audit Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Star Tracker Alpha</td>
+            <td>ST-A-104</td>
+            <td>0.002 deg</td>
+            <td>&lt; 0.005 deg</td>
+            <td><span class="status-tag" data-status="certified">PASS</span></td>
+          </tr>
+          <tr>
+            <td>Reaction Wheel Beta</td>
+            <td>RW-B-209</td>
+            <td>3,450 RPM</td>
+            <td>3,200 - 4,000</td>
+            <td><span class="status-tag" data-status="nominal">PASS</span></td>
+          </tr>
+          <tr>
+            <td>Propulsion Gate Valve</td>
+            <td>PV-G-311</td>
+            <td>24.1 bar</td>
+            <td>22.0 - 26.0 bar</td>
+            <td><span class="status-tag" data-status="certified">PASS</span></td>
+          </tr>
+          <tr>
+            <td>Thermal Radiator Loop</td>
+            <td>TR-L-408</td>
+            <td>288.4 K</td>
+            <td>280 - 305 K</td>
+            <td><span class="status-tag" data-status="certified">PASS</span></td>
+          </tr>
+          <tr>
+            <td>Transponder X-Band</td>
+            <td>TX-X-512</td>
+            <td>42.6 dBW</td>
+            <td>&gt; 40.0 dBW</td>
+            <td><span class="status-tag" data-status="nominal">PASS</span></td>
+          </tr>
+          <tr>
+            <td>Payload Backup Array</td>
+            <td>PB-A-601</td>
+            <td><span class="spacer-cell">STANDBY</span>READY</td>
+            <td>STANDBY</td>
+            <td><span class="status-tag" data-status="certified">PASS</span></td>
+          </tr>
+          <tr>
+            <td colspan="2">Consolidated Subsystem Reliability Index</td>
+            <td colspan="2">99.988% MTBF Compliance</td>
+            <td><span class="status-tag" data-status="certified">VERIFIED</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section-block">
+      <h2 class="section-heading">Detailed Telemetry Engineering Notes</h2>
+      <div class="multi-column-text">
+        <p>
+          Continuous downlink spectral density measurements confirmed robust signal lock during the entire trans-orbital passage. Cross-polarization discrimination surpassed the 28 dB threshold across all carrier frequencies, maintaining clean signal separation.
+        </p>
+        <p>
+          Internal telemetry logs recorded zero uncorrectable Reed-Solomon packet faults over 14 million transmitted bytes. Thermal cycle dissipation stayed well within the radiative margin, with heat pipe conductance operating at 98.6% of theoretical peak performance.
+        </p>
+      </div>
+    </div>
+
+    <div class="section-block">
+      <h2 class="section-heading">Mandatory Audit Action Items</h2>
+      <ul class="req-list">
+        <li>Execute scheduled propellant line heating cycle prior to apogee burn initialization.</li>
+        <li>Synchronize onboard atomic clock discriminator against ground station master beacon.</li>
+        <li>Archive complete telemetry payload chunk to non-volatile flight storage bank.</li>
+      </ul>
+    </div>
+
+    <div class="signoff-box">
+      <div class="signoff-col">
+        <div class="signoff-label">Lead Flight Dynamics Engineer</div>
+        <div class="signoff-val">Dr. Eleanor Vance, Systems Directorate</div>
+      </div>
+      <div class="signoff-col" style="text-align: right;">
+        <div class="signoff-label">Certification Status</div>
+        <div class="signoff-val" style="color: hsl(160, 68%, 32%);">FLIGHT READY · SIGN-OFF COMPLETE</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

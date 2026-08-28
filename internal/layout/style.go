@@ -220,6 +220,7 @@ type ResolvedStyle struct {
 	BackgroundImage string
 	// ListStylePosition is "inside" or "outside"; empty means outside.
 	ListStylePosition string
+	QuotesRaw         string
 	QuotesOpen        string
 	QuotesClose       string
 	CounterReset      string
@@ -693,7 +694,7 @@ type comparableResolvedStyle struct {
 	OutlineOffset                                                                                  float64
 	BackgroundImage                                                                                string
 	ListStylePosition                                                                              string
-	QuotesOpen, QuotesClose                                                                        string
+	QuotesRaw, QuotesOpen, QuotesClose                                                             string
 	CounterReset, CounterIncrement                                                                 string
 	ListStyleImage                                                                                 string
 	BoxShadowX, BoxShadowY, BoxShadowBlur                                                          float64
@@ -752,11 +753,11 @@ func comparableResolvedStyleFor(style ResolvedStyle) comparableResolvedStyle {
 		Orphans: style.Orphans,
 		Widows:  style.Widows, ContainerType: style.ContainerType, ContainerName: style.ContainerName,
 		Transform: style.Transform, HasTransform: style.HasTransform, TransformOrigin: style.TransformOrigin,
-		Opacity:      style.Opacity,
-		OutlineWidth: style.OutlineWidth, OutlineStyle: style.OutlineStyle,
+		Opacity: style.Opacity, OutlineWidth: style.OutlineWidth, OutlineStyle: style.OutlineStyle,
 		OutlineColor: style.OutlineColor, OutlineColorSet: style.OutlineColorSet,
 		OutlineOffset: style.OutlineOffset, BackgroundImage: style.BackgroundImage,
-		ListStylePosition: style.ListStylePosition, QuotesOpen: style.QuotesOpen, QuotesClose: style.QuotesClose,
+		ListStylePosition: style.ListStylePosition, QuotesRaw: style.QuotesRaw,
+		QuotesOpen: style.QuotesOpen, QuotesClose: style.QuotesClose,
 		CounterReset: style.CounterReset, CounterIncrement: style.CounterIncrement,
 		ListStyleImage: style.ListStyleImage,
 		BoxShadowX:     style.BoxShadowX, BoxShadowY: style.BoxShadowY, BoxShadowBlur: style.BoxShadowBlur,

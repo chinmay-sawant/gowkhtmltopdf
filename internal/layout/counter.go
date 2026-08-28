@@ -329,20 +329,17 @@ func (e *engine) contentEnvAt(target *html.Node, pseudo string) *contentEnv {
 }
 
 func (e *engine) quotesFor(ctx *styleContext, node *html.Node) quoteStyle {
-	for cur := node; cur != nil; cur = cur.Parent {
-		raw := cascadedProp(ctx, cur, cssPropQuotes)
-		if raw != "" && !isCSSWideKeyword(raw) {
-			return parseQuotes(raw)
+	if e != nil {
+		for cur := node; cur != nil; cur = cur.Parent {
+			if sty := e.stylePtr(cur); sty != nil && sty.QuotesRaw != "" {
+				return parseQuotes(sty.QuotesRaw)
+			}
 		}
-	}
-
-	if e != nil && node != nil {
-		sty := e.stylePtr(node)
-		if sty.QuotesOpen != "" || sty.QuotesClose != "" {
-			return quoteStyle{
-				opens:  []string{sty.QuotesOpen},
-				closes: []string{sty.QuotesClose},
-				none:   false,
+	} else {
+		for cur := node; cur != nil; cur = cur.Parent {
+			raw := cascadedProp(ctx, cur, cssPropQuotes)
+			if raw != "" && !isCSSWideKeyword(raw) {
+				return parseQuotes(raw)
 			}
 		}
 	}
@@ -352,7 +349,7 @@ func (e *engine) quotesFor(ctx *styleContext, node *html.Node) quoteStyle {
 
 func (e *engine) counterResetSpec(ctx *styleContext, node *html.Node) string {
 	if e != nil {
-		if sty := e.stylePtr(node); sty != nil && sty.CounterReset != "" {
+		if sty := e.stylePtr(node); sty != nil {
 			return sty.CounterReset
 		}
 	}
@@ -362,7 +359,7 @@ func (e *engine) counterResetSpec(ctx *styleContext, node *html.Node) string {
 
 func (e *engine) counterIncrementSpec(ctx *styleContext, node *html.Node) string {
 	if e != nil {
-		if sty := e.stylePtr(node); sty != nil && sty.CounterIncrement != "" {
+		if sty := e.stylePtr(node); sty != nil {
 			return sty.CounterIncrement
 		}
 	}

@@ -275,6 +275,7 @@ func firstCSSUrl(value string) (string, bool) {
 func applyGeneratedContentProps(style *ResolvedStyle, prop, value string) bool {
 	switch prop {
 	case "quotes":
+		style.QuotesRaw = value
 		if openQuote, closeQuote, parsed := parseQuotesPair(value); parsed {
 			style.QuotesOpen = openQuote
 			style.QuotesClose = closeQuote

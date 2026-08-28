@@ -186,6 +186,7 @@ var inheritableProps = []inheritCopy{ //nolint:gochecknoglobals // static inheri
 	{
 		[]string{"quotes"},
 		func(dst, src *ResolvedStyle) {
+			dst.QuotesRaw = src.QuotesRaw
 			dst.QuotesOpen = src.QuotesOpen
 			dst.QuotesClose = src.QuotesClose
 		},

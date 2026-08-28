@@ -182,3 +182,28 @@ func joinInts(vals []int, sep string) string {
 
 	return strings.Join(parts, sep)
 }
+
+func TestPseudoLargeListPerformance(t *testing.T) {
+	t.Parallel()
+
+	var htmlBuilder strings.Builder
+	htmlBuilder.WriteString("<html><body><ul>")
+	for i := range 500 {
+		htmlBuilder.WriteString("<li>Item ")
+		htmlBuilder.WriteString(strconv.Itoa(i))
+		htmlBuilder.WriteString("</li>")
+	}
+	htmlBuilder.WriteString("</ul></body></html>")
+
+	cssSheet := sheet(t, `
+body { margin: 0; font-size: 12pt; }
+li { display: inline; }
+li::after { content: " · "; }
+`)
+
+	res := layoutHTML(t, htmlBuilder.String(), cssSheet)
+	got := joinedPaintText(res)
+	if !strings.Contains(got, "Item 0 · Item 1 ·") || !strings.Contains(got, "Item 499 ·") {
+		t.Fatalf("unexpected paint text: %s", got[:min(len(got), 100)])
+	}
+}
