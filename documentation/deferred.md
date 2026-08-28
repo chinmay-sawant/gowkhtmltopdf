@@ -95,6 +95,9 @@ Do not treat a public SPA URL as the acceptance bar for report work.
 | `@page :first` / `:left` / `:right` | Margins applied. LTR page 1 is `:right`; `:first` wins on page 1. Size unnamed-only. | 54.1.2 `[x]` |
 | `page: ident` | Used-value inherit; sibling name change breaks; named `@page` margin on overlapping pages. No per-page size. | 54.1.3 `[x]` lite |
 | `@page` margin boxes (`@top-center`) | Unnamed quoted `@top-*` / `@bottom-*` fill empty CLI header/footer slots. `running()` / corners out. | 54.3 `[x]` lite |
+| Draft corner-shape CSS (34 properties: corner, corner-block-*, corner-inline-*, etc.) | Not implemented - Draft corner-shape CSS; not in print PDF engine. Left unsupported. | Deferred indefinitely (permanent non-goal) |
+| Ruby/MathML/rhythmic niche (33 properties: block-ellipsis, block-step-*, box-snap, ruby-*, math-*, etc.) | Not implemented - Ruby/MathML/rhythmic niche; not implemented for print PDF. Left unsupported. | Deferred indefinitely (permanent non-goal) |
+| Draft gap/row-rule decorations (27 properties: row-rule*, rule*) | Not implemented - Draft gap/row-rule decorations; no print consumer. Left unsupported. | Deferred indefinitely (permanent non-goal) |
 
 ---
 

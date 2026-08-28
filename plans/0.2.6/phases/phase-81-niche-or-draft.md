@@ -1,7 +1,7 @@
 # Phase 81: Niche or draft (tier 4, 94 properties)
 
 > **Parent:** `../48-canonical-0.2.6-css-coverage.md` Phase 81
-> **Status:** not started (honest Unsupported notes; no engine promotions expected)
+> **Status:** complete 2026-08-29 (94 niche/draft honest unsupported; mapping 374/0/444/0; --check 0; claim-scan 0; tests 0)
 > **Estimated effort:** M
 > **Owner:** catalog policy (+ matrix/deferred docs)
 > **Depends on:** Phase 80 plan published (may run in parallel for docs-only rows)
@@ -48,21 +48,21 @@ Tier 4 is **out of scope** for the near-term print push: draft corner-shape, Mat
 
 ## Checklist
 
-- [ ] 81.1.1 Ownership locked to 94 names in the three `D_*` buckets below.
-- [ ] 81.2.1 Policy: niche/draft deferred for print engine (`[~]` ok with next gate = later version or permanent non-goal).
-- [ ] 81.2.2 Every owned `mapping.json` row: `unsupported`, empty `code_path`, bucket-specific notes (not the mass-revert stub alone).
-- [ ] 81.2.3 Scripted verify: all 94 still unsupported.
-- [ ] 81.2.4 Matrix/deferred prose names the three families as unsupported.
-- [ ] 81.2.5 Do **not** add fake apply arms in `internal/layout` for these names.
+- [x] 81.1.1 Ownership locked to 94 names in the three `D_*` buckets below. Proof: `unsupported-triage.json` 34+33+27=94 verified `python3 -c` counters.
+- [x] 81.2.1 Policy: niche/draft deferred for print engine (`[~]` ok with next gate = later version or permanent non-goal). Proof: `documentation/deferred.md:98-100` Deferred indefinitely (permanent non-goal).
+- [x] 81.2.2 Every owned `mapping.json` row: `unsupported`, empty `code_path`, bucket-specific notes (not the mass-revert stub alone). Proof: `python3` 94/94 `unsupported` `code_path=""` bucket notes match templates; 4 ruby demoted `implemented -> unsupported` `internal/layout/style_properties.go` -> "".
+- [x] 81.2.3 Scripted verify: all 94 still unsupported. Proof: `python3` Counter fails=0 bad_notes=0; `mapping.json` 374/0/444/0.
+- [x] 81.2.4 Matrix/deferred prose names the three families as unsupported. Proof: `documentation/compatibility-matrix.md:313-323` §5.1 + `documentation/deferred.md:98-100` all 3 families with `unsupported` and `corner-* is not border-radius`, `row-rule* is not column-rule`.
+- [x] 81.2.5 Do **not** add fake apply arms in `internal/layout` for these names. Proof: `rg case "corner` 0 arms; `row-rule`/`rule` 0 arms; 4 vestigial `ruby-*` storage arms `style_leftovers.go:91-98` without consumer kept `unsupported` honest; no new arms added.
 
 ### Catalog and gate close
 
-- [ ] CATALOG.1 After any `engine_status` change, recount Implemented / Partial / Unsupported / Ignored from `mapping.json` with a `Counter` on `engine_status`.
-- [ ] CATALOG.2 Write the same counts into `catalog/coverage-summary.json` `counts.properties_by_engine_status` and into `property-counts.md`.
-- [ ] CATALOG.3 `python3 scripts/css-catalog-map.py --check` exit 0.
-- [ ] CATALOG.4 If layout/paint/CSS code changed: `go test ./internal/layout` and/or `go test ./internal/css` targeted; then `make test` and `make lint` exit 0. If paint/pagination changed: `make golden` exit 0.
-- [ ] CATALOG.5 If matrix/docs claims changed: `make claim-scan` exit 0.
-- [ ] CATALOG.6 No git commands were run unless the user explicitly asked.
+- [x] CATALOG.1 After any `engine_status` change, recount Implemented / Partial / Unsupported / Ignored from `mapping.json` with a `Counter` on `engine_status`. Proof: `Counter({'implemented':374,'unsupported':444,'partial':0,'ignored':0})` 818 total.
+- [x] CATALOG.2 Write the same counts into `catalog/coverage-summary.json` `counts.properties_by_engine_status` and into `property-counts.md`. Proof: `coverage-summary.json:13-18` 374/444; `property-counts.md:9-12` 374/444.
+- [x] CATALOG.3 `python3 scripts/css-catalog-map.py --check` exit 0. Proof: `css-catalog-map: check ok (259 apply arms mapped)` EXIT 0.
+- [x] CATALOG.4 If layout/paint/CSS code changed: `go test ./internal/layout` and/or `go test ./internal/css` targeted; then `make test` and `make lint` exit 0. If paint/pagination changed: `make golden` exit 0. Proof: `go test ./internal/layout` ok 2.54s; `go test ./internal/css` ok; `make test` ok; `make lint` ok v1.64.8 + eslint clean. No paint/pagination change so `make golden` not required (layout unchanged).
+- [x] CATALOG.5 If matrix/docs claims changed: `make claim-scan` exit 0. Proof: `claim-scan: clean` EXIT 0.
+- [x] CATALOG.6 No git commands were run unless the user explicitly asked. Proof: user banned git; zero `git` invocations in this session.
 
 
 ## Forbidden proofs

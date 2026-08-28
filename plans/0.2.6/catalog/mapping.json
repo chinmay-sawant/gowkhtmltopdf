@@ -11,8 +11,8 @@
     "webref_properties": 818,
     "mapped_properties": 818,
     "properties_by_engine_status": {
-      "implemented": 378,
-      "unsupported": 440,
+      "implemented": 374,
+      "unsupported": 444,
       "ignored": 0,
       "partial": 0
     },
@@ -2813,7 +2813,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Ruby/MathML/rhythmic niche; not implemented for print PDF. Left unsupported."
     },
     {
       "property": "block-size",
@@ -2862,7 +2862,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Ruby/MathML/rhythmic niche; not implemented for print PDF. Left unsupported."
     },
     {
       "property": "block-step-align",
@@ -2883,7 +2883,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Ruby/MathML/rhythmic niche; not implemented for print PDF. Left unsupported."
     },
     {
       "property": "block-step-insert",
@@ -2904,7 +2904,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Ruby/MathML/rhythmic niche; not implemented for print PDF. Left unsupported."
     },
     {
       "property": "block-step-round",
@@ -2925,7 +2925,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Ruby/MathML/rhythmic niche; not implemented for print PDF. Left unsupported."
     },
     {
       "property": "block-step-size",
@@ -2946,7 +2946,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Ruby/MathML/rhythmic niche; not implemented for print PDF. Left unsupported."
     },
     {
       "property": "bookmark-label",
@@ -5222,7 +5222,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Ruby/MathML/rhythmic niche; not implemented for print PDF. Left unsupported."
     },
     {
       "property": "break-after",
@@ -5709,7 +5709,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Ruby/MathML/rhythmic niche; not implemented for print PDF. Left unsupported."
     },
     {
       "property": "column-rule",
@@ -6124,7 +6124,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Ruby/MathML/rhythmic niche; not implemented for print PDF. Left unsupported."
     },
     {
       "property": "columns",
@@ -6431,7 +6431,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Ruby/MathML/rhythmic niche; not implemented for print PDF. Left unsupported."
     },
     {
       "property": "copy-into",
@@ -6452,7 +6452,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Ruby/MathML/rhythmic niche; not implemented for print PDF. Left unsupported."
     },
     {
       "property": "corner",
@@ -6476,7 +6476,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft corner-shape CSS; not in print PDF engine. Left unsupported."
     },
     {
       "property": "corner-block-end",
@@ -6500,7 +6500,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft corner-shape CSS; not in print PDF engine. Left unsupported."
     },
     {
       "property": "corner-block-end-shape",
@@ -6526,7 +6526,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft corner-shape CSS; not in print PDF engine. Left unsupported."
     },
     {
       "property": "corner-block-start",
@@ -6550,7 +6550,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft corner-shape CSS; not in print PDF engine. Left unsupported."
     },
     {
       "property": "corner-block-start-shape",
@@ -6576,7 +6576,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft corner-shape CSS; not in print PDF engine. Left unsupported."
     },
     {
       "property": "corner-bottom",
@@ -6600,7 +6600,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft corner-shape CSS; not in print PDF engine. Left unsupported."
     },
     {
       "property": "corner-bottom-left",
@@ -6624,7 +6624,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft corner-shape CSS; not in print PDF engine. Left unsupported."
     },
     {
       "property": "corner-bottom-left-shape",
@@ -6647,7 +6647,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft corner-shape CSS; not in print PDF engine. Left unsupported."
     },
     {
       "property": "corner-bottom-right",
@@ -6671,7 +6671,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft corner-shape CSS; not in print PDF engine. Left unsupported."
     },
     {
       "property": "corner-bottom-right-shape",
@@ -6694,7 +6694,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft corner-shape CSS; not in print PDF engine. Left unsupported."
     },
     {
       "property": "corner-bottom-shape",
@@ -6720,7 +6720,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft corner-shape CSS; not in print PDF engine. Left unsupported."
     },
     {
       "property": "corner-end-end",
@@ -6744,7 +6744,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft corner-shape CSS; not in print PDF engine. Left unsupported."
     },
     {
       "property": "corner-end-end-shape",
@@ -6767,7 +6767,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft corner-shape CSS; not in print PDF engine. Left unsupported."
     },
     {
       "property": "corner-end-start",
@@ -6791,7 +6791,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft corner-shape CSS; not in print PDF engine. Left unsupported."
     },
     {
       "property": "corner-end-start-shape",
@@ -6814,7 +6814,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft corner-shape CSS; not in print PDF engine. Left unsupported."
     },
     {
       "property": "corner-inline-end",
@@ -6838,7 +6838,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft corner-shape CSS; not in print PDF engine. Left unsupported."
     },
     {
       "property": "corner-inline-end-shape",
@@ -6864,7 +6864,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft corner-shape CSS; not in print PDF engine. Left unsupported."
     },
     {
       "property": "corner-inline-start",
@@ -6888,7 +6888,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft corner-shape CSS; not in print PDF engine. Left unsupported."
     },
     {
       "property": "corner-inline-start-shape",
@@ -6914,7 +6914,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft corner-shape CSS; not in print PDF engine. Left unsupported."
     },
     {
       "property": "corner-left",
@@ -6938,7 +6938,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft corner-shape CSS; not in print PDF engine. Left unsupported."
     },
     {
       "property": "corner-left-shape",
@@ -6964,7 +6964,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft corner-shape CSS; not in print PDF engine. Left unsupported."
     },
     {
       "property": "corner-right",
@@ -6988,7 +6988,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft corner-shape CSS; not in print PDF engine. Left unsupported."
     },
     {
       "property": "corner-right-shape",
@@ -7014,7 +7014,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft corner-shape CSS; not in print PDF engine. Left unsupported."
     },
     {
       "property": "corner-shape",
@@ -7042,7 +7042,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft corner-shape CSS; not in print PDF engine. Left unsupported."
     },
     {
       "property": "corner-start-end",
@@ -7066,7 +7066,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft corner-shape CSS; not in print PDF engine. Left unsupported."
     },
     {
       "property": "corner-start-end-shape",
@@ -7089,7 +7089,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft corner-shape CSS; not in print PDF engine. Left unsupported."
     },
     {
       "property": "corner-start-start",
@@ -7113,7 +7113,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft corner-shape CSS; not in print PDF engine. Left unsupported."
     },
     {
       "property": "corner-start-start-shape",
@@ -7136,7 +7136,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft corner-shape CSS; not in print PDF engine. Left unsupported."
     },
     {
       "property": "corner-top",
@@ -7160,7 +7160,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft corner-shape CSS; not in print PDF engine. Left unsupported."
     },
     {
       "property": "corner-top-left",
@@ -7184,7 +7184,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft corner-shape CSS; not in print PDF engine. Left unsupported."
     },
     {
       "property": "corner-top-left-shape",
@@ -7207,7 +7207,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft corner-shape CSS; not in print PDF engine. Left unsupported."
     },
     {
       "property": "corner-top-right",
@@ -7231,7 +7231,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft corner-shape CSS; not in print PDF engine. Left unsupported."
     },
     {
       "property": "corner-top-right-shape",
@@ -7254,7 +7254,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft corner-shape CSS; not in print PDF engine. Left unsupported."
     },
     {
       "property": "corner-top-shape",
@@ -7280,7 +7280,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft corner-shape CSS; not in print PDF engine. Left unsupported."
     },
     {
       "property": "counter-increment",
@@ -8093,7 +8093,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Ruby/MathML/rhythmic niche; not implemented for print PDF. Left unsupported."
     },
     {
       "property": "flex-shrink",
@@ -9063,7 +9063,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Ruby/MathML/rhythmic niche; not implemented for print PDF. Left unsupported."
     },
     {
       "property": "gap",
@@ -10246,7 +10246,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Ruby/MathML/rhythmic niche; not implemented for print PDF. Left unsupported."
     },
     {
       "property": "isolation",
@@ -10480,7 +10480,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Ruby/MathML/rhythmic niche; not implemented for print PDF. Left unsupported."
     },
     {
       "property": "line-grid",
@@ -10501,7 +10501,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Ruby/MathML/rhythmic niche; not implemented for print PDF. Left unsupported."
     },
     {
       "property": "line-height",
@@ -10547,7 +10547,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Ruby/MathML/rhythmic niche; not implemented for print PDF. Left unsupported."
     },
     {
       "property": "line-padding",
@@ -10568,7 +10568,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Ruby/MathML/rhythmic niche; not implemented for print PDF. Left unsupported."
     },
     {
       "property": "line-snap",
@@ -10589,7 +10589,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Ruby/MathML/rhythmic niche; not implemented for print PDF. Left unsupported."
     },
     {
       "property": "link-parameters",
@@ -10612,7 +10612,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Ruby/MathML/rhythmic niche; not implemented for print PDF. Left unsupported."
     },
     {
       "property": "list-style",
@@ -11567,7 +11567,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Ruby/MathML/rhythmic niche; not implemented for print PDF. Left unsupported."
     },
     {
       "property": "math-shift",
@@ -11590,7 +11590,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Ruby/MathML/rhythmic niche; not implemented for print PDF. Left unsupported."
     },
     {
       "property": "math-style",
@@ -11613,7 +11613,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Ruby/MathML/rhythmic niche; not implemented for print PDF. Left unsupported."
     },
     {
       "property": "max-block-size",
@@ -11818,7 +11818,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Ruby/MathML/rhythmic niche; not implemented for print PDF. Left unsupported."
     },
     {
       "property": "min-width",
@@ -12780,7 +12780,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Ruby/MathML/rhythmic niche; not implemented for print PDF. Left unsupported."
     },
     {
       "property": "overscroll-behavior",
@@ -13835,7 +13835,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Ruby/MathML/rhythmic niche; not implemented for print PDF. Left unsupported."
     },
     {
       "property": "reading-order",
@@ -13858,7 +13858,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Ruby/MathML/rhythmic niche; not implemented for print PDF. Left unsupported."
     },
     {
       "property": "region-fragment",
@@ -14063,7 +14063,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft gap/row-rule decorations; no print consumer. Left unsupported."
     },
     {
       "property": "row-rule-break",
@@ -14084,7 +14084,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft gap/row-rule decorations; no print consumer. Left unsupported."
     },
     {
       "property": "row-rule-color",
@@ -14105,7 +14105,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft gap/row-rule decorations; no print consumer. Left unsupported."
     },
     {
       "property": "row-rule-inset",
@@ -14131,7 +14131,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft gap/row-rule decorations; no print consumer. Left unsupported."
     },
     {
       "property": "row-rule-inset-cap",
@@ -14155,7 +14155,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft gap/row-rule decorations; no print consumer. Left unsupported."
     },
     {
       "property": "row-rule-inset-cap-end",
@@ -14176,7 +14176,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft gap/row-rule decorations; no print consumer. Left unsupported."
     },
     {
       "property": "row-rule-inset-cap-start",
@@ -14197,7 +14197,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft gap/row-rule decorations; no print consumer. Left unsupported."
     },
     {
       "property": "row-rule-inset-end",
@@ -14221,7 +14221,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft gap/row-rule decorations; no print consumer. Left unsupported."
     },
     {
       "property": "row-rule-inset-junction",
@@ -14245,7 +14245,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft gap/row-rule decorations; no print consumer. Left unsupported."
     },
     {
       "property": "row-rule-inset-junction-end",
@@ -14266,7 +14266,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft gap/row-rule decorations; no print consumer. Left unsupported."
     },
     {
       "property": "row-rule-inset-junction-start",
@@ -14287,7 +14287,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft gap/row-rule decorations; no print consumer. Left unsupported."
     },
     {
       "property": "row-rule-inset-start",
@@ -14311,7 +14311,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft gap/row-rule decorations; no print consumer. Left unsupported."
     },
     {
       "property": "row-rule-style",
@@ -14332,7 +14332,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft gap/row-rule decorations; no print consumer. Left unsupported."
     },
     {
       "property": "row-rule-visibility-items",
@@ -14353,7 +14353,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft gap/row-rule decorations; no print consumer. Left unsupported."
     },
     {
       "property": "row-rule-width",
@@ -14374,7 +14374,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft gap/row-rule decorations; no print consumer. Left unsupported."
     },
     {
       "property": "ruby-align",
@@ -14395,9 +14395,9 @@
       "groups": [
         "CSS Ruby"
       ],
-      "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "engine_status": "unsupported",
+      "code_path": "",
+      "notes": "Ruby/MathML/rhythmic niche; not implemented for print PDF. Left unsupported."
     },
     {
       "property": "ruby-merge",
@@ -14418,9 +14418,9 @@
       "groups": [
         "CSS Ruby"
       ],
-      "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "engine_status": "unsupported",
+      "code_path": "",
+      "notes": "Ruby/MathML/rhythmic niche; not implemented for print PDF. Left unsupported."
     },
     {
       "property": "ruby-overhang",
@@ -14441,9 +14441,9 @@
       "groups": [
         "CSS Ruby"
       ],
-      "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "engine_status": "unsupported",
+      "code_path": "",
+      "notes": "Ruby/MathML/rhythmic niche; not implemented for print PDF. Left unsupported."
     },
     {
       "property": "ruby-position",
@@ -14464,9 +14464,9 @@
       "groups": [
         "CSS Ruby"
       ],
-      "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "engine_status": "unsupported",
+      "code_path": "",
+      "notes": "Ruby/MathML/rhythmic niche; not implemented for print PDF. Left unsupported."
     },
     {
       "property": "rule",
@@ -14490,7 +14490,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft gap/row-rule decorations; no print consumer. Left unsupported."
     },
     {
       "property": "rule-break",
@@ -14514,7 +14514,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft gap/row-rule decorations; no print consumer. Left unsupported."
     },
     {
       "property": "rule-color",
@@ -14538,7 +14538,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft gap/row-rule decorations; no print consumer. Left unsupported."
     },
     {
       "property": "rule-inset",
@@ -14562,7 +14562,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft gap/row-rule decorations; no print consumer. Left unsupported."
     },
     {
       "property": "rule-inset-cap",
@@ -14585,7 +14585,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft gap/row-rule decorations; no print consumer. Left unsupported."
     },
     {
       "property": "rule-inset-end",
@@ -14609,7 +14609,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft gap/row-rule decorations; no print consumer. Left unsupported."
     },
     {
       "property": "rule-inset-junction",
@@ -14632,7 +14632,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft gap/row-rule decorations; no print consumer. Left unsupported."
     },
     {
       "property": "rule-inset-start",
@@ -14656,7 +14656,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft gap/row-rule decorations; no print consumer. Left unsupported."
     },
     {
       "property": "rule-overlap",
@@ -14677,7 +14677,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft gap/row-rule decorations; no print consumer. Left unsupported."
     },
     {
       "property": "rule-style",
@@ -14701,7 +14701,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft gap/row-rule decorations; no print consumer. Left unsupported."
     },
     {
       "property": "rule-visibility-items",
@@ -14724,7 +14724,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft gap/row-rule decorations; no print consumer. Left unsupported."
     },
     {
       "property": "rule-width",
@@ -14748,7 +14748,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Draft gap/row-rule decorations; no print consumer. Left unsupported."
     },
     {
       "property": "rx",
@@ -17288,7 +17288,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Ruby/MathML/rhythmic niche; not implemented for print PDF. Left unsupported."
     },
     {
       "property": "text-spacing",
@@ -18990,7 +18990,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Ruby/MathML/rhythmic niche; not implemented for print PDF. Left unsupported."
     }
   ],
   "atrules": [

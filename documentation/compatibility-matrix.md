@@ -310,6 +310,18 @@ Status legend as in §2; evidence in `internal/css/css.go`.
 | PDF/A-4, PDF/UA-2 (PDF 2.0 conformance profiles) | **Supported** (#33): Opt-in via `--pdf-profile a4-ua2` / `Document.PDFProfile` (`"a4-ua2"`, `"a4"`, `"ua2"`). Implies PDF 2.0. Emits claiming XMP (`pdfaid:part=4`, `pdfaid:rev=2020`, `pdfuaid:part=2`, `pdfuaid:rev=2024`), sRGB+Gray OutputIntent / Default* ICCBased, structure `/Namespace`, `ListNumbering` on lists, structure destinations on internal links, and full logical structure tree (`L` > `LI` > `LBody` > `Link`) |
 | PDF encryption, duplex, AcroForm | Out of scope (not in original wkhtmltopdf either) |
 
+### 5.1 Deferred niche and draft families (94 properties - Not implemented)
+
+The following 94 properties are intentionally left **unsupported** (Not implemented). They have no print PDF consumer and are out of scope for the print PDF engine. Declarations are parsed as valid property names where recognized and then ignored with graceful degrade, never claimed as Implemented. No Implemented claims are made for any of the 94.
+
+| Family | Count | Status | Note | Examples (not exhaustive) |
+|--------|-------|--------|------|---------------------------|
+| Draft corner-shape CSS (34 properties: corner, corner-block-*, corner-inline-*, etc.) | 34 | Not implemented | Draft corner-shape CSS; not in print PDF engine. Left unsupported. `corner-*` is not `border-radius` (see §2.1). | `corner`, `corner-shape`, `corner-block-start-shape`, `corner-inline-end-shape`, `corner-top-left-shape`, `corner-bottom-right-shape`, etc. |
+| Ruby/MathML/rhythmic niche (33 properties: block-ellipsis, block-step-*, box-snap, ruby-*, math-*, etc.) | 33 | Not implemented | Ruby/MathML/rhythmic niche; not implemented for print PDF. Left unsupported. | `block-ellipsis`, `block-step-*`, `box-snap`, `ruby-align`, `ruby-position`, `math-depth`, `math-style`, `line-snap`, etc. |
+| Draft gap/row-rule decorations (27 properties: row-rule*, rule*) | 27 | Not implemented | Draft gap/row-rule decorations; no print consumer. Left unsupported. `row-rule*` and `rule*` are not `column-rule` (see §2.9). | `row-rule`, `row-rule-break`, `row-rule-color`, `row-rule-style`, `row-rule-width`, `rule`, `rule-break`, `rule-color`, `rule-style`, `rule-width`, etc. |
+
+Total: 94 properties across three families. All are Not implemented and left unsupported with no print PDF consumer.
+
 ## 6. Security policy (frozen defaults)
 
 | Rule | Value |
