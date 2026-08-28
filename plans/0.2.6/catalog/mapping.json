@@ -11,10 +11,10 @@
     "webref_properties": 818,
     "mapped_properties": 818,
     "properties_by_engine_status": {
-      "implemented": 202,
-      "unsupported": 497,
+      "implemented": 378,
+      "unsupported": 440,
       "ignored": 0,
-      "partial": 119
+      "partial": 0
     },
     "properties_print_relevant": 818,
     "properties_goal_implement": 818,
@@ -1724,7 +1724,7 @@
       "groups": [
         "CSS Inline"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -2309,7 +2309,7 @@
       "groups": [
         "CSS Transforms"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
@@ -2364,7 +2364,7 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -2387,8 +2387,8 @@
       "groups": [
         "Compositing and Blending"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -2410,7 +2410,7 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -2479,7 +2479,7 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -2505,7 +2505,7 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -2526,7 +2526,7 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/background-position-block",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -2547,7 +2547,7 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/background-position-inline",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -2570,7 +2570,7 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -2593,7 +2593,7 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -2616,7 +2616,7 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -2637,7 +2637,7 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/background-repeat-block",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -2658,7 +2658,7 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/background-repeat-inline",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -2679,7 +2679,7 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/background-repeat-x",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -2700,7 +2700,7 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/background-repeat-y",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -2723,7 +2723,7 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -2965,8 +2965,8 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/bookmark-label",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -2986,8 +2986,8 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/bookmark-level",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -3007,8 +3007,8 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/bookmark-state",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -3060,7 +3060,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -3110,7 +3110,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -3137,7 +3137,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -3181,7 +3181,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -3205,7 +3205,7 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/border-block-end-radius",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -3228,7 +3228,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -3251,7 +3251,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -3278,7 +3278,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -3322,7 +3322,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -3346,7 +3346,7 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/border-block-start-radius",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -3369,7 +3369,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -3392,7 +3392,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -3418,7 +3418,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -3444,7 +3444,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -3562,7 +3562,7 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/border-bottom-radius",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -3608,7 +3608,7 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -3752,7 +3752,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -3775,7 +3775,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -3804,7 +3804,7 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -3827,7 +3827,7 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -3850,7 +3850,7 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -3873,7 +3873,7 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -3896,7 +3896,7 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -3919,7 +3919,7 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -3945,7 +3945,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -3995,7 +3995,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -4022,7 +4022,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -4066,7 +4066,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -4090,7 +4090,7 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/border-inline-end-radius",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -4113,7 +4113,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -4136,7 +4136,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -4163,7 +4163,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -4207,7 +4207,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -4231,7 +4231,7 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/border-inline-start-radius",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -4254,7 +4254,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -4277,7 +4277,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -4303,7 +4303,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -4329,7 +4329,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -4424,7 +4424,7 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/border-left-radius",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -4447,7 +4447,7 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -4614,7 +4614,7 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/border-right-radius",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -4637,7 +4637,7 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -4729,7 +4729,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -4752,7 +4752,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -4898,7 +4898,7 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/border-top-radius",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -4944,7 +4944,7 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -5042,8 +5042,8 @@
       "groups": [
         "CSS Fragmentation"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -5092,7 +5092,7 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/box-shadow-blur",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -5113,7 +5113,7 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/box-shadow-color",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -5134,7 +5134,7 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/box-shadow-offset",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -5155,7 +5155,7 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/box-shadow-position",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -5176,7 +5176,7 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/box-shadow-spread",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -5454,7 +5454,7 @@
       "groups": [
         "CSS Masking"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
@@ -5477,7 +5477,7 @@
       "groups": [
         "CSS Masking"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
@@ -5500,7 +5500,7 @@
       "groups": [
         "CSS Masking"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
@@ -5546,8 +5546,8 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/color-adjust",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -5567,7 +5567,7 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/color-interpolation",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -5590,7 +5590,7 @@
       "groups": [
         "Filter Effects"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
@@ -5613,8 +5613,8 @@
       "groups": [
         "CSS Color"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -6172,8 +6172,8 @@
       "groups": [
         "CSS Containment"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -6195,8 +6195,8 @@
       "groups": [
         "CSS Box Sizing"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -6218,8 +6218,8 @@
       "groups": [
         "CSS Box Sizing"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -6241,8 +6241,8 @@
       "groups": [
         "CSS Box Sizing"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -6267,8 +6267,8 @@
       "groups": [
         "CSS Box Sizing"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -6290,8 +6290,8 @@
       "groups": [
         "CSS Box Sizing"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -6408,8 +6408,8 @@
       "groups": [
         "CSS Containment"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -7528,7 +7528,7 @@
       "groups": [
         "CSS Writing Modes"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -7575,7 +7575,7 @@
         "CSS Inline",
         "Scalable Vector Graphics"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -7598,8 +7598,8 @@
       "groups": [
         "CSS Color"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -7902,7 +7902,7 @@
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
@@ -8455,8 +8455,8 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -8478,8 +8478,8 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -8501,8 +8501,8 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -8927,8 +8927,8 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -8994,8 +8994,8 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/footnote-display",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -9015,8 +9015,8 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/footnote-policy",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -9038,8 +9038,8 @@
       "groups": [
         "CSS Color"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -9616,7 +9616,7 @@
       "groups": [
         "CSS Text"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -9725,7 +9725,7 @@
       "groups": [
         "CSS Text"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -9769,8 +9769,8 @@
       "groups": [
         "CSS Images"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -9815,8 +9815,8 @@
       "groups": [
         "CSS Images"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -10267,8 +10267,8 @@
       "groups": [
         "Compositing and Blending"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -10430,7 +10430,7 @@
       "groups": [
         "CSS Text"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -10457,8 +10457,8 @@
       "groups": [
         "CSS Overflow"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -10851,7 +10851,7 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/margin-break",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -11018,8 +11018,8 @@
       "groups": [
         "CSS Box Model"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -11703,8 +11703,8 @@
       "groups": [
         "CSS Overflow"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -11862,8 +11862,8 @@
       "groups": [
         "Compositing and Blending"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -12015,8 +12015,8 @@
       "groups": [
         "CSS Images"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -12447,7 +12447,7 @@
       "groups": [
         "CSS Overflow"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -12471,8 +12471,8 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/overflow-clip-margin-block",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -12492,8 +12492,8 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/overflow-clip-margin-block-end",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -12513,8 +12513,8 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/overflow-clip-margin-block-start",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -12534,8 +12534,8 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/overflow-clip-margin-bottom",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -12558,8 +12558,8 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/overflow-clip-margin-inline",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -12579,8 +12579,8 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/overflow-clip-margin-inline-end",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -12600,8 +12600,8 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/overflow-clip-margin-inline-start",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -12621,8 +12621,8 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/overflow-clip-margin-left",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -12642,8 +12642,8 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/overflow-clip-margin-right",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -12663,8 +12663,8 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/overflow-clip-margin-top",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -13387,7 +13387,7 @@
       "groups": [
         "CSS Transforms"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
@@ -13410,7 +13410,7 @@
       "groups": [
         "CSS Transforms"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
@@ -13764,8 +13764,8 @@
       "groups": [
         "CSS Color"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -14013,7 +14013,7 @@
       "groups": [
         "CSS Transforms"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -14395,7 +14395,7 @@
       "groups": [
         "CSS Ruby"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -14418,7 +14418,7 @@
       "groups": [
         "CSS Ruby"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -14441,7 +14441,7 @@
       "groups": [
         "CSS Ruby"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -14464,7 +14464,7 @@
       "groups": [
         "CSS Ruby"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -14815,7 +14815,7 @@
       "groups": [
         "CSS Transforms"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -14910,7 +14910,7 @@
       "groups": [
         "CSS Scroll Snap"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
@@ -15005,7 +15005,7 @@
       "groups": [
         "CSS Scroll Snap"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
@@ -15100,7 +15100,7 @@
       "groups": [
         "CSS Scroll Snap"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
@@ -15123,7 +15123,7 @@
       "groups": [
         "CSS Scroll Snap"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
@@ -15146,7 +15146,7 @@
       "groups": [
         "CSS Scroll Snap"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
@@ -15800,7 +15800,7 @@
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -15995,8 +15995,8 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/string-set",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -16190,7 +16190,7 @@
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
@@ -16234,7 +16234,7 @@
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
@@ -16278,7 +16278,7 @@
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
@@ -16301,7 +16301,7 @@
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
@@ -16324,7 +16324,7 @@
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
@@ -16477,7 +16477,7 @@
       "groups": [
         "CSS Text"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -16547,7 +16547,7 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/text-align-all",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -16570,7 +16570,7 @@
       "groups": [
         "CSS Text"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -16593,7 +16593,7 @@
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -16708,8 +16708,8 @@
       "groups": [
         "CSS Writing Modes"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -16759,7 +16759,7 @@
       "groups": [
         "CSS Text Decoration"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -16782,8 +16782,8 @@
       "groups": [
         "CSS Text Decoration"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -16805,7 +16805,7 @@
       "groups": [
         "CSS Text Decoration"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -16833,8 +16833,8 @@
       "groups": [
         "CSS Text Decoration"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -16854,8 +16854,8 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/text-decoration-skip-box",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -16877,8 +16877,8 @@
       "groups": [
         "CSS Text Decoration"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -16898,8 +16898,8 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/text-decoration-skip-self",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -16919,8 +16919,8 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/text-decoration-skip-spaces",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -16942,7 +16942,7 @@
       "groups": [
         "CSS Text Decoration"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -16965,7 +16965,7 @@
       "groups": [
         "CSS Text Decoration"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -16991,8 +16991,8 @@
       "groups": [
         "CSS Text Decoration"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -17014,8 +17014,8 @@
       "groups": [
         "CSS Text Decoration"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -17037,8 +17037,8 @@
       "groups": [
         "CSS Text Decoration"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -17058,8 +17058,8 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/text-emphasis-skip",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -17081,8 +17081,8 @@
       "groups": [
         "CSS Text Decoration"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -17171,7 +17171,7 @@
       "groups": [
         "CSS Text"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -17194,8 +17194,8 @@
       "groups": [
         "CSS Writing Modes"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -17217,8 +17217,8 @@
       "groups": [
         "CSS Overflow"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -17263,7 +17263,7 @@
       "groups": [
         "CSS Text Decoration"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -17380,7 +17380,7 @@
       "groups": [
         "CSS Text Decoration"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -17403,7 +17403,7 @@
       "groups": [
         "CSS Text Decoration"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -17429,7 +17429,7 @@
       "groups": [
         "CSS Text"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -17452,7 +17452,7 @@
       "groups": [
         "CSS Text"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -17475,7 +17475,7 @@
       "groups": [
         "CSS Text"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -17809,7 +17809,7 @@
       "groups": [
         "CSS Transforms"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -17855,7 +17855,7 @@
       "groups": [
         "CSS Transforms"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
@@ -18022,7 +18022,7 @@
       "groups": [
         "CSS Transforms"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -18068,8 +18068,8 @@
       "groups": [
         "CSS Writing Modes"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
       "notes": ""
     },
     {
@@ -18567,7 +18567,7 @@
       "groups": [
         "CSS Text"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -18588,7 +18588,7 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/white-space-trim",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },

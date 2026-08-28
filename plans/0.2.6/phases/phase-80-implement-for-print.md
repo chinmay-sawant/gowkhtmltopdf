@@ -388,4 +388,156 @@ counter-set
 empty-cells
 ```
 
+---
+
+## Unsupported properties triage rationale (honest unsupported)
+
+The properties below from the Tier 5 print ownership set remain honestly marked as `unsupported` in `mapping.json` because they require complex non-print subsystems, unstandardized draft specifications, or dictionary-based engines out of scope for a pure-Go print layout engine:
+
+### `E_backgrounds_borders` (15 draft specifications)
+- `background-tbd`: Unstandardized placeholder draft property in CSS Backgrounds specification.
+- `border-block-clip`: CSS Borders 4 draft for clipping border-block decorations with a custom clip path.
+- `border-block-end-clip`: CSS Borders 4 draft for clipping border-block-end with a custom clip path.
+- `border-block-start-clip`: CSS Borders 4 draft for clipping border-block-start with a custom clip path.
+- `border-bottom-clip`: CSS Borders 4 draft for clipping bottom border with a custom clip path.
+- `border-boundary`: CSS Borders 4 draft for restricting border painting across element boundaries.
+- `border-clip`: CSS Borders 4 draft shorthand for clipping border strokes with custom paths.
+- `border-inline-clip`: CSS Borders 4 draft for clipping inline borders with custom paths.
+- `border-inline-end-clip`: CSS Borders 4 draft for clipping inline-end border with a custom path.
+- `border-inline-start-clip`: CSS Borders 4 draft for clipping inline-start border with a custom path.
+- `border-left-clip`: CSS Borders 4 draft for clipping left border with a custom path.
+- `border-limit`: CSS Borders 4 draft for limiting border length to sub-segments of an edge.
+- `border-right-clip`: CSS Borders 4 draft for clipping right border with a custom path.
+- `border-shape`: CSS Borders 4 draft for conforming borders to non-rectangular path shapes.
+- `border-top-clip`: CSS Borders 4 draft for clipping top border with a custom path.
+
+### `E_text` (11 dictionary and CJK typography properties)
+- `hanging-punctuation`: Requires glyph-margin overhang calculation for punctuation outside the line box.
+- `hyphenate-limit-chars`: Requires hyphenation dictionary engine with min-word, min-before, and min-after rules.
+- `hyphenate-limit-last`: Requires multi-line hyphenation lookahead to suppress hyphenation on page breaks.
+- `hyphenate-limit-lines`: Requires multi-line tracking to limit consecutive hyphenated lines.
+- `hyphenate-limit-zone`: Requires trailing whitespace hyphenation threshold calculations.
+- `text-autospace`: Requires CJK and Western script boundary detection for inter-script spacing.
+- `text-fit`: Non-standard draft property for auto-scaling text to fit container boundaries.
+- `text-group-align`: Requires whole-paragraph text cluster alignment calculations.
+- `text-spacing`: CSS Text 4 shorthand for CJK punctuation collapse and script spacing.
+- `text-spacing-trim`: Requires CJK fullwidth punctuation kerning and space trim tables.
+- `word-space-transform`: CSS Text 4 draft for custom space character expansion transformations.
+
+### `E_fonts` (4 variable font design and palette properties)
+- `font-language-override`: Requires low-level OpenType language system tag overrides during shaping.
+- `font-optical-sizing`: Requires variable font optical size (opsz) axis delta interpolation.
+- `font-palette`: Requires OpenType COLR/CPAL color font palette index selection and rasterization.
+- `font-variation-settings`: Requires arbitrary variable font axis coordinate interpolation tables.
+
+### `E_text_decoration` (11 Asian emphasis marks and glyph clipping)
+- `text-decoration-inset`: CSS Text Decoration 4 draft for insetting text decoration line start and end.
+- `text-decoration-skip`: CSS Text Decoration 4 shorthand for suppressing decorations over ink, glyphs, and spaces.
+- `text-decoration-skip-box`: Suppresses decoration lines across margin, border, and padding child boxes.
+- `text-decoration-skip-ink`: Requires outline path intersection calculation to break underline around descenders.
+- `text-decoration-skip-self`: Suppresses decoration on element itself when inherited from ancestors.
+- `text-decoration-skip-spaces`: Suppresses decoration painting under whitespace characters.
+- `text-emphasis`: Requires Asian typography emphasis mark synthesis and positioning above glyphs.
+- `text-emphasis-color`: Specifies custom color for Asian text emphasis marks.
+- `text-emphasis-position`: Controls over/under positioning of Asian text emphasis marks.
+- `text-emphasis-skip`: Controls suppression of text emphasis marks over punctuation or spaces.
+- `text-emphasis-style`: Specifies shape or character for Asian text emphasis marks.
+
+### `E_overflow` (13 multi-line clamping and directional clip margins)
+- `line-clamp`: Requires multi-line layout break truncation with inline ellipsis insertion.
+- `max-lines`: Requires line-box counting and pagination suppression beyond max count.
+- `overflow-clip-margin-block`: Directional logical block clip margin for overflow clipping.
+- `overflow-clip-margin-block-end`: Directional logical block-end clip margin for overflow clipping.
+- `overflow-clip-margin-block-start`: Directional logical block-start clip margin for overflow clipping.
+- `overflow-clip-margin-bottom`: Directional bottom clip margin for overflow clipping.
+- `overflow-clip-margin-inline`: Directional logical inline clip margin for overflow clipping.
+- `overflow-clip-margin-inline-end`: Directional logical inline-end clip margin for overflow clipping.
+- `overflow-clip-margin-inline-start`: Directional logical inline-start clip margin for overflow clipping.
+- `overflow-clip-margin-left`: Directional left clip margin for overflow clipping.
+- `overflow-clip-margin-right`: Directional right clip margin for overflow clipping.
+- `overflow-clip-margin-top`: Directional top clip margin for overflow clipping.
+- `text-overflow`: Requires single-line text clipping and inline ellipsis trailing rendering.
+
+### `E_multicol` (11 CSS Multi-column 2 draft decorations)
+- `column-rule-break`: CSS Multi-column 2 draft for breaking column rule dividers across elements.
+- `column-rule-inset`: CSS Multi-column 2 draft for insetting column rule divider start and end.
+- `column-rule-inset-cap`: CSS Multi-column 2 draft for capping column rule line endpoints.
+- `column-rule-inset-cap-end`: CSS Multi-column 2 draft for end endpoint cap styling on column rules.
+- `column-rule-inset-cap-start`: CSS Multi-column 2 draft for start endpoint cap styling on column rules.
+- `column-rule-inset-end`: CSS Multi-column 2 draft for insetting bottom/end of column rules.
+- `column-rule-inset-junction`: CSS Multi-column 2 draft for column rule intersection junction styles.
+- `column-rule-inset-junction-end`: CSS Multi-column 2 draft for end junction styling on column rules.
+- `column-rule-inset-junction-start`: CSS Multi-column 2 draft for start junction styling on column rules.
+- `column-rule-inset-start`: CSS Multi-column 2 draft for insetting top/start of column rules.
+- `column-rule-visibility-items`: CSS Multi-column 2 draft for controlling rule visibility across empty columns.
+
+### `E_inline_layout` (8 drop-caps and leading-trim metrics)
+- `baseline-source`: Selects font baseline metric source across first and last formatted lines.
+- `initial-letter`: Requires multi-line drop cap and raised cap glyph sizing and line reservation.
+- `initial-letter-align`: Specifies vertical alignment baseline for initial-letter drop caps.
+- `initial-letter-wrap`: Controls text flow wrap margin and exclusion boundary around drop caps.
+- `inline-sizing`: CSS Inline 3 draft for determining inline box sizing algorithms.
+- `text-box`: CSS Inline 3 shorthand for leading-trim and edge metric alignment.
+- `text-box-edge`: Specifies font metric edge (cap-height, ex, ascender) for text-box trimming.
+- `text-box-trim`: Trims half-leading from start and end of formatted text block boxes.
+
+### `E_shapes` (8 non-rectangular exclusions and page floats)
+- `float-defer`: CSS Page Floats draft for deferring float placement to subsequent pages.
+- `float-offset`: CSS Page Floats draft for offsetting float position within page area.
+- `float-reference`: CSS Page Floats draft for anchoring float relative to page, column, or region.
+- `shape-image-threshold`: Requires image alpha channel thresholding to derive text wrap polygon.
+- `shape-inside`: Requires arbitrary polygon interior text filling and line-segment fitting.
+- `shape-margin`: Adds geometric margin expansion to CSS shape text wrap exclusion boundary.
+- `shape-outside`: Requires arbitrary polygon and image alpha text exclusion calculation for floats.
+- `shape-padding`: Adds interior padding offset to shape-inside polygon text container.
+
+### `E_box_sizing` (5 placeholder containment sizing)
+- `contain-intrinsic-block-size`: Provides placeholder block size for elements with size containment.
+- `contain-intrinsic-height`: Provides placeholder height for elements with size containment.
+- `contain-intrinsic-inline-size`: Provides placeholder inline size for elements with size containment.
+- `contain-intrinsic-size`: Shorthand placeholder size for elements with size containment.
+- `contain-intrinsic-width`: Provides placeholder width for elements with size containment.
+
+### `E_paged_media` (6 dynamic GCPM running headers and footnotes)
+- `bookmark-label`: CSS GCPM draft for generating PDF bookmark title from content expression.
+- `bookmark-level`: CSS GCPM draft for setting hierarchy level of PDF outline bookmarks.
+- `bookmark-state`: CSS GCPM draft for setting open/closed state of PDF outline bookmarks.
+- `footnote-display`: CSS GCPM draft for formatting footnote block vs inline display.
+- `footnote-policy`: CSS GCPM draft for footnote placement across page break boundaries.
+- `string-set`: CSS GCPM draft for capturing dynamic header/footer string variables from page content.
+
+### `E_color` (4 browser display and accessibility HDR controls)
+- `color-adjust`: Legacy alias for print-color-adjust and forced-color-adjust.
+- `color-scheme`: Informs browser UA styling of dark/light OS color schemes.
+- `dynamic-range-limit`: Controls HDR dynamic range luminance clamping on display hardware.
+- `forced-color-adjust`: Controls UA color override behavior in OS high-contrast accessibility modes.
+
+### `E_images` (3 EXIF rotation and image resolution metadata)
+- `image-orientation`: Controls image auto-rotation based on EXIF metadata tags.
+- `image-resolution`: Specifies source image resolution override in DPI/DPPX.
+- `object-view-box`: Specifies coordinate sub-rectangle for cropping embedded raster images.
+
+### `E_writing_modes` (3 vertical Tate-chu-yoko and Bidirectional Algorithm)
+- `text-combine-upright`: Requires tate-chu-yoko combination of horizontal digits inside vertical text.
+- `text-orientation`: Controls glyph rotation orientation (mixed, upright, sideways) in vertical text.
+- `unicode-bidi`: Requires Unicode Bidirectional Algorithm (UBA) override level handling.
+
+### `E_compositing` (3 Porter-Duff blend modes and transparency groups)
+- `background-blend-mode`: Requires blend mode equation evaluation between background layers.
+- `isolation`: Creates stacking context isolation boundary for blend-mode compositing.
+- `mix-blend-mode`: Requires PDF transparency group blending between element and backdrop content.
+
+### `E_containment` (2 DOM performance subtrees)
+- `contain`: Isolates element subtree for layout, paint, and size performance optimization.
+- `content-visibility`: Controls offscreen rendering suppression for browser DOM rendering.
+
+### `E_box_model` (1 margin trim)
+- `margin-trim`: Trims container margin on first and last child elements at box edges.
+
+### `E_cascade` (1 universal reset)
+- `all`: Universal property reset resetting all inherited and non-inherited CSS properties simultaneously.
+
+### `E_fragmentation` (1 page break box decoration break)
+- `box-decoration-break`: Controls whether borders, padding, and backgrounds clone or slice across page breaks.
+
 

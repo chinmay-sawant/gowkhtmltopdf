@@ -1,4 +1,4 @@
-//nolint:cyclop,wsl,nlreturn,goconst // font property helpers
+//nolint:cyclop,wsl,nlreturn // font property helpers
 package layout
 
 import (

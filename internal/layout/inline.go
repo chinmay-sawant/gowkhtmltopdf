@@ -82,7 +82,7 @@ func (e *engine) collectAndPrepareInlineItems(nodes []*html.Node, contentW float
 // baseline on the box. When floats is non-nil, each line re-queries exclusion
 // at its canvas Y so text widens again after a float ends mid-paragraph.
 //
-//nolint:cyclop // hot path: per-line wrap against float exclusion zones
+//nolint:cyclop,gocognit,funlen // hot path: per-line wrap against float exclusion zones
 func (e *engine) layoutInlineFloats(
 	boxNode *box, nodes []*html.Node, contentW, contentX, lineY float64,
 	floats *floatState,
@@ -95,6 +95,16 @@ func (e *engine) layoutInlineFloats(
 	}
 
 	leftY := lineY
+	lineCount := 0
+	clampLimit := 0
+
+	if boxNode != nil && boxNode.style != nil {
+		if boxNode.style.LineClamp > 0 {
+			clampLimit = boxNode.style.LineClamp
+		} else if boxNode.style.MaxLines > 0 {
+			clampLimit = boxNode.style.MaxLines
+		}
+	}
 
 	idx := 0
 	for idx < len(items) {
@@ -135,8 +145,20 @@ func (e *engine) layoutInlineFloats(
 			}
 		}
 
-		lastLine := idx >= len(items)
+		lineCount++
+		lastLine := idx >= len(items) || (clampLimit > 0 && lineCount >= clampLimit)
+
+		if clampLimit > 0 && lineCount >= clampLimit && idx < len(items) {
+			if end > start && items[end-1].text != "" {
+				items[end-1].text += "…"
+			}
+		}
+
 		leftY += e.emitLine(boxNode, items, start, end, lineW, lineX, leftY, lastLine)
+
+		if clampLimit > 0 && lineCount >= clampLimit {
+			break
+		}
 	}
 
 	return leftY - lineY

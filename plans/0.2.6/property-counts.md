@@ -2,16 +2,16 @@
 
 WebRef inventory size is 818 property names.
 
-## Current snapshot (Phase 80 closure 2026-08-29)
+## Current snapshot (Advanced Print Waves A-D 2026-08-29)
 
 | Status | Count |
 |--------|------:|
-| Implemented | 202 |
-| Partial | 119 |
-| Unsupported | 497 |
+| Implemented | 378 |
+| Partial | 0 |
+| Unsupported | 440 |
 | Ignored | 0 |
 
-Phase 80 implemented 119 print properties across Waves 80.1 - 80.5 with full code paths, consumers, and unit tests (24 logical border properties, 8 logical corner/side radii, direction/margin-break, background positioning/sizing/repeating/clipping/origin, border-image, box-shadow longhands, border side styles, text layout/wrap/alignment/hyphens/shadow/decoration properties, font features/kerning/variants/synthesis, SVG presentation, visual overflow/scroll-margin, transforms, and ruby properties).
+Phase 80 and Advanced Waves A-D implemented 176 print properties across all waves with full code paths, consumers, and unit tests (PDF bookmarks & outline levels, line clamping, text truncation & ellipsis, universal reset, box decoration break, image orientation & resolution, print color adjust, color scheme, container sizing, variable fonts, OpenType overrides, blend modes, text emphasis, and text decoration skip).
 
 ## Unsupported triage (phases 80-84, not started)
 

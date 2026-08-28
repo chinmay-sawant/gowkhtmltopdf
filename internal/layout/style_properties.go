@@ -1930,6 +1930,10 @@ func applyTransformGroup(
 		"backface-visibility", "rotate", "scale", "translate":
 		return applyLeftoversProps(style, prop, value, fsize)
 	default:
+		if applyAdvancedProps(style, prop, value, fsize) {
+			return true
+		}
+
 		return false
 	}
 
