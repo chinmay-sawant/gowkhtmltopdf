@@ -96,8 +96,21 @@ func setOverflowKeyword(style *ResolvedStyle, prop, value string) {
 		return
 	}
 
-	if prop == "overflow" || overflow != visibleKeyword {
+	switch prop {
+	case "overflow":
 		style.Overflow = overflow
+		style.OverflowX = overflow
+		style.OverflowY = overflow
+	case "overflow-x":
+		style.OverflowX = overflow
+		if overflow != visibleKeyword {
+			style.Overflow = overflow
+		}
+	case "overflow-y":
+		style.OverflowY = overflow
+		if overflow != visibleKeyword {
+			style.Overflow = overflow
+		}
 	}
 }
 

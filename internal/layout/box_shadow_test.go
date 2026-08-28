@@ -14,6 +14,7 @@ func TestBoxShadowParse(t *testing.T) {
 		<div class="xy">x</div>
 		<div class="blur0">x</div>
 		<div class="blur">x</div>
+		<div class="spread">x</div>
 		<div class="none">x</div>
 		<div class="inset">x</div>
 		<div class="named">x</div>
@@ -22,6 +23,7 @@ func TestBoxShadowParse(t *testing.T) {
 		.xy { box-shadow: 2pt 2pt #000 }
 		.blur0 { box-shadow: 2pt 2pt 0 #000 }
 		.blur { box-shadow: 2pt 2pt 4pt #000 }
+		.spread { box-shadow: 2pt 2pt 4pt 3pt #000 }
 		.none { box-shadow: none }
 		.inset { box-shadow: inset 2pt 2pt #000 }
 		.named { box-shadow: 2pt 2pt black }
@@ -37,6 +39,12 @@ func TestBoxShadowParse(t *testing.T) {
 
 	blur := styleByClass(t, styles, "blur")
 	assertBoxShadow(t, blur, 2, 2, 4, black, true)
+
+	spread := styleByClass(t, styles, "spread")
+	assertBoxShadow(t, spread, 2, 2, 4, black, true)
+	if !near(spread.BoxShadowSpread, 3) {
+		t.Fatalf("box-shadow spread = %.3f, want 3", spread.BoxShadowSpread)
+	}
 
 	none := styleByClass(t, styles, "none")
 	if none.BoxShadowSet {
@@ -56,8 +64,34 @@ func TestBoxShadowPaints(t *testing.T) {
 	t.Parallel()
 
 	t.Run("offset-fill", testBoxShadowOffsetFill)
+	t.Run("spread-fill", testBoxShadowSpreadFill)
 	t.Run("layout-size-unchanged", testBoxShadowLayoutSizeUnchanged)
 	t.Run("rounded-fill", testBoxShadowRoundedFill)
+}
+
+func testBoxShadowSpreadFill(t *testing.T) {
+	t.Parallel()
+
+	eng := &engine{scale: 1, opts: Options{Background: true}} //nolint:exhaustruct // chrome probe
+	sty := ResolvedStyle{                                     //nolint:exhaustruct // shadow fields under test
+		BGColor:         [4]float64{1, 1, 1, 1},
+		BoxShadowX:      2,
+		BoxShadowY:      2,
+		BoxShadowSpread: 5,
+		BoxShadowColor:  [3]float64{0, 0, 0},
+		BoxShadowSet:    true,
+	}
+	boxNode := &box{style: &sty, w: 100, height: 50} //nolint:exhaustruct // geometry probe
+	eng.prependChrome(0, boxNode, sty, 10, 20, 100, 50)
+
+	if len(eng.deferredChrome) != 1 {
+		t.Fatalf("deferred chrome entries = %d, want 1", len(eng.deferredChrome))
+	}
+
+	// 10 + 2 - 5 = 7, 20 + 2 - 5 = 17, 100 + 10 = 110, 50 + 10 = 60
+	if !hasOffsetShadowFill(eng.deferredChrome[0].ops, 7, 17, 110, 60) {
+		t.Fatalf("missing spread shadow fill at 7,17 110x60 in %+v", eng.deferredChrome[0].ops)
+	}
 }
 
 func TestBoxShadowBlurPaints(t *testing.T) {

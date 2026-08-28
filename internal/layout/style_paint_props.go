@@ -27,11 +27,12 @@ func parseUsedColor(value string, current [3]float64) ([3]float64, bool) {
 	return [3]float64{float64(r) / 255, float64(g) / 255, float64(b) / 255}, true
 }
 
-// applyOutlineProps owns outline and its longhands. Outline is painted outside
-// the border edge and must not change used Width/Height. box-shadow is applied
-// here so the existing applyBorderGroup dispatch can reach it.
 func applyOutlineProps(style *ResolvedStyle, prop, value string, fsize float64) bool {
 	if applyBoxShadowProp(style, prop, value, fsize) {
+		return true
+	}
+
+	if applySVGPresentationProps(style, prop, value, fsize) {
 		return true
 	}
 
@@ -42,6 +43,39 @@ func applyOutlineProps(style *ResolvedStyle, prop, value string, fsize float64) 
 	}
 
 	return applyOutlineLonghands(style, prop, value, fsize)
+}
+
+//nolint:cyclop // SVG presentation longhands
+func applySVGPresentationProps(style *ResolvedStyle, prop, value string, fsize float64) bool {
+	switch prop {
+	case "fill":
+		if color, parsed := parseUsedColor(value, style.Color); parsed {
+			style.Fill = color
+			style.FillSet = true
+		}
+	case "fill-opacity":
+		if opacity, parsed := parseOpacityValue(value); parsed {
+			style.FillOpacity = opacity
+		}
+	case "stroke":
+		if color, parsed := parseUsedColor(value, style.Color); parsed {
+			style.Stroke = color
+			style.StrokeSet = true
+		}
+	case "stroke-width":
+		if width, parsed := plainLength(value, fsize, 0); parsed {
+			style.StrokeWidth = width
+			style.StrokeWidthSet = true
+		}
+	case "stroke-opacity":
+		if opacity, parsed := parseOpacityValue(value); parsed {
+			style.StrokeOpacity = opacity
+		}
+	default:
+		return false
+	}
+
+	return true
 }
 
 func applyOutlineLonghands(style *ResolvedStyle, prop, value string, fsize float64) bool {
@@ -101,6 +135,7 @@ func applyBoxShadowValue(style *ResolvedStyle, value string, fsize float64) {
 	style.BoxShadowX = shadow.x
 	style.BoxShadowY = shadow.y
 	style.BoxShadowBlur = shadow.blur
+	style.BoxShadowSpread = shadow.spread
 	style.BoxShadowColor = shadow.color
 	style.BoxShadowSet = true
 }
@@ -109,6 +144,7 @@ func clearBoxShadow(style *ResolvedStyle) {
 	style.BoxShadowX = 0
 	style.BoxShadowY = 0
 	style.BoxShadowBlur = 0
+	style.BoxShadowSpread = 0
 	style.BoxShadowColor = [3]float64{}
 	style.BoxShadowSet = false
 }

@@ -782,13 +782,70 @@ var styleGroups = [...]styleGroupFn{ //nolint:gochecknoglobals // static dispatc
 	applyTransformGroup,
 }
 
+//nolint:cyclop,goconst,funlen // vendor prefix lookup map
+func normalizeVendorPrefix(prop string) string {
+	if !strings.HasPrefix(prop, "-webkit-") {
+		return prop
+	}
+
+	switch prop {
+	case "-webkit-box-sizing":
+		return "box-sizing"
+	case "-webkit-border-radius":
+		return "border-radius"
+	case "-webkit-border-top-left-radius":
+		return "border-top-left-radius"
+	case "-webkit-border-top-right-radius":
+		return "border-top-right-radius"
+	case "-webkit-border-bottom-left-radius":
+		return "border-bottom-left-radius"
+	case "-webkit-border-bottom-right-radius":
+		return "border-bottom-right-radius"
+	case "-webkit-transform":
+		return "transform"
+	case "-webkit-transform-origin":
+		return "transform-origin"
+	case "-webkit-flex":
+		return "flex"
+	case "-webkit-flex-basis":
+		return "flex-basis"
+	case "-webkit-flex-direction":
+		return "flex-direction"
+	case "-webkit-flex-flow":
+		return "flex-flow"
+	case "-webkit-flex-grow":
+		return "flex-grow"
+	case "-webkit-flex-shrink":
+		return "flex-shrink"
+	case "-webkit-flex-wrap":
+		return "flex-wrap"
+	case "-webkit-justify-content":
+		return "justify-content"
+	case "-webkit-align-content":
+		return "align-content"
+	case "-webkit-align-items":
+		return "align-items"
+	case "-webkit-align-self":
+		return "align-self"
+	case "-webkit-order":
+		return "order"
+	case "-webkit-box-shadow":
+		return "box-shadow"
+	case "-webkit-filter":
+		return "filter"
+	default:
+		return prop
+	}
+}
+
 // applyStyleProp routes one cascaded property to the group that owns it.
 func applyStyleProp(
 	style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext,
 	parent *ResolvedStyle, hasParent bool,
 ) {
+	effectiveProp := normalizeVendorPrefix(prop)
 	for _, group := range styleGroups {
-		if group(style, prop, value, fsize, ctx, parent, hasParent) {
+		if group(style, effectiveProp, value, fsize, ctx, parent, hasParent) {
 			return
 		}
 	}

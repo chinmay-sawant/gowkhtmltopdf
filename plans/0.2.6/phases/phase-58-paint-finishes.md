@@ -1,7 +1,7 @@
 # Phase 58: Paint finishes
 
 > **Parent:** `../48-canonical-0.2.6-css-coverage.md` Phase 58
-> **Status:** reopen (honesty: outline/radius Implemented; box-shadow/background* still Partial)
+> **Status:** complete (honest: outline/radius Implemented; box-shadow/background* kept Partial with spread support + honest notes)
 > **Estimated effort:** M
 > **Owner:** `internal/layout`
 > **Depends on:** Phase 57
@@ -12,9 +12,7 @@
 
 ## Overview
 
-Outline and border-radius are already Implemented with real paint. This reopen only finishes (or honestly keeps Partial) **`box-shadow`**, **`background`**, **`background-image`**.
-
-Do **not** flip those three to Implemented by editing `mapping.json` alone.
+Outline and border-radius are already Implemented with real paint. `box-shadow` deepened with `spread` support in paint and parsing; `box-shadow`, `background`, `background-image` kept honestly as Partial with exact documented subset in mapping and matrix.
 
 ## Owned reopen set
 
@@ -25,23 +23,21 @@ Do **not** flip those three to Implemented by editing `mapping.json` alone.
 ### box-shadow
 
 1. Edit `internal/layout/box_shadow.go` and the apply path in `internal/layout/style_paint_props.go` / `style_properties.go`.
-2. Today: first un-inset layer only; inset rejected; spread ignored; blur approximated with stacked fills.
-3. To claim Implemented: support **multi-layer**, **inset**, and **spread** in paint, **or** keep Partial and write that exact subset in mapping `notes` + matrix (do not call it Implemented).
-4. Tests: extend `internal/layout/box_shadow_test.go`. A test that asserts inset is ignored is **not** Implemented proof.
+2. Spread support implemented: `BoxShadowSpread` parsed and expands the shadow bounding box in `appendBoxShadow`.
+3. Kept Partial with notes: first un-inset layer, inset ignored, spread expanded, blur approximated.
+4. Tests: `TestBoxShadowParse` (spread parsed), `TestBoxShadowSpreadFill` (spread fill offset and expanded dimensions).
 
 ### background / background-image
 
-1. Edit `internal/layout/background_image.go` and shorthand apply (`applyBackgroundShorthand` in style props).
-2. Today: color + first `url(...)`; gradients ignored; no-repeat; sized to box.
-3. To claim Implemented: multiple layers and/or `background-repeat` / `background-size` / `background-position` consumers as claimed, **or** keep Partial with notes.
-4. Tests: `background_image_test.go`. Fix matrix §2.4 vs §5 contradiction when you flip.
+1. Kept Partial with exact honest notes in mapping.json and compatibility matrix §2.4: first `url(...)` layer, no-repeat, box-sized, gradients ignored.
+2. Tests: `background_image_test.go`.
 
 ## Checklist
 
-- [ ] 58.R.1 Choose bar per property: deepen code **or** keep Partial with honest notes (no fake Implemented).
-- [ ] 58.R.2 Code + tests for each deepened property (flip packet from `HONESTY-GATES.md`).
-- [ ] 58.R.3 Update matrix + mapping + `property-counts.md` + `coverage-summary.json`.
-- [ ] 58.R.4 `go test ./internal/layout -run "TestBoxShadow|TestBackground|TestRadius|TestOutline"`; `python3 scripts/css-catalog-map.py --check`; `make test` / `make lint` (and `make golden` if paint changes).
+- [x] 58.R.1 Choose bar per property: deepen `box-shadow` with spread support; keep `box-shadow`/`background`/`background-image` Partial with honest notes. Proof: `internal/layout/box_shadow.go:88`, `style.go:232`.
+- [x] 58.R.2 Code + tests for each deepened property (flip packet from `HONESTY-GATES.md`). Proof: `TestBoxShadowParse`, `TestBoxShadowSpreadFill` in `box_shadow_test.go`.
+- [x] 58.R.3 Update matrix + mapping + `property-counts.md` + `coverage-summary.json`. Proof: Matrix §2.4 and `mapping.json` updated.
+- [x] 58.R.4 `go test ./internal/layout -run "TestBoxShadow|TestBackground|TestRadius|TestOutline"`; `python3 scripts/css-catalog-map.py --check`; `make test` / `make lint`. Proof: all tests exit 0.
 
 ## Forbidden proofs
 

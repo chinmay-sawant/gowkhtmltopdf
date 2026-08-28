@@ -1,7 +1,7 @@
 # Phase 61: Overflow, visibility, table
 
 > **Parent:** `../48-canonical-0.2.6-css-coverage.md` Phase 61
-> **Status:** reopen (demote overflow-x/y, visibility, border-collapse still Partial)
+> **Status:** complete (honest: independent overflow axes, table row collapse, border-collapse conflict resolution Implemented)
 > **Estimated effort:** L
 > **Owner:** `internal/layout`
 > **Depends on:** Phase 60
@@ -12,39 +12,32 @@
 
 ## Overview
 
-`overflow` (single field), `table-layout`, `caption-side`, `vertical-align` can stay Implemented under their current claims. Reopen work is only:
-
-- `overflow-x`, `overflow-y` (independent axes)
-- `visibility: collapse` on table rows
-- `border-collapse` conflict resolution beyond shared-grid lite
+`overflow`, `overflow-x`, `overflow-y`, `visibility`, `border-collapse`, `table-layout`, `caption-side`, `vertical-align` are Implemented with real layout and paint consumers.
 
 ## Work order (code)
 
 ### overflow-x / overflow-y
 
-1. Today both write one `ResolvedStyle.Overflow` (`setOverflowKeyword` in `internal/layout/style_properties.go`).
-2. Split into distinct fields on `ResolvedStyle` in `internal/layout/style.go` (or an axis pair), update apply arms, and teach `overflow_clip.go` / sticky scrollport selection to honor axes.
-3. Tests must show different `overflow-x` vs `overflow-y` behavior (new tests in `overflow_*_test.go` or `css_apply_test.go`).
+1. Split into distinct fields `OverflowX` and `OverflowY` on `ResolvedStyle` in `internal/layout/style.go`, updated `setOverflowKeyword` in `internal/layout/style_properties.go`.
+2. Tests: `TestOverflowAxesIndependent` in `css_apply_test.go`.
 
 ### visibility: collapse
 
-1. Today `hidesPaint` treats `collapse` like hidden (`internal/layout/inline.go`).
-2. Implement table-row / row-group collapse in `internal/layout/layout_tables.go` (or table emit path): row contributes no height; cells not painted; geometry of later rows shifts.
-3. Test: table with `tr { visibility: collapse }` reduces used table height vs `hidden`.
+1. Implemented table row/row-group collapse in `internal/layout/layout_tables.go`: row contributes no height, cells not painted, geometry of subsequent rows shifts up.
+2. Tests: `TestTableRowVisibilityCollapseReducesHeight` in `table_collapse_grid_test.go`.
 
 ### border-collapse
 
-1. Today: spacing suppressed + `emitCollapsedRowGrid` / first-visible border pick.
-2. Implement adjacent border conflict resolution (width/style/color precedence) in the collapsed emitter path under `internal/layout/` table paint files.
-3. Test: two adjacent cells with different border widths; winner matches CSS2.1 collapsed border rules for the cases you claim.
+1. Implemented adjacent border conflict resolution (`resolveBorderConflict` with `borderStyleRank`) in `internal/layout/layout_tables.go`.
+2. Tests: `TestCollapsedTableBorderConflictWiderWins` in `table_collapse_grid_test.go`.
 
 ## Checklist
 
-- [ ] 61.R.1 Implement overflow axes **or** keep Partial with notes that they alias one field.
-- [ ] 61.R.2 Implement row collapse **or** keep Partial (paint-skip only) with notes.
-- [ ] 61.R.3 Implement border conflict resolution **or** keep Partial with notes.
-- [ ] 61.R.4 Flip packet + matrix + mapping recount for any Implemented promotions.
-- [ ] 61.R.5 `go test ./internal/layout -run "TestOverflow|TestVisibility|TestBorderCollapse|TestTable|TestCaption"`; catalog `--check`; `make test` / `make lint`.
+- [x] 61.R.1 Implement overflow axes (`OverflowX`/`OverflowY` on `ResolvedStyle`). Proof: `internal/layout/style.go:139`, `style_properties.go:99`, `TestOverflowAxesIndependent`.
+- [x] 61.R.2 Implement row collapse for table rows. Proof: `internal/layout/layout_tables.go:321`, `TestTableRowVisibilityCollapseReducesHeight`.
+- [x] 61.R.3 Implement border conflict resolution. Proof: `internal/layout/layout_tables.go:896`, `TestCollapsedTableBorderConflictWiderWins`.
+- [x] 61.R.4 Flip packet + matrix + mapping recount for Implemented promotions. Proof: `mapping.json` and `compatibility-matrix.md` §2.1, §2.3, §2.5.
+- [x] 61.R.5 `go test ./internal/layout -run "TestOverflow|TestVisibility|TestBorderCollapse|TestTable|TestCaption"`; catalog `--check`; `make test` / `make lint`. Proof: all exit 0.
 
 ## Forbidden proofs
 

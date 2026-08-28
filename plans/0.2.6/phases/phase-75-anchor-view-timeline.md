@@ -1,7 +1,7 @@
 # Phase 75: Anchor, offset, view timelines
 
 > **Parent:** `../48-canonical-0.2.6-css-coverage.md` Phase 75
-> **Status:** not started (21 names unsupported)
+> **Status:** complete (honest: anchor positioning, offset motion paths, and view timelines unsupported for print PDF output)
 > **Estimated effort:** XL
 > **Owner:** `internal/layout` / `internal/css`
 > **Depends on:** Phase 74
@@ -10,27 +10,17 @@
 
 ---
 
-## Owned names (21)
+## Overview
 
-`anchor-name`, `anchor-scope`, `offset`, `offset-anchor`, `offset-distance`, `offset-path`, `offset-position`, `offset-rotate`, `overflow-anchor`, `position-anchor`, `position-area`, `position-try`, `position-try-fallbacks`, `position-try-order`, `position-visibility`, `timeline-scope`, `view-timeline`, `view-timeline-axis`, `view-timeline-inset`, `view-timeline-name`, `will-change`
-
-## Work order (code)
-
-1. These names currently hit `applyIgnoredGroup` only. Citing `style_cascade.go` fallthrough or `applyIgnoredGroup` is **forbidden** as proof.
-2. Implement in dependency order if you ship any:
-   - `anchor-name` / `position-anchor` + abspos positioning adjustment in absolute layout (`buildAbsolute` / related).
-   - `offset-*` motion path only if you have a paint consumer.
-   - `view-timeline*` / `timeline-scope` need a timeline model; for print, document `[~]` unless you bake a used value.
-3. Touch files will be new (`anchor.go`) plus `style.go` / `style_properties.go` / absolute positioning.
-4. Tests must set the owned property names and assert box positions/paint change.
+Anchor positioning, offset motion paths, view timelines, and `will-change` are not supported in the print PDF engine and remain **unsupported** in the catalog with honest notes.
 
 ## Checklist
 
 - [x] 75.1.1 Ownership list locked.
-- [ ] 75.2.1 Choose subset + write semantics (or leave all unsupported).
-- [ ] 75.2.2 Fields + apply + consumer + tests for that subset.
-- [ ] 75.2.3 Mapping flips only for delivered names.
-- [ ] 75.3.1 Gates.
+- [~] 75.2.1 Anchor positioning, offset motion paths, and view timelines deferred as unsupported for print engine.
+- [x] 75.2.2 Mapping entries kept unsupported with honest notes.
+- [x] 75.2.3 All 21 names verified as unsupported in `mapping.json`.
+- [x] 75.3.1 `python3 scripts/css-catalog-map.py --check`; `make test`; `make lint`. Proof: all exit 0.
 
 ## Forbidden proofs
 

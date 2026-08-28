@@ -318,7 +318,7 @@ func (e *engine) collectTableRows(node *html.Node) ([][]*html.Node, int) {
 			}
 
 			cstate := e.stylePtr(child)
-			if cstate.Display == cssDisplayNone {
+			if cstate.Display == cssDisplayNone || cstate.Visibility == "collapse" {
 				continue
 			}
 
@@ -893,48 +893,133 @@ func borderVisible(side border) bool {
 	return side.Width > 0 && side.Style != cssDisplayNone
 }
 
-//nolint:wsl // border precedence is easiest to read as ordered guards
-func horizontalTableBorder(tb *box, boundary, col int) (border, bool) {
-	for _, cell := range tb.children {
+//nolint:mnd // CSS 2.1 border-style precedence ranking
+func borderStyleRank(style string) int {
+	switch style {
+	case "double":
+		return 5
+	case solidKeyword:
+		return 4
+	case "dashed":
+		return 3
+	case "dotted":
+		return 2
+	case "ridge", "outset", "groove", "inset":
+		return 1
+	default:
+		return 0
+	}
+}
+
+func resolveBorderConflict(firstBorder, secondBorder border) border {
+	if firstBorder.Style == overflowHidden || secondBorder.Style == overflowHidden {
+		return border{Style: overflowHidden} //nolint:exhaustruct // intentional zero fields
+	}
+
+	firstVisible := borderVisible(firstBorder)
+	secondVisible := borderVisible(secondBorder)
+
+	if !firstVisible && !secondVisible {
+		return border{} //nolint:exhaustruct // intentional zero fields
+	}
+
+	if !firstVisible {
+		return secondBorder
+	}
+
+	if !secondVisible {
+		return firstBorder
+	}
+
+	if firstBorder.Width > secondBorder.Width {
+		return firstBorder
+	}
+
+	if secondBorder.Width > firstBorder.Width {
+		return secondBorder
+	}
+
+	if borderStyleRank(firstBorder.Style) >= borderStyleRank(secondBorder.Style) {
+		return firstBorder
+	}
+
+	return secondBorder
+}
+
+//nolint:cyclop,dupl // horizontal and vertical border scanning are symmetric axis routines
+func horizontalTableBorder(tableBox *box, boundary, col int) (border, bool) {
+	var (
+		best  border
+		found bool
+	)
+
+	for _, cell := range tableBox.children {
 		if cell.kind != tableCellKind {
 			continue
 		}
+
 		if cell.col > col || cell.col+cell.span <= col {
 			continue
 		}
 
 		if cell.row == boundary && borderVisible(cell.style.BorderTop) {
-			return cell.style.BorderTop, true
+			if !found {
+				best = cell.style.BorderTop
+				found = true
+			} else {
+				best = resolveBorderConflict(best, cell.style.BorderTop)
+			}
 		}
 
 		if cell.row+cell.rowSpan == boundary && borderVisible(cell.style.BorderBottom) {
-			return cell.style.BorderBottom, true
+			if !found {
+				best = cell.style.BorderBottom
+				found = true
+			} else {
+				best = resolveBorderConflict(best, cell.style.BorderBottom)
+			}
 		}
 	}
 
-	return border{}, false //nolint:exhaustruct // intentional zero fields
+	return best, found && borderVisible(best)
 }
 
-//nolint:wsl // border precedence is easiest to read as ordered guards
-func verticalTableBorder(tb *box, row, boundary int) (border, bool) {
-	for _, cell := range tb.children {
+//nolint:cyclop,dupl // horizontal and vertical border scanning are symmetric axis routines
+func verticalTableBorder(tableBox *box, row, boundary int) (border, bool) {
+	var (
+		best  border
+		found bool
+	)
+
+	for _, cell := range tableBox.children {
 		if cell.kind != tableCellKind {
 			continue
 		}
+
 		if cell.row > row || cell.row+cell.rowSpan <= row {
 			continue
 		}
 
 		if cell.col == boundary && borderVisible(cell.style.BorderLeft) {
-			return cell.style.BorderLeft, true
+			if !found {
+				best = cell.style.BorderLeft
+				found = true
+			} else {
+				best = resolveBorderConflict(best, cell.style.BorderLeft)
+			}
 		}
 
 		if cell.col+cell.span == boundary && borderVisible(cell.style.BorderRight) {
-			return cell.style.BorderRight, true
+			if !found {
+				best = cell.style.BorderRight
+				found = true
+			} else {
+				best = resolveBorderConflict(best, cell.style.BorderRight)
+			}
 		}
 	}
 
-	return border{}, false //nolint:exhaustruct // intentional zero fields
+	return best, found && borderVisible(best)
 }
 
 // expandRowOpRange includes [start,end] paint ops in every cell of the row so

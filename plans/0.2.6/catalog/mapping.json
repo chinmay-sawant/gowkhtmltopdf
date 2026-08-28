@@ -11,9 +11,10 @@
     "webref_properties": 818,
     "mapped_properties": 818,
     "properties_by_engine_status": {
-      "unsupported": 643,
-      "partial": 23,
-      "implemented": 152
+      "unsupported": 616,
+      "partial": 25,
+      "implemented": 177,
+      "ignored": 0
     },
     "properties_print_relevant": 818,
     "properties_goal_implement": 818,
@@ -68,9 +69,9 @@
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_cascade.go",
+      "notes": "Vendor alias mapped to align-content via normalizeVendorPrefix."
     },
     {
       "property": "-webkit-align-items",
@@ -89,9 +90,9 @@
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_cascade.go",
+      "notes": "Vendor alias mapped to align-items via normalizeVendorPrefix."
     },
     {
       "property": "-webkit-align-self",
@@ -110,9 +111,9 @@
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_cascade.go",
+      "notes": "Vendor alias mapped to align-self via normalizeVendorPrefix."
     },
     {
       "property": "-webkit-animation",
@@ -437,9 +438,9 @@
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_cascade.go",
+      "notes": "Vendor alias mapped to border-bottom-left-radius via normalizeVendorPrefix."
     },
     {
       "property": "-webkit-border-bottom-right-radius",
@@ -458,9 +459,9 @@
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_cascade.go",
+      "notes": "Vendor alias mapped to border-bottom-right-radius via normalizeVendorPrefix."
     },
     {
       "property": "-webkit-border-radius",
@@ -484,9 +485,9 @@
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_cascade.go",
+      "notes": "Vendor alias mapped to border-radius via normalizeVendorPrefix."
     },
     {
       "property": "-webkit-border-top-left-radius",
@@ -505,9 +506,9 @@
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_cascade.go",
+      "notes": "Vendor alias mapped to border-top-left-radius via normalizeVendorPrefix."
     },
     {
       "property": "-webkit-border-top-right-radius",
@@ -526,9 +527,9 @@
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_cascade.go",
+      "notes": "Vendor alias mapped to border-top-right-radius via normalizeVendorPrefix."
     },
     {
       "property": "-webkit-box-align",
@@ -658,9 +659,9 @@
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_cascade.go",
+      "notes": "Vendor alias mapped to box-shadow via normalizeVendorPrefix."
     },
     {
       "property": "-webkit-box-sizing",
@@ -679,9 +680,9 @@
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_cascade.go",
+      "notes": "Vendor alias mapped to box-sizing via normalizeVendorPrefix."
     },
     {
       "property": "-webkit-filter",
@@ -700,9 +701,9 @@
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_cascade.go",
+      "notes": "Vendor alias mapped to filter via normalizeVendorPrefix."
     },
     {
       "property": "-webkit-flex",
@@ -725,9 +726,9 @@
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_cascade.go",
+      "notes": "Vendor alias mapped to flex via normalizeVendorPrefix."
     },
     {
       "property": "-webkit-flex-basis",
@@ -746,9 +747,9 @@
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_cascade.go",
+      "notes": "Vendor alias mapped to flex-basis via normalizeVendorPrefix."
     },
     {
       "property": "-webkit-flex-direction",
@@ -767,9 +768,9 @@
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_cascade.go",
+      "notes": "Vendor alias mapped to flex-direction via normalizeVendorPrefix."
     },
     {
       "property": "-webkit-flex-flow",
@@ -791,9 +792,9 @@
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_cascade.go",
+      "notes": "Vendor alias mapped to flex-flow via normalizeVendorPrefix."
     },
     {
       "property": "-webkit-flex-grow",
@@ -812,9 +813,9 @@
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_cascade.go",
+      "notes": "Vendor alias mapped to flex-grow via normalizeVendorPrefix."
     },
     {
       "property": "-webkit-flex-shrink",
@@ -833,9 +834,9 @@
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_cascade.go",
+      "notes": "Vendor alias mapped to flex-shrink via normalizeVendorPrefix."
     },
     {
       "property": "-webkit-flex-wrap",
@@ -854,9 +855,9 @@
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_cascade.go",
+      "notes": "Vendor alias mapped to flex-wrap via normalizeVendorPrefix."
     },
     {
       "property": "-webkit-justify-content",
@@ -875,9 +876,9 @@
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_cascade.go",
+      "notes": "Vendor alias mapped to justify-content via normalizeVendorPrefix."
     },
     {
       "property": "-webkit-line-clamp",
@@ -1250,9 +1251,9 @@
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_cascade.go",
+      "notes": "Vendor alias mapped to order via normalizeVendorPrefix."
     },
     {
       "property": "-webkit-perspective",
@@ -1429,9 +1430,9 @@
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_cascade.go",
+      "notes": "Vendor alias mapped to transform via normalizeVendorPrefix."
     },
     {
       "property": "-webkit-transform-origin",
@@ -1450,9 +1451,9 @@
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_cascade.go",
+      "notes": "Vendor alias mapped to transform-origin via normalizeVendorPrefix."
     },
     {
       "property": "-webkit-transform-style",
@@ -5071,8 +5072,8 @@
         "CSS Backgrounds and Borders"
       ],
       "engine_status": "partial",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": "Honesty: first un-inset layer; inset ignored; blur approximated. Demoted from fake Implemented."
+      "code_path": "internal/layout/style_paint_props.go",
+      "notes": "Honesty: first un-inset layer; inset ignored; spread expanded; blur approximated."
     },
     {
       "property": "box-shadow-blur",
@@ -7729,9 +7730,9 @@
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_paint_props.go",
+      "notes": "SVG presentation property applied to ResolvedStyle."
     },
     {
       "property": "fill-break",
@@ -7815,9 +7816,9 @@
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_paint_props.go",
+      "notes": "SVG presentation property applied to ResolvedStyle."
     },
     {
       "property": "fill-origin",
@@ -16017,9 +16018,9 @@
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_paint_props.go",
+      "notes": "SVG presentation property applied to ResolvedStyle."
     },
     {
       "property": "stroke-align",
@@ -16346,9 +16347,9 @@
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_paint_props.go",
+      "notes": "SVG presentation property applied to ResolvedStyle."
     },
     {
       "property": "stroke-origin",
@@ -16453,9 +16454,9 @@
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_paint_props.go",
+      "notes": "SVG presentation property applied to ResolvedStyle."
     },
     {
       "property": "tab-size",

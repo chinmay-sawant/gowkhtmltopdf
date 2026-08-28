@@ -6,9 +6,9 @@ WebRef inventory size is 818 property names.
 
 | Status | Count |
 |--------|------:|
-| Implemented | 152 |
-| Partial | 23 |
-| Unsupported | 643 |
+| Implemented | 177 |
+| Partial | 25 |
+| Unsupported | 616 |
 | Ignored | 0 |
 
 Four explore subagents audited all former Implemented rows (apply arm + consumer + matrix agreement). **14** over-claims demoted to Partial (list in `implemented-honesty-pass.md`). No DEMOTE_UNSUPPORTED.

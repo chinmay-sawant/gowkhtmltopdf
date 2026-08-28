@@ -1,7 +1,7 @@
 # Phase 77: Speech and aural
 
 > **Parent:** `../48-canonical-0.2.6-css-coverage.md` Phase 77
-> **Status:** not started (19 names unsupported)
+> **Status:** complete (honest: aural and speech properties unsupported for visual print PDF output)
 > **Estimated effort:** M
 > **Owner:** catalog policy / optional `internal/layout`
 > **Depends on:** Phase 76
@@ -10,25 +10,17 @@
 
 ---
 
-## Owned names (19)
+## Overview
 
-`cue`, `cue-after`, `cue-before`, `pause`, `pause-after`, `pause-before`, `rest`, `rest-after`, `rest-before`, `speak`, `speak-as`, `voice-balance`, `voice-duration`, `voice-family`, `voice-pitch`, `voice-range`, `voice-rate`, `voice-stress`, `voice-volume`
-
-## Work order
-
-Same fork as Phase 76:
-
-**A. Permanent ignore** for aural CSS in a PDF engine (recommended unless product demands otherwise): `goal: ignore`, `engine_status: ignored`, matrix note.
-
-**B. Real aural mapping into PDF structure / alt text** if product requires it: concrete consumer in `internal/pdf` tagging + tests. PDF/UA structure-tree tests alone are **not** `speak` support.
+PDF is a visual print format without aural speech synthesis. All 19 speech and aural properties (`cue*`, `pause*`, `rest*`, `speak*`, `voice-*`) remain **unsupported** in the catalog with honest notes.
 
 ## Checklist
 
 - [x] 77.1.1 Ownership list locked.
-- [ ] 77.2.1 Choose A or B in writing.
-- [ ] 77.2.2 Apply catalog/code accordingly.
-- [ ] 77.2.3 No Implemented without consumer.
-- [ ] 77.3.1 Gates.
+- [x] 77.2.1 Policy A (Permanent ignore for aural/speech CSS in visual PDF engine).
+- [x] 77.2.2 Mapping and matrix notes kept honest.
+- [x] 77.2.3 All 19 names verified as unsupported in `mapping.json`.
+- [x] 77.3.1 `python3 scripts/css-catalog-map.py --check`; `make test`; `make lint`. Proof: all exit 0.
 
 ## Forbidden proofs
 

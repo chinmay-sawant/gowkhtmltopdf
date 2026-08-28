@@ -88,7 +88,7 @@ Status legend (verified against `applyRestProps` in
 |----------|--------|---------------------|
 | `font` (shorthand) | Implemented | Shorthand expands to font-size, line-height, font-family, font-weight, font-style (`parseFontShorthand` `style_values.go`). Test `TestFontShorthand` |
 | `font-family` (named + generic) | Implemented | parsed + inherited; embedded Liberation Sans family (R/B/I/BI) plus **font registry** (`--font-path`, optional `--use-system-fonts`) and `@font-face` TTF/OTF/WOFF1 (local and `https://` via `FetchSub`) on **PDF and image** paths (see §4 / §5). Named families resolve as named; missing faces fall through the author stack, then Liberation; only CSS generics (`serif`/`sans-serif`/`monospace`) expand to Liberation |
-| `writing-mode` (`horizontal-tb|vertical-rl|vertical-lr`) | Implemented | Parsed + inherited (`TestWritingModeInherits`). `vertical-rl` / `vertical-lr` format vertical text lines with RotateDeg == -90 and vertical writing height calculation (`inline_paint.go`, `layout.go`). |
+| `writing-mode` (`horizontal-tb|vertical-rl|vertical-lr`) | Partial | Parsed + inherited (`TestWritingModeInherits`). `vertical-rl` / `vertical-lr` format vertical text lines with RotateDeg == -90 and vertical writing height calculation (`inline_paint.go`, `layout.go`). Block/inline flow progression is horizontal. |
 | `font-size` | Implemented | `style.go` `fontSize` (px/pt/em/%/rem/in/cm/mm/pc + keywords); `%`/`em` resolve against parent; test `TestFontSizeEmInherit` |
 | `font-weight` (`normal|bold|100-900`) | Implemented | ≥700 selects Liberation Sans **Bold** (or BoldItalic); fake stroke bold only if a bold face is missing; tests `TestRealBoldFaceOps`, `TestBoldFaceInInvoicePDF` |
 | `font-style` (`italic|oblique`) | Implemented | selects Liberation Sans Italic / BoldItalic (`pdf.FaceSet.Resolve`); test `TestRealBoldFaceOps` |
@@ -113,10 +113,10 @@ Status legend (verified against `applyRestProps` in
 |----------|--------|---------------------|
 | `color` | Implemented | `style.go:402-405`; consumed `inline.go:152-155`; test `TestCascadeAndInline`. `hsl()`/`hsla()` parse in `ParseColor` (`values.go`; `TestParseColorHsl`) |
 | `background-color` | Implemented | `style.go:406-409`; painted `layout.go:234-237, 504-507, 531-534` (gated by `Background`); tests `TestBackgroundFill`, `TestRunPDFStyleTableImage` |
-| `background` (shorthand) | Implemented | Color token plus optional first `url(...)` (`BackgroundImage`). Gradients ignored. Tests `TestBackgroundImageParse` |
-| `background-image` | Implemented | First `url(...)` layer, no-repeat at box origin, sized to the box (`background_image.go`). Missing image skipped. Gradients ignored. Test `TestBackgroundImageLayoutPaints` |
+| `background` (shorthand) | Partial | Color token plus optional first `url(...)` (`BackgroundImage`). Gradients ignored. Tests `TestBackgroundImageParse` |
+| `background-image` | Partial | First `url(...)` layer, no-repeat at box origin, sized to the box (`background_image.go`). Missing image skipped. Gradients ignored. Test `TestBackgroundImageLayoutPaints` |
 | `outline` / `outline-width` / `outline-style` / `outline-color` / `outline-offset` | Implemented | Stroke outside the border edge; does not affect layout size. solid/dashed/dotted. Tests `TestOutlineParse`, `TestOutlineStroke` |
-| `box-shadow` | Implemented | First un-inset layer. Offset fill plus lite blur as stacked expanding `OpFillRect`s with decreasing alpha (`appendBoxShadow` `box_shadow.go`). Inset and spread ignored. Does not change layout size. Tests `TestBoxShadowParse`, `TestBoxShadowPaints`, `TestBoxShadowBlurPaints` |
+| `box-shadow` | Partial | First un-inset layer. Offset fill and spread plus lite blur as stacked expanding `OpFillRect`s with decreasing alpha (`appendBoxShadow` `box_shadow.go`). Inset ignored. Does not change layout size. Tests `TestBoxShadowParse`, `TestBoxShadowPaints`, `TestBoxShadowBlurPaints` |
 | `opacity` | Partial | Parsed in `applyRestProps`; paint via PDF ExtGState (`SetOpacity`). Nested opacities multiply. Also accepts `filter: opacity()`; other filter functions ignored (permanent print non-goal for blur/shadow). |
 | `accent-color` | Partial | Parsed `style_properties.go:928`; inherited. Fill color for native `progress`/`meter` (`widgetValueColor` `layout.go:1417`). Other form controls ignore it. Test `widget_color_test.go` |
 

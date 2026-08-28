@@ -392,6 +392,36 @@ func TestFontShorthand(t *testing.T) {
 	}
 }
 
+func TestOverflowAxesIndependent(t *testing.T) {
+	t.Parallel()
+
+	root := mustParse(t, `<html><body>
+		<div class="x-hidden">x</div>
+		<div class="y-scroll">x</div>
+		<div class="split">x</div>
+	</body></html>`)
+	styles := resolveStyles(root, []*css.Stylesheet{sheet(t, `
+		.x-hidden { overflow-x: hidden; }
+		.y-scroll { overflow-y: scroll; }
+		.split { overflow-x: hidden; overflow-y: visible; }
+	`)}, "print", testViewport, 800)
+
+	xHidden := styleByClass(t, styles, "x-hidden")
+	if xHidden.OverflowX != overflowHidden || xHidden.OverflowY != visibleKeyword {
+		t.Fatalf("x-hidden: OverflowX=%q OverflowY=%q, want hidden/visible", xHidden.OverflowX, xHidden.OverflowY)
+	}
+
+	yScroll := styleByClass(t, styles, "y-scroll")
+	if yScroll.OverflowX != visibleKeyword || yScroll.OverflowY != overflowScroll {
+		t.Fatalf("y-scroll: OverflowX=%q OverflowY=%q, want visible/scroll", yScroll.OverflowX, yScroll.OverflowY)
+	}
+
+	split := styleByClass(t, styles, "split")
+	if split.OverflowX != overflowHidden || split.OverflowY != visibleKeyword {
+		t.Fatalf("split: OverflowX=%q OverflowY=%q, want hidden/visible", split.OverflowX, split.OverflowY)
+	}
+}
+
 func joinedText(res *Result) string {
 	var b strings.Builder
 

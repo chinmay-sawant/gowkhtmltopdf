@@ -11,12 +11,12 @@ const (
 )
 
 type parsedBoxShadow struct {
-	x, y, blur float64
-	color      [3]float64
+	x, y, blur, spread float64
+	color              [3]float64
 }
 
 // parseBoxShadowLayer reads offset-x offset-y [blur [spread]] [color].
-// Inset layers are dropped. Spread is accepted and ignored. Blur is stored
+// Inset layers are dropped. Spread expands the shadow box. Blur is stored
 // and painted as stacked expanding fills with decreasing alpha.
 func parseBoxShadowLayer(value string, current [3]float64, fsize float64) (parsedBoxShadow, bool) {
 	var tokens [boxShadowMaxTokens]string
@@ -74,6 +74,7 @@ func boxShadowFromLengths(
 	}
 
 	blur := 0.0
+	spread := 0.0
 
 	if lengthCount >= three {
 		if lengths[two] < 0 {
@@ -83,12 +84,16 @@ func boxShadowFromLengths(
 		blur = lengths[two]
 	}
 
-	return parsedBoxShadow{x: lengths[0], y: lengths[1], blur: blur, color: color}, true
+	if lengthCount >= boxShadowMaxLengths {
+		spread = lengths[three]
+	}
+
+	return parsedBoxShadow{x: lengths[0], y: lengths[1], blur: blur, spread: spread, color: color}, true
 }
 
-// appendBoxShadow paints one opaque fill the size of the border box, offset
-// by BoxShadowX/Y. When blur > 0 it first paints stacked expanding fills with
-// decreasing alpha. Layout size is unchanged. Inset and spread stay ignored.
+// appendBoxShadow paints one opaque fill the size of the border box expanded
+// by BoxShadowSpread, offset by BoxShadowX/Y. When blur > 0 it first paints
+// stacked expanding fills with decreasing alpha. Layout size is unchanged.
 func (e *engine) appendBoxShadow(
 	dst []Op, sty ResolvedStyle, posX, posY, width, height float64,
 	radiusX, radiusY [4]float64,
@@ -97,13 +102,21 @@ func (e *engine) appendBoxShadow(
 		return dst
 	}
 
-	originX := posX + e.scalePt(sty.BoxShadowX)
-	originY := posY + e.scalePt(sty.BoxShadowY)
+	spread := e.scalePt(sty.BoxShadowSpread)
+	originX := posX + e.scalePt(sty.BoxShadowX) - spread
+	originY := posY + e.scalePt(sty.BoxShadowY) - spread
+	shadowW := width + spread*two
+	shadowH := height + spread*two
+
+	if shadowW <= 0 || shadowH <= 0 {
+		return dst
+	}
+
 	dst = appendBoxShadowBlur(
-		dst, originX, originY, width, height, e.scalePt(sty.BoxShadowBlur), sty.BoxShadowColor, radiusX, radiusY,
+		dst, originX, originY, shadowW, shadowH, e.scalePt(sty.BoxShadowBlur), sty.BoxShadowColor, radiusX, radiusY,
 	)
 
-	return append(dst, shadowFillOp(originX, originY, width, height, sty.BoxShadowColor, radiusX, radiusY))
+	return append(dst, shadowFillOp(originX, originY, shadowW, shadowH, sty.BoxShadowColor, radiusX, radiusY))
 }
 
 func shadowFillOp(

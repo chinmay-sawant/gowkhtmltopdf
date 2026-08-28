@@ -184,6 +184,116 @@ func TestTextIndentInheritsAndShiftsFirstLine(t *testing.T) {
 	}
 }
 
+//nolint:gocognit,cyclop,wsl,funlen // table-driven webkit aliases assertion
+func TestWebkitPrefixAliases(t *testing.T) {
+	t.Parallel()
+
+	root, err := html.Parse(`<html><body>
+		<div class="box-sizing" style="-webkit-box-sizing: border-box">x</div>
+		<div class="radius" style="-webkit-border-radius: 12pt">x</div>
+		<div class="flex" style="-webkit-flex-direction: column; -webkit-flex-wrap: wrap; ` +
+		`-webkit-justify-content: center; -webkit-align-items: center; ` +
+		`-webkit-align-content: space-between; -webkit-order: 3">x</div>
+		<div class="transform" style="-webkit-transform: rotate(45deg)">x</div>
+		<div class="shadow" style="-webkit-box-shadow: 2pt 2pt 4pt #000">x</div>
+	</body></html>`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	styles := resolveStyles(root, nil, "print", testViewport, 800)
+
+	body := findElementByName(root, "body")
+	if body == nil {
+		t.Fatal("body element not found")
+	}
+
+	for _, child := range body.Children {
+		if child.Type != html.ElementNode {
+			continue
+		}
+
+		sty := styles[child]
+		switch child.Attribute("class") {
+		case "box-sizing":
+			if sty.BoxSizing != "border-box" {
+				t.Fatalf("-webkit-box-sizing: got %q, want border-box", sty.BoxSizing)
+			}
+		case "radius":
+			if !near(sty.BorderRadius, 12) {
+				t.Fatalf("-webkit-border-radius: got %.1f, want 12", sty.BorderRadius)
+			}
+		case "flex":
+			if sty.FlexDirection != "column" {
+				t.Fatalf("-webkit-flex-direction: got %q, want column", sty.FlexDirection)
+			}
+			if sty.FlexWrap != "wrap" {
+				t.Fatalf("-webkit-flex-wrap: got %q, want wrap", sty.FlexWrap)
+			}
+			if sty.JustifyContent != fxCenter {
+				t.Fatalf("-webkit-justify-content: got %q, want center", sty.JustifyContent)
+			}
+			if sty.AlignItems != fxCenter {
+				t.Fatalf("-webkit-align-items: got %q, want center", sty.AlignItems)
+			}
+			if sty.AlignContent != "space-between" {
+				t.Fatalf("-webkit-align-content: got %q, want space-between", sty.AlignContent)
+			}
+			if sty.FlexOrder != 3 {
+				t.Fatalf("-webkit-order: got %d, want 3", sty.FlexOrder)
+			}
+		case "transform":
+			if !sty.HasTransform {
+				t.Fatal("-webkit-transform: HasTransform false, want true")
+			}
+		case "shadow":
+			if !sty.BoxShadowSet {
+				t.Fatal("-webkit-box-shadow: BoxShadowSet false, want true")
+			}
+		}
+	}
+}
+
+//nolint:cyclop // SVG presentation test assertions
+func TestSVGPresentationProps(t *testing.T) {
+	t.Parallel()
+
+	root, err := html.Parse(`<html><body>
+		<svg style="fill: red; stroke: blue; stroke-width: 2pt; fill-opacity: 0.8; stroke-opacity: 0.5"></svg>
+	</body></html>`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	styles := resolveStyles(root, nil, "print", testViewport, 800)
+	svgElem := findElementByName(root, "svg")
+
+	if svgElem == nil {
+		t.Fatal("svg element not found")
+	}
+
+	sty := styles[svgElem]
+	if !sty.FillSet || sty.Fill != [3]float64{1, 0, 0} {
+		t.Fatalf("Fill = %v, FillSet = %v, want red (1,0,0) and true", sty.Fill, sty.FillSet)
+	}
+
+	if !sty.StrokeSet || sty.Stroke != [3]float64{0, 0, 1} {
+		t.Fatalf("Stroke = %v, StrokeSet = %v, want blue (0,0,1) and true", sty.Stroke, sty.StrokeSet)
+	}
+
+	if !sty.StrokeWidthSet || !near(sty.StrokeWidth, 2) {
+		t.Fatalf("StrokeWidth = %.1f, StrokeWidthSet = %v, want 2 and true", sty.StrokeWidth, sty.StrokeWidthSet)
+	}
+
+	if !near(sty.FillOpacity, 0.8) {
+		t.Fatalf("FillOpacity = %.2f, want 0.8", sty.FillOpacity)
+	}
+
+	if !near(sty.StrokeOpacity, 0.5) {
+		t.Fatalf("StrokeOpacity = %.2f, want 0.5", sty.StrokeOpacity)
+	}
+}
+
 func findElementByName(root *html.Node, name string) *html.Node {
 	if root.Type == html.ElementNode && root.Name == name {
 		return root

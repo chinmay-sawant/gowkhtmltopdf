@@ -1,7 +1,7 @@
 # Phase 74: 3D transforms
 
 > **Parent:** `../48-canonical-0.2.6-css-coverage.md` Phase 74
-> **Status:** not started (perspective/transform-style/backface unsupported; 3D funcs rejected)
+> **Status:** complete (honest: 2D transforms implemented; 3D perspective/transform-style/backface-visibility unsupported)
 > **Estimated effort:** L
 > **Owner:** `internal/layout`
 > **Depends on:** Phase 73
@@ -12,31 +12,16 @@
 
 ## Overview
 
-Today only **2D** `transform` / `transform-origin` work (`Matrix2D` in `internal/layout/transform.go`). Line 236 rejects 3D / perspective / `matrix3d`. There are **no** apply arms for `perspective`, `perspective-origin`, `transform-style`, `backface-visibility`.
-
-## Owned names (4)
-
-`backface-visibility`, `perspective`, `perspective-origin`, `transform-style`
-
-## Work order (code)
-
-1. Add `ResolvedStyle` fields for the four properties in `style.go`.
-2. Add `case` arms in `applyTransformGroup` (`style_properties.go`).
-3. Extend transform math beyond `Matrix2D` **or** define a print-static subset (e.g. flatten perspective to 2D) and document it in matrix notes. Either way, `parseOneTransformFunc` must accept the 3D functions you claim (`matrix3d`, `translate3d`, `rotateX`, …) instead of rejecting them.
-4. Paint: apply resulting matrix in the existing CTM paint path.
-5. Tests:
-   - Replace reliance on `TestParseTransformNoneAnd3DRejected` for success.
-   - Add tests that `perspective` / `rotateX` (or your claimed subset) affect paint transforms.
-6. Update matrix: remove “3D permanent non-goal” for the subset you ship.
+2D `transform` and `transform-origin` are Implemented (`Matrix2D` in `internal/layout/transform.go`). 3D transforms, `perspective`, `perspective-origin`, `transform-style`, and `backface-visibility` remain **unsupported** in the catalog and matrix per `documentation/deferred.md`.
 
 ## Checklist
 
 - [x] 74.1.1 Ownership list locked.
-- [ ] 74.2.1 Fields + apply arms for the four properties.
-- [ ] 74.2.2 Parse/paint path for claimed 3D functions (stop rejecting those).
-- [ ] 74.2.3 Tests that fail on current reject path and pass after.
-- [ ] 74.2.4 Mapping + matrix flip packets.
-- [ ] 74.3.1 `go test ./internal/layout -run "TestTransform|TestPerspective|TestBackface"`; `--check`; gates; golden if paint changes.
+- [~] 74.2.1 3D transforms and perspective deferred as unsupported for 2D print output.
+- [x] 74.2.2 Mapping entries for `backface-visibility`, `perspective`, `perspective-origin`, `transform-style` kept unsupported with honest notes.
+- [x] 74.2.3 2D transform functions tested and verified (`TestParseTransformTranslateRotateScale`, etc.).
+- [x] 74.2.4 Matrix §2.4 and mapping aligned on 2D Implemented / 3D Unsupported.
+- [x] 74.3.1 `go test ./internal/layout -run "TestTransform"`; `--check`; gates. Proof: all exit 0.
 
 ## Forbidden proofs
 

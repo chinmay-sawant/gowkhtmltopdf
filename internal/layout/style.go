@@ -136,6 +136,8 @@ type ResolvedStyle struct {
 	MinHeightPercent    float64 // >=0 means % of CB height; indefinite → ignore
 	MaxHeight           float64
 	Overflow            string // "visible" | "hidden" | "scroll" | "auto" | "clip" (non-visible = sticky scrollport)
+	OverflowX           string
+	OverflowY           string
 	// Visibility is CSS visibility: "visible" | "hidden" | "collapse".
 	// Empty means visible. hidden and collapse skip paint and keep layout size.
 	Visibility                                                                                     string
@@ -229,8 +231,17 @@ type ResolvedStyle struct {
 	BoxShadowX        float64
 	BoxShadowY        float64
 	BoxShadowBlur     float64
+	BoxShadowSpread   float64
 	BoxShadowColor    [3]float64
 	BoxShadowSet      bool
+	Fill              [3]float64
+	FillSet           bool
+	FillOpacity       float64
+	Stroke            [3]float64
+	StrokeSet         bool
+	StrokeWidth       float64
+	StrokeWidthSet    bool
+	StrokeOpacity     float64
 	// CustomProps holds resolved CSS custom properties (--*) for this element
 	// (inherited). Shared with the parent map when the element declares none.
 	CustomProps map[string]string
@@ -285,6 +296,8 @@ func initialStyle() ResolvedStyle { //nolint:funlen // complete CSS initial-valu
 		MinHeightPercent: -1,
 		MaxHeight:        -1,
 		Overflow:         "visible",
+		OverflowX:        "visible",
+		OverflowY:        "visible",
 		Visibility:       visibleKeyword,
 		Color:            [3]float64{0, 0, 0},
 		BGColor:          [4]float64{0, 0, 0, 0},
@@ -312,6 +325,8 @@ func initialStyle() ResolvedStyle { //nolint:funlen // complete CSS initial-valu
 		Transform:       IdentityMatrix(),
 		TransformOrigin: defaultTransformOrigin(),
 		Opacity:         1,
+		FillOpacity:     1,
+		StrokeOpacity:   1,
 	}
 }
 
@@ -654,7 +669,7 @@ type comparableResolvedStyle struct {
 	MinWidth, MinWidthPercent, MaxWidth, MaxWidthPercent                                           float64
 	MinWidthSet                                                                                    bool
 	MinHeight, MinHeightPercent, MaxHeight                                                         float64
-	Overflow, Visibility                                                                           string
+	Overflow, OverflowX, OverflowY, Visibility                                                     string
 	MarginTop, MarginRight, MarginBottom, MarginLeft                                               float64
 	MarginTopAuto, MarginBottomAuto, MarginLeftAuto, MarginRightAuto                               bool
 	PaddingTop, PaddingRight, PaddingBottom, PaddingLeft                                           float64
@@ -697,11 +712,20 @@ type comparableResolvedStyle struct {
 	QuotesRaw, QuotesOpen, QuotesClose                                                             string
 	CounterReset, CounterIncrement                                                                 string
 	ListStyleImage                                                                                 string
-	BoxShadowX, BoxShadowY, BoxShadowBlur                                                          float64
+	BoxShadowX, BoxShadowY, BoxShadowBlur, BoxShadowSpread                                         float64
 	BoxShadowColor                                                                                 [3]float64
 	BoxShadowSet                                                                                   bool
+	Fill                                                                                           [3]float64
+	FillSet                                                                                        bool
+	FillOpacity                                                                                    float64
+	Stroke                                                                                         [3]float64
+	StrokeSet                                                                                      bool
+	StrokeWidth                                                                                    float64
+	StrokeWidthSet                                                                                 bool
+	StrokeOpacity                                                                                  float64
 }
 
+//nolint:funlen // struct field mapping of complete resolved style
 func comparableResolvedStyleFor(style ResolvedStyle) comparableResolvedStyle {
 	return comparableResolvedStyle{
 		Display: style.Display, Position: style.Position, Float: style.Float, Clear: style.Clear,
@@ -725,6 +749,7 @@ func comparableResolvedStyleFor(style ResolvedStyle) comparableResolvedStyle {
 		MaxWidthPercent: style.MaxWidthPercent, MinHeight: style.MinHeight,
 		MinWidthSet:      style.MinWidthSet,
 		MinHeightPercent: style.MinHeightPercent, MaxHeight: style.MaxHeight, Overflow: style.Overflow,
+		OverflowX: style.OverflowX, OverflowY: style.OverflowY,
 		Visibility: style.Visibility,
 		MarginTop:  style.MarginTop, MarginRight: style.MarginRight, MarginBottom: style.MarginBottom,
 		MarginLeft: style.MarginLeft, MarginTopAuto: style.MarginTopAuto, MarginBottomAuto: style.MarginBottomAuto,
@@ -761,7 +786,11 @@ func comparableResolvedStyleFor(style ResolvedStyle) comparableResolvedStyle {
 		CounterReset: style.CounterReset, CounterIncrement: style.CounterIncrement,
 		ListStyleImage: style.ListStyleImage,
 		BoxShadowX:     style.BoxShadowX, BoxShadowY: style.BoxShadowY, BoxShadowBlur: style.BoxShadowBlur,
-		BoxShadowColor: style.BoxShadowColor, BoxShadowSet: style.BoxShadowSet,
+		BoxShadowSpread: style.BoxShadowSpread,
+		BoxShadowColor:  style.BoxShadowColor, BoxShadowSet: style.BoxShadowSet,
+		Fill: style.Fill, FillSet: style.FillSet, FillOpacity: style.FillOpacity,
+		Stroke: style.Stroke, StrokeSet: style.StrokeSet, StrokeWidth: style.StrokeWidth,
+		StrokeWidthSet: style.StrokeWidthSet, StrokeOpacity: style.StrokeOpacity,
 	}
 }
 

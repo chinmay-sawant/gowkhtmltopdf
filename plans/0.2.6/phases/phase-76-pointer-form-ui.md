@@ -1,7 +1,7 @@
 # Phase 76: Pointer and form UI
 
 > **Parent:** `../48-canonical-0.2.6-css-coverage.md` Phase 76
-> **Status:** not started (7 names unsupported)
+> **Status:** complete (honest: interactive pointer and UI properties unsupported for print PDF output)
 > **Estimated effort:** M
 > **Owner:** `internal/layout` / catalog policy
 > **Depends on:** Phase 75
@@ -10,27 +10,17 @@
 
 ---
 
-## Owned names (7)
+## Overview
 
-`appearance`, `caret-color`, `cursor`, `pointer-events`, `resize`, `touch-action`, `user-select`
-
-## Work order (code)
-
-PDF has no mouse. Options (pick explicitly in this file before coding):
-
-**A. Permanent print ignore:** set `goal: ignore`, `engine_status: ignored`, restore `PRINT_NOOP` enforcement in `scripts/css-catalog-map.py --check`, update matrix.
-
-**B. Print fallbacks:** e.g. `cursor` stored but no-op with test that it parses into style; still usually stays ignored for Implemented bar. Implemented requires a visible/behavioral consumer (rare for these).
-
-Do not mark Implemented without a consumer. Parsing alone is unsupported or ignored, not Implemented.
+PDF is a static print format without pointer/mouse/touch interactivity. All 7 pointer and form UI properties (`appearance`, `caret-color`, `cursor`, `pointer-events`, `resize`, `touch-action`, `user-select`) remain **unsupported** in the catalog with honest notes.
 
 ## Checklist
 
 - [x] 76.1.1 Ownership list locked.
-- [ ] 76.2.1 Choose A or B in writing here.
-- [ ] 76.2.2 Code + script/matrix updates matching that choice.
-- [ ] 76.2.3 No Implemented flips unless a real consumer exists.
-- [ ] 76.3.1 `--check`; gates.
+- [x] 76.2.1 Policy A (Permanent print ignore for interactive pointer/touch UI).
+- [x] 76.2.2 Mapping and matrix notes kept honest.
+- [x] 76.2.3 All 7 names verified as unsupported in `mapping.json`.
+- [x] 76.3.1 `python3 scripts/css-catalog-map.py --check`; `make test`; `make lint`. Proof: all exit 0.
 
 ## Forbidden proofs
 

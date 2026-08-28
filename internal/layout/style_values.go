@@ -554,7 +554,7 @@ func lineHeight(value string, fsize float64) float64 {
 // detection. clip is treated like hidden (scroll container, no user scroll).
 func parseOverflowKeyword(value string) (string, bool) {
 	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "visible", overflowHidden, "scroll", overflowAuto, "clip":
+	case visibleKeyword, overflowHidden, overflowScroll, overflowAuto, "clip":
 		return strings.ToLower(strings.TrimSpace(value)), true
 	}
 
