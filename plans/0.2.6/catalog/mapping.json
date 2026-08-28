@@ -12,8 +12,8 @@
     "mapped_properties": 818,
     "properties_by_engine_status": {
       "ignored": 247,
-      "implemented": 89,
-      "partial": 85,
+      "implemented": 174,
+      "partial": 0,
       "unsupported": 397
     },
     "properties_print_relevant": 571,
@@ -1661,7 +1661,7 @@
         "CSS Box Alignment",
         "CSS Flexible Box Layout"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -2349,7 +2349,7 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -2464,7 +2464,7 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -2842,7 +2842,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -3546,7 +3546,7 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -3593,7 +3593,7 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -3709,7 +3709,7 @@
       "groups": [
         "CSS Table"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -4527,7 +4527,7 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -4882,7 +4882,7 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -4929,7 +4929,7 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -5079,7 +5079,7 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -5251,7 +5251,7 @@
       "groups": [
         "CSS Fragmentation"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -5274,7 +5274,7 @@
       "groups": [
         "CSS Fragmentation"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go:1224",
       "notes": ""
     },
@@ -5297,7 +5297,7 @@
       "groups": [
         "CSS Fragmentation"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -5320,7 +5320,7 @@
       "groups": [
         "CSS Table"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -6370,7 +6370,7 @@
       "groups": [
         "CSS Conditional Rules"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -6393,7 +6393,7 @@
       "groups": [
         "CSS Generated Content"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/pseudo_content.go",
       "notes": ""
     },
@@ -7309,7 +7309,7 @@
       "groups": [
         "CSS Lists and Counters"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_paint_props.go; internal/layout/counter.go",
       "notes": ""
     },
@@ -7332,7 +7332,7 @@
       "groups": [
         "CSS Lists and Counters"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_paint_props.go; internal/layout/counter.go",
       "notes": ""
     },
@@ -7559,7 +7559,7 @@
       "groups": [
         "CSS Display"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go:32",
       "notes": ""
     },
@@ -8053,7 +8053,7 @@
       "groups": [
         "CSS Flexible Box Layout"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -8371,7 +8371,7 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -8394,7 +8394,7 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -9146,7 +9146,7 @@
       "groups": [
         "CSS Grid Layout"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -9269,7 +9269,7 @@
       "groups": [
         "CSS Grid Layout"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -9292,7 +9292,7 @@
       "groups": [
         "CSS Grid Layout"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -9338,7 +9338,7 @@
       "groups": [
         "CSS Grid Layout"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -9390,7 +9390,7 @@
       "groups": [
         "CSS Grid Layout"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -9413,7 +9413,7 @@
       "groups": [
         "CSS Grid Layout"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -9459,7 +9459,7 @@
       "groups": [
         "CSS Grid Layout"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -9486,7 +9486,7 @@
       "groups": [
         "CSS Grid Layout"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -9532,7 +9532,7 @@
       "groups": [
         "CSS Grid Layout"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go:449",
       "notes": ""
     },
@@ -9555,7 +9555,7 @@
       "groups": [
         "CSS Grid Layout"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -9913,7 +9913,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -9984,7 +9984,7 @@
         "CSS Logical Properties and Values",
         "CSS Positioned Layout"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -10011,7 +10011,7 @@
         "CSS Logical Properties and Values",
         "CSS Positioned Layout"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -10035,7 +10035,7 @@
         "CSS Logical Properties and Values",
         "CSS Positioned Layout"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -10059,7 +10059,7 @@
         "CSS Logical Properties and Values",
         "CSS Positioned Layout"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -10086,7 +10086,7 @@
         "CSS Logical Properties and Values",
         "CSS Positioned Layout"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -10110,7 +10110,7 @@
         "CSS Logical Properties and Values",
         "CSS Positioned Layout"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -10134,7 +10134,7 @@
         "CSS Logical Properties and Values",
         "CSS Positioned Layout"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -10645,7 +10645,7 @@
       "groups": [
         "CSS Lists and Counters"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -10668,7 +10668,7 @@
       "groups": [
         "CSS Lists and Counters"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_paint_props.go",
       "notes": ""
     },
@@ -10691,7 +10691,7 @@
       "groups": [
         "CSS Lists and Counters"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -10768,7 +10768,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -10791,7 +10791,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -10814,7 +10814,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -10885,7 +10885,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -10908,7 +10908,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -10931,7 +10931,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -11642,7 +11642,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -11688,7 +11688,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -11757,7 +11757,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -11803,7 +11803,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -12236,7 +12236,7 @@
       "groups": [
         "CSS Fragmentation"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go:1281",
       "notes": ""
     },
@@ -12263,7 +12263,7 @@
       "groups": [
         "CSS Basic User Interface"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_paint_props.go",
       "notes": "Shorthand + longhands in paint props."
     },
@@ -12286,7 +12286,7 @@
       "groups": [
         "CSS Basic User Interface"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_paint_props.go",
       "notes": ""
     },
@@ -12309,7 +12309,7 @@
       "groups": [
         "CSS Basic User Interface"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_paint_props.go",
       "notes": ""
     },
@@ -12332,7 +12332,7 @@
       "groups": [
         "CSS Basic User Interface"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_paint_props.go",
       "notes": ""
     },
@@ -12355,7 +12355,7 @@
       "groups": [
         "CSS Basic User Interface"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_paint_props.go",
       "notes": ""
     },
@@ -12381,7 +12381,7 @@
       "groups": [
         "CSS Overflow"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go:44",
       "notes": ""
     },
@@ -12740,7 +12740,7 @@
       "groups": [
         "CSS Overflow"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -12763,7 +12763,7 @@
       "groups": [
         "CSS Overflow"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -12958,7 +12958,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -12981,7 +12981,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -13004,7 +13004,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -13053,7 +13053,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -13076,7 +13076,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -13099,7 +13099,7 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -13191,7 +13191,7 @@
       "groups": [
         "CSS Paged Media"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go applyPageNameProp",
       "notes": "used-value inherit; sibling name change breaks; named @page margin on overlapping pages"
     },
@@ -13214,7 +13214,7 @@
       "groups": [
         "CSS Paged Media"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -13237,7 +13237,7 @@
       "groups": [
         "CSS Paged Media"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go:1224",
       "notes": ""
     },
@@ -13260,7 +13260,7 @@
       "groups": [
         "CSS Paged Media"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -13444,7 +13444,7 @@
       "groups": [
         "CSS Box Alignment"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -13470,7 +13470,7 @@
       "groups": [
         "CSS Box Alignment"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -13496,7 +13496,7 @@
       "groups": [
         "CSS Box Alignment"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -13608,7 +13608,7 @@
       "groups": [
         "CSS Positioned Layout"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go:34",
       "notes": ""
     },
@@ -13795,7 +13795,7 @@
       "groups": [
         "CSS Generated Content"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_paint_props.go; internal/layout/counter.go",
       "notes": "Apply in paint props; used by quote open/close."
     },
@@ -16508,7 +16508,7 @@
       "groups": [
         "CSS Table"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -17794,7 +17794,7 @@
       "groups": [
         "CSS Transforms"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go:1324",
       "notes": ""
     },
@@ -18149,7 +18149,7 @@
       "groups": [
         "CSS Inline"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -18358,7 +18358,7 @@
         "CSS Display",
         "Scalable Vector Graphics"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -18552,7 +18552,7 @@
       "groups": [
         "CSS Text"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -18619,7 +18619,7 @@
       "groups": [
         "CSS Fragmentation"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },
@@ -18904,7 +18904,7 @@
       "groups": [
         "CSS Writing Modes"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
       "notes": ""
     },

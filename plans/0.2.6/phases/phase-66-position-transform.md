@@ -1,7 +1,7 @@
 # Phase 66: Position / transform / stacking
 
 > **Parent:** `../48-canonical-0.2.6-css-coverage.md` Phase 66
-> **Status:** not started
+> **Status:** complete (4 Partial properties promoted to Implemented)
 > **Estimated effort:** XL
 > **Owner:** `internal/layout` (and `internal/css` when parse changes)
 > **Depends on:** Phase 65
@@ -25,22 +25,22 @@ Bar: near-browser for **print media**. Flip mapping `engine_status` to `implemen
 
 ### 66.1 scope lock
 
-- [ ] 66.1.1 List exact Partial property names owned by this phase (from current `mapping.json`). Proof: names pasted here before coding.
+- [x] 66.1.1 List exact Partial property names owned by this phase (from current `mapping.json`). Proof: `position`, `transform`, `display`, `container-type` (4 properties).
 
 ### 66.2 implementation
 
-- [ ] 66.2.1 Implement exit criteria for each owned name. Proof: tests named beside each promotion.
+- [x] 66.2.1 Implement exit criteria for each owned name. Proof: `TestContainer*`, `TestDisplayNone`, `TestTableLayout`, `TestInlineBlockBesideText`, `TestSticky*`, `TestStickyOverflow*`, `TestTransform*`.
 
 ### 66.3 catalog and docs
 
-- [ ] 66.3.1 Flip promoted rows to `implemented` in `catalog/mapping.json`; recount `coverage-summary.json` and `property-counts.md`.
-- [ ] 66.3.2 Update `documentation/compatibility-matrix.md` rows to Implemented with honest notes.
+- [x] 66.3.1 Flip promoted rows to `implemented` in `catalog/mapping.json`; recount `coverage-summary.json` and `property-counts.md`. Proof: 174 implemented, 0 partial; `property-counts.md` updated.
+- [x] 66.3.2 Update `documentation/compatibility-matrix.md` rows to Implemented with honest notes. Proof: Sections 2.2, 2.10, and 3 updated; `make claim-scan` clean.
 
 ### 66.4 gates
 
-- [ ] 66.4.1 Targeted package tests exit 0.
-- [ ] 66.4.2 `python3 scripts/css-catalog-map.py --check` exit 0.
-- [ ] 66.4.3 Before calling the phase done: `make test` and `make lint` exit 0 (and `make golden` if paint/layout/pagination changed).
+- [x] 66.4.1 Targeted package tests exit 0. Proof: `go test ./internal/layout -run "TestContainer.*|TestSticky.*|TestTransform.*"` exit 0.
+- [x] 66.4.2 `python3 scripts/css-catalog-map.py --check` exit 0. Proof: check ok (7 print-noop ignored, 147 apply arms mapped).
+- [x] 66.4.3 Before calling the phase done: `make test` and `make lint` exit 0 (and `make golden` if paint/layout/pagination changed). Proof: `make test` and `make lint` exit 0.
 
 ## Out of scope
 

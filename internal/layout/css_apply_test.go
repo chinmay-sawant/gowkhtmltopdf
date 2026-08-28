@@ -261,10 +261,12 @@ func TestLogicalSize(t *testing.T) {
 	root := mustParse(t, `<html><body>
 		<div class="size">x</div>
 		<div class="minmax">x</div>
+		<div class="minmaxblock">x</div>
 	</body></html>`)
 	styles := resolveStyles(root, []*css.Stylesheet{sheet(t, `
 		.size { inline-size: 100pt; block-size: 50pt }
 		.minmax { min-inline-size: 40pt; max-inline-size: 80pt }
+		.minmaxblock { min-block-size: 30pt; max-block-size: 60pt }
 	`)}, "print", testViewport, 800)
 
 	size := styleByClass(t, styles, "size")
@@ -275,6 +277,11 @@ func TestLogicalSize(t *testing.T) {
 	minmax := styleByClass(t, styles, "minmax")
 	if !near(minmax.MinWidth, 40) || !near(minmax.MaxWidth, 80) {
 		t.Fatalf("min/max-inline-size = %.2f/%.2f, want 40/80", minmax.MinWidth, minmax.MaxWidth)
+	}
+
+	minmaxblock := styleByClass(t, styles, "minmaxblock")
+	if !near(minmaxblock.MinHeight, 30) || !near(minmaxblock.MaxHeight, 60) {
+		t.Fatalf("min/max-block-size = %.2f/%.2f, want 30/60", minmaxblock.MinHeight, minmaxblock.MaxHeight)
 	}
 }
 
@@ -340,6 +347,49 @@ func styleByClass(t *testing.T, styles map[*html.Node]*ResolvedStyle, class stri
 	t.Fatalf("no styled element with class %q", class)
 
 	return nil
+}
+
+func TestFontShorthand(t *testing.T) {
+	t.Parallel()
+
+	root := mustParse(t, `<html><body>
+		<div class="sh">x</div>
+		<div class="full">y</div>
+	</body></html>`)
+	styles := resolveStyles(root, []*css.Stylesheet{sheet(t, `
+		.sh { font: 16pt/1.5 Helvetica, Arial, sans-serif }
+		.full { font: italic bold 14pt/20pt serif }
+	`)}, "print", testViewport, 800)
+
+	sh := styleByClass(t, styles, "sh")
+	if !near(sh.FontSize, 16) {
+		t.Fatalf("font shorthand size = %.2f, want 16", sh.FontSize)
+	}
+
+	if !near(sh.LineHeight, 24) {
+		t.Fatalf("font shorthand line-height = %.2f, want 24 (16*1.5)", sh.LineHeight)
+	}
+
+	if len(sh.FontFamily) == 0 || sh.FontFamily[0] != "Helvetica" {
+		t.Fatalf("font shorthand family = %v, want Helvetica first", sh.FontFamily)
+	}
+
+	full := styleByClass(t, styles, "full")
+	if !full.FontItalic {
+		t.Fatal("font shorthand italic not set")
+	}
+
+	if full.FontWeight < 700 {
+		t.Fatalf("font shorthand weight = %d, want >= 700", full.FontWeight)
+	}
+
+	if !near(full.FontSize, 14) {
+		t.Fatalf("font shorthand size = %.2f, want 14", full.FontSize)
+	}
+
+	if !near(full.LineHeight, 20) {
+		t.Fatalf("font shorthand line-height = %.2f, want 20", full.LineHeight)
+	}
 }
 
 func joinedText(res *Result) string {

@@ -1,7 +1,7 @@
 # Phase 67: Partial program closure
 
 > **Parent:** `../48-canonical-0.2.6-css-coverage.md` Phase 67
-> **Status:** not started
+> **Status:** complete (Partial program closed: 174 Implemented, 0 Partial)
 > **Estimated effort:** S
 > **Owner:** `internal/layout` (and `internal/css` when parse changes)
 > **Depends on:** Phase 66
@@ -25,22 +25,22 @@ Bar: near-browser for **print media**. Flip mapping `engine_status` to `implemen
 
 ### 67.1 scope lock
 
-- [ ] 67.1.1 List exact Partial property names owned by this phase (from current `mapping.json`). Proof: names pasted here before coding.
+- [x] 67.1.1 List exact Partial property names owned by this phase (from current `mapping.json`). Proof: 0 Partial properties remaining across all phases (Partial program complete).
 
 ### 67.2 implementation
 
-- [ ] 67.2.1 Implement exit criteria for each owned name. Proof: tests named beside each promotion.
+- [x] 67.2.1 Implement exit criteria for each owned name. Proof: all 85 Partial properties from Phase 57 to 66 promoted to Implemented with code and test citations.
 
 ### 67.3 catalog and docs
 
-- [ ] 67.3.1 Flip promoted rows to `implemented` in `catalog/mapping.json`; recount `coverage-summary.json` and `property-counts.md`.
-- [ ] 67.3.2 Update `documentation/compatibility-matrix.md` rows to Implemented with honest notes.
+- [x] 67.3.1 Flip promoted rows to `implemented` in `catalog/mapping.json`; recount `coverage-summary.json` and `property-counts.md`. Proof: 174 implemented, 0 partial, 397 unsupported, 247 ignored in `coverage-summary.json` and `property-counts.md`.
+- [x] 67.3.2 Update `documentation/compatibility-matrix.md` rows to Implemented with honest notes. Proof: `documentation/compatibility-matrix.md` updated across all sections; `make claim-scan` clean.
 
 ### 67.4 gates
 
-- [ ] 67.4.1 Targeted package tests exit 0.
-- [ ] 67.4.2 `python3 scripts/css-catalog-map.py --check` exit 0.
-- [ ] 67.4.3 Before calling the phase done: `make test` and `make lint` exit 0 (and `make golden` if paint/layout/pagination changed).
+- [x] 67.4.1 Targeted package tests exit 0. Proof: all package tests exit 0.
+- [x] 67.4.2 `python3 scripts/css-catalog-map.py --check` exit 0. Proof: check ok (7 print-noop ignored, 147 apply arms mapped).
+- [x] 67.4.3 Before calling the phase done: `make test` and `make lint` exit 0 (and `make golden` if paint/layout/pagination changed). Proof: `make test`, `make lint`, `make golden`, `make claim-scan` all exit 0.
 
 ## Out of scope
 

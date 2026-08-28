@@ -84,6 +84,19 @@ body { margin: 0 }
 	}
 }
 
+func TestRadiusPercentAxes(t *testing.T) {
+	t.Parallel()
+
+	res := layoutHTML(t, `<html><body><div class="pill">x</div></body></html>`, sheet(t, `
+body { margin: 0 }
+.pill { width: 100pt; height: 40pt; background: #f00; border-radius: 50% }
+`))
+	fill := redFillOp(t, res.Ops)
+	if !near(fill.RadiusTopLeft, 50) || !near(fill.RadiusTopLeftY, 20) {
+		t.Fatalf("percent radius X=%.3f Y=%.3f, want 50 / 20", fill.RadiusTopLeft, fill.RadiusTopLeftY)
+	}
+}
+
 func assertCornerRadiusXY(t *testing.T, radiusX, radiusY, wantX, wantY float64, label string) {
 	t.Helper()
 

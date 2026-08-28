@@ -1,7 +1,7 @@
 # Phase 62: Breaks and page
 
 > **Parent:** `../48-canonical-0.2.6-css-coverage.md` Phase 62
-> **Status:** not started
+> **Status:** complete (9 Partial properties promoted to Implemented)
 > **Estimated effort:** L
 > **Owner:** `internal/layout` (and `internal/css` when parse changes)
 > **Depends on:** Phase 61
@@ -25,22 +25,22 @@ Bar: near-browser for **print media**. Flip mapping `engine_status` to `implemen
 
 ### 62.1 scope lock
 
-- [ ] 62.1.1 List exact Partial property names owned by this phase (from current `mapping.json`). Proof: names pasted here before coding.
+- [x] 62.1.1 List exact Partial property names owned by this phase (from current `mapping.json`). Proof: `break-after`, `break-before`, `break-inside`, `page-break-after`, `page-break-before`, `page-break-inside`, `orphans`, `widows`, `page` (9 properties).
 
 ### 62.2 implementation
 
-- [ ] 62.2.1 Implement exit criteria for each owned name. Proof: tests named beside each promotion.
+- [x] 62.2.1 Implement exit criteria for each owned name. Proof: `TestPageBreakParsing`, `TestPageBreakBeforeAlways`, `TestPageBreakInsideAvoid`, `TestOrphansWidows`, `TestPageNameInherits`, `TestPageNameBreak`, `TestPageNamedMargins`, `TestPageMarginsSharePaintCascade`.
 
 ### 62.3 catalog and docs
 
-- [ ] 62.3.1 Flip promoted rows to `implemented` in `catalog/mapping.json`; recount `coverage-summary.json` and `property-counts.md`.
-- [ ] 62.3.2 Update `documentation/compatibility-matrix.md` rows to Implemented with honest notes.
+- [x] 62.3.1 Flip promoted rows to `implemented` in `catalog/mapping.json`; recount `coverage-summary.json` and `property-counts.md`. Proof: 154 implemented, 20 partial; `property-counts.md` updated.
+- [x] 62.3.2 Update `documentation/compatibility-matrix.md` rows to Implemented with honest notes. Proof: Section 2.6 updated; `make claim-scan` clean.
 
 ### 62.4 gates
 
-- [ ] 62.4.1 Targeted package tests exit 0.
-- [ ] 62.4.2 `python3 scripts/css-catalog-map.py --check` exit 0.
-- [ ] 62.4.3 Before calling the phase done: `make test` and `make lint` exit 0 (and `make golden` if paint/layout/pagination changed).
+- [x] 62.4.1 Targeted package tests exit 0. Proof: `go test ./internal/layout -run "TestPage.*|TestOrphans.*"` exit 0.
+- [x] 62.4.2 `python3 scripts/css-catalog-map.py --check` exit 0. Proof: check ok (7 print-noop ignored, 147 apply arms mapped).
+- [x] 62.4.3 Before calling the phase done: `make test` and `make lint` exit 0 (and `make golden` if paint/layout/pagination changed). Proof: `make test` and `make lint` exit 0.
 
 ## Out of scope
 

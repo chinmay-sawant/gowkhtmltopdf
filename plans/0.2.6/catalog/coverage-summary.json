@@ -12,8 +12,8 @@
     "mapped_properties": 818,
     "properties_by_engine_status": {
       "ignored": 247,
-      "implemented": 89,
-      "partial": 85,
+      "implemented": 174,
+      "partial": 0,
       "unsupported": 397
     },
     "properties_print_relevant": 571,

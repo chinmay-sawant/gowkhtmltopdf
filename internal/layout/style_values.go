@@ -56,12 +56,15 @@ func parseFontShorthand(style *ResolvedStyle, value string, remBase float64) {
 			continue
 		}
 		// first size token
-		rest, lineH := fontSizeToken(page, style.FontSize)
-		if lineH >= 0 {
-			setFontLineHeight(style, page, lineH)
-		}
+		sizePart, linePart, hasLineH := strings.Cut(page, "/")
+		style.FontSize = fontSize(sizePart, style.FontSize, remBase)
 
-		style.FontSize = fontSize(rest, style.FontSize, remBase)
+		if hasLineH {
+			lineH := lineHeight(linePart, style.FontSize)
+			if lineH >= 0 {
+				setFontLineHeight(style, page, lineH)
+			}
+		}
 
 		if idx+1 < len(parts) {
 			if fam := css.ParseFontFamily(strings.Join(parts[idx+1:], " ")); len(fam) > 0 {
@@ -86,15 +89,6 @@ func applyFontStyleKeyword(style *ResolvedStyle, page string) bool {
 	}
 
 	return true
-}
-
-// fontSizeToken splits "12px/1.4" into the size part and line-height (or -1).
-func fontSizeToken(page string, fsize float64) (string, float64) {
-	if before, after, ok := strings.Cut(page, "/"); ok {
-		return before, lineHeight(after, fsize)
-	}
-
-	return page, -1
 }
 
 // parseFlexShorthand handles flex: none | auto | <grow> | <grow> <shrink> | <grow> <shrink> <basis>.

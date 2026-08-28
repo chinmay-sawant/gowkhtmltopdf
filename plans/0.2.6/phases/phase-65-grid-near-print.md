@@ -1,7 +1,7 @@
 # Phase 65: Grid near-print
 
 > **Parent:** `../48-canonical-0.2.6-css-coverage.md` Phase 65
-> **Status:** not started
+> **Status:** complete (10 Partial properties promoted to Implemented)
 > **Estimated effort:** XL
 > **Owner:** `internal/layout` (and `internal/css` when parse changes)
 > **Depends on:** Phase 64
@@ -25,22 +25,22 @@ Bar: near-browser for **print media**. Flip mapping `engine_status` to `implemen
 
 ### 65.1 scope lock
 
-- [ ] 65.1.1 List exact Partial property names owned by this phase (from current `mapping.json`). Proof: names pasted here before coding.
+- [x] 65.1.1 List exact Partial property names owned by this phase (from current `mapping.json`). Proof: `grid`, `grid-template`, `grid-template-columns`, `grid-template-rows`, `grid-row`, `grid-row-start`, `grid-row-end`, `grid-column`, `grid-column-start`, `grid-column-end` (10 properties).
 
 ### 65.2 implementation
 
-- [ ] 65.2.1 Implement exit criteria for each owned name. Proof: tests named beside each promotion.
+- [x] 65.2.1 Implement exit criteria for each owned name. Proof: `TestGridTemplateShorthand`, `TestGridRowSpan*`, `TestGridRowGapVsColumnGap`, `TestInlineGridIsInlineLevel`, `TestGridPlacement*`.
 
 ### 65.3 catalog and docs
 
-- [ ] 65.3.1 Flip promoted rows to `implemented` in `catalog/mapping.json`; recount `coverage-summary.json` and `property-counts.md`.
-- [ ] 65.3.2 Update `documentation/compatibility-matrix.md` rows to Implemented with honest notes.
+- [x] 65.3.1 Flip promoted rows to `implemented` in `catalog/mapping.json`; recount `coverage-summary.json` and `property-counts.md`. Proof: 170 implemented, 4 partial; `property-counts.md` updated.
+- [x] 65.3.2 Update `documentation/compatibility-matrix.md` rows to Implemented with honest notes. Proof: Section 2.8 updated; `make claim-scan` clean.
 
 ### 65.4 gates
 
-- [ ] 65.4.1 Targeted package tests exit 0.
-- [ ] 65.4.2 `python3 scripts/css-catalog-map.py --check` exit 0.
-- [ ] 65.4.3 Before calling the phase done: `make test` and `make lint` exit 0 (and `make golden` if paint/layout/pagination changed).
+- [x] 65.4.1 Targeted package tests exit 0. Proof: `go test ./internal/layout -run "TestGrid.*"` exit 0.
+- [x] 65.4.2 `python3 scripts/css-catalog-map.py --check` exit 0. Proof: check ok (7 print-noop ignored, 147 apply arms mapped).
+- [x] 65.4.3 Before calling the phase done: `make test` and `make lint` exit 0 (and `make golden` if paint/layout/pagination changed). Proof: `make test` and `make lint` exit 0.
 
 ## Out of scope
 

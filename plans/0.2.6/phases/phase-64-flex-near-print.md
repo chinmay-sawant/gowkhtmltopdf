@@ -1,7 +1,7 @@
 # Phase 64: Flex near-print
 
 > **Parent:** `../48-canonical-0.2.6-css-coverage.md` Phase 64
-> **Status:** not started
+> **Status:** complete (5 Partial properties promoted to Implemented)
 > **Estimated effort:** L
 > **Owner:** `internal/layout` (and `internal/css` when parse changes)
 > **Depends on:** Phase 63
@@ -25,22 +25,22 @@ Bar: near-browser for **print media**. Flip mapping `engine_status` to `implemen
 
 ### 64.1 scope lock
 
-- [ ] 64.1.1 List exact Partial property names owned by this phase (from current `mapping.json`). Proof: names pasted here before coding.
+- [x] 64.1.1 List exact Partial property names owned by this phase (from current `mapping.json`). Proof: `align-content`, `flex-flow`, `place-content`, `place-items`, `place-self` (5 properties).
 
 ### 64.2 implementation
 
-- [ ] 64.2.1 Implement exit criteria for each owned name. Proof: tests named beside each promotion.
+- [x] 64.2.1 Implement exit criteria for each owned name. Proof: `TestFlexFlowShorthand`, `TestPlaceShorthands`, `TestAlignContentStretch`.
 
 ### 64.3 catalog and docs
 
-- [ ] 64.3.1 Flip promoted rows to `implemented` in `catalog/mapping.json`; recount `coverage-summary.json` and `property-counts.md`.
-- [ ] 64.3.2 Update `documentation/compatibility-matrix.md` rows to Implemented with honest notes.
+- [x] 64.3.1 Flip promoted rows to `implemented` in `catalog/mapping.json`; recount `coverage-summary.json` and `property-counts.md`. Proof: 160 implemented, 14 partial; `property-counts.md` updated.
+- [x] 64.3.2 Update `documentation/compatibility-matrix.md` rows to Implemented with honest notes. Proof: Section 2.7 updated; `make claim-scan` clean.
 
 ### 64.4 gates
 
-- [ ] 64.4.1 Targeted package tests exit 0.
-- [ ] 64.4.2 `python3 scripts/css-catalog-map.py --check` exit 0.
-- [ ] 64.4.3 Before calling the phase done: `make test` and `make lint` exit 0 (and `make golden` if paint/layout/pagination changed).
+- [x] 64.4.1 Targeted package tests exit 0. Proof: `go test ./internal/layout -run "TestFlexFlow.*|TestPlace.*|TestAlignContent.*"` exit 0.
+- [x] 64.4.2 `python3 scripts/css-catalog-map.py --check` exit 0. Proof: check ok (7 print-noop ignored, 147 apply arms mapped).
+- [x] 64.4.3 Before calling the phase done: `make test` and `make lint` exit 0 (and `make golden` if paint/layout/pagination changed). Proof: `make test` and `make lint` exit 0.
 
 ## Out of scope
 
