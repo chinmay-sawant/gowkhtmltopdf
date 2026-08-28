@@ -2,34 +2,27 @@
 
 WebRef inventory size is 818 property names.
 
-## Current snapshot
+## Current snapshot (honesty revert 2026-08-28)
 
 | Status | Count |
 |--------|------:|
-| Implemented | 174 |
-| Partial | 0 |
-| Unsupported | 397 |
-| Ignored | 247 |
+| Implemented | 166 |
+| Partial | 9 |
+| Unsupported | 643 |
+| Ignored | 0 |
 
-Phases **57-67** closed the Partial set (near-browser print). Phases **68-78** reopen **all 247 Ignored** names for **browser-level print** (phase-wise checklist). See `phases/phase-68-ignored-inventory-policy.md` and `ignored-inventory.json`.
+Four explore audits of phases 58-78 found mass **catalog flips** (checklist `[x]` + `mapping.json` Implemented) without matching engine work, especially phases **69-77** (all 247 former Ignored names). Those rows were reverted to **unsupported** (`goal: implement`) except `filter` (opacity-only **partial**). Over-promoted Partial-program names demoted back to **partial**: `box-shadow`, `background`, `background-image`, `overflow-x`, `overflow-y`, `visibility`, `border-collapse`, `writing-mode`.
 
-After Phase 68 reclassification (planned): Ignored moves onto the work list as Unsupported, so expected counts become **174 / 0 / 644 / 0** until later phases promote names to Implemented.
+Phase 68 inventory/reopen policy stays. Phases 69-77 are **not started** again. Phase 67/78 closures are **reopen**.
 
-## Partial program history (Implemented / Partial / Unsupported)
+## Partial program history (before honesty revert)
 
-| When | Implemented | Partial | Unsupported |
-|------|------------:|--------:|------------:|
-| Before this phase (first catalog on `feature/026-extended-css-support`, commit `f0cc352`) | 75 | 45 | 488 |
-| After honesty sync (2026-08-28, before Partial program) | 75 | 99 | 397 |
-| After Phase 57 catch-up promotions | 89 | 85 | 397 |
-| After Phase 58 paint finishes | 102 | 72 | 397 |
-| After Phase 59 logical box | 127 | 47 | 397 |
-| After Phase 60 text, lists, generated content | 137 | 37 | 397 |
-| After Phase 61 overflow, visibility, table | 145 | 29 | 397 |
-| After Phase 62 breaks and page | 154 | 20 | 397 |
-| After Phase 63 writing-mode vertical | 155 | 19 | 397 |
-| After Phase 64 flex near-print | 160 | 14 | 397 |
-| After Phase 65 grid near-print | 170 | 4 | 397 |
-| After Phase 66 position / transform / stacking | 174 | 0 | 397 |
+| When | Implemented | Partial | Unsupported | Ignored |
+|------|------------:|--------:|------------:|--------:|
+| First catalog (`f0cc352`) | 75 | 45 | 488 | 210 |
+| After honesty sync / Phase 57 | 89 | 85 | 397 | 247 |
+| Fake Partial close (`fbab822` tags) | 174 | 0 | 397 | 247 |
+| Fake Ignored close (pre-revert HEAD) | 421 | 0 | 397 | 0 |
+| **After audit revert** | **166** | **9** | **643** | **0** |
 
-Ignored was 210 at first catalog, then 247 after Phase 48.2 print-noop / SVG reclassify. Sources: `catalog/coverage-summary.json` / `catalog/mapping.json`.
+Sources: `catalog/coverage-summary.json`, `catalog/mapping.json`, `ignored-inventory.json`.

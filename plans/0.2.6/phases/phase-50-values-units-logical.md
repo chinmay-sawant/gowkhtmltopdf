@@ -63,6 +63,11 @@ Modern report CSS uses `clamp()` for type scale and `margin-inline` for horizont
 
 Package tests listed above. Matrix §3.
 
+
+## Agent guard
+
+Read `../HONESTY-GATES.md` before any mapping flip. This phase is marked complete only for the **print subset documented in the matrix**. Do not broaden to Chrome-complete or re-fake Implemented rows with empty `code_path`.
+
 ## Out of scope
 
 Color 4 `oklch` / `color-mix`. `cq*` units. Full `calc` grammar trees.

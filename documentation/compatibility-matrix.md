@@ -4,7 +4,7 @@
 > **Status:** living contract - amendments go through plan review  
 > **Target:** authored HTML templates → PDF. **Not** a browser.  
 > **Last honesty audit:** 2026-08-27 · fidelity guide: [fidelity.md](fidelity.md)  
-> **Phase 21 note:** arbitrary-website / “decent print” work does **not** expand this matrix. CSS remains a **print CSS subset** (Partial flex/grid/position; many properties Not implemented). No new Implemented rows until code + tests ship — see [fidelity.md § Arbitrary websites](fidelity.md#arbitrary-websites-phase-21).
+> **Phase 21 note:** arbitrary-website / "decent print" work does **not** expand this matrix. CSS remains a **print CSS subset** (Partial flex/grid/position; many properties Not implemented). No new Implemented rows until code + tests ship - see [fidelity.md § Arbitrary websites](fidelity.md#arbitrary-websites-phase-21).
 
 This document is the **contract** the layout engine is allowed to implement.
 Anything not listed here is *unsupported*; unsupported input must degrade
@@ -226,9 +226,9 @@ Evidence: `internal/layout/multicol.go`, `style_cascade.go` (`applyRestProps`) a
 | `column-width` (`auto` \| `<length>`) | [x] Implemented | Used count/width per Multicol §3.3; `TestUsedColumnCountWidth` |
 | `columns` shorthand | [x] Implemented | `parseColumnsShorthand` |
 | `column-gap` (`normal` \| `<length>`) | [x] Implemented | Multicol: `normal` → 1em; flex/grid still treat unset/normal as 0 gap |
-| `column-span` (`none` \| `all`) | [x] Implemented | Mid-flow spanner; preceding columns balance — fixture-39 / `TestMulticolColumnSpanAll` |
-| `column-fill` (`balance` \| `auto`) | [x] Implemented | Balance packs to equal stacks; auto fills to page/definite height |
-| Column box pagination | [x] Implemented | Column boxes do not cross page boundaries; new multicol line on next page — `TestMulticolLinesDoNotStraddlePages` |
+| `column-span` (`none` \| `all`) | [x] Implemented | Mid-flow spanner; preceding columns balance - fixture-39 / `TestMulticolColumnSpanAll` |
+| Nested multicol (2 levels) | [x] Implemented | Outer / inner geometry isolated - `TestMulticolNestedTwoLevels` |
+| Column box pagination | [x] Implemented | Column boxes do not cross page boundaries; new multicol line on next page - `TestMulticolLinesDoNotStraddlePages` |
 | `break-*: column \| avoid-column` | [~] Partial | `column` on before/after aliases to page `always` (`applyBreakBeforeProps` `style_properties.go:1486`). `avoid-column` is **ignored** (not page `avoid`). See §2.6 alias table. |
 | `column-rule` / `column-rule-width` / `column-rule-style` / `column-rule-color` | [x] Implemented | Border-style subset (`solid` / `dashed` / `dotted` / `none`); width `thin` / `medium` / `thick` plus lengths; color `currentColor`. Vertical rule centered in `column-gap`; gap 0 or `none` paints nothing. No column-axis (horizontal) rule. `TestColumnRuleParse`, `TestColumnRulePaints` |
 | L2 integer spans, overflow columns | [ ] Missing | Deferred (see `plans/0.2.0/phases/tier-2-pending-3/multicol.md` out of scope) |
@@ -419,7 +419,7 @@ They fail parse with `unknown option` (`TestStubFlagsRemoved`,
 | `--custom-header-propagation`, `--no-custom-header-propagation` | Both | **Rejected** (`unknown option`) |
 | `--timeout` | Both | Supported (HTTP response timeout) |
 | `--external-links`, `--no-external-links` | PDF | **Supported** (`--no-external-links` honored via `stripLinkURIs`; default on) |
-| `--internal-links`, `--no-internal-links` | PDF | Partial (body `#` fragment GoTo via layout `OpLinkURI` + `applyInternalLinks`; HTML HF `#id` → body `AddLinkDest`. Geometry caveats — runs without paint boxes still skipped) |
+| `--internal-links`, `--no-internal-links` | PDF | Partial (body `#` fragment GoTo via layout `OpLinkURI` + `applyInternalLinks`; HTML HF `#id` → body `AddLinkDest`. Geometry caveats - runs without paint boxes still skipped) |
 | `--resolve-relative-links`, `--keep-relative-links` | PDF | Supported (`resolveRelativeLinkURIs`; relative `href` resolution vs keep-as-written) |
 | `--font-path` | Both | Supported (extra font search directories for registry discovery) |
 | `--use-system-fonts` | Both | Supported (opt-in system font dirs; default off for determinism) |

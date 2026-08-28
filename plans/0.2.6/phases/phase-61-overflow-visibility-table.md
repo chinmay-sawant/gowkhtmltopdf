@@ -1,51 +1,56 @@
 # Phase 61: Overflow, visibility, table
 
 > **Parent:** `../48-canonical-0.2.6-css-coverage.md` Phase 61
-> **Status:** complete (8 Partial properties promoted to Implemented)
+> **Status:** reopen (demote overflow-x/y, visibility, border-collapse still Partial)
 > **Estimated effort:** L
-> **Owner:** `internal/layout` (and `internal/css` when parse changes)
+> **Owner:** `internal/layout`
 > **Depends on:** Phase 60
-> **Unblocks:** Phase 62
+> **Unblocks:** honest table/overflow Implemented claims
+> **Honesty:** `../HONESTY-GATES.md`
 
 ---
 
 ## Overview
 
-overflow-x/y, visibility:collapse on rows, border-collapse, table-layout fixed, caption-side, vertical-align.
+`overflow` (single field), `table-layout`, `caption-side`, `vertical-align` can stay Implemented under their current claims. Reopen work is only:
 
-Bar: near-browser for **print media**. Flip mapping `engine_status` to `implemented` only with code + tests + matrix agreement. Goldens stay structural.
+- `overflow-x`, `overflow-y` (independent axes)
+- `visibility: collapse` on table rows
+- `border-collapse` conflict resolution beyond shared-grid lite
 
-## Goals
+## Work order (code)
 
-- Close the Phase 61 Partial names listed in the parent plan inventory for this slice
-- Keep `python3 scripts/css-catalog-map.py --check` green after mapping edits
-- Do not grow `paint_flow.go` / `paint_pagination.go`; extract if touched
+### overflow-x / overflow-y
+
+1. Today both write one `ResolvedStyle.Overflow` (`setOverflowKeyword` in `internal/layout/style_properties.go`).
+2. Split into distinct fields on `ResolvedStyle` in `internal/layout/style.go` (or an axis pair), update apply arms, and teach `overflow_clip.go` / sticky scrollport selection to honor axes.
+3. Tests must show different `overflow-x` vs `overflow-y` behavior (new tests in `overflow_*_test.go` or `css_apply_test.go`).
+
+### visibility: collapse
+
+1. Today `hidesPaint` treats `collapse` like hidden (`internal/layout/inline.go`).
+2. Implement table-row / row-group collapse in `internal/layout/layout_tables.go` (or table emit path): row contributes no height; cells not painted; geometry of later rows shifts.
+3. Test: table with `tr { visibility: collapse }` reduces used table height vs `hidden`.
+
+### border-collapse
+
+1. Today: spacing suppressed + `emitCollapsedRowGrid` / first-visible border pick.
+2. Implement adjacent border conflict resolution (width/style/color precedence) in the collapsed emitter path under `internal/layout/` table paint files.
+3. Test: two adjacent cells with different border widths; winner matches CSS2.1 collapsed border rules for the cases you claim.
 
 ## Checklist
 
-### 61.1 scope lock
+- [ ] 61.R.1 Implement overflow axes **or** keep Partial with notes that they alias one field.
+- [ ] 61.R.2 Implement row collapse **or** keep Partial (paint-skip only) with notes.
+- [ ] 61.R.3 Implement border conflict resolution **or** keep Partial with notes.
+- [ ] 61.R.4 Flip packet + matrix + mapping recount for any Implemented promotions.
+- [ ] 61.R.5 `go test ./internal/layout -run "TestOverflow|TestVisibility|TestBorderCollapse|TestTable|TestCaption"`; catalog `--check`; `make test` / `make lint`.
 
-- [x] 61.1.1 List exact Partial property names owned by this phase (from current `mapping.json`). Proof: `overflow`, `overflow-x`, `overflow-y`, `visibility`, `border-collapse`, `table-layout`, `caption-side`, `vertical-align` (8 properties).
+## Forbidden proofs
 
-### 61.2 implementation
-
-- [x] 61.2.1 Implement exit criteria for each owned name. Proof: `TestOverflowClip`, `TestStickyOverflow*`, `TestVisibilityHidden`, `TestBorderSpacing`, `TestTableLayout`, `TestTableLayoutFixedIgnoresContentMax`, `TestCaptionSideBottom`, `TestCaptionSideLeft`, `TestCaptionSideRight`, `TestTableCellVerticalAlignMiddle`.
-
-### 61.3 catalog and docs
-
-- [x] 61.3.1 Flip promoted rows to `implemented` in `catalog/mapping.json`; recount `coverage-summary.json` and `property-counts.md`. Proof: 145 implemented, 29 partial; `property-counts.md` updated.
-- [x] 61.3.2 Update `documentation/compatibility-matrix.md` rows to Implemented with honest notes. Proof: Sections 2.1, 2.3, 2.5 updated; `make claim-scan` clean.
-
-### 61.4 gates
-
-- [x] 61.4.1 Targeted package tests exit 0. Proof: `go test ./internal/layout -run "TestTable.*|TestCaption.*|TestOverflow.*|TestVisibility.*"` exit 0.
-- [x] 61.4.2 `python3 scripts/css-catalog-map.py --check` exit 0. Proof: check ok (7 print-noop ignored, 147 apply arms mapped).
-- [x] 61.4.3 Before calling the phase done: `make test` and `make lint` exit 0 (and `make golden` if paint/layout/pagination changed). Proof: `make test` and `make lint` exit 0.
-
-## Out of scope
-
-Animation, 3D, filter blur, speech, pointer UI, new direct modules, Chrome pixel goldens.
+- Claiming Independent axes while both keywords write one string field
+- `TestVisibilityHidden` checking only non-table paint skip for `collapse`
 
 ## Handoff
 
-Next is Phase 62.
+Phase 63 (`writing-mode`) is the next Partial honesty hole.

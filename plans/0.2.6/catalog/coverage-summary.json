@@ -5,19 +5,18 @@
     "all_properties": "https://www.w3.org/Style/CSS/all-properties.en.json",
     "mdn_units": "mdn/data css/units.json",
     "mdn_properties": "mdn/data css/properties.json (overlay for mdn_url/groups)",
-    "engine": "internal/layout + css; Phase 57 Partial->Implemented catch-up 2026-08-28"
+    "engine": "honesty revert after audit of phases 58-78 fake Implemented flips"
   },
   "counts": {
     "webref_properties": 818,
     "mapped_properties": 818,
     "properties_by_engine_status": {
-      "ignored": 247,
-      "implemented": 174,
-      "partial": 0,
-      "unsupported": 397
+      "unsupported": 643,
+      "implemented": 166,
+      "partial": 9
     },
-    "properties_print_relevant": 571,
-    "properties_goal_implement": 571,
+    "properties_print_relevant": 818,
+    "properties_goal_implement": 818,
     "atrules": 55,
     "atrules_by_engine_status": {
       "ignored": 10,
@@ -46,17 +45,9 @@
     }
   },
   "policy": {
-    "product": "print-oriented HTML to PDF, not a browser",
+    "product": "print-oriented HTML to PDF moving toward browser-level print; catalog must not claim Implemented without code",
     "no_javascript": true,
     "no_chrome_print_parity": true,
-    "permanent_ignore": [
-      "animation",
-      "transition",
-      "3d-transforms",
-      "filter-blur",
-      "scroll-snap",
-      "anchor-positioning",
-      "speech"
-    ]
+    "permanent_ignore": []
   }
 }

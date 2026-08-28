@@ -72,6 +72,11 @@ Image resolve used by `<img>`. Rounded fill already in `layout_chrome.go`.
 
 Golden with CSS background. Outline unit test. Sticky overflow tests still pass.
 
+
+## Agent guard
+
+Read `../HONESTY-GATES.md` before any mapping flip. This phase is marked complete only for the **print subset documented in the matrix**. Do not broaden to Chrome-complete or re-fake Implemented rows with empty `code_path`.
+
 ## Out of scope
 
 Gradients as a closer for this phase. Multiple background layers. Filter blur. `clip-path`. Mix-blend.

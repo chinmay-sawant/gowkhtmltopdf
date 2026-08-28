@@ -62,6 +62,11 @@ Phase 48 catalog. Existing `:has()` / `:not()` parse paths to copy (`css.go:1048
 - convert import test
 - golden if any fixture added
 
+
+## Agent guard
+
+Read `../HONESTY-GATES.md` before any mapping flip. This phase is marked complete only for the **print subset documented in the matrix**. Do not broaden to Chrome-complete or re-fake Implemented rows with empty `code_path`.
+
 ## Out of scope
 
 Forgiving selector lists. Shadow DOM. `@layer` ordering. Full `@supports`. `@charset` / `@namespace`.

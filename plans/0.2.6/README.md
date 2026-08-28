@@ -10,6 +10,7 @@
 | [phases/phase-57-partial-to-implemented-catchup.md](phases/phase-57-partial-to-implemented-catchup.md) | Phase 57-67: Partial to Implemented (closed) |
 | [phases/phase-68-ignored-inventory-policy.md](phases/phase-68-ignored-inventory-policy.md) | Phase 68-78: Ignored to browser-level print |
 | [AGENTS.md](AGENTS.md) | Agent rules for this ledger |
+| [HONESTY-GATES.md](HONESTY-GATES.md) | Anti catalog-only close rules + flip packet |
 | [review/](review) | Post-ship architecture + ponytail ledger for commit `48e06dbc` |
 | [agy-review/](agy-review) | Go Design Patterns and Go Code Style review ledgers |
 

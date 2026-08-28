@@ -1,49 +1,38 @@
 # Phase 76: Pointer and form UI
 
 > **Parent:** `../48-canonical-0.2.6-css-coverage.md` Phase 76
-> **Status:** not started
+> **Status:** not started (7 names unsupported)
 > **Estimated effort:** M
-> **Owner:** `internal/layout` / `internal/css` / catalog
+> **Owner:** `internal/layout` / catalog policy
 > **Depends on:** Phase 75
 > **Unblocks:** Phase 77
+> **Honesty:** `../HONESTY-GATES.md`
 
 ---
 
-## Overview
+## Owned names (7)
 
-cursor, caret-color, resize, user-select, pointer-events, touch-action, appearance. PDF has no pointer; define print/UA fallbacks or paint-time equivalents.
+`appearance`, `caret-color`, `cursor`, `pointer-events`, `resize`, `touch-action`, `user-select`
 
-Bar: **browser-level print** for the former Ignored set (247 names). Goldens stay structural unless amended. Flip mapping only with code + tests + matrix agreement.
+## Work order (code)
 
-**Count:** 7
+PDF has no mouse. Options (pick explicitly in this file before coding):
 
-## Goals
+**A. Permanent print ignore:** set `goal: ignore`, `engine_status: ignored`, restore `PRINT_NOOP` enforcement in `scripts/css-catalog-map.py --check`, update matrix.
 
-- Clear every owned name from the work list into Implemented, or mark `[~]` with an explicit reason
-- Keep catalog counts honest after each promotion batch
+**B. Print fallbacks:** e.g. `cursor` stored but no-op with test that it parses into style; still usually stays ignored for Implemented bar. Implemented requires a visible/behavioral consumer (rare for these).
+
+Do not mark Implemented without a consumer. Parsing alone is unsupported or ignored, not Implemented.
 
 ## Checklist
 
-### 76.1 scope lock
+- [x] 76.1.1 Ownership list locked.
+- [ ] 76.2.1 Choose A or B in writing here.
+- [ ] 76.2.2 Code + script/matrix updates matching that choice.
+- [ ] 76.2.3 No Implemented flips unless a real consumer exists.
+- [ ] 76.3.1 `--check`; gates.
 
-- [ ] 76.1.1 Own these 7 properties (from Phase 68 inventory): `appearance`, `caret-color`, `cursor`, `pointer-events`, `resize`, `touch-action`, `user-select`. Proof: names still `unsupported` (or listed) in `mapping.json` at phase start.
+## Forbidden proofs
 
-### 76.2 implementation
-
-- [ ] 76.2.1 Implement browser-level print behavior for each owned name (or alias to an existing Implemented longhand). Proof: tests cited per promotion.
-- [ ] 76.2.2 Flip each finished name to `engine_status: implemented` with matrix notes. Proof: mapping + matrix.
-
-### 76.3 gates
-
-- [ ] 76.3.1 Targeted package tests exit 0.
-- [ ] 76.3.2 `python3 scripts/css-catalog-map.py --check` exit 0.
-- [ ] 76.3.3 `make test` and `make lint` exit 0 before phase complete; `make golden` if paint/layout/pagination changed.
-
-
-## Out of scope
-
-JavaScript execution. Pixel-diff Chrome goldens as the default gate. New direct Go modules without sign-off. Growing `paint_flow.go` / `paint_pagination.go` past the soft cap without extracting.
-
-## Handoff
-
-Next is Phase 77.
+- Layout variable named `cursor` / link hit-testing comments as CSS `cursor` support
+- Invented test names

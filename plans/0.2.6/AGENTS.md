@@ -5,25 +5,29 @@ Scope: this directory. Root `AGENTS.md` still applies. This file only adds rules
 ## This plan
 
 - Canonical ledger: `48-canonical-0.2.6-css-coverage.md`
-- Phases: `phases/phase-48-*.md` through `phase-56-*.md`. Do not restart at 01. Sidecar tracks used 01-08 numbering.
-- Product: print-oriented structured documents. Not Chrome visual parity. No JavaScript. No CGO on the default path.
+- Phases: `phases/phase-48-*.md` through `phase-78-*.md`
+- Honesty gates: `HONESTY-GATES.md` (read before any mapping flip)
+- Inventory: `catalog/mapping.json`, `ignored-inventory.json`, `property-counts.md`
+- Product: print-oriented structured documents moving toward browser-level print. No JavaScript. No CGO on the default path.
 
-Read `48-canonical-0.2.6-css-coverage.md` and `catalog/README.md` before editing CSS.
+Read `48-canonical-0.2.6-css-coverage.md`, `HONESTY-GATES.md`, and `catalog/README.md` before editing CSS.
 
 ## Git
 
 No `git add`, `commit`, `push`, `restore`, `clean`, `reset`, or `stash` unless the user asks. Branch names: lowercase `feature/`, `fix/`, `chore/`, or `docs/<short>`.
 
-## Checklists
+## Checklists (anti-fake-close)
 
-- `[x]` only after the named proof command exits 0 in the same change. Never from intent.
+- `[x]` only after the named proof command exits 0 **and** the flip packet in `HONESTY-GATES.md` is filled for every property claimed Implemented.
+- Never mark a phase `Status: complete` by only editing markdown + `mapping.json`.
+- Never cite rejection/ignore tests as Implemented proof.
 - `[~]` needs a reason, an owner, a next gate, and a pointer if work moved.
 - Do not keep the same active row in `plans/0.2.0/` and here. Move leftovers with `[~]` plus a pointer to this ledger.
 
 ## Source of truth for CSS
 
 1. Code in `internal/css` and `internal/layout` is what the engine does.
-2. `catalog/mapping.json` is the inventory of names. Engine status in that file must match code.
+2. `catalog/mapping.json` is the inventory of names. Engine status must match code.
 3. `documentation/compatibility-matrix.md` is the committed contract. It follows code, then the mapping.
 4. Knowledge-base follows those three. If they disagree, trust code, fix mapping and matrix, then KB.
 
@@ -38,19 +42,22 @@ Usual landing order. Skip a step only if it already exists.
 1. Parser: only if you need a new unit, function, at-rule, or selector. Unknown property *names* already parse (`internal/css/values.go` `validPropName`).
 2. `ResolvedStyle` field plus `initialStyle` and intern table (`internal/layout/style.go`).
 3. Inheritance row in `inheritableProps` if CSS inherits it (`internal/layout/style_cascade.go`).
-4. Apply arm in the right `apply*Group` (`internal/layout/style_properties.go`). Shorthands that must lose to longhands go in `restShorthandProps`.
+4. Apply arm in the right `apply*Group` (`internal/layout/style_properties.go` / `style_paint_props.go`). Shorthands that must lose to longhands go in `restShorthandProps`.
 5. A layout or paint consumer. A field nobody reads is still unsupported.
 6. Package test, then golden fixture if paint or pagination changes, then matrix row, then `mapping.json` `engine_status`.
 
+Open phases under `phases/phase-58+` include a **Work order** section with concrete files. Follow that section; do not invent a catalog-only shortcut.
+
 ## Claims
 
-No browser-parity, Qt WebKit, stdlib-only, full CSS, or byte-identical PDF claims. `make claim-scan` is the claims gate. Wikipedia and Chrome PDFs are canaries, not pass/fail.
+No browser-parity, Qt WebKit, stdlib-only, full CSS, or byte-identical PDF claims unless the user amends the ledger and the code matches. `make claim-scan` is the claims gate. Wikipedia and Chrome PDFs are canaries, not pass/fail.
 
 ## Gates
 
 - Targeted package tests while working: `go test ./internal/css` and `go test ./internal/layout`.
 - Before marking a non-doc phase complete: `make lint` and `make test`. Record both outcomes on the phase file.
 - After layout, paint, pagination, or CSS consume changes: `make golden`. New fixtures need a `fixturePageBounds` entry in `internal/convert/golden_test.go`.
+- After any mapping edit: `python3 scripts/css-catalog-map.py --check` and update `property-counts.md` + `coverage-summary.json`.
 - Direct modules stay `go-text/typesetting` and `tdewolff/canvas` unless the user signs off an amendment.
 
 ## Prose

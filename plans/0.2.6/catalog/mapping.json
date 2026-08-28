@@ -4,20 +4,19 @@
     "all_properties": "https://www.w3.org/Style/CSS/all-properties.en.json",
     "mdn_units": "mdn/data css/units.json",
     "mdn_properties": "mdn/data css/properties.json (overlay for mdn_url/groups)",
-    "engine": "internal/layout + css; Phase 57 Partial->Implemented catch-up 2026-08-28",
+    "engine": "honesty revert after audit of phases 58-78 fake Implemented flips",
     "generated": "2026-08-28"
   },
   "summary": {
     "webref_properties": 818,
     "mapped_properties": 818,
     "properties_by_engine_status": {
-      "ignored": 247,
-      "implemented": 174,
-      "partial": 0,
-      "unsupported": 397
+      "unsupported": 643,
+      "implemented": 166,
+      "partial": 9
     },
-    "properties_print_relevant": 571,
-    "properties_goal_implement": 571,
+    "properties_print_relevant": 818,
+    "properties_goal_implement": 818,
     "atrules": 55,
     "atrules_by_engine_status": {
       "ignored": 10,
@@ -46,18 +45,10 @@
     }
   },
   "policy": {
-    "product": "print-oriented HTML to PDF, not a browser",
+    "product": "print-oriented HTML to PDF moving toward browser-level print; catalog must not claim Implemented without code",
     "no_javascript": true,
     "no_chrome_print_parity": true,
-    "permanent_ignore": [
-      "animation",
-      "transition",
-      "3d-transforms",
-      "filter-blur",
-      "scroll-snap",
-      "anchor-positioning",
-      "speech"
-    ]
+    "permanent_ignore": []
   },
   "properties": [
     {
@@ -72,14 +63,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-align-content",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-align-items",
@@ -93,14 +84,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-align-items",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-align-self",
@@ -114,14 +105,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-align-self",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-animation",
@@ -145,14 +136,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-animation",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-animation-delay",
@@ -166,14 +157,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-animation-delay",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-animation-direction",
@@ -187,14 +178,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-animation-direction",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-animation-duration",
@@ -208,14 +199,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-animation-duration",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-animation-fill-mode",
@@ -229,14 +220,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-animation-fill-mode",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-animation-iteration-count",
@@ -250,14 +241,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-animation-iteration-count",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-animation-name",
@@ -271,14 +262,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-animation-name",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-animation-play-state",
@@ -292,14 +283,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-animation-play-state",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-animation-timing-function",
@@ -313,14 +304,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-animation-timing-function",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-appearance",
@@ -334,16 +325,16 @@
       "spec": "css-ui-4",
       "spec_href": "https://drafts.csswg.org/css-ui-4/#propdef--webkit-appearance",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/appearance",
       "mdn_status": "nonstandard",
       "groups": [
         "WebKit Extensions"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-backface-visibility",
@@ -357,14 +348,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-backface-visibility",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-background-clip",
@@ -378,14 +369,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-background-clip",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-background-origin",
@@ -399,14 +390,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-background-origin",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-background-size",
@@ -420,14 +411,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-background-size",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-border-bottom-left-radius",
@@ -441,14 +432,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-border-bottom-left-radius",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-border-bottom-right-radius",
@@ -462,14 +453,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-border-bottom-right-radius",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-border-radius",
@@ -488,14 +479,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-border-radius",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-border-top-left-radius",
@@ -509,14 +500,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-border-top-left-radius",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-border-top-right-radius",
@@ -530,14 +521,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-border-top-right-radius",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-box-align",
@@ -551,14 +542,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-box-align",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-box-flex",
@@ -572,14 +563,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-box-flex",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-box-ordinal-group",
@@ -593,14 +584,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-box-ordinal-group",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-box-orient",
@@ -614,14 +605,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-box-orient",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-box-pack",
@@ -635,14 +626,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-box-pack",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-box-shadow",
@@ -662,14 +653,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-box-shadow",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-box-sizing",
@@ -683,14 +674,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-box-sizing",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-filter",
@@ -704,14 +695,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-filter",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-flex",
@@ -729,14 +720,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-flex-propdef",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-flex-basis",
@@ -750,14 +741,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-flex-basis",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-flex-direction",
@@ -771,14 +762,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-flex-direction",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-flex-flow",
@@ -795,14 +786,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-flex-flow",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-flex-grow",
@@ -816,14 +807,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-flex-grow",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-flex-shrink",
@@ -837,14 +828,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-flex-shrink",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-flex-wrap",
@@ -858,14 +849,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-flex-wrap",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-justify-content",
@@ -879,14 +870,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-justify-content",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-line-clamp",
@@ -904,17 +895,17 @@
       "spec": "css-overflow-4",
       "spec_href": "https://drafts.csswg.org/css-overflow-4/#propdef--webkit-line-clamp",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/-webkit-line-clamp",
       "mdn_status": "standard",
       "groups": [
         "WebKit Extensions",
         "CSS Overflow"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-mask",
@@ -937,16 +928,16 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-mask",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/mask",
       "mdn_status": "nonstandard",
       "groups": [
         "WebKit Extensions"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-mask-box-image",
@@ -967,14 +958,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-mask-box-image",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-mask-box-image-outset",
@@ -988,14 +979,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-mask-box-image-outset",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-mask-box-image-repeat",
@@ -1009,14 +1000,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-mask-box-image-repeat",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-mask-box-image-slice",
@@ -1030,14 +1021,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-mask-box-image-slice",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-mask-box-image-source",
@@ -1051,14 +1042,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-mask-box-image-source",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-mask-box-image-width",
@@ -1072,14 +1063,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-mask-box-image-width",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-mask-clip",
@@ -1093,16 +1084,16 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-mask-clip",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/mask-clip",
       "mdn_status": "nonstandard",
       "groups": [
         "WebKit Extensions"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-mask-composite",
@@ -1116,16 +1107,16 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-mask-composite",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/-webkit-mask-composite",
       "mdn_status": "nonstandard",
       "groups": [
         "WebKit Extensions"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-mask-image",
@@ -1139,16 +1130,16 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-mask-image",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/mask-image",
       "mdn_status": "nonstandard",
       "groups": [
         "WebKit Extensions"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-mask-origin",
@@ -1162,16 +1153,16 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-mask-origin",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/mask-origin",
       "mdn_status": "nonstandard",
       "groups": [
         "WebKit Extensions"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-mask-position",
@@ -1185,16 +1176,16 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-mask-position",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/mask-position",
       "mdn_status": "nonstandard",
       "groups": [
         "WebKit Extensions"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-mask-repeat",
@@ -1208,16 +1199,16 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-mask-repeat",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/mask-repeat",
       "mdn_status": "nonstandard",
       "groups": [
         "WebKit Extensions"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-mask-size",
@@ -1231,16 +1222,16 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-mask-size",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/mask-size",
       "mdn_status": "nonstandard",
       "groups": [
         "WebKit Extensions"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-order",
@@ -1254,14 +1245,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-order",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-perspective",
@@ -1275,14 +1266,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-perspective",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-perspective-origin",
@@ -1296,14 +1287,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-perspective-origin",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-text-fill-color",
@@ -1317,16 +1308,16 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-text-fill-color",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/-webkit-text-fill-color",
       "mdn_status": "standard",
       "groups": [
         "WebKit Extensions"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-text-size-adjust",
@@ -1340,14 +1331,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-text-size-adjust",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-text-stroke",
@@ -1364,16 +1355,16 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-text-stroke",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/-webkit-text-stroke",
       "mdn_status": "standard",
       "groups": [
         "WebKit Extensions"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-text-stroke-color",
@@ -1387,16 +1378,16 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-text-stroke-color",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/-webkit-text-stroke-color",
       "mdn_status": "standard",
       "groups": [
         "WebKit Extensions"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-text-stroke-width",
@@ -1410,16 +1401,16 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-text-stroke-width",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/-webkit-text-stroke-width",
       "mdn_status": "standard",
       "groups": [
         "WebKit Extensions"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-transform",
@@ -1433,14 +1424,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-transform",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-transform-origin",
@@ -1454,14 +1445,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-transform-origin",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-transform-style",
@@ -1475,14 +1466,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-transform-style",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-transition",
@@ -1502,14 +1493,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-transition",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-transition-delay",
@@ -1523,14 +1514,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-transition-delay",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-transition-duration",
@@ -1544,14 +1535,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-transition-duration",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-transition-property",
@@ -1565,14 +1556,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-transition-property",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-transition-timing-function",
@@ -1586,14 +1577,14 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef--webkit-transition-timing-function",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "-webkit-user-select",
@@ -1607,16 +1598,16 @@
       "spec": "css-ui-4",
       "spec_href": "https://drafts.csswg.org/css-ui-4/#propdef--webkit-user-select",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/user-select",
       "mdn_status": "nonstandard",
       "groups": [
         "WebKit Extensions"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "accent-color",
@@ -1771,16 +1762,16 @@
       "spec": "css-anchor-position-1",
       "spec_href": "https://drafts.csswg.org/css-anchor-position-1/#propdef-anchor-name",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/anchor-name",
       "mdn_status": "experimental",
       "groups": [
         "CSS Anchor Positioning"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "anchor-scope",
@@ -1794,16 +1785,16 @@
       "spec": "css-anchor-position-1",
       "spec_href": "https://drafts.csswg.org/css-anchor-position-1/#propdef-anchor-scope",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/anchor-scope",
       "mdn_status": "experimental",
       "groups": [
         "CSS Anchor Positioning"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "animation",
@@ -1827,16 +1818,16 @@
       "spec": "css-animations-1",
       "spec_href": "https://drafts.csswg.org/css-animations-1/#propdef-animation",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/animation",
       "mdn_status": "standard",
       "groups": [
         "CSS Animations"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "animation-composition",
@@ -1850,16 +1841,16 @@
       "spec": "css-animations-2",
       "spec_href": "https://drafts.csswg.org/css-animations-2/#propdef-animation-composition",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/animation-composition",
       "mdn_status": "standard",
       "groups": [
         "CSS Animations"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "animation-delay",
@@ -1876,16 +1867,16 @@
       "spec": "css-animations-2",
       "spec_href": "https://drafts.csswg.org/css-animations-2/#propdef-animation-delay",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/animation-delay",
       "mdn_status": "standard",
       "groups": [
         "CSS Animations"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "animation-delay-end",
@@ -1899,14 +1890,14 @@
       "spec": "css-animations-2",
       "spec_href": "https://drafts.csswg.org/css-animations-2/#propdef-animation-delay-end",
       "spec_status": "ED",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/animation-delay-end",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "animation-delay-start",
@@ -1920,14 +1911,14 @@
       "spec": "css-animations-2",
       "spec_href": "https://drafts.csswg.org/css-animations-2/#propdef-animation-delay-start",
       "spec_status": "ED",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/animation-delay-start",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "animation-direction",
@@ -1941,16 +1932,16 @@
       "spec": "css-animations-1",
       "spec_href": "https://drafts.csswg.org/css-animations-1/#propdef-animation-direction",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/animation-direction",
       "mdn_status": "standard",
       "groups": [
         "CSS Animations"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "animation-duration",
@@ -1964,16 +1955,16 @@
       "spec": "css-animations-2",
       "spec_href": "https://drafts.csswg.org/css-animations-2/#propdef-animation-duration",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/animation-duration",
       "mdn_status": "standard",
       "groups": [
         "CSS Animations"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "animation-fill-mode",
@@ -1987,16 +1978,16 @@
       "spec": "css-animations-1",
       "spec_href": "https://drafts.csswg.org/css-animations-1/#propdef-animation-fill-mode",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/animation-fill-mode",
       "mdn_status": "standard",
       "groups": [
         "CSS Animations"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "animation-iteration-count",
@@ -2010,16 +2001,16 @@
       "spec": "css-animations-1",
       "spec_href": "https://drafts.csswg.org/css-animations-1/#propdef-animation-iteration-count",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/animation-iteration-count",
       "mdn_status": "standard",
       "groups": [
         "CSS Animations"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "animation-name",
@@ -2033,16 +2024,16 @@
       "spec": "css-animations-1",
       "spec_href": "https://drafts.csswg.org/css-animations-1/#propdef-animation-name",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/animation-name",
       "mdn_status": "standard",
       "groups": [
         "CSS Animations"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "animation-play-state",
@@ -2056,16 +2047,16 @@
       "spec": "css-animations-1",
       "spec_href": "https://drafts.csswg.org/css-animations-1/#propdef-animation-play-state",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/animation-play-state",
       "mdn_status": "standard",
       "groups": [
         "CSS Animations"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "animation-range",
@@ -2082,16 +2073,16 @@
       "spec": "scroll-animations-1",
       "spec_href": "https://drafts.csswg.org/scroll-animations-1/#propdef-animation-range",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/animation-range",
       "mdn_status": "experimental",
       "groups": [
         "Scroll-driven Animations"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "animation-range-center",
@@ -2105,14 +2096,14 @@
       "spec": "pointer-animations-1",
       "spec_href": "https://drafts.csswg.org/pointer-animations-1/#propdef-animation-range-center",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/animation-range-center",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "animation-range-end",
@@ -2126,16 +2117,16 @@
       "spec": "scroll-animations-1",
       "spec_href": "https://drafts.csswg.org/scroll-animations-1/#propdef-animation-range-end",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/animation-range-end",
       "mdn_status": "experimental",
       "groups": [
         "Scroll-driven Animations"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "animation-range-start",
@@ -2149,16 +2140,16 @@
       "spec": "scroll-animations-1",
       "spec_href": "https://drafts.csswg.org/scroll-animations-1/#propdef-animation-range-start",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/animation-range-start",
       "mdn_status": "experimental",
       "groups": [
         "Scroll-driven Animations"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "animation-timeline",
@@ -2172,16 +2163,16 @@
       "spec": "css-animations-2",
       "spec_href": "https://drafts.csswg.org/css-animations-2/#propdef-animation-timeline",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/animation-timeline",
       "mdn_status": "experimental",
       "groups": [
         "CSS Animations"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "animation-timing-function",
@@ -2195,16 +2186,16 @@
       "spec": "css-animations-1",
       "spec_href": "https://drafts.csswg.org/css-animations-1/#propdef-animation-timing-function",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/animation-timing-function",
       "mdn_status": "standard",
       "groups": [
         "CSS Animations"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "animation-trigger",
@@ -2218,16 +2209,16 @@
       "spec": "animation-triggers-1",
       "spec_href": "https://drafts.csswg.org/animation-triggers-1/#propdef-animation-trigger",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/animation-trigger",
       "mdn_status": "standard",
       "groups": [
         "CSS Animations"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "appearance",
@@ -2241,16 +2232,16 @@
       "spec": "css-ui-4",
       "spec_href": "https://drafts.csswg.org/css-ui-4/#propdef-appearance",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/appearance",
       "mdn_status": "standard",
       "groups": [
         "CSS Basic User Interface"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "aspect-ratio",
@@ -2287,16 +2278,16 @@
       "spec": "filter-effects-2",
       "spec_href": "https://drafts.csswg.org/filter-effects-2/#propdef-backdrop-filter",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/backdrop-filter",
       "mdn_status": "standard",
       "groups": [
         "Filter Effects"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "backface-visibility",
@@ -2310,16 +2301,16 @@
       "spec": "css-transforms-2",
       "spec_href": "https://drafts.csswg.org/css-transforms-2/#propdef-backface-visibility",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/backface-visibility",
       "mdn_status": "standard",
       "groups": [
         "CSS Transforms"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "background",
@@ -2349,9 +2340,9 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "implemented",
+      "engine_status": "partial",
       "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "notes": "Honesty: color + first url only; gradients ignored."
     },
     {
       "property": "background-attachment",
@@ -2464,9 +2455,9 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "implemented",
+      "engine_status": "partial",
       "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "notes": "Honesty: first url layer, no-repeat, box-sized; gradients ignored."
     },
     {
       "property": "background-origin",
@@ -3709,9 +3700,9 @@
       "groups": [
         "CSS Table"
       ],
-      "engine_status": "implemented",
+      "engine_status": "partial",
       "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "notes": "Honesty: shared grid emitter + spacing 0; not full border conflict resolution."
     },
     {
       "property": "border-color",
@@ -5079,9 +5070,9 @@
       "groups": [
         "CSS Backgrounds and Borders"
       ],
-      "engine_status": "implemented",
+      "engine_status": "partial",
       "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "notes": "Honesty: first un-inset layer; inset ignored; blur approximated. Demoted from fake Implemented."
     },
     {
       "property": "box-shadow-blur",
@@ -5386,16 +5377,16 @@
       "spec": "css-ui-4",
       "spec_href": "https://drafts.csswg.org/css-ui-4/#propdef-caret-color",
       "spec_status": "REC",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/caret-color",
       "mdn_status": "standard",
       "groups": [
         "CSS Basic User Interface"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "caret-shape",
@@ -5455,16 +5446,16 @@
       "spec": "css-masking-1",
       "spec_href": "https://drafts.csswg.org/css-masking-1/#propdef-clip",
       "spec_status": "REC",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/clip",
       "mdn_status": "obsolete",
       "groups": [
         "CSS Masking"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "clip-path",
@@ -5478,16 +5469,16 @@
       "spec": "css-masking-1",
       "spec_href": "https://drafts.csswg.org/css-masking-1/#propdef-clip-path",
       "spec_status": "CRD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/clip-path",
       "mdn_status": "standard",
       "groups": [
         "CSS Masking"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "clip-rule",
@@ -5501,16 +5492,16 @@
       "spec": "css-masking-1",
       "spec_href": "https://drafts.csswg.org/css-masking-1/#propdef-clip-rule",
       "spec_status": "CRD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/clip-rule",
       "mdn_status": "standard",
       "groups": [
         "CSS Masking"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "color",
@@ -5591,16 +5582,16 @@
       "spec": "filter-effects-1",
       "spec_href": "https://drafts.csswg.org/filter-effects-1/#propdef-color-interpolation-filters",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/color-interpolation-filters",
       "mdn_status": "standard",
       "groups": [
         "Filter Effects"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "color-scheme",
@@ -7374,14 +7365,14 @@
       "spec": "css-speech-1",
       "spec_href": "https://drafts.csswg.org/css-speech-1/#propdef-cue",
       "spec_status": "REC",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/cue",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "cue-after",
@@ -7395,14 +7386,14 @@
       "spec": "css-speech-1",
       "spec_href": "https://drafts.csswg.org/css-speech-1/#propdef-cue-after",
       "spec_status": "REC",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/cue-after",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "cue-before",
@@ -7416,14 +7407,14 @@
       "spec": "css-speech-1",
       "spec_href": "https://drafts.csswg.org/css-speech-1/#propdef-cue-before",
       "spec_status": "REC",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/cue-before",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "cursor",
@@ -7437,16 +7428,16 @@
       "spec": "css-ui-4",
       "spec_href": "https://drafts.csswg.org/css-ui-4/#propdef-cursor",
       "spec_status": "REC",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/cursor",
       "mdn_status": "standard",
       "groups": [
         "CSS Basic User Interface"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "cx",
@@ -7731,16 +7722,16 @@
       "spec": "svg2-draft",
       "spec_href": "https://w3c.github.io/svgwg/svg2-draft/painting.html#FillProperty",
       "spec_status": "FPWD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/fill",
       "mdn_status": "standard",
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "fill-break",
@@ -7754,14 +7745,14 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-fill-break",
       "spec_status": "FPWD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/fill-break",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "fill-color",
@@ -7775,14 +7766,14 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-fill-color",
       "spec_status": "FPWD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/fill-color",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "fill-image",
@@ -7796,14 +7787,14 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-fill-image",
       "spec_status": "FPWD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/fill-image",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "fill-opacity",
@@ -7817,16 +7808,16 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-fill-opacity",
       "spec_status": "FPWD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/fill-opacity",
       "mdn_status": "standard",
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "fill-origin",
@@ -7840,14 +7831,14 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-fill-origin",
       "spec_status": "FPWD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/fill-origin",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "fill-position",
@@ -7861,14 +7852,14 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-fill-position",
       "spec_status": "FPWD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/fill-position",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "fill-repeat",
@@ -7882,14 +7873,14 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-fill-repeat",
       "spec_status": "FPWD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/fill-repeat",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "fill-rule",
@@ -7903,16 +7894,16 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-fill-rule",
       "spec_status": "FPWD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/fill-rule",
       "mdn_status": "standard",
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "fill-size",
@@ -7926,14 +7917,14 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-fill-size",
       "spec_status": "FPWD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/fill-size",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "filter",
@@ -7947,16 +7938,16 @@
       "spec": "filter-effects-1",
       "spec_href": "https://drafts.csswg.org/filter-effects-1/#propdef-filter",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/filter",
       "mdn_status": "standard",
       "groups": [
         "Filter Effects"
       ],
-      "engine_status": "ignored",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_properties.go; internal/layout/transform.go",
+      "notes": "Apply arm only folds opacity(); blur etc. out of print bar until Phase 71 delivers."
     },
     {
       "property": "flex",
@@ -8247,16 +8238,16 @@
       "spec": "filter-effects-1",
       "spec_href": "https://drafts.csswg.org/filter-effects-1/#propdef-flood-color",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/flood-color",
       "mdn_status": "standard",
       "groups": [
         "Filter Effects"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "flood-opacity",
@@ -8270,16 +8261,16 @@
       "spec": "filter-effects-1",
       "spec_href": "https://drafts.csswg.org/filter-effects-1/#propdef-flood-opacity",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/flood-opacity",
       "mdn_status": "standard",
       "groups": [
         "Filter Effects"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "flow-from",
@@ -10408,16 +10399,16 @@
       "spec": "filter-effects-1",
       "spec_href": "https://drafts.csswg.org/filter-effects-1/#propdef-lighting-color",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/lighting-color",
       "mdn_status": "standard",
       "groups": [
         "Filter Effects"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "line-break",
@@ -11168,16 +11159,16 @@
       "spec": "css-masking-1",
       "spec_href": "https://drafts.csswg.org/css-masking-1/#propdef-mask",
       "spec_status": "CRD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/mask",
       "mdn_status": "standard",
       "groups": [
         "CSS Masking"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "mask-border",
@@ -11198,16 +11189,16 @@
       "spec": "css-masking-1",
       "spec_href": "https://drafts.csswg.org/css-masking-1/#propdef-mask-border",
       "spec_status": "CRD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/mask-border",
       "mdn_status": "standard",
       "groups": [
         "CSS Masking"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "mask-border-mode",
@@ -11221,16 +11212,16 @@
       "spec": "css-masking-1",
       "spec_href": "https://drafts.csswg.org/css-masking-1/#propdef-mask-border-mode",
       "spec_status": "CRD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/mask-border-mode",
       "mdn_status": "standard",
       "groups": [
         "CSS Masking"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "mask-border-outset",
@@ -11244,16 +11235,16 @@
       "spec": "css-masking-1",
       "spec_href": "https://drafts.csswg.org/css-masking-1/#propdef-mask-border-outset",
       "spec_status": "CRD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/mask-border-outset",
       "mdn_status": "standard",
       "groups": [
         "CSS Masking"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "mask-border-repeat",
@@ -11267,16 +11258,16 @@
       "spec": "css-masking-1",
       "spec_href": "https://drafts.csswg.org/css-masking-1/#propdef-mask-border-repeat",
       "spec_status": "CRD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/mask-border-repeat",
       "mdn_status": "standard",
       "groups": [
         "CSS Masking"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "mask-border-slice",
@@ -11290,16 +11281,16 @@
       "spec": "css-masking-1",
       "spec_href": "https://drafts.csswg.org/css-masking-1/#propdef-mask-border-slice",
       "spec_status": "CRD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/mask-border-slice",
       "mdn_status": "standard",
       "groups": [
         "CSS Masking"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "mask-border-source",
@@ -11313,16 +11304,16 @@
       "spec": "css-masking-1",
       "spec_href": "https://drafts.csswg.org/css-masking-1/#propdef-mask-border-source",
       "spec_status": "CRD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/mask-border-source",
       "mdn_status": "standard",
       "groups": [
         "CSS Masking"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "mask-border-width",
@@ -11336,16 +11327,16 @@
       "spec": "css-masking-1",
       "spec_href": "https://drafts.csswg.org/css-masking-1/#propdef-mask-border-width",
       "spec_status": "CRD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/mask-border-width",
       "mdn_status": "standard",
       "groups": [
         "CSS Masking"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "mask-clip",
@@ -11359,16 +11350,16 @@
       "spec": "css-masking-1",
       "spec_href": "https://drafts.csswg.org/css-masking-1/#propdef-mask-clip",
       "spec_status": "CRD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/mask-clip",
       "mdn_status": "standard",
       "groups": [
         "CSS Masking"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "mask-composite",
@@ -11382,16 +11373,16 @@
       "spec": "css-masking-1",
       "spec_href": "https://drafts.csswg.org/css-masking-1/#propdef-mask-composite",
       "spec_status": "CRD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/mask-composite",
       "mdn_status": "standard",
       "groups": [
         "CSS Masking"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "mask-image",
@@ -11405,16 +11396,16 @@
       "spec": "css-masking-1",
       "spec_href": "https://drafts.csswg.org/css-masking-1/#propdef-mask-image",
       "spec_status": "CRD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/mask-image",
       "mdn_status": "standard",
       "groups": [
         "CSS Masking"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "mask-mode",
@@ -11428,16 +11419,16 @@
       "spec": "css-masking-1",
       "spec_href": "https://drafts.csswg.org/css-masking-1/#propdef-mask-mode",
       "spec_status": "CRD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/mask-mode",
       "mdn_status": "standard",
       "groups": [
         "CSS Masking"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "mask-origin",
@@ -11451,16 +11442,16 @@
       "spec": "css-masking-1",
       "spec_href": "https://drafts.csswg.org/css-masking-1/#propdef-mask-origin",
       "spec_status": "CRD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/mask-origin",
       "mdn_status": "standard",
       "groups": [
         "CSS Masking"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "mask-position",
@@ -11474,16 +11465,16 @@
       "spec": "css-masking-1",
       "spec_href": "https://drafts.csswg.org/css-masking-1/#propdef-mask-position",
       "spec_status": "CRD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/mask-position",
       "mdn_status": "standard",
       "groups": [
         "CSS Masking"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "mask-repeat",
@@ -11497,16 +11488,16 @@
       "spec": "css-masking-1",
       "spec_href": "https://drafts.csswg.org/css-masking-1/#propdef-mask-repeat",
       "spec_status": "CRD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/mask-repeat",
       "mdn_status": "standard",
       "groups": [
         "CSS Masking"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "mask-size",
@@ -11520,16 +11511,16 @@
       "spec": "css-masking-1",
       "spec_href": "https://drafts.csswg.org/css-masking-1/#propdef-mask-size",
       "spec_status": "CRD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/mask-size",
       "mdn_status": "standard",
       "groups": [
         "CSS Masking"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "mask-type",
@@ -11543,16 +11534,16 @@
       "spec": "css-masking-1",
       "spec_href": "https://drafts.csswg.org/css-masking-1/#propdef-mask-type",
       "spec_status": "CRD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/mask-type",
       "mdn_status": "standard",
       "groups": [
         "CSS Masking"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "math-depth",
@@ -12045,16 +12036,16 @@
       "spec": "motion-1",
       "spec_href": "https://drafts.csswg.org/motion-1/#propdef-offset",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/offset",
       "mdn_status": "standard",
       "groups": [
         "Motion Path"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "offset-anchor",
@@ -12068,16 +12059,16 @@
       "spec": "motion-1",
       "spec_href": "https://drafts.csswg.org/motion-1/#propdef-offset-anchor",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/offset-anchor",
       "mdn_status": "standard",
       "groups": [
         "Motion Path"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "offset-distance",
@@ -12091,16 +12082,16 @@
       "spec": "motion-1",
       "spec_href": "https://drafts.csswg.org/motion-1/#propdef-offset-distance",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/offset-distance",
       "mdn_status": "standard",
       "groups": [
         "Motion Path"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "offset-path",
@@ -12114,16 +12105,16 @@
       "spec": "motion-1",
       "spec_href": "https://drafts.csswg.org/motion-1/#propdef-offset-path",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/offset-path",
       "mdn_status": "standard",
       "groups": [
         "Motion Path"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "offset-position",
@@ -12137,16 +12128,16 @@
       "spec": "motion-1",
       "spec_href": "https://drafts.csswg.org/motion-1/#propdef-offset-position",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/offset-position",
       "mdn_status": "standard",
       "groups": [
         "Motion Path"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "offset-rotate",
@@ -12160,16 +12151,16 @@
       "spec": "motion-1",
       "spec_href": "https://drafts.csswg.org/motion-1/#propdef-offset-rotate",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/offset-rotate",
       "mdn_status": "standard",
       "groups": [
         "Motion Path"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "opacity",
@@ -12397,16 +12388,16 @@
       "spec": "css-scroll-anchoring-1",
       "spec_href": "https://drafts.csswg.org/css-scroll-anchoring-1/#propdef-overflow-anchor",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/overflow-anchor",
       "mdn_status": "standard",
       "groups": [
         "CSS Scroll Anchoring"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "overflow-block",
@@ -12740,9 +12731,9 @@
       "groups": [
         "CSS Overflow"
       ],
-      "engine_status": "implemented",
+      "engine_status": "partial",
       "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "notes": "Honesty: aliases single Overflow field; not independent axis."
     },
     {
       "property": "overflow-y",
@@ -12763,9 +12754,9 @@
       "groups": [
         "CSS Overflow"
       ],
-      "engine_status": "implemented",
+      "engine_status": "partial",
       "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "notes": "Honesty: aliases single Overflow field; not independent axis."
     },
     {
       "property": "overlay",
@@ -12805,16 +12796,16 @@
       "spec": "css-overscroll-1",
       "spec_href": "https://drafts.csswg.org/css-overscroll-1/#propdef-overscroll-behavior",
       "spec_status": "FPWD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/overscroll-behavior",
       "mdn_status": "standard",
       "groups": [
         "CSS Overscroll Behavior"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "overscroll-behavior-block",
@@ -12828,16 +12819,16 @@
       "spec": "css-overscroll-1",
       "spec_href": "https://drafts.csswg.org/css-overscroll-1/#propdef-overscroll-behavior-block",
       "spec_status": "FPWD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/overscroll-behavior-block",
       "mdn_status": "standard",
       "groups": [
         "CSS Overscroll Behavior"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "overscroll-behavior-inline",
@@ -12851,16 +12842,16 @@
       "spec": "css-overscroll-1",
       "spec_href": "https://drafts.csswg.org/css-overscroll-1/#propdef-overscroll-behavior-inline",
       "spec_status": "FPWD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/overscroll-behavior-inline",
       "mdn_status": "standard",
       "groups": [
         "CSS Overscroll Behavior"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "overscroll-behavior-x",
@@ -12874,16 +12865,16 @@
       "spec": "css-overscroll-1",
       "spec_href": "https://drafts.csswg.org/css-overscroll-1/#propdef-overscroll-behavior-x",
       "spec_status": "FPWD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/overscroll-behavior-x",
       "mdn_status": "standard",
       "groups": [
         "CSS Overscroll Behavior"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "overscroll-behavior-y",
@@ -12897,16 +12888,16 @@
       "spec": "css-overscroll-1",
       "spec_href": "https://drafts.csswg.org/css-overscroll-1/#propdef-overscroll-behavior-y",
       "spec_status": "FPWD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/overscroll-behavior-y",
       "mdn_status": "standard",
       "groups": [
         "CSS Overscroll Behavior"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "padding",
@@ -13325,14 +13316,14 @@
       "spec": "css-speech-1",
       "spec_href": "https://drafts.csswg.org/css-speech-1/#propdef-pause",
       "spec_status": "REC",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/pause",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "pause-after",
@@ -13346,14 +13337,14 @@
       "spec": "css-speech-1",
       "spec_href": "https://drafts.csswg.org/css-speech-1/#propdef-pause-after",
       "spec_status": "REC",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/pause-after",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "pause-before",
@@ -13367,14 +13358,14 @@
       "spec": "css-speech-1",
       "spec_href": "https://drafts.csswg.org/css-speech-1/#propdef-pause-before",
       "spec_status": "REC",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/pause-before",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "perspective",
@@ -13388,16 +13379,16 @@
       "spec": "css-transforms-2",
       "spec_href": "https://drafts.csswg.org/css-transforms-2/#propdef-perspective",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/perspective",
       "mdn_status": "standard",
       "groups": [
         "CSS Transforms"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "perspective-origin",
@@ -13411,16 +13402,16 @@
       "spec": "css-transforms-2",
       "spec_href": "https://drafts.csswg.org/css-transforms-2/#propdef-perspective-origin",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/perspective-origin",
       "mdn_status": "standard",
       "groups": [
         "CSS Transforms"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "place-content",
@@ -13512,16 +13503,16 @@
       "spec": "svg2-draft",
       "spec_href": "https://w3c.github.io/svgwg/svg2-draft/interact.html#PointerEventsProperty",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/pointer-events",
       "mdn_status": "standard",
       "groups": [
         "CSS Basic User Interface"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "pointer-timeline",
@@ -13624,16 +13615,16 @@
       "spec": "css-anchor-position-1",
       "spec_href": "https://drafts.csswg.org/css-anchor-position-1/#propdef-position-anchor",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/position-anchor",
       "mdn_status": "experimental",
       "groups": [
         "CSS Anchor Positioning"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "position-area",
@@ -13647,16 +13638,16 @@
       "spec": "css-anchor-position-1",
       "spec_href": "https://drafts.csswg.org/css-anchor-position-1/#propdef-position-area",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/position-area",
       "mdn_status": "experimental",
       "groups": [
         "CSS Anchor Positioning"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "position-try",
@@ -13673,16 +13664,16 @@
       "spec": "css-anchor-position-1",
       "spec_href": "https://drafts.csswg.org/css-anchor-position-1/#propdef-position-try",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/position-try",
       "mdn_status": "experimental",
       "groups": [
         "CSS Anchor Positioning"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "position-try-fallbacks",
@@ -13696,16 +13687,16 @@
       "spec": "css-anchor-position-1",
       "spec_href": "https://drafts.csswg.org/css-anchor-position-1/#propdef-position-try-fallbacks",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/position-try-fallbacks",
       "mdn_status": "experimental",
       "groups": [
         "CSS Anchor Positioning"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "position-try-order",
@@ -13719,16 +13710,16 @@
       "spec": "css-anchor-position-1",
       "spec_href": "https://drafts.csswg.org/css-anchor-position-1/#propdef-position-try-order",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/position-try-order",
       "mdn_status": "experimental",
       "groups": [
         "CSS Anchor Positioning"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "position-visibility",
@@ -13742,16 +13733,16 @@
       "spec": "css-anchor-position-1",
       "spec_href": "https://drafts.csswg.org/css-anchor-position-1/#propdef-position-visibility",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/position-visibility",
       "mdn_status": "experimental",
       "groups": [
         "CSS Anchor Positioning"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "print-color-adjust",
@@ -13901,16 +13892,16 @@
       "spec": "css-ui-4",
       "spec_href": "https://drafts.csswg.org/css-ui-4/#propdef-resize",
       "spec_status": "REC",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/resize",
       "mdn_status": "standard",
       "groups": [
         "CSS Basic User Interface"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "rest",
@@ -13927,14 +13918,14 @@
       "spec": "css-speech-1",
       "spec_href": "https://drafts.csswg.org/css-speech-1/#propdef-rest",
       "spec_status": "CRD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/rest",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "rest-after",
@@ -13948,14 +13939,14 @@
       "spec": "css-speech-1",
       "spec_href": "https://drafts.csswg.org/css-speech-1/#propdef-rest-after",
       "spec_status": "CRD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/rest-after",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "rest-before",
@@ -13969,14 +13960,14 @@
       "spec": "css-speech-1",
       "spec_href": "https://drafts.csswg.org/css-speech-1/#propdef-rest-before",
       "spec_status": "CRD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/rest-before",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "right",
@@ -14839,14 +14830,14 @@
       "spec": "css-overflow-5",
       "spec_href": "https://drafts.csswg.org/css-overflow-5/#propdef-scroll-axis-lock",
       "spec_status": "ED",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/scroll-axis-lock",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "scroll-behavior",
@@ -14860,16 +14851,16 @@
       "spec": "css-overflow-3",
       "spec_href": "https://drafts.csswg.org/css-overflow-3/#propdef-scroll-behavior",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/scroll-behavior",
       "mdn_status": "standard",
       "groups": [
         "CSS Overflow"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "scroll-initial-target",
@@ -14883,16 +14874,16 @@
       "spec": "css-scroll-snap-2",
       "spec_href": "https://drafts.csswg.org/css-scroll-snap-2/#propdef-scroll-initial-target",
       "spec_status": "ED",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/scroll-initial-target",
       "mdn_status": "experimental",
       "groups": [
         "CSS Scroll Snap"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "scroll-margin",
@@ -14911,16 +14902,16 @@
       "spec": "css-scroll-snap-1",
       "spec_href": "https://drafts.csswg.org/css-scroll-snap-1/#propdef-scroll-margin",
       "spec_status": "CR",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/scroll-margin",
       "mdn_status": "standard",
       "groups": [
         "CSS Scroll Snap"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "scroll-margin-block",
@@ -14937,16 +14928,16 @@
       "spec": "css-scroll-snap-1",
       "spec_href": "https://drafts.csswg.org/css-scroll-snap-1/#propdef-scroll-margin-block",
       "spec_status": "CR",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/scroll-margin-block",
       "mdn_status": "standard",
       "groups": [
         "CSS Scroll Snap"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "scroll-margin-block-end",
@@ -14960,16 +14951,16 @@
       "spec": "css-scroll-snap-1",
       "spec_href": "https://drafts.csswg.org/css-scroll-snap-1/#propdef-scroll-margin-block-end",
       "spec_status": "CR",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/scroll-margin-block-end",
       "mdn_status": "standard",
       "groups": [
         "CSS Scroll Snap"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "scroll-margin-block-start",
@@ -14983,16 +14974,16 @@
       "spec": "css-scroll-snap-1",
       "spec_href": "https://drafts.csswg.org/css-scroll-snap-1/#propdef-scroll-margin-block-start",
       "spec_status": "CR",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/scroll-margin-block-start",
       "mdn_status": "standard",
       "groups": [
         "CSS Scroll Snap"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "scroll-margin-bottom",
@@ -15006,16 +14997,16 @@
       "spec": "css-scroll-snap-1",
       "spec_href": "https://drafts.csswg.org/css-scroll-snap-1/#propdef-scroll-margin-bottom",
       "spec_status": "CR",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/scroll-margin-bottom",
       "mdn_status": "standard",
       "groups": [
         "CSS Scroll Snap"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "scroll-margin-inline",
@@ -15032,16 +15023,16 @@
       "spec": "css-scroll-snap-1",
       "spec_href": "https://drafts.csswg.org/css-scroll-snap-1/#propdef-scroll-margin-inline",
       "spec_status": "CR",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/scroll-margin-inline",
       "mdn_status": "standard",
       "groups": [
         "CSS Scroll Snap"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "scroll-margin-inline-end",
@@ -15055,16 +15046,16 @@
       "spec": "css-scroll-snap-1",
       "spec_href": "https://drafts.csswg.org/css-scroll-snap-1/#propdef-scroll-margin-inline-end",
       "spec_status": "CR",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/scroll-margin-inline-end",
       "mdn_status": "standard",
       "groups": [
         "CSS Scroll Snap"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "scroll-margin-inline-start",
@@ -15078,16 +15069,16 @@
       "spec": "css-scroll-snap-1",
       "spec_href": "https://drafts.csswg.org/css-scroll-snap-1/#propdef-scroll-margin-inline-start",
       "spec_status": "CR",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/scroll-margin-inline-start",
       "mdn_status": "standard",
       "groups": [
         "CSS Scroll Snap"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "scroll-margin-left",
@@ -15101,16 +15092,16 @@
       "spec": "css-scroll-snap-1",
       "spec_href": "https://drafts.csswg.org/css-scroll-snap-1/#propdef-scroll-margin-left",
       "spec_status": "CR",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/scroll-margin-left",
       "mdn_status": "standard",
       "groups": [
         "CSS Scroll Snap"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "scroll-margin-right",
@@ -15124,16 +15115,16 @@
       "spec": "css-scroll-snap-1",
       "spec_href": "https://drafts.csswg.org/css-scroll-snap-1/#propdef-scroll-margin-right",
       "spec_status": "CR",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/scroll-margin-right",
       "mdn_status": "standard",
       "groups": [
         "CSS Scroll Snap"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "scroll-margin-top",
@@ -15147,16 +15138,16 @@
       "spec": "css-scroll-snap-1",
       "spec_href": "https://drafts.csswg.org/css-scroll-snap-1/#propdef-scroll-margin-top",
       "spec_status": "CR",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/scroll-margin-top",
       "mdn_status": "standard",
       "groups": [
         "CSS Scroll Snap"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "scroll-marker-group",
@@ -15170,16 +15161,16 @@
       "spec": "css-overflow-5",
       "spec_href": "https://drafts.csswg.org/css-overflow-5/#propdef-scroll-marker-group",
       "spec_status": "FPWD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/scroll-marker-group",
       "mdn_status": "standard",
       "groups": [
         "CSS Overflow"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "scroll-padding",
@@ -15198,16 +15189,16 @@
       "spec": "css-scroll-snap-1",
       "spec_href": "https://drafts.csswg.org/css-scroll-snap-1/#propdef-scroll-padding",
       "spec_status": "CR",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/scroll-padding",
       "mdn_status": "standard",
       "groups": [
         "CSS Scroll Snap"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "scroll-padding-block",
@@ -15224,16 +15215,16 @@
       "spec": "css-scroll-snap-1",
       "spec_href": "https://drafts.csswg.org/css-scroll-snap-1/#propdef-scroll-padding-block",
       "spec_status": "CR",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/scroll-padding-block",
       "mdn_status": "standard",
       "groups": [
         "CSS Scroll Snap"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "scroll-padding-block-end",
@@ -15247,16 +15238,16 @@
       "spec": "css-scroll-snap-1",
       "spec_href": "https://drafts.csswg.org/css-scroll-snap-1/#propdef-scroll-padding-block-end",
       "spec_status": "CR",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/scroll-padding-block-end",
       "mdn_status": "standard",
       "groups": [
         "CSS Scroll Snap"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "scroll-padding-block-start",
@@ -15270,16 +15261,16 @@
       "spec": "css-scroll-snap-1",
       "spec_href": "https://drafts.csswg.org/css-scroll-snap-1/#propdef-scroll-padding-block-start",
       "spec_status": "CR",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/scroll-padding-block-start",
       "mdn_status": "standard",
       "groups": [
         "CSS Scroll Snap"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "scroll-padding-bottom",
@@ -15293,16 +15284,16 @@
       "spec": "css-scroll-snap-1",
       "spec_href": "https://drafts.csswg.org/css-scroll-snap-1/#propdef-scroll-padding-bottom",
       "spec_status": "CR",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/scroll-padding-bottom",
       "mdn_status": "standard",
       "groups": [
         "CSS Scroll Snap"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "scroll-padding-inline",
@@ -15319,16 +15310,16 @@
       "spec": "css-scroll-snap-1",
       "spec_href": "https://drafts.csswg.org/css-scroll-snap-1/#propdef-scroll-padding-inline",
       "spec_status": "CR",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/scroll-padding-inline",
       "mdn_status": "standard",
       "groups": [
         "CSS Scroll Snap"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "scroll-padding-inline-end",
@@ -15342,16 +15333,16 @@
       "spec": "css-scroll-snap-1",
       "spec_href": "https://drafts.csswg.org/css-scroll-snap-1/#propdef-scroll-padding-inline-end",
       "spec_status": "CR",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/scroll-padding-inline-end",
       "mdn_status": "standard",
       "groups": [
         "CSS Scroll Snap"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "scroll-padding-inline-start",
@@ -15365,16 +15356,16 @@
       "spec": "css-scroll-snap-1",
       "spec_href": "https://drafts.csswg.org/css-scroll-snap-1/#propdef-scroll-padding-inline-start",
       "spec_status": "CR",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/scroll-padding-inline-start",
       "mdn_status": "standard",
       "groups": [
         "CSS Scroll Snap"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "scroll-padding-left",
@@ -15388,16 +15379,16 @@
       "spec": "css-scroll-snap-1",
       "spec_href": "https://drafts.csswg.org/css-scroll-snap-1/#propdef-scroll-padding-left",
       "spec_status": "CR",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/scroll-padding-left",
       "mdn_status": "standard",
       "groups": [
         "CSS Scroll Snap"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "scroll-padding-right",
@@ -15411,16 +15402,16 @@
       "spec": "css-scroll-snap-1",
       "spec_href": "https://drafts.csswg.org/css-scroll-snap-1/#propdef-scroll-padding-right",
       "spec_status": "CR",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/scroll-padding-right",
       "mdn_status": "standard",
       "groups": [
         "CSS Scroll Snap"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "scroll-padding-top",
@@ -15434,16 +15425,16 @@
       "spec": "css-scroll-snap-1",
       "spec_href": "https://drafts.csswg.org/css-scroll-snap-1/#propdef-scroll-padding-top",
       "spec_status": "CR",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/scroll-padding-top",
       "mdn_status": "standard",
       "groups": [
         "CSS Scroll Snap"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "scroll-snap-align",
@@ -15457,16 +15448,16 @@
       "spec": "css-scroll-snap-1",
       "spec_href": "https://drafts.csswg.org/css-scroll-snap-1/#propdef-scroll-snap-align",
       "spec_status": "CR",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/scroll-snap-align",
       "mdn_status": "standard",
       "groups": [
         "CSS Scroll Snap"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "scroll-snap-stop",
@@ -15480,16 +15471,16 @@
       "spec": "css-scroll-snap-1",
       "spec_href": "https://drafts.csswg.org/css-scroll-snap-1/#propdef-scroll-snap-stop",
       "spec_status": "CR",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/scroll-snap-stop",
       "mdn_status": "standard",
       "groups": [
         "CSS Scroll Snap"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "scroll-snap-type",
@@ -15503,16 +15494,16 @@
       "spec": "css-scroll-snap-1",
       "spec_href": "https://drafts.csswg.org/css-scroll-snap-1/#propdef-scroll-snap-type",
       "spec_status": "CR",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/scroll-snap-type",
       "mdn_status": "standard",
       "groups": [
         "CSS Scroll Snap"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "scroll-target-group",
@@ -15526,16 +15517,16 @@
       "spec": "css-overflow-5",
       "spec_href": "https://drafts.csswg.org/css-overflow-5/#propdef-scroll-target-group",
       "spec_status": "ED",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/scroll-target-group",
       "mdn_status": "standard",
       "groups": [
         "CSS Overflow"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "scroll-timeline",
@@ -15552,16 +15543,16 @@
       "spec": "scroll-animations-1",
       "spec_href": "https://drafts.csswg.org/scroll-animations-1/#propdef-scroll-timeline",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/scroll-timeline",
       "mdn_status": "experimental",
       "groups": [
         "Scroll-driven Animations"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "scroll-timeline-axis",
@@ -15575,16 +15566,16 @@
       "spec": "scroll-animations-1",
       "spec_href": "https://drafts.csswg.org/scroll-animations-1/#propdef-scroll-timeline-axis",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/scroll-timeline-axis",
       "mdn_status": "experimental",
       "groups": [
         "Scroll-driven Animations"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "scroll-timeline-name",
@@ -15598,16 +15589,16 @@
       "spec": "scroll-animations-1",
       "spec_href": "https://drafts.csswg.org/scroll-animations-1/#propdef-scroll-timeline-name",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/scroll-timeline-name",
       "mdn_status": "experimental",
       "groups": [
         "Scroll-driven Animations"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "scrollbar-color",
@@ -15621,16 +15612,16 @@
       "spec": "css-scrollbars-1",
       "spec_href": "https://drafts.csswg.org/css-scrollbars-1/#propdef-scrollbar-color",
       "spec_status": "CR",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/scrollbar-color",
       "mdn_status": "standard",
       "groups": [
         "CSS Scrollbars Styling"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "scrollbar-gutter",
@@ -15644,16 +15635,16 @@
       "spec": "css-overflow-3",
       "spec_href": "https://drafts.csswg.org/css-overflow-3/#propdef-scrollbar-gutter",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/scrollbar-gutter",
       "mdn_status": "standard",
       "groups": [
         "CSS Overflow"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "scrollbar-width",
@@ -15667,16 +15658,16 @@
       "spec": "css-scrollbars-1",
       "spec_href": "https://drafts.csswg.org/css-scrollbars-1/#propdef-scrollbar-width",
       "spec_status": "CR",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/scrollbar-width",
       "mdn_status": "standard",
       "groups": [
         "CSS Scrollbars Styling"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "shape-image-threshold",
@@ -15908,14 +15899,14 @@
       "spec": "css-speech-1",
       "spec_href": "https://drafts.csswg.org/css-speech-1/#propdef-speak",
       "spec_status": "REC",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/speak",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "speak-as",
@@ -15929,16 +15920,16 @@
       "spec": "css-speech-1",
       "spec_href": "https://drafts.csswg.org/css-speech-1/#propdef-speak-as",
       "spec_status": "CRD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/speak-as",
       "mdn_status": "experimental",
       "groups": [
         "CSS Speech"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "stop-color",
@@ -16019,16 +16010,16 @@
       "spec": "svg2-draft",
       "spec_href": "https://w3c.github.io/svgwg/svg2-draft/painting.html#StrokeProperty",
       "spec_status": "FPWD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke",
       "mdn_status": "standard",
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "stroke-align",
@@ -16042,14 +16033,14 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-stroke-align",
       "spec_status": "FPWD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke-align",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "stroke-alignment",
@@ -16063,14 +16054,14 @@
       "spec": "strokes",
       "spec_href": "https://svgwg.org/specs/strokes/#StrokeAlignmentProperty",
       "spec_status": "FPWD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke-alignment",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "stroke-break",
@@ -16084,14 +16075,14 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-stroke-break",
       "spec_status": "FPWD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke-break",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "stroke-color",
@@ -16105,16 +16096,16 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-stroke-color",
       "spec_status": "FPWD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke-color",
       "mdn_status": "experimental",
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "stroke-dash-corner",
@@ -16128,14 +16119,14 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-stroke-dash-corner",
       "spec_status": "FPWD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke-dash-corner",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "stroke-dash-justify",
@@ -16149,14 +16140,14 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-stroke-dash-justify",
       "spec_status": "FPWD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke-dash-justify",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "stroke-dashadjust",
@@ -16170,14 +16161,14 @@
       "spec": "strokes",
       "spec_href": "https://svgwg.org/specs/strokes/#StrokeDashadjustProperty",
       "spec_status": "FPWD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke-dashadjust",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "stroke-dasharray",
@@ -16191,16 +16182,16 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-stroke-dasharray",
       "spec_status": "FPWD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke-dasharray",
       "mdn_status": "standard",
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "stroke-dashcorner",
@@ -16214,14 +16205,14 @@
       "spec": "strokes",
       "spec_href": "https://svgwg.org/specs/strokes/#StrokeDashcornerProperty",
       "spec_status": "FPWD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke-dashcorner",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "stroke-dashoffset",
@@ -16235,16 +16226,16 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-stroke-dashoffset",
       "spec_status": "FPWD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke-dashoffset",
       "mdn_status": "standard",
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "stroke-image",
@@ -16258,14 +16249,14 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-stroke-image",
       "spec_status": "FPWD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke-image",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "stroke-linecap",
@@ -16279,16 +16270,16 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-stroke-linecap",
       "spec_status": "FPWD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke-linecap",
       "mdn_status": "standard",
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "stroke-linejoin",
@@ -16302,16 +16293,16 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-stroke-linejoin",
       "spec_status": "FPWD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke-linejoin",
       "mdn_status": "standard",
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "stroke-miterlimit",
@@ -16325,16 +16316,16 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-stroke-miterlimit",
       "spec_status": "FPWD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke-miterlimit",
       "mdn_status": "standard",
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "stroke-opacity",
@@ -16348,16 +16339,16 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-stroke-opacity",
       "spec_status": "FPWD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke-opacity",
       "mdn_status": "standard",
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "stroke-origin",
@@ -16371,14 +16362,14 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-stroke-origin",
       "spec_status": "FPWD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke-origin",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "stroke-position",
@@ -16392,14 +16383,14 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-stroke-position",
       "spec_status": "FPWD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke-position",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "stroke-repeat",
@@ -16413,14 +16404,14 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-stroke-repeat",
       "spec_status": "FPWD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke-repeat",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "stroke-size",
@@ -16434,14 +16425,14 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-stroke-size",
       "spec_status": "FPWD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke-size",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "stroke-width",
@@ -16455,16 +16446,16 @@
       "spec": "fill-stroke-3",
       "spec_href": "https://drafts.csswg.org/fill-stroke-3/#propdef-stroke-width",
       "spec_status": "FPWD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/stroke-width",
       "mdn_status": "standard",
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "tab-size",
@@ -17499,16 +17490,16 @@
       "spec": "scroll-animations-1",
       "spec_href": "https://drafts.csswg.org/scroll-animations-1/#propdef-timeline-scope",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/timeline-scope",
       "mdn_status": "experimental",
       "groups": [
         "Scroll-driven Animations"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "timeline-trigger",
@@ -17764,16 +17755,16 @@
       "spec": "compat.spec.whatwg.org",
       "spec_href": "https://compat.spec.whatwg.org/#propdef-touch-action",
       "spec_status": null,
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/touch-action",
       "mdn_status": "standard",
       "groups": [
         "Pointer Events"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "transform",
@@ -17856,16 +17847,16 @@
       "spec": "css-transforms-2",
       "spec_href": "https://drafts.csswg.org/css-transforms-2/#propdef-transform-style",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/transform-style",
       "mdn_status": "standard",
       "groups": [
         "CSS Transforms"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "transition",
@@ -17885,16 +17876,16 @@
       "spec": "css-transitions-1",
       "spec_href": "https://drafts.csswg.org/css-transitions-1/#propdef-transition",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/transition",
       "mdn_status": "standard",
       "groups": [
         "CSS Transitions"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "transition-behavior",
@@ -17908,16 +17899,16 @@
       "spec": "css-transitions-2",
       "spec_href": "https://drafts.csswg.org/css-transitions-2/#propdef-transition-behavior",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/transition-behavior",
       "mdn_status": "standard",
       "groups": [
         "CSS Transitions"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "transition-delay",
@@ -17931,16 +17922,16 @@
       "spec": "css-transitions-1",
       "spec_href": "https://drafts.csswg.org/css-transitions-1/#propdef-transition-delay",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/transition-delay",
       "mdn_status": "standard",
       "groups": [
         "CSS Transitions"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "transition-duration",
@@ -17954,16 +17945,16 @@
       "spec": "css-transitions-1",
       "spec_href": "https://drafts.csswg.org/css-transitions-1/#propdef-transition-duration",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/transition-duration",
       "mdn_status": "standard",
       "groups": [
         "CSS Transitions"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "transition-property",
@@ -17977,16 +17968,16 @@
       "spec": "css-transitions-1",
       "spec_href": "https://drafts.csswg.org/css-transitions-1/#propdef-transition-property",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/transition-property",
       "mdn_status": "standard",
       "groups": [
         "CSS Transitions"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "transition-timing-function",
@@ -18000,16 +17991,16 @@
       "spec": "css-transitions-1",
       "spec_href": "https://drafts.csswg.org/css-transitions-1/#propdef-transition-timing-function",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/transition-timing-function",
       "mdn_status": "standard",
       "groups": [
         "CSS Transitions"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "translate",
@@ -18092,16 +18083,16 @@
       "spec": "css-ui-4",
       "spec_href": "https://drafts.csswg.org/css-ui-4/#propdef-user-select",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/user-select",
       "mdn_status": "standard",
       "groups": [
         "CSS Basic User Interface"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "vector-effect",
@@ -18168,16 +18159,16 @@
       "spec": "scroll-animations-1",
       "spec_href": "https://drafts.csswg.org/scroll-animations-1/#propdef-view-timeline",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/view-timeline",
       "mdn_status": "experimental",
       "groups": [
         "Scroll-driven Animations"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "view-timeline-axis",
@@ -18191,16 +18182,16 @@
       "spec": "scroll-animations-1",
       "spec_href": "https://drafts.csswg.org/scroll-animations-1/#propdef-view-timeline-axis",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/view-timeline-axis",
       "mdn_status": "experimental",
       "groups": [
         "Scroll-driven Animations"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "view-timeline-inset",
@@ -18214,16 +18205,16 @@
       "spec": "scroll-animations-1",
       "spec_href": "https://drafts.csswg.org/scroll-animations-1/#propdef-view-timeline-inset",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/view-timeline-inset",
       "mdn_status": "experimental",
       "groups": [
         "Scroll-driven Animations"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "view-timeline-name",
@@ -18237,16 +18228,16 @@
       "spec": "scroll-animations-1",
       "spec_href": "https://drafts.csswg.org/scroll-animations-1/#propdef-view-timeline-name",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/view-timeline-name",
       "mdn_status": "experimental",
       "groups": [
         "Scroll-driven Animations"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "view-transition-class",
@@ -18260,16 +18251,16 @@
       "spec": "css-view-transitions-2",
       "spec_href": "https://drafts.csswg.org/css-view-transitions-2/#propdef-view-transition-class",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/view-transition-class",
       "mdn_status": "standard",
       "groups": [
         "CSS View Transitions"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "view-transition-group",
@@ -18283,14 +18274,14 @@
       "spec": "css-view-transitions-2",
       "spec_href": "https://drafts.csswg.org/css-view-transitions-2/#propdef-view-transition-group",
       "spec_status": "WD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/view-transition-group",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "view-transition-name",
@@ -18304,16 +18295,16 @@
       "spec": "css-view-transitions-2",
       "spec_href": "https://drafts.csswg.org/css-view-transitions-2/#propdef-view-transition-name",
       "spec_status": "CRD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/view-transition-name",
       "mdn_status": "standard",
       "groups": [
         "CSS View Transitions"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "view-transition-scope",
@@ -18327,16 +18318,16 @@
       "spec": "css-view-transitions-2",
       "spec_href": "https://drafts.csswg.org/css-view-transitions-2/#propdef-view-transition-scope",
       "spec_status": "ED",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/view-transition-scope",
       "mdn_status": "standard",
       "groups": [
         "CSS View Transitions"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "visibility",
@@ -18358,9 +18349,9 @@
         "CSS Display",
         "Scalable Vector Graphics"
       ],
-      "engine_status": "implemented",
+      "engine_status": "partial",
       "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "notes": "Honesty: hidden/collapse skip paint; table-row collapse not implemented."
     },
     {
       "property": "voice-balance",
@@ -18374,14 +18365,14 @@
       "spec": "css-speech-1",
       "spec_href": "https://drafts.csswg.org/css-speech-1/#propdef-voice-balance",
       "spec_status": "CRD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/voice-balance",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "voice-duration",
@@ -18395,14 +18386,14 @@
       "spec": "css-speech-1",
       "spec_href": "https://drafts.csswg.org/css-speech-1/#propdef-voice-duration",
       "spec_status": "CRD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/voice-duration",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "voice-family",
@@ -18416,14 +18407,14 @@
       "spec": "css-speech-1",
       "spec_href": "https://drafts.csswg.org/css-speech-1/#propdef-voice-family",
       "spec_status": "REC",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/voice-family",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "voice-pitch",
@@ -18437,14 +18428,14 @@
       "spec": "css-speech-1",
       "spec_href": "https://drafts.csswg.org/css-speech-1/#propdef-voice-pitch",
       "spec_status": "CRD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/voice-pitch",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "voice-range",
@@ -18458,14 +18449,14 @@
       "spec": "css-speech-1",
       "spec_href": "https://drafts.csswg.org/css-speech-1/#propdef-voice-range",
       "spec_status": "CRD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/voice-range",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "voice-rate",
@@ -18479,14 +18470,14 @@
       "spec": "css-speech-1",
       "spec_href": "https://drafts.csswg.org/css-speech-1/#propdef-voice-rate",
       "spec_status": "CRD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/voice-rate",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "voice-stress",
@@ -18500,14 +18491,14 @@
       "spec": "css-speech-1",
       "spec_href": "https://drafts.csswg.org/css-speech-1/#propdef-voice-stress",
       "spec_status": "CRD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/voice-stress",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "voice-volume",
@@ -18521,14 +18512,14 @@
       "spec": "css-speech-1",
       "spec_href": "https://drafts.csswg.org/css-speech-1/#propdef-voice-volume",
       "spec_status": "CRD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/voice-volume",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "white-space",
@@ -18658,16 +18649,16 @@
       "spec": "css-will-change-1",
       "spec_href": "https://drafts.csswg.org/css-will-change-1/#propdef-will-change",
       "spec_status": "CRD",
-      "print_relevant": false,
-      "goal": "ignore",
+      "print_relevant": true,
+      "goal": "implement",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/will-change",
       "mdn_status": "standard",
       "groups": [
         "CSS Will Change"
       ],
-      "engine_status": "ignored",
+      "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
     },
     {
       "property": "window-drag",
@@ -18904,9 +18895,9 @@
       "groups": [
         "CSS Writing Modes"
       ],
-      "engine_status": "implemented",
+      "engine_status": "partial",
       "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "notes": "Honesty: vertical modes glyph-rotate only; block/line flow stays horizontal."
     },
     {
       "property": "x",

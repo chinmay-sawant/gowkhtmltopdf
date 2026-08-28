@@ -422,7 +422,7 @@ var fixturePageBounds = map[string]fixtureBounds{ //nolint:gochecknoglobals // i
 	},
 	"fixture-57-vanguard-telemetry-audit.html": { //nolint:exhaustruct // intentional zero-value fields
 		minPages: 13, maxPages: 13,
-		needles:  []string{"VANGUARD", "TELEMETRY", "VANGUARD-CSS-571-COVERAGE"},
+		needles: []string{"VANGUARD", "TELEMETRY", "VANGUARD-CSS-571-COVERAGE"},
 	},
 }
 

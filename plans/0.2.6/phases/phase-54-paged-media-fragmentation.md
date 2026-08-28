@@ -57,6 +57,11 @@ Existing `PageStyle` side-channel. Named-page breaks clone interned style then r
 
 `TestPageFirstMargins`, `TestPageLeftRightMargins`, `TestPageNamedMargins`, `TestPageNameBreak`, `TestPageMarginBoxes`. Matrix §2.6.
 
+
+## Agent guard
+
+Read `../HONESTY-GATES.md` before any mapping flip. This phase is marked complete only for the **print subset documented in the matrix**. Do not broaden to Chrome-complete or re-fake Implemented rows with empty `code_path`.
+
 ## Out of scope
 
 GCPM `running()`, footnotes, named strings as browser headers. Combined selectors (`@page chapter:first`). Per-page page size. Matching Chrome's Wikipedia page count.

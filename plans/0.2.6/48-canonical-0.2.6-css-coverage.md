@@ -1,9 +1,9 @@
 # 48 - v0.2.6 CSS coverage (Canonical Execution Ledger)
 
 > **Parent:** `plans/0.2.5/40-canonical-0.2.5-python-bindings.md` (complete 2026-08-26). Leftover CSS rows under `plans/0.2.0/` move here with `[~]` pointers.
-> **Status:** phases 48-67 complete on `feature/026-extended-css-support` (Partial program closed: 174 Implemented / 0 Partial). Phases 68-78 open: reopen all 247 Ignored properties for browser-level print. VERSION still 0.2.5.
+> **Status:** phases 48-56 complete. Phases 57-67 Partial program partially honest (see reopen rows after 2026-08-28 audit). Phases 68 complete as inventory only; 69-77 **not started** after fake Implemented flips were reverted. Phase 78 reopen. Catalog after honesty revert: **166 Implemented / 9 Partial / 643 Unsupported / 0 Ignored**. VERSION still 0.2.5.
 > **Estimated effort:** several weeks across phases 48-56. Catalog and honesty first. Frequency slices next. Layout deepen last.
-> **Constraint:** pure Go, no CGO on the default path, no browser embed, no JavaScript. Direct modules stay `go-text/typesetting` and `tdewolff/canvas` unless an amendment is filed. `catalog/mapping.json` is the CSS name inventory.
+> **Constraint:** pure Go, no CGO on the default path, no browser embed, no JavaScript. Direct modules stay `go-text/typesetting` and `tdewolff/canvas` unless an amendment is filed. `catalog/mapping.json` is the CSS name inventory. Agents must follow `HONESTY-GATES.md` before any Implemented flip.
 > **Ordering principle:** freeze catalog and honesty docs first, then selectors and cascade, then values and units, then template-visible box/text/paint, then generated content, then paged media, then fixture-driven layout leftovers, then closure. No phase closes on intent.
 > **Workflow:** `skills/phase-wise-checklist/SKILLS.md`
 
@@ -381,11 +381,11 @@ Phases **57-67** promote the remaining **Partial** property rows to **Implemente
 
 ## Amendment (2026-08-28): Ignored to browser-level print (phases 68-78)
 
-Phases **68-78** reopen **all 247 Ignored** properties for **browser-level print**. Phase 68 moves them onto the work list (`goal: implement`, `engine_status: unsupported`). Later phases implement by bucket (vendor aliases, SVG, mask/clip/filter, scroll, animation/transition, 3D, anchor/timelines, pointer UI, speech). Pixel-diff Chrome goldens stay out unless amended. Inventory: [ignored-inventory.json](ignored-inventory.json).
+Phases **68-78** reopen **all 247 former Ignored** properties for **browser-level print**. Phase 68 inventory/policy stands. Phases **69-77 were falsely marked complete** (catalog Implemented without engine code); a 2026-08-28 four-agent audit reverted those rows to **unsupported** (`filter` opacity-only **partial**). Checklists for 69-77 are **not started** again. Do not flip `engine_status` to Implemented without apply arms + tests + matrix agreement.
 
-Browser-print golden harness: `testdata/golden/fixture-57-vanguard-telemetry-audit.html` declares all **571** `goal: implement` properties once (plus Vanguard narrative). Closure row: phase 78.2.
+Inventory: [ignored-inventory.json](ignored-inventory.json). Counts: [property-counts.md](property-counts.md).
 
-This amends the older `policy.permanent_ignore` list (animation, transition, 3D, filter blur, scroll-snap, anchor positioning, speech, print-noop UI, SVG fill/stroke). Those names are no longer permanent ignore under this program.
+Browser-print golden harness: `testdata/golden/fixture-57-vanguard-telemetry-audit.html` covers the pre-68 **571** print-relevant set (not the reopened Ignored names yet).
 
 ## Out of scope (unless this ledger is amended)
 

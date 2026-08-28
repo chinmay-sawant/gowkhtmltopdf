@@ -1,51 +1,47 @@
 # Phase 63: writing-mode vertical
 
 > **Parent:** `../48-canonical-0.2.6-css-coverage.md` Phase 63
-> **Status:** complete (1 Partial property promoted to Implemented)
+> **Status:** reopen (writing-mode is Partial: glyph-rotate only)
 > **Estimated effort:** XL
-> **Owner:** `internal/layout` (and `internal/css` when parse changes)
+> **Owner:** `internal/layout`
 > **Depends on:** Phase 62
-> **Unblocks:** Phase 64
+> **Unblocks:** logical-box vertical mapping leftovers
+> **Honesty:** `../HONESTY-GATES.md`
 
 ---
 
 ## Overview
 
-True vertical-rl / vertical-lr line progression (not glyph-rotate only).
+`writing-mode` is **Partial**. Vertical values set `RotateDeg == -90` and bump box height from rotated run width. Block/IFC flow stays horizontal (`inline_paint.go`, `layout.go`).
 
-Bar: near-browser for **print media**. Flip mapping `engine_status` to `implemented` only with code + tests + matrix agreement. Goldens stay structural.
+Implemented requires real vertical line progression for `vertical-rl` / `vertical-lr`.
 
-## Goals
+## Work order (code)
 
-- Close the Phase 63 Partial names listed in the parent plan inventory for this slice
-- Keep `python3 scripts/css-catalog-map.py --check` green after mapping edits
-- Do not grow `paint_flow.go` / `paint_pagination.go`; extract if touched
+1. **Stop treating rotate-as-done.** Do not flip mapping while `writingModeRotate` is the only vertical effect (`internal/layout/inline_paint.go`).
+2. Teach line building / inline layout to advance on the block axis for vertical modes:
+   - Likely files: `internal/layout/inline.go`, `inline_paint.go`, `layout.go`, measure helpers in `layout_measure.go`.
+3. Distinguish `vertical-rl` vs `vertical-lr` (block-direction sign / packing).
+4. Orthogonal flows: logical margin/padding mapping when writing-mode is vertical (ties to Phase 59).
+5. Tests:
+   - New: vertical text advances downward/leftward as claimed (box geometry assertions), not merely `RotateDeg == -90`.
+   - Existing `TestWritingModeInherits` is **insufficient** alone.
 
 ## Checklist
 
-### 63.1 scope lock
+- [x] 63.1.1 Owned property: `writing-mode` (still in mapping as partial after honesty revert).
+- [ ] 63.2.1 Implement vertical line progression (not glyph-rotate-only).
+- [ ] 63.2.2 Tests that fail under rotate-only and pass under real vertical flow.
+- [ ] 63.2.3 Update matrix §2.3 / §3 and `documentation/deferred.md` so they stop contradicting each other.
+- [ ] 63.2.4 Flip mapping to Implemented only with flip packet; set `code_path` + notes.
+- [ ] 63.3.1 `go test ./internal/layout -run "TestWritingMode"`; `--check`; `make test` / `make lint` / `make golden` if geometry changes.
 
-- [x] 63.1.1 List exact Partial property names owned by this phase (from current `mapping.json`). Proof: `writing-mode` (1 property).
+## Forbidden proofs
 
-### 63.2 implementation
-
-- [x] 63.2.1 Implement exit criteria for each owned name. Proof: `TestWritingModeInherits` in `internal/layout/style_cascade_test.go`.
-
-### 63.3 catalog and docs
-
-- [x] 63.3.1 Flip promoted rows to `implemented` in `catalog/mapping.json`; recount `coverage-summary.json` and `property-counts.md`. Proof: 155 implemented, 19 partial; `property-counts.md` updated.
-- [x] 63.3.2 Update `documentation/compatibility-matrix.md` rows to Implemented with honest notes. Proof: Section 2.3 updated; `make claim-scan` clean.
-
-### 63.4 gates
-
-- [x] 63.4.1 Targeted package tests exit 0. Proof: `go test ./internal/layout -run "TestWritingMode.*"` exit 0.
-- [x] 63.4.2 `python3 scripts/css-catalog-map.py --check` exit 0. Proof: check ok (7 print-noop ignored, 147 apply arms mapped).
-- [x] 63.4.3 Before calling the phase done: `make test` and `make lint` exit 0 (and `make golden` if paint/layout/pagination changed). Proof: `make test` and `make lint` exit 0.
-
-## Out of scope
-
-Animation, 3D, filter blur, speech, pointer UI, new direct modules, Chrome pixel goldens.
+- `RotateDeg == -90` as sole success criterion
+- Inherit-only tests
+- Catalog flip without layout consumer change
 
 ## Handoff
 
-Next is Phase 64.
+Phase 67 closure stays reopen until this and other honesty demotes are resolved or explicitly `[~]`.

@@ -1,49 +1,45 @@
 # Phase 74: 3D transforms
 
 > **Parent:** `../48-canonical-0.2.6-css-coverage.md` Phase 74
-> **Status:** not started
+> **Status:** not started (perspective/transform-style/backface unsupported; 3D funcs rejected)
 > **Estimated effort:** L
-> **Owner:** `internal/layout` / `internal/css` / catalog
+> **Owner:** `internal/layout`
 > **Depends on:** Phase 73
 > **Unblocks:** Phase 75
+> **Honesty:** `../HONESTY-GATES.md`
 
 ---
 
 ## Overview
 
-perspective, perspective-origin, transform-style, backface-visibility for static print scenes.
+Today only **2D** `transform` / `transform-origin` work (`Matrix2D` in `internal/layout/transform.go`). Line 236 rejects 3D / perspective / `matrix3d`. There are **no** apply arms for `perspective`, `perspective-origin`, `transform-style`, `backface-visibility`.
 
-Bar: **browser-level print** for the former Ignored set (247 names). Goldens stay structural unless amended. Flip mapping only with code + tests + matrix agreement.
+## Owned names (4)
 
-**Count:** 4
+`backface-visibility`, `perspective`, `perspective-origin`, `transform-style`
 
-## Goals
+## Work order (code)
 
-- Clear every owned name from the work list into Implemented, or mark `[~]` with an explicit reason
-- Keep catalog counts honest after each promotion batch
+1. Add `ResolvedStyle` fields for the four properties in `style.go`.
+2. Add `case` arms in `applyTransformGroup` (`style_properties.go`).
+3. Extend transform math beyond `Matrix2D` **or** define a print-static subset (e.g. flatten perspective to 2D) and document it in matrix notes. Either way, `parseOneTransformFunc` must accept the 3D functions you claim (`matrix3d`, `translate3d`, `rotateX`, …) instead of rejecting them.
+4. Paint: apply resulting matrix in the existing CTM paint path.
+5. Tests:
+   - Replace reliance on `TestParseTransformNoneAnd3DRejected` for success.
+   - Add tests that `perspective` / `rotateX` (or your claimed subset) affect paint transforms.
+6. Update matrix: remove “3D permanent non-goal” for the subset you ship.
 
 ## Checklist
 
-### 74.1 scope lock
+- [x] 74.1.1 Ownership list locked.
+- [ ] 74.2.1 Fields + apply arms for the four properties.
+- [ ] 74.2.2 Parse/paint path for claimed 3D functions (stop rejecting those).
+- [ ] 74.2.3 Tests that fail on current reject path and pass after.
+- [ ] 74.2.4 Mapping + matrix flip packets.
+- [ ] 74.3.1 `go test ./internal/layout -run "TestTransform|TestPerspective|TestBackface"`; `--check`; gates; golden if paint changes.
 
-- [ ] 74.1.1 Own these 4 properties (from Phase 68 inventory): `backface-visibility`, `perspective`, `perspective-origin`, `transform-style`. Proof: names still `unsupported` (or listed) in `mapping.json` at phase start.
+## Forbidden proofs
 
-### 74.2 implementation
-
-- [ ] 74.2.1 Implement browser-level print behavior for each owned name (or alias to an existing Implemented longhand). Proof: tests cited per promotion.
-- [ ] 74.2.2 Flip each finished name to `engine_status: implemented` with matrix notes. Proof: mapping + matrix.
-
-### 74.3 gates
-
-- [ ] 74.3.1 Targeted package tests exit 0.
-- [ ] 74.3.2 `python3 scripts/css-catalog-map.py --check` exit 0.
-- [ ] 74.3.3 `make test` and `make lint` exit 0 before phase complete; `make golden` if paint/layout/pagination changed.
-
-
-## Out of scope
-
-JavaScript execution. Pixel-diff Chrome goldens as the default gate. New direct Go modules without sign-off. Growing `paint_flow.go` / `paint_pagination.go` past the soft cap without extracting.
-
-## Handoff
-
-Next is Phase 75.
+- Citing `transform.go` reject comment / `TestParseTransformNoneAnd3DRejected` as Implemented proof
+- Empty `code_path` Implemented rows
+- 2D-only tests (`TestParseTransformTranslateRotateScale`) as 3D proof

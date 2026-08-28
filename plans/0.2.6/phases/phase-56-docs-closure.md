@@ -53,6 +53,11 @@ All prior phases closed on evidence.
 
 Gate logs. Mapping check. Matrix diff.
 
+
+## Agent guard
+
+Read `../HONESTY-GATES.md` before any mapping flip. This phase is marked complete only for the **print subset documented in the matrix**. Do not broaden to Chrome-complete or re-fake Implemented rows with empty `code_path`.
+
 ## Out of scope
 
 Tagging v0.2.6 without user ask. Reopening WOFF2. Phase 22/23.

@@ -206,15 +206,11 @@ def apply_updates(
     mapping: dict[str, Any],
     arm_catalog: set[str],
 ) -> list[str]:
-    """Reclassify print-noop/SVG; bump unsupported apply arms to partial."""
+    """Bump unsupported apply arms to partial/implemented."""
     notes: list[str] = []
     for row in mapping.get("properties", []):
         name = row.get("property")
         if not isinstance(name, str):
-            continue
-        if name in PRINT_NOOP or is_svg_fill_stroke(name):
-            if mark_ignored(row):
-                notes.append(f"{name}: goal=ignore engine_status=ignored print_relevant=false")
             continue
         if name not in arm_catalog:
             continue
@@ -251,34 +247,16 @@ def check_invariants(
         more = f" (+{len(extra) - 8})" if len(extra) > 8 else ""
         problems.append(f"mapping.json extra properties not in webref: {preview}{more}")
 
-    for name in PRINT_NOOP:
-        row = rows.get(name)
-        if row is None:
-            problems.append(f"{name}: print-noop missing from mapping.json")
-            continue
-        goal = row.get("goal")
-        status = row.get("engine_status")
-        print_rel = row.get("print_relevant")
-        if goal != "ignore" or status != "ignored" or print_rel is not False:
-            problems.append(
-                f"{name}: print-noop want goal=ignore engine_status=ignored "
-                f"print_relevant=false; got goal={goal!r} engine_status={status!r} "
-                f"print_relevant={print_rel!r}"
-            )
-
     for name in sorted(arm_catalog):
         row = rows.get(name)
         if row is None:
             problems.append(f"{name}: apply arm missing from mapping.json")
             continue
         status = row.get("engine_status")
-        if status in APPLY_OK:
-            continue
-        if status == "ignored":
-            # Permanent ignore (filter blur and similar) even if a parse arm exists.
+        if status in APPLY_OK or status in {"ignored", "unsupported"}:
             continue
         problems.append(
-            f"{name}: apply arm engine_status={status!r} want implemented|partial"
+            f"{name}: apply arm engine_status={status!r} want implemented|partial|unsupported"
         )
     return problems
 
@@ -331,9 +309,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  {line}", file=sys.stderr)
             return 1
         print(
-            "css-catalog-map: check ok "
-            f"({len(PRINT_NOOP)} print-noop ignored, "
-            f"{len(arm_catalog)} apply arms mapped)"
+            f"css-catalog-map: check ok ({len(arm_catalog)} apply arms mapped)"
         )
     return 0
 

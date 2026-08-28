@@ -1,49 +1,40 @@
 # Phase 71: Mask, clip, and filter
 
 > **Parent:** `../48-canonical-0.2.6-css-coverage.md` Phase 71
-> **Status:** not started
+> **Status:** not started (`filter` Partial opacity-only; rest unsupported)
 > **Estimated effort:** L
-> **Owner:** `internal/layout` / `internal/css` / catalog
+> **Owner:** `internal/layout` paint
 > **Depends on:** Phase 70
 > **Unblocks:** Phase 72
+> **Honesty:** `../HONESTY-GATES.md`
 
 ---
 
 ## Overview
 
-clip/clip-path/mask* plus filter and backdrop-filter for print raster/PDF paint.
+`filter` today only folds `opacity()` (`style_properties.go` + `transform.go` parseFilterOpacity). `overflow: clip` is unrelated to CSS `clip` / `clip-path`.
 
-Bar: **browser-level print** for the former Ignored set (247 names). Goldens stay structural unless amended. Flip mapping only with code + tests + matrix agreement.
+## Owned names (26)
 
-**Count:** 26
+`backdrop-filter`, `clip`, `clip-path`, `clip-rule`, `color-interpolation-filters`, `filter`, `flood-color`, `flood-opacity`, `lighting-color`, `mask`, `mask-border`, `mask-border-mode`, `mask-border-outset`, `mask-border-repeat`, `mask-border-slice`, `mask-border-source`, `mask-border-width`, `mask-clip`, `mask-composite`, `mask-image`, `mask-mode`, `mask-origin`, `mask-position`, `mask-repeat`, `mask-size`, `mask-type`
 
-## Goals
+## Work order (code)
 
-- Clear every owned name from the work list into Implemented, or mark `[~]` with an explicit reason
-- Keep catalog counts honest after each promotion batch
+1. **clip-path / clip:** parse basic shapes or `inset()` into a clip path; apply in paint (`paint.go` / clip stack). New fields on `ResolvedStyle`.
+2. **mask*:** at least `mask-image` url + mask paint path, or keep unsupported until you can ship a consumer.
+3. **filter / backdrop-filter:** extend beyond `opacity()` only if you implement blur/etc. in paint; otherwise leave `filter` Partial with notes and `backdrop-filter` unsupported.
+4. Tests must target the owned property names, not `TestOverflowClip*`.
 
 ## Checklist
 
-### 71.1 scope lock
+- [x] 71.1.1 Ownership list locked.
+- [ ] 71.2.1 Implement clip-path or document `[~]`.
+- [ ] 71.2.2 Implement mask subset or leave unsupported.
+- [ ] 71.2.3 Expand filter functions or keep Partial opacity-only with notes.
+- [ ] 71.2.4 Flip packets + matrix.
+- [ ] 71.3.1 Targeted layout paint tests; `--check`; gates.
 
-- [ ] 71.1.1 Own these 26 properties (from Phase 68 inventory): `backdrop-filter`, `clip`, `clip-path`, `clip-rule`, `color-interpolation-filters`, `filter`, `flood-color`, `flood-opacity`, `lighting-color`, `mask`, `mask-border`, `mask-border-mode`, `mask-border-outset`, `mask-border-repeat`, `mask-border-slice`, `mask-border-source`, `mask-border-width`, `mask-clip`, `mask-composite`, `mask-image`, `mask-mode`, `mask-origin`, `mask-position`, `mask-repeat`, `mask-size`, `mask-type`. Proof: names still `unsupported` (or listed) in `mapping.json` at phase start.
+## Forbidden proofs
 
-### 71.2 implementation
-
-- [ ] 71.2.1 Implement browser-level print behavior for each owned name (or alias to an existing Implemented longhand). Proof: tests cited per promotion.
-- [ ] 71.2.2 Flip each finished name to `engine_status: implemented` with matrix notes. Proof: mapping + matrix.
-
-### 71.3 gates
-
-- [ ] 71.3.1 Targeted package tests exit 0.
-- [ ] 71.3.2 `python3 scripts/css-catalog-map.py --check` exit 0.
-- [ ] 71.3.3 `make test` and `make lint` exit 0 before phase complete; `make golden` if paint/layout/pagination changed.
-
-
-## Out of scope
-
-JavaScript execution. Pixel-diff Chrome goldens as the default gate. New direct Go modules without sign-off. Growing `paint_flow.go` / `paint_pagination.go` past the soft cap without extracting.
-
-## Handoff
-
-Next is Phase 72.
+- `TestOverflowClip` as proof of `clip-path`
+- Marking full `filter` Implemented while only `opacity()` works

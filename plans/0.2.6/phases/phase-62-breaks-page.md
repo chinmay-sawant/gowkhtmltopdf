@@ -1,7 +1,7 @@
 # Phase 62: Breaks and page
 
 > **Parent:** `../48-canonical-0.2.6-css-coverage.md` Phase 62
-> **Status:** complete (9 Partial properties promoted to Implemented)
+> **Status:** complete (honest with documented break aliases)
 > **Estimated effort:** L
 > **Owner:** `internal/layout` (and `internal/css` when parse changes)
 > **Depends on:** Phase 61
@@ -41,6 +41,16 @@ Bar: near-browser for **print media**. Flip mapping `engine_status` to `implemen
 - [x] 62.4.1 Targeted package tests exit 0. Proof: `go test ./internal/layout -run "TestPage.*|TestOrphans.*"` exit 0.
 - [x] 62.4.2 `python3 scripts/css-catalog-map.py --check` exit 0. Proof: check ok (7 print-noop ignored, 147 apply arms mapped).
 - [x] 62.4.3 Before calling the phase done: `make test` and `make lint` exit 0 (and `make golden` if paint/layout/pagination changed). Proof: `make test` and `make lint` exit 0.
+
+
+## Honesty audit (2026-08-28)
+
+Audit 2026-08-28: KEEP_IMPLEMENTED for break/page/orphans/widows with matrix alias table.
+
+
+## Agent guard
+
+Read `../HONESTY-GATES.md` before any mapping flip. This phase is marked complete only for the **print subset documented in the matrix**. Do not broaden to Chrome-complete or re-fake Implemented rows with empty `code_path`.
 
 ## Out of scope
 
