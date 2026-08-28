@@ -6,9 +6,9 @@ WebRef inventory size is 818 property names.
 
 | Status | Count |
 |--------|------:|
-| Implemented | 374 |
+| Implemented | 380 |
 | Partial | 0 |
-| Unsupported | 444 |
+| Unsupported | 438 |
 | Ignored | 0 |
 
 Phase 80 and Advanced Waves A-D implemented 176 print properties across all waves with full code paths, consumers, and unit tests (PDF bookmarks & outline levels, line clamping, text truncation & ellipsis, universal reset, box decoration break, image orientation & resolution, print color adjust, color scheme, container sizing, variable fonts, OpenType overrides, blend modes, text emphasis, and text decoration skip).

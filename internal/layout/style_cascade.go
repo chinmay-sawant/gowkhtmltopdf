@@ -1,6 +1,7 @@
 package layout
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
@@ -960,24 +961,101 @@ func normalizeVendorPrefix(prop string) string {
 		return "box-shadow"
 	case "-webkit-filter":
 		return "filter"
+	case "-webkit-box-align":
+		return "align-items"
+	case "-webkit-box-flex":
+		return "flex-grow"
+	case "-webkit-box-ordinal-group":
+		return "order"
+	case "-webkit-box-orient":
+		return "flex-direction"
+	case "-webkit-box-pack":
+		return "justify-content"
+	case "-webkit-text-fill-color":
+		return "color"
 	default:
 		return prop
 	}
 }
 
 // applyStyleProp routes one cascaded property to the group that owns it.
+//
+//nolint:wsl // branching on effectiveProp
 func applyStyleProp(
 	style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext,
 	parent *ResolvedStyle, hasParent bool,
 ) {
 	effectiveProp := normalizeVendorPrefix(prop)
+	effectiveValue := value
+	if effectiveProp != prop {
+		effectiveValue = remapWebkitValue(prop, value)
+	}
 	for _, group := range styleGroups {
-		if group(style, effectiveProp, value, fsize, ctx, parent, hasParent) {
+		if group(style, effectiveProp, effectiveValue, fsize, ctx, parent, hasParent) {
 			return
 		}
 	}
 
 	applyIgnoredGroup(style, prop, value)
+}
+
+//nolint:cyclop,goconst,wsl,nlreturn,funlen // 2009 box value remaps
+func remapWebkitValue(prop, value string) string {
+	trimmed := strings.TrimSpace(value)
+	low := strings.ToLower(trimmed)
+	switch prop {
+	case "-webkit-box-align":
+		switch low {
+		case "start":
+			return flexStartKeyword
+		case "end":
+			return fxFlexEnd
+		case "center":
+			return fxCenter
+		case "stretch":
+			return fxStretch
+		case "baseline":
+			return "baseline"
+		default:
+			return low
+		}
+	case "-webkit-box-pack":
+		switch low {
+		case "start":
+			return flexStartKeyword
+		case "end":
+			return fxFlexEnd
+		case "center":
+			return fxCenter
+		case "justify":
+			return fxBetween
+		default:
+			return low
+		}
+	case "-webkit-box-orient":
+		switch low {
+		case "horizontal":
+			return fxRow
+		case "vertical":
+			return fxCol
+		case "inline-axis":
+			return fxRow
+		case "block-axis":
+			return fxCol
+		default:
+			return low
+		}
+	case "-webkit-box-ordinal-group":
+		if n, err := strconv.Atoi(trimmed); err == nil {
+			if n > 0 {
+				n--
+			}
+			return strconv.Itoa(n)
+		}
+		return trimmed
+	default:
+		return value
+	}
 }
 
 // applyDisplayGroup handles display, position-adjacent flow and stacking props.

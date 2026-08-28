@@ -11,8 +11,8 @@
     "webref_properties": 818,
     "mapped_properties": 818,
     "properties_by_engine_status": {
-      "implemented": 374,
-      "unsupported": 444,
+      "implemented": 380,
+      "unsupported": 438,
       "ignored": 0,
       "partial": 0
     },
@@ -144,7 +144,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print-noop base (animation/transition/3D/UI) skipped for print PDF. Left unsupported."
     },
     {
       "property": "-webkit-animation-delay",
@@ -165,7 +165,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print-noop base (animation/transition/3D/UI) skipped for print PDF. Left unsupported."
     },
     {
       "property": "-webkit-animation-direction",
@@ -186,14 +186,14 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print-noop base (animation/transition/3D/UI) skipped for print PDF. Left unsupported."
     },
     {
       "property": "-webkit-animation-duration",
       "kind": "legacy-alias",
       "legacy_aliases": [],
       "legacy_of": "animation-duration",
-      "syntax": "<time [0s,\u221e]>#",
+      "syntax": "<time [0s,∞]>#",
       "initial": null,
       "inherited": null,
       "longhands": [],
@@ -207,7 +207,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print-noop base (animation/transition/3D/UI) skipped for print PDF. Left unsupported."
     },
     {
       "property": "-webkit-animation-fill-mode",
@@ -228,7 +228,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print-noop base (animation/transition/3D/UI) skipped for print PDF. Left unsupported."
     },
     {
       "property": "-webkit-animation-iteration-count",
@@ -249,7 +249,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print-noop base (animation/transition/3D/UI) skipped for print PDF. Left unsupported."
     },
     {
       "property": "-webkit-animation-name",
@@ -270,7 +270,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print-noop base (animation/transition/3D/UI) skipped for print PDF. Left unsupported."
     },
     {
       "property": "-webkit-animation-play-state",
@@ -291,7 +291,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print-noop base (animation/transition/3D/UI) skipped for print PDF. Left unsupported."
     },
     {
       "property": "-webkit-animation-timing-function",
@@ -312,7 +312,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print-noop base (animation/transition/3D/UI) skipped for print PDF. Left unsupported."
     },
     {
       "property": "-webkit-appearance",
@@ -335,7 +335,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print-noop base (animation/transition/3D/UI) skipped for print PDF. Left unsupported."
     },
     {
       "property": "-webkit-backface-visibility",
@@ -356,7 +356,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print-noop base (animation/transition/3D/UI) skipped for print PDF. Left unsupported."
     },
     {
       "property": "-webkit-background-clip",
@@ -377,7 +377,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Base background-clip/origin/size not yet implemented for print (Phase 80 pending). Left unsupported."
     },
     {
       "property": "-webkit-background-origin",
@@ -398,7 +398,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Base background-clip/origin/size not yet implemented for print (Phase 80 pending). Left unsupported."
     },
     {
       "property": "-webkit-background-size",
@@ -419,7 +419,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Base background-clip/origin/size not yet implemented for print (Phase 80 pending). Left unsupported."
     },
     {
       "property": "-webkit-border-bottom-left-radius",
@@ -468,7 +468,7 @@
       "kind": "legacy-alias",
       "legacy_aliases": [],
       "legacy_of": "border-radius",
-      "syntax": "<length-percentage [0,\u221e]>{1,4} [ / <length-percentage [0,\u221e]>{1,4} ]?",
+      "syntax": "<length-percentage [0,∞]>{1,4} [ / <length-percentage [0,∞]>{1,4} ]?",
       "initial": null,
       "inherited": null,
       "longhands": [
@@ -548,9 +548,9 @@
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_cascade.go + internal/layout/style_properties.go",
+      "notes": "Vendor alias for align-items via normalizeVendorPrefix with box-align value remap (start/end/center/stretch/baseline -> flex-start/flex-end/center/stretch/baseline); base align-items implemented; display -webkit-box maps to flex in style_properties.go."
     },
     {
       "property": "-webkit-box-flex",
@@ -569,9 +569,9 @@
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_cascade.go + internal/layout/style_properties.go",
+      "notes": "Vendor alias for flex-grow via normalizeVendorPrefix; base flex-grow implemented; display -webkit-box maps to flex in style_properties.go."
     },
     {
       "property": "-webkit-box-ordinal-group",
@@ -590,9 +590,9 @@
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_cascade.go + internal/layout/style_properties.go",
+      "notes": "Vendor alias for order via normalizeVendorPrefix with box-ordinal-group value remap (group-1 -> order); base order implemented; display -webkit-box maps to flex in style_properties.go."
     },
     {
       "property": "-webkit-box-orient",
@@ -611,9 +611,9 @@
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_cascade.go + internal/layout/style_properties.go",
+      "notes": "Vendor alias for flex-direction via normalizeVendorPrefix with box-orient value remap (horizontal/vertical/inline-axis/block-axis -> row/column); base flex-direction implemented; display -webkit-box maps to flex in style_properties.go."
     },
     {
       "property": "-webkit-box-pack",
@@ -632,9 +632,9 @@
       "mdn_url": null,
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_cascade.go + internal/layout/style_properties.go",
+      "notes": "Vendor alias for justify-content via normalizeVendorPrefix with box-pack value remap (start/end/center/justify -> flex-start/flex-end/center/space-between); base justify-content implemented; display -webkit-box maps to flex in style_properties.go."
     },
     {
       "property": "-webkit-box-shadow",
@@ -801,7 +801,7 @@
       "kind": "legacy-alias",
       "legacy_aliases": [],
       "legacy_of": "flex-grow",
-      "syntax": "<number [0,\u221e]>",
+      "syntax": "<number [0,∞]>",
       "initial": null,
       "inherited": null,
       "longhands": [],
@@ -822,7 +822,7 @@
       "kind": "legacy-alias",
       "legacy_aliases": [],
       "legacy_of": "flex-shrink",
-      "syntax": "<number [0,\u221e]>",
+      "syntax": "<number [0,∞]>",
       "initial": null,
       "inherited": null,
       "longhands": [],
@@ -885,7 +885,7 @@
       "kind": "shorthand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "none | <integer [1,\u221e]>",
+      "syntax": "none | <integer [1,∞]>",
       "initial": "none",
       "inherited": "see individual properties",
       "longhands": [
@@ -906,7 +906,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "WebKit-native with no print consumer (line-clamp/text-stroke). Left unsupported."
     },
     {
       "property": "-webkit-mask",
@@ -938,7 +938,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Base mask/mask-border not implemented (hard defer Phase 83). Left unsupported."
     },
     {
       "property": "-webkit-mask-box-image",
@@ -966,7 +966,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Base mask/mask-border not implemented (hard defer Phase 83). Left unsupported."
     },
     {
       "property": "-webkit-mask-box-image-outset",
@@ -987,7 +987,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Base mask/mask-border not implemented (hard defer Phase 83). Left unsupported."
     },
     {
       "property": "-webkit-mask-box-image-repeat",
@@ -1008,7 +1008,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Base mask/mask-border not implemented (hard defer Phase 83). Left unsupported."
     },
     {
       "property": "-webkit-mask-box-image-slice",
@@ -1029,7 +1029,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Base mask/mask-border not implemented (hard defer Phase 83). Left unsupported."
     },
     {
       "property": "-webkit-mask-box-image-source",
@@ -1050,7 +1050,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Base mask/mask-border not implemented (hard defer Phase 83). Left unsupported."
     },
     {
       "property": "-webkit-mask-box-image-width",
@@ -1071,7 +1071,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Base mask/mask-border not implemented (hard defer Phase 83). Left unsupported."
     },
     {
       "property": "-webkit-mask-clip",
@@ -1094,7 +1094,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Base mask/mask-border not implemented (hard defer Phase 83). Left unsupported."
     },
     {
       "property": "-webkit-mask-composite",
@@ -1117,7 +1117,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Base mask/mask-border not implemented (hard defer Phase 83). Left unsupported."
     },
     {
       "property": "-webkit-mask-image",
@@ -1140,7 +1140,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Base mask/mask-border not implemented (hard defer Phase 83). Left unsupported."
     },
     {
       "property": "-webkit-mask-origin",
@@ -1163,7 +1163,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Base mask/mask-border not implemented (hard defer Phase 83). Left unsupported."
     },
     {
       "property": "-webkit-mask-position",
@@ -1186,7 +1186,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Base mask/mask-border not implemented (hard defer Phase 83). Left unsupported."
     },
     {
       "property": "-webkit-mask-repeat",
@@ -1209,7 +1209,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Base mask/mask-border not implemented (hard defer Phase 83). Left unsupported."
     },
     {
       "property": "-webkit-mask-size",
@@ -1232,7 +1232,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Base mask/mask-border not implemented (hard defer Phase 83). Left unsupported."
     },
     {
       "property": "-webkit-order",
@@ -1260,7 +1260,7 @@
       "kind": "legacy-alias",
       "legacy_aliases": [],
       "legacy_of": "perspective",
-      "syntax": "none | <length [0,\u221e]>",
+      "syntax": "none | <length [0,∞]>",
       "initial": null,
       "inherited": null,
       "longhands": [],
@@ -1274,7 +1274,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print-noop base (animation/transition/3D/UI) skipped for print PDF. Left unsupported."
     },
     {
       "property": "-webkit-perspective-origin",
@@ -1295,7 +1295,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print-noop base (animation/transition/3D/UI) skipped for print PDF. Left unsupported."
     },
     {
       "property": "-webkit-text-fill-color",
@@ -1316,16 +1316,16 @@
       "groups": [
         "WebKit Extensions"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_cascade.go",
+      "notes": "Vendor alias for color via normalizeVendorPrefix; base color implemented; no value remap."
     },
     {
       "property": "-webkit-text-size-adjust",
       "kind": "legacy-alias",
       "legacy_aliases": [],
       "legacy_of": "text-size-adjust",
-      "syntax": "auto | none | <percentage [0,\u221e]>",
+      "syntax": "auto | none | <percentage [0,∞]>",
       "initial": null,
       "inherited": null,
       "longhands": [],
@@ -1339,7 +1339,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "WebKit-native with no print consumer (line-clamp/text-stroke). Left unsupported."
     },
     {
       "property": "-webkit-text-stroke",
@@ -1365,7 +1365,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "WebKit-native with no print consumer (line-clamp/text-stroke). Left unsupported."
     },
     {
       "property": "-webkit-text-stroke-color",
@@ -1388,7 +1388,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "WebKit-native with no print consumer (line-clamp/text-stroke). Left unsupported."
     },
     {
       "property": "-webkit-text-stroke-width",
@@ -1411,7 +1411,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "WebKit-native with no print consumer (line-clamp/text-stroke). Left unsupported."
     },
     {
       "property": "-webkit-transform",
@@ -1474,7 +1474,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print-noop base (animation/transition/3D/UI) skipped for print PDF. Left unsupported."
     },
     {
       "property": "-webkit-transition",
@@ -1501,7 +1501,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print-noop base (animation/transition/3D/UI) skipped for print PDF. Left unsupported."
     },
     {
       "property": "-webkit-transition-delay",
@@ -1522,14 +1522,14 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print-noop base (animation/transition/3D/UI) skipped for print PDF. Left unsupported."
     },
     {
       "property": "-webkit-transition-duration",
       "kind": "legacy-alias",
       "legacy_aliases": [],
       "legacy_of": "transition-duration",
-      "syntax": "<time [0s,\u221e]>#",
+      "syntax": "<time [0s,∞]>#",
       "initial": null,
       "inherited": null,
       "longhands": [],
@@ -1543,7 +1543,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print-noop base (animation/transition/3D/UI) skipped for print PDF. Left unsupported."
     },
     {
       "property": "-webkit-transition-property",
@@ -1564,7 +1564,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print-noop base (animation/transition/3D/UI) skipped for print PDF. Left unsupported."
     },
     {
       "property": "-webkit-transition-timing-function",
@@ -1585,7 +1585,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print-noop base (animation/transition/3D/UI) skipped for print PDF. Left unsupported."
     },
     {
       "property": "-webkit-user-select",
@@ -1608,7 +1608,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print-noop base (animation/transition/3D/UI) skipped for print PDF. Left unsupported."
     },
     {
       "property": "accent-color",
@@ -1884,7 +1884,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<time [0s,\u221e]>#",
+      "syntax": "<time [0s,∞]>#",
       "initial": "0s",
       "inherited": "no",
       "longhands": [],
@@ -1949,7 +1949,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "[ auto | <time [0s,\u221e]> ]#",
+      "syntax": "[ auto | <time [0s,∞]> ]#",
       "initial": "auto",
       "inherited": "no",
       "longhands": [],
@@ -2932,7 +2932,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "none | <length [0,\u221e]>",
+      "syntax": "none | <length [0,∞]>",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -2974,7 +2974,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "none | <integer [1,\u221e]>",
+      "syntax": "none | <integer [1,∞]>",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -3146,7 +3146,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "none | [ <length-percentage [0,\u221e]> | <flex> ]+",
+      "syntax": "none | [ <length-percentage [0,∞]> | <flex> ]+",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -3190,7 +3190,7 @@
       "kind": "shorthand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<length-percentage [0,\u221e]>{1,2} [ / <length-percentage [0,\u221e]>{1,2} ]?",
+      "syntax": "<length-percentage [0,∞]>{1,2} [ / <length-percentage [0,∞]>{1,2} ]?",
       "initial": "0",
       "inherited": "no",
       "longhands": [
@@ -3287,7 +3287,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "none | [ <length-percentage [0,\u221e]> | <flex> ]+",
+      "syntax": "none | [ <length-percentage [0,∞]> | <flex> ]+",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -3331,7 +3331,7 @@
       "kind": "shorthand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<length-percentage [0,\u221e]>{1,2} [ / <length-percentage [0,\u221e]>{1,2} ]?",
+      "syntax": "<length-percentage [0,∞]>{1,2} [ / <length-percentage [0,∞]>{1,2} ]?",
       "initial": "0",
       "inherited": "no",
       "longhands": [
@@ -3480,7 +3480,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "none | [ <length-percentage [0,\u221e]> | <flex> ]+",
+      "syntax": "none | [ <length-percentage [0,∞]> | <flex> ]+",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -3547,7 +3547,7 @@
       "kind": "shorthand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<length-percentage [0,\u221e]>{1,2} [ / <length-percentage [0,\u221e]>{1,2} ]?",
+      "syntax": "<length-percentage [0,∞]>{1,2} [ / <length-percentage [0,∞]>{1,2} ]?",
       "initial": "0",
       "inherited": "no",
       "longhands": [
@@ -3703,7 +3703,7 @@
       ],
       "engine_status": "implemented",
       "code_path": "internal/layout/layout_tables.go",
-      "notes": "Full CSS 2.1 \u00a717.6.2.2 border conflict resolution with hidden precedence, style rank, and source order tie-breaking."
+      "notes": "Full CSS 2.1 §17.6.2.2 border conflict resolution with hidden precedence, style rank, and source order tie-breaking."
     },
     {
       "property": "border-color",
@@ -3813,7 +3813,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "[ <length [0,\u221e]> | <number [0,\u221e]> ]{1,4}",
+      "syntax": "[ <length [0,∞]> | <number [0,∞]> ]{1,4}",
       "initial": "0",
       "inherited": "no",
       "longhands": [],
@@ -3859,7 +3859,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "[<number [0,\u221e]> | <percentage [0,\u221e]>]{1,4} && fill?",
+      "syntax": "[<number [0,∞]> | <percentage [0,∞]>]{1,4} && fill?",
       "initial": "100%",
       "inherited": "no",
       "longhands": [],
@@ -3905,7 +3905,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "[ <length-percentage [0,\u221e]> | <number [0,\u221e]> | auto ]{1,4}",
+      "syntax": "[ <length-percentage [0,∞]> | <number [0,∞]> | auto ]{1,4}",
       "initial": "1",
       "inherited": "no",
       "longhands": [],
@@ -4031,7 +4031,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "none | [ <length-percentage [0,\u221e]> | <flex> ]+",
+      "syntax": "none | [ <length-percentage [0,∞]> | <flex> ]+",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -4075,7 +4075,7 @@
       "kind": "shorthand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<length-percentage [0,\u221e]>{1,2} [ / <length-percentage [0,\u221e]>{1,2} ]?",
+      "syntax": "<length-percentage [0,∞]>{1,2} [ / <length-percentage [0,∞]>{1,2} ]?",
       "initial": "0",
       "inherited": "no",
       "longhands": [
@@ -4172,7 +4172,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "none | [ <length-percentage [0,\u221e]> | <flex> ]+",
+      "syntax": "none | [ <length-percentage [0,∞]> | <flex> ]+",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -4216,7 +4216,7 @@
       "kind": "shorthand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<length-percentage [0,\u221e]>{1,2} [ / <length-percentage [0,\u221e]>{1,2} ]?",
+      "syntax": "<length-percentage [0,∞]>{1,2} [ / <length-percentage [0,∞]>{1,2} ]?",
       "initial": "0",
       "inherited": "no",
       "longhands": [
@@ -4365,7 +4365,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "none | [ <length-percentage [0,\u221e]> | <flex> ]+",
+      "syntax": "none | [ <length-percentage [0,∞]> | <flex> ]+",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -4409,7 +4409,7 @@
       "kind": "shorthand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<length-percentage [0,\u221e]>{1,2} [ / <length-percentage [0,\u221e]>{1,2} ]?",
+      "syntax": "<length-percentage [0,∞]>{1,2} [ / <length-percentage [0,∞]>{1,2} ]?",
       "initial": "0",
       "inherited": "no",
       "longhands": [
@@ -4479,7 +4479,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "all | [ sides | corners ] <length-percentage [0,\u221e]>? | [ top | right | bottom | left ] <length-percentage [0,\u221e]>",
+      "syntax": "all | [ sides | corners ] <length-percentage [0,∞]>? | [ top | right | bottom | left ] <length-percentage [0,∞]>",
       "initial": "all",
       "inherited": "no",
       "longhands": [],
@@ -4500,7 +4500,7 @@
       "kind": "shorthand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<length-percentage [0,\u221e]>{1,4} [ / <length-percentage [0,\u221e]>{1,4} ]?",
+      "syntax": "<length-percentage [0,∞]>{1,4} [ / <length-percentage [0,∞]>{1,4} ]?",
       "initial": "see individual properties",
       "inherited": "see individual properties",
       "longhands": [
@@ -4555,7 +4555,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "none | [ <length-percentage [0,\u221e]> | <flex> ]+",
+      "syntax": "none | [ <length-percentage [0,∞]> | <flex> ]+",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -4599,7 +4599,7 @@
       "kind": "shorthand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<length-percentage [0,\u221e]>{1,2} [ / <length-percentage [0,\u221e]>{1,2} ]?",
+      "syntax": "<length-percentage [0,∞]>{1,2} [ / <length-percentage [0,∞]>{1,2} ]?",
       "initial": "0",
       "inherited": "no",
       "longhands": [
@@ -4692,7 +4692,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<length [0,\u221e]>{1,2}",
+      "syntax": "<length [0,∞]>{1,2}",
       "initial": "0px 0px",
       "inherited": "yes",
       "longhands": [],
@@ -4816,7 +4816,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "none | [ <length-percentage [0,\u221e]> | <flex> ]+",
+      "syntax": "none | [ <length-percentage [0,∞]> | <flex> ]+",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -4883,7 +4883,7 @@
       "kind": "shorthand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<length-percentage [0,\u221e]>{1,2} [ / <length-percentage [0,\u221e]>{1,2} ]?",
+      "syntax": "<length-percentage [0,∞]>{1,2} [ / <length-percentage [0,∞]>{1,2} ]?",
       "initial": "0",
       "inherited": "no",
       "longhands": [
@@ -5080,7 +5080,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<length [0,\u221e]>#",
+      "syntax": "<length [0,∞]>#",
       "initial": "0",
       "inherited": "no",
       "longhands": [],
@@ -5622,7 +5622,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto | <integer [1,\u221e]>",
+      "syntax": "auto | <integer [1,∞]>",
       "initial": "auto",
       "inherited": "no",
       "longhands": [],
@@ -5668,7 +5668,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "normal | <length-percentage [0,\u221e]> | <line-width>",
+      "syntax": "normal | <length-percentage [0,∞]> | <line-width>",
       "initial": "normal",
       "inherited": "no",
       "longhands": [],
@@ -5692,7 +5692,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto | <length [0,\u221e]>",
+      "syntax": "auto | <length [0,∞]>",
       "initial": "auto",
       "inherited": "no",
       "longhands": [],
@@ -6060,7 +6060,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "none | <integer [1,\u221e]> | all | auto",
+      "syntax": "none | <integer [1,∞]> | all | auto",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -6083,7 +6083,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto | <length [0,\u221e]> | min-content | max-content | fit-content(<length-percentage>)",
+      "syntax": "auto | <length [0,∞]> | min-content | max-content | fit-content(<length-percentage>)",
       "initial": "auto",
       "inherited": "no",
       "longhands": [],
@@ -6181,7 +6181,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto? [ none | <length [0,\u221e]> ]",
+      "syntax": "auto? [ none | <length [0,∞]> ]",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -6204,7 +6204,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto? [ none | <length [0,\u221e]> ]",
+      "syntax": "auto? [ none | <length [0,∞]> ]",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -6227,7 +6227,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto? [ none | <length [0,\u221e]> ]",
+      "syntax": "auto? [ none | <length [0,∞]> ]",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -6250,7 +6250,7 @@
       "kind": "shorthand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "[ auto? [ none | <length [0,\u221e]> ] ]{1,2}",
+      "syntax": "[ auto? [ none | <length [0,∞]> ] ]{1,2}",
       "initial": "see individual properties",
       "inherited": "see individual properties",
       "longhands": [
@@ -6276,7 +6276,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto? [ none | <length [0,\u221e]> ]",
+      "syntax": "auto? [ none | <length [0,∞]> ]",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -8054,7 +8054,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<number [0,\u221e]>",
+      "syntax": "<number [0,∞]>",
       "initial": "0",
       "inherited": "no",
       "longhands": [],
@@ -8077,7 +8077,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<integer [1,\u221e]>",
+      "syntax": "<integer [1,∞]>",
       "initial": "1",
       "inherited": "no",
       "longhands": [],
@@ -8100,7 +8100,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<number [0,\u221e]>",
+      "syntax": "<number [0,∞]>",
       "initial": "1",
       "inherited": "no",
       "longhands": [],
@@ -8320,7 +8320,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "normal | <length-percentage [0,\u221e]> | infinite",
+      "syntax": "normal | <length-percentage [0,∞]> | infinite",
       "initial": "normal",
       "inherited": "no",
       "longhands": [],
@@ -8510,7 +8510,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<absolute-size> | <relative-size> | <length-percentage [0,\u221e]> | math",
+      "syntax": "<absolute-size> | <relative-size> | <length-percentage [0,∞]> | math",
       "initial": "medium",
       "inherited": "yes",
       "longhands": [],
@@ -8533,7 +8533,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "none | [ ex-height | cap-height | ch-width | ic-width | ic-height ]? [ from-font | <number [0,\u221e]> ]",
+      "syntax": "none | [ ex-height | cap-height | ch-width | ic-width | ic-height ]? [ from-font | <number [0,∞]> ]",
       "initial": "none",
       "inherited": "yes",
       "longhands": [],
@@ -8556,7 +8556,7 @@
       "kind": "legacy-alias",
       "legacy_aliases": [],
       "legacy_of": "font-width",
-      "syntax": "normal | <percentage [0,\u221e]> | ultra-condensed | extra-condensed | condensed | semi-condensed | semi-expanded | expanded | extra-expanded | ultra-expanded",
+      "syntax": "normal | <percentage [0,∞]> | ultra-condensed | extra-condensed | condensed | semi-condensed | semi-expanded | expanded | extra-expanded | ultra-expanded",
       "initial": null,
       "inherited": null,
       "longhands": [],
@@ -8959,7 +8959,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "normal | <percentage [0,\u221e]> | ultra-condensed | extra-condensed | condensed | semi-condensed | semi-expanded | expanded | extra-expanded | ultra-expanded",
+      "syntax": "normal | <percentage [0,∞]> | ultra-condensed | extra-condensed | condensed | semi-condensed | semi-expanded | expanded | extra-expanded | ultra-expanded",
       "initial": "normal",
       "inherited": "yes",
       "longhands": [],
@@ -9293,7 +9293,7 @@
       "kind": "legacy-alias",
       "legacy_aliases": [],
       "legacy_of": "column-gap",
-      "syntax": "normal | <length-percentage [0,\u221e]> | <line-width>",
+      "syntax": "normal | <length-percentage [0,∞]> | <line-width>",
       "initial": null,
       "inherited": null,
       "longhands": [],
@@ -9414,7 +9414,7 @@
       "kind": "legacy-alias",
       "legacy_aliases": [],
       "legacy_of": "row-gap",
-      "syntax": "normal | <length-percentage [0,\u221e]> | <line-width>",
+      "syntax": "normal | <length-percentage [0,∞]> | <line-width>",
       "initial": null,
       "inherited": null,
       "longhands": [],
@@ -9579,7 +9579,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto | <length-percentage [0,\u221e]> | min-content | max-content | fit-content(<length-percentage [0,\u221e]>) | <calc-size()> | <anchor-size()> | stretch | fit-content | contain",
+      "syntax": "auto | <length-percentage [0,∞]> | min-content | max-content | fit-content(<length-percentage [0,∞]>) | <calc-size()> | <anchor-size()> | stretch | fit-content | contain",
       "initial": "auto",
       "inherited": "no",
       "longhands": [],
@@ -9625,7 +9625,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "[ auto | <integer [0,\u221e]> ]{1,3}",
+      "syntax": "[ auto | <integer [0,∞]> ]{1,3}",
       "initial": "auto",
       "inherited": "yes",
       "longhands": [],
@@ -9669,7 +9669,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "no-limit | <integer [0,\u221e]>",
+      "syntax": "no-limit | <integer [0,∞]>",
       "initial": "no-limit",
       "inherited": "yes",
       "longhands": [],
@@ -9824,7 +9824,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "normal | <number [1,\u221e]> <integer [1,\u221e]> | <number [1,\u221e]> && [ drop | raise ]?",
+      "syntax": "normal | <number [1,∞]> <integer [1,∞]> | <number [1,∞]> && [ drop | raise ]?",
       "initial": "normal",
       "inherited": "no",
       "longhands": [],
@@ -10439,7 +10439,7 @@
       "kind": "shorthand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "none | [<integer [1,\u221e]> || <'block-ellipsis'>] -webkit-legacy?",
+      "syntax": "none | [<integer [1,∞]> || <'block-ellipsis'>] -webkit-legacy?",
       "initial": "none",
       "inherited": "see individual properties",
       "longhands": [
@@ -10508,7 +10508,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "normal | <number [0,\u221e]> | <length-percentage [0,\u221e]>",
+      "syntax": "normal | <number [0,∞]> | <length-percentage [0,∞]>",
       "initial": "normal",
       "inherited": "yes",
       "longhands": [],
@@ -10531,7 +10531,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<length [0,\u221e]>",
+      "syntax": "<length [0,∞]>",
       "initial": "0",
       "inherited": "yes",
       "longhands": [],
@@ -11643,7 +11643,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "none | <length-percentage [0,\u221e]> | min-content | max-content | fit-content(<length-percentage [0,\u221e]>) | <calc-size()> | <anchor-size()> | stretch | fit-content | contain",
+      "syntax": "none | <length-percentage [0,∞]> | min-content | max-content | fit-content(<length-percentage [0,∞]>) | <calc-size()> | <anchor-size()> | stretch | fit-content | contain",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -11689,7 +11689,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "none | <integer [1,\u221e]>",
+      "syntax": "none | <integer [1,∞]>",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -11712,7 +11712,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "none | <length-percentage [0,\u221e]> | min-content | max-content | fit-content(<length-percentage [0,\u221e]>) | <calc-size()> | <anchor-size()> | stretch | fit-content | contain",
+      "syntax": "none | <length-percentage [0,∞]> | min-content | max-content | fit-content(<length-percentage [0,∞]>) | <calc-size()> | <anchor-size()> | stretch | fit-content | contain",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -11758,7 +11758,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto | <length-percentage [0,\u221e]> | min-content | max-content | fit-content(<length-percentage [0,\u221e]>) | <calc-size()> | <anchor-size()> | stretch | fit-content | contain",
+      "syntax": "auto | <length-percentage [0,∞]> | min-content | max-content | fit-content(<length-percentage [0,∞]>) | <calc-size()> | <anchor-size()> | stretch | fit-content | contain",
       "initial": "auto",
       "inherited": "no",
       "longhands": [],
@@ -11825,7 +11825,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto | <length-percentage [0,\u221e]> | min-content | max-content | fit-content(<length-percentage [0,\u221e]>) | <calc-size()> | <anchor-size()> | stretch | fit-content | contain",
+      "syntax": "auto | <length-percentage [0,∞]> | min-content | max-content | fit-content(<length-percentage [0,∞]>) | <calc-size()> | <anchor-size()> | stretch | fit-content | contain",
       "initial": "auto",
       "inherited": "no",
       "longhands": [],
@@ -12214,7 +12214,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<integer [1,\u221e]>",
+      "syntax": "<integer [1,∞]>",
       "initial": "2",
       "inherited": "yes",
       "longhands": [],
@@ -13005,7 +13005,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<length-percentage [0,\u221e]>",
+      "syntax": "<length-percentage [0,∞]>",
       "initial": "0",
       "inherited": "no",
       "longhands": [],
@@ -13100,7 +13100,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<length-percentage [0,\u221e]>",
+      "syntax": "<length-percentage [0,∞]>",
       "initial": "0",
       "inherited": "no",
       "longhands": [],
@@ -13123,7 +13123,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<length-percentage [0,\u221e]>",
+      "syntax": "<length-percentage [0,∞]>",
       "initial": "0",
       "inherited": "no",
       "longhands": [],
@@ -13146,7 +13146,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<length-percentage [0,\u221e]>",
+      "syntax": "<length-percentage [0,∞]>",
       "initial": "0",
       "inherited": "no",
       "longhands": [],
@@ -13284,7 +13284,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "none | <length> [0,\u221e]",
+      "syntax": "none | <length> [0,∞]",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -13331,7 +13331,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<time [0s,\u221e]> | none | x-weak | weak | medium | strong | x-strong",
+      "syntax": "<time [0s,∞]> | none | x-weak | weak | medium | strong | x-strong",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -13352,7 +13352,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<time [0s,\u221e]> | none | x-weak | weak | medium | strong | x-strong",
+      "syntax": "<time [0s,∞]> | none | x-weak | weak | medium | strong | x-strong",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -13373,7 +13373,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "none | <length [0,\u221e]>",
+      "syntax": "none | <length [0,∞]>",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -13933,7 +13933,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<time [0s,\u221e]> | none | x-weak | weak | medium | strong | x-strong",
+      "syntax": "<time [0s,∞]> | none | x-weak | weak | medium | strong | x-strong",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -13954,7 +13954,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<time [0s,\u221e]> | none | x-weak | weak | medium | strong | x-strong",
+      "syntax": "<time [0s,∞]> | none | x-weak | weak | medium | strong | x-strong",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -14022,7 +14022,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "normal | <length-percentage [0,\u221e]> | <line-width>",
+      "syntax": "normal | <length-percentage [0,∞]> | <line-width>",
       "initial": "normal",
       "inherited": "no",
       "longhands": [],
@@ -15178,7 +15178,7 @@
       "kind": "shorthand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "[ auto | <length-percentage [0,\u221e]> ]{1,4}",
+      "syntax": "[ auto | <length-percentage [0,∞]> ]{1,4}",
       "initial": "auto",
       "inherited": "no",
       "longhands": [
@@ -15206,7 +15206,7 @@
       "kind": "shorthand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "[ auto | <length-percentage [0,\u221e]> ]{1,2}",
+      "syntax": "[ auto | <length-percentage [0,∞]> ]{1,2}",
       "initial": "auto",
       "inherited": "no",
       "longhands": [
@@ -15232,7 +15232,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto | <length-percentage [0,\u221e]>",
+      "syntax": "auto | <length-percentage [0,∞]>",
       "initial": "auto",
       "inherited": "no",
       "longhands": [],
@@ -15255,7 +15255,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto | <length-percentage [0,\u221e]>",
+      "syntax": "auto | <length-percentage [0,∞]>",
       "initial": "auto",
       "inherited": "no",
       "longhands": [],
@@ -15278,7 +15278,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto | <length-percentage [0,\u221e]>",
+      "syntax": "auto | <length-percentage [0,∞]>",
       "initial": "auto",
       "inherited": "no",
       "longhands": [],
@@ -15301,7 +15301,7 @@
       "kind": "shorthand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "[ auto | <length-percentage [0,\u221e]> ]{1,2}",
+      "syntax": "[ auto | <length-percentage [0,∞]> ]{1,2}",
       "initial": "auto",
       "inherited": "no",
       "longhands": [
@@ -15327,7 +15327,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto | <length-percentage [0,\u221e]>",
+      "syntax": "auto | <length-percentage [0,∞]>",
       "initial": "auto",
       "inherited": "no",
       "longhands": [],
@@ -15350,7 +15350,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto | <length-percentage [0,\u221e]>",
+      "syntax": "auto | <length-percentage [0,∞]>",
       "initial": "auto",
       "inherited": "no",
       "longhands": [],
@@ -15373,7 +15373,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto | <length-percentage [0,\u221e]>",
+      "syntax": "auto | <length-percentage [0,∞]>",
       "initial": "auto",
       "inherited": "no",
       "longhands": [],
@@ -15396,7 +15396,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto | <length-percentage [0,\u221e]>",
+      "syntax": "auto | <length-percentage [0,∞]>",
       "initial": "auto",
       "inherited": "no",
       "longhands": [],
@@ -15419,7 +15419,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto | <length-percentage [0,\u221e]>",
+      "syntax": "auto | <length-percentage [0,∞]>",
       "initial": "auto",
       "inherited": "no",
       "longhands": [],
@@ -15719,7 +15719,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<length-percentage [0,\u221e]>",
+      "syntax": "<length-percentage [0,∞]>",
       "initial": "0",
       "inherited": "no",
       "longhands": [],
@@ -15765,7 +15765,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<length-percentage [0,\u221e]>",
+      "syntax": "<length-percentage [0,∞]>",
       "initial": "0",
       "inherited": "no",
       "longhands": [],
@@ -16463,7 +16463,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<number [0,\u221e]> | <length [0,\u221e]>",
+      "syntax": "<number [0,∞]> | <length [0,∞]>",
       "initial": "8",
       "inherited": "yes",
       "longhands": [],
@@ -17272,7 +17272,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto | none | <percentage [0,\u221e]>",
+      "syntax": "auto | none | <percentage [0,∞]>",
       "initial": "auto",
       "inherited": "yes",
       "longhands": [],
@@ -17939,7 +17939,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<time [0s,\u221e]>#",
+      "syntax": "<time [0s,∞]>#",
       "initial": "0s",
       "inherited": "no",
       "longhands": [],
@@ -18380,7 +18380,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto | <time [0s,\u221e]>",
+      "syntax": "auto | <time [0s,∞]>",
       "initial": "auto",
       "inherited": "no",
       "longhands": [],
@@ -18422,7 +18422,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<frequency [0Hz,\u221e]> && absolute | [ [ x-low | low | medium | high | x-high ] || [ <frequency [0Hz,\u221e]> | <semitones> | <percentage> ] ]",
+      "syntax": "<frequency [0Hz,∞]> && absolute | [ [ x-low | low | medium | high | x-high ] || [ <frequency [0Hz,∞]> | <semitones> | <percentage> ] ]",
       "initial": "medium",
       "inherited": "yes",
       "longhands": [],
@@ -18443,7 +18443,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<frequency [0Hz,\u221e]> && absolute | [ [ x-low | low | medium | high | x-high ] || [ <frequency [0Hz,\u221e]> | <semitones> | <percentage> ] ]",
+      "syntax": "<frequency [0Hz,∞]> && absolute | [ [ x-low | low | medium | high | x-high ] || [ <frequency [0Hz,∞]> | <semitones> | <percentage> ] ]",
       "initial": "medium",
       "inherited": "yes",
       "longhands": [],
@@ -18464,7 +18464,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "[ normal | x-slow | slow | medium | fast | x-fast ] || <percentage [0,\u221e]>",
+      "syntax": "[ normal | x-slow | slow | medium | fast | x-fast ] || <percentage [0,∞]>",
       "initial": "normal",
       "inherited": "yes",
       "longhands": [],
@@ -18597,7 +18597,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<integer [1,\u221e]>",
+      "syntax": "<integer [1,∞]>",
       "initial": "2",
       "inherited": "yes",
       "longhands": [],
@@ -18620,7 +18620,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto | <length-percentage [0,\u221e]> | min-content | max-content | fit-content(<length-percentage [0,\u221e]>) | <calc-size()> | <anchor-size()> | stretch | fit-content | contain",
+      "syntax": "auto | <length-percentage [0,∞]> | min-content | max-content | fit-content(<length-percentage [0,∞]>) | <calc-size()> | <anchor-size()> | stretch | fit-content | contain",
       "initial": "auto",
       "inherited": "no",
       "longhands": [],
@@ -18974,7 +18974,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<number [0,\u221e]> | <percentage [0,\u221e]>",
+      "syntax": "<number [0,∞]> | <percentage [0,∞]>",
       "initial": "1",
       "inherited": "no",
       "longhands": [],
@@ -22601,7 +22601,7 @@
       "print_relevant": true,
       "goal": "implement",
       "engine_status": "partial",
-      "notes": "Viewport vmax; some length paths pass containing for both axes so vmin\u2248vmax.",
+      "notes": "Viewport vmax; some length paths pass containing for both axes so vmin≈vmax.",
       "code_path": "internal/layout/style_values.go"
     },
     {
@@ -22613,7 +22613,7 @@
       "print_relevant": true,
       "goal": "implement",
       "engine_status": "partial",
-      "notes": "Viewport vmin; some length paths pass containing for both axes so vmin\u2248vmax.",
+      "notes": "Viewport vmin; some length paths pass containing for both axes so vmin≈vmax.",
       "code_path": "internal/layout/style_values.go"
     },
     {

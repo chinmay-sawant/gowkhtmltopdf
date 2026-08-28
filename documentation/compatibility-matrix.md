@@ -322,6 +322,139 @@ The following 94 properties are intentionally left **unsupported** (Not implemen
 
 Total: 94 properties across three families. All are Not implemented and left unsupported with no print PDF consumer.
 
+### 5.2 Vendor-prefix aliases (-webkit-) - Phase 69 and Phase 82
+
+This section is the contract for vendor-prefixed alias handling. Alias mechanism is
+`normalizeVendorPrefix` at `internal/layout/style_cascade.go:913` called from
+`applyStyleProp`, plus `display` value remaps at `internal/layout/style_properties.go:81`
+and value remaps in `remapWebkitValue` at `internal/layout/style_cascade.go:1000`.
+
+- **Total tracked:** 70 `-webkit-` alias names.
+- **Implemented:** 28 aliases that map to an already Implemented unprefixed base.
+- **Unsupported:** 42 aliases whose bases are not Implemented or are print-noop. These are
+  not Implemented and degrade gracefully (ignored declaration).
+
+Do not treat Unsupported aliases as Implemented. Tests for Implemented aliases live in
+`internal/layout/style_cascade_test.go:188` (`TestWebkitPrefixAliases`).
+
+#### 5.2.1 Implemented vendor aliases (28)
+
+28 = 22 from Phase 69 + 6 new in Phase 82 slice A. Each entry has a prefixed-name
+test and a consumer in layout or paint (the unprefixed base is already Implemented).
+
+| Vendor alias | Canonical property | Notes / base |
+|--------------|--------------------|--------------|
+| `-webkit-box-sizing` | `box-sizing` | `normalizeVendorPrefix` `style_cascade.go:913` |
+| `-webkit-border-radius` | `border-radius` | same |
+| `-webkit-border-top-left-radius` | `border-top-left-radius` | same |
+| `-webkit-border-top-right-radius` | `border-top-right-radius` | same |
+| `-webkit-border-bottom-left-radius` | `border-bottom-left-radius` | same |
+| `-webkit-border-bottom-right-radius` | `border-bottom-right-radius` | same |
+| `-webkit-transform` | `transform` | same |
+| `-webkit-transform-origin` | `transform-origin` | same |
+| `-webkit-flex` | `flex` | flex shorthand |
+| `-webkit-flex-basis` | `flex-basis` | same |
+| `-webkit-flex-direction` | `flex-direction` | same |
+| `-webkit-flex-flow` | `flex-flow` | same |
+| `-webkit-flex-grow` | `flex-grow` | same |
+| `-webkit-flex-shrink` | `flex-shrink` | same |
+| `-webkit-flex-wrap` | `flex-wrap` | same |
+| `-webkit-justify-content` | `justify-content` | same |
+| `-webkit-align-content` | `align-content` | same |
+| `-webkit-align-items` | `align-items` | same |
+| `-webkit-align-self` | `align-self` | same |
+| `-webkit-order` | `order` | same |
+| `-webkit-box-shadow` | `box-shadow` | alias to `box-shadow` (see `box-shadow` row in 2.4) |
+| `-webkit-filter` | `filter` | alias to `filter` |
+| `-webkit-box-align` | `align-items` | **New in Phase 82 slice A.** Value remap `start`->`flex-start`, `end`->`flex-end`, `center`->`center`, `stretch`->`stretch`, `baseline`->`baseline` via `remapWebkitValue` `style_cascade.go:1000` |
+| `-webkit-box-flex` | `flex-grow` | **New in Phase 82 slice A.** Direct value pass-through to `flex-grow` |
+| `-webkit-box-ordinal-group` | `order` | **New in Phase 82 slice A.** Value remap `N` -> `N-1` (1-based group to 0-based order) via `remapWebkitValue` `style_cascade.go:1000` |
+| `-webkit-box-orient` | `flex-direction` | **New in Phase 82 slice A.** Value remap `horizontal`/`inline-axis`->`row`, `vertical`/`block-axis`->`column` via `remapWebkitValue` |
+| `-webkit-box-pack` | `justify-content` | **New in Phase 82 slice A.** Value remap `start`->`flex-start`, `end`->`flex-end`, `center`->`center`, `justify`->`space-between` via `remapWebkitValue` |
+| `-webkit-text-fill-color` | `color` | **New in Phase 82 slice A.** Alias to `color` |
+
+Display value aliases (also Phase 82 slice A, at `internal/layout/style_properties.go:81`):
+
+| Specified value | Used value |
+|-----------------|------------|
+| `display: -webkit-box` | `display: flex` |
+| `display: -webkit-inline-box` | `display: inline-flex` |
+
+#### 5.2.2 Still Unsupported vendor aliases (42)
+
+42 aliases remain **Unsupported**. They are not Implemented. Each group notes the
+blocking base. Do not claim Implemented for any of these 42.
+
+**Group B - 3 background longhands (wait Phase 80):** bases `background-clip`,
+`background-origin`, `background-size` are not yet Implemented. Aliases stay
+Unsupported until those bases ship.
+
+| Vendor alias | Blocking base | Reason |
+|--------------|---------------|--------|
+| `-webkit-background-clip` | `background-clip` | wait Phase 80 |
+| `-webkit-background-origin` | `background-origin` | wait Phase 80 |
+| `-webkit-background-size` | `background-size` | wait Phase 80 |
+
+**Group C - 14 mask family (wait Phase 83 hard defer):** bases `mask` and
+`mask-border` families are hard-deferred. No alias flips until bases are
+Implemented.
+
+| Vendor alias | Blocking base | Reason |
+|--------------|---------------|--------|
+| `-webkit-mask` | `mask` | wait Phase 83 hard defer |
+| `-webkit-mask-image` | `mask-image` | wait Phase 83 hard defer |
+| `-webkit-mask-size` | `mask-size` | wait Phase 83 hard defer |
+| `-webkit-mask-repeat` | `mask-repeat` | wait Phase 83 hard defer |
+| `-webkit-mask-position` | `mask-position` | wait Phase 83 hard defer |
+| `-webkit-mask-origin` | `mask-origin` | wait Phase 83 hard defer |
+| `-webkit-mask-clip` | `mask-clip` | wait Phase 83 hard defer |
+| `-webkit-mask-composite` | `mask-composite` | wait Phase 83 hard defer |
+| `-webkit-mask-box-image` | `mask-border` | wait Phase 83 hard defer |
+| `-webkit-mask-box-image-source` | `mask-border-source` | wait Phase 83 hard defer |
+| `-webkit-mask-box-image-slice` | `mask-border-slice` | wait Phase 83 hard defer |
+| `-webkit-mask-box-image-width` | `mask-border-width` | wait Phase 83 hard defer |
+| `-webkit-mask-box-image-outset` | `mask-border-outset` | wait Phase 83 hard defer |
+| `-webkit-mask-box-image-repeat` | `mask-border-repeat` | wait Phase 83 hard defer |
+
+**Group D - 20 animation / transition / 3D / UI print-noop:** bases have no print
+PDF consumer and stay skipped. Aliases stay Unsupported (permanent non-goal for
+print).
+
+| Vendor alias | Blocking base | Reason |
+|--------------|---------------|--------|
+| `-webkit-animation` | `animation` | print-noop (no timelines) |
+| `-webkit-animation-delay` | `animation-delay` | print-noop |
+| `-webkit-animation-direction` | `animation-direction` | print-noop |
+| `-webkit-animation-duration` | `animation-duration` | print-noop |
+| `-webkit-animation-fill-mode` | `animation-fill-mode` | print-noop |
+| `-webkit-animation-iteration-count` | `animation-iteration-count` | print-noop |
+| `-webkit-animation-name` | `animation-name` | print-noop |
+| `-webkit-animation-play-state` | `animation-play-state` | print-noop |
+| `-webkit-animation-timing-function` | `animation-timing-function` | print-noop |
+| `-webkit-transition` | `transition` | print-noop |
+| `-webkit-transition-delay` | `transition-delay` | print-noop |
+| `-webkit-transition-duration` | `transition-duration` | print-noop |
+| `-webkit-transition-property` | `transition-property` | print-noop |
+| `-webkit-transition-timing-function` | `transition-timing-function` | print-noop |
+| `-webkit-backface-visibility` | `backface-visibility` | print-noop (3D) |
+| `-webkit-perspective` | `perspective` | print-noop (3D) |
+| `-webkit-perspective-origin` | `perspective-origin` | print-noop (3D) |
+| `-webkit-transform-style` | `transform-style` | print-noop (3D) |
+| `-webkit-appearance` | `appearance` | print-noop (UI) |
+| `-webkit-user-select` | `user-select` | print-noop (UI) |
+
+**Group E - 5 WebKit-native with no print consumer:** bases are WebKit extensions
+with no consumer in the print engine. Left Unsupported unless a base plus consumer
+lands.
+
+| Vendor alias | Blocking base | Reason |
+|--------------|---------------|--------|
+| `-webkit-line-clamp` | `line-clamp` | WebKit-native, no print consumer |
+| `-webkit-text-size-adjust` | `text-size-adjust` | WebKit-native, no print consumer |
+| `-webkit-text-stroke` | `text-stroke` | WebKit-native, no print consumer |
+| `-webkit-text-stroke-color` | `text-stroke-color` | WebKit-native, no print consumer |
+| `-webkit-text-stroke-width` | `text-stroke-width` | WebKit-native, no print consumer |
+
 ## 6. Security policy (frozen defaults)
 
 | Rule | Value |

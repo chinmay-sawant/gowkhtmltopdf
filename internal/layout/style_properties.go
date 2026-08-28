@@ -78,6 +78,10 @@ func setDisplayKeyword(style *ResolvedStyle, value string) {
 		cssDisplayInlineBlock, displayTableCaption, "table-column", "table-column-group",
 		displayFlex, displayInlineFlex, displayGrid, displayInlineGrid, displaySubgrid, displayFlowRoot:
 		style.Display = value
+	case "-webkit-box":
+		style.Display = displayFlex
+	case "-webkit-inline-box":
+		style.Display = displayInlineFlex
 	}
 }
 
@@ -356,7 +360,7 @@ func setJustifyContentValue(style *ResolvedStyle, value string) {
 
 func setAlignItemsValue(style *ResolvedStyle, value string) {
 	switch value {
-	case fxStretch, flexStartKeyword, fxFlexEnd, fxCenter, fxStart, fxEnd:
+	case fxStretch, flexStartKeyword, fxFlexEnd, fxCenter, fxStart, fxEnd, "baseline":
 		style.AlignItems = value
 	}
 }
