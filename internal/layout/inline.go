@@ -440,6 +440,10 @@ func (e *engine) breakOverflowItem(
 // allowMidTokenBreak applies the CSS wrapping policy to decide whether the
 // token may be split mid-word on the current line instead of wrapping whole.
 func allowMidTokenBreak(pol wordBreakPolicy, adv, fullLineW float64, aloneOnLine bool) bool {
+	if pol == breakKeepAll {
+		return false
+	}
+
 	tokenExceedsLine := adv > fullLineW
 	// Mid-line: a normal / break-word token that fits a full next line must
 	// wrap whole — not mid-break into a tight remainW (captions: "International").

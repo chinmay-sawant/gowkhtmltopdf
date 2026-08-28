@@ -143,7 +143,7 @@ func TestBackgroundImageMissingSkips(t *testing.T) {
 	}
 }
 
-func TestBackgroundImageGradientIgnored(t *testing.T) {
+func TestBackgroundImageGradientRenders(t *testing.T) {
 	t.Parallel()
 
 	called := false
@@ -156,15 +156,15 @@ func TestBackgroundImageGradientIgnored(t *testing.T) {
 	eng.prependChrome(0, &box{}, sty, 0, 0, 100, 50)
 
 	if called {
-		t.Fatal("gradient fetched an image")
+		t.Fatal("gradient unexpectedly fetched an external image")
 	}
 
-	if len(eng.deferredChrome) != 0 {
-		t.Fatalf("gradient painted chrome = %+v", eng.deferredChrome)
+	if len(eng.deferredChrome) == 0 {
+		t.Fatal("gradient did not paint any chrome")
 	}
 }
 
-func TestBackgroundImageFirstLayerOnly(t *testing.T) {
+func TestBackgroundImageMultiLayer(t *testing.T) {
 	t.Parallel()
 
 	var fetched []string
@@ -175,10 +175,9 @@ func TestBackgroundImageFirstLayerOnly(t *testing.T) {
 	})
 	sty := ResolvedStyle{BackgroundImage: `url("a.png"), url("b.png")`} //nolint:exhaustruct // two layers
 	eng.prependChrome(0, &box{}, sty, 0, 0, 40, 20)
-	_ = wantSingleDeferredImage(t, eng)
 
-	if len(fetched) != 1 || fetched[0] != "a.png" {
-		t.Errorf("fetched = %q, want [a.png]", fetched)
+	if len(fetched) != 2 || fetched[0] != "b.png" || fetched[1] != "a.png" {
+		t.Errorf("fetched = %q, want [b.png a.png]", fetched)
 	}
 }
 

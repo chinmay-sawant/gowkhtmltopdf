@@ -1605,17 +1605,40 @@ func resolveDefiniteWidth(eng *engine, style ResolvedStyle, availW float64, widt
 
 // clampBlockMinMax applies the min/max-width constraints to w.
 func clampBlockMinMax(eng *engine, style ResolvedStyle, availW, width float64) float64 {
+	width = clampBlockMinWidth(eng, style, availW, width)
+
+	return clampBlockMaxWidth(eng, style, availW, width)
+}
+
+func clampBlockMinWidth(eng *engine, style ResolvedStyle, availW, width float64) float64 {
 	if style.MinWidthPercent >= 0 && availW > 0 && availW < 1e12 {
 		mn := availW * style.MinWidthPercent / cssPercent
 		if width < mn {
-			width = mn
+			return mn
 		}
-	} else if style.MinWidth > 0 && width < eng.scalePt(style.MinWidth) {
-		width = eng.scalePt(style.MinWidth)
+
+		return width
+	}
+
+	if style.MinWidth > 0 && width < eng.scalePt(style.MinWidth) {
+		return eng.scalePt(style.MinWidth)
+	}
+
+	return width
+}
+
+func clampBlockMaxWidth(eng *engine, style ResolvedStyle, availW, width float64) float64 {
+	if style.MaxWidthPercent >= 0 && availW > 0 && availW < 1e12 {
+		mx := availW * style.MaxWidthPercent / cssPercent
+		if width > mx {
+			return mx
+		}
+
+		return width
 	}
 
 	if style.MaxWidth >= 0 && width > eng.scalePt(style.MaxWidth) {
-		width = eng.scalePt(style.MaxWidth)
+		return eng.scalePt(style.MaxWidth)
 	}
 
 	return width

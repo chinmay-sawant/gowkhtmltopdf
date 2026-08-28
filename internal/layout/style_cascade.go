@@ -197,7 +197,10 @@ var inheritableProps = []inheritCopy{ //nolint:gochecknoglobals // static inheri
 	},
 	{
 		[]string{"border-spacing"},
-		func(dst, src *ResolvedStyle) { dst.BorderSpacing = src.BorderSpacing },
+		func(dst, src *ResolvedStyle) {
+			dst.BorderSpacing = src.BorderSpacing
+			dst.BorderSpacingV = src.BorderSpacingV
+		},
 	},
 	{[]string{"orphans"}, func(dst, src *ResolvedStyle) { dst.Orphans = src.Orphans }},
 	{[]string{"widows"}, func(dst, src *ResolvedStyle) { dst.Widows = src.Widows }},

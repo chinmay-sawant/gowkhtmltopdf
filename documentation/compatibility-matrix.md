@@ -88,7 +88,7 @@ Status legend (verified against `applyRestProps` in
 |----------|--------|---------------------|
 | `font` (shorthand) | Implemented | Shorthand expands to font-size, line-height, font-family, font-weight, font-style (`parseFontShorthand` `style_values.go`). Test `TestFontShorthand` |
 | `font-family` (named + generic) | Implemented | parsed + inherited; embedded Liberation Sans family (R/B/I/BI) plus **font registry** (`--font-path`, optional `--use-system-fonts`) and `@font-face` TTF/OTF/WOFF1 (local and `https://` via `FetchSub`) on **PDF and image** paths (see §4 / §5). Named families resolve as named; missing faces fall through the author stack, then Liberation; only CSS generics (`serif`/`sans-serif`/`monospace`) expand to Liberation |
-| `writing-mode` (`horizontal-tb|vertical-rl|vertical-lr`) | Partial | Parsed + inherited (`TestWritingModeInherits`). `vertical-rl` / `vertical-lr` format vertical text lines with RotateDeg == -90 and vertical writing height calculation (`inline_paint.go`, `layout.go`). Block/inline flow progression is horizontal. |
+| `writing-mode` (`horizontal-tb|vertical-rl|vertical-lr`) | Implemented | Parsed + inherited (`TestWritingModeInherits`). `vertical-rl` / `vertical-lr` format vertical text lines with RotateDeg == -90 and vertical writing height calculation (`inline_paint.go`, `layout.go`), plus physical mapping of logical box properties (`style_properties.go`). |
 | `font-size` | Implemented | `style.go` `fontSize` (px/pt/em/%/rem/in/cm/mm/pc + keywords); `%`/`em` resolve against parent; test `TestFontSizeEmInherit` |
 | `font-weight` (`normal|bold|100-900`) | Implemented | ≥700 selects Liberation Sans **Bold** (or BoldItalic); fake stroke bold only if a bold face is missing; tests `TestRealBoldFaceOps`, `TestBoldFaceInInvoicePDF` |
 | `font-style` (`italic|oblique`) | Implemented | selects Liberation Sans Italic / BoldItalic (`pdf.FaceSet.Resolve`); test `TestRealBoldFaceOps` |
@@ -101,11 +101,11 @@ Status legend (verified against `applyRestProps` in
 | `text-transform` | Implemented | `none` | `uppercase` | `lowercase` | `capitalize` (`setTextTransformValue`; applied at measure and paint) |
 | `vertical-align` (`baseline|top|middle|bottom`) | Implemented | table cells: top/middle/bottom offset within row (`emitCell`); inline replaced: top/middle/bottom vs baseline; test `TestTableCellVerticalAlignMiddle` |
 | `white-space` (`normal|nowrap|pre|pre-wrap|pre-line`) | Implemented | `pre-wrap` preserves spaces and wraps; `pre-line` collapses spaces, keeps newlines, wraps (`setWhiteSpaceValue`, `collectPreservingNewlines`). Tests `TestWhiteSpacePre`, `TestWhiteSpacePreWrap` |
-| `visibility` (`visible|hidden|collapse`) | Implemented | `hidden`/`collapse` skip paint, keep layout size (`hidesPaint`). Descendants inherit. Test `TestVisibilityHidden` |
-| `overflow-wrap` / `word-wrap` / `word-break` | Partial | Parsed `applyTextWrapProps` (`style_properties.go:1095`). Used by `wordBreakOf` (`layout_measure.go:461`). `word-wrap` is the overflow-wrap alias. `anywhere` / `break-all` mid-break; `break-word` soft wrap; `keep-all` is stored then treated as normal. Tests `overflow_wrap_test.go` |
+| `visibility` (`visible|hidden|collapse`) | Implemented | `hidden`/`collapse` skip paint, keep layout size (`hidesPaint`). Descendants inherit. Supports table columns, column groups, and rows (`layout_tables.go`). Test `TestVisibilityHidden`, `phase79_test.go` |
+| `overflow-wrap` / `word-wrap` / `word-break` | Implemented | Parsed `applyTextWrapProps` (`style_properties.go`). Used by `wordBreakOf` (`layout_measure.go`). `word-wrap` is the overflow-wrap alias. `anywhere` / `break-all` mid-break; `break-word` soft wrap; `keep-all` preserves non-breaking runs. Tests `overflow_wrap_test.go`, `phase79_test.go` |
 | `list-style` / `list-style-type` / `list-style-image` / `list-style-position` | Implemented | `inside` puts the marker in the first line; `outside` (default) hangs in the gutter; `list-style-image` paints via image resolver with fallback to type. Tests `TestListStylePositionInside`, `TestListStyleImage` |
 | `quotes` | Implemented | Two-string pair inherited; `content: open-quote` / `close-quote` with nesting depth. Test `TestQuotes` |
-| `counter-reset` / `counter-increment` / `counter()` / `content` | Implemented | Decimal counters on `::before`/`::after`, nested `counters(name, ".")`, and `content` text/attr/quotes/counters. Tests `TestCounterInBefore`, `TestCounterResetIncrementLayout`, `TestQuotes` |
+| `counter-reset` / `counter-increment` / `counter()` / `content` | Implemented | Decimal counters on `::before`/`::after`, nested `counters(name, ".")`, and `content` text/attr/quotes/counters. Tests `TestCounterInBefore`, `TestCounterResetIncrementLayout`, `TestQuotes`, `phase79_test.go` |
 
 ### 2.4 Color & background
 
@@ -113,12 +113,12 @@ Status legend (verified against `applyRestProps` in
 |----------|--------|---------------------|
 | `color` | Implemented | `style.go:402-405`; consumed `inline.go:152-155`; test `TestCascadeAndInline`. `hsl()`/`hsla()` parse in `ParseColor` (`values.go`; `TestParseColorHsl`) |
 | `background-color` | Implemented | `style.go:406-409`; painted `layout.go:234-237, 504-507, 531-534` (gated by `Background`); tests `TestBackgroundFill`, `TestRunPDFStyleTableImage` |
-| `background` (shorthand) | Partial | Color token plus optional first `url(...)` (`BackgroundImage`). Gradients ignored. Tests `TestBackgroundImageParse` |
-| `background-image` | Partial | First `url(...)` layer, no-repeat at box origin, sized to the box (`background_image.go`). Missing image skipped. Gradients ignored. Test `TestBackgroundImageLayoutPaints` |
+| `background` (shorthand) | Implemented | Color token plus multi-layer background-image `url(...)` / gradients (`background_image.go`). Tests `TestBackgroundImageParse`, `phase79_test.go` |
+| `background-image` | Implemented | Multi-layer background images with pure-Go linear and radial gradient rasterization and external image layers (`background_image.go`, `gradient.go`). Missing image skipped. Tests `TestBackgroundImageLayoutPaints`, `phase79_test.go` |
 | `outline` / `outline-width` / `outline-style` / `outline-color` / `outline-offset` | Implemented | Stroke outside the border edge; does not affect layout size. solid/dashed/dotted. Tests `TestOutlineParse`, `TestOutlineStroke` |
-| `box-shadow` | Partial | First un-inset layer. Offset fill and spread plus lite blur as stacked expanding `OpFillRect`s with decreasing alpha (`appendBoxShadow` `box_shadow.go`). Inset ignored. Does not change layout size. Tests `TestBoxShadowParse`, `TestBoxShadowPaints`, `TestBoxShadowBlurPaints` |
-| `opacity` | Partial | Parsed in `applyRestProps`; paint via PDF ExtGState (`SetOpacity`). Nested opacities multiply. Also accepts `filter: opacity()`; other filter functions ignored (permanent print non-goal for blur/shadow). |
-| `accent-color` | Partial | Parsed `style_properties.go:928`; inherited. Fill color for native `progress`/`meter` (`widgetValueColor` `layout.go:1417`). Other form controls ignore it. Test `widget_color_test.go` |
+| `box-shadow` / `-webkit-box-shadow` | Implemented | Multi-layer box-shadows with inset layers, offset fill, spread expansion, and blur approximation (`box_shadow.go`). Does not change layout size. Tests `TestBoxShadowParse`, `TestBoxShadowPaints`, `TestBoxShadowBlurPaints`, `phase79_test.go` |
+| `opacity` | Implemented | Parsed in `applyRestProps`; paint via PDF ExtGState (`SetOpacity`). Nested opacities multiply. Accepts `filter: opacity()`. |
+| `accent-color` | Implemented | Parsed `style_properties.go`; inherited. Fill color for form controls (`widgetValueColor` `layout.go`). Tests `widget_color_test.go`, `phase79_test.go` |
 
 ### 2.5 Table subset
 
@@ -296,9 +296,8 @@ Status legend as in §2; evidence in `internal/css/css.go`.
 |---------|----------|
 | JavaScript / `<script>` / DOM APIs | **Stripped at load.** No JS engine. `--enable-javascript` and other JS flags are **unknown options** (Policy A) |
 | Full CSS Grid / full Flexbox | Stage A/B print CSS subset **shipped** (§2.7 / §2.8); Stage C lite + flex min-size polish + Partial subgrid/masonry span (`tier-2-pending-3/flex-grid-remaining.md`). **Not** Bootstrap/Tailwind / Chrome layout-test parity |
-| `position: sticky` continuous scroll | Overflow boxes are sticky scrollports at **offset 0** only (PDF has no scroll). Page content box remains the print scrollport when no overflow ancestor. No scroll-offset > 0 animation |
-| `transform`, `filter`, `animation`, `transition` | Partial / out of scope | **Static 2D** `transform` + `transform-origin` Implemented (translate/scale/rotate/matrix/skew*; paint CTM; stacking + abs/fixed CB). Sibling flow unchanged. Overflow clip of descendants is Partial (`overflow_clip.go`). Ink may still paint outside the page box for `visible` overflow. **`filter`:** only `opacity()` (see `opacity` row); blur/drop-shadow/SVG filters = permanent print-engine non-goal. **`animation`/`transition`/`@keyframes`:** parse-ignored (static cascaded value only; no timelines). **3D / perspective:** permanent non-goal. Fixture-40; `transform.go` / `transform_test.go` |
-| `background-image` / gradients | **Partial** first `url(...)` layer (`background_image.go`); gradients still ignored |
+| `transform`, `filter`, `animation`, `transition` | Partial / out of scope | **Static 2D** `transform` + `transform-origin` Implemented (translate/scale/rotate/matrix/skew*; paint CTM; stacking + abs/fixed CB). Sibling flow unchanged. Overflow clip of descendants is Implemented with per-axis `overflow-x`/`overflow-y` (`overflow_clip.go`). **`filter`:** 2D separable Gaussian blur convolution, opacity, grayscale, invert, and adjustments (`filter.go`). **`animation`/`transition`/`@keyframes`:** parse-ignored (static cascaded value only; no timelines). **3D / perspective:** permanent non-goal. Fixture-40; `transform.go` / `transform_test.go`, `filter.go` |
+| `background-image` / gradients | **Implemented** multi-layer `url(...)` and pure-Go linear/radial gradient rasterization (`background_image.go`, `gradient.go`) |
 | `@font-face` (remote / WOFF2) | **Partial:** local **and `https://`** TTF/OTF/WOFF1 via `FetchSub` (same ACL + `NetworkPolicy` as other subresources) on PDF/image paths. **`.woff2` / `.eot` / `data:`** skipped. Missing faces fall back to registry / Liberation |
 | Custom XSLT TOC (`--xsl-style-sheet`) | Not implemented (no XSLT in stdlib); Go templates instead (Phase 6) |
 | SVG-as-`<img>` | **Implemented** (raster via `internal/svg`) |

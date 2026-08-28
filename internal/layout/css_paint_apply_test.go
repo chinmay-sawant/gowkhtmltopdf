@@ -227,8 +227,8 @@ func TestBackgroundImageParse(t *testing.T) {
 		t.Fatalf("background-image:none = %q, want empty", got)
 	}
 
-	if got := styleByClass(t, styles, "grad").BackgroundImage; got != "" {
-		t.Fatalf("gradient should be ignored, got %q", got)
+	if got := styleByClass(t, styles, "grad").BackgroundImage; got != "linear-gradient(red, blue)" {
+		t.Fatalf("gradient background = %q, want linear-gradient(red, blue)", got)
 	}
 
 	sh := styleByClass(t, styles, "sh")

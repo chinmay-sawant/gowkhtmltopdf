@@ -33,8 +33,9 @@ func (e *engine) buildTable(node *html.Node, style ResolvedStyle, availW, posX, 
 	// table width
 	// border-collapse: collapse suppresses the separate-border gap so colspan
 	// header rows and body cells share edges instead of looking double-lined.
-	spacing := e.tableSpacing(style)
-	chrome := spacing*float64(nCols+1) +
+	spacingH := e.tableHSpacing(style)
+	spacingV := e.tableVSpacing(style)
+	chrome := spacingH*float64(nCols+1) +
 		e.scalePt(style.BorderLeft.Width) + e.scalePt(style.BorderRight.Width) +
 		e.scalePt(style.PaddingLeft) + e.scalePt(style.PaddingRight)
 
@@ -69,7 +70,7 @@ func (e *engine) buildTable(node *html.Node, style ResolvedStyle, availW, posX, 
 		}
 	}
 
-	e.layoutTableGrid(tableBox, style, rows, cellData, colW, spacing, nCols, gridX, tableY)
+	e.layoutTableGrid(tableBox, style, rows, cellData, colW, spacingH, spacingV, nCols, gridX, tableY)
 	e.placeTableCaption(tableBox, capNode, side, captionW, gridW, posX, posY)
 
 	return tableBox
@@ -77,10 +78,12 @@ func (e *engine) buildTable(node *html.Node, style ResolvedStyle, availW, posX, 
 
 func (e *engine) layoutTableGrid(
 	tableBox *box, style ResolvedStyle, rows [][]*html.Node, cellData [][]*box,
-	colW []float64, spacing float64, nCols int, posX, tableY float64,
+	colW []float64, spacingH, spacingV float64, nCols int, posX, tableY float64,
 ) {
 	padL := e.scalePt(style.PaddingLeft) + e.scalePt(style.BorderLeft.Width)
-	rowHeights, rowTops, curY := e.measureTableRows(tableBox, rows, cellData, colW, spacing, nCols, posX, tableY, padL)
+	rowHeights, rowTops, curY := e.measureTableRows(
+		tableBox, rows, cellData, colW, spacingH, spacingV, nCols, posX, tableY, padL,
+	)
 
 	tableBox.rows = cellData
 	tableHeight := curY + e.scalePt(style.PaddingBottom) + e.scalePt(style.BorderBottom.Width)
@@ -235,14 +238,26 @@ func (e *engine) buildCaptionAt(capNode *html.Node, width, posX, posY float64) *
 	return e.build(capNode, width, posX, posY)
 }
 
-// tableSpacing is the inter-cell gap: border-collapse suppresses it.
-func (e *engine) tableSpacing(st ResolvedStyle) float64 {
-	spacing := e.scalePt(st.BorderSpacing)
-	if st.BorderCollapse != borderCollapseValue {
-		return spacing
+// tableHSpacing is the horizontal inter-cell gap: border-collapse suppresses it.
+func (e *engine) tableHSpacing(st ResolvedStyle) float64 {
+	if st.BorderCollapse == borderCollapseValue {
+		return 0
 	}
 
-	return 0
+	return e.scalePt(st.BorderSpacing)
+}
+
+// tableVSpacing is the vertical inter-cell gap: border-collapse suppresses it.
+func (e *engine) tableVSpacing(style ResolvedStyle) float64 {
+	if style.BorderCollapse == borderCollapseValue {
+		return 0
+	}
+
+	if style.BorderSpacingV != 0 {
+		return e.scalePt(style.BorderSpacingV)
+	}
+
+	return e.scalePt(style.BorderSpacing)
 }
 
 // emitTableCells paints the cell backgrounds/borders and the collapsed grid
@@ -604,7 +619,7 @@ func (e *engine) tableWidthHint(st ResolvedStyle, availW float64) float64 {
 // and cell heights. Returns rowHeights, rowTops and the content height.
 func (e *engine) measureTableRows(
 	tableBox *box, rows [][]*html.Node, cellData [][]*box, colW []float64,
-	spacing float64, nCols int, posX, posY, padL float64,
+	spacingH, spacingV float64, nCols int, posX, posY, padL float64,
 ) ([]float64, []float64, float64) {
 	// rows stays for the layoutTable call contract; ink flags now live on the
 	// cell boxes in cellData (recorded once at build time), so the row loop
@@ -621,7 +636,7 @@ func (e *engine) measureTableRows(
 	// height 0 until rowspan growth — do not invent a 1pt phantom band.
 	for rowIdx, cells := range cellData {
 		rowTops[rowIdx] = posY + curY
-		rowH := e.measureRowCells(tableBox, cells, rowIdx, colW, spacing, nCols, posX, padL, rowTops)
+		rowH := e.measureRowCells(tableBox, cells, rowIdx, colW, spacingH, nCols, posX, padL, rowTops)
 		// Collapse rows whose cells have no ink (only padding/borders of empty
 		// th/td). Keep a hairline only when the row has cells that paint
 		// borders in separate-border mode and measured some chrome — pure
@@ -633,21 +648,21 @@ func (e *engine) measureTableRows(
 
 		rowHeights[rowIdx] = rowH
 
-		if rowH > 0 || spacing > 0 {
-			curY += rowH + spacing
+		if rowH > 0 || spacingV > 0 {
+			curY += rowH + spacingV
 		}
 	}
 
-	growRowspanRows(tableBox, nRows, rowHeights, spacing)
+	growRowspanRows(tableBox, nRows, rowHeights, spacingV)
 
 	// Recompute tops and assign final cell heights after rowspan growth.
 	curY = e.scalePt(tableBox.style.PaddingTop) + e.scalePt(tableBox.style.BorderTop.Width)
 	for rowIdx := range rowHeights {
 		rowTops[rowIdx] = posY + curY
-		curY += rowHeights[rowIdx] + spacing
+		curY += rowHeights[rowIdx] + spacingV
 	}
 
-	assignFinalCellHeights(tableBox, nRows, rowHeights, rowTops, spacing)
+	assignFinalCellHeights(tableBox, nRows, rowHeights, rowTops, spacingV)
 
 	return rowHeights, rowTops, curY
 }
@@ -919,6 +934,33 @@ func resolveBorderConflict(firstBorder, secondBorder border) border {
 	firstVisible := borderVisible(firstBorder)
 	secondVisible := borderVisible(secondBorder)
 
+	if !firstVisible || !secondVisible {
+		return resolveOneVisibleBorder(firstBorder, secondBorder, firstVisible, secondVisible)
+	}
+
+	if firstBorder.Width != secondBorder.Width {
+		if firstBorder.Width > secondBorder.Width {
+			return firstBorder
+		}
+
+		return secondBorder
+	}
+
+	rank1 := borderStyleRank(firstBorder.Style)
+	rank2 := borderStyleRank(secondBorder.Style)
+
+	if rank1 != rank2 {
+		if rank1 > rank2 {
+			return firstBorder
+		}
+
+		return secondBorder
+	}
+
+	return secondBorder
+}
+
+func resolveOneVisibleBorder(firstBorder, secondBorder border, firstVisible, secondVisible bool) border {
 	if !firstVisible && !secondVisible {
 		return border{} //nolint:exhaustruct // intentional zero fields
 	}
@@ -927,23 +969,7 @@ func resolveBorderConflict(firstBorder, secondBorder border) border {
 		return secondBorder
 	}
 
-	if !secondVisible {
-		return firstBorder
-	}
-
-	if firstBorder.Width > secondBorder.Width {
-		return firstBorder
-	}
-
-	if secondBorder.Width > firstBorder.Width {
-		return secondBorder
-	}
-
-	if borderStyleRank(firstBorder.Style) >= borderStyleRank(secondBorder.Style) {
-		return firstBorder
-	}
-
-	return secondBorder
+	return firstBorder
 }
 
 //nolint:cyclop,dupl // horizontal and vertical border scanning are symmetric axis routines

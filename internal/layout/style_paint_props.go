@@ -6,7 +6,10 @@ import (
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
 )
 
-const currentColorKeyword = "currentcolor"
+const (
+	currentColorKeyword = "currentcolor"
+	propContent         = "content"
+)
 
 func isCurrentColor(value string) bool {
 	return strings.EqualFold(strings.TrimSpace(value), currentColorKeyword)
@@ -120,23 +123,25 @@ func applyBoxShadowValue(style *ResolvedStyle, value string, fsize float64) {
 		return
 	}
 
-	layer := strings.TrimSpace(firstCommaLayer(value))
-	if strings.EqualFold(layer, cssDisplayNone) {
+	if strings.EqualFold(value, cssDisplayNone) {
 		clearBoxShadow(style)
 
 		return
 	}
 
-	shadow, ok := parseBoxShadowLayer(layer, style.Color, fsize)
-	if !ok {
+	shadows := parseBoxShadowList(value, style.Color, fsize)
+	if len(shadows) == 0 {
 		return
 	}
 
-	style.BoxShadowX = shadow.x
-	style.BoxShadowY = shadow.y
-	style.BoxShadowBlur = shadow.blur
-	style.BoxShadowSpread = shadow.spread
-	style.BoxShadowColor = shadow.color
+	first := shadows[0]
+	style.BoxShadowX = first.x
+	style.BoxShadowY = first.y
+	style.BoxShadowBlur = first.blur
+	style.BoxShadowSpread = first.spread
+	style.BoxShadowColor = first.color
+	style.BoxShadowInset = first.inset
+	style.BoxShadowRaw = value
 	style.BoxShadowSet = true
 }
 
@@ -147,6 +152,8 @@ func clearBoxShadow(style *ResolvedStyle) {
 	style.BoxShadowSpread = 0
 	style.BoxShadowColor = [3]float64{}
 	style.BoxShadowSet = false
+	style.BoxShadowInset = false
+	style.BoxShadowRaw = ""
 }
 
 func parseRuleShorthand(value string, fsize float64, current [3]float64) (float64, string, [3]float64, bool) {
@@ -288,14 +295,21 @@ func applyBackgroundShorthand(style *ResolvedStyle, value string) {
 }
 
 func applyBackgroundImageValue(style *ResolvedStyle, value string) {
-	if url, ok := firstCSSUrl(value); ok {
+	trimmed := strings.TrimSpace(value)
+	if strings.EqualFold(trimmed, cssDisplayNone) {
+		style.BackgroundImage = ""
+
+		return
+	}
+
+	if url, ok := firstCSSUrl(trimmed); ok && !strings.Contains(trimmed, ",") && !isGradientFunc(trimmed) {
 		style.BackgroundImage = url
 
 		return
 	}
 
-	if strings.EqualFold(strings.TrimSpace(value), cssDisplayNone) {
-		style.BackgroundImage = ""
+	if trimmed != "" {
+		style.BackgroundImage = trimmed
 	}
 }
 
@@ -326,6 +340,8 @@ func applyGeneratedContentProps(style *ResolvedStyle, prop, value string) bool {
 		}
 	case "list-style-image":
 		applyListStyleImageValue(style, value)
+	case propContent:
+		style.Content = strings.TrimSpace(value)
 	default:
 		return false
 	}

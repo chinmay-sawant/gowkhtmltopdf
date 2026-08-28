@@ -1386,6 +1386,41 @@ func applyGridSpanToken(target gridLineTarget, token string) {
 	}
 }
 
+func applyGridEndOnly(style *ResolvedStyle, isRow bool, value string) {
+	target := gridTarget(style, isRow)
+	trimmed := strings.TrimSpace(value)
+
+	if strings.HasPrefix(trimmed, "span ") {
+		applyGridSpanToken(target, strings.TrimSpace(strings.TrimPrefix(trimmed, "span ")))
+
+		return
+	}
+
+	applyGridEndNumeric(style, target, isRow, trimmed)
+}
+
+func applyGridEndNumeric(style *ResolvedStyle, target gridLineTarget, isRow bool, value string) {
+	val, err := strconv.Atoi(value)
+	if err != nil || val <= 0 {
+		return
+	}
+
+	if isRow {
+		style.GridRowEnd = val
+	} else {
+		style.GridColumnEnd = val
+	}
+
+	if *target.start > 0 {
+		sp := val - *target.start
+		if sp < 1 {
+			sp = 1
+		}
+
+		*target.span = sp
+	}
+}
+
 // uaDecls is the user-agent declaration table for element names. Lookup is
 // per element; unknown names get the initial values.
 var uaDecls = map[string][]css.Declaration{ //nolint:gochecknoglobals // static UA table

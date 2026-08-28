@@ -127,6 +127,10 @@ func gridItemSpans(sty ResolvedStyle, areas gridTemplateAreasMap, nCols int) (in
 
 	colStart := sty.GridColumnStart - 1 // 0-based; -1 = auto
 	rowStart := sty.GridRowStart - 1
+
+	colStart, colSpan = resolveGridAxisSpan(colStart, sty.GridColumnEnd, colSpan)
+	rowStart, rowSpan = resolveGridAxisSpan(rowStart, sty.GridRowEnd, rowSpan)
+
 	definite := false
 
 	if name := strings.TrimSpace(sty.GridArea); name != "" {
@@ -146,6 +150,27 @@ func gridItemSpans(sty ResolvedStyle, areas gridTemplateAreasMap, nCols int) (in
 	}
 
 	return rowStart, colStart, rowSpan, colSpan, definite
+}
+
+func resolveGridAxisSpan(start, end, span int) (int, int) {
+	if end <= 0 {
+		return start, span
+	}
+
+	if start >= 0 && end-1 > start {
+		return start, (end - 1) - start
+	}
+
+	if start < 0 {
+		st := end - 1 - span
+		if st < 0 {
+			st = 0
+		}
+
+		return st, span
+	}
+
+	return start, span
 }
 
 // planGridItemPlacement plans the row/col and span for one grid item.

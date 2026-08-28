@@ -194,6 +194,7 @@ type ResolvedStyle struct {
 	ListStyleType   string // "disc" | "circle" | "square" | "decimal" | cssDisplayNone | …
 	BorderCollapse  string // "separate" | "collapse"
 	BorderSpacing   float64
+	BorderSpacingV  float64
 	TableLayout     string // overflowAuto | "fixed"
 	CaptionSide     string // "top" | "bottom" | "left" | "right"; empty means top
 	IsReplaced      bool   // img, hr
@@ -212,6 +213,10 @@ type ResolvedStyle struct {
 	HasTransform    bool
 	TransformOrigin transformOriginSpec
 	Opacity         float64 // 0..1; initial 1; also from filter:opacity()
+	Filter          string
+	Content         string
+	GridColumnEnd   int
+	GridRowEnd      int
 	// Outline* is CSS outline. Empty OutlineStyle means none. Does not affect layout size.
 	OutlineWidth    float64
 	OutlineStyle    string
@@ -234,6 +239,8 @@ type ResolvedStyle struct {
 	BoxShadowSpread   float64
 	BoxShadowColor    [3]float64
 	BoxShadowSet      bool
+	BoxShadowInset    bool
+	BoxShadowRaw      string
 	Fill              [3]float64
 	FillSet           bool
 	FillOpacity       float64
@@ -691,7 +698,7 @@ type comparableResolvedStyle struct {
 	TextDecoration                                                                                 string
 	LetterSpacing, WordSpacing, TextIndent                                                         float64
 	ListStyleType, BorderCollapse                                                                  string
-	BorderSpacing                                                                                  float64
+	BorderSpacing, BorderSpacingV                                                                  float64
 	TableLayout, CaptionSide                                                                       string
 	IsReplaced                                                                                     bool
 	PageBreakBefore, PageBreakAfter, PageBreakInside                                               string
@@ -702,6 +709,8 @@ type comparableResolvedStyle struct {
 	HasTransform                                                                                   bool
 	TransformOrigin                                                                                transformOriginSpec
 	Opacity                                                                                        float64
+	Filter, Content                                                                                string
+	GridColumnEnd, GridRowEnd                                                                      int
 	OutlineWidth                                                                                   float64
 	OutlineStyle                                                                                   string
 	OutlineColor                                                                                   [3]float64
@@ -714,7 +723,8 @@ type comparableResolvedStyle struct {
 	ListStyleImage                                                                                 string
 	BoxShadowX, BoxShadowY, BoxShadowBlur, BoxShadowSpread                                         float64
 	BoxShadowColor                                                                                 [3]float64
-	BoxShadowSet                                                                                   bool
+	BoxShadowSet, BoxShadowInset                                                                   bool
+	BoxShadowRaw                                                                                   string
 	Fill                                                                                           [3]float64
 	FillSet                                                                                        bool
 	FillOpacity                                                                                    float64
@@ -750,13 +760,12 @@ func comparableResolvedStyleFor(style ResolvedStyle) comparableResolvedStyle {
 		MinWidthSet:      style.MinWidthSet,
 		MinHeightPercent: style.MinHeightPercent, MaxHeight: style.MaxHeight, Overflow: style.Overflow,
 		OverflowX: style.OverflowX, OverflowY: style.OverflowY,
-		Visibility: style.Visibility,
-		MarginTop:  style.MarginTop, MarginRight: style.MarginRight, MarginBottom: style.MarginBottom,
-		MarginLeft: style.MarginLeft, MarginTopAuto: style.MarginTopAuto, MarginBottomAuto: style.MarginBottomAuto,
-		MarginLeftAuto: style.MarginLeftAuto, MarginRightAuto: style.MarginRightAuto,
-		PaddingTop: style.PaddingTop, PaddingRight: style.PaddingRight, PaddingBottom: style.PaddingBottom,
-		PaddingLeft: style.PaddingLeft, BorderTop: style.BorderTop, BorderRight: style.BorderRight,
-		BorderBottom: style.BorderBottom, BorderLeft: style.BorderLeft,
+		Visibility: style.Visibility, MarginTop: style.MarginTop, MarginRight: style.MarginRight,
+		MarginBottom: style.MarginBottom, MarginLeft: style.MarginLeft, MarginTopAuto: style.MarginTopAuto,
+		MarginBottomAuto: style.MarginBottomAuto, MarginLeftAuto: style.MarginLeftAuto,
+		MarginRightAuto: style.MarginRightAuto, PaddingTop: style.PaddingTop, PaddingRight: style.PaddingRight,
+		PaddingBottom: style.PaddingBottom, PaddingLeft: style.PaddingLeft, BorderTop: style.BorderTop,
+		BorderRight: style.BorderRight, BorderBottom: style.BorderBottom, BorderLeft: style.BorderLeft,
 		BorderRadius: style.BorderRadius, BorderRadiusPercent: style.BorderRadiusPercent,
 		BorderRadiusTopLeft: style.BorderRadiusTopLeft, BorderRadiusTopRight: style.BorderRadiusTopRight,
 		BorderRadiusBottomRight: style.BorderRadiusBottomRight, BorderRadiusBottomLeft: style.BorderRadiusBottomLeft,
@@ -771,14 +780,17 @@ func comparableResolvedStyleFor(style ResolvedStyle) comparableResolvedStyle {
 		WhiteSpace: style.WhiteSpace, OverflowWrap: style.OverflowWrap, WordBreak: style.WordBreak,
 		TextDecoration: style.TextDecoration, LetterSpacing: style.LetterSpacing,
 		WordSpacing: style.WordSpacing, TextIndent: style.TextIndent,
-		ListStyleType: style.ListStyleType, BorderCollapse: style.BorderCollapse, BorderSpacing: style.BorderSpacing,
+		ListStyleType: style.ListStyleType, BorderCollapse: style.BorderCollapse,
+		BorderSpacing: style.BorderSpacing, BorderSpacingV: style.BorderSpacingV,
 		TableLayout: style.TableLayout, CaptionSide: style.CaptionSide, IsReplaced: style.IsReplaced,
 		PageBreakBefore: style.PageBreakBefore,
 		PageBreakAfter:  style.PageBreakAfter, PageBreakInside: style.PageBreakInside, PageName: style.PageName,
 		Orphans: style.Orphans,
 		Widows:  style.Widows, ContainerType: style.ContainerType, ContainerName: style.ContainerName,
 		Transform: style.Transform, HasTransform: style.HasTransform, TransformOrigin: style.TransformOrigin,
-		Opacity: style.Opacity, OutlineWidth: style.OutlineWidth, OutlineStyle: style.OutlineStyle,
+		Opacity: style.Opacity, Filter: style.Filter, Content: style.Content,
+		GridColumnEnd: style.GridColumnEnd, GridRowEnd: style.GridRowEnd,
+		OutlineWidth: style.OutlineWidth, OutlineStyle: style.OutlineStyle,
 		OutlineColor: style.OutlineColor, OutlineColorSet: style.OutlineColorSet,
 		OutlineOffset: style.OutlineOffset, BackgroundImage: style.BackgroundImage,
 		ListStylePosition: style.ListStylePosition, QuotesRaw: style.QuotesRaw,
@@ -788,6 +800,7 @@ func comparableResolvedStyleFor(style ResolvedStyle) comparableResolvedStyle {
 		BoxShadowX:     style.BoxShadowX, BoxShadowY: style.BoxShadowY, BoxShadowBlur: style.BoxShadowBlur,
 		BoxShadowSpread: style.BoxShadowSpread,
 		BoxShadowColor:  style.BoxShadowColor, BoxShadowSet: style.BoxShadowSet,
+		BoxShadowInset: style.BoxShadowInset, BoxShadowRaw: style.BoxShadowRaw,
 		Fill: style.Fill, FillSet: style.FillSet, FillOpacity: style.FillOpacity,
 		Stroke: style.Stroke, StrokeSet: style.StrokeSet, StrokeWidth: style.StrokeWidth,
 		StrokeWidthSet: style.StrokeWidthSet, StrokeOpacity: style.StrokeOpacity,

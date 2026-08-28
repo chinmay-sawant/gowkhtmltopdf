@@ -467,10 +467,11 @@ func (m *cellMeasure) walkBlockChildren(nodeN *html.Node, childCS ResolvedStyle,
 type wordBreakPolicy int
 
 const (
-	breakNormal wordBreakPolicy = iota
-	breakAll                    // word-break:break-all / overflow-wrap:anywhere
-	breakWord                   // overflow-wrap:break-word (soft only)
-	breakNever                  // white-space:nowrap|pre
+	breakNormal  wordBreakPolicy = iota
+	breakAll                     // word-break:break-all / overflow-wrap:anywhere
+	breakWord                    // overflow-wrap:break-word (soft only)
+	breakNever                   // white-space:nowrap|pre
+	breakKeepAll                 // word-break:keep-all
 )
 
 func wordBreakOf(sty ResolvedStyle) wordBreakPolicy {
@@ -480,6 +481,10 @@ func wordBreakOf(sty ResolvedStyle) wordBreakPolicy {
 
 	if sty.WordBreak == "break-all" || sty.OverflowWrap == overflowWrapAnywhere {
 		return breakAll
+	}
+
+	if sty.WordBreak == "keep-all" {
+		return breakKeepAll
 	}
 
 	if sty.OverflowWrap == overflowWrapBreakWord {
@@ -498,7 +503,7 @@ func softModeOf(pol wordBreakPolicy) softBreakMode {
 		return softBreakNone
 	case breakWord:
 		return softBreakWord
-	case breakNever:
+	case breakNever, breakKeepAll:
 		return softBreakURL
 	case breakNormal:
 		return softBreakURL
@@ -526,7 +531,7 @@ func (e *engine) minContentWidth(cssSheet string, sty *ResolvedStyle, full float
 	case breakWord:
 		// Soft opportunities (/, ?, &, ...) split the token for min-content.
 		return e.maxSoftSegmentWidth(cssSheet, sty)
-	case breakNormal:
+	case breakNormal, breakKeepAll:
 		return full
 	}
 

@@ -100,9 +100,18 @@ func (e *engine) emitInlineImage(
 	imgX, imgY, imgW, imgH := e.applyInlineImageBorders(item, leftX, top)
 
 	if item.imgRef != nil && item.imgRef.data != nil && imgW > 0 && imgH > 0 {
+		imgData := item.imgRef.data
+		isJPEG := item.imgRef.isJPEG
+
+		if item.style != nil && item.style.Filter != "" {
+			filters := parseFilterList(item.style.Filter, item.style.Color, item.style.FontSize)
+			imgData = applyImageFilterToImage(imgData, filters)
+			isJPEG = false
+		}
+
 		e.add(Op{ //nolint:exhaustruct // intentional zero fields
 			Kind: OpImage, X: imgX, Y: imgY, W: imgW, H: imgH,
-			Image: item.imgRef.data, ImgW: item.imgRef.w, ImgH: item.imgRef.h, IsJPEG: item.imgRef.isJPEG,
+			Image: imgData, ImgW: item.imgRef.w, ImgH: item.imgRef.h, IsJPEG: isJPEG,
 			Alt: item.alt,
 		})
 	}

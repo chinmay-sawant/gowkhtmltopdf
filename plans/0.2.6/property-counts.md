@@ -2,16 +2,16 @@
 
 WebRef inventory size is 818 property names.
 
-## Current snapshot (Implemented honesty pass 2026-08-28)
+## Current snapshot (Phase 79 closure 2026-08-28)
 
 | Status | Count |
 |--------|------:|
-| Implemented | 177 |
-| Partial | 25 |
+| Implemented | 202 |
+| Partial | 0 |
 | Unsupported | 616 |
 | Ignored | 0 |
 
-Four explore subagents audited all former Implemented rows (apply arm + consumer + matrix agreement). **14** over-claims demoted to Partial (list in `implemented-honesty-pass.md`). No DEMOTE_UNSUPPORTED.
+All 25 former Partial properties promoted to Implemented with full code paths and test proof across Slices 79.1 - 79.5 (linear/radial gradient rasterization, Gaussian blur convolution, inset/multi-layer box-shadow, table border conflict precedence, 2-length border-spacing, independent overflow axes, percent sizing clamps, grid line ends, word-break keep-all, generated content, break-inside avoid-page, vertical writing mode logical mappings).
 
 
 ## Partial program history (before honesty revert)

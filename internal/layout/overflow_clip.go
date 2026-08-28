@@ -74,23 +74,49 @@ func (e *engine) applyOverflowClips(root *box) {
 	e.clipOverflowTree(root, nil)
 }
 
+const (
+	unconstrainedClipOffset = -1e9
+	unconstrainedClipSpan   = 2e9
+)
+
+func (e *engine) computeBoxOverflowClip(boxNode *box, current *clipRect) *clipRect {
+	if boxNode.style == nil {
+		return current
+	}
+
+	clipX := overflowClipsPaint(boxNode.style.OverflowX) || overflowClipsPaint(boxNode.style.Overflow)
+	clipY := overflowClipsPaint(boxNode.style.OverflowY) || overflowClipsPaint(boxNode.style.Overflow)
+
+	if !clipX && !clipY {
+		return current
+	}
+
+	pb := e.paddingBoxOf(boxNode)
+	if !clipX {
+		pb.x = unconstrainedClipOffset
+		pb.w = unconstrainedClipSpan
+	}
+
+	if !clipY {
+		pb.y = unconstrainedClipOffset
+		pb.h = unconstrainedClipSpan
+	}
+
+	if current != nil {
+		merged := intersectClip(*current, pb)
+
+		return &merged
+	}
+
+	return &pb
+}
+
 func (e *engine) clipOverflowTree(boxNode *box, clip *clipRect) {
 	if boxNode == nil {
 		return
 	}
 
-	next := clip
-
-	if boxNode.style != nil && overflowClipsPaint(boxNode.style.Overflow) {
-		pb := e.paddingBoxOf(boxNode)
-		if clip != nil {
-			merged := intersectClip(*clip, pb)
-			next = &merged
-		} else {
-			pbCopy := pb
-			next = &pbCopy
-		}
-	}
+	next := e.computeBoxOverflowClip(boxNode, clip)
 
 	switch {
 	case clip != nil:

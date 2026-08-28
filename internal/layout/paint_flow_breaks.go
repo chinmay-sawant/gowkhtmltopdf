@@ -7,6 +7,19 @@ import (
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
 
+func isAvoidInsideBreak(style *ResolvedStyle) bool {
+	if style == nil {
+		return false
+	}
+
+	switch style.PageBreakInside {
+	case pageBreakAvoid, "avoid-page", "avoid-column":
+		return true
+	default:
+		return false
+	}
+}
+
 // avoidInside walks post-order and moves page-break-inside:avoid boxes wholly
 // to the next page when they span multiple pages but fit one content height.
 // Aside callouts are lifted earlier by keepImplicitAsides (before text snap).
@@ -25,8 +38,7 @@ func avoidInside(res *Result, contentH float64) bool {
 		// Table cells inherit the avoid policy from table-row pagination, but
 		// moving cells independently splits the collapsed grid. rowsIntact
 		// owns the row-level move and keeps the cell borders/text together.
-		if !inTable && !boxInsideTable(boxNode) && boxNode.height > 0 &&
-			boxNode.style != nil && boxNode.style.PageBreakInside == pageBreakAvoid {
+		if !inTable && !boxInsideTable(boxNode) && boxNode.height > 0 && isAvoidInsideBreak(boxNode.style) {
 			if keepTogetherForAvoid(res, boxNode, contentH) {
 				changed = true
 			}

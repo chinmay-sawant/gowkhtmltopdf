@@ -52,8 +52,9 @@ func TestBoxShadowParse(t *testing.T) {
 	}
 
 	inset := styleByClass(t, styles, "inset")
-	if inset.BoxShadowSet {
-		t.Fatalf("inset box-shadow set=%v, want false (ignored)", inset.BoxShadowSet)
+	assertBoxShadow(t, inset, 2, 2, 0, black, true)
+	if !inset.BoxShadowInset {
+		t.Fatal("inset box-shadow not marked BoxShadowInset")
 	}
 
 	named := styleByClass(t, styles, "named")

@@ -256,16 +256,25 @@ func (e *engine) paintReplacedImage(
 		alt = boxNode.node.Attribute("alt")
 	}
 
+	imgData := boxNode.img.data
+	isJPEG := boxNode.img.isJPEG
+
+	if sty.Filter != "" {
+		filters := parseFilterList(sty.Filter, sty.Color, sty.FontSize)
+		imgData = applyImageFilterToImage(imgData, filters)
+		isJPEG = false
+	}
+
 	e.add(Op{ //nolint:exhaustruct // intentional zero fields
 		Kind:   OpImage,
 		X:      imgX,
 		Y:      imgY,
 		W:      imgW,
 		H:      imgH,
-		Image:  boxNode.img.data,
+		Image:  imgData,
 		ImgW:   boxNode.img.w,
 		ImgH:   boxNode.img.h,
-		IsJPEG: boxNode.img.isJPEG,
+		IsJPEG: isJPEG,
 		Alt:    alt,
 	})
 

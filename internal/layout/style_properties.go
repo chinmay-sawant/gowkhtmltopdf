@@ -13,6 +13,20 @@ const (
 	borderRadiusValueCount  = 4
 	borderRadiusPairCount   = 2
 	borderRadiusTripleCount = 3
+	twoTokens               = 2
+	propMarginInlineStart   = "margin-inline-start"
+	propMarginInlineEnd     = "margin-inline-end"
+	propMarginBlockStart    = "margin-block-start"
+	propMarginBlockEnd      = "margin-block-end"
+	propPaddingInlineStart  = "padding-inline-start"
+	propPaddingInlineEnd    = "padding-inline-end"
+	propPaddingBlockStart   = "padding-block-start"
+	propPaddingBlockEnd     = "padding-block-end"
+	propBlockSize           = "block-size"
+	propMinInlineSize       = "min-inline-size"
+	propMaxInlineSize       = "max-inline-size"
+	propMinBlockSize        = "min-block-size"
+	propMaxBlockSize        = "max-block-size"
 )
 
 func applyDisplayGroup(
@@ -156,7 +170,7 @@ func setOpacityValue(style *ResolvedStyle, value string) {
 }
 
 func setFilterValue(style *ResolvedStyle, value string) {
-	// opacity() via ExtGState; blur/drop-shadow permanent non-goals.
+	style.Filter = value
 	if v, ok := parseFilterOpacity(value); ok {
 		style.Opacity *= v
 	}
@@ -561,14 +575,18 @@ func applyGridTemplateProps(style *ResolvedStyle, prop, value string) bool {
 
 func applyGridPlacementProps(style *ResolvedStyle, prop, value string) bool {
 	switch prop {
-	case "grid-column", "grid-column-end":
+	case "grid-column":
 		parseGridColumn(style, value)
 	case "grid-column-start":
 		setGridStartIndex(style, "grid-column-start", value)
-	case "grid-row", "grid-row-end":
+	case "grid-column-end":
+		applyGridEndOnly(style, false, value)
+	case "grid-row":
 		parseGridRow(style, value)
 	case "grid-row-start":
 		setGridStartIndex(style, "grid-row-start", value)
+	case "grid-row-end":
+		applyGridEndOnly(style, true, value)
 	default:
 		return false
 	}
@@ -826,15 +844,15 @@ func mapsLogicalToPhysical(style *ResolvedStyle) bool {
 
 func applyLogicalBoxProps(style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext) bool {
 	switch prop {
-	case cssPropMarginInline, "margin-inline-start", "margin-inline-end",
-		cssPropMarginBlock, "margin-block-start", "margin-block-end":
+	case cssPropMarginInline, propMarginInlineStart, propMarginInlineEnd,
+		cssPropMarginBlock, propMarginBlockStart, propMarginBlockEnd:
 		return applyLogicalMargin(style, prop, value, fsize, ctx.viewportW)
-	case cssPropPaddingInline, "padding-inline-start", "padding-inline-end",
-		cssPropPaddingBlock, "padding-block-start", "padding-block-end":
+	case cssPropPaddingInline, propPaddingInlineStart, propPaddingInlineEnd,
+		cssPropPaddingBlock, propPaddingBlockStart, propPaddingBlockEnd:
 		return applyLogicalPadding(style, prop, value, fsize, ctx.viewportW)
-	case containerInlineSize, "block-size",
-		"min-inline-size", "max-inline-size",
-		"min-block-size", "max-block-size":
+	case containerInlineSize, propBlockSize,
+		propMinInlineSize, propMaxInlineSize,
+		propMinBlockSize, propMaxBlockSize:
 		return applyLogicalSize(style, prop, value, fsize, ctx)
 	default:
 		return false
@@ -842,22 +860,63 @@ func applyLogicalBoxProps(style *ResolvedStyle, prop, value string, fsize float6
 }
 
 func applyLogicalMargin(style *ResolvedStyle, prop, value string, fsize, viewportW float64) bool {
-	if !mapsLogicalToPhysical(style) {
-		return true
-	}
-
 	if applyLogicalMarginPair(style, prop, value, fsize, viewportW) {
 		return true
 	}
 
+	switch style.WritingMode {
+	case writingModeVerticalRL:
+		return applyLogicalMarginVerticalRL(style, prop, value, fsize, viewportW)
+	case writingModeVerticalLR:
+		return applyLogicalMarginVerticalLR(style, prop, value, fsize, viewportW)
+	default:
+		return applyLogicalMarginHorizontal(style, prop, value, fsize, viewportW)
+	}
+}
+
+func applyLogicalMarginVerticalRL(style *ResolvedStyle, prop, value string, fsize, viewportW float64) bool {
 	switch prop {
-	case "margin-inline-start":
-		style.MarginLeft, style.MarginLeftAuto = marginLenAuto(value, fsize, viewportW)
-	case "margin-inline-end":
-		style.MarginRight, style.MarginRightAuto = marginLenAuto(value, fsize, viewportW)
-	case "margin-block-start":
+	case propMarginInlineStart:
 		style.MarginTop, style.MarginTopAuto = marginLenAuto(value, fsize, viewportW)
-	case "margin-block-end":
+	case propMarginInlineEnd:
+		style.MarginBottom, style.MarginBottomAuto = marginLenAuto(value, fsize, viewportW)
+	case propMarginBlockStart:
+		style.MarginRight, style.MarginRightAuto = marginLenAuto(value, fsize, viewportW)
+	case propMarginBlockEnd:
+		style.MarginLeft, style.MarginLeftAuto = marginLenAuto(value, fsize, viewportW)
+	default:
+		return false
+	}
+
+	return true
+}
+
+func applyLogicalMarginVerticalLR(style *ResolvedStyle, prop, value string, fsize, viewportW float64) bool {
+	switch prop {
+	case propMarginInlineStart:
+		style.MarginTop, style.MarginTopAuto = marginLenAuto(value, fsize, viewportW)
+	case propMarginInlineEnd:
+		style.MarginBottom, style.MarginBottomAuto = marginLenAuto(value, fsize, viewportW)
+	case propMarginBlockStart:
+		style.MarginLeft, style.MarginLeftAuto = marginLenAuto(value, fsize, viewportW)
+	case propMarginBlockEnd:
+		style.MarginRight, style.MarginRightAuto = marginLenAuto(value, fsize, viewportW)
+	default:
+		return false
+	}
+
+	return true
+}
+
+func applyLogicalMarginHorizontal(style *ResolvedStyle, prop, value string, fsize, viewportW float64) bool {
+	switch prop {
+	case propMarginInlineStart:
+		style.MarginLeft, style.MarginLeftAuto = marginLenAuto(value, fsize, viewportW)
+	case propMarginInlineEnd:
+		style.MarginRight, style.MarginRightAuto = marginLenAuto(value, fsize, viewportW)
+	case propMarginBlockStart:
+		style.MarginTop, style.MarginTopAuto = marginLenAuto(value, fsize, viewportW)
+	case propMarginBlockEnd:
 		style.MarginBottom, style.MarginBottomAuto = marginLenAuto(value, fsize, viewportW)
 	default:
 		return false
@@ -871,15 +930,16 @@ func applyLogicalMarginPair(style *ResolvedStyle, prop, value string, fsize, vie
 	case cssPropMarginInline:
 		start, end, parsed := logicalPair(value)
 		if parsed {
-			style.MarginLeft, style.MarginLeftAuto = marginLenAuto(start, fsize, viewportW)
-			style.MarginRight, style.MarginRightAuto = marginLenAuto(end, fsize, viewportW)
+			if isVerticalWritingMode(style.WritingMode) {
+				style.MarginTop, style.MarginTopAuto = marginLenAuto(start, fsize, viewportW)
+				style.MarginBottom, style.MarginBottomAuto = marginLenAuto(end, fsize, viewportW)
+			} else {
+				style.MarginLeft, style.MarginLeftAuto = marginLenAuto(start, fsize, viewportW)
+				style.MarginRight, style.MarginRightAuto = marginLenAuto(end, fsize, viewportW)
+			}
 		}
 	case cssPropMarginBlock:
-		start, end, parsed := logicalPair(value)
-		if parsed {
-			style.MarginTop, style.MarginTopAuto = marginLenAuto(start, fsize, viewportW)
-			style.MarginBottom, style.MarginBottomAuto = marginLenAuto(end, fsize, viewportW)
-		}
+		applyLogicalMarginBlockPair(style, value, fsize, viewportW)
 	default:
 		return false
 	}
@@ -887,23 +947,83 @@ func applyLogicalMarginPair(style *ResolvedStyle, prop, value string, fsize, vie
 	return true
 }
 
-func applyLogicalPadding(style *ResolvedStyle, prop, value string, fsize, viewportW float64) bool {
-	if !mapsLogicalToPhysical(style) {
-		return true
+func applyLogicalMarginBlockPair(style *ResolvedStyle, value string, fsize, viewportW float64) {
+	start, end, parsed := logicalPair(value)
+	if !parsed {
+		return
 	}
 
+	switch style.WritingMode {
+	case writingModeVerticalRL:
+		style.MarginRight, style.MarginRightAuto = marginLenAuto(start, fsize, viewportW)
+		style.MarginLeft, style.MarginLeftAuto = marginLenAuto(end, fsize, viewportW)
+	case writingModeVerticalLR:
+		style.MarginLeft, style.MarginLeftAuto = marginLenAuto(start, fsize, viewportW)
+		style.MarginRight, style.MarginRightAuto = marginLenAuto(end, fsize, viewportW)
+	default:
+		style.MarginTop, style.MarginTopAuto = marginLenAuto(start, fsize, viewportW)
+		style.MarginBottom, style.MarginBottomAuto = marginLenAuto(end, fsize, viewportW)
+	}
+}
+
+func applyLogicalPadding(style *ResolvedStyle, prop, value string, fsize, viewportW float64) bool {
 	if applyLogicalPaddingPair(style, prop, value, fsize, viewportW) {
 		return true
 	}
 
+	switch style.WritingMode {
+	case writingModeVerticalRL:
+		return applyLogicalPaddingVerticalRL(style, prop, value, fsize, viewportW)
+	case writingModeVerticalLR:
+		return applyLogicalPaddingVerticalLR(style, prop, value, fsize, viewportW)
+	default:
+		return applyLogicalPaddingHorizontal(style, prop, value, fsize, viewportW)
+	}
+}
+
+func applyLogicalPaddingVerticalRL(style *ResolvedStyle, prop, value string, fsize, viewportW float64) bool {
 	switch prop {
-	case "padding-inline-start":
-		style.PaddingLeft = marginLen(value, fsize, viewportW)
-	case "padding-inline-end":
-		style.PaddingRight = marginLen(value, fsize, viewportW)
-	case "padding-block-start":
+	case propPaddingInlineStart:
 		style.PaddingTop = marginLen(value, fsize, viewportW)
-	case "padding-block-end":
+	case propPaddingInlineEnd:
+		style.PaddingBottom = marginLen(value, fsize, viewportW)
+	case propPaddingBlockStart:
+		style.PaddingRight = marginLen(value, fsize, viewportW)
+	case propPaddingBlockEnd:
+		style.PaddingLeft = marginLen(value, fsize, viewportW)
+	default:
+		return false
+	}
+
+	return true
+}
+
+func applyLogicalPaddingVerticalLR(style *ResolvedStyle, prop, value string, fsize, viewportW float64) bool {
+	switch prop {
+	case propPaddingInlineStart:
+		style.PaddingTop = marginLen(value, fsize, viewportW)
+	case propPaddingInlineEnd:
+		style.PaddingBottom = marginLen(value, fsize, viewportW)
+	case propPaddingBlockStart:
+		style.PaddingLeft = marginLen(value, fsize, viewportW)
+	case propPaddingBlockEnd:
+		style.PaddingRight = marginLen(value, fsize, viewportW)
+	default:
+		return false
+	}
+
+	return true
+}
+
+func applyLogicalPaddingHorizontal(style *ResolvedStyle, prop, value string, fsize, viewportW float64) bool {
+	switch prop {
+	case propPaddingInlineStart:
+		style.PaddingLeft = marginLen(value, fsize, viewportW)
+	case propPaddingInlineEnd:
+		style.PaddingRight = marginLen(value, fsize, viewportW)
+	case propPaddingBlockStart:
+		style.PaddingTop = marginLen(value, fsize, viewportW)
+	case propPaddingBlockEnd:
 		style.PaddingBottom = marginLen(value, fsize, viewportW)
 	default:
 		return false
@@ -917,15 +1037,16 @@ func applyLogicalPaddingPair(style *ResolvedStyle, prop, value string, fsize, vi
 	case cssPropPaddingInline:
 		start, end, parsed := logicalPair(value)
 		if parsed {
-			style.PaddingLeft = marginLen(start, fsize, viewportW)
-			style.PaddingRight = marginLen(end, fsize, viewportW)
+			if isVerticalWritingMode(style.WritingMode) {
+				style.PaddingTop = marginLen(start, fsize, viewportW)
+				style.PaddingBottom = marginLen(end, fsize, viewportW)
+			} else {
+				style.PaddingLeft = marginLen(start, fsize, viewportW)
+				style.PaddingRight = marginLen(end, fsize, viewportW)
+			}
 		}
 	case cssPropPaddingBlock:
-		start, end, parsed := logicalPair(value)
-		if parsed {
-			style.PaddingTop = marginLen(start, fsize, viewportW)
-			style.PaddingBottom = marginLen(end, fsize, viewportW)
-		}
+		applyLogicalPaddingBlockPair(style, value, fsize, viewportW)
 	default:
 		return false
 	}
@@ -933,23 +1054,65 @@ func applyLogicalPaddingPair(style *ResolvedStyle, prop, value string, fsize, vi
 	return true
 }
 
-func applyLogicalSize(style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext) bool {
-	if !mapsLogicalToPhysical(style) {
-		return true
+func applyLogicalPaddingBlockPair(style *ResolvedStyle, value string, fsize, viewportW float64) {
+	start, end, parsed := logicalPair(value)
+	if !parsed {
+		return
 	}
 
+	switch style.WritingMode {
+	case writingModeVerticalRL:
+		style.PaddingRight = marginLen(start, fsize, viewportW)
+		style.PaddingLeft = marginLen(end, fsize, viewportW)
+	case writingModeVerticalLR:
+		style.PaddingLeft = marginLen(start, fsize, viewportW)
+		style.PaddingRight = marginLen(end, fsize, viewportW)
+	default:
+		style.PaddingTop = marginLen(start, fsize, viewportW)
+		style.PaddingBottom = marginLen(end, fsize, viewportW)
+	}
+}
+
+func applyLogicalSize(style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext) bool {
+	if isVerticalWritingMode(style.WritingMode) {
+		return applyLogicalSizeVertical(style, prop, value, fsize, ctx)
+	}
+
+	return applyLogicalSizeHorizontal(style, prop, value, fsize, ctx)
+}
+
+func applyLogicalSizeVertical(style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext) bool {
+	switch prop {
+	case containerInlineSize:
+		return setHeightValue(style, value, fsize, ctx)
+	case propBlockSize:
+		return setWidthValue(style, value, fsize, ctx)
+	case propMinInlineSize:
+		return setMinHeightValue(style, value, fsize, ctx.viewportH)
+	case propMaxInlineSize:
+		return setMaxHeightValue(style, value, fsize, ctx.viewportH)
+	case propMinBlockSize:
+		return setMinWidthValue(style, value, fsize, ctx.viewportW)
+	case propMaxBlockSize:
+		return setMaxWidthValue(style, value, fsize, ctx.viewportW)
+	default:
+		return false
+	}
+}
+
+func applyLogicalSizeHorizontal(style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext) bool {
 	switch prop {
 	case containerInlineSize:
 		return setWidthValue(style, value, fsize, ctx)
-	case "block-size":
+	case propBlockSize:
 		return setHeightValue(style, value, fsize, ctx)
-	case "min-inline-size":
+	case propMinInlineSize:
 		return setMinWidthValue(style, value, fsize, ctx.viewportW)
-	case "max-inline-size":
+	case propMaxInlineSize:
 		return setMaxWidthValue(style, value, fsize, ctx.viewportW)
-	case "min-block-size":
+	case propMinBlockSize:
 		return setMinHeightValue(style, value, fsize, ctx.viewportH)
-	case "max-block-size":
+	case propMaxBlockSize:
 		return setMaxHeightValue(style, value, fsize, ctx.viewportH)
 	default:
 		return false
@@ -1499,7 +1662,7 @@ func applyTableProps(style *ResolvedStyle, prop, value string, fsize, viewportW 
 			style.BorderCollapse = value
 		}
 	case "border-spacing":
-		style.BorderSpacing = marginLen(value, fsize, viewportW)
+		applyBorderSpacingValue(style, value, fsize, viewportW)
 	case "table-layout":
 		if value == positionFixed || value == overflowAuto {
 			style.TableLayout = value
@@ -1511,6 +1674,18 @@ func applyTableProps(style *ResolvedStyle, prop, value string, fsize, viewportW 
 	}
 
 	return true
+}
+
+func applyBorderSpacingValue(style *ResolvedStyle, value string, fsize, viewportW float64) {
+	fields := strings.Fields(strings.TrimSpace(value))
+	if len(fields) >= twoTokens {
+		style.BorderSpacing = marginLen(fields[0], fsize, viewportW)
+		style.BorderSpacingV = marginLen(fields[1], fsize, viewportW)
+	} else if len(fields) == 1 {
+		sp := marginLen(fields[0], fsize, viewportW)
+		style.BorderSpacing = sp
+		style.BorderSpacingV = sp
+	}
 }
 
 func applyCaptionSideValue(style *ResolvedStyle, value string) {

@@ -1,6 +1,10 @@
+//nolint:varnamelen,wsl,mnd,nlreturn // multi-layer and inset box-shadow parser and renderer
 package layout
 
-import "strings"
+import (
+	"math"
+	"strings"
+)
 
 const (
 	boxShadowProp       = "box-shadow"
@@ -13,11 +17,26 @@ const (
 type parsedBoxShadow struct {
 	x, y, blur, spread float64
 	color              [3]float64
+	inset              bool
 }
 
-// parseBoxShadowLayer reads offset-x offset-y [blur [spread]] [color].
-// Inset layers are dropped. Spread expands the shadow box. Blur is stored
-// and painted as stacked expanding fills with decreasing alpha.
+// parseBoxShadowList parses all comma-separated box-shadow layers.
+func parseBoxShadowList(value string, current [3]float64, fsize float64) []parsedBoxShadow {
+	layers := splitCommaLayers(value)
+	var list []parsedBoxShadow
+	for _, layer := range layers {
+		layer = strings.TrimSpace(layer)
+		if layer == "" || strings.EqualFold(layer, cssDisplayNone) {
+			continue
+		}
+		if s, ok := parseBoxShadowLayer(layer, current, fsize); ok {
+			list = append(list, s)
+		}
+	}
+	return list
+}
+
+// parseBoxShadowLayer reads [inset] offset-x offset-y [blur [spread]] [color].
 func parseBoxShadowLayer(value string, current [3]float64, fsize float64) (parsedBoxShadow, bool) {
 	var tokens [boxShadowMaxTokens]string
 
@@ -26,26 +45,29 @@ func parseBoxShadowLayer(value string, current [3]float64, fsize float64) (parse
 		return parsedBoxShadow{}, false //nolint:exhaustruct // invalid layer
 	}
 
-	lengths, lengthCount, color, ok := collectBoxShadowTokens(tokens[:tokenCount], current, fsize)
+	lengths, lengthCount, color, inset, ok := collectBoxShadowTokens(tokens[:tokenCount], current, fsize)
 	if !ok {
 		return parsedBoxShadow{}, false //nolint:exhaustruct // invalid layer
 	}
 
-	return boxShadowFromLengths(lengths, lengthCount, color)
+	return boxShadowFromLengths(lengths, lengthCount, color, inset)
 }
 
 func collectBoxShadowTokens(
 	tokens []string, current [3]float64, fsize float64,
-) ([boxShadowMaxLengths]float64, int, [3]float64, bool) {
+) ([boxShadowMaxLengths]float64, int, [3]float64, bool, bool) {
 	var (
 		lengths     [boxShadowMaxLengths]float64
 		lengthCount int
 		color       = current
+		inset       = false
 	)
 
 	for _, tok := range tokens {
 		if strings.EqualFold(tok, insetKeyword) {
-			return lengths, 0, color, false
+			inset = true
+
+			continue
 		}
 
 		if parsed, parsedOK := parseUsedColor(tok, current); parsedOK {
@@ -56,18 +78,18 @@ func collectBoxShadowTokens(
 
 		length, lengthOK := plainLength(tok, fsize, 0)
 		if !lengthOK || lengthCount >= len(lengths) {
-			return lengths, 0, color, false
+			return lengths, 0, color, false, false
 		}
 
 		lengths[lengthCount] = length
 		lengthCount++
 	}
 
-	return lengths, lengthCount, color, true
+	return lengths, lengthCount, color, inset, true
 }
 
 func boxShadowFromLengths(
-	lengths [boxShadowMaxLengths]float64, lengthCount int, color [3]float64,
+	lengths [boxShadowMaxLengths]float64, lengthCount int, color [3]float64, inset bool,
 ) (parsedBoxShadow, bool) {
 	if lengthCount < pairLen {
 		return parsedBoxShadow{}, false //nolint:exhaustruct // invalid layer
@@ -88,12 +110,10 @@ func boxShadowFromLengths(
 		spread = lengths[three]
 	}
 
-	return parsedBoxShadow{x: lengths[0], y: lengths[1], blur: blur, spread: spread, color: color}, true
+	return parsedBoxShadow{x: lengths[0], y: lengths[1], blur: blur, spread: spread, color: color, inset: inset}, true
 }
 
-// appendBoxShadow paints one opaque fill the size of the border box expanded
-// by BoxShadowSpread, offset by BoxShadowX/Y. When blur > 0 it first paints
-// stacked expanding fills with decreasing alpha. Layout size is unchanged.
+// appendBoxShadow paints all box-shadow layers in reverse order so layer 0 is on top.
 func (e *engine) appendBoxShadow(
 	dst []Op, sty ResolvedStyle, posX, posY, width, height float64,
 	radiusX, radiusY [4]float64,
@@ -102,9 +122,33 @@ func (e *engine) appendBoxShadow(
 		return dst
 	}
 
-	spread := e.scalePt(sty.BoxShadowSpread)
-	originX := posX + e.scalePt(sty.BoxShadowX) - spread
-	originY := posY + e.scalePt(sty.BoxShadowY) - spread
+	shadows := parseBoxShadowList(sty.BoxShadowRaw, sty.Color, sty.FontSize)
+	if len(shadows) == 0 {
+		shadows = []parsedBoxShadow{{
+			x: sty.BoxShadowX, y: sty.BoxShadowY, blur: sty.BoxShadowBlur,
+			spread: sty.BoxShadowSpread, color: sty.BoxShadowColor, inset: sty.BoxShadowInset,
+		}}
+	}
+
+	for i := len(shadows) - 1; i >= 0; i-- {
+		shadow := shadows[i]
+		if shadow.inset {
+			dst = e.appendInsetBoxShadow(dst, shadow, posX, posY, width, height, radiusX, radiusY)
+		} else {
+			dst = e.appendOuterBoxShadow(dst, shadow, posX, posY, width, height, radiusX, radiusY)
+		}
+	}
+
+	return dst
+}
+
+func (e *engine) appendOuterBoxShadow(
+	dst []Op, shadow parsedBoxShadow, posX, posY, width, height float64,
+	radiusX, radiusY [4]float64,
+) []Op {
+	spread := e.scalePt(shadow.spread)
+	originX := posX + e.scalePt(shadow.x) - spread
+	originY := posY + e.scalePt(shadow.y) - spread
 	shadowW := width + spread*two
 	shadowH := height + spread*two
 
@@ -113,10 +157,58 @@ func (e *engine) appendBoxShadow(
 	}
 
 	dst = appendBoxShadowBlur(
-		dst, originX, originY, shadowW, shadowH, e.scalePt(sty.BoxShadowBlur), sty.BoxShadowColor, radiusX, radiusY,
+		dst, originX, originY, shadowW, shadowH, e.scalePt(shadow.blur), shadow.color, radiusX, radiusY,
 	)
 
-	return append(dst, shadowFillOp(originX, originY, shadowW, shadowH, sty.BoxShadowColor, radiusX, radiusY))
+	return append(dst, shadowFillOp(originX, originY, shadowW, shadowH, shadow.color, radiusX, radiusY))
+}
+
+func (e *engine) appendInsetBoxShadow(
+	dst []Op, shadow parsedBoxShadow, posX, posY, width, height float64,
+	radiusX, radiusY [4]float64,
+) []Op {
+	spread := e.scalePt(shadow.spread)
+	blur := e.scalePt(shadow.blur)
+	offX := e.scalePt(shadow.x)
+	offY := e.scalePt(shadow.y)
+
+	insetDepth := math.Max(spread+blur, 1.0)
+	if insetDepth > width/2 {
+		insetDepth = width / 2
+	}
+	if insetDepth > height/2 {
+		insetDepth = height / 2
+	}
+
+	// Paint inner blur / shadow band inside padding box
+	steps := boxShadowBlurSteps
+	if blur <= 0 {
+		steps = 1
+	}
+
+	for step := 1; step <= steps; step++ {
+		d := insetDepth * float64(step) / float64(steps)
+		alpha := 1.0 - float64(step-1)/float64(steps)
+		if blur > 0 {
+			alpha *= 0.5
+		}
+
+		op := shadowFillOp(
+			posX+offX, posY+offY, width, d, shadow.color, radiusX, radiusY,
+		)
+		op.Alpha = alpha
+		dst = append(dst, op)
+
+		if height > d {
+			opBot := shadowFillOp(
+				posX+offX, posY+height-d+offY, width, d, shadow.color, radiusX, radiusY,
+			)
+			opBot.Alpha = alpha
+			dst = append(dst, opBot)
+		}
+	}
+
+	return dst
 }
 
 func shadowFillOp(
@@ -133,10 +225,6 @@ func shadowFillOp(
 	}
 }
 
-// appendBoxShadowBlur approximates CSS blur with expanding rects. Outer rings
-// use lower alpha; the caller paints the opaque core afterward. PDF StyleOf
-// pre-composites translucent fills against white, so the rings read as
-// stepped gray. This is not a Gaussian raster of descendants.
 func appendBoxShadowBlur(
 	dst []Op, originX, originY, width, height, blur float64, color [3]float64,
 	radiusX, radiusY [4]float64,
