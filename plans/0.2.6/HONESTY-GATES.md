@@ -1,4 +1,4 @@
-# Honesty gates (phases 57-78)
+# Honesty gates (phases 57-84)
 
 Agents keep failing this ledger by flipping `catalog/mapping.json` to `implemented` and checking `[x]` without engine work. That is forbidden.
 

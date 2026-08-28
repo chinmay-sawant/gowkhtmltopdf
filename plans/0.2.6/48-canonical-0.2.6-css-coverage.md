@@ -1,7 +1,7 @@
 # 48 - v0.2.6 CSS coverage (Canonical Execution Ledger)
 
 > **Parent:** `plans/0.2.5/40-canonical-0.2.5-python-bindings.md` (complete 2026-08-26). Leftover CSS rows under `plans/0.2.0/` move here with `[~]` pointers.
-> **Status:** phases 48-56 complete. Phases 57-67 Partial program partially honest (see reopen rows after 2026-08-28 audit). Phases 68 complete as inventory only; 69-77 **not started** after fake Implemented flips were reverted. Phase 78 reopen. Catalog after honesty revert: **166 Implemented / 9 Partial / 643 Unsupported / 0 Ignored**. VERSION still 0.2.5.
+> **Status:** phases 48-79 largely complete (Phase 79 closed Partial→Implemented). Catalog baseline 2026-08-29: **202 Implemented / 0 Partial / 616 Unsupported / 0 Ignored**. Phases **80-84** are the Unsupported triage program (not started). VERSION still 0.2.5.
 > **Estimated effort:** several weeks across phases 48-56. Catalog and honesty first. Frequency slices next. Layout deepen last.
 > **Constraint:** pure Go, no CGO on the default path, no browser embed, no JavaScript. Direct modules stay `go-text/typesetting` and `tdewolff/canvas` unless an amendment is filed. `catalog/mapping.json` is the CSS name inventory. Agents must follow `HONESTY-GATES.md` before any Implemented flip.
 > **Ordering principle:** freeze catalog and honesty docs first, then selectors and cascade, then values and units, then template-visible box/text/paint, then generated content, then paged media, then fixture-driven layout leftovers, then closure. No phase closes on intent.
@@ -115,6 +115,12 @@ First-pass `goal: implement` is 608 names. That still includes print-noop UI (`c
                                                         -> 76 Pointer / form UI
                                                           -> 77 Speech / aural
                                                             -> 78 Ignored program closure
+                                                              -> 79 Partial remaining to Implemented
+                                                                -> 80 Implement for print (232)
+                                                                  -> 81 Niche / draft (94)
+                                                                    -> 82 Vendor aliases when base done (48)
+                                                                      -> 83 Hard defer (87)
+                                                                        -> 84 Skip print noop (155)
 ```
 
 | Phase | File | Goal |
@@ -150,8 +156,14 @@ First-pass `goal: implement` is 608 names. That still includes print-noop UI (`c
 | 76 | [phases/phase-76-pointer-form-ui.md](phases/phase-76-pointer-form-ui.md) | Pointer / form UI (7) |
 | 77 | [phases/phase-77-speech-aural.md](phases/phase-77-speech-aural.md) | Speech / aural (19) |
 | 78 | [phases/phase-78-ignored-program-closure.md](phases/phase-78-ignored-program-closure.md) | Recount, matrix, gates |
+| 79 | [phases/phase-79-partial-remaining-to-implemented.md](phases/phase-79-partial-remaining-to-implemented.md) | Remaining Partial to Implemented (closed at 202/0/616/0) |
+| 80 | [phases/phase-80-implement-for-print.md](phases/phase-80-implement-for-print.md) | Tier 5 implement-for-print (**232**) |
+| 81 | [phases/phase-81-niche-or-draft.md](phases/phase-81-niche-or-draft.md) | Tier 4 niche/draft honesty (**94**) |
+| 82 | [phases/phase-82-vendor-aliases-when-base-done.md](phases/phase-82-vendor-aliases-when-base-done.md) | Tier 3 vendor aliases when base done (**48**) |
+| 83 | [phases/phase-83-hard-defer.md](phases/phase-83-hard-defer.md) | Tier 2 hard defer SVG/mask/regions (**87**) |
+| 84 | [phases/phase-84-skip-print-noop.md](phases/phase-84-skip-print-noop.md) | Tier 1 skip print noop (**155**) |
 
-Name inventory for 68-78: [ignored-inventory.json](ignored-inventory.json).
+Name inventory for 68-78: [ignored-inventory.json](ignored-inventory.json). Unsupported triage for 80-84: [unsupported-triage.md](unsupported-triage.md) / [unsupported-triage.json](unsupported-triage.json) (232+94+48+87+155=616).
 
 Older CSS ledgers: `plans/0.2.0/phases/pending-phase-items/`, `tier-2-pending-3/`, `phase-17-broader-css.md`. Those rows move here with `[~]` pointers. Do not copy the checklists.
 
@@ -361,6 +373,30 @@ See [phases/phase-77-speech-aural.md](phases/phase-77-speech-aural.md).
 
 See [phases/phase-78-ignored-program-closure.md](phases/phase-78-ignored-program-closure.md).
 
+## Phase 79: Partial remaining to Implemented
+
+See [phases/phase-79-partial-remaining-to-implemented.md](phases/phase-79-partial-remaining-to-implemented.md).
+
+## Phase 80: Implement for print (232)
+
+See [phases/phase-80-implement-for-print.md](phases/phase-80-implement-for-print.md).
+
+## Phase 81: Niche or draft (94)
+
+See [phases/phase-81-niche-or-draft.md](phases/phase-81-niche-or-draft.md).
+
+## Phase 82: Vendor aliases when base done (48)
+
+See [phases/phase-82-vendor-aliases-when-base-done.md](phases/phase-82-vendor-aliases-when-base-done.md).
+
+## Phase 83: Hard defer (87)
+
+See [phases/phase-83-hard-defer.md](phases/phase-83-hard-defer.md).
+
+## Phase 84: Skip print noop (155)
+
+See [phases/phase-84-skip-print-noop.md](phases/phase-84-skip-print-noop.md).
+
 ---
 
 ## Dependencies
@@ -386,6 +422,20 @@ Phases **68-78** reopen **all 247 former Ignored** properties for **browser-leve
 Inventory: [ignored-inventory.json](ignored-inventory.json). Counts: [property-counts.md](property-counts.md).
 
 Browser-print golden harness: `testdata/golden/fixture-57-vanguard-telemetry-audit.html` covers the pre-68 **571** print-relevant set (not the reopened Ignored names yet).
+
+## Amendment (2026-08-29): Unsupported triage phases 80-84
+
+After Phase 79 closed at **202 / 0 / 616 / 0**, the remaining **616 Unsupported** names were triaged in [unsupported-triage.md](unsupported-triage.md):
+
+| Phase | Tier | Count | Mode |
+|------:|------|------:|------|
+| 80 | implement for print | 232 | Code + tests + mapping (waves); hard rows may stay Unsupported honestly |
+| 81 | niche / draft | 94 | Catalog notes; no Implemented flips |
+| 82 | alias when base done | 48 | Prefixed aliases only after unprefixed base is Implemented |
+| 83 | hard defer | 87 | Default honesty/docs; optional tiny clip/mask only with flip packets |
+| 84 | skip print noop | 155 | Catalog notes; print non-goals |
+
+Standing rules in every 80-84 checklist: **no git commands unless the user explicitly asks**; after status changes update both `catalog/mapping.json` and `catalog/coverage-summary.json` (plus `property-counts.md`); mapping last per `HONESTY-GATES.md`.
 
 ## Out of scope (unless this ledger is amended)
 

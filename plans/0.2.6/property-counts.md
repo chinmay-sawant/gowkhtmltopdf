@@ -13,6 +13,21 @@ WebRef inventory size is 818 property names.
 
 All 25 former Partial properties promoted to Implemented with full code paths and test proof across Slices 79.1 - 79.5 (linear/radial gradient rasterization, Gaussian blur convolution, inset/multi-layer box-shadow, table border conflict precedence, 2-length border-spacing, independent overflow axes, percent sizing clamps, grid line ends, word-break keep-all, generated content, break-inside avoid-page, vertical writing mode logical mappings).
 
+## Unsupported triage (phases 80-84, not started)
+
+The 616 Unsupported names are owned by [unsupported-triage.md](unsupported-triage.md) and phase checklists:
+
+| Phase | Tier | Count |
+|------:|------|------:|
+| 80 | implement for print | 232 |
+| 81 | niche / draft | 94 |
+| 82 | alias when base done | 48 |
+| 83 | hard defer | 87 |
+| 84 | skip print noop | 155 |
+| | **sum** | **616** |
+
+Agents must update `catalog/mapping.json` and `catalog/coverage-summary.json` together after any status change. No git commands unless the user explicitly asks.
+
 
 ## Partial program history (before honesty revert)
 

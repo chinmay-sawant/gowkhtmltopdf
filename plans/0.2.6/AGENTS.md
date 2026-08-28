@@ -5,16 +5,16 @@ Scope: this directory. Root `AGENTS.md` still applies. This file only adds rules
 ## This plan
 
 - Canonical ledger: `48-canonical-0.2.6-css-coverage.md`
-- Phases: `phases/phase-48-*.md` through `phase-78-*.md`
+- Phases: `phases/phase-48-*.md` through `phase-84-*.md`
 - Honesty gates: `HONESTY-GATES.md` (read before any mapping flip)
-- Inventory: `catalog/mapping.json`, `ignored-inventory.json`, `property-counts.md`
+- Inventory: `catalog/mapping.json`, `ignored-inventory.json`, `unsupported-triage.json`, `property-counts.md`
 - Product: print-oriented structured documents moving toward browser-level print. No JavaScript. No CGO on the default path.
 
 Read `48-canonical-0.2.6-css-coverage.md`, `HONESTY-GATES.md`, and `catalog/README.md` before editing CSS.
 
 ## Git
 
-No `git add`, `commit`, `push`, `restore`, `clean`, `reset`, or `stash` unless the user asks. Branch names: lowercase `feature/`, `fix/`, `chore/`, or `docs/<short>`.
+No `git add`, `commit`, `push`, `restore`, `clean`, `reset`, or `stash` unless the user **explicitly** asks. This ban is also copied into every phase 80-84 checklist. Branch names: lowercase `feature/`, `fix/`, `chore/`, or `docs/<short>`.
 
 ## Checklists (anti-fake-close)
 
@@ -57,7 +57,7 @@ No browser-parity, Qt WebKit, stdlib-only, full CSS, or byte-identical PDF claim
 - Targeted package tests while working: `go test ./internal/css` and `go test ./internal/layout`.
 - Before marking a non-doc phase complete: `make lint` and `make test`. Record both outcomes on the phase file.
 - After layout, paint, pagination, or CSS consume changes: `make golden`. New fixtures need a `fixturePageBounds` entry in `internal/convert/golden_test.go`.
-- After any mapping edit: `python3 scripts/css-catalog-map.py --check` and update `property-counts.md` + `coverage-summary.json`.
+- After any mapping edit: `python3 scripts/css-catalog-map.py --check` and update **both** `catalog/mapping.json` and `catalog/coverage-summary.json`, plus `property-counts.md`.
 - Direct modules stay `go-text/typesetting` and `tdewolff/canvas` unless the user signs off an amendment.
 
 ## Prose

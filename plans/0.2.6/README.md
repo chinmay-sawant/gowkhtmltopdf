@@ -2,10 +2,12 @@
 
 | File / Folder | Role |
 |---------------|------|
-| [48-canonical-0.2.6-css-coverage.md](48-canonical-0.2.6-css-coverage.md) | Canonical v0.2.6 execution ledger, phases 48-78 |
-| [phases/](phases) | Per-phase atomic checklists |
+| [48-canonical-0.2.6-css-coverage.md](48-canonical-0.2.6-css-coverage.md) | Canonical v0.2.6 execution ledger, phases 48-84 |
+| [phases/](phases) | Per-phase atomic checklists (80-84 = Unsupported triage) |
 | [catalog/](catalog) | Frozen CSS catalogs plus `mapping.json` vs current engine |
 | [property-counts.md](property-counts.md) | Property counts (implemented / partial / unsupported / ignored) |
+| [unsupported-triage.md](unsupported-triage.md) | Triage of the 616 Unsupported properties into skip / defer / implement buckets |
+| [unsupported-triage.json](unsupported-triage.json) | Machine-readable triage lists (full property names per bucket) |
 | [ignored-inventory.json](ignored-inventory.json) | Phase 68-78 ownership of all 247 Ignored names |
 | [phases/phase-57-partial-to-implemented-catchup.md](phases/phase-57-partial-to-implemented-catchup.md) | Phase 57-67: Partial to Implemented (closed) |
 | [phases/phase-68-ignored-inventory-policy.md](phases/phase-68-ignored-inventory-policy.md) | Phase 68-78: Ignored to browser-level print |
