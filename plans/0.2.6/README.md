@@ -11,6 +11,7 @@
 | [phases/phase-68-ignored-inventory-policy.md](phases/phase-68-ignored-inventory-policy.md) | Phase 68-78: Ignored to browser-level print |
 | [AGENTS.md](AGENTS.md) | Agent rules for this ledger |
 | [HONESTY-GATES.md](HONESTY-GATES.md) | Anti catalog-only close rules + flip packet |
+| [implemented-honesty-pass.md](implemented-honesty-pass.md) | 2026-08-28 audit of Implemented rows (152 kept / 14 demoted) |
 | [review/](review) | Post-ship architecture + ponytail ledger for commit `48e06dbc` |
 | [agy-review/](agy-review) | Go Design Patterns and Go Code Style review ledgers |
 

@@ -5,15 +5,15 @@
     "all_properties": "https://www.w3.org/Style/CSS/all-properties.en.json",
     "mdn_units": "mdn/data css/units.json",
     "mdn_properties": "mdn/data css/properties.json (overlay for mdn_url/groups)",
-    "engine": "honesty revert after audit of phases 58-78 fake Implemented flips"
+    "engine": "honesty pass over 166 Implemented (4 subagents); 14 demoted to partial"
   },
   "counts": {
     "webref_properties": 818,
     "mapped_properties": 818,
     "properties_by_engine_status": {
       "unsupported": 643,
-      "implemented": 166,
-      "partial": 9
+      "partial": 23,
+      "implemented": 152
     },
     "properties_print_relevant": 818,
     "properties_goal_implement": 818,

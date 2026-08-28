@@ -4,7 +4,7 @@
     "all_properties": "https://www.w3.org/Style/CSS/all-properties.en.json",
     "mdn_units": "mdn/data css/units.json",
     "mdn_properties": "mdn/data css/properties.json (overlay for mdn_url/groups)",
-    "engine": "honesty revert after audit of phases 58-78 fake Implemented flips",
+    "engine": "honesty pass over 166 Implemented (4 subagents); 14 demoted to partial",
     "generated": "2026-08-28"
   },
   "summary": {
@@ -12,8 +12,8 @@
     "mapped_properties": 818,
     "properties_by_engine_status": {
       "unsupported": 643,
-      "implemented": 166,
-      "partial": 9
+      "partial": 23,
+      "implemented": 152
     },
     "properties_print_relevant": 818,
     "properties_goal_implement": 818,
@@ -1628,9 +1628,9 @@
       "groups": [
         "CSS Basic User Interface"
       ],
-      "engine_status": "implemented",
+      "engine_status": "partial",
       "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "notes": "Honesty: apply+consumer for progress/meter only; matrix Partial."
     },
     {
       "property": "align-content",
@@ -4705,9 +4705,9 @@
       "groups": [
         "CSS Table"
       ],
-      "engine_status": "implemented",
+      "engine_status": "partial",
       "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "notes": "Honesty: single float gap; no separate horizontal/vertical lengths."
     },
     {
       "property": "border-start-end-radius",
@@ -5288,9 +5288,9 @@
       "groups": [
         "CSS Fragmentation"
       ],
-      "engine_status": "implemented",
+      "engine_status": "partial",
       "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "notes": "Honesty: pagination honors avoid; always/page stored but unused."
     },
     {
       "property": "caption-side",
@@ -6384,9 +6384,9 @@
       "groups": [
         "CSS Generated Content"
       ],
-      "engine_status": "implemented",
+      "engine_status": "partial",
       "code_path": "internal/layout/pseudo_content.go",
-      "notes": ""
+      "notes": "Honesty: ::before/::after pseudo path only; no ResolvedStyle apply arm."
     },
     {
       "property": "content-visibility",
@@ -9283,9 +9283,9 @@
       "groups": [
         "CSS Grid Layout"
       ],
-      "engine_status": "implemented",
+      "engine_status": "partial",
       "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "notes": "Honesty: bare line index folds to start via parseGridColumn; not true end longhand."
     },
     {
       "property": "grid-column-gap",
@@ -9404,9 +9404,9 @@
       "groups": [
         "CSS Grid Layout"
       ],
-      "engine_status": "implemented",
+      "engine_status": "partial",
       "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "notes": "Honesty: bare line index folds to start via parseGridRow; not true end longhand."
     },
     {
       "property": "grid-row-gap",
@@ -11679,9 +11679,9 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "implemented",
+      "engine_status": "partial",
       "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "notes": "Honesty: maps to max-width; same percent consumer gap."
     },
     {
       "property": "max-lines",
@@ -11725,9 +11725,9 @@
       "groups": [
         "CSS Box Sizing"
       ],
-      "engine_status": "implemented",
+      "engine_status": "partial",
       "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "notes": "Honesty: MaxWidthPercent not consumed by clampBlockMinMax (images only)."
     },
     {
       "property": "min-block-size",
@@ -11748,9 +11748,9 @@
       "groups": [
         "CSS Logical Properties and Values"
       ],
-      "engine_status": "implemented",
+      "engine_status": "partial",
       "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "notes": "Honesty: maps to min-height; same percent consumer gap."
     },
     {
       "property": "min-height",
@@ -11771,9 +11771,9 @@
       "groups": [
         "CSS Box Sizing"
       ],
-      "engine_status": "implemented",
+      "engine_status": "partial",
       "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "notes": "Honesty: MinHeightPercent not consumed by applyHeightConstraints (flex only)."
     },
     {
       "property": "min-inline-size",
@@ -12181,9 +12181,9 @@
       "groups": [
         "CSS Color"
       ],
-      "engine_status": "implemented",
+      "engine_status": "partial",
       "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "notes": "Honesty: ExtGState paint works; matrix already Partial (filter opacity side-path)."
     },
     {
       "property": "order",
@@ -12708,9 +12708,9 @@
       "groups": [
         "CSS Text"
       ],
-      "engine_status": "implemented",
+      "engine_status": "partial",
       "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "notes": "Honesty: anywhere/break-word used; matrix Partial (keep-all sibling incomplete)."
     },
     {
       "property": "overflow-x",
@@ -18700,9 +18700,9 @@
       "groups": [
         "CSS Text"
       ],
-      "engine_status": "implemented",
+      "engine_status": "partial",
       "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "notes": "Honesty: keep-all stored then treated as normal."
     },
     {
       "property": "word-space-transform",
@@ -18767,9 +18767,9 @@
       "groups": [
         "CSS Text"
       ],
-      "engine_status": "implemented",
+      "engine_status": "partial",
       "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "notes": "Honesty: alias of overflow-wrap; same Partial bar."
     },
     {
       "property": "wrap-after",
