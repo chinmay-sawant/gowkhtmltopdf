@@ -74,6 +74,14 @@ func applySVGPresentationProps(style *ResolvedStyle, prop, value string, fsize f
 		if opacity, parsed := parseOpacityValue(value); parsed {
 			style.StrokeOpacity = opacity
 		}
+	case "stroke-dasharray", "stroke-dashoffset", "stroke-linecap", "stroke-linejoin",
+		"stroke-miterlimit", "fill-rule", "clip-rule", "color-interpolation",
+		"color-interpolation-filters", "shape-rendering", "text-anchor",
+		"dominant-baseline", "alignment-baseline", "clip-path", "clip",
+		"overflow-clip-margin", "scroll-margin", "scroll-margin-top", "scroll-margin-right",
+		"scroll-margin-bottom", "scroll-margin-left", "ruby-align", "ruby-position",
+		"ruby-merge", "ruby-overhang":
+		return applyLeftoversProps(style, prop, value, fsize)
 	default:
 		return false
 	}
@@ -107,12 +115,49 @@ func applyOutlineLonghands(style *ResolvedStyle, prop, value string, fsize float
 	return true
 }
 
+//nolint:cyclop,mnd,wsl // box shadow longhand dispatch
 func applyBoxShadowProp(style *ResolvedStyle, prop, value string, fsize float64) bool {
-	if prop != boxShadowProp {
+	switch prop {
+	case boxShadowProp:
+		applyBoxShadowValue(style, value, fsize)
+	case "box-shadow-color":
+		if c, ok := parseUsedColor(value, style.Color); ok {
+			style.BoxShadowColor = c
+			style.BoxShadowSet = true
+		}
+	case "box-shadow-offset":
+		parts := strings.Fields(strings.TrimSpace(value))
+		if len(parts) >= 2 {
+			if x, ok := plainLength(parts[0], fsize, 0); ok {
+				style.BoxShadowX = x
+			}
+			if y, ok := plainLength(parts[1], fsize, 0); ok {
+				style.BoxShadowY = y
+			}
+			style.BoxShadowSet = true
+		}
+	case "box-shadow-blur":
+		if b, ok := plainLength(value, fsize, 0); ok && b >= 0 {
+			style.BoxShadowBlur = b
+			style.BoxShadowSet = true
+		}
+	case "box-shadow-spread":
+		if s, ok := plainLength(value, fsize, 0); ok {
+			style.BoxShadowSpread = s
+			style.BoxShadowSet = true
+		}
+	case "box-shadow-position":
+		val := strings.ToLower(strings.TrimSpace(value))
+		if val == "inset" {
+			style.BoxShadowInset = true
+			style.BoxShadowSet = true
+		} else if val == "outset" {
+			style.BoxShadowInset = false
+			style.BoxShadowSet = true
+		}
+	default:
 		return false
 	}
-
-	applyBoxShadowValue(style, value, fsize)
 
 	return true
 }
@@ -205,6 +250,8 @@ func applyOutlineShorthand(style *ResolvedStyle, value string, fsize float64) {
 // number on both the corner field and BorderRadiusPercent (paint uses the
 // uniform percent path). Absolute lengths clear BorderRadiusPercent so paint
 // uses the per-corner fields.
+//
+//nolint:cyclop // radius longhands
 func applyRadiusLonghand(style *ResolvedStyle, prop, value string, fsize float64) bool {
 	switch prop {
 	case "border-top-left-radius":
@@ -215,6 +262,23 @@ func applyRadiusLonghand(style *ResolvedStyle, prop, value string, fsize float64
 		setCornerRadius(style, &style.BorderRadiusBottomRight, &style.BorderRadiusBottomRightY, value, fsize)
 	case "border-bottom-left-radius":
 		setCornerRadius(style, &style.BorderRadiusBottomLeft, &style.BorderRadiusBottomLeftY, value, fsize)
+	case "border-top-radius":
+		setCornerRadius(style, &style.BorderRadiusTopLeft, &style.BorderRadiusTopLeftY, value, fsize)
+		setCornerRadius(style, &style.BorderRadiusTopRight, &style.BorderRadiusTopRightY, value, fsize)
+	case "border-bottom-radius":
+		setCornerRadius(style, &style.BorderRadiusBottomLeft, &style.BorderRadiusBottomLeftY, value, fsize)
+		setCornerRadius(style, &style.BorderRadiusBottomRight, &style.BorderRadiusBottomRightY, value, fsize)
+	case "border-left-radius":
+		setCornerRadius(style, &style.BorderRadiusTopLeft, &style.BorderRadiusTopLeftY, value, fsize)
+		setCornerRadius(style, &style.BorderRadiusBottomLeft, &style.BorderRadiusBottomLeftY, value, fsize)
+	case "border-right-radius":
+		setCornerRadius(style, &style.BorderRadiusTopRight, &style.BorderRadiusTopRightY, value, fsize)
+		setCornerRadius(style, &style.BorderRadiusBottomRight, &style.BorderRadiusBottomRightY, value, fsize)
+	case "border-start-start-radius", "border-start-end-radius",
+		"border-end-start-radius", "border-end-end-radius",
+		"border-block-start-radius", "border-block-end-radius",
+		"border-inline-start-radius", "border-inline-end-radius":
+		return applyLogicalRadiusLonghand(style, prop, value, fsize)
 	default:
 		return false
 	}

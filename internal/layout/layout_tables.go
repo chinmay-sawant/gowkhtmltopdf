@@ -333,7 +333,7 @@ func (e *engine) collectTableRows(node *html.Node) ([][]*html.Node, int) {
 			}
 
 			cstate := e.stylePtr(child)
-			if cstate.Display == cssDisplayNone || cstate.Visibility == "collapse" {
+			if cstate.Display == cssDisplayNone || cstate.Visibility == borderCollapseValue {
 				continue
 			}
 
@@ -915,9 +915,9 @@ func borderStyleRank(style string) int {
 		return 5
 	case solidKeyword:
 		return 4
-	case "dashed":
+	case borderStyleDashed:
 		return 3
-	case "dotted":
+	case borderStyleDotted:
 		return 2
 	case "ridge", "outset", "groove", "inset":
 		return 1

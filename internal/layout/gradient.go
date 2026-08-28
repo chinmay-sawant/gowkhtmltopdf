@@ -1,4 +1,4 @@
-//nolint:varnamelen,funlen,cyclop,mnd,wsl,intrange,nlreturn,nestif,goconst,gocognit,gocritic,nonamedreturns // grad
+//nolint:varnamelen,funlen,cyclop,mnd,wsl,intrange,nlreturn,nestif,gocognit,gocritic,nonamedreturns // grad
 package layout
 
 import (

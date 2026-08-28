@@ -41,6 +41,8 @@ func applyDisplayGroup(
 
 // applyDisplayFlowProps owns the display/position/float/clear/box-sizing/
 // writing-mode/overflow keyword properties.
+//
+//nolint:cyclop // display/flow keyword properties
 func applyDisplayFlowProps(style *ResolvedStyle, prop, value string) bool {
 	switch prop {
 	case "display":
@@ -55,6 +57,11 @@ func applyDisplayFlowProps(style *ResolvedStyle, prop, value string) bool {
 		setBoxSizingKeyword(style, value)
 	case "writing-mode":
 		setWritingModeKeyword(style, value)
+	case "direction":
+		val := strings.ToLower(strings.TrimSpace(value))
+		if val == "ltr" || val == "rtl" {
+			style.Direction = val
+		}
 	case "overflow", "overflow-x", "overflow-y":
 		setOverflowKeyword(style, prop, value)
 	default:
@@ -76,7 +83,7 @@ func setDisplayKeyword(style *ResolvedStyle, value string) {
 
 func setPositionKeyword(style *ResolvedStyle, value string) {
 	switch value {
-	case "static", "relative", "absolute", "fixed", "sticky":
+	case "static", "relative", "absolute", positionFixed, "sticky":
 		style.Position = value
 	}
 }
@@ -529,7 +536,7 @@ func applyColumnFillSpanProps(style *ResolvedStyle, prop, value string) bool {
 		}
 	case "column-fill":
 		switch value {
-		case "balance", overflowAuto:
+		case balanceKeyword, overflowAuto:
 			style.ColumnFill = value
 		}
 	default:
@@ -1202,6 +1209,8 @@ func logicalPair(value string) (string, string, bool) {
 }
 
 // applyBorderGroup handles the border shorthand and per-side props.
+//
+//nolint:cyclop // border shorthand and per-side props
 func applyBorderGroup(
 	style *ResolvedStyle, prop, value string, fsize float64, _ *styleContext, _ *ResolvedStyle, _ bool,
 ) bool {
@@ -1221,8 +1230,21 @@ func applyBorderGroup(
 	case borderWidthKeyword, "border-top-width", "border-right-width", "border-bottom-width", "border-left-width":
 		return applyBorderWidthProps(style, prop, value, fsize)
 	case borderStyleKeyword, borderColorKeyword,
-		"border-top-color", "border-right-color", "border-bottom-color", "border-left-color":
+		"border-top-color", "border-right-color", "border-bottom-color", "border-left-color",
+		"border-top-style", "border-right-style", "border-bottom-style", "border-left-style":
 		return applyBorderStyleColorProps(style, prop, value)
+	case "border-block", "border-block-start", "border-block-end",
+		"border-block-width", "border-block-start-width", "border-block-end-width",
+		"border-block-style", "border-block-start-style", "border-block-end-style",
+		"border-block-color", "border-block-start-color", "border-block-end-color",
+		"border-inline", "border-inline-start", "border-inline-end",
+		"border-inline-width", "border-inline-start-width", "border-inline-end-width",
+		"border-inline-style", "border-inline-start-style", "border-inline-end-style",
+		"border-inline-color", "border-inline-start-color", "border-inline-end-color":
+		return applyLogicalBorder(style, prop, value, fsize)
+	case "border-image", "border-image-source", "border-image-slice",
+		"border-image-width", "border-image-outset", "border-image-repeat":
+		return applyBorderImageProps(style, prop, value)
 	case "border-radius":
 		return setBorderRadius(style, value, fsize)
 	default:
@@ -1325,11 +1347,28 @@ func applyBorderStyleColorProps(style *ResolvedStyle, prop, value string) bool {
 		setBorderColor(&style.BorderBottom, value, style.Color)
 	case "border-left-color":
 		setBorderColor(&style.BorderLeft, value, style.Color)
+	case "border-top-style":
+		setBorderStyleSide(&style.BorderTop, value)
+	case "border-right-style":
+		setBorderStyleSide(&style.BorderRight, value)
+	case "border-bottom-style":
+		setBorderStyleSide(&style.BorderBottom, value)
+	case "border-left-style":
+		setBorderStyleSide(&style.BorderLeft, value)
 	default:
 		return false
 	}
 
 	return true
+}
+
+func setBorderStyleSide(side *border, value string) {
+	s := strings.ToLower(strings.TrimSpace(value))
+	if s != solidKeyword && s != borderStyleDashed && s != borderStyleDotted {
+		s = cssDisplayNone
+	}
+
+	side.Style = s
 }
 
 func setBorderColor(side *border, value string, current [3]float64) {
@@ -1361,8 +1400,8 @@ func applyColorForegroundProps(style *ResolvedStyle, prop, value string, parent 
 			style.Color = c
 		}
 	case "accent-color":
-		if value == inheritKeyword {
-			if hasParent && parent != nil && parent.AccentColorSet {
+		if value == inheritKeyword || isCurrentColor(value) {
+			if hasParent && parent != nil {
 				style.AccentColor = parent.AccentColor
 				style.AccentColorSet = true
 			}
@@ -1381,6 +1420,7 @@ func applyColorForegroundProps(style *ResolvedStyle, prop, value string, parent 
 	return true
 }
 
+//nolint:cyclop,mnd // color background properties
 func applyColorBackgroundProps(style *ResolvedStyle, prop, value string) bool {
 	switch prop {
 	case "background-color":
@@ -1391,6 +1431,33 @@ func applyColorBackgroundProps(style *ResolvedStyle, prop, value string) bool {
 		applyBackgroundShorthand(style, value)
 	case "background-image":
 		applyBackgroundImageValue(style, value)
+	case "background-position":
+		parts := strings.Fields(strings.TrimSpace(value))
+		if len(parts) >= 2 {
+			style.BackgroundPosX = parts[0]
+			style.BackgroundPosY = parts[1]
+		} else if len(parts) == 1 {
+			style.BackgroundPosX = parts[0]
+			style.BackgroundPosY = parts[0]
+		}
+	case "background-position-x", "background-position-inline":
+		style.BackgroundPosX = strings.TrimSpace(value)
+	case "background-position-y", "background-position-block":
+		style.BackgroundPosY = strings.TrimSpace(value)
+	case "background-size":
+		style.BackgroundSize = strings.TrimSpace(value)
+	case "background-repeat":
+		style.BackgroundRepeat = strings.TrimSpace(value)
+	case "background-repeat-x", "background-repeat-inline":
+		style.BackgroundRepeat = "repeat-x"
+	case "background-repeat-y", "background-repeat-block":
+		style.BackgroundRepeat = "repeat-y"
+	case "background-clip":
+		style.BackgroundClip = strings.ToLower(strings.TrimSpace(value))
+	case "background-origin":
+		style.BackgroundOrigin = strings.ToLower(strings.TrimSpace(value))
+	case "background-attachment":
+		style.BackgroundAttachment = strings.ToLower(strings.TrimSpace(value))
 	default:
 		return false
 	}
@@ -1444,6 +1511,15 @@ func applyTextGroup(
 	style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext,
 	parent *ResolvedStyle, hasParent bool,
 ) bool {
+	switch prop {
+	case "text-align-last", "text-align-all", "tab-size", "text-wrap", "text-wrap-mode", "text-wrap-style",
+		"white-space-collapse", "white-space-trim", "hyphens", "hyphenate-character",
+		"text-justify", "line-break", "text-decoration-line", "text-decoration-color",
+		"text-decoration-style", "text-decoration-thickness", "text-underline-offset",
+		"text-underline-position", "text-shadow":
+		return applyTextPropsWave3(style, prop, value, fsize, parent, hasParent)
+	}
+
 	if applyTextLayoutProps(style, prop, value) {
 		return true
 	}
@@ -1570,8 +1646,8 @@ func applyTextDecorationProps(style *ResolvedStyle, prop, value string, parent *
 		switch value {
 		case cssTextDecorationUnderline:
 			style.TextDecoration = cssTextDecorationUnderline
-		case "line-through":
-			style.TextDecoration = "line-through"
+		case cssTextDecorationLineThrough:
+			style.TextDecoration = cssTextDecorationLineThrough
 		case cssDisplayNone:
 			style.TextDecoration = cssDisplayNone
 		case inheritKeyword:
@@ -1634,15 +1710,16 @@ func applyTextSpacingProps(style *ResolvedStyle, prop, value string, fsize float
 	return true
 }
 
-// applyTableBreakGroup handles table borders/spacing and page-break props.
+// applyTableBreakGroup handles table layout, page-break, orphans/widows, and container queries.
 func applyTableBreakGroup(
-	style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext, parent *ResolvedStyle, _ bool,
+	style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext,
+	parent *ResolvedStyle, _ bool,
 ) bool {
 	switch prop {
 	case "border-collapse", "border-spacing", "table-layout", "caption-side":
 		return applyTableProps(style, prop, value, fsize, ctx.viewportW)
 	case "page-break-before", "break-before", "page-break-after", "break-after",
-		"page-break-inside", "break-inside":
+		"page-break-inside", "break-inside", "margin-break":
 		return applyPageBreakProps(style, prop, value)
 	case pageKeyword:
 		return applyPageNameProp(style, value, parent)
@@ -1658,7 +1735,7 @@ func applyTableBreakGroup(
 func applyTableProps(style *ResolvedStyle, prop, value string, fsize, viewportW float64) bool {
 	switch prop {
 	case "border-collapse":
-		if value == "collapse" || value == "separate" {
+		if value == borderCollapseValue || value == "separate" {
 			style.BorderCollapse = value
 		}
 	case "border-spacing":
@@ -1704,6 +1781,17 @@ func applyPageBreakProps(style *ResolvedStyle, prop, value string) bool {
 		return applyBreakAfterProps(style, value)
 	case "page-break-inside", "break-inside":
 		return applyBreakInsideProps(style, value)
+	case "margin-break":
+		val := strings.ToLower(strings.TrimSpace(value))
+		if val == marginBreakKeep || val == "discard" || val == "auto" {
+			style.MarginBreak = val
+
+			return true
+		}
+
+		return false
+	case "page":
+		return applyLeftoversProps(style, prop, value, 0)
 	default:
 		return false
 	}
@@ -1778,6 +1866,7 @@ func applyPageNameProp(style *ResolvedStyle, value string, parent *ResolvedStyle
 	}
 
 	style.PageName = low
+	style.Page = low
 
 	return true
 }
@@ -1837,6 +1926,9 @@ func applyTransformGroup(
 		if spec, ok := parseTransformOrigin(value, fsize); ok {
 			style.TransformOrigin = spec
 		}
+	case "transform-box", "transform-style", "perspective", "perspective-origin",
+		"backface-visibility", "rotate", "scale", "translate":
+		return applyLeftoversProps(style, prop, value, fsize)
 	default:
 		return false
 	}

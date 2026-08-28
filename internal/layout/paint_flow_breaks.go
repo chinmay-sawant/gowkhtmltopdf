@@ -508,6 +508,10 @@ func processBeforeAlwaysTarget(
 	boxY := target.box.y
 	targetY, alreadyFresh := forcedBreakTargetY(boxY, state.maxEff, contentH)
 
+	if target.box != nil && target.box.style != nil && target.box.style.MarginBreak == marginBreakKeep {
+		targetY += target.box.style.MarginTop
+	}
+
 	if alreadyFresh {
 		return false
 	}

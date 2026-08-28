@@ -139,15 +139,59 @@ var inheritableProps = []inheritCopy{ //nolint:gochecknoglobals // static inheri
 	}},
 	{[]string{"font-family"}, func(dst, src *ResolvedStyle) { dst.FontFamily = src.FontFamily }},
 	{[]string{"font-size"}, func(dst, src *ResolvedStyle) { dst.FontSize = src.FontSize }},
+	{[]string{"font-size-adjust"}, func(dst, src *ResolvedStyle) { dst.FontSizeAdjust = src.FontSizeAdjust }},
 	{[]string{"font-weight"}, func(dst, src *ResolvedStyle) { dst.FontWeight = src.FontWeight }},
 	{[]string{"font-style"}, func(dst, src *ResolvedStyle) { dst.FontItalic = src.FontItalic }},
+	{[]string{"font-feature-settings"}, func(dst, src *ResolvedStyle) {
+		dst.FontFeatureSettings = src.FontFeatureSettings
+	}},
+	{[]string{"font-kerning"}, func(dst, src *ResolvedStyle) { dst.FontKerning = src.FontKerning }},
+	{[]string{"font-variant"}, func(dst, src *ResolvedStyle) { dst.FontVariant = src.FontVariant }},
+	{[]string{"font-variant-caps"}, func(dst, src *ResolvedStyle) { dst.FontVariantCaps = src.FontVariantCaps }},
+	{[]string{"font-variant-ligatures"}, func(dst, src *ResolvedStyle) {
+		dst.FontVariantLigatures = src.FontVariantLigatures
+	}},
+	{[]string{"font-variant-numeric"}, func(dst, src *ResolvedStyle) { dst.FontVariantNumeric = src.FontVariantNumeric }},
+	{[]string{"font-variant-position"}, func(dst, src *ResolvedStyle) {
+		dst.FontVariantPosition = src.FontVariantPosition
+	}},
+	{[]string{"font-variant-east-asian"}, func(dst, src *ResolvedStyle) {
+		dst.FontVariantEastAsian = src.FontVariantEastAsian
+	}},
+	{[]string{"font-variant-emoji"}, func(dst, src *ResolvedStyle) { dst.FontVariantEmoji = src.FontVariantEmoji }},
+	{[]string{"font-variant-alternates"}, func(dst, src *ResolvedStyle) {
+		dst.FontVariantAlternates = src.FontVariantAlternates
+	}},
+	{[]string{"font-stretch", "font-width"}, func(dst, src *ResolvedStyle) { dst.FontStretch = src.FontStretch }},
+	{[]string{"font-synthesis"}, func(dst, src *ResolvedStyle) { dst.FontSynthesis = src.FontSynthesis }},
+	{[]string{"font-synthesis-weight"}, func(dst, src *ResolvedStyle) {
+		dst.FontSynthesisWeight = src.FontSynthesisWeight
+	}},
+	{[]string{"font-synthesis-style"}, func(dst, src *ResolvedStyle) { dst.FontSynthesisStyle = src.FontSynthesisStyle }},
+	{[]string{"font-synthesis-small-caps"}, func(dst, src *ResolvedStyle) {
+		dst.FontSynthesisSmallCaps = src.FontSynthesisSmallCaps
+	}},
+	{[]string{"font-synthesis-position"}, func(dst, src *ResolvedStyle) {
+		dst.FontSynthesisPosition = src.FontSynthesisPosition
+	}},
 	{[]string{"line-height"}, func(dst, src *ResolvedStyle) {
 		dst.LineHeight = src.LineHeight
 		dst.LineHeightUnitless = src.LineHeightUnitless
 	}},
 	{[]string{"text-align"}, func(dst, src *ResolvedStyle) { dst.TextAlign = src.TextAlign }},
+	{[]string{"text-align-last"}, func(dst, src *ResolvedStyle) { dst.TextAlignLast = src.TextAlignLast }},
 	{[]string{"text-transform"}, func(dst, src *ResolvedStyle) { dst.TextTransform = src.TextTransform }},
 	{[]string{"white-space"}, func(dst, src *ResolvedStyle) { dst.WhiteSpace = src.WhiteSpace }},
+	{[]string{"white-space-collapse"}, func(dst, src *ResolvedStyle) { dst.WhiteSpaceCollapse = src.WhiteSpaceCollapse }},
+	{[]string{"white-space-trim"}, func(dst, src *ResolvedStyle) { dst.WhiteSpaceTrim = src.WhiteSpaceTrim }},
+	{[]string{"text-wrap"}, func(dst, src *ResolvedStyle) { dst.TextWrap = src.TextWrap }},
+	{[]string{"text-wrap-mode"}, func(dst, src *ResolvedStyle) { dst.TextWrapMode = src.TextWrapMode }},
+	{[]string{"text-wrap-style"}, func(dst, src *ResolvedStyle) { dst.TextWrapStyle = src.TextWrapStyle }},
+	{[]string{"tab-size"}, func(dst, src *ResolvedStyle) { dst.TabSize = src.TabSize }},
+	{[]string{"hyphens"}, func(dst, src *ResolvedStyle) { dst.Hyphens = src.Hyphens }},
+	{[]string{"hyphenate-character"}, func(dst, src *ResolvedStyle) { dst.HyphenateCharacter = src.HyphenateCharacter }},
+	{[]string{"text-justify"}, func(dst, src *ResolvedStyle) { dst.TextJustify = src.TextJustify }},
+	{[]string{"line-break"}, func(dst, src *ResolvedStyle) { dst.LineBreak = src.LineBreak }},
 	// overflow-wrap / word-wrap and word-break are inherited (CSS Text).
 	{
 		[]string{"overflow-wrap", "word-wrap"},
@@ -208,7 +252,33 @@ var inheritableProps = []inheritCopy{ //nolint:gochecknoglobals // static inheri
 	// parent used value. Copying when the property is unspecified matches that.
 	{[]string{pageKeyword}, func(dst, src *ResolvedStyle) { dst.PageName = src.PageName }},
 	{[]string{"writing-mode"}, func(dst, src *ResolvedStyle) { dst.WritingMode = src.WritingMode }},
+	{[]string{"direction"}, func(dst, src *ResolvedStyle) { dst.Direction = src.Direction }},
 	{[]string{"text-indent"}, func(dst, src *ResolvedStyle) { dst.TextIndent = src.TextIndent }},
+	{[]string{"fill"}, func(dst, src *ResolvedStyle) { dst.Fill = src.Fill; dst.FillSet = src.FillSet }},
+	{[]string{"stroke"}, func(dst, src *ResolvedStyle) { dst.Stroke = src.Stroke; dst.StrokeSet = src.StrokeSet }},
+	{[]string{"stroke-width"}, func(dst, src *ResolvedStyle) {
+		dst.StrokeWidth = src.StrokeWidth
+		dst.StrokeWidthSet = src.StrokeWidthSet
+	}},
+	{[]string{"stroke-linecap"}, func(dst, src *ResolvedStyle) { dst.StrokeLineCap = src.StrokeLineCap }},
+	{[]string{"stroke-linejoin"}, func(dst, src *ResolvedStyle) { dst.StrokeLineJoin = src.StrokeLineJoin }},
+	{[]string{"stroke-dasharray"}, func(dst, src *ResolvedStyle) { dst.StrokeDashArray = src.StrokeDashArray }},
+	{[]string{"stroke-dashoffset"}, func(dst, src *ResolvedStyle) { dst.StrokeDashOffset = src.StrokeDashOffset }},
+	{[]string{"stroke-miterlimit"}, func(dst, src *ResolvedStyle) { dst.StrokeMiterLimit = src.StrokeMiterLimit }},
+	{[]string{"fill-rule"}, func(dst, src *ResolvedStyle) { dst.FillRule = src.FillRule }},
+	{[]string{"clip-rule"}, func(dst, src *ResolvedStyle) { dst.ClipRule = src.ClipRule }},
+	{[]string{"color-interpolation"}, func(dst, src *ResolvedStyle) { dst.ColorInterpolation = src.ColorInterpolation }},
+	{[]string{"color-interpolation-filters"}, func(dst, src *ResolvedStyle) {
+		dst.ColorInterpolationFilters = src.ColorInterpolationFilters
+	}},
+	{[]string{"shape-rendering"}, func(dst, src *ResolvedStyle) { dst.ShapeRendering = src.ShapeRendering }},
+	{[]string{"text-anchor"}, func(dst, src *ResolvedStyle) { dst.TextAnchor = src.TextAnchor }},
+	{[]string{"dominant-baseline"}, func(dst, src *ResolvedStyle) { dst.DominantBaseline = src.DominantBaseline }},
+	{[]string{"alignment-baseline"}, func(dst, src *ResolvedStyle) { dst.AlignmentBaseline = src.AlignmentBaseline }},
+	{[]string{"ruby-align"}, func(dst, src *ResolvedStyle) { dst.RubyAlign = src.RubyAlign }},
+	{[]string{"ruby-position"}, func(dst, src *ResolvedStyle) { dst.RubyPosition = src.RubyPosition }},
+	{[]string{"ruby-merge"}, func(dst, src *ResolvedStyle) { dst.RubyMerge = src.RubyMerge }},
+	{[]string{"ruby-overhang"}, func(dst, src *ResolvedStyle) { dst.RubyOverhang = src.RubyOverhang }},
 }
 
 // inheritProps copies inheritable properties from the parent, unless the
@@ -636,6 +706,7 @@ func applyFontProps(style *ResolvedStyle, raw map[string]string, parentSize floa
 	applyFontFamilyValue(style, raw)
 	applyFontWeightValue(style, raw)
 	applyFontStyleValue(style, raw)
+	applyFontPropsWave4(style, raw)
 
 	if val, found := raw["font"]; found {
 		parseFontShorthand(style, val, remBase)
@@ -718,12 +789,17 @@ var restShorthandProps = [...]string{ //nolint:gochecknoglobals // static apply 
 	borderColorKeyword, gapKeyword, flexKeyword, containerKeyword,
 	cssPropMarginInline, cssPropMarginBlock, cssPropPaddingInline, cssPropPaddingBlock,
 	insetKeyword, cssPropInsetBlock, cssPropInsetInline, "column-rule",
+	"border-block", "border-inline", "border-block-start", "border-block-end",
+	"border-inline-start", "border-inline-end", "border-block-width", "border-block-style",
+	"border-block-color", "border-inline-width", "border-inline-style", "border-inline-color",
 }
 
 // applyRestProps resolves every non-font property once the font size is known.
 // Shorthands run first in a fixed order; remaining longhands run in any order
 // (longhands do not clobber each other via shorthand expansion). This avoids
 // sorting and intermediate prop slices on every element.
+//
+//nolint:goconst // rest shorthand filtering
 func applyRestProps(
 	style *ResolvedStyle, raw map[string]string, ctx *styleContext,
 	parent *ResolvedStyle,
@@ -753,7 +829,10 @@ func applyRestProps(
 			borderWidthKeyword, borderStyleKeyword,
 			borderColorKeyword, gapKeyword, flexKeyword, containerKeyword,
 			cssPropMarginInline, cssPropMarginBlock, cssPropPaddingInline, cssPropPaddingBlock,
-			insetKeyword, cssPropInsetBlock, cssPropInsetInline, "column-rule":
+			insetKeyword, cssPropInsetBlock, cssPropInsetInline, "column-rule",
+			"border-block", "border-inline", "border-block-start", "border-block-end",
+			"border-inline-start", "border-inline-end", "border-block-width", "border-block-style",
+			"border-block-color", "border-inline-width", "border-inline-style", "border-inline-color":
 			continue
 		}
 

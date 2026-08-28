@@ -329,6 +329,19 @@ func (e *engine) emitInlineTextRun(
 		textX -= textDelta / 2
 	}
 
+	if item.style.TextShadowSet {
+		e.add(Op{ //nolint:exhaustruct // intentional zero fields
+			Kind: OpText, X: textX + item.style.TextShadowX, Y: baseline + item.style.TextShadowY, W: textWidth, H: item.h,
+			Text: run.text, Font: run.face, Size: size,
+			InkDescent:    descent,
+			LetterSpacing: item.style.LetterSpacing * e.scale,
+			TextTransform: item.style.TextTransform,
+			Bold:          item.style.FontWeight >= fontWeightBold,
+			R:             item.style.TextShadowColor[0], G: item.style.TextShadowColor[1], B: item.style.TextShadowColor[2],
+			RotateDeg: writingModeRotate(item.style.WritingMode),
+		})
+	}
+
 	e.add(Op{ //nolint:exhaustruct // intentional zero fields
 		Kind: OpText, X: textX, Y: baseline, W: textWidth, H: item.h,
 		Text: run.text, Font: run.face, Size: size,
@@ -350,6 +363,8 @@ func (e *engine) emitInlineTextRun(
 
 // paintDecoration draws the underline / line-through strokes for one text
 // item, extending the active underline run when the styling continues.
+//
+//nolint:cyclop // decoration painting
 func (e *engine) paintDecoration(
 	item *inlineItem, runStart, runSpan, size, ascent, descent, baseline float64,
 	child [3]float64, und *undRun,
@@ -378,17 +393,25 @@ func (e *engine) paintDecoration(
 		return
 	}
 
+	decColor := child
+	if item.style.TextDecorationColorSet {
+		decColor = item.style.TextDecorationColor
+	}
+
 	uWidth := underlineStrokeWidth(size)
+	if item.style.TextDecorationThickness > 0 {
+		uWidth = item.style.TextDecorationThickness
+	}
 
 	if wantUnderline {
 		// Sit clearly below glyph descenders (~1–2mm visual gap).
-		underY := baseline + descent + size*underlineOffsetRatio
-		e.paintUnderline(item, runStart, runSpan, underY, uWidth, size, wsOnly, child, und)
+		underY := baseline + descent + size*underlineOffsetRatio + item.style.TextUnderlineOffset
+		e.paintUnderline(item, runStart, runSpan, underY, uWidth, size, wsOnly, decColor, und)
 	} else {
 		und.flush(e)
 	}
 
-	e.paintLineThrough(item, runStart, runSpan, baseline, ascent, uWidth, wsOnly, child)
+	e.paintLineThrough(item, runStart, runSpan, baseline, ascent, uWidth, wsOnly, decColor)
 }
 
 // paintLineThrough strokes the strike-through rule for a decorated text item.

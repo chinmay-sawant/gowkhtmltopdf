@@ -1,7 +1,7 @@
 # Phase 80: Implement for print (tier 5, 232 properties)
 
 > **Parent:** `../48-canonical-0.2.6-css-coverage.md` Phase 80
-> **Status:** not started
+> **Status:** completed
 > **Estimated effort:** XL (5 waves; many props stay honest Unsupported inside this phase)
 > **Owner:** `internal/layout` + `internal/css` + `internal/pdf` + catalog
 > **Depends on:** Phase 79 closure (202 Implemented / 0 Partial / 616 Unsupported / 0 Ignored)
@@ -74,12 +74,12 @@ Do not grow `paint_flow.go` / `paint_pagination.go` further; extract new helpers
 
 ### Checklist
 
-- [ ] 80.1.1 Lock the 29 `E_logical_box` names from triage (see Ownership).
-- [ ] 80.1.2 Implement logical border width/style/color shorthands and start/end longhands for `horizontal-tb` (vertical WM optional same wave or `[~]`).
-- [ ] 80.1.3 Implement logical corner radii mapping onto physical corners.
-- [ ] 80.1.4 Decide `margin-break`: implement lite consumer **or** leave Unsupported with honest note (`[~]`).
-- [ ] 80.1.5 Tests `TestLogicalBorder*` / radius; flip packets only for Implemented set.
-- [ ] 80.1.6 Update matrix § box/border; flip `mapping.json`; recount `coverage-summary.json`.
+- [x] 80.1.1 Lock the 29 `E_logical_box` names from triage (see Ownership).
+- [x] 80.1.2 Implement logical border width/style/color shorthands and start/end longhands for `horizontal-tb` and vertical writing modes (`internal/layout/style_logical_border.go`).
+- [x] 80.1.3 Implement logical corner radii mapping onto physical corners (`style_logical_border.go` and `style_paint_props.go`).
+- [x] 80.1.4 Implement `margin-break` field and pagination consumer (`internal/layout/paint_flow_breaks.go`).
+- [x] 80.1.5 Tests `TestLogicalBorderBlockAndInline`, `TestLogicalCornerRadii`, `TestMarginBreakProperty` passing in `internal/layout/style_logical_border_test.go`.
+- [x] 80.1.6 Update matrix; flip `mapping.json`; recount `coverage-summary.json`.
 
 ---
 
@@ -97,13 +97,13 @@ Do not grow `paint_flow.go` / `paint_pagination.go` further; extract new helpers
 
 ### Checklist
 
-- [ ] 80.2.1 Lock the 52 names; publish (a)/(b)/(c) split in this file or a slice note.
-- [ ] 80.2.2 Ship (a) alias longhands with consumers already present; flip packets.
-- [ ] 80.2.3 Ship background position/size/repeat (+ deepen `background` shorthand).
-- [ ] 80.2.4 Ship background clip/origin (attachment may be Implemented-as-scroll with note).
-- [ ] 80.2.5 Border-image lite **or** `[~]` with next gate.
-- [ ] 80.2.6 Leave (c) draft names Unsupported with notes; do not flip them Implemented.
-- [ ] 80.2.7 Matrix §2.4; mapping + coverage-summary recount.
+- [x] 80.2.1 Lock the 52 names; publish (a)/(b)/(c) split in this file or a slice note.
+- [x] 80.2.2 Ship (a) alias longhands with consumers already present; flip packets.
+- [x] 80.2.3 Ship background position/size/repeat (`internal/layout/background_image.go`).
+- [x] 80.2.4 Ship background clip/origin (`internal/layout/background_image.go`).
+- [x] 80.2.5 Border-image (`internal/layout/border_image.go` wired in `prependChrome`).
+- [x] 80.2.6 Leave (c) draft names Unsupported with notes in `mapping.json`.
+- [x] 80.2.7 Matrix §2.4; mapping + coverage-summary recount; tests in `internal/layout/style_backgrounds_borders_test.go` pass.
 
 ---
 
@@ -120,12 +120,12 @@ Do not grow `paint_flow.go` / `paint_pagination.go` further; extract new helpers
 
 ### Checklist
 
-- [ ] 80.3.1 Lock 23 `E_text` + 18 `E_text_decoration` names.
-- [ ] 80.3.2 Near-print text slice: `text-align-last`, `tab-size`, wrap/white-space longhands, `hyphens` none/manual + `hyphenate-character` as chosen.
-- [ ] 80.3.3 Near-print decoration: line/color/thickness/underline-offset (+ shorthand expand); style solid/dashed/dotted as chosen.
-- [ ] 80.3.4 `text-shadow` lite **or** `[~]`.
-- [ ] 80.3.5 Mark hard rows Unsupported with notes (no fake Implemented).
-- [ ] 80.3.6 Tests + matrix + mapping + coverage-summary recount.
+- [x] 80.3.1 Lock 23 `E_text` + 18 `E_text_decoration` names.
+- [x] 80.3.2 Near-print text slice: `text-align-last`, `tab-size`, wrap/white-space longhands, `hyphens` none/manual + `hyphenate-character` (`internal/layout/style_text_props.go`, `inline.go`).
+- [x] 80.3.3 Near-print decoration: line/color/thickness/underline-offset/underline-position (`style_text_props.go`, `inline_paint.go`).
+- [x] 80.3.4 `text-shadow` implemented and wired into `inline_paint.go`.
+- [x] 80.3.5 Mark hard rows Unsupported with notes (no fake Implemented).
+- [x] 80.3.6 Tests `TestTextPropsWave3`, `TestTextDecorationPropsWave3` pass in `internal/layout/style_text_props_test.go`; matrix + mapping + coverage-summary recount.
 
 ---
 
@@ -142,12 +142,12 @@ Do not grow `paint_flow.go` / `paint_pagination.go` further; extract new helpers
 
 ### Checklist
 
-- [ ] 80.4.1 Lock 22 `E_fonts` names.
-- [ ] 80.4.2 Implement `font-feature-settings` end-to-end (apply → measure → shape → paint identical features).
-- [ ] 80.4.3 `font-kerning` + chosen `font-variant-*` tag mappings.
-- [ ] 80.4.4 `font-synthesis-weight` (and siblings as chosen) gating FakeBold.
-- [ ] 80.4.5 Leave palette / variation-settings / optical-sizing / language-override Unsupported unless a real consumer lands.
-- [ ] 80.4.6 Tests + matrix/fonts docs + mapping + coverage-summary recount.
+- [x] 80.4.1 Lock 22 `E_fonts` names.
+- [x] 80.4.2 Implement `font-feature-settings` end-to-end (apply -> measure -> shape -> paint identical features, `internal/layout/style_font_props.go`, `layout.go`).
+- [x] 80.4.3 `font-kerning` + `font-variant-*` tag mappings (`style_font_props.go`, `style_cascade.go`).
+- [x] 80.4.4 `font-synthesis-weight`, `font-synthesis-style`, etc. gating `FakeBoldFor` (`internal/layout/paint.go`).
+- [x] 80.4.5 Leave palette / variation-settings / optical-sizing / language-override Unsupported with honest notes in catalog.
+- [x] 80.4.6 Tests `TestFontPropsWave4` pass in `internal/layout/style_font_props_test.go`; matrix/fonts docs + mapping + coverage-summary recount.
 
 ---
 
@@ -171,25 +171,25 @@ Counts: overflow 16 + multicol 11 + inline 8 + shapes 8 + box-sizing 6 + paged 6
 
 ### Checklist
 
-- [ ] 80.5.1 Lock the 88 leftover names; write do-now vs leave-unsupported split.
-- [ ] 80.5.2 Ship grid aliases + auto tracks as chosen.
-- [ ] 80.5.3 Ship `rotate`/`scale`/`translate` (+ `transform-box` lite or `[~]`).
-- [ ] 80.5.4 Ship `object-fit` / `object-position` (and optional orientation).
-- [ ] 80.5.5 Ship overflow logical axes + chosen clamp/ellipsis lite.
-- [ ] 80.5.6 Ship cheap singles with flip packets.
-- [ ] 80.5.7 Document leave-unsupported set with notes; no fake flips.
-- [ ] 80.5.8 Matrix + mapping + coverage-summary recount.
+- [x] 80.5.1 Lock the 88 leftover names; write do-now vs leave-unsupported split.
+- [x] 80.5.2 Ship grid aliases + auto tracks (`internal/layout/style_properties.go`).
+- [x] 80.5.3 Ship `rotate`/`scale`/`translate`, `transform-box`, `transform-style`, `perspective`, `perspective-origin`, `backface-visibility` (`internal/layout/style_leftovers.go`).
+- [x] 80.5.4 Ship `object-fit` / `object-position` and SVG presentation properties (`stroke-dasharray`, `stroke-dashoffset`, `stroke-linecap`, `stroke-linejoin`, `stroke-miterlimit`, `fill-rule`, `clip-rule`, `shape-rendering`, `text-anchor`, `dominant-baseline`, `alignment-baseline`).
+- [x] 80.5.5 Ship overflow logical axes + `clip-path`, `clip`, `overflow-clip-margin`, `scroll-margin*` (`internal/layout/style_leftovers.go`, `style_paint_props.go`).
+- [x] 80.5.6 Ship ruby properties (`ruby-align`, `ruby-position`, `ruby-merge`, `ruby-overhang`), `page`, and single properties.
+- [x] 80.5.7 Document leave-unsupported set with notes in catalog; no fake flips.
+- [x] 80.5.8 Tests `TestLeftoversPropsWave5` pass in `internal/layout/style_leftovers_test.go`; matrix + mapping + coverage-summary recount.
 
 ---
 
 ### Catalog and gate close
 
-- [ ] CATALOG.1 After any `engine_status` change, recount Implemented / Partial / Unsupported / Ignored from `mapping.json` with a `Counter` on `engine_status`.
-- [ ] CATALOG.2 Write the same counts into `catalog/coverage-summary.json` `counts.properties_by_engine_status` and into `property-counts.md`.
-- [ ] CATALOG.3 `python3 scripts/css-catalog-map.py --check` exit 0.
-- [ ] CATALOG.4 If layout/paint/CSS code changed: `go test ./internal/layout` and/or `go test ./internal/css` targeted; then `make test` and `make lint` exit 0. If paint/pagination changed: `make golden` exit 0.
-- [ ] CATALOG.5 If matrix/docs claims changed: `make claim-scan` exit 0.
-- [ ] CATALOG.6 No git commands were run unless the user explicitly asked.
+- [x] CATALOG.1 After any `engine_status` change, recount Implemented / Partial / Unsupported / Ignored from `mapping.json` with a `Counter` on `engine_status`.
+- [x] CATALOG.2 Write the same counts into `catalog/coverage-summary.json` `counts.properties_by_engine_status` and into `property-counts.md`.
+- [x] CATALOG.3 `python3 scripts/css-catalog-map.py --check` exit 0.
+- [x] CATALOG.4 If layout/paint/CSS code changed: `go test ./internal/layout` and/or `go test ./internal/css` targeted; then `make test` and `make lint` exit 0. If paint/pagination changed: `make golden` exit 0.
+- [x] CATALOG.5 If matrix/docs claims changed: `make claim-scan` exit 0.
+- [x] CATALOG.6 No git commands were run unless the user explicitly asked.
 
 
 ## Forbidden proofs

@@ -533,7 +533,7 @@ func StyleOf(paintOp *Op) PaintStyle {
 // FakeBoldFor reports whether CSS bold should be synthesized for op (Latin
 // only; CJK stroking produces streak artifacts).
 func FakeBoldFor(op *Op) bool {
-	if op == nil || !op.Bold || (op.Font != nil && op.Font.Bold()) {
+	if op == nil || op.NoFakeBold || !op.Bold || (op.Font != nil && op.Font.Bold()) {
 		return false
 	}
 

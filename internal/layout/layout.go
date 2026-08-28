@@ -41,6 +41,7 @@ const (
 	positionRelative        = "relative"
 	positionStatic          = "static"
 	positionSticky          = "sticky"
+	balanceKeyword          = "balance"
 	htmlMeter               = "meter"
 	displayBlock            = "block"
 	displayFlex             = "flex"
@@ -67,6 +68,7 @@ const (
 	pseudoAfter             = "after"
 	bulletDisc              = "\u2022"
 	borderCollapseValue     = "collapse"
+	marginBreakKeep         = "keep"
 	overflowWrapAnywhere    = "anywhere"
 	overflowWrapBreakWord   = "break-word"
 	borderStyleDashed       = "dashed"
@@ -76,6 +78,7 @@ const (
 	textTransformLowercase  = "lowercase"
 	textTransformCapitalize = "capitalize"
 	tableCellKind           = "cell"
+	defaultTabSize          = 8
 )
 
 // Options controls a Layout run.
@@ -322,6 +325,8 @@ type Op struct {
 	// TextTransform is applied when the text operation is painted.
 	TextTransform string
 	Bold          bool
+	NoFakeBold    bool
+	FontFeatures  string
 
 	URI string
 

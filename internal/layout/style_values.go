@@ -380,7 +380,7 @@ func parseBorder(value string, fsize float64, current [3]float64) (border, bool)
 	}
 
 	if boxNode.Style == "" {
-		boxNode.Style = "solid"
+		boxNode.Style = solidKeyword
 	}
 
 	if boxNode.Width == 0 {

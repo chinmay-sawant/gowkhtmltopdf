@@ -252,7 +252,7 @@ func chromeMustSpliceImmediately(st ResolvedStyle) bool {
 // Sticky/fixed/transform keep an immediate splice so mid-build StickyID/Fixed
 // stamps and transform exclusive ranges stay correct without re-derivation.
 //
-//nolint:cyclop,wsl // paint ordering and border geometry stay together
+//nolint:cyclop,wsl,funlen // paint ordering and border geometry stay together
 func (e *engine) prependChrome(insertAt int, boxNode *box, sty ResolvedStyle, posX, posY, width, height float64) {
 	if e.noEmit {
 		return
@@ -280,13 +280,17 @@ func (e *engine) prependChrome(insertAt int, boxNode *box, sty ResolvedStyle, po
 	}
 	chrome = e.appendBackgroundImage(chrome, sty, posX, posY, width, height)
 
-	switch {
-	case hasRoundedRadii(radii) && roundedSolidBorder(sty):
-		chrome = append(chrome, e.roundedBorderOps(sty, posX, posY, width, height, radii)...)
-	case hasRoundedRadii(radii) && roundedAccentBorder(sty):
-		chrome = append(chrome, e.roundedAccentBorderOps(sty, posX, posY, width, height, radii)...)
-	default:
-		chrome = append(chrome, e.collapsedOrFullBorderOps(boxNode, sty, posX, posY, width, height)...)
+	if sty.BorderImageSource != "" {
+		chrome = e.appendBorderImage(chrome, sty, posX, posY, width, height)
+	} else {
+		switch {
+		case hasRoundedRadii(radii) && roundedSolidBorder(sty):
+			chrome = append(chrome, e.roundedBorderOps(sty, posX, posY, width, height, radii)...)
+		case hasRoundedRadii(radii) && roundedAccentBorder(sty):
+			chrome = append(chrome, e.roundedAccentBorderOps(sty, posX, posY, width, height, radii)...)
+		default:
+			chrome = append(chrome, e.collapsedOrFullBorderOps(boxNode, sty, posX, posY, width, height)...)
+		}
 	}
 	chrome = append(chrome, e.outlineOps(&sty, posX, posY, width, height)...)
 	stampOpRadiiY(chrome, radiiY)

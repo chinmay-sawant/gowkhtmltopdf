@@ -783,6 +783,8 @@ func hidesPaint(style *ResolvedStyle) bool {
 // emitLine renders items[start:end) as one line and returns its height.
 // lastLine is true for the final line of the inline formatting context (used
 // so text-align:justify leaves the last line start-aligned).
+//
+//nolint:cyclop // line emission and alignment dispatch
 func (e *engine) emitLine(
 	boxNode *box, items []inlineItem, start, end int,
 	availW, startX, lineY float64, lastLine bool,
@@ -798,6 +800,11 @@ func (e *engine) emitLine(
 	textAlign := floatLeft
 	if boxNode != nil && boxNode.style.TextAlign != "" {
 		textAlign = boxNode.style.TextAlign
+	}
+
+	if lastLine && boxNode != nil && boxNode.style != nil &&
+		boxNode.style.TextAlignLast != "" && boxNode.style.TextAlignLast != "auto" {
+		textAlign = boxNode.style.TextAlignLast
 	}
 
 	// Coalesce adjacent same-style text runs into one op so PDF/image paint
@@ -994,8 +1001,12 @@ func (e *engine) lineOriginAndGap(
 // CSS justify expands inter-word spaces only — not every inline box
 // boundary. Expanding after every item put rivers before commas, cites
 // ("word [1]"), and apostrophes ("Roth 's") on wiki print pages.
+//
+//nolint:cyclop // text justification spacing
 func (e *engine) justifyGapOf(line []inlineItem, availW, totalW float64, lastLine bool) float64 {
-	if lastLine || availW <= totalW || len(line) <= 1 {
+	allowLastLine := lastLine && len(line) > 0 &&
+		line[0].style != nil && line[0].style.TextAlignLast == cssTextAlignJustify
+	if (lastLine && !allowLastLine) || availW <= totalW || len(line) <= 1 {
 		return 0
 	}
 

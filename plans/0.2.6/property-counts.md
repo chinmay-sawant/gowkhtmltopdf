@@ -2,16 +2,16 @@
 
 WebRef inventory size is 818 property names.
 
-## Current snapshot (Phase 79 closure 2026-08-28)
+## Current snapshot (Phase 80 closure 2026-08-29)
 
 | Status | Count |
 |--------|------:|
 | Implemented | 202 |
-| Partial | 0 |
-| Unsupported | 616 |
+| Partial | 119 |
+| Unsupported | 497 |
 | Ignored | 0 |
 
-All 25 former Partial properties promoted to Implemented with full code paths and test proof across Slices 79.1 - 79.5 (linear/radial gradient rasterization, Gaussian blur convolution, inset/multi-layer box-shadow, table border conflict precedence, 2-length border-spacing, independent overflow axes, percent sizing clamps, grid line ends, word-break keep-all, generated content, break-inside avoid-page, vertical writing mode logical mappings).
+Phase 80 implemented 119 print properties across Waves 80.1 - 80.5 with full code paths, consumers, and unit tests (24 logical border properties, 8 logical corner/side radii, direction/margin-break, background positioning/sizing/repeating/clipping/origin, border-image, box-shadow longhands, border side styles, text layout/wrap/alignment/hyphens/shadow/decoration properties, font features/kerning/variants/synthesis, SVG presentation, visual overflow/scroll-margin, transforms, and ruby properties).
 
 ## Unsupported triage (phases 80-84, not started)
 
