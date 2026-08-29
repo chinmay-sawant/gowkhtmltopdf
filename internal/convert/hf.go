@@ -143,7 +143,7 @@ func drawTextHF(page *pdf.Page, hfVal settings.HeaderFooter, geom hfGeom, parms 
 
 	size := hfVal.FontSize
 	if size <= 0 {
-		size = 12
+		size = 8.5
 	}
 
 	spacing := hfVal.Spacing * mmToPt
@@ -611,7 +611,7 @@ func hfHeightFor(ctx context.Context, loader *load.Loader, font *pdf.Font, state
 
 	size := hfVal.FontSize
 	if size <= 0 {
-		size = 12
+		size = 8.5
 	}
 
 	if state != nil {

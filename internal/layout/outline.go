@@ -69,6 +69,54 @@ func appendOutlineOps(
 	return dst
 }
 
+func hasRoundedCorners(sty *ResolvedStyle) bool {
+	return sty.BorderRadiusTopLeft > 0 || sty.BorderRadiusTopRight > 0 ||
+		sty.BorderRadiusBottomRight > 0 || sty.BorderRadiusBottomLeft > 0
+}
+
+func inflateRadius(rad, inflate float64) float64 {
+	if rad > 0 {
+		return rad + inflate
+	}
+
+	return 0
+}
+
+func (e *engine) roundedOutlineOp(
+	sty *ResolvedStyle, posX, posY, width, height, outlineWidth, outlineOff, red, green, blue float64,
+) (Op, bool) {
+	inflate := outlineInflate(outlineWidth, outlineOff)
+	outX := posX - inflate
+	outY := posY - inflate
+	outW := width + two*inflate
+	outH := height + two*inflate
+
+	if outW <= 0 || outH <= 0 {
+		return Op{}, false //nolint:exhaustruct
+	}
+
+	radTL := inflateRadius(e.scalePt(sty.BorderRadiusTopLeft), inflate)
+	radTR := inflateRadius(e.scalePt(sty.BorderRadiusTopRight), inflate)
+	radBR := inflateRadius(e.scalePt(sty.BorderRadiusBottomRight), inflate)
+	radBL := inflateRadius(e.scalePt(sty.BorderRadiusBottomLeft), inflate)
+
+	return Op{ //nolint:exhaustruct // outline rounded stroke op
+		Kind:              OpStrokeRect,
+		X:                 outX,
+		Y:                 outY,
+		W:                 outW,
+		H:                 outH,
+		Width:             outlineWidth,
+		R:                 red,
+		G:                 green,
+		B:                 blue,
+		RadiusTopLeft:     radTL,
+		RadiusTopRight:    radTR,
+		RadiusBottomRight: radBR,
+		RadiusBottomLeft:  radBL,
+	}, true
+}
+
 func (e *engine) outlineOps(sty *ResolvedStyle, posX, posY, width, height float64) []Op {
 	if e == nil || !outlinePaints(sty) {
 		return nil
@@ -77,6 +125,12 @@ func (e *engine) outlineOps(sty *ResolvedStyle, posX, posY, width, height float6
 	outlineWidth := e.scalePt(sty.OutlineWidth)
 	outlineOff := e.scalePt(sty.OutlineOffset)
 	red, green, blue := outlineStrokeColor(sty)
+
+	if sty.OutlineStyle == solidKeyword && hasRoundedCorners(sty) {
+		if op, ok := e.roundedOutlineOp(sty, posX, posY, width, height, outlineWidth, outlineOff, red, green, blue); ok {
+			return []Op{op}
+		}
+	}
 
 	return appendOutlineOps(
 		make([]Op, 0, outlineSideHint),

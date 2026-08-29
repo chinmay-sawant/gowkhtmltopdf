@@ -77,6 +77,41 @@ func (e *engine) collectAndPrepareInlineItems(nodes []*html.Node, contentW float
 	return items
 }
 
+func (e *engine) injectBlockPseudos(boxNode *box, items []inlineItem) []inlineItem {
+	if boxNode == nil || boxNode.node == nil || boxNode.style == nil || boxNode.kind != displayBlock {
+		return items
+	}
+
+	if item, ok := e.makeInflowPseudoItem(boxNode.node, pseudoBefore, *boxNode.style); ok {
+		items = append([]inlineItem{item}, items...)
+	}
+
+	if item, ok := e.makeInflowPseudoItem(boxNode.node, pseudoAfter, *boxNode.style); ok {
+		items = append(items, item)
+	}
+
+	return items
+}
+
+func (e *engine) makeInflowPseudoItem(
+	node *html.Node, pseudoEl string, host ResolvedStyle,
+) (inlineItem, bool) {
+	txt := e.pseudoContent(node, pseudoEl)
+	if txt == "" {
+		return inlineItem{}, false //nolint:exhaustruct
+	}
+
+	pstyle := e.pseudoStyle(node, pseudoEl, host)
+	if pstyle.Position == positionAbsolute || pstyle.Position == positionFixed {
+		return inlineItem{}, false //nolint:exhaustruct
+	}
+
+	item := e.textItem(txt, pstyle)
+	e.enableInlineChrome(&item)
+
+	return item, true
+}
+
 // layoutInlineFloats lays out inline content into line boxes and emits
 // text/image ops. It returns the consumed height and records the first line's
 // baseline on the box. When floats is non-nil, each line re-queries exclusion
@@ -89,6 +124,8 @@ func (e *engine) layoutInlineFloats(
 ) float64 {
 	items := e.collectAndPrepareInlineItems(nodes, contentW)
 	defer e.releaseInlineItems(items)
+
+	items = e.injectBlockPseudos(boxNode, items)
 
 	if len(items) == 0 {
 		return 0

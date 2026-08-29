@@ -12,7 +12,7 @@ import (
 const (
 	backgroundURLPrefix = "url("
 	gradientFuncMark    = "gradient("
-	maxBackgroundTiles  = 64
+	maxBackgroundTiles  = 1024
 )
 
 // appendBackgroundImage paints all background-image layers (gradients, images)

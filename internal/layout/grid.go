@@ -48,6 +48,7 @@ func (e *engine) buildGrid(node *html.Node, sty ResolvedStyle, availW, posX, pos
 	}
 	boxNode.w = resolveUsedWidth(sty, availW, e)
 	contentX, contentW := e.contentBox(boxNode.x, boxNode.w, sty)
+
 	contentStart := len(e.ops)
 	curY := e.scalePt(sty.PaddingTop) + e.scalePt(sty.BorderTop.Width)
 
@@ -57,6 +58,14 @@ func (e *engine) buildGrid(node *html.Node, sty ResolvedStyle, availW, posX, pos
 	colDefs := gridColumnDefs(sty.GridTemplateColumns, areas.cols)
 
 	kids := collectGridKids(e, node)
+
+	// Handle repeat(auto-fit/auto-fill, minmax(..., 1fr)) which parseGridTrackDefs collapses to auto.
+	// Expand at layout time when contentW is known: n = floor((contentW+gap)/(min+gap)), min from minmax.
+	if len(colDefs) == 1 && colDefs[0].min.kind == trackAuto && colDefs[0].max.kind == trackAuto {
+		if autoDefs := parseAutoFitDefs(sty.GridTemplateColumns, contentW, columnGap, e, len(kids)); len(autoDefs) > 0 {
+			colDefs = autoDefs
+		}
+	}
 
 	// Intrinsic measure lite for min-content / max-content column mins.
 	colIntrinsics := measureTrackIntrinsics(e, kids, len(colDefs), true)
@@ -180,6 +189,79 @@ func gridColumnDefs(raw string, areaCols int) []gridTrackDef {
 	}
 
 	return colDefs
+}
+
+func parseAutoFitDefs(raw string, contentW, gap float64, eng *engine, kidCount int) []gridTrackDef {
+	lower := strings.ToLower(strings.TrimSpace(raw))
+	// quick check for auto-fit/auto-fill
+	idx := strings.Index(lower, "repeat(")
+	if idx < 0 {
+		return nil
+	}
+	// find matching paren for repeat(
+	end := -1
+	depth := 0
+	for i := idx; i < len(raw); i++ {
+		if raw[i] == '(' {
+			depth++
+		} else if raw[i] == ')' {
+			depth--
+			if depth == 0 {
+				end = i
+				break
+			}
+		}
+	}
+	if end < 0 {
+		return nil
+	}
+	inner := raw[idx+len("repeat(") : end]
+	parts := splitTopLevelComma(inner)
+	if len(parts) != 2 {
+		return nil
+	}
+	first := strings.TrimSpace(strings.ToLower(parts[0]))
+	if first != "auto-fit" && first != "auto-fill" {
+		return nil
+	}
+	trackStr := strings.TrimSpace(parts[1])
+	// track is expected to be minmax(...,1fr) or similar; parse as one def
+	def := parseOneTrackDef(trackStr)
+	// Extract min width in pt for column count
+	minW := 0.0
+	if def.min.kind == trackFixed && def.min.val >= 0 {
+		minW = eng.scalePt(def.min.val)
+	} else if def.min.kind == trackFixed && def.min.val < 0 {
+		// percentage - resolve against contentW
+		pct := -def.min.val
+		minW = contentW * pct / 100
+	} else {
+		// fallback: use 200pt
+		minW = 200
+	}
+	if minW <= 0 {
+		minW = 200
+	}
+	// Compute n columns that fit: floor((contentW+gap)/(minW+gap)), at least 1, at most kidCount
+	n := 1
+	if contentW > 0 && minW+gap > 0 {
+		n = int((contentW + gap) / (minW + gap))
+		if n < 1 {
+			n = 1
+		}
+		if kidCount > 0 && n > kidCount {
+			n = kidCount
+		}
+		// Clamp to reasonable max to avoid explosion
+		if n > 12 {
+			n = 12
+		}
+	}
+	out := make([]gridTrackDef, n)
+	for i := range out {
+		out[i] = def
+	}
+	return out
 }
 
 // collectGridKids returns the element children that participate in grid
@@ -353,6 +435,11 @@ func emitGridItem(
 
 	buildH := gridStretchBuildHeight(align, cellH, *cstate)
 
+	oldMax := eng.imgMaxW
+	if pbox.cellW > 0 {
+		eng.imgMaxW = pbox.cellW
+	}
+
 	var cblock *box
 
 	if buildH > 0 {
@@ -364,6 +451,8 @@ func emitGridItem(
 	} else {
 		cblock = eng.build(pbox.n, pbox.cellW, pbox.cx, targetY)
 	}
+
+	eng.imgMaxW = oldMax
 
 	if cblock == nil {
 		return

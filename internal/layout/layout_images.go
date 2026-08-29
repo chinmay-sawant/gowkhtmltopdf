@@ -241,7 +241,7 @@ func (e *engine) paintReplacedImage(
 
 	inlineLevel := sty.Display == cssDisplayInline || sty.Display == cssDisplayInlineBlock ||
 		sty.Display == displayInlineFlex || sty.Display == displayInlineGrid || sty.Display == ""
-	if sty.Float == cssDisplayNone && inlineLevel {
+	if sty.Float == cssDisplayNone && inlineLevel && !e.isGridOrFlexItem(boxNode.node) {
 		return
 	}
 
@@ -301,6 +301,24 @@ func (e *engine) emitThumbImageBottomSeparator(sty ResolvedStyle, posX, posY, wi
 		e.scalePt(borderPaint(bottom)), bottom.Style,
 		bottom.Color[0], bottom.Color[1], bottom.Color[2],
 	)
+}
+
+func (e *engine) isGridOrFlexItem(n *html.Node) bool {
+	if n == nil || n.Parent == nil {
+		return false
+	}
+
+	parentStyle := e.stylePtr(n.Parent)
+	if parentStyle == nil {
+		return false
+	}
+
+	switch parentStyle.Display {
+	case displayGrid, displayInlineGrid, displayFlex, displayInlineFlex:
+		return true
+	default:
+		return false
+	}
 }
 
 func (e *engine) buildHR(n *html.Node, sty ResolvedStyle, availW, posX, posY float64) *box {
