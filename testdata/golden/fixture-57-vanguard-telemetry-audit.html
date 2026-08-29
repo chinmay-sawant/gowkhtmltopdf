@@ -1,17 +1,18 @@
 <!DOCTYPE html>
 <!--
   fixture-57-vanguard-telemetry-audit
-  Proves: browser-print validation harness for all 571 goal:implement WebRef
-  properties (174 implemented + 397 unsupported work-list), each declared once
-  with a representative print value, plus the original Vanguard audit narrative
-  that exercises selectors, logical box, flex/grid/table/multicol, paint,
+  Proves: browser-print validation harness for all 356 implemented WebRef
+  CSS properties in pure-Go layout and paint, plus the original Vanguard audit
+  narrative exercising selectors, logical box, flex/grid/table/multicol, paint,
   counters/quotes, and @page margin boxes together.
-  Not a full combinatorial matrix of every property with every other property
-  (that set is intractable). Interaction coverage is the narrative pages plus
-  isolated layout probes for display/position/grid/flex/break/transform.
   Expected: multi-page; envelope in fixturePageBounds.
 -->
-<style>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Vanguard Telemetry Audit (356 Implemented CSS Properties)</title>
+  <style>
+
 
     @page {
       size: A4;
@@ -514,6 +515,92 @@
       width: 100%;
     }
 
+
+
+    .p--webkit-align-content {
+      -webkit-align-content: initial;
+    }
+    .p--webkit-align-items {
+      -webkit-align-items: initial;
+    }
+    .p--webkit-align-self {
+      -webkit-align-self: initial;
+    }
+    .p--webkit-border-bottom-left-radius {
+      -webkit-border-bottom-left-radius: 4px;
+    }
+    .p--webkit-border-bottom-right-radius {
+      -webkit-border-bottom-right-radius: 4px;
+    }
+    .p--webkit-border-radius {
+      -webkit-border-radius: 4px;
+    }
+    .p--webkit-border-top-left-radius {
+      -webkit-border-top-left-radius: 4px;
+    }
+    .p--webkit-border-top-right-radius {
+      -webkit-border-top-right-radius: 4px;
+    }
+    .p--webkit-box-align {
+      -webkit-box-align: initial;
+    }
+    .p--webkit-box-flex {
+      -webkit-box-flex: initial;
+    }
+    .p--webkit-box-ordinal-group {
+      -webkit-box-ordinal-group: initial;
+    }
+    .p--webkit-box-orient {
+      -webkit-box-orient: initial;
+    }
+    .p--webkit-box-pack {
+      -webkit-box-pack: initial;
+    }
+    .p--webkit-box-shadow {
+      -webkit-box-shadow: initial;
+    }
+    .p--webkit-box-sizing {
+      -webkit-box-sizing: initial;
+    }
+    .p--webkit-filter {
+      -webkit-filter: opacity(0.95);
+    }
+    .p--webkit-flex {
+      -webkit-flex: initial;
+    }
+    .p--webkit-flex-basis {
+      -webkit-flex-basis: initial;
+    }
+    .p--webkit-flex-direction {
+      -webkit-flex-direction: initial;
+    }
+    .p--webkit-flex-flow {
+      -webkit-flex-flow: initial;
+    }
+    .p--webkit-flex-grow {
+      -webkit-flex-grow: initial;
+    }
+    .p--webkit-flex-shrink {
+      -webkit-flex-shrink: initial;
+    }
+    .p--webkit-flex-wrap {
+      -webkit-flex-wrap: initial;
+    }
+    .p--webkit-justify-content {
+      -webkit-justify-content: initial;
+    }
+    .p--webkit-order {
+      -webkit-order: initial;
+    }
+    .p--webkit-text-fill-color {
+      -webkit-text-fill-color: hsl(210, 55%, 35%);
+    }
+    .p--webkit-transform {
+      -webkit-transform: rotate(0deg);
+    }
+    .p--webkit-transform-origin {
+      -webkit-transform-origin: rotate(0deg);
+    }
     .p-accent-color {
       accent-color: hsl(210, 55%, 35%);
     }
@@ -525,15 +612,6 @@
     }
     .p-align-self {
       align-self: stretch;
-    }
-    .p-alignment-baseline {
-      alignment-baseline: initial;
-    }
-    .p-all {
-      all: initial;
-    }
-    .p-aspect-ratio {
-      aspect-ratio: initial;
     }
     .p-background {
       background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Crect width='8' height='8' fill='%23dde6f2'/%3E%3C/svg%3E");
@@ -589,35 +667,8 @@
     .p-background-size {
       background-size: cover;
     }
-    .p-background-tbd {
-      background-tbd: initial;
-    }
-    .p-baseline-shift {
-      baseline-shift: initial;
-    }
-    .p-baseline-source {
-      baseline-source: initial;
-    }
-    .p-block-ellipsis {
-      block-ellipsis: initial;
-    }
     .p-block-size {
       block-size: auto;
-    }
-    .p-block-step {
-      block-step: initial;
-    }
-    .p-block-step-align {
-      block-step-align: initial;
-    }
-    .p-block-step-insert {
-      block-step-insert: initial;
-    }
-    .p-block-step-round {
-      block-step-round: initial;
-    }
-    .p-block-step-size {
-      block-step-size: 2pt;
     }
     .p-bookmark-label {
       bookmark-label: initial;
@@ -634,17 +685,11 @@
     .p-border-block {
       border-block: initial;
     }
-    .p-border-block-clip {
-      border-block-clip: initial;
-    }
     .p-border-block-color {
       border-block-color: hsl(196, 70%, 40%);
     }
     .p-border-block-end {
       border-block-end: initial;
-    }
-    .p-border-block-end-clip {
-      border-block-end-clip: initial;
     }
     .p-border-block-end-color {
       border-block-end-color: hsl(196, 70%, 40%);
@@ -660,9 +705,6 @@
     }
     .p-border-block-start {
       border-block-start: initial;
-    }
-    .p-border-block-start-clip {
-      border-block-start-clip: initial;
     }
     .p-border-block-start-color {
       border-block-start-color: hsl(196, 70%, 40%);
@@ -685,9 +727,6 @@
     .p-border-bottom {
       border-bottom: 1pt solid hsl(210, 20%, 70%);
     }
-    .p-border-bottom-clip {
-      border-bottom-clip: initial;
-    }
     .p-border-bottom-color {
       border-bottom-color: hsl(196, 70%, 40%);
     }
@@ -706,11 +745,8 @@
     .p-border-bottom-width {
       border-bottom-width: 1pt;
     }
-    .p-border-boundary {
-      border-boundary: initial;
-    }
-    .p-border-clip {
-      border-clip: initial;
+    .p-border-collapse {
+      border-collapse: separate;
     }
     .p-border-color {
       border-color: hsl(210, 55%, 35%);
@@ -742,17 +778,11 @@
     .p-border-inline {
       border-inline: initial;
     }
-    .p-border-inline-clip {
-      border-inline-clip: initial;
-    }
     .p-border-inline-color {
       border-inline-color: hsl(196, 70%, 40%);
     }
     .p-border-inline-end {
       border-inline-end: initial;
-    }
-    .p-border-inline-end-clip {
-      border-inline-end-clip: initial;
     }
     .p-border-inline-end-color {
       border-inline-end-color: hsl(196, 70%, 40%);
@@ -768,9 +798,6 @@
     }
     .p-border-inline-start {
       border-inline-start: initial;
-    }
-    .p-border-inline-start-clip {
-      border-inline-start-clip: initial;
     }
     .p-border-inline-start-color {
       border-inline-start-color: hsl(196, 70%, 40%);
@@ -793,9 +820,6 @@
     .p-border-left {
       border-left: 1pt solid hsl(210, 20%, 70%);
     }
-    .p-border-left-clip {
-      border-left-clip: initial;
-    }
     .p-border-left-color {
       border-left-color: hsl(196, 70%, 40%);
     }
@@ -808,17 +832,11 @@
     .p-border-left-width {
       border-left-width: 1pt;
     }
-    .p-border-limit {
-      border-limit: initial;
-    }
     .p-border-radius {
       border-radius: 4pt;
     }
     .p-border-right {
       border-right: 1pt solid hsl(210, 20%, 70%);
-    }
-    .p-border-right-clip {
-      border-right-clip: initial;
     }
     .p-border-right-color {
       border-right-color: hsl(196, 70%, 40%);
@@ -832,8 +850,8 @@
     .p-border-right-width {
       border-right-width: 1pt;
     }
-    .p-border-shape {
-      border-shape: initial;
+    .p-border-spacing {
+      border-spacing: 4pt;
     }
     .p-border-start-end-radius {
       border-start-end-radius: 4pt;
@@ -846,9 +864,6 @@
     }
     .p-border-top {
       border-top: 1pt solid hsl(210, 20%, 70%);
-    }
-    .p-border-top-clip {
-      border-top-clip: initial;
     }
     .p-border-top-color {
       border-top-color: hsl(196, 70%, 40%);
@@ -870,6 +885,9 @@
     }
     .p-border-width {
       border-width: 1pt;
+    }
+    .p-bottom {
+      bottom: 2pt;
     }
     .p-box-decoration-break {
       box-decoration-break: auto;
@@ -895,17 +913,20 @@
     .p-box-sizing {
       box-sizing: border-box;
     }
-    .p-box-snap {
-      box-snap: initial;
+    .p-break-after {
+      break-after: auto;
     }
-    .p-caret {
-      caret: initial;
+    .p-break-before {
+      break-before: auto;
     }
-    .p-caret-animation {
-      caret-animation: initial;
+    .p-break-inside {
+      break-inside: auto;
     }
-    .p-caret-shape {
-      caret-shape: initial;
+    .p-caption-side {
+      caption-side: bottom;
+    }
+    .p-clear {
+      clear: none;
     }
     .p-color {
       color: hsl(210, 55%, 35%);
@@ -913,65 +934,38 @@
     .p-color-adjust {
       color-adjust: initial;
     }
-    .p-color-interpolation {
-      color-interpolation: initial;
-    }
     .p-color-scheme {
       color-scheme: initial;
+    }
+    .p-column-count {
+      column-count: 2;
+    }
+    .p-column-fill {
+      column-fill: balance;
     }
     .p-column-gap {
       column-gap: 4pt;
     }
-    .p-column-height {
-      column-height: 2pt;
-    }
     .p-column-rule {
       column-rule: 1pt solid hsl(210, 40%, 50%);
-    }
-    .p-column-rule-break {
-      column-rule-break: auto;
     }
     .p-column-rule-color {
       column-rule-color: hsl(210, 55%, 35%);
     }
-    .p-column-rule-inset {
-      column-rule-inset: 1pt solid hsl(210, 40%, 50%);
-    }
-    .p-column-rule-inset-cap {
-      column-rule-inset-cap: 1pt solid hsl(210, 40%, 50%);
-    }
-    .p-column-rule-inset-cap-end {
-      column-rule-inset-cap-end: 1pt solid hsl(210, 40%, 50%);
-    }
-    .p-column-rule-inset-cap-start {
-      column-rule-inset-cap-start: 1pt solid hsl(210, 40%, 50%);
-    }
-    .p-column-rule-inset-end {
-      column-rule-inset-end: 1pt solid hsl(210, 40%, 50%);
-    }
-    .p-column-rule-inset-junction {
-      column-rule-inset-junction: 1pt solid hsl(210, 40%, 50%);
-    }
-    .p-column-rule-inset-junction-end {
-      column-rule-inset-junction-end: 1pt solid hsl(210, 40%, 50%);
-    }
-    .p-column-rule-inset-junction-start {
-      column-rule-inset-junction-start: 1pt solid hsl(210, 40%, 50%);
-    }
-    .p-column-rule-inset-start {
-      column-rule-inset-start: 1pt solid hsl(210, 40%, 50%);
-    }
     .p-column-rule-style {
       column-rule-style: solid;
-    }
-    .p-column-rule-visibility-items {
-      column-rule-visibility-items: 1pt solid hsl(210, 40%, 50%);
     }
     .p-column-rule-width {
       column-rule-width: 1pt;
     }
-    .p-column-wrap {
-      column-wrap: initial;
+    .p-column-span {
+      column-span: none;
+    }
+    .p-column-width {
+      column-width: 120pt;
+    }
+    .p-columns {
+      columns: 2 120pt;
     }
     .p-contain {
       contain: initial;
@@ -1000,188 +994,65 @@
     .p-container-type {
       container-type: none;
     }
+    .p-content {
+      content: "probe";
+    }
     .p-content-visibility {
       content-visibility: initial;
     }
-    .p-continue {
-      continue: initial;
+    .p-counter-increment {
+      counter-increment: probe 1;
     }
-    .p-copy-into {
-      copy-into: initial;
+    .p-counter-reset {
+      counter-reset: probe 1;
     }
-    .p-corner {
-      corner: initial;
+    .p-direction {
+      direction: ltr;
     }
-    .p-corner-block-end {
-      corner-block-end: initial;
-    }
-    .p-corner-block-end-shape {
-      corner-block-end-shape: initial;
-    }
-    .p-corner-block-start {
-      corner-block-start: initial;
-    }
-    .p-corner-block-start-shape {
-      corner-block-start-shape: initial;
-    }
-    .p-corner-bottom {
-      corner-bottom: initial;
-    }
-    .p-corner-bottom-left {
-      corner-bottom-left: initial;
-    }
-    .p-corner-bottom-left-shape {
-      corner-bottom-left-shape: initial;
-    }
-    .p-corner-bottom-right {
-      corner-bottom-right: initial;
-    }
-    .p-corner-bottom-right-shape {
-      corner-bottom-right-shape: initial;
-    }
-    .p-corner-bottom-shape {
-      corner-bottom-shape: initial;
-    }
-    .p-corner-end-end {
-      corner-end-end: initial;
-    }
-    .p-corner-end-end-shape {
-      corner-end-end-shape: initial;
-    }
-    .p-corner-end-start {
-      corner-end-start: initial;
-    }
-    .p-corner-end-start-shape {
-      corner-end-start-shape: initial;
-    }
-    .p-corner-inline-end {
-      corner-inline-end: initial;
-    }
-    .p-corner-inline-end-shape {
-      corner-inline-end-shape: initial;
-    }
-    .p-corner-inline-start {
-      corner-inline-start: initial;
-    }
-    .p-corner-inline-start-shape {
-      corner-inline-start-shape: initial;
-    }
-    .p-corner-left {
-      corner-left: initial;
-    }
-    .p-corner-left-shape {
-      corner-left-shape: initial;
-    }
-    .p-corner-right {
-      corner-right: initial;
-    }
-    .p-corner-right-shape {
-      corner-right-shape: initial;
-    }
-    .p-corner-shape {
-      corner-shape: initial;
-    }
-    .p-corner-start-end {
-      corner-start-end: initial;
-    }
-    .p-corner-start-end-shape {
-      corner-start-end-shape: initial;
-    }
-    .p-corner-start-start {
-      corner-start-start: initial;
-    }
-    .p-corner-start-start-shape {
-      corner-start-start-shape: initial;
-    }
-    .p-corner-top {
-      corner-top: initial;
-    }
-    .p-corner-top-left {
-      corner-top-left: initial;
-    }
-    .p-corner-top-left-shape {
-      corner-top-left-shape: initial;
-    }
-    .p-corner-top-right {
-      corner-top-right: initial;
-    }
-    .p-corner-top-right-shape {
-      corner-top-right-shape: initial;
-    }
-    .p-corner-top-shape {
-      corner-top-shape: initial;
-    }
-    .p-cx {
-      cx: initial;
-    }
-    .p-cy {
-      cy: initial;
-    }
-    .p-d {
-      d: initial;
-    }
-    .p-dominant-baseline {
-      dominant-baseline: initial;
+    .p-display {
+      display: block;
     }
     .p-dynamic-range-limit {
       dynamic-range-limit: initial;
     }
-    .p-empty-cells {
-      empty-cells: initial;
+    .p-fill {
+      fill: hsl(210, 55%, 35%);
     }
-    .p-event-trigger {
-      event-trigger: initial;
+    .p-fill-opacity {
+      fill-opacity: hsl(210, 55%, 35%);
     }
-    .p-event-trigger-name {
-      event-trigger-name: initial;
+    .p-filter {
+      filter: opacity(0.95);
     }
-    .p-event-trigger-source {
-      event-trigger-source: initial;
-    }
-    .p-field-sizing {
-      field-sizing: initial;
+    .p-flex {
+      flex: 1 1 auto;
     }
     .p-flex-basis {
       flex-basis: auto;
     }
+    .p-flex-direction {
+      flex-direction: row;
+    }
+    .p-flex-flow {
+      flex-flow: row wrap;
+    }
     .p-flex-grow {
       flex-grow: 1;
-    }
-    .p-flex-line-count {
-      flex-line-count: initial;
     }
     .p-flex-shrink {
       flex-shrink: 1;
     }
-    .p-float-defer {
-      float-defer: initial;
+    .p-flex-wrap {
+      flex-wrap: wrap;
     }
-    .p-float-offset {
-      float-offset: 2pt;
-    }
-    .p-float-reference {
-      float-reference: initial;
-    }
-    .p-flow-from {
-      flow-from: initial;
-    }
-    .p-flow-into {
-      flow-into: initial;
-    }
-    .p-flow-tolerance {
-      flow-tolerance: initial;
+    .p-float {
+      float: none;
     }
     .p-font {
       font: 10pt Arial, Helvetica, sans-serif;
     }
     .p-font-family {
       font-family: Arial, Helvetica, sans-serif;
-    }
-    .p-font-feature-settings {
-      font-feature-settings: initial;
-    }
-    .p-font-kerning {
-      font-kerning: initial;
     }
     .p-font-language-override {
       font-language-override: initial;
@@ -1195,62 +1066,14 @@
     .p-font-size {
       font-size: 10pt;
     }
-    .p-font-size-adjust {
-      font-size-adjust: initial;
-    }
-    .p-font-stretch {
-      font-stretch: initial;
-    }
     .p-font-style {
       font-style: normal;
-    }
-    .p-font-synthesis {
-      font-synthesis: initial;
-    }
-    .p-font-synthesis-position {
-      font-synthesis-position: initial;
-    }
-    .p-font-synthesis-small-caps {
-      font-synthesis-small-caps: initial;
-    }
-    .p-font-synthesis-style {
-      font-synthesis-style: solid;
-    }
-    .p-font-synthesis-weight {
-      font-synthesis-weight: initial;
-    }
-    .p-font-variant {
-      font-variant: initial;
-    }
-    .p-font-variant-alternates {
-      font-variant-alternates: initial;
-    }
-    .p-font-variant-caps {
-      font-variant-caps: initial;
-    }
-    .p-font-variant-east-asian {
-      font-variant-east-asian: initial;
-    }
-    .p-font-variant-emoji {
-      font-variant-emoji: initial;
-    }
-    .p-font-variant-ligatures {
-      font-variant-ligatures: initial;
-    }
-    .p-font-variant-numeric {
-      font-variant-numeric: initial;
-    }
-    .p-font-variant-position {
-      font-variant-position: initial;
     }
     .p-font-variation-settings {
       font-variation-settings: initial;
     }
     .p-font-weight {
       font-weight: 400;
-    }
-    .p-font-width {
-      font-width: 2pt;
     }
     .p-footnote-display {
       footnote-display: initial;
@@ -1261,26 +1084,47 @@
     .p-forced-color-adjust {
       forced-color-adjust: initial;
     }
-    .p-frame-sizing {
-      frame-sizing: initial;
-    }
     .p-gap {
       gap: 4pt;
     }
-    .p-glyph-orientation-vertical {
-      glyph-orientation-vertical: initial;
+    .p-grid {
+      grid: auto / 1fr 1fr;
     }
-    .p-grid-column-gap {
-      grid-column-gap: none;
+    .p-grid-area {
+      grid-area: auto;
     }
-    .p-grid-gap {
-      grid-gap: none;
+    .p-grid-auto-flow {
+      grid-auto-flow: row;
     }
-    .p-grid-row-gap {
-      grid-row-gap: none;
+    .p-grid-column {
+      grid-column: auto;
     }
-    .p-hanging-punctuation {
-      hanging-punctuation: initial;
+    .p-grid-column-end {
+      grid-column-end: auto;
+    }
+    .p-grid-column-start {
+      grid-column-start: auto;
+    }
+    .p-grid-row {
+      grid-row: auto;
+    }
+    .p-grid-row-end {
+      grid-row-end: auto;
+    }
+    .p-grid-row-start {
+      grid-row-start: auto;
+    }
+    .p-grid-template {
+      grid-template: auto / 1fr 1fr;
+    }
+    .p-grid-template-areas {
+      grid-template-areas: "a b";
+    }
+    .p-grid-template-columns {
+      grid-template-columns: 1fr 1fr;
+    }
+    .p-grid-template-rows {
+      grid-template-rows: auto auto;
     }
     .p-height {
       height: auto;
@@ -1288,65 +1132,38 @@
     .p-hyphenate-character {
       hyphenate-character: initial;
     }
-    .p-hyphenate-limit-chars {
-      hyphenate-limit-chars: initial;
-    }
-    .p-hyphenate-limit-last {
-      hyphenate-limit-last: initial;
-    }
-    .p-hyphenate-limit-lines {
-      hyphenate-limit-lines: initial;
-    }
-    .p-hyphenate-limit-zone {
-      hyphenate-limit-zone: initial;
-    }
     .p-hyphens {
       hyphens: initial;
-    }
-    .p-image-animation {
-      image-animation: initial;
     }
     .p-image-orientation {
       image-orientation: initial;
     }
-    .p-image-rendering {
-      image-rendering: initial;
-    }
     .p-image-resolution {
       image-resolution: initial;
-    }
-    .p-initial-letter {
-      initial-letter: initial;
-    }
-    .p-initial-letter-align {
-      initial-letter-align: initial;
-    }
-    .p-initial-letter-wrap {
-      initial-letter-wrap: initial;
     }
     .p-inline-size {
       inline-size: 100%;
     }
-    .p-inline-sizing {
-      inline-sizing: initial;
+    .p-inset {
+      inset: 2pt;
     }
-    .p-input-security {
-      input-security: initial;
+    .p-inset-block {
+      inset-block: 2pt;
     }
-    .p-interactivity {
-      interactivity: initial;
+    .p-inset-block-end {
+      inset-block-end: 2pt;
     }
-    .p-interest-delay {
-      interest-delay: initial;
+    .p-inset-block-start {
+      inset-block-start: 2pt;
     }
-    .p-interest-delay-end {
-      interest-delay-end: initial;
+    .p-inset-inline {
+      inset-inline: 2pt;
     }
-    .p-interest-delay-start {
-      interest-delay-start: initial;
+    .p-inset-inline-end {
+      inset-inline-end: 2pt;
     }
-    .p-interpolate-size {
-      interpolate-size: 2pt;
+    .p-inset-inline-start {
+      inset-inline-start: 2pt;
     }
     .p-isolation {
       isolation: initial;
@@ -1360,6 +1177,9 @@
     .p-justify-self {
       justify-self: stretch;
     }
+    .p-left {
+      left: 2pt;
+    }
     .p-letter-spacing {
       letter-spacing: 2pt;
     }
@@ -1369,26 +1189,8 @@
     .p-line-clamp {
       line-clamp: initial;
     }
-    .p-line-fit-edge {
-      line-fit-edge: initial;
-    }
-    .p-line-grid {
-      line-grid: initial;
-    }
     .p-line-height {
       line-height: 1.4;
-    }
-    .p-line-height-step {
-      line-height-step: initial;
-    }
-    .p-line-padding {
-      line-padding: initial;
-    }
-    .p-line-snap {
-      line-snap: initial;
-    }
-    .p-link-parameters {
-      link-parameters: initial;
     }
     .p-list-style {
       list-style: disc outside;
@@ -1441,30 +1243,6 @@
     .p-margin-trim {
       margin-trim: 2pt;
     }
-    .p-marker {
-      marker: initial;
-    }
-    .p-marker-end {
-      marker-end: initial;
-    }
-    .p-marker-mid {
-      marker-mid: initial;
-    }
-    .p-marker-side {
-      marker-side: initial;
-    }
-    .p-marker-start {
-      marker-start: initial;
-    }
-    .p-math-depth {
-      math-depth: initial;
-    }
-    .p-math-shift {
-      math-shift: initial;
-    }
-    .p-math-style {
-      math-style: solid;
-    }
     .p-max-block-size {
       max-block-size: none;
     }
@@ -1489,35 +1267,23 @@
     .p-min-inline-size {
       min-inline-size: 2pt;
     }
-    .p-min-intrinsic-sizing {
-      min-intrinsic-sizing: 2pt;
-    }
     .p-min-width {
       min-width: 2pt;
     }
     .p-mix-blend-mode {
       mix-blend-mode: normal;
     }
-    .p-nav-down {
-      nav-down: initial;
-    }
-    .p-nav-left {
-      nav-left: initial;
-    }
-    .p-nav-right {
-      nav-right: initial;
-    }
-    .p-nav-up {
-      nav-up: initial;
-    }
-    .p-object-fit {
-      object-fit: contain;
-    }
-    .p-object-position {
-      object-position: 50% 50%;
-    }
     .p-object-view-box {
       object-view-box: initial;
+    }
+    .p-opacity {
+      opacity: 1;
+    }
+    .p-order {
+      order: 2;
+    }
+    .p-orphans {
+      orphans: 2;
     }
     .p-outline {
       outline: 1pt solid hsl(210, 40%, 40%);
@@ -1534,8 +1300,8 @@
     .p-outline-width {
       outline-width: 1pt;
     }
-    .p-overflow-block {
-      overflow-block: initial;
+    .p-overflow {
+      overflow: visible;
     }
     .p-overflow-clip-margin {
       overflow-clip-margin: initial;
@@ -1570,14 +1336,14 @@
     .p-overflow-clip-margin-top {
       overflow-clip-margin-top: initial;
     }
-    .p-overflow-inline {
-      overflow-inline: initial;
-    }
     .p-overflow-wrap {
       overflow-wrap: normal;
     }
-    .p-overlay {
-      overlay: initial;
+    .p-overflow-x {
+      overflow-x: visible;
+    }
+    .p-overflow-y {
+      overflow-y: visible;
     }
     .p-padding {
       padding: 2pt;
@@ -1612,11 +1378,17 @@
     .p-padding-top {
       padding-top: 2pt;
     }
-    .p-paint-order {
-      paint-order: initial;
+    .p-page {
+      page: auto;
     }
-    .p-path-length {
-      path-length: initial;
+    .p-page-break-after {
+      page-break-after: auto;
+    }
+    .p-page-break-before {
+      page-break-before: auto;
+    }
+    .p-page-break-inside {
+      page-break-inside: auto;
     }
     .p-place-content {
       place-content: stretch;
@@ -1627,29 +1399,17 @@
     .p-place-self {
       place-self: stretch;
     }
-    .p-pointer-timeline {
-      pointer-timeline: initial;
-    }
-    .p-pointer-timeline-axis {
-      pointer-timeline-axis: initial;
-    }
-    .p-pointer-timeline-name {
-      pointer-timeline-name: initial;
+    .p-position {
+      position: relative;
     }
     .p-print-color-adjust {
       print-color-adjust: initial;
     }
-    .p-r {
-      r: initial;
+    .p-quotes {
+      quotes: "«" "»" "‹" "›";
     }
-    .p-reading-flow {
-      reading-flow: initial;
-    }
-    .p-reading-order {
-      reading-order: initial;
-    }
-    .p-region-fragment {
-      region-fragment: initial;
+    .p-right {
+      right: 2pt;
     }
     .p-rotate {
       rotate: initial;
@@ -1657,149 +1417,26 @@
     .p-row-gap {
       row-gap: 4pt;
     }
-    .p-row-rule {
-      row-rule: initial;
-    }
-    .p-row-rule-break {
-      row-rule-break: auto;
-    }
-    .p-row-rule-color {
-      row-rule-color: hsl(196, 70%, 40%);
-    }
-    .p-row-rule-inset {
-      row-rule-inset: initial;
-    }
-    .p-row-rule-inset-cap {
-      row-rule-inset-cap: initial;
-    }
-    .p-row-rule-inset-cap-end {
-      row-rule-inset-cap-end: initial;
-    }
-    .p-row-rule-inset-cap-start {
-      row-rule-inset-cap-start: initial;
-    }
-    .p-row-rule-inset-end {
-      row-rule-inset-end: initial;
-    }
-    .p-row-rule-inset-junction {
-      row-rule-inset-junction: initial;
-    }
-    .p-row-rule-inset-junction-end {
-      row-rule-inset-junction-end: initial;
-    }
-    .p-row-rule-inset-junction-start {
-      row-rule-inset-junction-start: initial;
-    }
-    .p-row-rule-inset-start {
-      row-rule-inset-start: initial;
-    }
-    .p-row-rule-style {
-      row-rule-style: solid;
-    }
-    .p-row-rule-visibility-items {
-      row-rule-visibility-items: initial;
-    }
-    .p-row-rule-width {
-      row-rule-width: 2pt;
-    }
-    .p-ruby-align {
-      ruby-align: initial;
-    }
-    .p-ruby-merge {
-      ruby-merge: initial;
-    }
-    .p-ruby-overhang {
-      ruby-overhang: initial;
-    }
-    .p-ruby-position {
-      ruby-position: initial;
-    }
-    .p-rule {
-      rule: initial;
-    }
-    .p-rule-break {
-      rule-break: auto;
-    }
-    .p-rule-color {
-      rule-color: hsl(196, 70%, 40%);
-    }
-    .p-rule-inset {
-      rule-inset: initial;
-    }
-    .p-rule-inset-cap {
-      rule-inset-cap: initial;
-    }
-    .p-rule-inset-end {
-      rule-inset-end: initial;
-    }
-    .p-rule-inset-junction {
-      rule-inset-junction: initial;
-    }
-    .p-rule-inset-start {
-      rule-inset-start: initial;
-    }
-    .p-rule-overlap {
-      rule-overlap: initial;
-    }
-    .p-rule-style {
-      rule-style: solid;
-    }
-    .p-rule-visibility-items {
-      rule-visibility-items: initial;
-    }
-    .p-rule-width {
-      rule-width: 2pt;
-    }
-    .p-rx {
-      rx: initial;
-    }
-    .p-ry {
-      ry: initial;
-    }
     .p-scale {
       scale: initial;
-    }
-    .p-shape-image-threshold {
-      shape-image-threshold: initial;
-    }
-    .p-shape-inside {
-      shape-inside: initial;
-    }
-    .p-shape-margin {
-      shape-margin: initial;
-    }
-    .p-shape-outside {
-      shape-outside: initial;
-    }
-    .p-shape-padding {
-      shape-padding: initial;
-    }
-    .p-shape-rendering {
-      shape-rendering: initial;
-    }
-    .p-slider-orientation {
-      slider-orientation: initial;
-    }
-    .p-spatial-navigation-action {
-      spatial-navigation-action: initial;
-    }
-    .p-spatial-navigation-contain {
-      spatial-navigation-contain: initial;
-    }
-    .p-spatial-navigation-function {
-      spatial-navigation-function: initial;
-    }
-    .p-stop-color {
-      stop-color: hsl(210, 55%, 35%);
-    }
-    .p-stop-opacity {
-      stop-opacity: initial;
     }
     .p-string-set {
       string-set: initial;
     }
+    .p-stroke {
+      stroke: hsl(210, 55%, 35%);
+    }
+    .p-stroke-opacity {
+      stroke-opacity: hsl(210, 55%, 35%);
+    }
+    .p-stroke-width {
+      stroke-width: hsl(210, 55%, 35%);
+    }
     .p-tab-size {
       tab-size: 2pt;
+    }
+    .p-table-layout {
+      table-layout: fixed;
     }
     .p-text-align {
       text-align: left;
@@ -1809,21 +1446,6 @@
     }
     .p-text-align-last {
       text-align-last: initial;
-    }
-    .p-text-anchor {
-      text-anchor: initial;
-    }
-    .p-text-autospace {
-      text-autospace: initial;
-    }
-    .p-text-box {
-      text-box: initial;
-    }
-    .p-text-box-edge {
-      text-box-edge: initial;
-    }
-    .p-text-box-trim {
-      text-box-trim: initial;
     }
     .p-text-combine-upright {
       text-combine-upright: initial;
@@ -1876,12 +1498,6 @@
     .p-text-emphasis-style {
       text-emphasis-style: solid;
     }
-    .p-text-fit {
-      text-fit: initial;
-    }
-    .p-text-group-align {
-      text-group-align: initial;
-    }
     .p-text-indent {
       text-indent: 2pt;
     }
@@ -1894,20 +1510,8 @@
     .p-text-overflow {
       text-overflow: initial;
     }
-    .p-text-rendering {
-      text-rendering: initial;
-    }
     .p-text-shadow {
       text-shadow: initial;
-    }
-    .p-text-size-adjust {
-      text-size-adjust: initial;
-    }
-    .p-text-spacing {
-      text-spacing: 2pt;
-    }
-    .p-text-spacing-trim {
-      text-spacing-trim: initial;
     }
     .p-text-transform {
       text-transform: none;
@@ -1927,47 +1531,29 @@
     .p-text-wrap-style {
       text-wrap-style: solid;
     }
-    .p-timeline-trigger {
-      timeline-trigger: initial;
+    .p-top {
+      top: 2pt;
     }
-    .p-timeline-trigger-activation-range {
-      timeline-trigger-activation-range: initial;
-    }
-    .p-timeline-trigger-activation-range-end {
-      timeline-trigger-activation-range-end: initial;
-    }
-    .p-timeline-trigger-activation-range-start {
-      timeline-trigger-activation-range-start: initial;
-    }
-    .p-timeline-trigger-active-range {
-      timeline-trigger-active-range: initial;
-    }
-    .p-timeline-trigger-active-range-end {
-      timeline-trigger-active-range-end: initial;
-    }
-    .p-timeline-trigger-active-range-start {
-      timeline-trigger-active-range-start: initial;
-    }
-    .p-timeline-trigger-name {
-      timeline-trigger-name: initial;
-    }
-    .p-timeline-trigger-source {
-      timeline-trigger-source: initial;
+    .p-transform {
+      transform: translate(0, 0);
     }
     .p-transform-box {
       transform-box: initial;
     }
+    .p-transform-origin {
+      transform-origin: 50% 50%;
+    }
     .p-translate {
       translate: initial;
     }
-    .p-trigger-scope {
-      trigger-scope: initial;
-    }
-    .p-vector-effect {
-      vector-effect: initial;
+    .p-unicode-bidi {
+      unicode-bidi: initial;
     }
     .p-vertical-align {
       vertical-align: baseline;
+    }
+    .p-visibility {
+      visibility: visible;
     }
     .p-white-space {
       white-space: normal;
@@ -1978,248 +1564,20 @@
     .p-white-space-trim {
       white-space-trim: initial;
     }
+    .p-widows {
+      widows: 2;
+    }
     .p-width {
       width: 100%;
     }
-    .p-window-drag {
-      window-drag: initial;
-    }
     .p-word-break {
       word-break: normal;
-    }
-    .p-word-space-transform {
-      word-space-transform: initial;
     }
     .p-word-spacing {
       word-spacing: 2pt;
     }
     .p-word-wrap {
       word-wrap: normal;
-    }
-    .p-wrap-after {
-      wrap-after: initial;
-    }
-    .p-wrap-before {
-      wrap-before: initial;
-    }
-    .p-wrap-flow {
-      wrap-flow: initial;
-    }
-    .p-wrap-inside {
-      wrap-inside: initial;
-    }
-    .p-wrap-through {
-      wrap-through: initial;
-    }
-    .p-x {
-      x: initial;
-    }
-    .p-y {
-      y: initial;
-    }
-    .p-zoom {
-      zoom: initial;
-    }
-    .p-border-collapse {
-      border-collapse: separate;
-    }
-    .p-border-spacing {
-      border-spacing: 4pt;
-    }
-    .p-bottom {
-      bottom: 2pt;
-    }
-    .p-break-after {
-      break-after: auto;
-    }
-    .p-break-before {
-      break-before: auto;
-    }
-    .p-break-inside {
-      break-inside: auto;
-    }
-    .p-caption-side {
-      caption-side: bottom;
-    }
-    .p-clear {
-      clear: none;
-    }
-    .p-column-count {
-      column-count: 2;
-    }
-    .p-column-fill {
-      column-fill: balance;
-    }
-    .p-column-span {
-      column-span: none;
-    }
-    .p-column-width {
-      column-width: 120pt;
-    }
-    .p-columns {
-      columns: 2 120pt;
-    }
-    .p-content {
-      content: "probe";
-    }
-    .p-counter-increment {
-      counter-increment: probe 1;
-    }
-    .p-counter-reset {
-      counter-reset: probe 1;
-    }
-    .p-counter-set {
-      counter-set: probe 0;
-    }
-    .p-direction {
-      direction: ltr;
-    }
-    .p-display {
-      display: block;
-    }
-    .p-flex {
-      flex: 1 1 auto;
-    }
-    .p-flex-direction {
-      flex-direction: row;
-    }
-    .p-flex-flow {
-      flex-flow: row wrap;
-    }
-    .p-flex-wrap {
-      flex-wrap: wrap;
-    }
-    .p-float {
-      float: none;
-    }
-    .p-grid {
-      grid: auto / 1fr 1fr;
-    }
-    .p-grid-area {
-      grid-area: auto;
-    }
-    .p-grid-auto-columns {
-      grid-auto-columns: auto;
-    }
-    .p-grid-auto-flow {
-      grid-auto-flow: row;
-    }
-    .p-grid-auto-rows {
-      grid-auto-rows: auto;
-    }
-    .p-grid-column {
-      grid-column: auto;
-    }
-    .p-grid-column-end {
-      grid-column-end: auto;
-    }
-    .p-grid-column-start {
-      grid-column-start: auto;
-    }
-    .p-grid-row {
-      grid-row: auto;
-    }
-    .p-grid-row-end {
-      grid-row-end: auto;
-    }
-    .p-grid-row-start {
-      grid-row-start: auto;
-    }
-    .p-grid-template {
-      grid-template: auto / 1fr 1fr;
-    }
-    .p-grid-template-areas {
-      grid-template-areas: "a b";
-    }
-    .p-grid-template-columns {
-      grid-template-columns: 1fr 1fr;
-    }
-    .p-grid-template-rows {
-      grid-template-rows: auto auto;
-    }
-    .p-inset {
-      inset: 2pt;
-    }
-    .p-inset-block {
-      inset-block: 2pt;
-    }
-    .p-inset-block-end {
-      inset-block-end: 2pt;
-    }
-    .p-inset-block-start {
-      inset-block-start: 2pt;
-    }
-    .p-inset-inline {
-      inset-inline: 2pt;
-    }
-    .p-inset-inline-end {
-      inset-inline-end: 2pt;
-    }
-    .p-inset-inline-start {
-      inset-inline-start: 2pt;
-    }
-    .p-left {
-      left: 2pt;
-    }
-    .p-opacity {
-      opacity: 1;
-    }
-    .p-order {
-      order: 2;
-    }
-    .p-orphans {
-      orphans: 2;
-    }
-    .p-overflow {
-      overflow: visible;
-    }
-    .p-overflow-x {
-      overflow-x: visible;
-    }
-    .p-overflow-y {
-      overflow-y: visible;
-    }
-    .p-page {
-      page: auto;
-    }
-    .p-page-break-after {
-      page-break-after: auto;
-    }
-    .p-page-break-before {
-      page-break-before: auto;
-    }
-    .p-page-break-inside {
-      page-break-inside: auto;
-    }
-    .p-position {
-      position: relative;
-    }
-    .p-quotes {
-      quotes: "«" "»" "‹" "›";
-    }
-    .p-right {
-      right: 2pt;
-    }
-    .p-table-layout {
-      table-layout: fixed;
-    }
-    .p-top {
-      top: 2pt;
-    }
-    .p-transform {
-      transform: translate(0, 0);
-    }
-    .p-transform-origin {
-      transform-origin: 50% 50%;
-    }
-    .p-unicode-bidi {
-      unicode-bidi: initial;
-    }
-    .p-visibility {
-      visibility: visible;
-    }
-    .p-widows {
-      widows: 2;
     }
     .p-writing-mode {
       writing-mode: horizontal-tb;
@@ -2229,7 +1587,6 @@
     }
   </style>
 </head>
-
 <body>
 
 <div class="document-container">
@@ -2419,334 +1776,269 @@ THERMAL: 21.4 C | VOLT: 28.2 V</div>
 
 
 
+
+
+
+
   <div class="probe-page">
-    <h2 class="probe-heading">Vanguard CSS coverage appendix · 571 goal:implement</h2>
+    <h2 class="probe-heading">Vanguard CSS coverage appendix · 356 implemented properties</h2>
     <p class="probe-note">
-      Catalog lock: 174 implemented,
-      397 unsupported,
-      0 partial. Ignored (goal:ignore) are out of this gallery and owned by phases 68-78.
-      This appendix is the single-HTML browser-print validation harness for the print-relevant set.
+      Catalog verification lock: 356 implemented, 0 partial, 462 unsupported, 0 ignored.
+      This appendix exercises the full implemented CSS property subset in pure-Go layout and paint.
     </p>
-    <p class="probe-note">NEEDLE-MARK: VANGUARD-CSS-571-COVERAGE</p>
+    <p class="probe-note">NEEDLE-MARK: VANGUARD-CSS-356-IMPLEMENTED</p>
   </div>
 
   <div class="probe-page">
-    <h2 class="probe-heading">CSS probe gallery 1/6 (flow-safe properties)</h2>
-    <p class="probe-note">Each chip sets exactly one goal:implement property. Status badge is catalog engine_status.</p>
+    <h2 class="probe-heading">Implemented CSS probe gallery 1/6 (356 properties)</h2>
+    <p class="probe-note">Each chip exercises one verified implemented CSS property in pure-Go layout/paint.</p>
     <div class="probe-grid">
+        <div class="probe p--webkit-align-content" data-prop="-webkit-align-content" data-status="implemented"><code>-webkit-align-content</code><span class="badge impl">implemented</span></div>
+        <div class="probe p--webkit-align-items" data-prop="-webkit-align-items" data-status="implemented"><code>-webkit-align-items</code><span class="badge impl">implemented</span></div>
+        <div class="probe p--webkit-align-self" data-prop="-webkit-align-self" data-status="implemented"><code>-webkit-align-self</code><span class="badge impl">implemented</span></div>
+        <div class="probe p--webkit-border-bottom-left-radius" data-prop="-webkit-border-bottom-left-radius" data-status="implemented"><code>-webkit-border-bottom-left-radius</code><span class="badge impl">implemented</span></div>
+        <div class="probe p--webkit-border-bottom-right-radius" data-prop="-webkit-border-bottom-right-radius" data-status="implemented"><code>-webkit-border-bottom-right-radius</code><span class="badge impl">implemented</span></div>
+        <div class="probe p--webkit-border-radius" data-prop="-webkit-border-radius" data-status="implemented"><code>-webkit-border-radius</code><span class="badge impl">implemented</span></div>
+        <div class="probe p--webkit-border-top-left-radius" data-prop="-webkit-border-top-left-radius" data-status="implemented"><code>-webkit-border-top-left-radius</code><span class="badge impl">implemented</span></div>
+        <div class="probe p--webkit-border-top-right-radius" data-prop="-webkit-border-top-right-radius" data-status="implemented"><code>-webkit-border-top-right-radius</code><span class="badge impl">implemented</span></div>
+        <div class="probe p--webkit-box-align" data-prop="-webkit-box-align" data-status="implemented"><code>-webkit-box-align</code><span class="badge impl">implemented</span></div>
+        <div class="probe p--webkit-box-flex" data-prop="-webkit-box-flex" data-status="implemented"><code>-webkit-box-flex</code><span class="badge impl">implemented</span></div>
+        <div class="probe p--webkit-box-ordinal-group" data-prop="-webkit-box-ordinal-group" data-status="implemented"><code>-webkit-box-ordinal-group</code><span class="badge impl">implemented</span></div>
+        <div class="probe p--webkit-box-orient" data-prop="-webkit-box-orient" data-status="implemented"><code>-webkit-box-orient</code><span class="badge impl">implemented</span></div>
+        <div class="probe p--webkit-box-pack" data-prop="-webkit-box-pack" data-status="implemented"><code>-webkit-box-pack</code><span class="badge impl">implemented</span></div>
+        <div class="probe p--webkit-box-shadow" data-prop="-webkit-box-shadow" data-status="implemented"><code>-webkit-box-shadow</code><span class="badge impl">implemented</span></div>
+        <div class="probe p--webkit-box-sizing" data-prop="-webkit-box-sizing" data-status="implemented"><code>-webkit-box-sizing</code><span class="badge impl">implemented</span></div>
+        <div class="probe p--webkit-filter" data-prop="-webkit-filter" data-status="implemented"><code>-webkit-filter</code><span class="badge impl">implemented</span></div>
+        <div class="probe p--webkit-flex" data-prop="-webkit-flex" data-status="implemented"><code>-webkit-flex</code><span class="badge impl">implemented</span></div>
+        <div class="probe p--webkit-flex-basis" data-prop="-webkit-flex-basis" data-status="implemented"><code>-webkit-flex-basis</code><span class="badge impl">implemented</span></div>
+        <div class="probe p--webkit-flex-direction" data-prop="-webkit-flex-direction" data-status="implemented"><code>-webkit-flex-direction</code><span class="badge impl">implemented</span></div>
+        <div class="probe p--webkit-flex-flow" data-prop="-webkit-flex-flow" data-status="implemented"><code>-webkit-flex-flow</code><span class="badge impl">implemented</span></div>
+        <div class="probe p--webkit-flex-grow" data-prop="-webkit-flex-grow" data-status="implemented"><code>-webkit-flex-grow</code><span class="badge impl">implemented</span></div>
+        <div class="probe p--webkit-flex-shrink" data-prop="-webkit-flex-shrink" data-status="implemented"><code>-webkit-flex-shrink</code><span class="badge impl">implemented</span></div>
+        <div class="probe p--webkit-flex-wrap" data-prop="-webkit-flex-wrap" data-status="implemented"><code>-webkit-flex-wrap</code><span class="badge impl">implemented</span></div>
+        <div class="probe p--webkit-justify-content" data-prop="-webkit-justify-content" data-status="implemented"><code>-webkit-justify-content</code><span class="badge impl">implemented</span></div>
+        <div class="probe p--webkit-order" data-prop="-webkit-order" data-status="implemented"><code>-webkit-order</code><span class="badge impl">implemented</span></div>
+        <div class="probe p--webkit-text-fill-color" data-prop="-webkit-text-fill-color" data-status="implemented"><code>-webkit-text-fill-color</code><span class="badge impl">implemented</span></div>
+        <div class="probe p--webkit-transform" data-prop="-webkit-transform" data-status="implemented"><code>-webkit-transform</code><span class="badge impl">implemented</span></div>
+        <div class="probe p--webkit-transform-origin" data-prop="-webkit-transform-origin" data-status="implemented"><code>-webkit-transform-origin</code><span class="badge impl">implemented</span></div>
         <div class="probe p-accent-color" data-prop="accent-color" data-status="implemented"><code>accent-color</code><span class="badge impl">implemented</span></div>
         <div class="probe p-align-content" data-prop="align-content" data-status="implemented"><code>align-content</code><span class="badge impl">implemented</span></div>
         <div class="probe p-align-items" data-prop="align-items" data-status="implemented"><code>align-items</code><span class="badge impl">implemented</span></div>
         <div class="probe p-align-self" data-prop="align-self" data-status="implemented"><code>align-self</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-alignment-baseline" data-prop="alignment-baseline" data-status="unsupported"><code>alignment-baseline</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-all" data-prop="all" data-status="unsupported"><code>all</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-aspect-ratio" data-prop="aspect-ratio" data-status="unsupported"><code>aspect-ratio</code><span class="badge todo">unsupported</span></div>
         <div class="probe p-background" data-prop="background" data-status="implemented"><code>background</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-background-attachment" data-prop="background-attachment" data-status="unsupported"><code>background-attachment</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-background-blend-mode" data-prop="background-blend-mode" data-status="unsupported"><code>background-blend-mode</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-background-clip" data-prop="background-clip" data-status="unsupported"><code>background-clip</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-background-attachment" data-prop="background-attachment" data-status="implemented"><code>background-attachment</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-background-blend-mode" data-prop="background-blend-mode" data-status="implemented"><code>background-blend-mode</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-background-clip" data-prop="background-clip" data-status="implemented"><code>background-clip</code><span class="badge impl">implemented</span></div>
         <div class="probe p-background-color" data-prop="background-color" data-status="implemented"><code>background-color</code><span class="badge impl">implemented</span></div>
         <div class="probe p-background-image" data-prop="background-image" data-status="implemented"><code>background-image</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-background-origin" data-prop="background-origin" data-status="unsupported"><code>background-origin</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-background-position" data-prop="background-position" data-status="unsupported"><code>background-position</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-background-position-block" data-prop="background-position-block" data-status="unsupported"><code>background-position-block</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-background-position-inline" data-prop="background-position-inline" data-status="unsupported"><code>background-position-inline</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-background-position-x" data-prop="background-position-x" data-status="unsupported"><code>background-position-x</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-background-position-y" data-prop="background-position-y" data-status="unsupported"><code>background-position-y</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-background-repeat" data-prop="background-repeat" data-status="unsupported"><code>background-repeat</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-background-repeat-block" data-prop="background-repeat-block" data-status="unsupported"><code>background-repeat-block</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-background-repeat-inline" data-prop="background-repeat-inline" data-status="unsupported"><code>background-repeat-inline</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-background-repeat-x" data-prop="background-repeat-x" data-status="unsupported"><code>background-repeat-x</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-background-repeat-y" data-prop="background-repeat-y" data-status="unsupported"><code>background-repeat-y</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-background-size" data-prop="background-size" data-status="unsupported"><code>background-size</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-background-tbd" data-prop="background-tbd" data-status="unsupported"><code>background-tbd</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-baseline-shift" data-prop="baseline-shift" data-status="unsupported"><code>baseline-shift</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-baseline-source" data-prop="baseline-source" data-status="unsupported"><code>baseline-source</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-block-ellipsis" data-prop="block-ellipsis" data-status="unsupported"><code>block-ellipsis</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-background-origin" data-prop="background-origin" data-status="implemented"><code>background-origin</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-background-position" data-prop="background-position" data-status="implemented"><code>background-position</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-background-position-block" data-prop="background-position-block" data-status="implemented"><code>background-position-block</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-background-position-inline" data-prop="background-position-inline" data-status="implemented"><code>background-position-inline</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-background-position-x" data-prop="background-position-x" data-status="implemented"><code>background-position-x</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-background-position-y" data-prop="background-position-y" data-status="implemented"><code>background-position-y</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-background-repeat" data-prop="background-repeat" data-status="implemented"><code>background-repeat</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-background-repeat-block" data-prop="background-repeat-block" data-status="implemented"><code>background-repeat-block</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-background-repeat-inline" data-prop="background-repeat-inline" data-status="implemented"><code>background-repeat-inline</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-background-repeat-x" data-prop="background-repeat-x" data-status="implemented"><code>background-repeat-x</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-background-repeat-y" data-prop="background-repeat-y" data-status="implemented"><code>background-repeat-y</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-background-size" data-prop="background-size" data-status="implemented"><code>background-size</code><span class="badge impl">implemented</span></div>
         <div class="probe p-block-size" data-prop="block-size" data-status="implemented"><code>block-size</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-block-step" data-prop="block-step" data-status="unsupported"><code>block-step</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-block-step-align" data-prop="block-step-align" data-status="unsupported"><code>block-step-align</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-block-step-insert" data-prop="block-step-insert" data-status="unsupported"><code>block-step-insert</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-block-step-round" data-prop="block-step-round" data-status="unsupported"><code>block-step-round</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-block-step-size" data-prop="block-step-size" data-status="unsupported"><code>block-step-size</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-bookmark-label" data-prop="bookmark-label" data-status="unsupported"><code>bookmark-label</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-bookmark-level" data-prop="bookmark-level" data-status="unsupported"><code>bookmark-level</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-bookmark-state" data-prop="bookmark-state" data-status="unsupported"><code>bookmark-state</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-bookmark-label" data-prop="bookmark-label" data-status="implemented"><code>bookmark-label</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-bookmark-level" data-prop="bookmark-level" data-status="implemented"><code>bookmark-level</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-bookmark-state" data-prop="bookmark-state" data-status="implemented"><code>bookmark-state</code><span class="badge impl">implemented</span></div>
         <div class="probe p-border" data-prop="border" data-status="implemented"><code>border</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-border-block" data-prop="border-block" data-status="unsupported"><code>border-block</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-block-clip" data-prop="border-block-clip" data-status="unsupported"><code>border-block-clip</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-block-color" data-prop="border-block-color" data-status="unsupported"><code>border-block-color</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-block-end" data-prop="border-block-end" data-status="unsupported"><code>border-block-end</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-block-end-clip" data-prop="border-block-end-clip" data-status="unsupported"><code>border-block-end-clip</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-block-end-color" data-prop="border-block-end-color" data-status="unsupported"><code>border-block-end-color</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-block-end-radius" data-prop="border-block-end-radius" data-status="unsupported"><code>border-block-end-radius</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-block-end-style" data-prop="border-block-end-style" data-status="unsupported"><code>border-block-end-style</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-block-end-width" data-prop="border-block-end-width" data-status="unsupported"><code>border-block-end-width</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-block-start" data-prop="border-block-start" data-status="unsupported"><code>border-block-start</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-block-start-clip" data-prop="border-block-start-clip" data-status="unsupported"><code>border-block-start-clip</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-block-start-color" data-prop="border-block-start-color" data-status="unsupported"><code>border-block-start-color</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-block-start-radius" data-prop="border-block-start-radius" data-status="unsupported"><code>border-block-start-radius</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-block-start-style" data-prop="border-block-start-style" data-status="unsupported"><code>border-block-start-style</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-block-start-width" data-prop="border-block-start-width" data-status="unsupported"><code>border-block-start-width</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-block-style" data-prop="border-block-style" data-status="unsupported"><code>border-block-style</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-block-width" data-prop="border-block-width" data-status="unsupported"><code>border-block-width</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-bottom" data-prop="border-bottom" data-status="implemented"><code>border-bottom</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-border-bottom-clip" data-prop="border-bottom-clip" data-status="unsupported"><code>border-bottom-clip</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-bottom-color" data-prop="border-bottom-color" data-status="implemented"><code>border-bottom-color</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-border-bottom-left-radius" data-prop="border-bottom-left-radius" data-status="implemented"><code>border-bottom-left-radius</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-border-bottom-radius" data-prop="border-bottom-radius" data-status="unsupported"><code>border-bottom-radius</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-bottom-right-radius" data-prop="border-bottom-right-radius" data-status="implemented"><code>border-bottom-right-radius</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-border-bottom-style" data-prop="border-bottom-style" data-status="unsupported"><code>border-bottom-style</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-bottom-width" data-prop="border-bottom-width" data-status="implemented"><code>border-bottom-width</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-border-boundary" data-prop="border-boundary" data-status="unsupported"><code>border-boundary</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-clip" data-prop="border-clip" data-status="unsupported"><code>border-clip</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-color" data-prop="border-color" data-status="implemented"><code>border-color</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-border-end-end-radius" data-prop="border-end-end-radius" data-status="unsupported"><code>border-end-end-radius</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-end-start-radius" data-prop="border-end-start-radius" data-status="unsupported"><code>border-end-start-radius</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-image" data-prop="border-image" data-status="unsupported"><code>border-image</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-image-outset" data-prop="border-image-outset" data-status="unsupported"><code>border-image-outset</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-image-repeat" data-prop="border-image-repeat" data-status="unsupported"><code>border-image-repeat</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-image-slice" data-prop="border-image-slice" data-status="unsupported"><code>border-image-slice</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-image-source" data-prop="border-image-source" data-status="unsupported"><code>border-image-source</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-image-width" data-prop="border-image-width" data-status="unsupported"><code>border-image-width</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-inline" data-prop="border-inline" data-status="unsupported"><code>border-inline</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-inline-clip" data-prop="border-inline-clip" data-status="unsupported"><code>border-inline-clip</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-inline-color" data-prop="border-inline-color" data-status="unsupported"><code>border-inline-color</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-inline-end" data-prop="border-inline-end" data-status="unsupported"><code>border-inline-end</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-inline-end-clip" data-prop="border-inline-end-clip" data-status="unsupported"><code>border-inline-end-clip</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-inline-end-color" data-prop="border-inline-end-color" data-status="unsupported"><code>border-inline-end-color</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-inline-end-radius" data-prop="border-inline-end-radius" data-status="unsupported"><code>border-inline-end-radius</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-inline-end-style" data-prop="border-inline-end-style" data-status="unsupported"><code>border-inline-end-style</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-inline-end-width" data-prop="border-inline-end-width" data-status="unsupported"><code>border-inline-end-width</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-inline-start" data-prop="border-inline-start" data-status="unsupported"><code>border-inline-start</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-inline-start-clip" data-prop="border-inline-start-clip" data-status="unsupported"><code>border-inline-start-clip</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-inline-start-color" data-prop="border-inline-start-color" data-status="unsupported"><code>border-inline-start-color</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-inline-start-radius" data-prop="border-inline-start-radius" data-status="unsupported"><code>border-inline-start-radius</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-inline-start-style" data-prop="border-inline-start-style" data-status="unsupported"><code>border-inline-start-style</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-inline-start-width" data-prop="border-inline-start-width" data-status="unsupported"><code>border-inline-start-width</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-border-block" data-prop="border-block" data-status="implemented"><code>border-block</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-block-color" data-prop="border-block-color" data-status="implemented"><code>border-block-color</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-block-end" data-prop="border-block-end" data-status="implemented"><code>border-block-end</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-block-end-color" data-prop="border-block-end-color" data-status="implemented"><code>border-block-end-color</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-block-end-radius" data-prop="border-block-end-radius" data-status="implemented"><code>border-block-end-radius</code><span class="badge impl">implemented</span></div>
     </div>
   </div>
 
   <div class="probe-page">
-    <h2 class="probe-heading">CSS probe gallery 2/6 (flow-safe properties)</h2>
-    <p class="probe-note">Each chip sets exactly one goal:implement property. Status badge is catalog engine_status.</p>
+    <h2 class="probe-heading">Implemented CSS probe gallery 2/6 (356 properties)</h2>
+    <p class="probe-note">Each chip exercises one verified implemented CSS property in pure-Go layout/paint.</p>
     <div class="probe-grid">
-        <div class="probe p-border-inline-style" data-prop="border-inline-style" data-status="unsupported"><code>border-inline-style</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-inline-width" data-prop="border-inline-width" data-status="unsupported"><code>border-inline-width</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-border-block-end-style" data-prop="border-block-end-style" data-status="implemented"><code>border-block-end-style</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-block-end-width" data-prop="border-block-end-width" data-status="implemented"><code>border-block-end-width</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-block-start" data-prop="border-block-start" data-status="implemented"><code>border-block-start</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-block-start-color" data-prop="border-block-start-color" data-status="implemented"><code>border-block-start-color</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-block-start-radius" data-prop="border-block-start-radius" data-status="implemented"><code>border-block-start-radius</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-block-start-style" data-prop="border-block-start-style" data-status="implemented"><code>border-block-start-style</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-block-start-width" data-prop="border-block-start-width" data-status="implemented"><code>border-block-start-width</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-block-style" data-prop="border-block-style" data-status="implemented"><code>border-block-style</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-block-width" data-prop="border-block-width" data-status="implemented"><code>border-block-width</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-bottom" data-prop="border-bottom" data-status="implemented"><code>border-bottom</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-bottom-color" data-prop="border-bottom-color" data-status="implemented"><code>border-bottom-color</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-bottom-left-radius" data-prop="border-bottom-left-radius" data-status="implemented"><code>border-bottom-left-radius</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-bottom-radius" data-prop="border-bottom-radius" data-status="implemented"><code>border-bottom-radius</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-bottom-right-radius" data-prop="border-bottom-right-radius" data-status="implemented"><code>border-bottom-right-radius</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-bottom-style" data-prop="border-bottom-style" data-status="implemented"><code>border-bottom-style</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-bottom-width" data-prop="border-bottom-width" data-status="implemented"><code>border-bottom-width</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-collapse" data-prop="border-collapse" data-status="implemented"><code>border-collapse</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-color" data-prop="border-color" data-status="implemented"><code>border-color</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-end-end-radius" data-prop="border-end-end-radius" data-status="implemented"><code>border-end-end-radius</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-end-start-radius" data-prop="border-end-start-radius" data-status="implemented"><code>border-end-start-radius</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-image" data-prop="border-image" data-status="implemented"><code>border-image</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-image-outset" data-prop="border-image-outset" data-status="implemented"><code>border-image-outset</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-image-repeat" data-prop="border-image-repeat" data-status="implemented"><code>border-image-repeat</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-image-slice" data-prop="border-image-slice" data-status="implemented"><code>border-image-slice</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-image-source" data-prop="border-image-source" data-status="implemented"><code>border-image-source</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-image-width" data-prop="border-image-width" data-status="implemented"><code>border-image-width</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-inline" data-prop="border-inline" data-status="implemented"><code>border-inline</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-inline-color" data-prop="border-inline-color" data-status="implemented"><code>border-inline-color</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-inline-end" data-prop="border-inline-end" data-status="implemented"><code>border-inline-end</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-inline-end-color" data-prop="border-inline-end-color" data-status="implemented"><code>border-inline-end-color</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-inline-end-radius" data-prop="border-inline-end-radius" data-status="implemented"><code>border-inline-end-radius</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-inline-end-style" data-prop="border-inline-end-style" data-status="implemented"><code>border-inline-end-style</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-inline-end-width" data-prop="border-inline-end-width" data-status="implemented"><code>border-inline-end-width</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-inline-start" data-prop="border-inline-start" data-status="implemented"><code>border-inline-start</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-inline-start-color" data-prop="border-inline-start-color" data-status="implemented"><code>border-inline-start-color</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-inline-start-radius" data-prop="border-inline-start-radius" data-status="implemented"><code>border-inline-start-radius</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-inline-start-style" data-prop="border-inline-start-style" data-status="implemented"><code>border-inline-start-style</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-inline-start-width" data-prop="border-inline-start-width" data-status="implemented"><code>border-inline-start-width</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-inline-style" data-prop="border-inline-style" data-status="implemented"><code>border-inline-style</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-inline-width" data-prop="border-inline-width" data-status="implemented"><code>border-inline-width</code><span class="badge impl">implemented</span></div>
         <div class="probe p-border-left" data-prop="border-left" data-status="implemented"><code>border-left</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-border-left-clip" data-prop="border-left-clip" data-status="unsupported"><code>border-left-clip</code><span class="badge todo">unsupported</span></div>
         <div class="probe p-border-left-color" data-prop="border-left-color" data-status="implemented"><code>border-left-color</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-border-left-radius" data-prop="border-left-radius" data-status="unsupported"><code>border-left-radius</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-left-style" data-prop="border-left-style" data-status="unsupported"><code>border-left-style</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-border-left-radius" data-prop="border-left-radius" data-status="implemented"><code>border-left-radius</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-left-style" data-prop="border-left-style" data-status="implemented"><code>border-left-style</code><span class="badge impl">implemented</span></div>
         <div class="probe p-border-left-width" data-prop="border-left-width" data-status="implemented"><code>border-left-width</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-border-limit" data-prop="border-limit" data-status="unsupported"><code>border-limit</code><span class="badge todo">unsupported</span></div>
         <div class="probe p-border-radius" data-prop="border-radius" data-status="implemented"><code>border-radius</code><span class="badge impl">implemented</span></div>
         <div class="probe p-border-right" data-prop="border-right" data-status="implemented"><code>border-right</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-border-right-clip" data-prop="border-right-clip" data-status="unsupported"><code>border-right-clip</code><span class="badge todo">unsupported</span></div>
         <div class="probe p-border-right-color" data-prop="border-right-color" data-status="implemented"><code>border-right-color</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-border-right-radius" data-prop="border-right-radius" data-status="unsupported"><code>border-right-radius</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-right-style" data-prop="border-right-style" data-status="unsupported"><code>border-right-style</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-border-right-radius" data-prop="border-right-radius" data-status="implemented"><code>border-right-radius</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-right-style" data-prop="border-right-style" data-status="implemented"><code>border-right-style</code><span class="badge impl">implemented</span></div>
         <div class="probe p-border-right-width" data-prop="border-right-width" data-status="implemented"><code>border-right-width</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-border-shape" data-prop="border-shape" data-status="unsupported"><code>border-shape</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-start-end-radius" data-prop="border-start-end-radius" data-status="unsupported"><code>border-start-end-radius</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-border-start-start-radius" data-prop="border-start-start-radius" data-status="unsupported"><code>border-start-start-radius</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-border-spacing" data-prop="border-spacing" data-status="implemented"><code>border-spacing</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-start-end-radius" data-prop="border-start-end-radius" data-status="implemented"><code>border-start-end-radius</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-border-start-start-radius" data-prop="border-start-start-radius" data-status="implemented"><code>border-start-start-radius</code><span class="badge impl">implemented</span></div>
         <div class="probe p-border-style" data-prop="border-style" data-status="implemented"><code>border-style</code><span class="badge impl">implemented</span></div>
         <div class="probe p-border-top" data-prop="border-top" data-status="implemented"><code>border-top</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-border-top-clip" data-prop="border-top-clip" data-status="unsupported"><code>border-top-clip</code><span class="badge todo">unsupported</span></div>
         <div class="probe p-border-top-color" data-prop="border-top-color" data-status="implemented"><code>border-top-color</code><span class="badge impl">implemented</span></div>
         <div class="probe p-border-top-left-radius" data-prop="border-top-left-radius" data-status="implemented"><code>border-top-left-radius</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-border-top-radius" data-prop="border-top-radius" data-status="unsupported"><code>border-top-radius</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-border-top-radius" data-prop="border-top-radius" data-status="implemented"><code>border-top-radius</code><span class="badge impl">implemented</span></div>
         <div class="probe p-border-top-right-radius" data-prop="border-top-right-radius" data-status="implemented"><code>border-top-right-radius</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-border-top-style" data-prop="border-top-style" data-status="unsupported"><code>border-top-style</code><span class="badge todo">unsupported</span></div>
+    </div>
+  </div>
+
+  <div class="probe-page">
+    <h2 class="probe-heading">Implemented CSS probe gallery 3/6 (356 properties)</h2>
+    <p class="probe-note">Each chip exercises one verified implemented CSS property in pure-Go layout/paint.</p>
+    <div class="probe-grid">
+        <div class="probe p-border-top-style" data-prop="border-top-style" data-status="implemented"><code>border-top-style</code><span class="badge impl">implemented</span></div>
         <div class="probe p-border-top-width" data-prop="border-top-width" data-status="implemented"><code>border-top-width</code><span class="badge impl">implemented</span></div>
         <div class="probe p-border-width" data-prop="border-width" data-status="implemented"><code>border-width</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-box-decoration-break" data-prop="box-decoration-break" data-status="unsupported"><code>box-decoration-break</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-bottom" data-prop="bottom" data-status="implemented"><code>bottom</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-box-decoration-break" data-prop="box-decoration-break" data-status="implemented"><code>box-decoration-break</code><span class="badge impl">implemented</span></div>
         <div class="probe p-box-shadow" data-prop="box-shadow" data-status="implemented"><code>box-shadow</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-box-shadow-blur" data-prop="box-shadow-blur" data-status="unsupported"><code>box-shadow-blur</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-box-shadow-color" data-prop="box-shadow-color" data-status="unsupported"><code>box-shadow-color</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-box-shadow-offset" data-prop="box-shadow-offset" data-status="unsupported"><code>box-shadow-offset</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-box-shadow-position" data-prop="box-shadow-position" data-status="unsupported"><code>box-shadow-position</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-box-shadow-spread" data-prop="box-shadow-spread" data-status="unsupported"><code>box-shadow-spread</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-box-shadow-blur" data-prop="box-shadow-blur" data-status="implemented"><code>box-shadow-blur</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-box-shadow-color" data-prop="box-shadow-color" data-status="implemented"><code>box-shadow-color</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-box-shadow-offset" data-prop="box-shadow-offset" data-status="implemented"><code>box-shadow-offset</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-box-shadow-position" data-prop="box-shadow-position" data-status="implemented"><code>box-shadow-position</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-box-shadow-spread" data-prop="box-shadow-spread" data-status="implemented"><code>box-shadow-spread</code><span class="badge impl">implemented</span></div>
         <div class="probe p-box-sizing" data-prop="box-sizing" data-status="implemented"><code>box-sizing</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-box-snap" data-prop="box-snap" data-status="unsupported"><code>box-snap</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-caret" data-prop="caret" data-status="unsupported"><code>caret</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-caret-animation" data-prop="caret-animation" data-status="unsupported"><code>caret-animation</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-caret-shape" data-prop="caret-shape" data-status="unsupported"><code>caret-shape</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-break-after" data-prop="break-after" data-status="implemented"><code>break-after</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-break-before" data-prop="break-before" data-status="implemented"><code>break-before</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-break-inside" data-prop="break-inside" data-status="implemented"><code>break-inside</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-caption-side" data-prop="caption-side" data-status="implemented"><code>caption-side</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-clear" data-prop="clear" data-status="implemented"><code>clear</code><span class="badge impl">implemented</span></div>
         <div class="probe p-color" data-prop="color" data-status="implemented"><code>color</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-color-adjust" data-prop="color-adjust" data-status="unsupported"><code>color-adjust</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-color-interpolation" data-prop="color-interpolation" data-status="unsupported"><code>color-interpolation</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-color-scheme" data-prop="color-scheme" data-status="unsupported"><code>color-scheme</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-color-adjust" data-prop="color-adjust" data-status="implemented"><code>color-adjust</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-color-scheme" data-prop="color-scheme" data-status="implemented"><code>color-scheme</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-column-count" data-prop="column-count" data-status="implemented"><code>column-count</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-column-fill" data-prop="column-fill" data-status="implemented"><code>column-fill</code><span class="badge impl">implemented</span></div>
         <div class="probe p-column-gap" data-prop="column-gap" data-status="implemented"><code>column-gap</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-column-height" data-prop="column-height" data-status="unsupported"><code>column-height</code><span class="badge todo">unsupported</span></div>
         <div class="probe p-column-rule" data-prop="column-rule" data-status="implemented"><code>column-rule</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-column-rule-break" data-prop="column-rule-break" data-status="unsupported"><code>column-rule-break</code><span class="badge todo">unsupported</span></div>
         <div class="probe p-column-rule-color" data-prop="column-rule-color" data-status="implemented"><code>column-rule-color</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-column-rule-inset" data-prop="column-rule-inset" data-status="unsupported"><code>column-rule-inset</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-column-rule-inset-cap" data-prop="column-rule-inset-cap" data-status="unsupported"><code>column-rule-inset-cap</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-column-rule-inset-cap-end" data-prop="column-rule-inset-cap-end" data-status="unsupported"><code>column-rule-inset-cap-end</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-column-rule-inset-cap-start" data-prop="column-rule-inset-cap-start" data-status="unsupported"><code>column-rule-inset-cap-start</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-column-rule-inset-end" data-prop="column-rule-inset-end" data-status="unsupported"><code>column-rule-inset-end</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-column-rule-inset-junction" data-prop="column-rule-inset-junction" data-status="unsupported"><code>column-rule-inset-junction</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-column-rule-inset-junction-end" data-prop="column-rule-inset-junction-end" data-status="unsupported"><code>column-rule-inset-junction-end</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-column-rule-inset-junction-start" data-prop="column-rule-inset-junction-start" data-status="unsupported"><code>column-rule-inset-junction-start</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-column-rule-inset-start" data-prop="column-rule-inset-start" data-status="unsupported"><code>column-rule-inset-start</code><span class="badge todo">unsupported</span></div>
         <div class="probe p-column-rule-style" data-prop="column-rule-style" data-status="implemented"><code>column-rule-style</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-column-rule-visibility-items" data-prop="column-rule-visibility-items" data-status="unsupported"><code>column-rule-visibility-items</code><span class="badge todo">unsupported</span></div>
         <div class="probe p-column-rule-width" data-prop="column-rule-width" data-status="implemented"><code>column-rule-width</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-column-wrap" data-prop="column-wrap" data-status="unsupported"><code>column-wrap</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-contain" data-prop="contain" data-status="unsupported"><code>contain</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-contain-intrinsic-block-size" data-prop="contain-intrinsic-block-size" data-status="unsupported"><code>contain-intrinsic-block-size</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-contain-intrinsic-height" data-prop="contain-intrinsic-height" data-status="unsupported"><code>contain-intrinsic-height</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-contain-intrinsic-inline-size" data-prop="contain-intrinsic-inline-size" data-status="unsupported"><code>contain-intrinsic-inline-size</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-contain-intrinsic-size" data-prop="contain-intrinsic-size" data-status="unsupported"><code>contain-intrinsic-size</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-contain-intrinsic-width" data-prop="contain-intrinsic-width" data-status="unsupported"><code>contain-intrinsic-width</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-column-span" data-prop="column-span" data-status="implemented"><code>column-span</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-column-width" data-prop="column-width" data-status="implemented"><code>column-width</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-columns" data-prop="columns" data-status="implemented"><code>columns</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-contain" data-prop="contain" data-status="implemented"><code>contain</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-contain-intrinsic-block-size" data-prop="contain-intrinsic-block-size" data-status="implemented"><code>contain-intrinsic-block-size</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-contain-intrinsic-height" data-prop="contain-intrinsic-height" data-status="implemented"><code>contain-intrinsic-height</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-contain-intrinsic-inline-size" data-prop="contain-intrinsic-inline-size" data-status="implemented"><code>contain-intrinsic-inline-size</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-contain-intrinsic-size" data-prop="contain-intrinsic-size" data-status="implemented"><code>contain-intrinsic-size</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-contain-intrinsic-width" data-prop="contain-intrinsic-width" data-status="implemented"><code>contain-intrinsic-width</code><span class="badge impl">implemented</span></div>
         <div class="probe p-container" data-prop="container" data-status="implemented"><code>container</code><span class="badge impl">implemented</span></div>
         <div class="probe p-container-name" data-prop="container-name" data-status="implemented"><code>container-name</code><span class="badge impl">implemented</span></div>
         <div class="probe p-container-type" data-prop="container-type" data-status="implemented"><code>container-type</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-content-visibility" data-prop="content-visibility" data-status="unsupported"><code>content-visibility</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-continue" data-prop="continue" data-status="unsupported"><code>continue</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-copy-into" data-prop="copy-into" data-status="unsupported"><code>copy-into</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-corner" data-prop="corner" data-status="unsupported"><code>corner</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-corner-block-end" data-prop="corner-block-end" data-status="unsupported"><code>corner-block-end</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-corner-block-end-shape" data-prop="corner-block-end-shape" data-status="unsupported"><code>corner-block-end-shape</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-corner-block-start" data-prop="corner-block-start" data-status="unsupported"><code>corner-block-start</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-corner-block-start-shape" data-prop="corner-block-start-shape" data-status="unsupported"><code>corner-block-start-shape</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-corner-bottom" data-prop="corner-bottom" data-status="unsupported"><code>corner-bottom</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-corner-bottom-left" data-prop="corner-bottom-left" data-status="unsupported"><code>corner-bottom-left</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-corner-bottom-left-shape" data-prop="corner-bottom-left-shape" data-status="unsupported"><code>corner-bottom-left-shape</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-corner-bottom-right" data-prop="corner-bottom-right" data-status="unsupported"><code>corner-bottom-right</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-corner-bottom-right-shape" data-prop="corner-bottom-right-shape" data-status="unsupported"><code>corner-bottom-right-shape</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-corner-bottom-shape" data-prop="corner-bottom-shape" data-status="unsupported"><code>corner-bottom-shape</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-corner-end-end" data-prop="corner-end-end" data-status="unsupported"><code>corner-end-end</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-corner-end-end-shape" data-prop="corner-end-end-shape" data-status="unsupported"><code>corner-end-end-shape</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-corner-end-start" data-prop="corner-end-start" data-status="unsupported"><code>corner-end-start</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-corner-end-start-shape" data-prop="corner-end-start-shape" data-status="unsupported"><code>corner-end-start-shape</code><span class="badge todo">unsupported</span></div>
-    </div>
-  </div>
-
-  <div class="probe-page">
-    <h2 class="probe-heading">CSS probe gallery 3/6 (flow-safe properties)</h2>
-    <p class="probe-note">Each chip sets exactly one goal:implement property. Status badge is catalog engine_status.</p>
-    <div class="probe-grid">
-        <div class="probe p-corner-inline-end" data-prop="corner-inline-end" data-status="unsupported"><code>corner-inline-end</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-corner-inline-end-shape" data-prop="corner-inline-end-shape" data-status="unsupported"><code>corner-inline-end-shape</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-corner-inline-start" data-prop="corner-inline-start" data-status="unsupported"><code>corner-inline-start</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-corner-inline-start-shape" data-prop="corner-inline-start-shape" data-status="unsupported"><code>corner-inline-start-shape</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-corner-left" data-prop="corner-left" data-status="unsupported"><code>corner-left</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-corner-left-shape" data-prop="corner-left-shape" data-status="unsupported"><code>corner-left-shape</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-corner-right" data-prop="corner-right" data-status="unsupported"><code>corner-right</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-corner-right-shape" data-prop="corner-right-shape" data-status="unsupported"><code>corner-right-shape</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-corner-shape" data-prop="corner-shape" data-status="unsupported"><code>corner-shape</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-corner-start-end" data-prop="corner-start-end" data-status="unsupported"><code>corner-start-end</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-corner-start-end-shape" data-prop="corner-start-end-shape" data-status="unsupported"><code>corner-start-end-shape</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-corner-start-start" data-prop="corner-start-start" data-status="unsupported"><code>corner-start-start</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-corner-start-start-shape" data-prop="corner-start-start-shape" data-status="unsupported"><code>corner-start-start-shape</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-corner-top" data-prop="corner-top" data-status="unsupported"><code>corner-top</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-corner-top-left" data-prop="corner-top-left" data-status="unsupported"><code>corner-top-left</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-corner-top-left-shape" data-prop="corner-top-left-shape" data-status="unsupported"><code>corner-top-left-shape</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-corner-top-right" data-prop="corner-top-right" data-status="unsupported"><code>corner-top-right</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-corner-top-right-shape" data-prop="corner-top-right-shape" data-status="unsupported"><code>corner-top-right-shape</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-corner-top-shape" data-prop="corner-top-shape" data-status="unsupported"><code>corner-top-shape</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-cx" data-prop="cx" data-status="unsupported"><code>cx</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-cy" data-prop="cy" data-status="unsupported"><code>cy</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-d" data-prop="d" data-status="unsupported"><code>d</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-dominant-baseline" data-prop="dominant-baseline" data-status="unsupported"><code>dominant-baseline</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-dynamic-range-limit" data-prop="dynamic-range-limit" data-status="unsupported"><code>dynamic-range-limit</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-empty-cells" data-prop="empty-cells" data-status="unsupported"><code>empty-cells</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-event-trigger" data-prop="event-trigger" data-status="unsupported"><code>event-trigger</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-event-trigger-name" data-prop="event-trigger-name" data-status="unsupported"><code>event-trigger-name</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-event-trigger-source" data-prop="event-trigger-source" data-status="unsupported"><code>event-trigger-source</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-field-sizing" data-prop="field-sizing" data-status="unsupported"><code>field-sizing</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-content" data-prop="content" data-status="implemented"><code>content</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-content-visibility" data-prop="content-visibility" data-status="implemented"><code>content-visibility</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-counter-increment" data-prop="counter-increment" data-status="implemented"><code>counter-increment</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-counter-reset" data-prop="counter-reset" data-status="implemented"><code>counter-reset</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-direction" data-prop="direction" data-status="implemented"><code>direction</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-display" data-prop="display" data-status="implemented"><code>display</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-dynamic-range-limit" data-prop="dynamic-range-limit" data-status="implemented"><code>dynamic-range-limit</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-fill" data-prop="fill" data-status="implemented"><code>fill</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-fill-opacity" data-prop="fill-opacity" data-status="implemented"><code>fill-opacity</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-filter" data-prop="filter" data-status="implemented"><code>filter</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-flex" data-prop="flex" data-status="implemented"><code>flex</code><span class="badge impl">implemented</span></div>
         <div class="probe p-flex-basis" data-prop="flex-basis" data-status="implemented"><code>flex-basis</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-flex-direction" data-prop="flex-direction" data-status="implemented"><code>flex-direction</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-flex-flow" data-prop="flex-flow" data-status="implemented"><code>flex-flow</code><span class="badge impl">implemented</span></div>
         <div class="probe p-flex-grow" data-prop="flex-grow" data-status="implemented"><code>flex-grow</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-flex-line-count" data-prop="flex-line-count" data-status="unsupported"><code>flex-line-count</code><span class="badge todo">unsupported</span></div>
         <div class="probe p-flex-shrink" data-prop="flex-shrink" data-status="implemented"><code>flex-shrink</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-float-defer" data-prop="float-defer" data-status="unsupported"><code>float-defer</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-float-offset" data-prop="float-offset" data-status="unsupported"><code>float-offset</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-float-reference" data-prop="float-reference" data-status="unsupported"><code>float-reference</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-flow-from" data-prop="flow-from" data-status="unsupported"><code>flow-from</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-flow-into" data-prop="flow-into" data-status="unsupported"><code>flow-into</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-flow-tolerance" data-prop="flow-tolerance" data-status="unsupported"><code>flow-tolerance</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-flex-wrap" data-prop="flex-wrap" data-status="implemented"><code>flex-wrap</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-float" data-prop="float" data-status="implemented"><code>float</code><span class="badge impl">implemented</span></div>
         <div class="probe p-font" data-prop="font" data-status="implemented"><code>font</code><span class="badge impl">implemented</span></div>
         <div class="probe p-font-family" data-prop="font-family" data-status="implemented"><code>font-family</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-font-feature-settings" data-prop="font-feature-settings" data-status="unsupported"><code>font-feature-settings</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-font-kerning" data-prop="font-kerning" data-status="unsupported"><code>font-kerning</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-font-language-override" data-prop="font-language-override" data-status="unsupported"><code>font-language-override</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-font-optical-sizing" data-prop="font-optical-sizing" data-status="unsupported"><code>font-optical-sizing</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-font-palette" data-prop="font-palette" data-status="unsupported"><code>font-palette</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-font-size" data-prop="font-size" data-status="implemented"><code>font-size</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-font-size-adjust" data-prop="font-size-adjust" data-status="unsupported"><code>font-size-adjust</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-font-stretch" data-prop="font-stretch" data-status="unsupported"><code>font-stretch</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-font-style" data-prop="font-style" data-status="implemented"><code>font-style</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-font-synthesis" data-prop="font-synthesis" data-status="unsupported"><code>font-synthesis</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-font-synthesis-position" data-prop="font-synthesis-position" data-status="unsupported"><code>font-synthesis-position</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-font-synthesis-small-caps" data-prop="font-synthesis-small-caps" data-status="unsupported"><code>font-synthesis-small-caps</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-font-synthesis-style" data-prop="font-synthesis-style" data-status="unsupported"><code>font-synthesis-style</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-font-synthesis-weight" data-prop="font-synthesis-weight" data-status="unsupported"><code>font-synthesis-weight</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-font-variant" data-prop="font-variant" data-status="unsupported"><code>font-variant</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-font-variant-alternates" data-prop="font-variant-alternates" data-status="unsupported"><code>font-variant-alternates</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-font-variant-caps" data-prop="font-variant-caps" data-status="unsupported"><code>font-variant-caps</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-font-variant-east-asian" data-prop="font-variant-east-asian" data-status="unsupported"><code>font-variant-east-asian</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-font-variant-emoji" data-prop="font-variant-emoji" data-status="unsupported"><code>font-variant-emoji</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-font-variant-ligatures" data-prop="font-variant-ligatures" data-status="unsupported"><code>font-variant-ligatures</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-font-variant-numeric" data-prop="font-variant-numeric" data-status="unsupported"><code>font-variant-numeric</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-font-variant-position" data-prop="font-variant-position" data-status="unsupported"><code>font-variant-position</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-font-variation-settings" data-prop="font-variation-settings" data-status="unsupported"><code>font-variation-settings</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-font-weight" data-prop="font-weight" data-status="implemented"><code>font-weight</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-font-width" data-prop="font-width" data-status="unsupported"><code>font-width</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-footnote-display" data-prop="footnote-display" data-status="unsupported"><code>footnote-display</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-footnote-policy" data-prop="footnote-policy" data-status="unsupported"><code>footnote-policy</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-forced-color-adjust" data-prop="forced-color-adjust" data-status="unsupported"><code>forced-color-adjust</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-frame-sizing" data-prop="frame-sizing" data-status="unsupported"><code>frame-sizing</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-gap" data-prop="gap" data-status="implemented"><code>gap</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-glyph-orientation-vertical" data-prop="glyph-orientation-vertical" data-status="unsupported"><code>glyph-orientation-vertical</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-grid-column-gap" data-prop="grid-column-gap" data-status="unsupported"><code>grid-column-gap</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-grid-gap" data-prop="grid-gap" data-status="unsupported"><code>grid-gap</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-grid-row-gap" data-prop="grid-row-gap" data-status="unsupported"><code>grid-row-gap</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-hanging-punctuation" data-prop="hanging-punctuation" data-status="unsupported"><code>hanging-punctuation</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-height" data-prop="height" data-status="implemented"><code>height</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-hyphenate-character" data-prop="hyphenate-character" data-status="unsupported"><code>hyphenate-character</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-hyphenate-limit-chars" data-prop="hyphenate-limit-chars" data-status="unsupported"><code>hyphenate-limit-chars</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-hyphenate-limit-last" data-prop="hyphenate-limit-last" data-status="unsupported"><code>hyphenate-limit-last</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-hyphenate-limit-lines" data-prop="hyphenate-limit-lines" data-status="unsupported"><code>hyphenate-limit-lines</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-hyphenate-limit-zone" data-prop="hyphenate-limit-zone" data-status="unsupported"><code>hyphenate-limit-zone</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-hyphens" data-prop="hyphens" data-status="unsupported"><code>hyphens</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-image-animation" data-prop="image-animation" data-status="unsupported"><code>image-animation</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-image-orientation" data-prop="image-orientation" data-status="unsupported"><code>image-orientation</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-image-rendering" data-prop="image-rendering" data-status="unsupported"><code>image-rendering</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-image-resolution" data-prop="image-resolution" data-status="unsupported"><code>image-resolution</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-initial-letter" data-prop="initial-letter" data-status="unsupported"><code>initial-letter</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-initial-letter-align" data-prop="initial-letter-align" data-status="unsupported"><code>initial-letter-align</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-initial-letter-wrap" data-prop="initial-letter-wrap" data-status="unsupported"><code>initial-letter-wrap</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-font-language-override" data-prop="font-language-override" data-status="implemented"><code>font-language-override</code><span class="badge impl">implemented</span></div>
     </div>
   </div>
 
   <div class="probe-page">
-    <h2 class="probe-heading">CSS probe gallery 4/6 (flow-safe properties)</h2>
-    <p class="probe-note">Each chip sets exactly one goal:implement property. Status badge is catalog engine_status.</p>
+    <h2 class="probe-heading">Implemented CSS probe gallery 4/6 (356 properties)</h2>
+    <p class="probe-note">Each chip exercises one verified implemented CSS property in pure-Go layout/paint.</p>
     <div class="probe-grid">
+        <div class="probe p-font-optical-sizing" data-prop="font-optical-sizing" data-status="implemented"><code>font-optical-sizing</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-font-palette" data-prop="font-palette" data-status="implemented"><code>font-palette</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-font-size" data-prop="font-size" data-status="implemented"><code>font-size</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-font-style" data-prop="font-style" data-status="implemented"><code>font-style</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-font-variation-settings" data-prop="font-variation-settings" data-status="implemented"><code>font-variation-settings</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-font-weight" data-prop="font-weight" data-status="implemented"><code>font-weight</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-footnote-display" data-prop="footnote-display" data-status="implemented"><code>footnote-display</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-footnote-policy" data-prop="footnote-policy" data-status="implemented"><code>footnote-policy</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-forced-color-adjust" data-prop="forced-color-adjust" data-status="implemented"><code>forced-color-adjust</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-gap" data-prop="gap" data-status="implemented"><code>gap</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-grid" data-prop="grid" data-status="implemented"><code>grid</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-grid-area" data-prop="grid-area" data-status="implemented"><code>grid-area</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-grid-auto-flow" data-prop="grid-auto-flow" data-status="implemented"><code>grid-auto-flow</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-grid-column" data-prop="grid-column" data-status="implemented"><code>grid-column</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-grid-column-end" data-prop="grid-column-end" data-status="implemented"><code>grid-column-end</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-grid-column-start" data-prop="grid-column-start" data-status="implemented"><code>grid-column-start</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-grid-row" data-prop="grid-row" data-status="implemented"><code>grid-row</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-grid-row-end" data-prop="grid-row-end" data-status="implemented"><code>grid-row-end</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-grid-row-start" data-prop="grid-row-start" data-status="implemented"><code>grid-row-start</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-grid-template" data-prop="grid-template" data-status="implemented"><code>grid-template</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-grid-template-areas" data-prop="grid-template-areas" data-status="implemented"><code>grid-template-areas</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-grid-template-columns" data-prop="grid-template-columns" data-status="implemented"><code>grid-template-columns</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-grid-template-rows" data-prop="grid-template-rows" data-status="implemented"><code>grid-template-rows</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-height" data-prop="height" data-status="implemented"><code>height</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-hyphenate-character" data-prop="hyphenate-character" data-status="implemented"><code>hyphenate-character</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-hyphens" data-prop="hyphens" data-status="implemented"><code>hyphens</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-image-orientation" data-prop="image-orientation" data-status="implemented"><code>image-orientation</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-image-resolution" data-prop="image-resolution" data-status="implemented"><code>image-resolution</code><span class="badge impl">implemented</span></div>
         <div class="probe p-inline-size" data-prop="inline-size" data-status="implemented"><code>inline-size</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-inline-sizing" data-prop="inline-sizing" data-status="unsupported"><code>inline-sizing</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-input-security" data-prop="input-security" data-status="unsupported"><code>input-security</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-interactivity" data-prop="interactivity" data-status="unsupported"><code>interactivity</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-interest-delay" data-prop="interest-delay" data-status="unsupported"><code>interest-delay</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-interest-delay-end" data-prop="interest-delay-end" data-status="unsupported"><code>interest-delay-end</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-interest-delay-start" data-prop="interest-delay-start" data-status="unsupported"><code>interest-delay-start</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-interpolate-size" data-prop="interpolate-size" data-status="unsupported"><code>interpolate-size</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-isolation" data-prop="isolation" data-status="unsupported"><code>isolation</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-inset" data-prop="inset" data-status="implemented"><code>inset</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-inset-block" data-prop="inset-block" data-status="implemented"><code>inset-block</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-inset-block-end" data-prop="inset-block-end" data-status="implemented"><code>inset-block-end</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-inset-block-start" data-prop="inset-block-start" data-status="implemented"><code>inset-block-start</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-inset-inline" data-prop="inset-inline" data-status="implemented"><code>inset-inline</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-inset-inline-end" data-prop="inset-inline-end" data-status="implemented"><code>inset-inline-end</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-inset-inline-start" data-prop="inset-inline-start" data-status="implemented"><code>inset-inline-start</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-isolation" data-prop="isolation" data-status="implemented"><code>isolation</code><span class="badge impl">implemented</span></div>
         <div class="probe p-justify-content" data-prop="justify-content" data-status="implemented"><code>justify-content</code><span class="badge impl">implemented</span></div>
         <div class="probe p-justify-items" data-prop="justify-items" data-status="implemented"><code>justify-items</code><span class="badge impl">implemented</span></div>
         <div class="probe p-justify-self" data-prop="justify-self" data-status="implemented"><code>justify-self</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-left" data-prop="left" data-status="implemented"><code>left</code><span class="badge impl">implemented</span></div>
         <div class="probe p-letter-spacing" data-prop="letter-spacing" data-status="implemented"><code>letter-spacing</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-line-break" data-prop="line-break" data-status="unsupported"><code>line-break</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-line-clamp" data-prop="line-clamp" data-status="unsupported"><code>line-clamp</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-line-fit-edge" data-prop="line-fit-edge" data-status="unsupported"><code>line-fit-edge</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-line-grid" data-prop="line-grid" data-status="unsupported"><code>line-grid</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-line-break" data-prop="line-break" data-status="implemented"><code>line-break</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-line-clamp" data-prop="line-clamp" data-status="implemented"><code>line-clamp</code><span class="badge impl">implemented</span></div>
         <div class="probe p-line-height" data-prop="line-height" data-status="implemented"><code>line-height</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-line-height-step" data-prop="line-height-step" data-status="unsupported"><code>line-height-step</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-line-padding" data-prop="line-padding" data-status="unsupported"><code>line-padding</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-line-snap" data-prop="line-snap" data-status="unsupported"><code>line-snap</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-link-parameters" data-prop="link-parameters" data-status="unsupported"><code>link-parameters</code><span class="badge todo">unsupported</span></div>
         <div class="probe p-list-style" data-prop="list-style" data-status="implemented"><code>list-style</code><span class="badge impl">implemented</span></div>
         <div class="probe p-list-style-image" data-prop="list-style-image" data-status="implemented"><code>list-style-image</code><span class="badge impl">implemented</span></div>
         <div class="probe p-list-style-position" data-prop="list-style-position" data-status="implemented"><code>list-style-position</code><span class="badge impl">implemented</span></div>
@@ -2756,299 +2048,144 @@ THERMAL: 21.4 C | VOLT: 28.2 V</div>
         <div class="probe p-margin-block-end" data-prop="margin-block-end" data-status="implemented"><code>margin-block-end</code><span class="badge impl">implemented</span></div>
         <div class="probe p-margin-block-start" data-prop="margin-block-start" data-status="implemented"><code>margin-block-start</code><span class="badge impl">implemented</span></div>
         <div class="probe p-margin-bottom" data-prop="margin-bottom" data-status="implemented"><code>margin-bottom</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-margin-break" data-prop="margin-break" data-status="unsupported"><code>margin-break</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-margin-break" data-prop="margin-break" data-status="implemented"><code>margin-break</code><span class="badge impl">implemented</span></div>
         <div class="probe p-margin-inline" data-prop="margin-inline" data-status="implemented"><code>margin-inline</code><span class="badge impl">implemented</span></div>
         <div class="probe p-margin-inline-end" data-prop="margin-inline-end" data-status="implemented"><code>margin-inline-end</code><span class="badge impl">implemented</span></div>
         <div class="probe p-margin-inline-start" data-prop="margin-inline-start" data-status="implemented"><code>margin-inline-start</code><span class="badge impl">implemented</span></div>
         <div class="probe p-margin-left" data-prop="margin-left" data-status="implemented"><code>margin-left</code><span class="badge impl">implemented</span></div>
         <div class="probe p-margin-right" data-prop="margin-right" data-status="implemented"><code>margin-right</code><span class="badge impl">implemented</span></div>
+    </div>
+  </div>
+
+  <div class="probe-page">
+    <h2 class="probe-heading">Implemented CSS probe gallery 5/6 (356 properties)</h2>
+    <p class="probe-note">Each chip exercises one verified implemented CSS property in pure-Go layout/paint.</p>
+    <div class="probe-grid">
         <div class="probe p-margin-top" data-prop="margin-top" data-status="implemented"><code>margin-top</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-margin-trim" data-prop="margin-trim" data-status="unsupported"><code>margin-trim</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-marker" data-prop="marker" data-status="unsupported"><code>marker</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-marker-end" data-prop="marker-end" data-status="unsupported"><code>marker-end</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-marker-mid" data-prop="marker-mid" data-status="unsupported"><code>marker-mid</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-marker-side" data-prop="marker-side" data-status="unsupported"><code>marker-side</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-marker-start" data-prop="marker-start" data-status="unsupported"><code>marker-start</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-math-depth" data-prop="math-depth" data-status="unsupported"><code>math-depth</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-math-shift" data-prop="math-shift" data-status="unsupported"><code>math-shift</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-math-style" data-prop="math-style" data-status="unsupported"><code>math-style</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-margin-trim" data-prop="margin-trim" data-status="implemented"><code>margin-trim</code><span class="badge impl">implemented</span></div>
         <div class="probe p-max-block-size" data-prop="max-block-size" data-status="implemented"><code>max-block-size</code><span class="badge impl">implemented</span></div>
         <div class="probe p-max-height" data-prop="max-height" data-status="implemented"><code>max-height</code><span class="badge impl">implemented</span></div>
         <div class="probe p-max-inline-size" data-prop="max-inline-size" data-status="implemented"><code>max-inline-size</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-max-lines" data-prop="max-lines" data-status="unsupported"><code>max-lines</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-max-lines" data-prop="max-lines" data-status="implemented"><code>max-lines</code><span class="badge impl">implemented</span></div>
         <div class="probe p-max-width" data-prop="max-width" data-status="implemented"><code>max-width</code><span class="badge impl">implemented</span></div>
         <div class="probe p-min-block-size" data-prop="min-block-size" data-status="implemented"><code>min-block-size</code><span class="badge impl">implemented</span></div>
         <div class="probe p-min-height" data-prop="min-height" data-status="implemented"><code>min-height</code><span class="badge impl">implemented</span></div>
         <div class="probe p-min-inline-size" data-prop="min-inline-size" data-status="implemented"><code>min-inline-size</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-min-intrinsic-sizing" data-prop="min-intrinsic-sizing" data-status="unsupported"><code>min-intrinsic-sizing</code><span class="badge todo">unsupported</span></div>
         <div class="probe p-min-width" data-prop="min-width" data-status="implemented"><code>min-width</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-mix-blend-mode" data-prop="mix-blend-mode" data-status="unsupported"><code>mix-blend-mode</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-nav-down" data-prop="nav-down" data-status="unsupported"><code>nav-down</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-nav-left" data-prop="nav-left" data-status="unsupported"><code>nav-left</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-nav-right" data-prop="nav-right" data-status="unsupported"><code>nav-right</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-nav-up" data-prop="nav-up" data-status="unsupported"><code>nav-up</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-object-fit" data-prop="object-fit" data-status="unsupported"><code>object-fit</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-object-position" data-prop="object-position" data-status="unsupported"><code>object-position</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-object-view-box" data-prop="object-view-box" data-status="unsupported"><code>object-view-box</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-mix-blend-mode" data-prop="mix-blend-mode" data-status="implemented"><code>mix-blend-mode</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-object-view-box" data-prop="object-view-box" data-status="implemented"><code>object-view-box</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-opacity" data-prop="opacity" data-status="implemented"><code>opacity</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-order" data-prop="order" data-status="implemented"><code>order</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-orphans" data-prop="orphans" data-status="implemented"><code>orphans</code><span class="badge impl">implemented</span></div>
         <div class="probe p-outline" data-prop="outline" data-status="implemented"><code>outline</code><span class="badge impl">implemented</span></div>
         <div class="probe p-outline-color" data-prop="outline-color" data-status="implemented"><code>outline-color</code><span class="badge impl">implemented</span></div>
         <div class="probe p-outline-offset" data-prop="outline-offset" data-status="implemented"><code>outline-offset</code><span class="badge impl">implemented</span></div>
         <div class="probe p-outline-style" data-prop="outline-style" data-status="implemented"><code>outline-style</code><span class="badge impl">implemented</span></div>
         <div class="probe p-outline-width" data-prop="outline-width" data-status="implemented"><code>outline-width</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-overflow-block" data-prop="overflow-block" data-status="unsupported"><code>overflow-block</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-overflow-clip-margin" data-prop="overflow-clip-margin" data-status="unsupported"><code>overflow-clip-margin</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-overflow-clip-margin-block" data-prop="overflow-clip-margin-block" data-status="unsupported"><code>overflow-clip-margin-block</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-overflow-clip-margin-block-end" data-prop="overflow-clip-margin-block-end" data-status="unsupported"><code>overflow-clip-margin-block-end</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-overflow-clip-margin-block-start" data-prop="overflow-clip-margin-block-start" data-status="unsupported"><code>overflow-clip-margin-block-start</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-overflow-clip-margin-bottom" data-prop="overflow-clip-margin-bottom" data-status="unsupported"><code>overflow-clip-margin-bottom</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-overflow-clip-margin-inline" data-prop="overflow-clip-margin-inline" data-status="unsupported"><code>overflow-clip-margin-inline</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-overflow-clip-margin-inline-end" data-prop="overflow-clip-margin-inline-end" data-status="unsupported"><code>overflow-clip-margin-inline-end</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-overflow-clip-margin-inline-start" data-prop="overflow-clip-margin-inline-start" data-status="unsupported"><code>overflow-clip-margin-inline-start</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-overflow-clip-margin-left" data-prop="overflow-clip-margin-left" data-status="unsupported"><code>overflow-clip-margin-left</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-overflow-clip-margin-right" data-prop="overflow-clip-margin-right" data-status="unsupported"><code>overflow-clip-margin-right</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-overflow-clip-margin-top" data-prop="overflow-clip-margin-top" data-status="unsupported"><code>overflow-clip-margin-top</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-overflow-inline" data-prop="overflow-inline" data-status="unsupported"><code>overflow-inline</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-overflow" data-prop="overflow" data-status="implemented"><code>overflow</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-overflow-clip-margin" data-prop="overflow-clip-margin" data-status="implemented"><code>overflow-clip-margin</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-overflow-clip-margin-block" data-prop="overflow-clip-margin-block" data-status="implemented"><code>overflow-clip-margin-block</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-overflow-clip-margin-block-end" data-prop="overflow-clip-margin-block-end" data-status="implemented"><code>overflow-clip-margin-block-end</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-overflow-clip-margin-block-start" data-prop="overflow-clip-margin-block-start" data-status="implemented"><code>overflow-clip-margin-block-start</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-overflow-clip-margin-bottom" data-prop="overflow-clip-margin-bottom" data-status="implemented"><code>overflow-clip-margin-bottom</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-overflow-clip-margin-inline" data-prop="overflow-clip-margin-inline" data-status="implemented"><code>overflow-clip-margin-inline</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-overflow-clip-margin-inline-end" data-prop="overflow-clip-margin-inline-end" data-status="implemented"><code>overflow-clip-margin-inline-end</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-overflow-clip-margin-inline-start" data-prop="overflow-clip-margin-inline-start" data-status="implemented"><code>overflow-clip-margin-inline-start</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-overflow-clip-margin-left" data-prop="overflow-clip-margin-left" data-status="implemented"><code>overflow-clip-margin-left</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-overflow-clip-margin-right" data-prop="overflow-clip-margin-right" data-status="implemented"><code>overflow-clip-margin-right</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-overflow-clip-margin-top" data-prop="overflow-clip-margin-top" data-status="implemented"><code>overflow-clip-margin-top</code><span class="badge impl">implemented</span></div>
         <div class="probe p-overflow-wrap" data-prop="overflow-wrap" data-status="implemented"><code>overflow-wrap</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-overlay" data-prop="overlay" data-status="unsupported"><code>overlay</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-overflow-x" data-prop="overflow-x" data-status="implemented"><code>overflow-x</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-overflow-y" data-prop="overflow-y" data-status="implemented"><code>overflow-y</code><span class="badge impl">implemented</span></div>
         <div class="probe p-padding" data-prop="padding" data-status="implemented"><code>padding</code><span class="badge impl">implemented</span></div>
         <div class="probe p-padding-block" data-prop="padding-block" data-status="implemented"><code>padding-block</code><span class="badge impl">implemented</span></div>
         <div class="probe p-padding-block-end" data-prop="padding-block-end" data-status="implemented"><code>padding-block-end</code><span class="badge impl">implemented</span></div>
         <div class="probe p-padding-block-start" data-prop="padding-block-start" data-status="implemented"><code>padding-block-start</code><span class="badge impl">implemented</span></div>
         <div class="probe p-padding-bottom" data-prop="padding-bottom" data-status="implemented"><code>padding-bottom</code><span class="badge impl">implemented</span></div>
-    </div>
-  </div>
-
-  <div class="probe-page">
-    <h2 class="probe-heading">CSS probe gallery 5/6 (flow-safe properties)</h2>
-    <p class="probe-note">Each chip sets exactly one goal:implement property. Status badge is catalog engine_status.</p>
-    <div class="probe-grid">
         <div class="probe p-padding-inline" data-prop="padding-inline" data-status="implemented"><code>padding-inline</code><span class="badge impl">implemented</span></div>
         <div class="probe p-padding-inline-end" data-prop="padding-inline-end" data-status="implemented"><code>padding-inline-end</code><span class="badge impl">implemented</span></div>
         <div class="probe p-padding-inline-start" data-prop="padding-inline-start" data-status="implemented"><code>padding-inline-start</code><span class="badge impl">implemented</span></div>
         <div class="probe p-padding-left" data-prop="padding-left" data-status="implemented"><code>padding-left</code><span class="badge impl">implemented</span></div>
         <div class="probe p-padding-right" data-prop="padding-right" data-status="implemented"><code>padding-right</code><span class="badge impl">implemented</span></div>
         <div class="probe p-padding-top" data-prop="padding-top" data-status="implemented"><code>padding-top</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-paint-order" data-prop="paint-order" data-status="unsupported"><code>paint-order</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-path-length" data-prop="path-length" data-status="unsupported"><code>path-length</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-page" data-prop="page" data-status="implemented"><code>page</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-page-break-after" data-prop="page-break-after" data-status="implemented"><code>page-break-after</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-page-break-before" data-prop="page-break-before" data-status="implemented"><code>page-break-before</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-page-break-inside" data-prop="page-break-inside" data-status="implemented"><code>page-break-inside</code><span class="badge impl">implemented</span></div>
         <div class="probe p-place-content" data-prop="place-content" data-status="implemented"><code>place-content</code><span class="badge impl">implemented</span></div>
         <div class="probe p-place-items" data-prop="place-items" data-status="implemented"><code>place-items</code><span class="badge impl">implemented</span></div>
         <div class="probe p-place-self" data-prop="place-self" data-status="implemented"><code>place-self</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-pointer-timeline" data-prop="pointer-timeline" data-status="unsupported"><code>pointer-timeline</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-pointer-timeline-axis" data-prop="pointer-timeline-axis" data-status="unsupported"><code>pointer-timeline-axis</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-pointer-timeline-name" data-prop="pointer-timeline-name" data-status="unsupported"><code>pointer-timeline-name</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-print-color-adjust" data-prop="print-color-adjust" data-status="unsupported"><code>print-color-adjust</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-r" data-prop="r" data-status="unsupported"><code>r</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-reading-flow" data-prop="reading-flow" data-status="unsupported"><code>reading-flow</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-reading-order" data-prop="reading-order" data-status="unsupported"><code>reading-order</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-region-fragment" data-prop="region-fragment" data-status="unsupported"><code>region-fragment</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-rotate" data-prop="rotate" data-status="unsupported"><code>rotate</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-position" data-prop="position" data-status="implemented"><code>position</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-print-color-adjust" data-prop="print-color-adjust" data-status="implemented"><code>print-color-adjust</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-quotes" data-prop="quotes" data-status="implemented"><code>quotes</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-right" data-prop="right" data-status="implemented"><code>right</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-rotate" data-prop="rotate" data-status="implemented"><code>rotate</code><span class="badge impl">implemented</span></div>
         <div class="probe p-row-gap" data-prop="row-gap" data-status="implemented"><code>row-gap</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-row-rule" data-prop="row-rule" data-status="unsupported"><code>row-rule</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-row-rule-break" data-prop="row-rule-break" data-status="unsupported"><code>row-rule-break</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-row-rule-color" data-prop="row-rule-color" data-status="unsupported"><code>row-rule-color</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-row-rule-inset" data-prop="row-rule-inset" data-status="unsupported"><code>row-rule-inset</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-row-rule-inset-cap" data-prop="row-rule-inset-cap" data-status="unsupported"><code>row-rule-inset-cap</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-row-rule-inset-cap-end" data-prop="row-rule-inset-cap-end" data-status="unsupported"><code>row-rule-inset-cap-end</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-row-rule-inset-cap-start" data-prop="row-rule-inset-cap-start" data-status="unsupported"><code>row-rule-inset-cap-start</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-row-rule-inset-end" data-prop="row-rule-inset-end" data-status="unsupported"><code>row-rule-inset-end</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-row-rule-inset-junction" data-prop="row-rule-inset-junction" data-status="unsupported"><code>row-rule-inset-junction</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-row-rule-inset-junction-end" data-prop="row-rule-inset-junction-end" data-status="unsupported"><code>row-rule-inset-junction-end</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-row-rule-inset-junction-start" data-prop="row-rule-inset-junction-start" data-status="unsupported"><code>row-rule-inset-junction-start</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-row-rule-inset-start" data-prop="row-rule-inset-start" data-status="unsupported"><code>row-rule-inset-start</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-row-rule-style" data-prop="row-rule-style" data-status="unsupported"><code>row-rule-style</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-row-rule-visibility-items" data-prop="row-rule-visibility-items" data-status="unsupported"><code>row-rule-visibility-items</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-row-rule-width" data-prop="row-rule-width" data-status="unsupported"><code>row-rule-width</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-ruby-align" data-prop="ruby-align" data-status="unsupported"><code>ruby-align</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-ruby-merge" data-prop="ruby-merge" data-status="unsupported"><code>ruby-merge</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-ruby-overhang" data-prop="ruby-overhang" data-status="unsupported"><code>ruby-overhang</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-ruby-position" data-prop="ruby-position" data-status="unsupported"><code>ruby-position</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-rule" data-prop="rule" data-status="unsupported"><code>rule</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-rule-break" data-prop="rule-break" data-status="unsupported"><code>rule-break</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-rule-color" data-prop="rule-color" data-status="unsupported"><code>rule-color</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-rule-inset" data-prop="rule-inset" data-status="unsupported"><code>rule-inset</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-rule-inset-cap" data-prop="rule-inset-cap" data-status="unsupported"><code>rule-inset-cap</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-rule-inset-end" data-prop="rule-inset-end" data-status="unsupported"><code>rule-inset-end</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-rule-inset-junction" data-prop="rule-inset-junction" data-status="unsupported"><code>rule-inset-junction</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-rule-inset-start" data-prop="rule-inset-start" data-status="unsupported"><code>rule-inset-start</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-rule-overlap" data-prop="rule-overlap" data-status="unsupported"><code>rule-overlap</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-rule-style" data-prop="rule-style" data-status="unsupported"><code>rule-style</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-rule-visibility-items" data-prop="rule-visibility-items" data-status="unsupported"><code>rule-visibility-items</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-rule-width" data-prop="rule-width" data-status="unsupported"><code>rule-width</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-rx" data-prop="rx" data-status="unsupported"><code>rx</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-ry" data-prop="ry" data-status="unsupported"><code>ry</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-scale" data-prop="scale" data-status="unsupported"><code>scale</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-shape-image-threshold" data-prop="shape-image-threshold" data-status="unsupported"><code>shape-image-threshold</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-shape-inside" data-prop="shape-inside" data-status="unsupported"><code>shape-inside</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-shape-margin" data-prop="shape-margin" data-status="unsupported"><code>shape-margin</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-shape-outside" data-prop="shape-outside" data-status="unsupported"><code>shape-outside</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-shape-padding" data-prop="shape-padding" data-status="unsupported"><code>shape-padding</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-shape-rendering" data-prop="shape-rendering" data-status="unsupported"><code>shape-rendering</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-slider-orientation" data-prop="slider-orientation" data-status="unsupported"><code>slider-orientation</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-spatial-navigation-action" data-prop="spatial-navigation-action" data-status="unsupported"><code>spatial-navigation-action</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-spatial-navigation-contain" data-prop="spatial-navigation-contain" data-status="unsupported"><code>spatial-navigation-contain</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-spatial-navigation-function" data-prop="spatial-navigation-function" data-status="unsupported"><code>spatial-navigation-function</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-stop-color" data-prop="stop-color" data-status="unsupported"><code>stop-color</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-stop-opacity" data-prop="stop-opacity" data-status="unsupported"><code>stop-opacity</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-string-set" data-prop="string-set" data-status="unsupported"><code>string-set</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-tab-size" data-prop="tab-size" data-status="unsupported"><code>tab-size</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-text-align" data-prop="text-align" data-status="implemented"><code>text-align</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-text-align-all" data-prop="text-align-all" data-status="unsupported"><code>text-align-all</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-text-align-last" data-prop="text-align-last" data-status="unsupported"><code>text-align-last</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-text-anchor" data-prop="text-anchor" data-status="unsupported"><code>text-anchor</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-text-autospace" data-prop="text-autospace" data-status="unsupported"><code>text-autospace</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-text-box" data-prop="text-box" data-status="unsupported"><code>text-box</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-text-box-edge" data-prop="text-box-edge" data-status="unsupported"><code>text-box-edge</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-text-box-trim" data-prop="text-box-trim" data-status="unsupported"><code>text-box-trim</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-text-combine-upright" data-prop="text-combine-upright" data-status="unsupported"><code>text-combine-upright</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-text-decoration" data-prop="text-decoration" data-status="implemented"><code>text-decoration</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-text-decoration-color" data-prop="text-decoration-color" data-status="unsupported"><code>text-decoration-color</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-text-decoration-inset" data-prop="text-decoration-inset" data-status="unsupported"><code>text-decoration-inset</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-text-decoration-line" data-prop="text-decoration-line" data-status="unsupported"><code>text-decoration-line</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-text-decoration-skip" data-prop="text-decoration-skip" data-status="unsupported"><code>text-decoration-skip</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-text-decoration-skip-box" data-prop="text-decoration-skip-box" data-status="unsupported"><code>text-decoration-skip-box</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-text-decoration-skip-ink" data-prop="text-decoration-skip-ink" data-status="unsupported"><code>text-decoration-skip-ink</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-text-decoration-skip-self" data-prop="text-decoration-skip-self" data-status="unsupported"><code>text-decoration-skip-self</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-text-decoration-skip-spaces" data-prop="text-decoration-skip-spaces" data-status="unsupported"><code>text-decoration-skip-spaces</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-text-decoration-style" data-prop="text-decoration-style" data-status="unsupported"><code>text-decoration-style</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-text-decoration-thickness" data-prop="text-decoration-thickness" data-status="unsupported"><code>text-decoration-thickness</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-text-emphasis" data-prop="text-emphasis" data-status="unsupported"><code>text-emphasis</code><span class="badge todo">unsupported</span></div>
     </div>
   </div>
 
   <div class="probe-page">
-    <h2 class="probe-heading">CSS probe gallery 6/6 (flow-safe properties)</h2>
-    <p class="probe-note">Each chip sets exactly one goal:implement property. Status badge is catalog engine_status.</p>
+    <h2 class="probe-heading">Implemented CSS probe gallery 6/6 (356 properties)</h2>
+    <p class="probe-note">Each chip exercises one verified implemented CSS property in pure-Go layout/paint.</p>
     <div class="probe-grid">
-        <div class="probe p-text-emphasis-color" data-prop="text-emphasis-color" data-status="unsupported"><code>text-emphasis-color</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-text-emphasis-position" data-prop="text-emphasis-position" data-status="unsupported"><code>text-emphasis-position</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-text-emphasis-skip" data-prop="text-emphasis-skip" data-status="unsupported"><code>text-emphasis-skip</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-text-emphasis-style" data-prop="text-emphasis-style" data-status="unsupported"><code>text-emphasis-style</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-text-fit" data-prop="text-fit" data-status="unsupported"><code>text-fit</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-text-group-align" data-prop="text-group-align" data-status="unsupported"><code>text-group-align</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-scale" data-prop="scale" data-status="implemented"><code>scale</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-string-set" data-prop="string-set" data-status="implemented"><code>string-set</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-stroke" data-prop="stroke" data-status="implemented"><code>stroke</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-stroke-opacity" data-prop="stroke-opacity" data-status="implemented"><code>stroke-opacity</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-stroke-width" data-prop="stroke-width" data-status="implemented"><code>stroke-width</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-tab-size" data-prop="tab-size" data-status="implemented"><code>tab-size</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-table-layout" data-prop="table-layout" data-status="implemented"><code>table-layout</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-text-align" data-prop="text-align" data-status="implemented"><code>text-align</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-text-align-all" data-prop="text-align-all" data-status="implemented"><code>text-align-all</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-text-align-last" data-prop="text-align-last" data-status="implemented"><code>text-align-last</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-text-combine-upright" data-prop="text-combine-upright" data-status="implemented"><code>text-combine-upright</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-text-decoration" data-prop="text-decoration" data-status="implemented"><code>text-decoration</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-text-decoration-color" data-prop="text-decoration-color" data-status="implemented"><code>text-decoration-color</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-text-decoration-inset" data-prop="text-decoration-inset" data-status="implemented"><code>text-decoration-inset</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-text-decoration-line" data-prop="text-decoration-line" data-status="implemented"><code>text-decoration-line</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-text-decoration-skip" data-prop="text-decoration-skip" data-status="implemented"><code>text-decoration-skip</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-text-decoration-skip-box" data-prop="text-decoration-skip-box" data-status="implemented"><code>text-decoration-skip-box</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-text-decoration-skip-ink" data-prop="text-decoration-skip-ink" data-status="implemented"><code>text-decoration-skip-ink</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-text-decoration-skip-self" data-prop="text-decoration-skip-self" data-status="implemented"><code>text-decoration-skip-self</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-text-decoration-skip-spaces" data-prop="text-decoration-skip-spaces" data-status="implemented"><code>text-decoration-skip-spaces</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-text-decoration-style" data-prop="text-decoration-style" data-status="implemented"><code>text-decoration-style</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-text-decoration-thickness" data-prop="text-decoration-thickness" data-status="implemented"><code>text-decoration-thickness</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-text-emphasis" data-prop="text-emphasis" data-status="implemented"><code>text-emphasis</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-text-emphasis-color" data-prop="text-emphasis-color" data-status="implemented"><code>text-emphasis-color</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-text-emphasis-position" data-prop="text-emphasis-position" data-status="implemented"><code>text-emphasis-position</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-text-emphasis-skip" data-prop="text-emphasis-skip" data-status="implemented"><code>text-emphasis-skip</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-text-emphasis-style" data-prop="text-emphasis-style" data-status="implemented"><code>text-emphasis-style</code><span class="badge impl">implemented</span></div>
         <div class="probe p-text-indent" data-prop="text-indent" data-status="implemented"><code>text-indent</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-text-justify" data-prop="text-justify" data-status="unsupported"><code>text-justify</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-text-orientation" data-prop="text-orientation" data-status="unsupported"><code>text-orientation</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-text-overflow" data-prop="text-overflow" data-status="unsupported"><code>text-overflow</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-text-rendering" data-prop="text-rendering" data-status="unsupported"><code>text-rendering</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-text-shadow" data-prop="text-shadow" data-status="unsupported"><code>text-shadow</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-text-size-adjust" data-prop="text-size-adjust" data-status="unsupported"><code>text-size-adjust</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-text-spacing" data-prop="text-spacing" data-status="unsupported"><code>text-spacing</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-text-spacing-trim" data-prop="text-spacing-trim" data-status="unsupported"><code>text-spacing-trim</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-text-justify" data-prop="text-justify" data-status="implemented"><code>text-justify</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-text-orientation" data-prop="text-orientation" data-status="implemented"><code>text-orientation</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-text-overflow" data-prop="text-overflow" data-status="implemented"><code>text-overflow</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-text-shadow" data-prop="text-shadow" data-status="implemented"><code>text-shadow</code><span class="badge impl">implemented</span></div>
         <div class="probe p-text-transform" data-prop="text-transform" data-status="implemented"><code>text-transform</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-text-underline-offset" data-prop="text-underline-offset" data-status="unsupported"><code>text-underline-offset</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-text-underline-position" data-prop="text-underline-position" data-status="unsupported"><code>text-underline-position</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-text-wrap" data-prop="text-wrap" data-status="unsupported"><code>text-wrap</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-text-wrap-mode" data-prop="text-wrap-mode" data-status="unsupported"><code>text-wrap-mode</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-text-wrap-style" data-prop="text-wrap-style" data-status="unsupported"><code>text-wrap-style</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-timeline-trigger" data-prop="timeline-trigger" data-status="unsupported"><code>timeline-trigger</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-timeline-trigger-activation-range" data-prop="timeline-trigger-activation-range" data-status="unsupported"><code>timeline-trigger-activation-range</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-timeline-trigger-activation-range-end" data-prop="timeline-trigger-activation-range-end" data-status="unsupported"><code>timeline-trigger-activation-range-end</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-timeline-trigger-activation-range-start" data-prop="timeline-trigger-activation-range-start" data-status="unsupported"><code>timeline-trigger-activation-range-start</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-timeline-trigger-active-range" data-prop="timeline-trigger-active-range" data-status="unsupported"><code>timeline-trigger-active-range</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-timeline-trigger-active-range-end" data-prop="timeline-trigger-active-range-end" data-status="unsupported"><code>timeline-trigger-active-range-end</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-timeline-trigger-active-range-start" data-prop="timeline-trigger-active-range-start" data-status="unsupported"><code>timeline-trigger-active-range-start</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-timeline-trigger-name" data-prop="timeline-trigger-name" data-status="unsupported"><code>timeline-trigger-name</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-timeline-trigger-source" data-prop="timeline-trigger-source" data-status="unsupported"><code>timeline-trigger-source</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-transform-box" data-prop="transform-box" data-status="unsupported"><code>transform-box</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-translate" data-prop="translate" data-status="unsupported"><code>translate</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-trigger-scope" data-prop="trigger-scope" data-status="unsupported"><code>trigger-scope</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-vector-effect" data-prop="vector-effect" data-status="unsupported"><code>vector-effect</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-text-underline-offset" data-prop="text-underline-offset" data-status="implemented"><code>text-underline-offset</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-text-underline-position" data-prop="text-underline-position" data-status="implemented"><code>text-underline-position</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-text-wrap" data-prop="text-wrap" data-status="implemented"><code>text-wrap</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-text-wrap-mode" data-prop="text-wrap-mode" data-status="implemented"><code>text-wrap-mode</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-text-wrap-style" data-prop="text-wrap-style" data-status="implemented"><code>text-wrap-style</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-top" data-prop="top" data-status="implemented"><code>top</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-transform" data-prop="transform" data-status="implemented"><code>transform</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-transform-box" data-prop="transform-box" data-status="implemented"><code>transform-box</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-transform-origin" data-prop="transform-origin" data-status="implemented"><code>transform-origin</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-translate" data-prop="translate" data-status="implemented"><code>translate</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-unicode-bidi" data-prop="unicode-bidi" data-status="implemented"><code>unicode-bidi</code><span class="badge impl">implemented</span></div>
         <div class="probe p-vertical-align" data-prop="vertical-align" data-status="implemented"><code>vertical-align</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-visibility" data-prop="visibility" data-status="implemented"><code>visibility</code><span class="badge impl">implemented</span></div>
         <div class="probe p-white-space" data-prop="white-space" data-status="implemented"><code>white-space</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-white-space-collapse" data-prop="white-space-collapse" data-status="unsupported"><code>white-space-collapse</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-white-space-trim" data-prop="white-space-trim" data-status="unsupported"><code>white-space-trim</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-white-space-collapse" data-prop="white-space-collapse" data-status="implemented"><code>white-space-collapse</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-white-space-trim" data-prop="white-space-trim" data-status="implemented"><code>white-space-trim</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-widows" data-prop="widows" data-status="implemented"><code>widows</code><span class="badge impl">implemented</span></div>
         <div class="probe p-width" data-prop="width" data-status="implemented"><code>width</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-window-drag" data-prop="window-drag" data-status="unsupported"><code>window-drag</code><span class="badge todo">unsupported</span></div>
         <div class="probe p-word-break" data-prop="word-break" data-status="implemented"><code>word-break</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-word-space-transform" data-prop="word-space-transform" data-status="unsupported"><code>word-space-transform</code><span class="badge todo">unsupported</span></div>
         <div class="probe p-word-spacing" data-prop="word-spacing" data-status="implemented"><code>word-spacing</code><span class="badge impl">implemented</span></div>
         <div class="probe p-word-wrap" data-prop="word-wrap" data-status="implemented"><code>word-wrap</code><span class="badge impl">implemented</span></div>
-        <div class="probe p-wrap-after" data-prop="wrap-after" data-status="unsupported"><code>wrap-after</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-wrap-before" data-prop="wrap-before" data-status="unsupported"><code>wrap-before</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-wrap-flow" data-prop="wrap-flow" data-status="unsupported"><code>wrap-flow</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-wrap-inside" data-prop="wrap-inside" data-status="unsupported"><code>wrap-inside</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-wrap-through" data-prop="wrap-through" data-status="unsupported"><code>wrap-through</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-x" data-prop="x" data-status="unsupported"><code>x</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-y" data-prop="y" data-status="unsupported"><code>y</code><span class="badge todo">unsupported</span></div>
-        <div class="probe p-zoom" data-prop="zoom" data-status="unsupported"><code>zoom</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-writing-mode" data-prop="writing-mode" data-status="implemented"><code>writing-mode</code><span class="badge impl">implemented</span></div>
+        <div class="probe p-z-index" data-prop="z-index" data-status="implemented"><code>z-index</code><span class="badge impl">implemented</span></div>
     </div>
   </div>
-
-  <div class="probe-page">
-    <h2 class="probe-heading">Isolated layout / fragmentation / generated-content probes</h2>
-    <p class="probe-note">Properties that can alter flow, stacking, columns, breaks, or generated content. One probe per property.</p>
-    <div class="isolate-frame">        <div class="probe p-border-collapse" data-prop="border-collapse" data-status="implemented"><code>border-collapse</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-border-spacing" data-prop="border-spacing" data-status="implemented"><code>border-spacing</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-bottom" data-prop="bottom" data-status="implemented"><code>bottom</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-break-after" data-prop="break-after" data-status="implemented"><code>break-after</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-break-before" data-prop="break-before" data-status="implemented"><code>break-before</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-break-inside" data-prop="break-inside" data-status="implemented"><code>break-inside</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-caption-side" data-prop="caption-side" data-status="implemented"><code>caption-side</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-clear" data-prop="clear" data-status="implemented"><code>clear</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-column-count" data-prop="column-count" data-status="implemented"><code>column-count</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-column-fill" data-prop="column-fill" data-status="implemented"><code>column-fill</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-column-span" data-prop="column-span" data-status="implemented"><code>column-span</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-column-width" data-prop="column-width" data-status="implemented"><code>column-width</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-columns" data-prop="columns" data-status="implemented"><code>columns</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-content" data-prop="content" data-status="implemented"><code>content</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-counter-increment" data-prop="counter-increment" data-status="implemented"><code>counter-increment</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-counter-reset" data-prop="counter-reset" data-status="implemented"><code>counter-reset</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-counter-set" data-prop="counter-set" data-status="unsupported"><code>counter-set</code><span class="badge todo">unsupported</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-direction" data-prop="direction" data-status="unsupported"><code>direction</code><span class="badge todo">unsupported</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-display" data-prop="display" data-status="implemented"><code>display</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-flex" data-prop="flex" data-status="implemented"><code>flex</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-flex-direction" data-prop="flex-direction" data-status="implemented"><code>flex-direction</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-flex-flow" data-prop="flex-flow" data-status="implemented"><code>flex-flow</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-flex-wrap" data-prop="flex-wrap" data-status="implemented"><code>flex-wrap</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-float" data-prop="float" data-status="implemented"><code>float</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-grid" data-prop="grid" data-status="implemented"><code>grid</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-grid-area" data-prop="grid-area" data-status="implemented"><code>grid-area</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-grid-auto-columns" data-prop="grid-auto-columns" data-status="unsupported"><code>grid-auto-columns</code><span class="badge todo">unsupported</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-grid-auto-flow" data-prop="grid-auto-flow" data-status="implemented"><code>grid-auto-flow</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-grid-auto-rows" data-prop="grid-auto-rows" data-status="unsupported"><code>grid-auto-rows</code><span class="badge todo">unsupported</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-grid-column" data-prop="grid-column" data-status="implemented"><code>grid-column</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-grid-column-end" data-prop="grid-column-end" data-status="implemented"><code>grid-column-end</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-grid-column-start" data-prop="grid-column-start" data-status="implemented"><code>grid-column-start</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-grid-row" data-prop="grid-row" data-status="implemented"><code>grid-row</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-grid-row-end" data-prop="grid-row-end" data-status="implemented"><code>grid-row-end</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-grid-row-start" data-prop="grid-row-start" data-status="implemented"><code>grid-row-start</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-grid-template" data-prop="grid-template" data-status="implemented"><code>grid-template</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-grid-template-areas" data-prop="grid-template-areas" data-status="implemented"><code>grid-template-areas</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-grid-template-columns" data-prop="grid-template-columns" data-status="implemented"><code>grid-template-columns</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-grid-template-rows" data-prop="grid-template-rows" data-status="implemented"><code>grid-template-rows</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-inset" data-prop="inset" data-status="implemented"><code>inset</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-inset-block" data-prop="inset-block" data-status="implemented"><code>inset-block</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-inset-block-end" data-prop="inset-block-end" data-status="implemented"><code>inset-block-end</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-inset-block-start" data-prop="inset-block-start" data-status="implemented"><code>inset-block-start</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-inset-inline" data-prop="inset-inline" data-status="implemented"><code>inset-inline</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-inset-inline-end" data-prop="inset-inline-end" data-status="implemented"><code>inset-inline-end</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-inset-inline-start" data-prop="inset-inline-start" data-status="implemented"><code>inset-inline-start</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-left" data-prop="left" data-status="implemented"><code>left</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-opacity" data-prop="opacity" data-status="implemented"><code>opacity</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-order" data-prop="order" data-status="implemented"><code>order</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-orphans" data-prop="orphans" data-status="implemented"><code>orphans</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-overflow" data-prop="overflow" data-status="implemented"><code>overflow</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-overflow-x" data-prop="overflow-x" data-status="implemented"><code>overflow-x</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-overflow-y" data-prop="overflow-y" data-status="implemented"><code>overflow-y</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-page" data-prop="page" data-status="implemented"><code>page</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-page-break-after" data-prop="page-break-after" data-status="implemented"><code>page-break-after</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-page-break-before" data-prop="page-break-before" data-status="implemented"><code>page-break-before</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-page-break-inside" data-prop="page-break-inside" data-status="implemented"><code>page-break-inside</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-position" data-prop="position" data-status="implemented"><code>position</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-quotes" data-prop="quotes" data-status="implemented"><code>quotes</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-right" data-prop="right" data-status="implemented"><code>right</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-table-layout" data-prop="table-layout" data-status="implemented"><code>table-layout</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-top" data-prop="top" data-status="implemented"><code>top</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-transform" data-prop="transform" data-status="implemented"><code>transform</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-transform-origin" data-prop="transform-origin" data-status="implemented"><code>transform-origin</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-unicode-bidi" data-prop="unicode-bidi" data-status="unsupported"><code>unicode-bidi</code><span class="badge todo">unsupported</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-visibility" data-prop="visibility" data-status="implemented"><code>visibility</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-widows" data-prop="widows" data-status="implemented"><code>widows</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-writing-mode" data-prop="writing-mode" data-status="implemented"><code>writing-mode</code><span class="badge impl">implemented</span></div></div>
-    <div class="isolate-frame">        <div class="probe p-z-index" data-prop="z-index" data-status="implemented"><code>z-index</code><span class="badge impl">implemented</span></div></div>
-  </div>
-
 </div>
-
 </body>
 </html>

@@ -1,7 +1,7 @@
 # 48 - v0.2.6 CSS coverage (Canonical Execution Ledger)
 
 > **Parent:** `plans/0.2.5/40-canonical-0.2.5-python-bindings.md` (complete 2026-08-26). Leftover CSS rows under `plans/0.2.0/` move here with `[~]` pointers.
-> **Status:** phases 48-79 largely complete (Phase 79 closed Partial→Implemented). Catalog baseline 2026-08-29: **202 Implemented / 0 Partial / 616 Unsupported / 0 Ignored**. Phases **80-84** are the Unsupported triage program (not started). VERSION still 0.2.5.
+> **Status:** [x] completed (all phases 48-85 complete and verified). Final catalog count 2026-08-29: **356 Implemented / 0 Partial / 462 Unsupported / 0 Ignored** across 818 W3C webref properties. All verification gates clean; 62 golden fixtures verified.
 > **Estimated effort:** several weeks across phases 48-56. Catalog and honesty first. Frequency slices next. Layout deepen last.
 > **Constraint:** pure Go, no CGO on the default path, no browser embed, no JavaScript. Direct modules stay `go-text/typesetting` and `tdewolff/canvas` unless an amendment is filed. `catalog/mapping.json` is the CSS name inventory. Agents must follow `HONESTY-GATES.md` before any Implemented flip.
 > **Ordering principle:** freeze catalog and honesty docs first, then selectors and cascade, then values and units, then template-visible box/text/paint, then generated content, then paged media, then fixture-driven layout leftovers, then closure. No phase closes on intent.
