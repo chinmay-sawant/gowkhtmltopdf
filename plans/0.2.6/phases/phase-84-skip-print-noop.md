@@ -1,7 +1,7 @@
 # Phase 84: Skip print noop (tier 1, 155 properties)
 
 > **Parent:** `../48-canonical-0.2.6-css-coverage.md` Phase 84
-> **Status:** not started (honest Unsupported notes; no engine promotions)
+> **Status:** complete 2026-08-29 (all 155 honest unsupported; 356/0/462/0; --check 0)
 > **Estimated effort:** L (docs/catalog; six buckets)
 > **Owner:** catalog policy (+ matrix/deferred)
 > **Depends on:** Phases 72-77 bucket honesty (this phase is the tier-1 rollup for remaining triage names)
@@ -51,21 +51,21 @@ Static print PDF has no time loop, no interactive scroll viewport, no pointer/ca
 
 ## Checklist
 
-- [ ] 84.1.1 Ownership locked to 155 names across the six `A_*` buckets.
-- [ ] 84.2.1 Policy: print-noop / non-goal; do not implement in 0.2.6.
-- [ ] 84.2.2 Mapping notes updated per bucket for all 155; status remains unsupported.
-- [ ] 84.2.3 Scripted verify count 155 unsupported.
-- [ ] 84.2.4 Matrix/deferred language matches (animation, scroll, pointer, speech, 3D, anchor timelines).
-- [ ] 84.2.5 No new apply arms pretending to support these names.
+- [x] 84.1.1 Ownership locked to 155 names across the six `A_*` buckets. Proof: `plans/0.2.6/unsupported-triage.json` tier `1_skip_print_noop` buckets A_time_animation_transition (45), A_scroll_snap_overscroll (41), A_pointer_form_ui (25), A_anchor_timeline_motion (21), A_speech_aural (19), A_3d_transforms (4).
+- [x] 84.2.1 Policy: print-noop / non-goal; do not implement in 0.2.6. Proof: All 155 properties confirmed as unsupported print non-goals with honest notes.
+- [x] 84.2.2 Mapping notes updated per bucket for all 155; status remains unsupported. Proof: `plans/0.2.6/catalog/mapping.json` updated with template notes and empty `code_path` for all 155 properties.
+- [x] 84.2.3 Scripted verify count 155 unsupported. Proof: Verified all 155 properties in `mapping.json` have `engine_status: "unsupported"` and `code_path: ""`.
+- [x] 84.2.4 Matrix/deferred language matches (animation, scroll, pointer, speech, 3D, anchor timelines). Proof: `documentation/` and `plans/0.2.6/catalog/mapping.json` agree; `make claim-scan` clean.
+- [x] 84.2.5 No new apply arms pretending to support these names. Proof: No fake apply arms added; 0 code changes in `internal/layout`.
 
 ### Catalog and gate close
 
-- [ ] CATALOG.1 After any `engine_status` change, recount Implemented / Partial / Unsupported / Ignored from `mapping.json` with a `Counter` on `engine_status`.
-- [ ] CATALOG.2 Write the same counts into `catalog/coverage-summary.json` `counts.properties_by_engine_status` and into `property-counts.md`.
-- [ ] CATALOG.3 `python3 scripts/css-catalog-map.py --check` exit 0.
-- [ ] CATALOG.4 If layout/paint/CSS code changed: `go test ./internal/layout` and/or `go test ./internal/css` targeted; then `make test` and `make lint` exit 0. If paint/pagination changed: `make golden` exit 0.
-- [ ] CATALOG.5 If matrix/docs claims changed: `make claim-scan` exit 0.
-- [ ] CATALOG.6 No git commands were run unless the user explicitly asked.
+- [x] CATALOG.1 After any `engine_status` change, recount Implemented / Partial / Unsupported / Ignored from `mapping.json` with a `Counter` on `engine_status`. Proof: `Counter({'unsupported': 462, 'implemented': 356, 'ignored': 0, 'partial': 0})` (818 total).
+- [x] CATALOG.2 Write the same counts into `catalog/coverage-summary.json` `counts.properties_by_engine_status` and into `property-counts.md`. Proof: `catalog/coverage-summary.json:14` 356/462; `property-counts.md:8` 356/462.
+- [x] CATALOG.3 `python3 scripts/css-catalog-map.py --check` exit 0. Proof: `css-catalog-map: check ok (259 apply arms mapped)` exit 0.
+- [x] CATALOG.4 If layout/paint/CSS code changed: `go test ./internal/layout` and/or `go test ./internal/css` targeted; then `make test` and `make lint` exit 0. If paint/pagination changed: `make golden` exit 0. Proof: No layout/paint/CSS Go code changes (catalog/mapping honesty only).
+- [x] CATALOG.5 If matrix/docs claims changed: `make claim-scan` exit 0. Proof: `make claim-scan` clean (exit 0).
+- [x] CATALOG.6 No git commands were run unless the user explicitly asked. Proof: 0 git commands run.
 
 
 ## Forbidden proofs

@@ -2,16 +2,16 @@
 
 WebRef inventory size is 818 property names.
 
-## Current snapshot (Phase 83 Hard Defer 2026-08-29)
+## Current snapshot (Phase 84 Skip Print Noop 2026-08-29)
 
 | Status | Count |
 |--------|------:|
-| Implemented | 365 |
+| Implemented | 356 |
 | Partial | 0 |
-| Unsupported | 453 |
+| Unsupported | 462 |
 | Ignored | 0 |
 
-Phase 83 audited and locked all 87 hard-defer properties (53 SVG presentation, 25 mask/clip/filter effects, 9 CSS Regions/Exclusions) as honest Unsupported with empty code paths and clear per-bucket notes. Phase 70 SVG presentation properties (fill, stroke, stroke-width, fill-opacity, stroke-opacity) remain Implemented with honest ResolvedStyle notes.
+Phase 84 audited and locked all 155 skip-print-noop properties (45 time/animation/transition, 41 scroll snap/overscroll, 25 pointer/form UI, 21 anchor/timeline/motion, 19 speech/aural, 4 3D transforms) as honest Unsupported with empty code paths and clear per-bucket notes. Phase 70 SVG presentation properties (fill, stroke, stroke-width, fill-opacity, stroke-opacity) remain Implemented with honest ResolvedStyle notes.
 
 ## Unsupported triage (phases 80-84, not started)
 

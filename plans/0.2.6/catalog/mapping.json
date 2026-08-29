@@ -11,8 +11,8 @@
     "webref_properties": 818,
     "mapped_properties": 818,
     "properties_by_engine_status": {
-      "implemented": 365,
-      "unsupported": 453,
+      "implemented": 356,
+      "unsupported": 462,
       "ignored": 0,
       "partial": 0
     },
@@ -1772,7 +1772,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Anchor positioning / view timelines not supported for print. Left unsupported."
     },
     {
       "property": "anchor-scope",
@@ -1795,7 +1795,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Anchor positioning / view timelines not supported for print. Left unsupported."
     },
     {
       "property": "animation",
@@ -1828,7 +1828,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "animation-composition",
@@ -1851,7 +1851,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "animation-delay",
@@ -1877,7 +1877,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "animation-delay-end",
@@ -1898,7 +1898,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "animation-delay-start",
@@ -1919,7 +1919,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "animation-direction",
@@ -1942,7 +1942,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "animation-duration",
@@ -1965,7 +1965,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "animation-fill-mode",
@@ -1988,7 +1988,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "animation-iteration-count",
@@ -2011,7 +2011,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "animation-name",
@@ -2034,7 +2034,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "animation-play-state",
@@ -2057,7 +2057,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "animation-range",
@@ -2083,7 +2083,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "animation-range-center",
@@ -2104,7 +2104,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "animation-range-end",
@@ -2127,7 +2127,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "animation-range-start",
@@ -2150,7 +2150,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "animation-timeline",
@@ -2173,7 +2173,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "animation-timing-function",
@@ -2196,7 +2196,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "animation-trigger",
@@ -2219,7 +2219,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "appearance",
@@ -2242,7 +2242,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no pointer/caret/form chrome. Left unsupported."
     },
     {
       "property": "aspect-ratio",
@@ -2309,9 +2309,9 @@
       "groups": [
         "CSS Transforms"
       ],
-      "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "unsupported",
+      "code_path": "",
+      "notes": "2D transform only; perspective/transform-style/backface-visibility unsupported."
     },
     {
       "property": "background",
@@ -5341,7 +5341,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Print PDF has no pointer/caret/form chrome. Left unsupported."
     },
     {
       "property": "caret-animation",
@@ -5364,7 +5364,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Print PDF has no pointer/caret/form chrome. Left unsupported."
     },
     {
       "property": "caret-color",
@@ -5387,7 +5387,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no pointer/caret/form chrome. Left unsupported."
     },
     {
       "property": "caret-shape",
@@ -5410,7 +5410,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Print PDF has no pointer/caret/form chrome. Left unsupported."
     },
     {
       "property": "clear",
@@ -7373,7 +7373,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Visual print PDF has no aural speech synthesis. Left unsupported."
     },
     {
       "property": "cue-after",
@@ -7394,7 +7394,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Visual print PDF has no aural speech synthesis. Left unsupported."
     },
     {
       "property": "cue-before",
@@ -7415,7 +7415,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Visual print PDF has no aural speech synthesis. Left unsupported."
     },
     {
       "property": "cursor",
@@ -7438,7 +7438,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no pointer/caret/form chrome. Left unsupported."
     },
     {
       "property": "cx",
@@ -7644,7 +7644,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "event-trigger-name",
@@ -7665,7 +7665,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "event-trigger-source",
@@ -7686,7 +7686,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "field-sizing",
@@ -7709,7 +7709,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Print PDF has no pointer/caret/form chrome. Left unsupported."
     },
     {
       "property": "fill",
@@ -9748,7 +9748,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "image-orientation",
@@ -9949,7 +9949,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Print PDF has no pointer/caret/form chrome. Left unsupported."
     },
     {
       "property": "inset",
@@ -10151,7 +10151,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Print PDF has no pointer/caret/form chrome. Left unsupported."
     },
     {
       "property": "interest-delay",
@@ -10177,7 +10177,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Print PDF has no pointer/caret/form chrome. Left unsupported."
     },
     {
       "property": "interest-delay-end",
@@ -10200,7 +10200,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Print PDF has no pointer/caret/form chrome. Left unsupported."
     },
     {
       "property": "interest-delay-start",
@@ -10223,7 +10223,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Print PDF has no pointer/caret/form chrome. Left unsupported."
     },
     {
       "property": "interpolate-size",
@@ -11885,7 +11885,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Print PDF has no pointer/caret/form chrome. Left unsupported."
     },
     {
       "property": "nav-left",
@@ -11906,7 +11906,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Print PDF has no pointer/caret/form chrome. Left unsupported."
     },
     {
       "property": "nav-right",
@@ -11927,7 +11927,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Print PDF has no pointer/caret/form chrome. Left unsupported."
     },
     {
       "property": "nav-up",
@@ -11948,7 +11948,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Print PDF has no pointer/caret/form chrome. Left unsupported."
     },
     {
       "property": "object-fit",
@@ -12046,7 +12046,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Anchor positioning / view timelines not supported for print. Left unsupported."
     },
     {
       "property": "offset-anchor",
@@ -12069,7 +12069,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Anchor positioning / view timelines not supported for print. Left unsupported."
     },
     {
       "property": "offset-distance",
@@ -12092,7 +12092,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Anchor positioning / view timelines not supported for print. Left unsupported."
     },
     {
       "property": "offset-path",
@@ -12115,7 +12115,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Anchor positioning / view timelines not supported for print. Left unsupported."
     },
     {
       "property": "offset-position",
@@ -12138,7 +12138,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Anchor positioning / view timelines not supported for print. Left unsupported."
     },
     {
       "property": "offset-rotate",
@@ -12161,7 +12161,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Anchor positioning / view timelines not supported for print. Left unsupported."
     },
     {
       "property": "opacity",
@@ -12398,7 +12398,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Anchor positioning / view timelines not supported for print. Left unsupported."
     },
     {
       "property": "overflow-block",
@@ -12806,7 +12806,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "overscroll-behavior-block",
@@ -12829,7 +12829,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "overscroll-behavior-inline",
@@ -12852,7 +12852,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "overscroll-behavior-x",
@@ -12875,7 +12875,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "overscroll-behavior-y",
@@ -12898,7 +12898,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "padding",
@@ -13324,7 +13324,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Visual print PDF has no aural speech synthesis. Left unsupported."
     },
     {
       "property": "pause-after",
@@ -13345,7 +13345,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Visual print PDF has no aural speech synthesis. Left unsupported."
     },
     {
       "property": "pause-before",
@@ -13366,7 +13366,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Visual print PDF has no aural speech synthesis. Left unsupported."
     },
     {
       "property": "perspective",
@@ -13387,9 +13387,9 @@
       "groups": [
         "CSS Transforms"
       ],
-      "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "unsupported",
+      "code_path": "",
+      "notes": "2D transform only; perspective/transform-style/backface-visibility unsupported."
     },
     {
       "property": "perspective-origin",
@@ -13410,9 +13410,9 @@
       "groups": [
         "CSS Transforms"
       ],
-      "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "unsupported",
+      "code_path": "",
+      "notes": "2D transform only; perspective/transform-style/backface-visibility unsupported."
     },
     {
       "property": "place-content",
@@ -13513,7 +13513,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no pointer/caret/form chrome. Left unsupported."
     },
     {
       "property": "pointer-timeline",
@@ -13537,7 +13537,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "pointer-timeline-axis",
@@ -13558,7 +13558,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "pointer-timeline-name",
@@ -13579,7 +13579,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "position",
@@ -13625,7 +13625,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Anchor positioning / view timelines not supported for print. Left unsupported."
     },
     {
       "property": "position-area",
@@ -13648,7 +13648,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Anchor positioning / view timelines not supported for print. Left unsupported."
     },
     {
       "property": "position-try",
@@ -13674,7 +13674,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Anchor positioning / view timelines not supported for print. Left unsupported."
     },
     {
       "property": "position-try-fallbacks",
@@ -13697,7 +13697,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Anchor positioning / view timelines not supported for print. Left unsupported."
     },
     {
       "property": "position-try-order",
@@ -13720,7 +13720,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Anchor positioning / view timelines not supported for print. Left unsupported."
     },
     {
       "property": "position-visibility",
@@ -13743,7 +13743,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Anchor positioning / view timelines not supported for print. Left unsupported."
     },
     {
       "property": "print-color-adjust",
@@ -13902,7 +13902,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no pointer/caret/form chrome. Left unsupported."
     },
     {
       "property": "rest",
@@ -13926,7 +13926,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Visual print PDF has no aural speech synthesis. Left unsupported."
     },
     {
       "property": "rest-after",
@@ -13947,7 +13947,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Visual print PDF has no aural speech synthesis. Left unsupported."
     },
     {
       "property": "rest-before",
@@ -13968,7 +13968,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Visual print PDF has no aural speech synthesis. Left unsupported."
     },
     {
       "property": "right",
@@ -14838,7 +14838,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "scroll-behavior",
@@ -14861,7 +14861,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "scroll-initial-target",
@@ -14884,7 +14884,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "scroll-margin",
@@ -14910,9 +14910,9 @@
       "groups": [
         "CSS Scroll Snap"
       ],
-      "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "unsupported",
+      "code_path": "",
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "scroll-margin-block",
@@ -14938,7 +14938,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "scroll-margin-block-end",
@@ -14961,7 +14961,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "scroll-margin-block-start",
@@ -14984,7 +14984,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "scroll-margin-bottom",
@@ -15005,9 +15005,9 @@
       "groups": [
         "CSS Scroll Snap"
       ],
-      "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "unsupported",
+      "code_path": "",
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "scroll-margin-inline",
@@ -15033,7 +15033,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "scroll-margin-inline-end",
@@ -15056,7 +15056,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "scroll-margin-inline-start",
@@ -15079,7 +15079,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "scroll-margin-left",
@@ -15100,9 +15100,9 @@
       "groups": [
         "CSS Scroll Snap"
       ],
-      "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "unsupported",
+      "code_path": "",
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "scroll-margin-right",
@@ -15123,9 +15123,9 @@
       "groups": [
         "CSS Scroll Snap"
       ],
-      "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "unsupported",
+      "code_path": "",
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "scroll-margin-top",
@@ -15146,9 +15146,9 @@
       "groups": [
         "CSS Scroll Snap"
       ],
-      "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "unsupported",
+      "code_path": "",
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "scroll-marker-group",
@@ -15171,7 +15171,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "scroll-padding",
@@ -15199,7 +15199,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "scroll-padding-block",
@@ -15225,7 +15225,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "scroll-padding-block-end",
@@ -15248,7 +15248,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "scroll-padding-block-start",
@@ -15271,7 +15271,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "scroll-padding-bottom",
@@ -15294,7 +15294,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "scroll-padding-inline",
@@ -15320,7 +15320,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "scroll-padding-inline-end",
@@ -15343,7 +15343,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "scroll-padding-inline-start",
@@ -15366,7 +15366,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "scroll-padding-left",
@@ -15389,7 +15389,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "scroll-padding-right",
@@ -15412,7 +15412,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "scroll-padding-top",
@@ -15435,7 +15435,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "scroll-snap-align",
@@ -15458,7 +15458,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "scroll-snap-stop",
@@ -15481,7 +15481,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "scroll-snap-type",
@@ -15504,7 +15504,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "scroll-target-group",
@@ -15527,7 +15527,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "scroll-timeline",
@@ -15553,7 +15553,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "scroll-timeline-axis",
@@ -15576,7 +15576,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "scroll-timeline-name",
@@ -15599,7 +15599,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "scrollbar-color",
@@ -15622,7 +15622,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "scrollbar-gutter",
@@ -15645,7 +15645,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "scrollbar-width",
@@ -15668,7 +15668,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no interactive scroll viewport. Left unsupported."
     },
     {
       "property": "shape-image-threshold",
@@ -15823,7 +15823,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Print PDF has no pointer/caret/form chrome. Left unsupported."
     },
     {
       "property": "spatial-navigation-action",
@@ -15844,7 +15844,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Print PDF has no pointer/caret/form chrome. Left unsupported."
     },
     {
       "property": "spatial-navigation-contain",
@@ -15865,7 +15865,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Print PDF has no pointer/caret/form chrome. Left unsupported."
     },
     {
       "property": "spatial-navigation-function",
@@ -15886,7 +15886,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Print PDF has no pointer/caret/form chrome. Left unsupported."
     },
     {
       "property": "speak",
@@ -15907,7 +15907,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Visual print PDF has no aural speech synthesis. Left unsupported."
     },
     {
       "property": "speak-as",
@@ -15930,7 +15930,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Visual print PDF has no aural speech synthesis. Left unsupported."
     },
     {
       "property": "stop-color",
@@ -17500,7 +17500,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Anchor positioning / view timelines not supported for print. Left unsupported."
     },
     {
       "property": "timeline-trigger",
@@ -17528,7 +17528,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "timeline-trigger-activation-range",
@@ -17554,7 +17554,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "timeline-trigger-activation-range-end",
@@ -17577,7 +17577,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "timeline-trigger-activation-range-start",
@@ -17600,7 +17600,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "timeline-trigger-active-range",
@@ -17626,7 +17626,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "timeline-trigger-active-range-end",
@@ -17649,7 +17649,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "timeline-trigger-active-range-start",
@@ -17672,7 +17672,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "timeline-trigger-name",
@@ -17695,7 +17695,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "timeline-trigger-source",
@@ -17718,7 +17718,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "top",
@@ -17765,7 +17765,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no pointer/caret/form chrome. Left unsupported."
     },
     {
       "property": "transform",
@@ -17855,9 +17855,9 @@
       "groups": [
         "CSS Transforms"
       ],
-      "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "unsupported",
+      "code_path": "",
+      "notes": "2D transform only; perspective/transform-style/backface-visibility unsupported."
     },
     {
       "property": "transition",
@@ -17886,7 +17886,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "transition-behavior",
@@ -17909,7 +17909,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "transition-delay",
@@ -17932,7 +17932,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "transition-duration",
@@ -17955,7 +17955,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "transition-property",
@@ -17978,7 +17978,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "transition-timing-function",
@@ -18001,7 +18001,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "translate",
@@ -18047,7 +18047,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "unicode-bidi",
@@ -18093,7 +18093,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Print PDF has no pointer/caret/form chrome. Left unsupported."
     },
     {
       "property": "vector-effect",
@@ -18169,7 +18169,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Anchor positioning / view timelines not supported for print. Left unsupported."
     },
     {
       "property": "view-timeline-axis",
@@ -18192,7 +18192,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Anchor positioning / view timelines not supported for print. Left unsupported."
     },
     {
       "property": "view-timeline-inset",
@@ -18215,7 +18215,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Anchor positioning / view timelines not supported for print. Left unsupported."
     },
     {
       "property": "view-timeline-name",
@@ -18238,7 +18238,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Anchor positioning / view timelines not supported for print. Left unsupported."
     },
     {
       "property": "view-transition-class",
@@ -18261,7 +18261,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "view-transition-group",
@@ -18282,7 +18282,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "view-transition-name",
@@ -18305,7 +18305,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "view-transition-scope",
@@ -18328,7 +18328,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Static print PDF: no animation/transition timeline. Left unsupported."
     },
     {
       "property": "visibility",
@@ -18373,7 +18373,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Visual print PDF has no aural speech synthesis. Left unsupported."
     },
     {
       "property": "voice-duration",
@@ -18394,7 +18394,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Visual print PDF has no aural speech synthesis. Left unsupported."
     },
     {
       "property": "voice-family",
@@ -18415,7 +18415,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Visual print PDF has no aural speech synthesis. Left unsupported."
     },
     {
       "property": "voice-pitch",
@@ -18436,7 +18436,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Visual print PDF has no aural speech synthesis. Left unsupported."
     },
     {
       "property": "voice-range",
@@ -18457,7 +18457,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Visual print PDF has no aural speech synthesis. Left unsupported."
     },
     {
       "property": "voice-rate",
@@ -18478,7 +18478,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Visual print PDF has no aural speech synthesis. Left unsupported."
     },
     {
       "property": "voice-stress",
@@ -18499,7 +18499,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Visual print PDF has no aural speech synthesis. Left unsupported."
     },
     {
       "property": "voice-volume",
@@ -18520,7 +18520,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Visual print PDF has no aural speech synthesis. Left unsupported."
     },
     {
       "property": "white-space",
@@ -18659,7 +18659,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "Anchor positioning / view timelines not supported for print. Left unsupported."
     },
     {
       "property": "window-drag",
@@ -18680,7 +18680,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "Print PDF has no pointer/caret/form chrome. Left unsupported."
     },
     {
       "property": "word-break",
