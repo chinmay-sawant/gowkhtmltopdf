@@ -33,7 +33,14 @@ func (e *engine) appendBackgroundImage(
 	if originW <= 0 || originH <= 0 {
 		originX, originY, originW, originH = posX, posY, width, height
 	}
+	// Backgrounds always paint inside the background-clip box (CSS Backgrounds).
+	clipX, clipY, clipW, clipH := resolveBackgroundClipBox(sty, posX, posY, width, height)
+	if clipW <= 0 || clipH <= 0 {
+		clipX, clipY, clipW, clipH = posX, posY, width, height
+	}
+	clip := clipRect{x: clipX, y: clipY, w: clipW, h: clipH}
 
+	layerStart := len(dst)
 	for i := len(layers) - 1; i >= 0; i-- {
 		layer := strings.TrimSpace(layers[i])
 		if layer == "" || strings.EqualFold(layer, cssDisplayNone) {
@@ -82,8 +89,9 @@ func (e *engine) appendBackgroundImage(
 			imgH = originH
 		}
 
-		destW, destH := resolveBackgroundSize(sty.BackgroundSize, originW, originH, imgW, imgH)
-		if (sty.BackgroundSize == "" || strings.EqualFold(sty.BackgroundSize, "auto")) &&
+		sizeSpec := backgroundSizeForLayer(sty.BackgroundSize, len(layers)-1-i)
+		destW, destH := resolveBackgroundSize(sizeSpec, originW, originH, imgW, imgH)
+		if (sizeSpec == "" || strings.EqualFold(sizeSpec, "auto")) &&
 			(strings.EqualFold(sty.BackgroundRepeat, "repeat") ||
 				strings.EqualFold(sty.BackgroundRepeat, "repeat-x") ||
 				strings.EqualFold(sty.BackgroundRepeat, "repeat-y")) {
@@ -116,8 +124,45 @@ func (e *engine) appendBackgroundImage(
 			dst, baseOp, sty.BackgroundRepeat, originX, originY, originW, originH, destX, destY, destW, destH,
 		)
 	}
+	// Clip every layer (including no-repeat / cover overflow) to background-clip.
+	clipOpsSlice(dst[layerStart:], clip)
 
 	return dst
+}
+
+// backgroundSizeForLayer picks the comma-separated background-size token for
+// layer index (0 = furthest back, matching paint order of split layers).
+func backgroundSizeForLayer(sizeSpec string, layerIndex int) string {
+	parts := splitCommaLayers(sizeSpec)
+	if len(parts) == 0 {
+		return sizeSpec
+	}
+	if layerIndex >= 0 && layerIndex < len(parts) {
+		return strings.TrimSpace(parts[layerIndex])
+	}
+
+	return strings.TrimSpace(parts[len(parts)-1])
+}
+
+func resolveBackgroundClipBox(
+	sty ResolvedStyle, posX, posY, width, height float64,
+) (float64, float64, float64, float64) {
+	switch strings.ToLower(strings.TrimSpace(sty.BackgroundClip)) {
+	case "content-box":
+		x := posX + sty.BorderLeft.Width + sty.PaddingLeft
+		y := posY + sty.BorderTop.Width + sty.PaddingTop
+		w := width - sty.BorderLeft.Width - sty.BorderRight.Width - sty.PaddingLeft - sty.PaddingRight
+		h := height - sty.BorderTop.Width - sty.BorderBottom.Width - sty.PaddingTop - sty.PaddingBottom
+		return x, y, math.Max(0, w), math.Max(0, h)
+	case "border-box":
+		return posX, posY, width, height
+	default: // padding-box (initial)
+		x := posX + sty.BorderLeft.Width
+		y := posY + sty.BorderTop.Width
+		w := width - sty.BorderLeft.Width - sty.BorderRight.Width
+		h := height - sty.BorderTop.Width - sty.BorderBottom.Width
+		return x, y, math.Max(0, w), math.Max(0, h)
+	}
 }
 
 func resolveBackgroundOriginBox(
@@ -243,7 +288,26 @@ func tileBackgroundRepeat(
 	spec := strings.ToLower(strings.TrimSpace(repeatSpec))
 	switch spec {
 	case "no-repeat", "":
-		dst = append(dst, baseOp)
+		op := baseOp
+		// Cover / positioned layers can extend past the origin; clip to it
+		// before background-clip is applied by the caller.
+		if op.X < originX {
+			op.W -= originX - op.X
+			op.X = originX
+		}
+		if op.Y < originY {
+			op.H -= originY - op.Y
+			op.Y = originY
+		}
+		if op.X+op.W > originX+originW {
+			op.W = originX + originW - op.X
+		}
+		if op.Y+op.H > originY+originH {
+			op.H = originY + originH - op.Y
+		}
+		if op.W > 0 && op.H > 0 {
+			dst = append(dst, op)
+		}
 		return dst
 	case "repeat-x":
 		if destW <= 0 {

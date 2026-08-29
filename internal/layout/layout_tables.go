@@ -1218,6 +1218,7 @@ func (e *engine) emitCell(cell *box, skipBorders bool) {
 		e.emitBorders(sty, cell.x, cell.y, cell.w, cell.height)
 	}
 
+	contentStart := len(e.ops)
 	curX, contentW := e.contentBox(cell.x, cell.w, sty)
 	curY := cell.y + e.scalePt(sty.PaddingTop) + e.scalePt(sty.BorderTop.Width)
 	curY = cellVerticalAlignOffset(cell, curY)
@@ -1249,6 +1250,13 @@ func (e *engine) emitCell(cell *box, skipBorders bool) {
 		distributeRowspanLines(e.ops, start, len(e.ops), cell.y, cell.height,
 			e.scalePt(sty.PaddingTop)+e.scalePt(sty.BorderTop.Width),
 			e.scalePt(sty.PaddingBottom)+e.scalePt(sty.BorderBottom.Width))
+	}
+
+	// Table cells clip descendant paint to the padding box so background
+	// images / overflow from nested blocks cannot spill into neighbor cells
+	// (fixture-60 page-3 Effect/Description overlap).
+	if contentStart < len(e.ops) {
+		clipOpsRange(e.ops, contentStart, len(e.ops)-1, e.paddingBoxOf(cell))
 	}
 
 	cell.opStart, cell.opEnd = start, len(e.ops)-1

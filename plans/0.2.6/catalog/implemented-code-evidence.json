@@ -1,0 +1,4712 @@
+{
+  "generated": "2026-08-30",
+  "scope": "Validate mapping engine_status=implemented (356) against non-test Go under internal/layout",
+  "method": [
+    "switch prop { case \"name\": } in style_properties/paint/advanced/leftovers/cascade",
+    "case ConstIdent where const ConstIdent = \"name\"",
+    "raw[\"name\"] lookups (font and similar)",
+    "normalizeVendorPrefix -webkit aliases",
+    "feature files for box-shadow/content/border-image*",
+    "prop == \"name\" equality in apply helpers (e.g. outline)"
+  ],
+  "excludes": [
+    "_test.go"
+  ],
+  "counts": {
+    "VERIFIED": 356
+  },
+  "implemented_total": 356,
+  "properties": [
+    {
+      "property": "-webkit-align-content",
+      "kind": "legacy-alias",
+      "legacy_of": "align-content",
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 1112,
+      "files": [
+        "internal/layout/style_cascade.go"
+      ],
+      "claimed_code_path": "internal/layout/style_cascade.go"
+    },
+    {
+      "property": "-webkit-align-items",
+      "kind": "legacy-alias",
+      "legacy_of": "align-items",
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 1114,
+      "files": [
+        "internal/layout/style_cascade.go"
+      ],
+      "claimed_code_path": "internal/layout/style_cascade.go"
+    },
+    {
+      "property": "-webkit-align-self",
+      "kind": "legacy-alias",
+      "legacy_of": "align-self",
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 1116,
+      "files": [
+        "internal/layout/style_cascade.go"
+      ],
+      "claimed_code_path": "internal/layout/style_cascade.go"
+    },
+    {
+      "property": "-webkit-border-bottom-left-radius",
+      "kind": "legacy-alias",
+      "legacy_of": "border-bottom-left-radius",
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 1088,
+      "files": [
+        "internal/layout/style_cascade.go"
+      ],
+      "claimed_code_path": "internal/layout/style_cascade.go"
+    },
+    {
+      "property": "-webkit-border-bottom-right-radius",
+      "kind": "legacy-alias",
+      "legacy_of": "border-bottom-right-radius",
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 1090,
+      "files": [
+        "internal/layout/style_cascade.go"
+      ],
+      "claimed_code_path": "internal/layout/style_cascade.go"
+    },
+    {
+      "property": "-webkit-border-radius",
+      "kind": "legacy-alias",
+      "legacy_of": "border-radius",
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 1082,
+      "files": [
+        "internal/layout/style_cascade.go"
+      ],
+      "claimed_code_path": "internal/layout/style_cascade.go"
+    },
+    {
+      "property": "-webkit-border-top-left-radius",
+      "kind": "legacy-alias",
+      "legacy_of": "border-top-left-radius",
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 1084,
+      "files": [
+        "internal/layout/style_cascade.go"
+      ],
+      "claimed_code_path": "internal/layout/style_cascade.go"
+    },
+    {
+      "property": "-webkit-border-top-right-radius",
+      "kind": "legacy-alias",
+      "legacy_of": "border-top-right-radius",
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 1086,
+      "files": [
+        "internal/layout/style_cascade.go"
+      ],
+      "claimed_code_path": "internal/layout/style_cascade.go"
+    },
+    {
+      "property": "-webkit-box-align",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 1124,
+      "files": [
+        "internal/layout/style_cascade.go"
+      ],
+      "claimed_code_path": "internal/layout/style_cascade.go + internal/layout/style_properties.go"
+    },
+    {
+      "property": "-webkit-box-flex",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 1126,
+      "files": [
+        "internal/layout/style_cascade.go"
+      ],
+      "claimed_code_path": "internal/layout/style_cascade.go + internal/layout/style_properties.go"
+    },
+    {
+      "property": "-webkit-box-ordinal-group",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 1128,
+      "files": [
+        "internal/layout/style_cascade.go"
+      ],
+      "claimed_code_path": "internal/layout/style_cascade.go + internal/layout/style_properties.go"
+    },
+    {
+      "property": "-webkit-box-orient",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 1130,
+      "files": [
+        "internal/layout/style_cascade.go"
+      ],
+      "claimed_code_path": "internal/layout/style_cascade.go + internal/layout/style_properties.go"
+    },
+    {
+      "property": "-webkit-box-pack",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 1132,
+      "files": [
+        "internal/layout/style_cascade.go"
+      ],
+      "claimed_code_path": "internal/layout/style_cascade.go + internal/layout/style_properties.go"
+    },
+    {
+      "property": "-webkit-box-shadow",
+      "kind": "legacy-alias",
+      "legacy_of": "box-shadow",
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 1120,
+      "files": [
+        "internal/layout/style_cascade.go"
+      ],
+      "claimed_code_path": "internal/layout/box_shadow.go"
+    },
+    {
+      "property": "-webkit-box-sizing",
+      "kind": "legacy-alias",
+      "legacy_of": "box-sizing",
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 1080,
+      "files": [
+        "internal/layout/style_cascade.go"
+      ],
+      "claimed_code_path": "internal/layout/style_cascade.go"
+    },
+    {
+      "property": "-webkit-filter",
+      "kind": "legacy-alias",
+      "legacy_of": "filter",
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 1122,
+      "files": [
+        "internal/layout/style_cascade.go"
+      ],
+      "claimed_code_path": "internal/layout/filter.go"
+    },
+    {
+      "property": "-webkit-flex",
+      "kind": "legacy-alias",
+      "legacy_of": "flex",
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 1096,
+      "files": [
+        "internal/layout/style_cascade.go"
+      ],
+      "claimed_code_path": "internal/layout/style_cascade.go"
+    },
+    {
+      "property": "-webkit-flex-basis",
+      "kind": "legacy-alias",
+      "legacy_of": "flex-basis",
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 1098,
+      "files": [
+        "internal/layout/style_cascade.go"
+      ],
+      "claimed_code_path": "internal/layout/style_cascade.go"
+    },
+    {
+      "property": "-webkit-flex-direction",
+      "kind": "legacy-alias",
+      "legacy_of": "flex-direction",
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 1100,
+      "files": [
+        "internal/layout/style_cascade.go"
+      ],
+      "claimed_code_path": "internal/layout/style_cascade.go"
+    },
+    {
+      "property": "-webkit-flex-flow",
+      "kind": "legacy-alias",
+      "legacy_of": "flex-flow",
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 1102,
+      "files": [
+        "internal/layout/style_cascade.go"
+      ],
+      "claimed_code_path": "internal/layout/style_cascade.go"
+    },
+    {
+      "property": "-webkit-flex-grow",
+      "kind": "legacy-alias",
+      "legacy_of": "flex-grow",
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 1104,
+      "files": [
+        "internal/layout/style_cascade.go"
+      ],
+      "claimed_code_path": "internal/layout/style_cascade.go"
+    },
+    {
+      "property": "-webkit-flex-shrink",
+      "kind": "legacy-alias",
+      "legacy_of": "flex-shrink",
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 1106,
+      "files": [
+        "internal/layout/style_cascade.go"
+      ],
+      "claimed_code_path": "internal/layout/style_cascade.go"
+    },
+    {
+      "property": "-webkit-flex-wrap",
+      "kind": "legacy-alias",
+      "legacy_of": "flex-wrap",
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 1108,
+      "files": [
+        "internal/layout/style_cascade.go"
+      ],
+      "claimed_code_path": "internal/layout/style_cascade.go"
+    },
+    {
+      "property": "-webkit-justify-content",
+      "kind": "legacy-alias",
+      "legacy_of": "justify-content",
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 1110,
+      "files": [
+        "internal/layout/style_cascade.go"
+      ],
+      "claimed_code_path": "internal/layout/style_cascade.go"
+    },
+    {
+      "property": "-webkit-order",
+      "kind": "legacy-alias",
+      "legacy_of": "order",
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 1118,
+      "files": [
+        "internal/layout/style_cascade.go"
+      ],
+      "claimed_code_path": "internal/layout/style_cascade.go"
+    },
+    {
+      "property": "-webkit-text-fill-color",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 1134,
+      "files": [
+        "internal/layout/style_cascade.go"
+      ],
+      "claimed_code_path": "internal/layout/style_cascade.go"
+    },
+    {
+      "property": "-webkit-transform",
+      "kind": "legacy-alias",
+      "legacy_of": "transform",
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 1092,
+      "files": [
+        "internal/layout/style_cascade.go"
+      ],
+      "claimed_code_path": "internal/layout/style_cascade.go"
+    },
+    {
+      "property": "-webkit-transform-origin",
+      "kind": "legacy-alias",
+      "legacy_of": "transform-origin",
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 1094,
+      "files": [
+        "internal/layout/style_cascade.go"
+      ],
+      "claimed_code_path": "internal/layout/style_cascade.go"
+    },
+    {
+      "property": "accent-color",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1406,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/layout.go"
+    },
+    {
+      "property": "align-content",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 228,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "align-items",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 228,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "align-self",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 228,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "background",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1434,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/background_image.go"
+    },
+    {
+      "property": "background-attachment",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1463,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "background-blend-mode",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 162,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "background-clip",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1459,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "background-color",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1430,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go:951"
+    },
+    {
+      "property": "background-image",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1436,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/background_image.go"
+    },
+    {
+      "property": "background-origin",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1461,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "background-position",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1438,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "background-position-block",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1449,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "background-position-inline",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1447,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "background-position-x",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1447,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "background-position-y",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1449,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "background-repeat",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1453,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "background-repeat-block",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1457,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "background-repeat-inline",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1455,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "background-repeat-x",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1455,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "background-repeat-y",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1457,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "background-size",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1451,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "block-size",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:propBlockSize",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 864,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "bookmark-label",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 30,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "bookmark-level",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 21,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "bookmark-state",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 33,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "border",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:borderProperty",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 789,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go:717"
+    },
+    {
+      "property": "border-block",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:cssPropBorderBlock",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 730,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-block-color",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:cssPropBorderBlockColor",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 742,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-block-end",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:cssPropBorderBlockEnd",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 736,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-block-end-color",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:cssPropBorderBlockEndColor",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 748,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-block-end-radius",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_paint_props.go",
+      "primary_line": 277,
+      "files": [
+        "internal/layout/style_paint_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-block-end-style",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:cssPropBorderBlockEndStyle",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 760,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-block-end-width",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:cssPropBorderBlockEndWidth",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 772,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-block-start",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:cssPropBorderBlockStart",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 734,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-block-start-color",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:cssPropBorderBlockStartColor",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 746,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-block-start-radius",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_paint_props.go",
+      "primary_line": 277,
+      "files": [
+        "internal/layout/style_paint_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-block-start-style",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:cssPropBorderBlockStartStyle",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 758,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-block-start-width",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:cssPropBorderBlockStartWidth",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 770,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-block-style",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:cssPropBorderBlockStyle",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 754,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-block-width",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:cssPropBorderBlockWidth",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 766,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-bottom",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:borderBottomProperty",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 1033,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-bottom-color",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1236,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-bottom-left-radius",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_paint_props.go",
+      "primary_line": 263,
+      "files": [
+        "internal/layout/style_paint_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-bottom-radius",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_paint_props.go",
+      "primary_line": 268,
+      "files": [
+        "internal/layout/style_paint_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-bottom-right-radius",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_paint_props.go",
+      "primary_line": 261,
+      "files": [
+        "internal/layout/style_paint_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-bottom-style",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1236,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-bottom-width",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1234,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-collapse",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1723,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/layout_tables.go"
+    },
+    {
+      "property": "border-color",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:borderColorKeyword",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 1033,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-end-end-radius",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_paint_props.go",
+      "primary_line": 277,
+      "files": [
+        "internal/layout/style_paint_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-end-start-radius",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_paint_props.go",
+      "primary_line": 277,
+      "files": [
+        "internal/layout/style_paint_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-image",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1249,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-image-outset",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1249,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-image-repeat",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1249,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-image-slice",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1249,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-image-source",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1249,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-image-width",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1249,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-inline",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:cssPropBorderInline",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 732,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-inline-color",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:cssPropBorderInlineColor",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 744,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-inline-end",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:cssPropBorderInlineEnd",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 740,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-inline-end-color",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:cssPropBorderInlineEndColor",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 752,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-inline-end-radius",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_paint_props.go",
+      "primary_line": 277,
+      "files": [
+        "internal/layout/style_paint_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-inline-end-style",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:cssPropBorderInlineEndStyle",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 764,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-inline-end-width",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:cssPropBorderInlineEndWidth",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 776,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-inline-start",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:cssPropBorderInlineStart",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 738,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-inline-start-color",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:cssPropBorderInlineStartColor",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 750,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-inline-start-radius",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_paint_props.go",
+      "primary_line": 277,
+      "files": [
+        "internal/layout/style_paint_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-inline-start-style",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:cssPropBorderInlineStartStyle",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 762,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-inline-start-width",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:cssPropBorderInlineStartWidth",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 774,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-inline-style",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:cssPropBorderInlineStyle",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 756,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-inline-width",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:cssPropBorderInlineWidth",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 768,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-left",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:borderLeftProperty",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 1033,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-left-color",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1236,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-left-radius",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_paint_props.go",
+      "primary_line": 271,
+      "files": [
+        "internal/layout/style_paint_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-left-style",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1236,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-left-width",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1234,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-radius",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1252,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-right",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:borderRightProperty",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 1033,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-right-color",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1236,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-right-radius",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_paint_props.go",
+      "primary_line": 274,
+      "files": [
+        "internal/layout/style_paint_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-right-style",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1236,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-right-width",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1234,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-spacing",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1723,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/layout_tables.go"
+    },
+    {
+      "property": "border-start-end-radius",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_paint_props.go",
+      "primary_line": 277,
+      "files": [
+        "internal/layout/style_paint_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-start-start-radius",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_paint_props.go",
+      "primary_line": 277,
+      "files": [
+        "internal/layout/style_paint_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-style",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:borderStyleKeyword",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 1033,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-top",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:borderTopProperty",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 1033,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-top-color",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1236,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-top-left-radius",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_paint_props.go",
+      "primary_line": 257,
+      "files": [
+        "internal/layout/style_paint_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-top-radius",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_paint_props.go",
+      "primary_line": 265,
+      "files": [
+        "internal/layout/style_paint_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-top-right-radius",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_paint_props.go",
+      "primary_line": 259,
+      "files": [
+        "internal/layout/style_paint_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-top-style",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1236,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-top-width",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1234,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "border-width",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:borderWidthKeyword",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 1033,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "bottom",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:cssVerticalAlignBottom",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 210,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "box-decoration-break",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 84,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "box-shadow",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:boxShadowProp",
+      "primary_file": "internal/layout/style_paint_props.go",
+      "primary_line": 121,
+      "files": [
+        "internal/layout/style_paint_props.go"
+      ],
+      "claimed_code_path": "internal/layout/box_shadow.go"
+    },
+    {
+      "property": "box-shadow-blur",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_paint_props.go",
+      "primary_line": 139,
+      "files": [
+        "internal/layout/style_paint_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "box-shadow-color",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_paint_props.go",
+      "primary_line": 123,
+      "files": [
+        "internal/layout/style_paint_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "box-shadow-offset",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_paint_props.go",
+      "primary_line": 128,
+      "files": [
+        "internal/layout/style_paint_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "box-shadow-position",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_paint_props.go",
+      "primary_line": 149,
+      "files": [
+        "internal/layout/style_paint_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "box-shadow-spread",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_paint_props.go",
+      "primary_line": 144,
+      "files": [
+        "internal/layout/style_paint_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "box-sizing",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 56,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "break-after",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1725,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "break-before",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1725,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go:1224"
+    },
+    {
+      "property": "break-inside",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1725,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/paint_flow_breaks.go"
+    },
+    {
+      "property": "caption-side",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1723,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "clear",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:clearKeyword",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 54,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "color",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1398,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go:920"
+    },
+    {
+      "property": "color-adjust",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 102,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "color-scheme",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 112,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "column-count",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 501,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go:384"
+    },
+    {
+      "property": "column-fill",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 541,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "column-gap",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 226,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "column-rule",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 1033,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "column-rule-color",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 475,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "column-rule-style",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 471,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "column-rule-width",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 467,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "column-span",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 536,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "column-width",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 503,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "columns",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 505,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "contain",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 135,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "contain-intrinsic-block-size",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 132,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "contain-intrinsic-height",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 126,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "contain-intrinsic-inline-size",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 129,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "contain-intrinsic-size",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 120,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "contain-intrinsic-width",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 123,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "container",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:containerKeyword",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 1033,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "container-name",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1732,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "container-type",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1732,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "content",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:propContent",
+      "primary_file": "internal/layout/style_paint_props.go",
+      "primary_line": 407,
+      "files": [
+        "internal/layout/style_paint_props.go"
+      ],
+      "claimed_code_path": "internal/layout/pseudo_content.go"
+    },
+    {
+      "property": "content-visibility",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 138,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "counter-increment",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_paint_props.go",
+      "primary_line": 401,
+      "files": [
+        "internal/layout/style_paint_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_paint_props.go; internal/layout/counter.go"
+    },
+    {
+      "property": "counter-reset",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_paint_props.go",
+      "primary_line": 397,
+      "files": [
+        "internal/layout/style_paint_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_paint_props.go; internal/layout/counter.go"
+    },
+    {
+      "property": "direction",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 60,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "display",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 48,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go:32"
+    },
+    {
+      "property": "dynamic-range-limit",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 115,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "fill",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_paint_props.go",
+      "primary_line": 54,
+      "files": [
+        "internal/layout/style_paint_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_paint_props.go"
+    },
+    {
+      "property": "fill-opacity",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_paint_props.go",
+      "primary_line": 59,
+      "files": [
+        "internal/layout/style_paint_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_paint_props.go"
+    },
+    {
+      "property": "filter",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 156,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/filter.go"
+    },
+    {
+      "property": "flex",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:flexKeyword",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 1033,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "flex-basis",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 232,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "flex-direction",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 228,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go:177"
+    },
+    {
+      "property": "flex-flow",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 228,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "flex-grow",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 232,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "flex-shrink",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 232,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "flex-wrap",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 228,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "float",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 52,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go:36"
+    },
+    {
+      "property": "font",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "raw",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 921,
+      "files": [
+        "internal/layout/style_cascade.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "font-family",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "raw",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 949,
+      "files": [
+        "internal/layout/style_cascade.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "font-language-override",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 153,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "font-optical-sizing",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 148,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "font-palette",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 156,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "font-size",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "raw",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 929,
+      "files": [
+        "internal/layout/style_cascade.go"
+      ],
+      "claimed_code_path": "internal/layout/style_cascade.go:604"
+    },
+    {
+      "property": "font-style",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "raw",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 967,
+      "files": [
+        "internal/layout/style_cascade.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "font-variation-settings",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 145,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "font-weight",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "raw",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 960,
+      "files": [
+        "internal/layout/style_cascade.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "footnote-display",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 38,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "footnote-policy",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 43,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "forced-color-adjust",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 107,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "gap",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:gapKeyword",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 1033,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "grid",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 578,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "grid-area",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 572,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "grid-auto-flow",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 574,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "grid-column",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 589,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "grid-column-end",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 593,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/grid_placement.go"
+    },
+    {
+      "property": "grid-column-start",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 591,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "grid-row",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 595,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "grid-row-end",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 599,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/grid_placement.go"
+    },
+    {
+      "property": "grid-row-start",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 597,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "grid-template",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 576,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "grid-template-areas",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 570,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "grid-template-columns",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 566,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go:449"
+    },
+    {
+      "property": "grid-template-rows",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 568,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "height",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 639,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "hyphenate-character",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1519,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "hyphens",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1519,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "image-orientation",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 89,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "image-resolution",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 94,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "inline-size",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:containerInlineSize",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 864,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "inset",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:insetKeyword",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 1033,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "inset-block",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:cssPropInsetBlock",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 700,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "inset-block-end",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:cssPropInsetBlockEnd",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 716,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "inset-block-start",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:cssPropInsetBlockStart",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 714,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "inset-inline",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:cssPropInsetInline",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 707,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "inset-inline-end",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:cssPropInsetInlineEnd",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 720,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "inset-inline-start",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:cssPropInsetInlineStart",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 718,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "isolation",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 165,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "justify-content",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 228,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "justify-items",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 228,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "justify-self",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 228,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "left",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:floatLeft",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 212,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "letter-spacing",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1700,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "line-break",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1519,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "line-clamp",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 58,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "line-height",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1552,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "list-style",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1679,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "list-style-image",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_paint_props.go",
+      "primary_line": 405,
+      "files": [
+        "internal/layout/style_paint_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_paint_props.go"
+    },
+    {
+      "property": "list-style-position",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1675,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "list-style-type",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1671,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "margin",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:marginProperty",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 787,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go:521"
+    },
+    {
+      "property": "margin-block",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:cssPropMarginBlock",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 649,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "margin-block-end",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 665,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "margin-block-start",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 663,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "margin-bottom",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 654,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "margin-break",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1725,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "margin-inline",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:cssPropMarginInline",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 656,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "margin-inline-end",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 669,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "margin-inline-start",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 667,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "margin-left",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 656,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "margin-right",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 656,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "margin-top",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 654,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "margin-trim",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 76,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "max-block-size",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:propMaxBlockSize",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 864,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "max-height",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 643,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "max-inline-size",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:propMaxInlineSize",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 864,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/layout.go"
+    },
+    {
+      "property": "max-lines",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 67,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "max-width",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 643,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/layout.go"
+    },
+    {
+      "property": "min-block-size",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:propMinBlockSize",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 864,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/layout.go"
+    },
+    {
+      "property": "min-height",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 641,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/layout.go"
+    },
+    {
+      "property": "min-inline-size",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:propMinInlineSize",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 864,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "min-width",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 641,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "mix-blend-mode",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 159,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "object-view-box",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 99,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "opacity",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 154,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/transform.go"
+    },
+    {
+      "property": "order",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 232,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "orphans",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1730,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go:1281"
+    },
+    {
+      "property": "outline",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "prop-eq",
+      "primary_file": "internal/layout/style_paint_props.go",
+      "primary_line": 42,
+      "files": [
+        "internal/layout/style_paint_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_paint_props.go"
+    },
+    {
+      "property": "outline-color",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_paint_props.go",
+      "primary_line": 102,
+      "files": [
+        "internal/layout/style_paint_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_paint_props.go"
+    },
+    {
+      "property": "outline-offset",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_paint_props.go",
+      "primary_line": 107,
+      "files": [
+        "internal/layout/style_paint_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_paint_props.go"
+    },
+    {
+      "property": "outline-style",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_paint_props.go",
+      "primary_line": 98,
+      "files": [
+        "internal/layout/style_paint_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_paint_props.go"
+    },
+    {
+      "property": "outline-width",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_paint_props.go",
+      "primary_line": 94,
+      "files": [
+        "internal/layout/style_paint_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_paint_props.go"
+    },
+    {
+      "property": "overflow",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 65,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go:44"
+    },
+    {
+      "property": "overflow-clip-margin",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_leftovers.go",
+      "primary_line": 15,
+      "files": [
+        "internal/layout/style_leftovers.go",
+        "internal/layout/style_paint_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "overflow-clip-margin-block",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 234,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "overflow-clip-margin-block-end",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 234,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "overflow-clip-margin-block-start",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 234,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "overflow-clip-margin-bottom",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 225,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "overflow-clip-margin-inline",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 231,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "overflow-clip-margin-inline-end",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 231,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "overflow-clip-margin-inline-start",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 231,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "overflow-clip-margin-left",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 228,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "overflow-clip-margin-right",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 222,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "overflow-clip-margin-top",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 219,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "overflow-wrap",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1615,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/inline.go"
+    },
+    {
+      "property": "overflow-x",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 65,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/overflow_clip.go"
+    },
+    {
+      "property": "overflow-y",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 65,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/overflow_clip.go"
+    },
+    {
+      "property": "padding",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:paddingProperty",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 787,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go:529"
+    },
+    {
+      "property": "padding-block",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:cssPropPaddingBlock",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 671,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "padding-block-end",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 687,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "padding-block-start",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 685,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "padding-bottom",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 660,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "padding-inline",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:cssPropPaddingInline",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 678,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "padding-inline-end",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 691,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "padding-inline-start",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_cascade.go",
+      "primary_line": 689,
+      "files": [
+        "internal/layout/style_cascade.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "padding-left",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 660,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "padding-right",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 660,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "padding-top",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 660,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "page",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_leftovers.go",
+      "primary_line": 88,
+      "files": [
+        "internal/layout/style_leftovers.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go applyPageNameProp"
+    },
+    {
+      "property": "page-break-after",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1725,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "page-break-before",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1725,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go:1224"
+    },
+    {
+      "property": "page-break-inside",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1725,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "place-content",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 228,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "place-items",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 228,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "place-self",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 228,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "position",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 50,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go:34"
+    },
+    {
+      "property": "print-color-adjust",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 102,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "quotes",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_paint_props.go",
+      "primary_line": 391,
+      "files": [
+        "internal/layout/style_paint_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_paint_props.go; internal/layout/counter.go"
+    },
+    {
+      "property": "right",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:floatRight",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 208,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "rotate",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_leftovers.go",
+      "primary_line": 81,
+      "files": [
+        "internal/layout/style_leftovers.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "row-gap",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 226,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "scale",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_leftovers.go",
+      "primary_line": 83,
+      "files": [
+        "internal/layout/style_leftovers.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "string-set",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 48,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "stroke",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_paint_props.go",
+      "primary_line": 63,
+      "files": [
+        "internal/layout/style_paint_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_paint_props.go"
+    },
+    {
+      "property": "stroke-opacity",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_paint_props.go",
+      "primary_line": 73,
+      "files": [
+        "internal/layout/style_paint_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_paint_props.go"
+    },
+    {
+      "property": "stroke-width",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_paint_props.go",
+      "primary_line": 68,
+      "files": [
+        "internal/layout/style_paint_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_paint_props.go"
+    },
+    {
+      "property": "tab-size",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1519,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "table-layout",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1723,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "text-align",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1559,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "text-align-all",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1519,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "text-align-last",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1519,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "text-combine-upright",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 170,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "text-decoration",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1649,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "text-decoration-color",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1519,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "text-decoration-inset",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 216,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "text-decoration-line",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1519,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "text-decoration-skip",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 199,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "text-decoration-skip-box",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 207,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "text-decoration-skip-ink",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 202,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "text-decoration-skip-self",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 210,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "text-decoration-skip-spaces",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 213,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "text-decoration-style",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1519,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "text-decoration-thickness",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1519,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "text-emphasis",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 181,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "text-emphasis-color",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 184,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "text-emphasis-position",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 190,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "text-emphasis-skip",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 196,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "text-emphasis-style",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 193,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "text-indent",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1708,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "text-justify",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1519,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "text-orientation",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 173,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "text-overflow",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 53,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "text-shadow",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1519,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "text-transform",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1561,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "text-underline-offset",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1519,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "text-underline-position",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1519,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "text-wrap",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1519,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "text-wrap-mode",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1519,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "text-wrap-style",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1519,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "top",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-const:cssVerticalAlignTop",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 206,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "transform",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1923,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go:1324"
+    },
+    {
+      "property": "transform-box",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_leftovers.go",
+      "primary_line": 69,
+      "files": [
+        "internal/layout/style_leftovers.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "transform-origin",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1929,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "translate",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_leftovers.go",
+      "primary_line": 85,
+      "files": [
+        "internal/layout/style_leftovers.go",
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "unicode-bidi",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 178,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
+      "property": "vertical-align",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1563,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "visibility",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 158,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/layout_tables.go"
+    },
+    {
+      "property": "white-space",
+      "kind": "shorthand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1565,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "white-space-collapse",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1519,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "white-space-trim",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1519,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "widows",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1730,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "width",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 639,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "word-break",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1617,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/layout_measure.go"
+    },
+    {
+      "property": "word-spacing",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1702,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "word-wrap",
+      "kind": "legacy-alias",
+      "legacy_of": "overflow-wrap",
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 1615,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/inline.go"
+    },
+    {
+      "property": "writing-mode",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 58,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/inline_paint.go"
+    },
+    {
+      "property": "z-index",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_properties.go",
+      "primary_line": 152,
+      "files": [
+        "internal/layout/style_properties.go"
+      ],
+      "claimed_code_path": "internal/layout/style_properties.go"
+    }
+  ]
+}

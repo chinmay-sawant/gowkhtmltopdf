@@ -1,0 +1,7 @@
+Liberation fonts (Sans Regular/Bold/Italic, Serif Regular, Mono Regular)
+License: SIL Open Font License 1.1 (OFL-1.1)
+Upstream: https://github.com/liberationfonts/liberation-fonts
+Compatible with MIT for bundling and redistribution in this repo (same faces
+already ship under internal/pdf/assets/). Copied here so fixture-60/61/62 can
+pin --font-path testdata/fonts/implemented-audit and prove embedding.
+Family CSS names: "Liberation Sans", "Liberation Serif", "Liberation Mono"

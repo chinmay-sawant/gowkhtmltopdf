@@ -432,6 +432,18 @@ var fixturePageBounds = map[string]fixtureBounds{ //nolint:gochecknoglobals // i
 		minPages: 7, maxPages: 8, images: true,
 		needles: []string{"Core Solutions", "Recent Work", "Transparent Pricing"},
 	},
+	"fixture-60-implemented-props-a.html": { //nolint:exhaustruct // intentional zero-value fields
+		minPages: 7, maxPages: 9, images: true,
+		needles: []string{"IMPLEMENTED-PROPS-A"},
+	},
+	"fixture-61-implemented-props-b.html": { //nolint:exhaustruct // intentional zero-value fields
+		minPages: 7, maxPages: 9, images: true,
+		needles: []string{"IMPLEMENTED-PROPS-B"},
+	},
+	"fixture-62-implemented-props-c.html": { //nolint:exhaustruct // intentional zero-value fields
+		minPages: 7, maxPages: 9, images: true,
+		needles: []string{"IMPLEMENTED-PROPS-C"},
+	},
 }
 
 // fixtureHeaderOK enforces the corpus hygiene rule: every fixture starts
