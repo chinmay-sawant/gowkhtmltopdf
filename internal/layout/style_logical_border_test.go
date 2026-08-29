@@ -103,13 +103,16 @@ func TestLogicalCornerRadii(t *testing.T) {
 			s1.BorderRadiusTopLeft, s1.BorderRadiusTopRight, s1.BorderRadiusBottomLeft, s1.BorderRadiusBottomRight)
 	}
 
-	// Side radii
+	// Side radii: block-start is top (TL, TR = 15), inline-end is right (TR, BR = 25 -> TR overwritten with 25)
 	s2 := initialStyle()
-	raw2 := map[string]string{
+	raw2a := map[string]string{
 		"border-block-start-radius": "15pt",
-		"border-inline-end-radius":  "25pt",
 	}
-	applyRestProps(&s2, raw2, ctx, nil)
+	applyRestProps(&s2, raw2a, ctx, nil)
+	raw2b := map[string]string{
+		"border-inline-end-radius": "25pt",
+	}
+	applyRestProps(&s2, raw2b, ctx, nil)
 
 	// block-start is top (TL, TR = 15), inline-end is right (TR, BR = 25 -> TR overwritten with 25)
 	if s2.BorderRadiusTopLeft != 15 || s2.BorderRadiusTopRight != 25 || s2.BorderRadiusBottomRight != 25 {

@@ -54,7 +54,7 @@ input (file / URL / inline HTML)
    internal/layout        boxes + display list (text, rects, images, links)
         │
         ▼
-   layout.PaintContext    paginate the display list (PDF) — page-break-*,
+   layout.PaintContext    paginate the display list (PDF) - page-break-*,
                           thead repeat, orphans/widows, sticky print
         │
         ├──────────────────────────────┐
@@ -75,22 +75,22 @@ canvas.
 `convert.Run`. The function is a thin owner of request state; stage order
 lives in `internal/convert/render`:
 
-1. **`Validate` / `ValidatePDF`** — explicit `Output` sink, copies/object
+1. **`Validate` / `ValidatePDF`** - explicit `Output` sink, copies/object
    limits, at least one renderable body object. Dump-outline also requires a
    separate `OutlineOutput`. Image jobs use `imageout.Request.Validate`
    instead of the PDF request path.
-2. **Loader** — `load.NewLoaderWithError` so a bad proxy policy fails before
+2. **Loader** - `load.NewLoaderWithError` so a bad proxy policy fails before
    fonts or the document exist.
-3. **Fonts** — bundled default face (`pdf.DefaultFont`) plus an opt-in
+3. **Fonts** - bundled default face (`pdf.DefaultFont`) plus an opt-in
    registry from `--font-path` / `--use-system-fonts`.
-4. **`pdf.NewDocument` / `pdf.NewDocumentWithPolicy`** — one shared writer for
+4. **`pdf.NewDocument` / `pdf.NewDocumentWithPolicy`** - one shared writer for
    the whole job, configured with the requested `WriterPolicy`.
 5. **`render.Run`** on the PDF adapter (`pdfPipeline`):
-   - **`RenderObjects`** — each `page`/`cover` object: prepare → layout
+   - **`RenderObjects`** - each `page`/`cover` object: prepare → layout
      (optional smart-shrink re-layout) → `layout.PaintContext` into the
      document. TOC objects are recorded for assembly, not painted yet.
-   - **`Assemble`** — document-wide passes (below).
-   - **`Finalize`** — `doc.Write` to `req.Output`.
+   - **`Assemble`** - document-wide passes (below).
+   - **`Finalize`** - `doc.Write` to `req.Output`.
 
 ### Assemble (PDF)
 
@@ -135,14 +135,14 @@ Image jobs use `imageout.Request` (`imageout.RunRequest`), also driven by
 | Trailer `/ID` | Deterministic 16-byte hex identifiers on PDF 1.7 and 2.0 (`/ID [ <a> <b> ]`); absent on 1.4 |
 | Info & Metadata | Info dict kept on all versions (Latin-1 on 1.4, UTF-16BE + BOM on 1.7, UTF-8 text strings on 2.0); non-claiming XMP Metadata stream on 1.7 and 2.0 (Dublin Core + Producer, no conformance claims) |
 | Classic xref | Standard counting xref table for 1.4, 1.7, and 2.0 (no xref streams) |
-| Catalog `/Version` | **Not emitted** on any version — the file header is the sole version authority (matching the 1.7 sibling) |
+| Catalog `/Version` | **Not emitted** on any version - the file header is the sole version authority (matching the 1.7 sibling) |
 | Streams | `/Filter /FlateDecode` via zlib (RFC 1950) |
 | Latin fonts | Subset TTF, simple font, WinAnsi-style codes, `/Widths` in 1000 units/em |
 | Unicode | Type0 / CIDFontType2 + Identity-H when a run has runes above U+00FF |
 | Images | JPEG bytes as DCTDecode; PNG → Flate RGB + `/SMask` for alpha |
 | Links | URI annotations and GoTo destinations; PDF/UA-2 also emits structure destinations (`/SD`) on internal named dests |
 | Outlines | Catalog `/Outlines` after outline object refs exist; UA-2 outline dests can carry `/SD` |
-| Info Title | `--title` / settings only — **not** `<title>` |
+| Info Title | `--title` / settings only - **not** `<title>` |
 | Profiles | Empty `--pdf-profile` is unclaimed PDF (default still 1.4). `--pdf-version` is **not** a PDF/A or PDF/UA claim. `--pdf-profile` is: `PDF/A-3a`, `PDF/UA-1`, `PDF/A-3a+PDF/UA-1` (imply 1.7); `PDF/A-4`, `PDF/UA-2`, `PDF/A-4+PDF/UA-2` (imply 2.0). `Get("pdfprofile")` returns those canonical tokens (alias `a3a-ua1` stores `PDF/A-3a+PDF/UA-1`) |
 
 Explicit out-of-scope boundaries: `--pdf-version` alone is a **version**

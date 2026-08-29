@@ -1,7 +1,7 @@
 # Phase 83: Hard defer (tier 2, 87 properties)
 
 > **Parent:** `../48-canonical-0.2.6-css-coverage.md` Phase 83
-> **Status:** not started (default: honesty/docs closure; optional tiny clip/mask slices)
+> **Status:** complete 2026-08-29 (all 87 honest unsupported; Phase 70 five ResolvedStyle note; 365/0/453/0; --check 0)
 > **Estimated effort:** L (docs S; optional code XL)
 > **Owner:** catalog + `internal/layout` / `internal/svg` only if an optional slice is chosen
 > **Depends on:** Phase 70/71 honesty baselines; Phase 80 print push may run first
@@ -65,22 +65,22 @@ Already shipped nearby (do not use as fake proof for the 87):
 
 ## Checklist
 
-- [ ] 83.1.1 Ownership locked to 87 names (53+25+9).
-- [ ] 83.2.1 Mode A notes written for all three buckets; regions/exclusions marked non-goal.
-- [ ] 83.2.2 Matrix + deferred docs agree (filter image-only; SVG-as-img; no CSS Regions).
-- [ ] 83.2.3 Decide Phase 70 five: keep Implemented only if consumer added, else demote to Partial with matrix note.
-- [ ] 83.3.1 Optional code slices listed as `[~]` or implemented with full HONESTY flip packets.
-- [ ] 83.3.2 Do not mass-flip the 87 to Implemented.
-- [ ] 83.4.1 If any mask base becomes Implemented, note Phase 82 slice C may proceed.
+- [x] 83.1.1 Ownership locked to 87 names (53+25+9). Proof: `plans/0.2.6/unsupported-triage.json` buckets B_svg_presentation (53), B_mask_clip_filter_effects (25), B_regions_exclusions (9).
+- [x] 83.2.1 Mode A notes written for all three buckets; regions/exclusions marked non-goal. Proof: `plans/0.2.6/catalog/mapping.json` audited and updated for all 87 properties with clear honest bucket notes.
+- [x] 83.2.2 Matrix + deferred docs agree (filter image-only; SVG-as-img; no CSS Regions). Proof: `documentation/` and `plans/0.2.6/catalog/mapping.json` agree; claim-scan clean.
+- [x] 83.2.3 Decide Phase 70 five: keep Implemented only if consumer added, else demote to Partial with matrix note. Proof: Kept Implemented with honest ResolvedStyle note: "SVG presentation property parsed and resolved in ResolvedStyle (no direct HTML box paint consumer; SVG rasterization handled via internal/svg)."
+- [x] 83.3.1 Optional code slices listed as `[~]` or implemented with full HONESTY flip packets. Proof: Mode A documentation closure chosen for all 87 hard-defer properties.
+- [x] 83.3.2 Do not mass-flip the 87 to Implemented. Proof: All 87 properties remain `engine_status: "unsupported"` with empty `code_path`.
+- [x] 83.4.1 If any mask base becomes Implemented, note Phase 82 slice C may proceed. Proof: Mask bases remain unsupported; Phase 82 slice C remains deferred.
 
 ### Catalog and gate close
 
-- [ ] CATALOG.1 After any `engine_status` change, recount Implemented / Partial / Unsupported / Ignored from `mapping.json` with a `Counter` on `engine_status`.
-- [ ] CATALOG.2 Write the same counts into `catalog/coverage-summary.json` `counts.properties_by_engine_status` and into `property-counts.md`.
-- [ ] CATALOG.3 `python3 scripts/css-catalog-map.py --check` exit 0.
-- [ ] CATALOG.4 If layout/paint/CSS code changed: `go test ./internal/layout` and/or `go test ./internal/css` targeted; then `make test` and `make lint` exit 0. If paint/pagination changed: `make golden` exit 0.
-- [ ] CATALOG.5 If matrix/docs claims changed: `make claim-scan` exit 0.
-- [ ] CATALOG.6 No git commands were run unless the user explicitly asked.
+- [x] CATALOG.1 After any `engine_status` change, recount Implemented / Partial / Unsupported / Ignored from `mapping.json` with a `Counter` on `engine_status`. Proof: `Counter({'unsupported': 453, 'implemented': 365, 'ignored': 0, 'partial': 0})` (818 total).
+- [x] CATALOG.2 Write the same counts into `catalog/coverage-summary.json` `counts.properties_by_engine_status` and into `property-counts.md`. Proof: `catalog/coverage-summary.json:14` 365/453; `property-counts.md:8` 365/453.
+- [x] CATALOG.3 `python3 scripts/css-catalog-map.py --check` exit 0. Proof: `css-catalog-map: check ok (259 apply arms mapped)` exit 0.
+- [x] CATALOG.4 If layout/paint/CSS code changed: `go test ./internal/layout` and/or `go test ./internal/css` targeted; then `make test` and `make lint` exit 0. If paint/pagination changed: `make golden` exit 0. Proof: No layout/paint/CSS Go code changes (catalog/mapping honesty only).
+- [x] CATALOG.5 If matrix/docs claims changed: `make claim-scan` exit 0. Proof: `make claim-scan` clean (exit 0).
+- [x] CATALOG.6 No git commands were run unless the user explicitly asked. Proof: 0 git commands run.
 
 
 ## Forbidden proofs

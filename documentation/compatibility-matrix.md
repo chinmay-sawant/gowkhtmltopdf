@@ -164,7 +164,7 @@ Status legend (verified against `applyRestProps` in
 | Floats / absolute positioning | Float lite + absolute/fixed/sticky lite | float/`clear` lite (§2.2); relative/absolute/fixed lite; sticky = print page scrollport + overflow@0 (§2.2; fixture-31) |
 | Flexbox / Grid | Partial | Stage A flex + Stage B grid (areas/dense/`minmax`) + Stage C lite (§2.7 / §2.8). Paths: `flex.go`, `grid.go`, `style.go`; fixtures 25/28/32-35; plan `plans/0.2.0/phases/subplans-tier-2/flex-grid-full.md`. **Not** Bootstrap/Tailwind / Chrome layout-test parity |
 | Multicol | Partial | Report lite: `column-count`/`column-width`/`columns`, `column-gap` (normal to 1em), `column-span:none\|all`, `column-fill:balance\|auto`; column boxes do not straddle pages (§2.9; `multicol.go`; fixture-39) |
-| Transforms (static 2D) | Implemented | `transform` + `transform-origin` paint CTM; stacking + abs/fixed CB; sibling flow unchanged. No animation timelines; no 3D; `filter` only `opacity()`. Fixture-40; `transform.go` |
+| Transforms (static 2D) | Implemented | `transform` + `transform-origin` paint CTM; stacking + abs/fixed CB; sibling flow unchanged. No animation timelines; no 3D; 2D image filter (opacity, blur, grayscale, invert, adjustments) on raster images + CSS `opacity()` on elements; no CSS shader/SVG filter composition. Fixture-40; `transform.go`, `filter.go` |
 | JavaScript | No | `<script>` stripped at load; no engine. `--enable-javascript` is an **unknown option** (Policy A) |
 | Image-mode text | TTF outline raster | same Liberation faces as PDF; pure-Go coverage AA (`internal/imageout/ttfraster.go`); 5×7 bitmap only if an op has no font |
 
@@ -296,11 +296,13 @@ Status legend as in §2; evidence in `internal/css/css.go`.
 |---------|----------|
 | JavaScript / `<script>` / DOM APIs | **Stripped at load.** No JS engine. `--enable-javascript` and other JS flags are **unknown options** (Policy A) |
 | Full CSS Grid / full Flexbox | Stage A/B print CSS subset **shipped** (§2.7 / §2.8); Stage C lite + flex min-size polish + Partial subgrid/masonry span (`tier-2-pending-3/flex-grid-remaining.md`). **Not** Bootstrap/Tailwind / Chrome layout-test parity |
-| `transform`, `filter`, `animation`, `transition` | Partial / out of scope | **Static 2D** `transform` + `transform-origin` Implemented (translate/scale/rotate/matrix/skew*; paint CTM; stacking + abs/fixed CB). Sibling flow unchanged. Overflow clip of descendants is Implemented with per-axis `overflow-x`/`overflow-y` (`overflow_clip.go`). **`filter`:** 2D separable Gaussian blur convolution, opacity, grayscale, invert, and adjustments (`filter.go`). **`animation`/`transition`/`@keyframes`:** parse-ignored (static cascaded value only; no timelines). **3D / perspective:** permanent non-goal. Fixture-40; `transform.go` / `transform_test.go`, `filter.go` |
+| `transform`, `filter`, `animation`, `transition` | Partial / out of scope | **Static 2D** `transform` + `transform-origin` Implemented (translate/scale/rotate/matrix/skew*; paint CTM; stacking + abs/fixed CB). Sibling flow unchanged. **`filter`:** 2D image filter (opacity, blur, grayscale, invert, adjustments) on raster images (`filter.go`) + CSS `opacity()` on elements; no CSS shader/SVG filter composition. **`animation`/`transition`/`@keyframes`:** parse-ignored (static cascaded value only; no timelines). **3D / perspective:** permanent non-goal. Fixture-40; `transform.go` / `transform_test.go`, `filter.go` |
 | `background-image` / gradients | **Implemented** multi-layer `url(...)` and pure-Go linear/radial gradient rasterization (`background_image.go`, `gradient.go`) |
 | `@font-face` (remote / WOFF2) | **Partial:** local **and `https://`** TTF/OTF/WOFF1 via `FetchSub` (same ACL + `NetworkPolicy` as other subresources) on PDF/image paths. **`.woff2` / `.eot` / `data:`** skipped. Missing faces fall back to registry / Liberation |
 | Custom XSLT TOC (`--xsl-style-sheet`) | Not implemented (no XSLT in stdlib); Go templates instead (Phase 6) |
-| SVG-as-`<img>` | **Implemented** (raster via `internal/svg`) |
+| SVG-as-`<img>` / SVG presentation | **Implemented** SVG-as-`<img>` rasterization via `internal/svg`; 5 CSS properties (`fill`, `stroke`, `stroke-width`, `fill-opacity`, `stroke-opacity`) parsed in style; remaining 53 SVG presentation properties are unsupported |
+| Masking / clipping | **Implemented** `overflow-clip` for descendant box clipping (`overflow_clip.go`); `clip-path` and CSS `mask-*` properties are unsupported |
+| CSS Regions & Exclusions | **Not implemented** (`flow-from`, `flow-into`, `flow-tolerance`, `region-fragment`, `wrap-after`, `wrap-before`, `wrap-flow`, `wrap-inside`, `wrap-through` are permanent non-goals for print PDF) |
 | WebP, AVIF | Not implemented; broken-image placeholder or skip |
 | Fixed CSS headers/footers via `position: fixed` alone | Prefer CLI `--header-*` / `--footer-*` for repeating chrome; CSS `fixed` lite paints on every page but is not a full running-element model |
 | Complex-script shaping (Indic, Arabic, CJK) | **Type0/CID Identity-H** for BMP Unicode (CJK with a capable face); **Arabic OT** via `go-text/typesetting` when the face has GSUB (+ presentation-form `ShapeText` fallback); Hangul needs a Hangul face. `writing-mode` vertical keywords inherit and rotate glyphs (`RotateDeg == -90`); block/line layout stays horizontal. **Indic Partial** (OT when face/cmap allow; not production-claimed). Optional OT **`halt`/`palt`** for CJK punctuation via `ShapeTextFont` FontFeatures |
@@ -322,7 +324,19 @@ The following 94 properties are intentionally left **unsupported** (Not implemen
 
 Total: 94 properties across three families. All are Not implemented and left unsupported with no print PDF consumer.
 
-### 5.2 Vendor-prefix aliases (-webkit-) - Phase 69 and Phase 82
+### 5.2 Phase 83 hard-defer categories (87 properties - Not implemented)
+
+The following 87 properties across three categories are intentionally left **unsupported** (Not implemented) as hard-deferred or permanent non-goals for print PDF:
+
+| Category | Count | Status | Description and scope |
+|----------|-------|--------|-----------------------|
+| SVG presentation & geometry (`B_svg_presentation`) | 53 | Not implemented | Remaining SVG presentation and geometry properties. SVG-as-`<img>` is implemented via `internal/svg` rasterizer; 5 CSS properties (`fill`, `stroke`, `stroke-width`, `fill-opacity`, `stroke-opacity`) are parsed in style; remaining 53 SVG presentation properties are unsupported (`alignment-baseline`, `baseline-shift`, `color-interpolation`, `cx`, `cy`, `d`, `dominant-baseline`, `fill-break`, `fill-color`, `fill-image`, `fill-origin`, `fill-position`, `fill-repeat`, `fill-rule`, `fill-size`, `glyph-orientation-vertical`, `image-rendering`, `marker`, `marker-end`, `marker-mid`, `marker-side`, `marker-start`, `paint-order`, `path-length`, `r`, `rx`, `ry`, `shape-rendering`, `stop-color`, `stop-opacity`, `stroke-align`, `stroke-alignment`, `stroke-break`, `stroke-color`, `stroke-dash-corner`, `stroke-dash-justify`, `stroke-dashadjust`, `stroke-dasharray`, `stroke-dashcorner`, `stroke-dashoffset`, `stroke-image`, `stroke-linecap`, `stroke-linejoin`, `stroke-miterlimit`, `stroke-origin`, `stroke-position`, `stroke-repeat`, `stroke-size`, `text-anchor`, `text-rendering`, `vector-effect`, `x`, `y`). |
+| Mask, clip, and filter effects (`B_mask_clip_filter_effects`) | 25 | Not implemented | Masking, clipping, and filter primitives. `overflow-clip` is implemented for descendant box clipping (`overflow_clip.go`); 2D image filter (opacity, blur, grayscale, invert, adjustments) on raster images + CSS `opacity()` on elements are implemented (`filter.go`); `clip-path`, CSS `mask-*` properties, `backdrop-filter`, and CSS shader/SVG filter composition are unsupported (`backdrop-filter`, `clip`, `clip-path`, `clip-rule`, `color-interpolation-filters`, `flood-color`, `flood-opacity`, `lighting-color`, `mask`, `mask-border`, `mask-border-mode`, `mask-border-outset`, `mask-border-repeat`, `mask-border-slice`, `mask-border-source`, `mask-border-width`, `mask-clip`, `mask-composite`, `mask-image`, `mask-mode`, `mask-origin`, `mask-position`, `mask-repeat`, `mask-size`, `mask-type`). |
+| CSS Regions & Exclusions (`B_regions_exclusions`) | 9 | Not implemented | CSS Regions and Exclusions are permanent non-goals for print PDF (`flow-from`, `flow-into`, `flow-tolerance`, `region-fragment`, `wrap-after`, `wrap-before`, `wrap-flow`, `wrap-inside`, `wrap-through`). |
+
+Total: 87 properties across three hard-defer categories. All remain Not implemented.
+
+### 5.3 Vendor-prefix aliases (-webkit-) - Phase 69 and Phase 82
 
 This section is the contract for vendor-prefixed alias handling. Alias mechanism is
 `normalizeVendorPrefix` at `internal/layout/style_cascade.go:913` called from
@@ -337,7 +351,7 @@ and value remaps in `remapWebkitValue` at `internal/layout/style_cascade.go:1000
 Do not treat Unsupported aliases as Implemented. Tests for Implemented aliases live in
 `internal/layout/style_cascade_test.go:188` (`TestWebkitPrefixAliases`).
 
-#### 5.2.1 Implemented vendor aliases (28)
+#### 5.3.1 Implemented vendor aliases (28)
 
 28 = 22 from Phase 69 + 6 new in Phase 82 slice A. Each entry has a prefixed-name
 test and a consumer in layout or paint (the unprefixed base is already Implemented).
@@ -380,7 +394,7 @@ Display value aliases (also Phase 82 slice A, at `internal/layout/style_properti
 | `display: -webkit-box` | `display: flex` |
 | `display: -webkit-inline-box` | `display: inline-flex` |
 
-#### 5.2.2 Still Unsupported vendor aliases (42)
+#### 5.3.2 Still Unsupported vendor aliases (42)
 
 42 aliases remain **Unsupported**. They are not Implemented. Each group notes the
 blocking base. Do not claim Implemented for any of these 42.

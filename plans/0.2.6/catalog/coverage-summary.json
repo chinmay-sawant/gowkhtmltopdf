@@ -11,8 +11,8 @@
     "webref_properties": 818,
     "mapped_properties": 818,
     "properties_by_engine_status": {
-      "implemented": 380,
-      "unsupported": 438,
+      "implemented": 365,
+      "unsupported": 453,
       "ignored": 0,
       "partial": 0
     },

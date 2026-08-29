@@ -11,8 +11,8 @@
     "webref_properties": 818,
     "mapped_properties": 818,
     "properties_by_engine_status": {
-      "implemented": 380,
-      "unsupported": 438,
+      "implemented": 365,
+      "unsupported": 453,
       "ignored": 0,
       "partial": 0
     },
@@ -193,7 +193,7 @@
       "kind": "legacy-alias",
       "legacy_aliases": [],
       "legacy_of": "animation-duration",
-      "syntax": "<time [0s,∞]>#",
+      "syntax": "<time [0s,\u221e]>#",
       "initial": null,
       "inherited": null,
       "longhands": [],
@@ -468,7 +468,7 @@
       "kind": "legacy-alias",
       "legacy_aliases": [],
       "legacy_of": "border-radius",
-      "syntax": "<length-percentage [0,∞]>{1,4} [ / <length-percentage [0,∞]>{1,4} ]?",
+      "syntax": "<length-percentage [0,\u221e]>{1,4} [ / <length-percentage [0,\u221e]>{1,4} ]?",
       "initial": null,
       "inherited": null,
       "longhands": [
@@ -801,7 +801,7 @@
       "kind": "legacy-alias",
       "legacy_aliases": [],
       "legacy_of": "flex-grow",
-      "syntax": "<number [0,∞]>",
+      "syntax": "<number [0,\u221e]>",
       "initial": null,
       "inherited": null,
       "longhands": [],
@@ -822,7 +822,7 @@
       "kind": "legacy-alias",
       "legacy_aliases": [],
       "legacy_of": "flex-shrink",
-      "syntax": "<number [0,∞]>",
+      "syntax": "<number [0,\u221e]>",
       "initial": null,
       "inherited": null,
       "longhands": [],
@@ -885,7 +885,7 @@
       "kind": "shorthand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "none | <integer [1,∞]>",
+      "syntax": "none | <integer [1,\u221e]>",
       "initial": "none",
       "inherited": "see individual properties",
       "longhands": [
@@ -1260,7 +1260,7 @@
       "kind": "legacy-alias",
       "legacy_aliases": [],
       "legacy_of": "perspective",
-      "syntax": "none | <length [0,∞]>",
+      "syntax": "none | <length [0,\u221e]>",
       "initial": null,
       "inherited": null,
       "longhands": [],
@@ -1325,7 +1325,7 @@
       "kind": "legacy-alias",
       "legacy_aliases": [],
       "legacy_of": "text-size-adjust",
-      "syntax": "auto | none | <percentage [0,∞]>",
+      "syntax": "auto | none | <percentage [0,\u221e]>",
       "initial": null,
       "inherited": null,
       "longhands": [],
@@ -1529,7 +1529,7 @@
       "kind": "legacy-alias",
       "legacy_aliases": [],
       "legacy_of": "transition-duration",
-      "syntax": "<time [0s,∞]>#",
+      "syntax": "<time [0s,\u221e]>#",
       "initial": null,
       "inherited": null,
       "longhands": [],
@@ -1724,9 +1724,9 @@
       "groups": [
         "CSS Inline"
       ],
-      "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "engine_status": "unsupported",
+      "code_path": "",
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "all",
@@ -1884,7 +1884,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<time [0s,∞]>#",
+      "syntax": "<time [0s,\u221e]>#",
       "initial": "0s",
       "inherited": "no",
       "longhands": [],
@@ -1949,7 +1949,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "[ auto | <time [0s,∞]> ]#",
+      "syntax": "[ auto | <time [0s,\u221e]> ]#",
       "initial": "auto",
       "inherited": "no",
       "longhands": [],
@@ -2288,7 +2288,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "CSS masking/clipping/filter effects; out of scope for print PDF engine. Left unsupported."
     },
     {
       "property": "backface-visibility",
@@ -2769,7 +2769,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "baseline-source",
@@ -2932,7 +2932,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "none | <length [0,∞]>",
+      "syntax": "none | <length [0,\u221e]>",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -2974,7 +2974,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "none | <integer [1,∞]>",
+      "syntax": "none | <integer [1,\u221e]>",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -3146,7 +3146,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "none | [ <length-percentage [0,∞]> | <flex> ]+",
+      "syntax": "none | [ <length-percentage [0,\u221e]> | <flex> ]+",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -3190,7 +3190,7 @@
       "kind": "shorthand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<length-percentage [0,∞]>{1,2} [ / <length-percentage [0,∞]>{1,2} ]?",
+      "syntax": "<length-percentage [0,\u221e]>{1,2} [ / <length-percentage [0,\u221e]>{1,2} ]?",
       "initial": "0",
       "inherited": "no",
       "longhands": [
@@ -3287,7 +3287,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "none | [ <length-percentage [0,∞]> | <flex> ]+",
+      "syntax": "none | [ <length-percentage [0,\u221e]> | <flex> ]+",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -3331,7 +3331,7 @@
       "kind": "shorthand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<length-percentage [0,∞]>{1,2} [ / <length-percentage [0,∞]>{1,2} ]?",
+      "syntax": "<length-percentage [0,\u221e]>{1,2} [ / <length-percentage [0,\u221e]>{1,2} ]?",
       "initial": "0",
       "inherited": "no",
       "longhands": [
@@ -3480,7 +3480,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "none | [ <length-percentage [0,∞]> | <flex> ]+",
+      "syntax": "none | [ <length-percentage [0,\u221e]> | <flex> ]+",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -3547,7 +3547,7 @@
       "kind": "shorthand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<length-percentage [0,∞]>{1,2} [ / <length-percentage [0,∞]>{1,2} ]?",
+      "syntax": "<length-percentage [0,\u221e]>{1,2} [ / <length-percentage [0,\u221e]>{1,2} ]?",
       "initial": "0",
       "inherited": "no",
       "longhands": [
@@ -3703,7 +3703,7 @@
       ],
       "engine_status": "implemented",
       "code_path": "internal/layout/layout_tables.go",
-      "notes": "Full CSS 2.1 §17.6.2.2 border conflict resolution with hidden precedence, style rank, and source order tie-breaking."
+      "notes": "Full CSS 2.1 \u00a717.6.2.2 border conflict resolution with hidden precedence, style rank, and source order tie-breaking."
     },
     {
       "property": "border-color",
@@ -3813,7 +3813,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "[ <length [0,∞]> | <number [0,∞]> ]{1,4}",
+      "syntax": "[ <length [0,\u221e]> | <number [0,\u221e]> ]{1,4}",
       "initial": "0",
       "inherited": "no",
       "longhands": [],
@@ -3859,7 +3859,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "[<number [0,∞]> | <percentage [0,∞]>]{1,4} && fill?",
+      "syntax": "[<number [0,\u221e]> | <percentage [0,\u221e]>]{1,4} && fill?",
       "initial": "100%",
       "inherited": "no",
       "longhands": [],
@@ -3905,7 +3905,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "[ <length-percentage [0,∞]> | <number [0,∞]> | auto ]{1,4}",
+      "syntax": "[ <length-percentage [0,\u221e]> | <number [0,\u221e]> | auto ]{1,4}",
       "initial": "1",
       "inherited": "no",
       "longhands": [],
@@ -4031,7 +4031,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "none | [ <length-percentage [0,∞]> | <flex> ]+",
+      "syntax": "none | [ <length-percentage [0,\u221e]> | <flex> ]+",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -4075,7 +4075,7 @@
       "kind": "shorthand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<length-percentage [0,∞]>{1,2} [ / <length-percentage [0,∞]>{1,2} ]?",
+      "syntax": "<length-percentage [0,\u221e]>{1,2} [ / <length-percentage [0,\u221e]>{1,2} ]?",
       "initial": "0",
       "inherited": "no",
       "longhands": [
@@ -4172,7 +4172,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "none | [ <length-percentage [0,∞]> | <flex> ]+",
+      "syntax": "none | [ <length-percentage [0,\u221e]> | <flex> ]+",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -4216,7 +4216,7 @@
       "kind": "shorthand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<length-percentage [0,∞]>{1,2} [ / <length-percentage [0,∞]>{1,2} ]?",
+      "syntax": "<length-percentage [0,\u221e]>{1,2} [ / <length-percentage [0,\u221e]>{1,2} ]?",
       "initial": "0",
       "inherited": "no",
       "longhands": [
@@ -4365,7 +4365,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "none | [ <length-percentage [0,∞]> | <flex> ]+",
+      "syntax": "none | [ <length-percentage [0,\u221e]> | <flex> ]+",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -4409,7 +4409,7 @@
       "kind": "shorthand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<length-percentage [0,∞]>{1,2} [ / <length-percentage [0,∞]>{1,2} ]?",
+      "syntax": "<length-percentage [0,\u221e]>{1,2} [ / <length-percentage [0,\u221e]>{1,2} ]?",
       "initial": "0",
       "inherited": "no",
       "longhands": [
@@ -4479,7 +4479,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "all | [ sides | corners ] <length-percentage [0,∞]>? | [ top | right | bottom | left ] <length-percentage [0,∞]>",
+      "syntax": "all | [ sides | corners ] <length-percentage [0,\u221e]>? | [ top | right | bottom | left ] <length-percentage [0,\u221e]>",
       "initial": "all",
       "inherited": "no",
       "longhands": [],
@@ -4500,7 +4500,7 @@
       "kind": "shorthand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<length-percentage [0,∞]>{1,4} [ / <length-percentage [0,∞]>{1,4} ]?",
+      "syntax": "<length-percentage [0,\u221e]>{1,4} [ / <length-percentage [0,\u221e]>{1,4} ]?",
       "initial": "see individual properties",
       "inherited": "see individual properties",
       "longhands": [
@@ -4555,7 +4555,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "none | [ <length-percentage [0,∞]> | <flex> ]+",
+      "syntax": "none | [ <length-percentage [0,\u221e]> | <flex> ]+",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -4599,7 +4599,7 @@
       "kind": "shorthand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<length-percentage [0,∞]>{1,2} [ / <length-percentage [0,∞]>{1,2} ]?",
+      "syntax": "<length-percentage [0,\u221e]>{1,2} [ / <length-percentage [0,\u221e]>{1,2} ]?",
       "initial": "0",
       "inherited": "no",
       "longhands": [
@@ -4692,7 +4692,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<length [0,∞]>{1,2}",
+      "syntax": "<length [0,\u221e]>{1,2}",
       "initial": "0px 0px",
       "inherited": "yes",
       "longhands": [],
@@ -4816,7 +4816,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "none | [ <length-percentage [0,∞]> | <flex> ]+",
+      "syntax": "none | [ <length-percentage [0,\u221e]> | <flex> ]+",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -4883,7 +4883,7 @@
       "kind": "shorthand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<length-percentage [0,∞]>{1,2} [ / <length-percentage [0,∞]>{1,2} ]?",
+      "syntax": "<length-percentage [0,\u221e]>{1,2} [ / <length-percentage [0,\u221e]>{1,2} ]?",
       "initial": "0",
       "inherited": "no",
       "longhands": [
@@ -5080,7 +5080,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<length [0,∞]>#",
+      "syntax": "<length [0,\u221e]>#",
       "initial": "0",
       "inherited": "no",
       "longhands": [],
@@ -5454,9 +5454,9 @@
       "groups": [
         "CSS Masking"
       ],
-      "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "unsupported",
+      "code_path": "",
+      "notes": "CSS masking/clipping/filter effects; out of scope for print PDF engine. Left unsupported."
     },
     {
       "property": "clip-path",
@@ -5477,9 +5477,9 @@
       "groups": [
         "CSS Masking"
       ],
-      "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "unsupported",
+      "code_path": "",
+      "notes": "CSS masking/clipping/filter effects; out of scope for print PDF engine. Left unsupported."
     },
     {
       "property": "clip-rule",
@@ -5500,9 +5500,9 @@
       "groups": [
         "CSS Masking"
       ],
-      "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "unsupported",
+      "code_path": "",
+      "notes": "CSS masking/clipping/filter effects; out of scope for print PDF engine. Left unsupported."
     },
     {
       "property": "color",
@@ -5567,9 +5567,9 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/color-interpolation",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "engine_status": "unsupported",
+      "code_path": "",
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "color-interpolation-filters",
@@ -5590,9 +5590,9 @@
       "groups": [
         "Filter Effects"
       ],
-      "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "unsupported",
+      "code_path": "",
+      "notes": "CSS masking/clipping/filter effects; out of scope for print PDF engine. Left unsupported."
     },
     {
       "property": "color-scheme",
@@ -5622,7 +5622,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto | <integer [1,∞]>",
+      "syntax": "auto | <integer [1,\u221e]>",
       "initial": "auto",
       "inherited": "no",
       "longhands": [],
@@ -5668,7 +5668,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "normal | <length-percentage [0,∞]> | <line-width>",
+      "syntax": "normal | <length-percentage [0,\u221e]> | <line-width>",
       "initial": "normal",
       "inherited": "no",
       "longhands": [],
@@ -5692,7 +5692,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto | <length [0,∞]>",
+      "syntax": "auto | <length [0,\u221e]>",
       "initial": "auto",
       "inherited": "no",
       "longhands": [],
@@ -6060,7 +6060,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "none | <integer [1,∞]> | all | auto",
+      "syntax": "none | <integer [1,\u221e]> | all | auto",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -6083,7 +6083,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto | <length [0,∞]> | min-content | max-content | fit-content(<length-percentage>)",
+      "syntax": "auto | <length [0,\u221e]> | min-content | max-content | fit-content(<length-percentage>)",
       "initial": "auto",
       "inherited": "no",
       "longhands": [],
@@ -6181,7 +6181,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto? [ none | <length [0,∞]> ]",
+      "syntax": "auto? [ none | <length [0,\u221e]> ]",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -6204,7 +6204,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto? [ none | <length [0,∞]> ]",
+      "syntax": "auto? [ none | <length [0,\u221e]> ]",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -6227,7 +6227,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto? [ none | <length [0,∞]> ]",
+      "syntax": "auto? [ none | <length [0,\u221e]> ]",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -6250,7 +6250,7 @@
       "kind": "shorthand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "[ auto? [ none | <length [0,∞]> ] ]{1,2}",
+      "syntax": "[ auto? [ none | <length [0,\u221e]> ] ]{1,2}",
       "initial": "see individual properties",
       "inherited": "see individual properties",
       "longhands": [
@@ -6276,7 +6276,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto? [ none | <length [0,∞]> ]",
+      "syntax": "auto? [ none | <length [0,\u221e]> ]",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -7461,7 +7461,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "cy",
@@ -7484,7 +7484,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "d",
@@ -7507,7 +7507,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "direction",
@@ -7575,9 +7575,9 @@
         "CSS Inline",
         "Scalable Vector Graphics"
       ],
-      "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "engine_status": "unsupported",
+      "code_path": "",
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "dynamic-range-limit",
@@ -7732,7 +7732,7 @@
       ],
       "engine_status": "implemented",
       "code_path": "internal/layout/style_paint_props.go",
-      "notes": "SVG presentation property applied to ResolvedStyle."
+      "notes": "SVG presentation property parsed and resolved in ResolvedStyle (no direct HTML box paint consumer; SVG rasterization handled via internal/svg)."
     },
     {
       "property": "fill-break",
@@ -7753,7 +7753,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "fill-color",
@@ -7774,7 +7774,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "fill-image",
@@ -7795,7 +7795,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "fill-opacity",
@@ -7818,7 +7818,7 @@
       ],
       "engine_status": "implemented",
       "code_path": "internal/layout/style_paint_props.go",
-      "notes": "SVG presentation property applied to ResolvedStyle."
+      "notes": "SVG presentation property parsed and resolved in ResolvedStyle (no direct HTML box paint consumer; SVG rasterization handled via internal/svg)."
     },
     {
       "property": "fill-origin",
@@ -7839,7 +7839,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "fill-position",
@@ -7860,7 +7860,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "fill-repeat",
@@ -7881,7 +7881,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "fill-rule",
@@ -7902,9 +7902,9 @@
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "unsupported",
+      "code_path": "",
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "fill-size",
@@ -7925,7 +7925,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "filter",
@@ -8054,7 +8054,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<number [0,∞]>",
+      "syntax": "<number [0,\u221e]>",
       "initial": "0",
       "inherited": "no",
       "longhands": [],
@@ -8077,7 +8077,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<integer [1,∞]>",
+      "syntax": "<integer [1,\u221e]>",
       "initial": "1",
       "inherited": "no",
       "longhands": [],
@@ -8100,7 +8100,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<number [0,∞]>",
+      "syntax": "<number [0,\u221e]>",
       "initial": "1",
       "inherited": "no",
       "longhands": [],
@@ -8248,7 +8248,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "CSS masking/clipping/filter effects; out of scope for print PDF engine. Left unsupported."
     },
     {
       "property": "flood-opacity",
@@ -8271,7 +8271,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "CSS masking/clipping/filter effects; out of scope for print PDF engine. Left unsupported."
     },
     {
       "property": "flow-from",
@@ -8292,7 +8292,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "CSS Regions/Exclusions; permanent print non-goal. Left unsupported."
     },
     {
       "property": "flow-into",
@@ -8313,14 +8313,14 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "CSS Regions/Exclusions; permanent print non-goal. Left unsupported."
     },
     {
       "property": "flow-tolerance",
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "normal | <length-percentage [0,∞]> | infinite",
+      "syntax": "normal | <length-percentage [0,\u221e]> | infinite",
       "initial": "normal",
       "inherited": "no",
       "longhands": [],
@@ -8334,7 +8334,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "CSS Regions/Exclusions; permanent print non-goal. Left unsupported."
     },
     {
       "property": "font",
@@ -8510,7 +8510,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<absolute-size> | <relative-size> | <length-percentage [0,∞]> | math",
+      "syntax": "<absolute-size> | <relative-size> | <length-percentage [0,\u221e]> | math",
       "initial": "medium",
       "inherited": "yes",
       "longhands": [],
@@ -8533,7 +8533,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "none | [ ex-height | cap-height | ch-width | ic-width | ic-height ]? [ from-font | <number [0,∞]> ]",
+      "syntax": "none | [ ex-height | cap-height | ch-width | ic-width | ic-height ]? [ from-font | <number [0,\u221e]> ]",
       "initial": "none",
       "inherited": "yes",
       "longhands": [],
@@ -8556,7 +8556,7 @@
       "kind": "legacy-alias",
       "legacy_aliases": [],
       "legacy_of": "font-width",
-      "syntax": "normal | <percentage [0,∞]> | ultra-condensed | extra-condensed | condensed | semi-condensed | semi-expanded | expanded | extra-expanded | ultra-expanded",
+      "syntax": "normal | <percentage [0,\u221e]> | ultra-condensed | extra-condensed | condensed | semi-condensed | semi-expanded | expanded | extra-expanded | ultra-expanded",
       "initial": null,
       "inherited": null,
       "longhands": [],
@@ -8959,7 +8959,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "normal | <percentage [0,∞]> | ultra-condensed | extra-condensed | condensed | semi-condensed | semi-expanded | expanded | extra-expanded | ultra-expanded",
+      "syntax": "normal | <percentage [0,\u221e]> | ultra-condensed | extra-condensed | condensed | semi-condensed | semi-expanded | expanded | extra-expanded | ultra-expanded",
       "initial": "normal",
       "inherited": "yes",
       "longhands": [],
@@ -9110,7 +9110,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "grid",
@@ -9293,7 +9293,7 @@
       "kind": "legacy-alias",
       "legacy_aliases": [],
       "legacy_of": "column-gap",
-      "syntax": "normal | <length-percentage [0,∞]> | <line-width>",
+      "syntax": "normal | <length-percentage [0,\u221e]> | <line-width>",
       "initial": null,
       "inherited": null,
       "longhands": [],
@@ -9414,7 +9414,7 @@
       "kind": "legacy-alias",
       "legacy_aliases": [],
       "legacy_of": "row-gap",
-      "syntax": "normal | <length-percentage [0,∞]> | <line-width>",
+      "syntax": "normal | <length-percentage [0,\u221e]> | <line-width>",
       "initial": null,
       "inherited": null,
       "longhands": [],
@@ -9579,7 +9579,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto | <length-percentage [0,∞]> | min-content | max-content | fit-content(<length-percentage [0,∞]>) | <calc-size()> | <anchor-size()> | stretch | fit-content | contain",
+      "syntax": "auto | <length-percentage [0,\u221e]> | min-content | max-content | fit-content(<length-percentage [0,\u221e]>) | <calc-size()> | <anchor-size()> | stretch | fit-content | contain",
       "initial": "auto",
       "inherited": "no",
       "longhands": [],
@@ -9625,7 +9625,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "[ auto | <integer [0,∞]> ]{1,3}",
+      "syntax": "[ auto | <integer [0,\u221e]> ]{1,3}",
       "initial": "auto",
       "inherited": "yes",
       "longhands": [],
@@ -9669,7 +9669,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "no-limit | <integer [0,∞]>",
+      "syntax": "no-limit | <integer [0,\u221e]>",
       "initial": "no-limit",
       "inherited": "yes",
       "longhands": [],
@@ -9794,7 +9794,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "image-resolution",
@@ -9824,7 +9824,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "normal | <number [1,∞]> <integer [1,∞]> | <number [1,∞]> && [ drop | raise ]?",
+      "syntax": "normal | <number [1,\u221e]> <integer [1,\u221e]> | <number [1,\u221e]> && [ drop | raise ]?",
       "initial": "normal",
       "inherited": "no",
       "longhands": [],
@@ -10409,7 +10409,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "CSS masking/clipping/filter effects; out of scope for print PDF engine. Left unsupported."
     },
     {
       "property": "line-break",
@@ -10439,7 +10439,7 @@
       "kind": "shorthand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "none | [<integer [1,∞]> || <'block-ellipsis'>] -webkit-legacy?",
+      "syntax": "none | [<integer [1,\u221e]> || <'block-ellipsis'>] -webkit-legacy?",
       "initial": "none",
       "inherited": "see individual properties",
       "longhands": [
@@ -10508,7 +10508,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "normal | <number [0,∞]> | <length-percentage [0,∞]>",
+      "syntax": "normal | <number [0,\u221e]> | <length-percentage [0,\u221e]>",
       "initial": "normal",
       "inherited": "yes",
       "longhands": [],
@@ -10531,7 +10531,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<length [0,∞]>",
+      "syntax": "<length [0,\u221e]>",
       "initial": "0",
       "inherited": "yes",
       "longhands": [],
@@ -11047,7 +11047,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "marker-end",
@@ -11070,7 +11070,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "marker-mid",
@@ -11093,7 +11093,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "marker-side",
@@ -11114,7 +11114,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "marker-start",
@@ -11137,7 +11137,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "mask",
@@ -11169,7 +11169,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "CSS masking/clipping/filter effects; out of scope for print PDF engine. Left unsupported."
     },
     {
       "property": "mask-border",
@@ -11199,7 +11199,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "CSS masking/clipping/filter effects; out of scope for print PDF engine. Left unsupported."
     },
     {
       "property": "mask-border-mode",
@@ -11222,7 +11222,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "CSS masking/clipping/filter effects; out of scope for print PDF engine. Left unsupported."
     },
     {
       "property": "mask-border-outset",
@@ -11245,7 +11245,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "CSS masking/clipping/filter effects; out of scope for print PDF engine. Left unsupported."
     },
     {
       "property": "mask-border-repeat",
@@ -11268,7 +11268,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "CSS masking/clipping/filter effects; out of scope for print PDF engine. Left unsupported."
     },
     {
       "property": "mask-border-slice",
@@ -11291,7 +11291,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "CSS masking/clipping/filter effects; out of scope for print PDF engine. Left unsupported."
     },
     {
       "property": "mask-border-source",
@@ -11314,7 +11314,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "CSS masking/clipping/filter effects; out of scope for print PDF engine. Left unsupported."
     },
     {
       "property": "mask-border-width",
@@ -11337,7 +11337,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "CSS masking/clipping/filter effects; out of scope for print PDF engine. Left unsupported."
     },
     {
       "property": "mask-clip",
@@ -11360,7 +11360,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "CSS masking/clipping/filter effects; out of scope for print PDF engine. Left unsupported."
     },
     {
       "property": "mask-composite",
@@ -11383,7 +11383,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "CSS masking/clipping/filter effects; out of scope for print PDF engine. Left unsupported."
     },
     {
       "property": "mask-image",
@@ -11406,7 +11406,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "CSS masking/clipping/filter effects; out of scope for print PDF engine. Left unsupported."
     },
     {
       "property": "mask-mode",
@@ -11429,7 +11429,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "CSS masking/clipping/filter effects; out of scope for print PDF engine. Left unsupported."
     },
     {
       "property": "mask-origin",
@@ -11452,7 +11452,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "CSS masking/clipping/filter effects; out of scope for print PDF engine. Left unsupported."
     },
     {
       "property": "mask-position",
@@ -11475,7 +11475,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "CSS masking/clipping/filter effects; out of scope for print PDF engine. Left unsupported."
     },
     {
       "property": "mask-repeat",
@@ -11498,7 +11498,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "CSS masking/clipping/filter effects; out of scope for print PDF engine. Left unsupported."
     },
     {
       "property": "mask-size",
@@ -11521,7 +11521,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "CSS masking/clipping/filter effects; out of scope for print PDF engine. Left unsupported."
     },
     {
       "property": "mask-type",
@@ -11544,7 +11544,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "CSS masking/clipping/filter effects; out of scope for print PDF engine. Left unsupported."
     },
     {
       "property": "math-depth",
@@ -11643,7 +11643,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "none | <length-percentage [0,∞]> | min-content | max-content | fit-content(<length-percentage [0,∞]>) | <calc-size()> | <anchor-size()> | stretch | fit-content | contain",
+      "syntax": "none | <length-percentage [0,\u221e]> | min-content | max-content | fit-content(<length-percentage [0,\u221e]>) | <calc-size()> | <anchor-size()> | stretch | fit-content | contain",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -11689,7 +11689,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "none | <integer [1,∞]>",
+      "syntax": "none | <integer [1,\u221e]>",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -11712,7 +11712,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "none | <length-percentage [0,∞]> | min-content | max-content | fit-content(<length-percentage [0,∞]>) | <calc-size()> | <anchor-size()> | stretch | fit-content | contain",
+      "syntax": "none | <length-percentage [0,\u221e]> | min-content | max-content | fit-content(<length-percentage [0,\u221e]>) | <calc-size()> | <anchor-size()> | stretch | fit-content | contain",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -11758,7 +11758,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto | <length-percentage [0,∞]> | min-content | max-content | fit-content(<length-percentage [0,∞]>) | <calc-size()> | <anchor-size()> | stretch | fit-content | contain",
+      "syntax": "auto | <length-percentage [0,\u221e]> | min-content | max-content | fit-content(<length-percentage [0,\u221e]>) | <calc-size()> | <anchor-size()> | stretch | fit-content | contain",
       "initial": "auto",
       "inherited": "no",
       "longhands": [],
@@ -11825,7 +11825,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto | <length-percentage [0,∞]> | min-content | max-content | fit-content(<length-percentage [0,∞]>) | <calc-size()> | <anchor-size()> | stretch | fit-content | contain",
+      "syntax": "auto | <length-percentage [0,\u221e]> | min-content | max-content | fit-content(<length-percentage [0,\u221e]>) | <calc-size()> | <anchor-size()> | stretch | fit-content | contain",
       "initial": "auto",
       "inherited": "no",
       "longhands": [],
@@ -12214,7 +12214,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<integer [1,∞]>",
+      "syntax": "<integer [1,\u221e]>",
       "initial": "2",
       "inherited": "yes",
       "longhands": [],
@@ -13005,7 +13005,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<length-percentage [0,∞]>",
+      "syntax": "<length-percentage [0,\u221e]>",
       "initial": "0",
       "inherited": "no",
       "longhands": [],
@@ -13100,7 +13100,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<length-percentage [0,∞]>",
+      "syntax": "<length-percentage [0,\u221e]>",
       "initial": "0",
       "inherited": "no",
       "longhands": [],
@@ -13123,7 +13123,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<length-percentage [0,∞]>",
+      "syntax": "<length-percentage [0,\u221e]>",
       "initial": "0",
       "inherited": "no",
       "longhands": [],
@@ -13146,7 +13146,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<length-percentage [0,∞]>",
+      "syntax": "<length-percentage [0,\u221e]>",
       "initial": "0",
       "inherited": "no",
       "longhands": [],
@@ -13277,14 +13277,14 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "path-length",
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "none | <length> [0,∞]",
+      "syntax": "none | <length> [0,\u221e]",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -13300,7 +13300,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "pause",
@@ -13331,7 +13331,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<time [0s,∞]> | none | x-weak | weak | medium | strong | x-strong",
+      "syntax": "<time [0s,\u221e]> | none | x-weak | weak | medium | strong | x-strong",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -13352,7 +13352,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<time [0s,∞]> | none | x-weak | weak | medium | strong | x-strong",
+      "syntax": "<time [0s,\u221e]> | none | x-weak | weak | medium | strong | x-strong",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -13373,7 +13373,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "none | <length [0,∞]>",
+      "syntax": "none | <length [0,\u221e]>",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -13812,7 +13812,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "reading-flow",
@@ -13879,7 +13879,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "CSS Regions/Exclusions; permanent print non-goal. Left unsupported."
     },
     {
       "property": "resize",
@@ -13933,7 +13933,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<time [0s,∞]> | none | x-weak | weak | medium | strong | x-strong",
+      "syntax": "<time [0s,\u221e]> | none | x-weak | weak | medium | strong | x-strong",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -13954,7 +13954,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<time [0s,∞]> | none | x-weak | weak | medium | strong | x-strong",
+      "syntax": "<time [0s,\u221e]> | none | x-weak | weak | medium | strong | x-strong",
       "initial": "none",
       "inherited": "no",
       "longhands": [],
@@ -14022,7 +14022,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "normal | <length-percentage [0,∞]> | <line-width>",
+      "syntax": "normal | <length-percentage [0,\u221e]> | <line-width>",
       "initial": "normal",
       "inherited": "no",
       "longhands": [],
@@ -14771,7 +14771,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "ry",
@@ -14794,7 +14794,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "scale",
@@ -15178,7 +15178,7 @@
       "kind": "shorthand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "[ auto | <length-percentage [0,∞]> ]{1,4}",
+      "syntax": "[ auto | <length-percentage [0,\u221e]> ]{1,4}",
       "initial": "auto",
       "inherited": "no",
       "longhands": [
@@ -15206,7 +15206,7 @@
       "kind": "shorthand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "[ auto | <length-percentage [0,∞]> ]{1,2}",
+      "syntax": "[ auto | <length-percentage [0,\u221e]> ]{1,2}",
       "initial": "auto",
       "inherited": "no",
       "longhands": [
@@ -15232,7 +15232,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto | <length-percentage [0,∞]>",
+      "syntax": "auto | <length-percentage [0,\u221e]>",
       "initial": "auto",
       "inherited": "no",
       "longhands": [],
@@ -15255,7 +15255,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto | <length-percentage [0,∞]>",
+      "syntax": "auto | <length-percentage [0,\u221e]>",
       "initial": "auto",
       "inherited": "no",
       "longhands": [],
@@ -15278,7 +15278,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto | <length-percentage [0,∞]>",
+      "syntax": "auto | <length-percentage [0,\u221e]>",
       "initial": "auto",
       "inherited": "no",
       "longhands": [],
@@ -15301,7 +15301,7 @@
       "kind": "shorthand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "[ auto | <length-percentage [0,∞]> ]{1,2}",
+      "syntax": "[ auto | <length-percentage [0,\u221e]> ]{1,2}",
       "initial": "auto",
       "inherited": "no",
       "longhands": [
@@ -15327,7 +15327,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto | <length-percentage [0,∞]>",
+      "syntax": "auto | <length-percentage [0,\u221e]>",
       "initial": "auto",
       "inherited": "no",
       "longhands": [],
@@ -15350,7 +15350,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto | <length-percentage [0,∞]>",
+      "syntax": "auto | <length-percentage [0,\u221e]>",
       "initial": "auto",
       "inherited": "no",
       "longhands": [],
@@ -15373,7 +15373,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto | <length-percentage [0,∞]>",
+      "syntax": "auto | <length-percentage [0,\u221e]>",
       "initial": "auto",
       "inherited": "no",
       "longhands": [],
@@ -15396,7 +15396,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto | <length-percentage [0,∞]>",
+      "syntax": "auto | <length-percentage [0,\u221e]>",
       "initial": "auto",
       "inherited": "no",
       "longhands": [],
@@ -15419,7 +15419,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto | <length-percentage [0,∞]>",
+      "syntax": "auto | <length-percentage [0,\u221e]>",
       "initial": "auto",
       "inherited": "no",
       "longhands": [],
@@ -15719,7 +15719,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<length-percentage [0,∞]>",
+      "syntax": "<length-percentage [0,\u221e]>",
       "initial": "0",
       "inherited": "no",
       "longhands": [],
@@ -15765,7 +15765,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<length-percentage [0,∞]>",
+      "syntax": "<length-percentage [0,\u221e]>",
       "initial": "0",
       "inherited": "no",
       "longhands": [],
@@ -15800,9 +15800,9 @@
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "engine_status": "unsupported",
+      "code_path": "",
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "slider-orientation",
@@ -15953,7 +15953,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "stop-opacity",
@@ -15976,7 +15976,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "string-set",
@@ -16020,7 +16020,7 @@
       ],
       "engine_status": "implemented",
       "code_path": "internal/layout/style_paint_props.go",
-      "notes": "SVG presentation property applied to ResolvedStyle."
+      "notes": "SVG presentation property parsed and resolved in ResolvedStyle (no direct HTML box paint consumer; SVG rasterization handled via internal/svg)."
     },
     {
       "property": "stroke-align",
@@ -16041,7 +16041,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "stroke-alignment",
@@ -16062,7 +16062,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "stroke-break",
@@ -16083,7 +16083,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "stroke-color",
@@ -16106,7 +16106,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "stroke-dash-corner",
@@ -16127,7 +16127,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "stroke-dash-justify",
@@ -16148,7 +16148,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "stroke-dashadjust",
@@ -16169,7 +16169,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "stroke-dasharray",
@@ -16190,9 +16190,9 @@
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "unsupported",
+      "code_path": "",
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "stroke-dashcorner",
@@ -16213,7 +16213,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "stroke-dashoffset",
@@ -16234,9 +16234,9 @@
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "unsupported",
+      "code_path": "",
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "stroke-image",
@@ -16257,7 +16257,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "stroke-linecap",
@@ -16278,9 +16278,9 @@
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "unsupported",
+      "code_path": "",
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "stroke-linejoin",
@@ -16301,9 +16301,9 @@
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "unsupported",
+      "code_path": "",
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "stroke-miterlimit",
@@ -16324,9 +16324,9 @@
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "engine_status": "unsupported",
+      "code_path": "",
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "stroke-opacity",
@@ -16349,7 +16349,7 @@
       ],
       "engine_status": "implemented",
       "code_path": "internal/layout/style_paint_props.go",
-      "notes": "SVG presentation property applied to ResolvedStyle."
+      "notes": "SVG presentation property parsed and resolved in ResolvedStyle (no direct HTML box paint consumer; SVG rasterization handled via internal/svg)."
     },
     {
       "property": "stroke-origin",
@@ -16370,7 +16370,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "stroke-position",
@@ -16391,7 +16391,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "stroke-repeat",
@@ -16412,7 +16412,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "stroke-size",
@@ -16433,7 +16433,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": "Honesty revert: catalog Implemented without engine support (phases 69-77 fake close)."
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "stroke-width",
@@ -16456,14 +16456,14 @@
       ],
       "engine_status": "implemented",
       "code_path": "internal/layout/style_paint_props.go",
-      "notes": "SVG presentation property applied to ResolvedStyle."
+      "notes": "SVG presentation property parsed and resolved in ResolvedStyle (no direct HTML box paint consumer; SVG rasterization handled via internal/svg)."
     },
     {
       "property": "tab-size",
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<number [0,∞]> | <length [0,∞]>",
+      "syntax": "<number [0,\u221e]> | <length [0,\u221e]>",
       "initial": "8",
       "inherited": "yes",
       "longhands": [],
@@ -16593,9 +16593,9 @@
       "groups": [
         "Scalable Vector Graphics"
       ],
-      "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "engine_status": "unsupported",
+      "code_path": "",
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "text-autospace",
@@ -17242,7 +17242,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "text-shadow",
@@ -17272,7 +17272,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto | none | <percentage [0,∞]>",
+      "syntax": "auto | none | <percentage [0,\u221e]>",
       "initial": "auto",
       "inherited": "yes",
       "longhands": [],
@@ -17939,7 +17939,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<time [0s,∞]>#",
+      "syntax": "<time [0s,\u221e]>#",
       "initial": "0s",
       "inherited": "no",
       "longhands": [],
@@ -18116,7 +18116,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "vertical-align",
@@ -18380,7 +18380,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto | <time [0s,∞]>",
+      "syntax": "auto | <time [0s,\u221e]>",
       "initial": "auto",
       "inherited": "no",
       "longhands": [],
@@ -18422,7 +18422,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<frequency [0Hz,∞]> && absolute | [ [ x-low | low | medium | high | x-high ] || [ <frequency [0Hz,∞]> | <semitones> | <percentage> ] ]",
+      "syntax": "<frequency [0Hz,\u221e]> && absolute | [ [ x-low | low | medium | high | x-high ] || [ <frequency [0Hz,\u221e]> | <semitones> | <percentage> ] ]",
       "initial": "medium",
       "inherited": "yes",
       "longhands": [],
@@ -18443,7 +18443,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<frequency [0Hz,∞]> && absolute | [ [ x-low | low | medium | high | x-high ] || [ <frequency [0Hz,∞]> | <semitones> | <percentage> ] ]",
+      "syntax": "<frequency [0Hz,\u221e]> && absolute | [ [ x-low | low | medium | high | x-high ] || [ <frequency [0Hz,\u221e]> | <semitones> | <percentage> ] ]",
       "initial": "medium",
       "inherited": "yes",
       "longhands": [],
@@ -18464,7 +18464,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "[ normal | x-slow | slow | medium | fast | x-fast ] || <percentage [0,∞]>",
+      "syntax": "[ normal | x-slow | slow | medium | fast | x-fast ] || <percentage [0,\u221e]>",
       "initial": "normal",
       "inherited": "yes",
       "longhands": [],
@@ -18597,7 +18597,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<integer [1,∞]>",
+      "syntax": "<integer [1,\u221e]>",
       "initial": "2",
       "inherited": "yes",
       "longhands": [],
@@ -18620,7 +18620,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "auto | <length-percentage [0,∞]> | min-content | max-content | fit-content(<length-percentage [0,∞]>) | <calc-size()> | <anchor-size()> | stretch | fit-content | contain",
+      "syntax": "auto | <length-percentage [0,\u221e]> | min-content | max-content | fit-content(<length-percentage [0,\u221e]>) | <calc-size()> | <anchor-size()> | stretch | fit-content | contain",
       "initial": "auto",
       "inherited": "no",
       "longhands": [],
@@ -18791,7 +18791,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "CSS Regions/Exclusions; permanent print non-goal. Left unsupported."
     },
     {
       "property": "wrap-before",
@@ -18812,7 +18812,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "CSS Regions/Exclusions; permanent print non-goal. Left unsupported."
     },
     {
       "property": "wrap-flow",
@@ -18833,7 +18833,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "CSS Regions/Exclusions; permanent print non-goal. Left unsupported."
     },
     {
       "property": "wrap-inside",
@@ -18854,7 +18854,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "CSS Regions/Exclusions; permanent print non-goal. Left unsupported."
     },
     {
       "property": "wrap-through",
@@ -18875,7 +18875,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "CSS Regions/Exclusions; permanent print non-goal. Left unsupported."
     },
     {
       "property": "writing-mode",
@@ -18921,7 +18921,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "y",
@@ -18944,7 +18944,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "SVG presentation property; out of scope for print CSS without full SVG composition engine. Left unsupported."
     },
     {
       "property": "z-index",
@@ -18974,7 +18974,7 @@
       "kind": "longhand",
       "legacy_aliases": [],
       "legacy_of": null,
-      "syntax": "<number [0,∞]> | <percentage [0,∞]>",
+      "syntax": "<number [0,\u221e]> | <percentage [0,\u221e]>",
       "initial": "1",
       "inherited": "no",
       "longhands": [],
@@ -22601,7 +22601,7 @@
       "print_relevant": true,
       "goal": "implement",
       "engine_status": "partial",
-      "notes": "Viewport vmax; some length paths pass containing for both axes so vmin≈vmax.",
+      "notes": "Viewport vmax; some length paths pass containing for both axes so vmin\u2248vmax.",
       "code_path": "internal/layout/style_values.go"
     },
     {
@@ -22613,7 +22613,7 @@
       "print_relevant": true,
       "goal": "implement",
       "engine_status": "partial",
-      "notes": "Viewport vmin; some length paths pass containing for both axes so vmin≈vmax.",
+      "notes": "Viewport vmin; some length paths pass containing for both axes so vmin\u2248vmax.",
       "code_path": "internal/layout/style_values.go"
     },
     {

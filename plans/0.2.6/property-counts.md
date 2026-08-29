@@ -2,16 +2,16 @@
 
 WebRef inventory size is 818 property names.
 
-## Current snapshot (Advanced Print Waves A-D 2026-08-29)
+## Current snapshot (Phase 83 Hard Defer 2026-08-29)
 
 | Status | Count |
 |--------|------:|
-| Implemented | 380 |
+| Implemented | 365 |
 | Partial | 0 |
-| Unsupported | 438 |
+| Unsupported | 453 |
 | Ignored | 0 |
 
-Phase 80 and Advanced Waves A-D implemented 176 print properties across all waves with full code paths, consumers, and unit tests (PDF bookmarks & outline levels, line clamping, text truncation & ellipsis, universal reset, box decoration break, image orientation & resolution, print color adjust, color scheme, container sizing, variable fonts, OpenType overrides, blend modes, text emphasis, and text decoration skip).
+Phase 83 audited and locked all 87 hard-defer properties (53 SVG presentation, 25 mask/clip/filter effects, 9 CSS Regions/Exclusions) as honest Unsupported with empty code paths and clear per-bucket notes. Phase 70 SVG presentation properties (fill, stroke, stroke-width, fill-opacity, stroke-opacity) remain Implemented with honest ResolvedStyle notes.
 
 ## Unsupported triage (phases 80-84, not started)
 
