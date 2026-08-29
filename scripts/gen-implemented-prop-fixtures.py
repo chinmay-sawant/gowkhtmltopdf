@@ -121,7 +121,18 @@ def effect_html(prop: str, kind: str, legacy_of: str | None) -> str:
     if p == "text-indent":
         return f'<div style="{p}:24px;border:1px solid #888;">Indented first line of a short paragraph.</div>'
     if p.startswith("white-space") or p in ("tab-size", "line-break", "overflow-wrap", "word-break", "word-wrap", "hyphens", "hyphenate-character"):
-        return f'<div style="{p}:{"pre-wrap" if "white-space" in p else ("4" if p=="tab-size" else ("auto" if "hyphen" in p else "break-word"))};border:1px dashed #888;width:140px;font-size:9pt;">supercalifragilistic wrapping-hyphenation sample</div>'
+        # Latin-only sample: CJK in Liberation triggers an empty Type0 cmap on write.
+        val = "pre-wrap" if "white-space" in p else (
+            "4" if p == "tab-size" else (
+                "auto" if "hyphen" in p else (
+                    "anywhere" if p == "line-break" else "break-word"
+                )
+            )
+        )
+        return (
+            f'<div style="{p}:{val};border:1px dashed #888;width:140px;font-size:9pt;">'
+            f'supercalifragilistic wrapping-hyphenation sample</div>'
+        )
     if p.startswith("margin"):
         return f'<div style="border:1px solid #333;display:inline-block;"><div style="{p}:10px;background:#dfd;border:1px dashed #080;">margin</div></div>'
     if p.startswith("padding"):

@@ -390,3 +390,39 @@ func TestCFFOTTORejection(t *testing.T) {
 		t.Fatalf("ParseTTF(OTTO) err = %v, want %v", err, errFontCFFNotSupported)
 	}
 }
+
+// TestType0MissingGlyphsDoNotEmptyCmap: non-Latin runes the face lacks must
+// not create an F0_u subset with an empty cmap (Write used to fail that way
+// for fixture-61 katakana on Liberation).
+func TestType0MissingGlyphsDoNotEmptyCmap(t *testing.T) {
+	t.Parallel()
+
+	face, err := DefaultFont()
+	if err != nil || face == nil {
+		t.Fatal(err)
+	}
+
+	dVal := fixedDoc(t)
+	dVal.SetCompression(false)
+	p := dVal.AddPage(400, 200)
+	cur := p.Content()
+	cur.UseEmbeddedFont("F0", face)
+	cur.BeginText()
+	cur.SetFont("F0", 12)
+	cur.TextAt(20, 100)
+	cur.TextShow("スーパー / super")
+	cur.EndText()
+
+	out := writePDF(t, dVal)
+	s := string(out)
+	if !bytes.Contains(out, []byte("%PDF-")) {
+		t.Fatal("expected a PDF")
+	}
+	// No Type0 sibling when Liberation has no katakana glyphs.
+	if strings.Contains(s, "/F0_u") {
+		t.Fatal("Liberation must not grow F0_u for missing katakana glyphs")
+	}
+	if !strings.Contains(s, "(super)") && !strings.Contains(s, "super") {
+		t.Fatal("expected Latin run to survive")
+	}
+}
