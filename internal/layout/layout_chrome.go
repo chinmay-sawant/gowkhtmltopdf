@@ -390,7 +390,10 @@ func roundedSolidBorder(sty ResolvedStyle) bool {
 }
 
 func roundedAccentBorder(sty ResolvedStyle) bool {
-	return sty.BorderTop.Width > 0 && sty.BorderTop.Style == solidKeyword
+	return (sty.BorderTop.Width > 0 && sty.BorderTop.Style == solidKeyword) ||
+		(sty.BorderRight.Width > 0 && sty.BorderRight.Style == solidKeyword) ||
+		(sty.BorderBottom.Width > 0 && sty.BorderBottom.Style == solidKeyword) ||
+		(sty.BorderLeft.Width > 0 && sty.BorderLeft.Style == solidKeyword)
 }
 
 func squareSideBorderRadii(side border, radii [4]float64, left bool) [4]float64 {
@@ -464,9 +467,8 @@ func (e *engine) roundedBorderOps(
 	return ops
 }
 
-// roundedAccentBorderOps keeps a solid top rail curved when the remaining
-// border sides use dotted or dashed styles. A complete rounded stroke cannot
-// represent those mixed styles, so the accent is a masked rounded path.
+// roundedAccentBorderOps keeps a solid accent rail curved when the remaining
+// border sides are absent or use dotted/dashed styles.
 // Solid remnant sides use StrokeMask* overlays; dashed/dotted sides stay as
 // segmented OpLines that stop at the corner radii.
 func (e *engine) roundedAccentBorderOps(
@@ -474,13 +476,7 @@ func (e *engine) roundedAccentBorderOps(
 	posX, posY, width, height float64,
 	radii [4]float64,
 ) []Op {
-	top := sty.BorderTop
-	ops := []Op{{ //nolint:exhaustruct // intentional zero fields
-		Kind: OpStrokeRect, X: posX, Y: posY, W: width, H: height,
-		R: top.Color[0], G: top.Color[1], B: top.Color[2], Width: e.scalePt(borderPaint(top)),
-		Radius: uniformRadius(radii), RadiusTopLeft: radii[0], RadiusTopRight: radii[1],
-		RadiusBottomRight: radii[2], RadiusBottomLeft: radii[3], StrokeMask: StrokeMaskTop,
-	}}
+	var ops []Op
 
 	appendSolidMask := func(side border, mask uint8, sideRadii [4]float64) {
 		if borderPaint(side) <= 0 || side.Style != solidKeyword {
@@ -498,7 +494,7 @@ func (e *engine) roundedAccentBorderOps(
 	}
 
 	appendDashedSide := func(sideX, sideY, sideW, sideH float64, side border) {
-		if side.Style == solidKeyword {
+		if borderPaint(side) <= 0 || side.Style == solidKeyword {
 			return
 		}
 
@@ -511,10 +507,12 @@ func (e *engine) roundedAccentBorderOps(
 
 	rightRadii := squareSideBorderRadii(sty.BorderRight, radii, false)
 	leftRadii := squareSideBorderRadii(sty.BorderLeft, radii, true)
+	appendSolidMask(sty.BorderTop, StrokeMaskTop, radii)
 	appendSolidMask(sty.BorderRight, StrokeMaskRight, rightRadii)
 	appendSolidMask(sty.BorderBottom, StrokeMaskBottom, radii)
 	appendSolidMask(sty.BorderLeft, StrokeMaskLeft, leftRadii)
 
+	appendDashedSide(posX+radii[0], posY, math.Max(width-radii[0]-radii[1], 0), 0, sty.BorderTop)
 	appendDashedSide(posX+width, posY+radii[1], 0, math.Max(height-radii[1]-radii[2], 0), sty.BorderRight)
 	appendDashedSide(posX+radii[3], posY+height, math.Max(width-radii[3]-radii[2], 0), 0, sty.BorderBottom)
 	appendDashedSide(posX, posY+radii[0], 0, math.Max(height-radii[0]-radii[3], 0), sty.BorderLeft)

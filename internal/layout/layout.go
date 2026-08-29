@@ -336,6 +336,9 @@ type Op struct {
 	IsJPEG bool
 	Alt    string // Alt text for Figure elements under PDF/UA-1
 
+	// IsBackground marks background/border images that belong to the chrome layer.
+	IsBackground bool
+
 	// Fixed marks ops from position:fixed boxes; Paint stamps them on every
 	// page at viewport-relative coordinates.
 	Fixed bool

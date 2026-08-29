@@ -57,15 +57,16 @@ func (e *engine) appendBorderImage(
 	}
 
 	op := Op{ //nolint:exhaustruct // intentional zero fields
-		Kind:   OpImage,
-		X:      posX,
-		Y:      posY,
-		W:      width,
-		H:      height,
-		Image:  ref.data,
-		ImgW:   ref.w,
-		ImgH:   ref.h,
-		IsJPEG: ref.isJPEG,
+		Kind:         OpImage,
+		X:            posX,
+		Y:            posY,
+		W:            width,
+		H:            height,
+		Image:        ref.data,
+		ImgW:         ref.w,
+		ImgH:         ref.h,
+		IsJPEG:       ref.isJPEG,
+		IsBackground: true,
 	}
 
 	return append(dst, op)

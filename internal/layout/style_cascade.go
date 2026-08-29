@@ -604,6 +604,14 @@ func applyCascadeDeclaration(
 	ids, classes, types, order int,
 	important bool,
 ) {
+	if expanded, ok := expandLogicalBoxDeclaration(prop, value); ok {
+		for _, item := range expanded {
+			applyCascadeDeclaration(wins, item.prop, item.val, ids, classes, types, order, important)
+		}
+
+		return
+	}
+
 	values, ok := expandBoxShorthand(prop, value)
 	if !ok {
 		applyCascadeWin(wins, prop, value, ids, classes, types, order, important)
@@ -613,6 +621,162 @@ func applyCascadeDeclaration(
 
 	for idx, side := range [...]string{"top", "right", "bottom", "left"} {
 		applyCascadeWin(wins, prop+"-"+side, values[idx], ids, classes, types, order, important)
+	}
+}
+
+type logicalPropDecl struct {
+	prop string
+	val  string
+}
+
+// expandLogicalBoxDeclaration expands logical margin/padding/inset/border
+// declarations to their physical counterpart properties for horizontal-tb.
+func expandLogicalBoxDeclaration(prop, value string) ([]logicalPropDecl, bool) {
+	if decls, ok := expandLogicalMarginPadding(prop, value); ok {
+		return decls, true
+	}
+
+	if decls, ok := expandLogicalInset(prop, value); ok {
+		return decls, true
+	}
+
+	return expandLogicalBorder(prop, value)
+}
+
+//nolint:cyclop // logical margin/padding mapping table
+func expandLogicalMarginPadding(prop, value string) ([]logicalPropDecl, bool) {
+	switch prop {
+	case cssPropMarginBlock:
+		start, end, ok := logicalPair(value)
+		if !ok {
+			return nil, false
+		}
+
+		return []logicalPropDecl{{"margin-top", start}, {"margin-bottom", end}}, true
+	case cssPropMarginInline:
+		start, end, ok := logicalPair(value)
+		if !ok {
+			return nil, false
+		}
+
+		return []logicalPropDecl{{"margin-left", start}, {"margin-right", end}}, true
+	case "margin-block-start":
+		return []logicalPropDecl{{"margin-top", value}}, true
+	case "margin-block-end":
+		return []logicalPropDecl{{"margin-bottom", value}}, true
+	case "margin-inline-start":
+		return []logicalPropDecl{{"margin-left", value}}, true
+	case "margin-inline-end":
+		return []logicalPropDecl{{"margin-right", value}}, true
+	case cssPropPaddingBlock:
+		start, end, ok := logicalPair(value)
+		if !ok {
+			return nil, false
+		}
+
+		return []logicalPropDecl{{"padding-top", start}, {"padding-bottom", end}}, true
+	case cssPropPaddingInline:
+		start, end, ok := logicalPair(value)
+		if !ok {
+			return nil, false
+		}
+
+		return []logicalPropDecl{{"padding-left", start}, {"padding-right", end}}, true
+	case "padding-block-start":
+		return []logicalPropDecl{{"padding-top", value}}, true
+	case "padding-block-end":
+		return []logicalPropDecl{{"padding-bottom", value}}, true
+	case "padding-inline-start":
+		return []logicalPropDecl{{"padding-left", value}}, true
+	case "padding-inline-end":
+		return []logicalPropDecl{{"padding-right", value}}, true
+	default:
+		return nil, false
+	}
+}
+
+func expandLogicalInset(prop, value string) ([]logicalPropDecl, bool) {
+	switch prop {
+	case cssPropInsetBlock:
+		start, end, ok := logicalPair(value)
+		if !ok {
+			return nil, false
+		}
+
+		return []logicalPropDecl{{"top", start}, {"bottom", end}}, true
+	case cssPropInsetInline:
+		start, end, ok := logicalPair(value)
+		if !ok {
+			return nil, false
+		}
+
+		return []logicalPropDecl{{"left", start}, {"right", end}}, true
+	case cssPropInsetBlockStart:
+		return []logicalPropDecl{{"top", value}}, true
+	case cssPropInsetBlockEnd:
+		return []logicalPropDecl{{"bottom", value}}, true
+	case cssPropInsetInlineStart:
+		return []logicalPropDecl{{"left", value}}, true
+	case cssPropInsetInlineEnd:
+		return []logicalPropDecl{{"right", value}}, true
+	default:
+		return nil, false
+	}
+}
+
+//nolint:cyclop,funlen // logical border mapping table
+func expandLogicalBorder(prop, value string) ([]logicalPropDecl, bool) {
+	switch prop {
+	case cssPropBorderBlock:
+		return []logicalPropDecl{{"border-top", value}, {"border-bottom", value}}, true
+	case cssPropBorderInline:
+		return []logicalPropDecl{{"border-left", value}, {"border-right", value}}, true
+	case cssPropBorderBlockStart:
+		return []logicalPropDecl{{"border-top", value}}, true
+	case cssPropBorderBlockEnd:
+		return []logicalPropDecl{{"border-bottom", value}}, true
+	case cssPropBorderInlineStart:
+		return []logicalPropDecl{{"border-left", value}}, true
+	case cssPropBorderInlineEnd:
+		return []logicalPropDecl{{"border-right", value}}, true
+	case cssPropBorderBlockColor:
+		return []logicalPropDecl{{"border-top-color", value}, {"border-bottom-color", value}}, true
+	case cssPropBorderInlineColor:
+		return []logicalPropDecl{{"border-left-color", value}, {"border-right-color", value}}, true
+	case cssPropBorderBlockStartColor:
+		return []logicalPropDecl{{"border-top-color", value}}, true
+	case cssPropBorderBlockEndColor:
+		return []logicalPropDecl{{"border-bottom-color", value}}, true
+	case cssPropBorderInlineStartColor:
+		return []logicalPropDecl{{"border-left-color", value}}, true
+	case cssPropBorderInlineEndColor:
+		return []logicalPropDecl{{"border-right-color", value}}, true
+	case cssPropBorderBlockStyle:
+		return []logicalPropDecl{{"border-top-style", value}, {"border-bottom-style", value}}, true
+	case cssPropBorderInlineStyle:
+		return []logicalPropDecl{{"border-left-style", value}, {"border-right-style", value}}, true
+	case cssPropBorderBlockStartStyle:
+		return []logicalPropDecl{{"border-top-style", value}}, true
+	case cssPropBorderBlockEndStyle:
+		return []logicalPropDecl{{"border-bottom-style", value}}, true
+	case cssPropBorderInlineStartStyle:
+		return []logicalPropDecl{{"border-left-style", value}}, true
+	case cssPropBorderInlineEndStyle:
+		return []logicalPropDecl{{"border-right-style", value}}, true
+	case cssPropBorderBlockWidth:
+		return []logicalPropDecl{{"border-top-width", value}, {"border-bottom-width", value}}, true
+	case cssPropBorderInlineWidth:
+		return []logicalPropDecl{{"border-left-width", value}, {"border-right-width", value}}, true
+	case cssPropBorderBlockStartWidth:
+		return []logicalPropDecl{{"border-top-width", value}}, true
+	case cssPropBorderBlockEndWidth:
+		return []logicalPropDecl{{"border-bottom-width", value}}, true
+	case cssPropBorderInlineStartWidth:
+		return []logicalPropDecl{{"border-left-width", value}}, true
+	case cssPropBorderInlineEndWidth:
+		return []logicalPropDecl{{"border-right-width", value}}, true
+	default:
+		return nil, false
 	}
 }
 
@@ -835,17 +999,15 @@ var restShorthandProps = [...]string{ //nolint:gochecknoglobals // static apply 
 	borderColorKeyword, gapKeyword, flexKeyword, containerKeyword,
 	cssPropMarginInline, cssPropMarginBlock, cssPropPaddingInline, cssPropPaddingBlock,
 	insetKeyword, cssPropInsetBlock, cssPropInsetInline, "column-rule",
-	"border-block", "border-inline", "border-block-start", "border-block-end",
-	"border-inline-start", "border-inline-end", "border-block-width", "border-block-style",
-	"border-block-color", "border-inline-width", "border-inline-style", "border-inline-color",
+	cssPropBorderBlock, cssPropBorderInline, cssPropBorderBlockStart, cssPropBorderBlockEnd,
+	cssPropBorderInlineStart, cssPropBorderInlineEnd, cssPropBorderBlockWidth, cssPropBorderBlockStyle,
+	cssPropBorderBlockColor, cssPropBorderInlineWidth, cssPropBorderInlineStyle, cssPropBorderInlineColor,
 }
 
 // applyRestProps resolves every non-font property once the font size is known.
 // Shorthands run first in a fixed order; remaining longhands run in any order
 // (longhands do not clobber each other via shorthand expansion). This avoids
 // sorting and intermediate prop slices on every element.
-//
-//nolint:goconst // rest shorthand filtering
 func applyRestProps(
 	style *ResolvedStyle, raw map[string]string, ctx *styleContext,
 	parent *ResolvedStyle,
@@ -857,9 +1019,7 @@ func applyRestProps(
 	fsize := style.FontSize
 	hasParent := parent != nil
 
-	for i := range restShorthandProps {
-		prop := restShorthandProps[i]
-
+	for _, prop := range restShorthandProps {
 		value, ok := raw[prop]
 		if !ok {
 			continue
@@ -876,9 +1036,9 @@ func applyRestProps(
 			borderColorKeyword, gapKeyword, flexKeyword, containerKeyword,
 			cssPropMarginInline, cssPropMarginBlock, cssPropPaddingInline, cssPropPaddingBlock,
 			insetKeyword, cssPropInsetBlock, cssPropInsetInline, "column-rule",
-			"border-block", "border-inline", "border-block-start", "border-block-end",
-			"border-inline-start", "border-inline-end", "border-block-width", "border-block-style",
-			"border-block-color", "border-inline-width", "border-inline-style", "border-inline-color":
+			cssPropBorderBlock, cssPropBorderInline, cssPropBorderBlockStart, cssPropBorderBlockEnd,
+			cssPropBorderInlineStart, cssPropBorderInlineEnd, cssPropBorderBlockWidth, cssPropBorderBlockStyle,
+			cssPropBorderBlockColor, cssPropBorderInlineWidth, cssPropBorderInlineStyle, cssPropBorderInlineColor:
 			continue
 		}
 

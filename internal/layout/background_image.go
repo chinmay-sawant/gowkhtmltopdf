@@ -43,15 +43,16 @@ func (e *engine) appendBackgroundImage(
 		if isGradientFunc(layer) {
 			if pngData, imgW, imgH, ok := renderGradientPNG(layer, originW, originH, sty.Color); ok {
 				op := Op{ //nolint:exhaustruct // intentional zero fields
-					Kind:   OpImage,
-					X:      originX,
-					Y:      originY,
-					W:      originW,
-					H:      originH,
-					Image:  pngData,
-					ImgW:   imgW,
-					ImgH:   imgH,
-					IsJPEG: false,
+					Kind:         OpImage,
+					X:            originX,
+					Y:            originY,
+					W:            originW,
+					H:            originH,
+					Image:        pngData,
+					ImgW:         imgW,
+					ImgH:         imgH,
+					IsJPEG:       false,
+					IsBackground: true,
 				}
 				if sty.Filter != "" {
 					filters := parseFilterList(sty.Filter, sty.Color, sty.FontSize)
@@ -95,15 +96,16 @@ func (e *engine) appendBackgroundImage(
 		)
 
 		baseOp := Op{ //nolint:exhaustruct // intentional zero fields
-			Kind:   OpImage,
-			X:      destX,
-			Y:      destY,
-			W:      destW,
-			H:      destH,
-			Image:  ref.data,
-			ImgW:   ref.w,
-			ImgH:   ref.h,
-			IsJPEG: ref.isJPEG,
+			Kind:         OpImage,
+			X:            destX,
+			Y:            destY,
+			W:            destW,
+			H:            destH,
+			Image:        ref.data,
+			ImgW:         ref.w,
+			ImgH:         ref.h,
+			IsJPEG:       ref.isJPEG,
+			IsBackground: true,
 		}
 		if sty.Filter != "" {
 			filters := parseFilterList(sty.Filter, sty.Color, sty.FontSize)

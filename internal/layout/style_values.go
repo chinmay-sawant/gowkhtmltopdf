@@ -254,8 +254,24 @@ func parsePlaceContent(style *ResolvedStyle, value string) {
 		return
 	}
 
+	if isPlaceDistributionKeyword(align) && (isPlaceAlignmentKeyword(justify) || justify == fxStretch) {
+		setJustifyContentValue(style, align)
+		setAlignContentValue(style, justify)
+		setAlignItemsValue(style, justify)
+
+		return
+	}
+
 	setAlignContentValue(style, align)
 	setJustifyContentValue(style, justify)
+}
+
+func isPlaceDistributionKeyword(val string) bool {
+	return val == fxBetween || val == fxAround || val == fxEvenly
+}
+
+func isPlaceAlignmentKeyword(val string) bool {
+	return val == fxCenter || val == fxStart || val == fxEnd || val == fxFlexStart || val == fxFlexEnd
 }
 
 func parsePlaceItems(style *ResolvedStyle, value string) {

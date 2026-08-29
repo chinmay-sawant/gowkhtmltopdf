@@ -79,9 +79,11 @@ func (e *engine) pseudoStyle(node *html.Node, pseudoEl string, host ResolvedStyl
 		return e.stylePtr(node)
 	}
 
-	sty := host
+	sty := initialStyle()
+	inheritProps(&sty, &host, raw)
 	applyFontProps(&sty, raw, host.FontSize, ctx)
 	applyRestProps(&sty, raw, ctx, &host)
+	inheritUnitlessLineHeight(&sty, &host, raw)
 	sty.famHash = hashFontFamily(sty.FontFamily)
 
 	return &sty

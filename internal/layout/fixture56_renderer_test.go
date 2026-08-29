@@ -1237,7 +1237,8 @@ func TestFixture56PaginationChromeAndWidgetGeometry(t *testing.T) { //nolint:par
 	borderTop := math.MaxFloat64
 	for i := noteBox.opStart; i <= noteBox.opEnd && i < len(res.Ops); i++ {
 		op := res.Ops[i]
-		if op.Kind == OpLine && math.Abs(op.X-noteBox.x) < 0.01 && op.H > 0 && op.R > 0.7 && op.G > 0.3 && op.B < 0.1 {
+		if (op.Kind == OpLine || (op.Kind == OpStrokeRect && op.StrokeMask&StrokeMaskLeft != 0)) &&
+			math.Abs(op.X-noteBox.x) < 0.01 && op.H > 0 && op.R > 0.7 && op.G > 0.3 && op.B < 0.1 {
 			if op.Y < borderTop {
 				borderTop = op.Y
 			}

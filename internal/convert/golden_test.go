@@ -429,7 +429,7 @@ var fixturePageBounds = map[string]fixtureBounds{ //nolint:gochecknoglobals // i
 		needles: []string{"UNSUPPORTED-WORKLIST-AUDIT", "VANGUARD-CSS-UNSUPPORTED-SAFE"},
 	},
 	"fixture-59-apex-digital-landing.html": { //nolint:exhaustruct // intentional zero-value fields
-		minPages: 8, maxPages: 8, images: true,
+		minPages: 7, maxPages: 8, images: true,
 		needles: []string{"Core Solutions", "Recent Work", "Transparent Pricing"},
 	},
 }

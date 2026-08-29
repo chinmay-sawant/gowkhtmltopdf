@@ -55,7 +55,7 @@ func paintOrderBefore(ops []Op, left, right int) bool {
 		return !leftOp.Positioned
 	}
 
-	leftLayer, rightLayer := paintLayer(leftOp.Kind), paintLayer(rightOp.Kind)
+	leftLayer, rightLayer := paintLayer(leftOp), paintLayer(rightOp)
 	if leftLayer != rightLayer {
 		return leftLayer < rightLayer
 	}
@@ -64,8 +64,12 @@ func paintOrderBefore(ops []Op, left, right int) bool {
 }
 
 // paintLayer orders ops within a z-index band: chrome under content.
-func paintLayer(k OpKind) int {
-	switch k {
+func paintLayer(op *Op) int {
+	if op.IsBackground {
+		return 0
+	}
+
+	switch op.Kind {
 	case OpFillRect, OpStrokeRect, OpLine:
 		return 0
 	case OpText, OpImage, OpLinkURI, OpBullet, opKindNoop:

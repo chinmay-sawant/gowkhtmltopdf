@@ -191,76 +191,85 @@ func gridColumnDefs(raw string, areaCols int) []gridTrackDef {
 	return colDefs
 }
 
+//nolint:cyclop,funlen,mnd // auto-fit calculation handles balanced track distribution
 func parseAutoFitDefs(raw string, contentW, gap float64, eng *engine, kidCount int) []gridTrackDef {
 	lower := strings.ToLower(strings.TrimSpace(raw))
-	// quick check for auto-fit/auto-fill
+
 	idx := strings.Index(lower, "repeat(")
 	if idx < 0 {
 		return nil
 	}
-	// find matching paren for repeat(
+
 	end := -1
 	depth := 0
-	for i := idx; i < len(raw); i++ {
-		if raw[i] == '(' {
+
+	for scanIdx := idx; scanIdx < len(raw); scanIdx++ {
+		if raw[scanIdx] == '(' {
 			depth++
-		} else if raw[i] == ')' {
+		} else if raw[scanIdx] == ')' {
 			depth--
 			if depth == 0 {
-				end = i
+				end = scanIdx
+
 				break
 			}
 		}
 	}
+
 	if end < 0 {
 		return nil
 	}
+
 	inner := raw[idx+len("repeat(") : end]
 	parts := splitTopLevelComma(inner)
+
 	if len(parts) != 2 {
 		return nil
 	}
+
 	first := strings.TrimSpace(strings.ToLower(parts[0]))
 	if first != "auto-fit" && first != "auto-fill" {
 		return nil
 	}
+
 	trackStr := strings.TrimSpace(parts[1])
-	// track is expected to be minmax(...,1fr) or similar; parse as one def
 	def := parseOneTrackDef(trackStr)
-	// Extract min width in pt for column count
-	minW := 0.0
-	if def.min.kind == trackFixed && def.min.val >= 0 {
+
+	minW := 200.0
+
+	switch {
+	case def.min.kind == trackFixed && def.min.val >= 0:
 		minW = eng.scalePt(def.min.val)
-	} else if def.min.kind == trackFixed && def.min.val < 0 {
-		// percentage - resolve against contentW
+	case def.min.kind == trackFixed && def.min.val < 0:
 		pct := -def.min.val
-		minW = contentW * pct / 100
-	} else {
-		// fallback: use 200pt
-		minW = 200
+		minW = contentW * pct / 100.0
 	}
+
 	if minW <= 0 {
-		minW = 200
+		minW = 200.0
 	}
-	// Compute n columns that fit: floor((contentW+gap)/(minW+gap)), at least 1, at most kidCount
-	n := 1
+
+	cols := 1
 	if contentW > 0 && minW+gap > 0 {
-		n = int((contentW + gap) / (minW + gap))
-		if n < 1 {
-			n = 1
+		cols = int((contentW + gap) / (minW + gap))
+		if cols < 1 {
+			cols = 1
 		}
-		if kidCount > 0 && n > kidCount {
-			n = kidCount
+
+		if kidCount > 0 && cols > kidCount {
+			cols = kidCount
 		}
-		// Clamp to reasonable max to avoid explosion
-		if n > 12 {
-			n = 12
+
+		if cols > 12 {
+			cols = 12
 		}
 	}
-	out := make([]gridTrackDef, n)
+
+	out := make([]gridTrackDef, cols)
 	for i := range out {
 		out[i] = def
 	}
+
 	return out
 }
 
@@ -436,6 +445,7 @@ func emitGridItem(
 	buildH := gridStretchBuildHeight(align, cellH, *cstate)
 
 	oldMax := eng.imgMaxW
+
 	if pbox.cellW > 0 {
 		eng.imgMaxW = pbox.cellW
 	}
