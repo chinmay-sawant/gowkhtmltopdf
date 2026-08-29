@@ -798,32 +798,20 @@ func drawFill(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintO
 func drawMaskedStroke(c *pdf.Content, op *Op, x, y, width float64) {
 	rx, ry := opRadiiXY(op)
 	if op.StrokeMask&StrokeMaskTop != 0 {
-		c.SetLineCap(1)
 		roundedTopPath(c, x, y, op.W, op.H, width, rx, ry)
 		c.Stroke()
-		c.SetLineCap(0)
 	}
 	if op.StrokeMask&StrokeMaskBottom != 0 {
-		c.SetLineCap(1)
 		roundedBottomPath(c, x, y, op.W, width, rx, ry)
 		c.Stroke()
-		c.SetLineCap(0)
 	}
 	if op.StrokeMask&StrokeMaskLeft != 0 {
-		if opHasRoundedCorners(op) {
-			c.SetLineCap(1)
-		}
 		roundedLeftPath(c, x, y, op.H, width, rx, ry)
 		c.Stroke()
-		c.SetLineCap(0)
 	}
 	if op.StrokeMask&StrokeMaskRight != 0 {
-		if opHasRoundedCorners(op) {
-			c.SetLineCap(1)
-		}
 		roundedRightPath(c, x, y, op.W, op.H, width, rx, ry)
 		c.Stroke()
-		c.SetLineCap(0)
 	}
 }
 
@@ -868,17 +856,18 @@ func roundedTopPath(
 	leftRY := math.Max(ry[0]-strokeInset, 0)
 	rightRX := math.Max(rx[1]-strokeInset, 0)
 	rightRY := math.Max(ry[1]-strokeInset, 0)
-	topY := originY + boxHeight
+	topY := originY + boxHeight - strokeInset
+	leftX := originX
 	rightX := originX + boxWidth
 
 	if leftRX <= 0 || leftRY <= 0 {
-		c.MoveTo(originX, topY)
+		c.MoveTo(leftX, topY)
 	} else {
-		c.MoveTo(originX, topY-leftRY)
+		c.MoveTo(leftX, topY-leftRY)
 		c.CurveTo(
-			originX, topY-leftRY+kappa*leftRY,
-			originX+leftRX-kappa*leftRX, topY,
-			originX+leftRX, topY,
+			leftX, topY-leftRY+kappa*leftRY,
+			leftX+leftRX-kappa*leftRX, topY,
+			leftX+leftRX, topY,
 		)
 	}
 
@@ -907,34 +896,35 @@ func roundedLeftPath(
 	const kappa = 0.5522847498
 
 	strokeInset := strokeWidth / 2 //nolint:mnd // half the stroke width insets the centerline radius
-	originX += strokeInset
+	leftX := originX + strokeInset
 	topRX := math.Max(rx[0]-strokeInset, 0)
 	topRY := math.Max(ry[0]-strokeInset, 0)
 	bottomRX := math.Max(rx[3]-strokeInset, 0)
 	bottomRY := math.Max(ry[3]-strokeInset, 0)
 	topY := originY + boxHeight
+	botY := originY
 
 	if bottomRX > 0 && bottomRY > 0 {
-		c.MoveTo(originX+bottomRX, originY)
+		c.MoveTo(leftX+bottomRX, botY)
 		c.CurveTo(
-			originX+bottomRX-kappa*bottomRX, originY,
-			originX, originY+bottomRY-kappa*bottomRY,
-			originX, originY+bottomRY,
+			leftX+bottomRX-kappa*bottomRX, botY,
+			leftX, botY+bottomRY-kappa*bottomRY,
+			leftX, botY+bottomRY,
 		)
 	} else {
-		c.MoveTo(originX, originY)
+		c.MoveTo(leftX, botY)
 	}
 
-	c.LineTo(originX, topY-topRY)
+	c.LineTo(leftX, topY-topRY)
 
 	if topRX > 0 && topRY > 0 {
 		c.CurveTo(
-			originX, topY-topRY+kappa*topRY,
-			originX+topRX-kappa*topRX, topY,
-			originX+topRX, topY,
+			leftX, topY-topRY+kappa*topRY,
+			leftX+topRX-kappa*topRX, topY,
+			leftX+topRX, topY,
 		)
 	} else {
-		c.LineTo(originX, topY)
+		c.LineTo(leftX, topY)
 	}
 }
 
@@ -953,29 +943,31 @@ func roundedBottomPath(
 	leftRY := math.Max(ry[3]-strokeInset, 0)
 	rightRX := math.Max(rx[2]-strokeInset, 0)
 	rightRY := math.Max(ry[2]-strokeInset, 0)
+	leftX := originX
 	rightX := originX + boxWidth
+	botY := originY + strokeInset
 
 	if leftRX <= 0 || leftRY <= 0 {
-		c.MoveTo(originX, originY)
+		c.MoveTo(leftX, botY)
 	} else {
-		c.MoveTo(originX, originY+leftRY)
+		c.MoveTo(leftX, botY+leftRY)
 		c.CurveTo(
-			originX, originY+leftRY-kappa*leftRY,
-			originX+leftRX-kappa*leftRX, originY,
-			originX+leftRX, originY,
+			leftX, botY+leftRY-kappa*leftRY,
+			leftX+leftRX-kappa*leftRX, botY,
+			leftX+leftRX, botY,
 		)
 	}
 
-	c.LineTo(rightX-rightRX, originY)
+	c.LineTo(rightX-rightRX, botY)
 
 	if rightRX > 0 && rightRY > 0 {
 		c.CurveTo(
-			rightX-rightRX+kappa*rightRX, originY,
-			rightX, originY+rightRY-kappa*rightRY,
-			rightX, originY+rightRY,
+			rightX-rightRX+kappa*rightRX, botY,
+			rightX, botY+rightRY-kappa*rightRY,
+			rightX, botY+rightRY,
 		)
 	} else {
-		c.LineTo(rightX, originY)
+		c.LineTo(rightX, botY)
 	}
 }
 
@@ -996,6 +988,7 @@ func roundedRightPath(
 	bottomRX := math.Max(rx[2]-strokeInset, 0)
 	bottomRY := math.Max(ry[2]-strokeInset, 0)
 	topY := originY + boxHeight
+	botY := originY
 
 	if topRX > 0 && topRY > 0 {
 		c.MoveTo(rightX-topRX, topY)
@@ -1008,16 +1001,16 @@ func roundedRightPath(
 		c.MoveTo(rightX, topY)
 	}
 
-	c.LineTo(rightX, originY+bottomRY)
+	c.LineTo(rightX, botY+bottomRY)
 
 	if bottomRX > 0 && bottomRY > 0 {
 		c.CurveTo(
-			rightX, originY+bottomRY-kappa*bottomRY,
-			rightX-bottomRX+kappa*bottomRX, originY,
-			rightX-bottomRX, originY,
+			rightX, botY+bottomRY-kappa*bottomRY,
+			rightX-bottomRX+kappa*bottomRX, botY,
+			rightX-bottomRX, botY,
 		)
 	} else {
-		c.LineTo(rightX, originY)
+		c.LineTo(rightX, botY)
 	}
 }
 

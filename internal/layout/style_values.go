@@ -422,7 +422,20 @@ func nextSpaceToken(value string, start int) (string, int, bool) {
 	}
 
 	end := start
-	for end < len(value) && !isCSSSpace(value[end]) {
+	depth := 0
+
+tokenLoop:
+	for end < len(value) {
+		char := value[end]
+		switch {
+		case char == '(':
+			depth++
+		case char == ')' && depth > 0:
+			depth--
+		case depth == 0 && isCSSSpace(char):
+			break tokenLoop
+		}
+
 		end++
 	}
 

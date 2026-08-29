@@ -1,4 +1,4 @@
-//nolint:varnamelen,cyclop,wsl,intrange,nlreturn,funlen,mnd,goconst // background layers
+//nolint:varnamelen,cyclop,wsl,intrange,nlreturn,funlen,mnd,goconst,gocognit // background layers
 package layout
 
 import (
@@ -82,6 +82,14 @@ func (e *engine) appendBackgroundImage(
 		}
 
 		destW, destH := resolveBackgroundSize(sty.BackgroundSize, originW, originH, imgW, imgH)
+		if (sty.BackgroundSize == "" || strings.EqualFold(sty.BackgroundSize, "auto")) &&
+			(strings.EqualFold(sty.BackgroundRepeat, "repeat") ||
+				strings.EqualFold(sty.BackgroundRepeat, "repeat-x") ||
+				strings.EqualFold(sty.BackgroundRepeat, "repeat-y")) {
+			if imgW > 0 && imgH > 0 {
+				destW, destH = imgW, imgH
+			}
+		}
 		destX, destY := resolveBackgroundPosition(
 			sty.BackgroundPosX, sty.BackgroundPosY, originX, originY, originW, originH, destW, destH,
 		)
@@ -248,7 +256,15 @@ func tileBackgroundRepeat(
 			op := baseOp
 			op.X = originX + float64(k)*destW
 			op.Y = destY
-			dst = append(dst, op)
+			if op.X+op.W > originX+originW {
+				op.W = originX + originW - op.X
+			}
+			if op.Y+op.H > originY+originH {
+				op.H = originY + originH - op.Y
+			}
+			if op.W > 0 && op.H > 0 {
+				dst = append(dst, op)
+			}
 		}
 		return dst
 	case "repeat-y":
@@ -264,7 +280,15 @@ func tileBackgroundRepeat(
 			op := baseOp
 			op.X = destX
 			op.Y = originY + float64(k)*destH
-			dst = append(dst, op)
+			if op.X+op.W > originX+originW {
+				op.W = originX + originW - op.X
+			}
+			if op.Y+op.H > originY+originH {
+				op.H = originY + originH - op.Y
+			}
+			if op.W > 0 && op.H > 0 {
+				dst = append(dst, op)
+			}
 		}
 		return dst
 	case "repeat":
@@ -283,7 +307,15 @@ func tileBackgroundRepeat(
 				op := baseOp
 				op.X = originX + float64(xk)*destW
 				op.Y = originY + float64(yk)*destH
-				dst = append(dst, op)
+				if op.X+op.W > originX+originW {
+					op.W = originX + originW - op.X
+				}
+				if op.Y+op.H > originY+originH {
+					op.H = originY + originH - op.Y
+				}
+				if op.W > 0 && op.H > 0 {
+					dst = append(dst, op)
+				}
 			}
 		}
 		return dst
