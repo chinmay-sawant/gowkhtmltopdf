@@ -128,8 +128,11 @@ func sealPageBottomClusters(
 
 		page := int((child.y - layoutSlack) / contentH)
 		pageBot := float64(page+1) * contentH
-		// Only near the page boundary (row ended as last on page).
-		if child.y < pageBot-40 || child.y > pageBot+eps {
+		// Seal last-row bottoms that sit in the lower band of the page.
+		// A tight 40pt window missed fixture-60 row 14 (room ≈ 40.9pt),
+		// leaving the table open when the next row moved to the next page.
+		const bottomSealBand = 56.0
+		if child.y < pageBot-bottomSealBand || child.y > pageBot+eps {
 			continue
 		}
 

@@ -67,6 +67,23 @@ func normalizeTableRowGaps(res *Result, contentH float64) {
 				continue
 			}
 
+			// Do not collapse the band reserved for a repeated thead on
+			// continuation pages (fixture-60 page-2 header overlapping body).
+			if table.headerRows > 0 && currentPage > 0 {
+				pageTop := float64(currentPage) * contentH
+				_, _, _, hdrH := rowSpan(table.rows[:table.headerRows], res)
+				if hdrH < 1 {
+					hdrH = previousBottom - previousTop
+				}
+				minTop := pageTop + hdrH
+				if currentTop-gap < minTop {
+					gap = currentTop - minTop
+					if gap <= layoutEpsilon {
+						continue
+					}
+				}
+			}
+
 			shiftOpsOnly(res, first, last, -gap)
 			shiftTableRowBoxes(table.rows[rowIndex], -gap)
 		}
@@ -132,6 +149,9 @@ func shiftRowToPage(res *Result, row []*box, contentH float64) bool {
 	// content moves and the grid stays behind (gapped /
 	// misaligned music-video tables across page breaks).
 	shiftFlowY(res, first, last, rowTop-layoutSlack, deltaY)
+	// Keep cell.y in sync with ops so later header-repeat / gap
+	// logic (rowYBounds) does not read stale pre-pagination tops.
+	shiftTableRowBoxes(row, deltaY)
 	for _, cell := range row {
 		if cell != nil {
 			cell.paginationShifted = true
@@ -260,7 +280,9 @@ func repeatTableHeaderOnPages(res *Result, tblBox *box, contentH float64) {
 
 	pages := headerContinuationPages(tblBox, firstPage, res, contentH)
 
-	for page := range pages {
+	// Process low pages first so later continuation shifts see stable Y.
+	pageList := sortedPageKeys(pages)
+	for _, page := range pageList {
 		if page <= firstPage {
 			continue
 		}
@@ -272,49 +294,130 @@ func repeatTableHeaderOnPages(res *Result, tblBox *box, contentH float64) {
 			dy := pageTop + hdrH - bodyTop
 			if dy > 0 {
 				shiftFlowY(res, shiftFrom, shiftTo, bodyTop-layoutSlack, dy)
+				// Table cells are not always in the flow-box index, so
+				// shiftFlowY alone can leave cell.y behind the ops.
+				shiftTableBodyBoxesFrom(tblBox, page, contentH, dy)
 			}
 		}
 
 		placeSliverBodyBelowHeader(res, tblBox, pageTop, hdrH)
+		// Guaranteed clearance: body must start at/after the header band.
+		ensureBodyBelowRepeatedHeader(res, tblBox, page, pageTop, hdrH, contentH)
 		cloneHeaderOps(res, hdrFirst, hdrLast, hdrTop, pageTop)
 	}
 }
 
-const (
-	tableSliverOffsetGap      = 6.0
-	tableSliverFallbackHeight = 12.0
-	tableSliverLookback       = 8.0
-	tableSliverInspectHeight  = 20.0
-)
-
-// placeSliverBodyBelowHeader pulls a body row that sits in the sliver just
-// above a continuation page (or under the repeated thead) down below the
-// header without moving rows that are already clear of the band.
-func placeSliverBodyBelowHeader(res *Result, tblBox *box, pageTop, hdrH float64) {
-	fromIdx, toIdx, top, bottom := sliverBodyOps(tblBox, pageTop, hdrH, res)
-	if fromIdx < 0 || top < 0 {
+// shiftTableBodyBoxesFrom updates cell.y for body rows whose top is on or
+// after page, matching a shiftFlowY applied to those rows' ops.
+func shiftTableBodyBoxesFrom(tblBox *box, page int, contentH, dy float64) {
+	if tblBox == nil || dy == 0 || contentH <= 0 {
 		return
 	}
 
-	target := pageTop + hdrH + tableSliverOffsetGap
-	sliverH := bottom - top
+	for _, row := range tblBox.rows[tblBox.headerRows:] {
+		_, _, top, _, ok := rowOpGeometry(row)
+		if !ok {
+			continue
+		}
 
-	if sliverH < 1 {
-		sliverH = tableSliverFallbackHeight
+		topPage, pageOK := checkedFlowPageOfY(top, contentH)
+		if !pageOK || topPage < page {
+			continue
+		}
+
+		shiftTableRowBoxes(row, dy)
 	}
+}
 
-	offFrom, officialTop := nextBodyAfterSliver(tblBox, pageTop, fromIdx, toIdx, res)
-	if offFrom >= 0 && officialTop >= 0 && officialTop < target+sliverH-0.5 {
-		push := target + sliverH - officialTop
-		if push > 0 {
-			shiftFlowY(res, offFrom, offFrom, officialTop-layoutSlack, push)
+func sortedPageKeys(pages map[int]bool) []int {
+	out := make([]int, 0, len(pages))
+	for page := range pages {
+		out = append(out, page)
+	}
+	for i := 0; i < len(out); i++ {
+		for j := i + 1; j < len(out); j++ {
+			if out[j] < out[i] {
+				out[i], out[j] = out[j], out[i]
+			}
 		}
 	}
 
-	dy := target - top
-	if math.Abs(dy) > layoutSlack {
-		shiftOpsOnly(res, fromIdx, toIdx, dy)
-		shiftTableBoxesInOpRange(tblBox, fromIdx, toIdx, dy)
+	return out
+}
+
+// ensureBodyBelowRepeatedHeader pushes the first body ops on a continuation
+// page down when they still sit inside the repeated thead band.
+func ensureBodyBelowRepeatedHeader(
+	res *Result, tblBox *box, page int, pageTop, hdrH, contentH float64,
+) {
+	if res == nil || tblBox == nil || hdrH <= 0 {
+		return
+	}
+
+	minTop := pageTop + hdrH
+	shiftFrom, shiftTo, bodyTop := tableBodyRange(tblBox, page, res, contentH)
+	if shiftFrom < 0 || bodyTop < 0 {
+		return
+	}
+	if bodyTop >= minTop-layoutEpsilon {
+		return
+	}
+
+	dy := minTop - bodyTop
+	if dy > 0 {
+		shiftFlowY(res, shiftFrom, shiftTo, bodyTop-layoutSlack, dy)
+		shiftTableBodyBoxesFrom(tblBox, page, contentH, dy)
+	}
+}
+
+const (
+	tableSliverLookback      = 8.0
+	tableSliverInspectHeight = 20.0
+)
+
+// placeSliverBodyBelowHeader pulls whole body rows that still intersect the
+// repeated-thead band (or the lookback sliver above the page) down below the
+// header. It must move each row's full op range together: shifting only the
+// ops that sit inside the band splits borders from text (fixture-60 page-3
+// empty gap under thead with body text starting a row-height lower).
+func placeSliverBodyBelowHeader(res *Result, tblBox *box, pageTop, hdrH float64) {
+	if res == nil || tblBox == nil || hdrH <= 0 {
+		return
+	}
+
+	target := pageTop + hdrH
+	loBound := pageTop - tableSliverLookback
+	hiBound := pageTop + hdrH
+
+	for _, row := range tblBox.rows[tblBox.headerRows:] {
+		first, last := rowOpRange(row)
+		if first < 0 || last < first {
+			continue
+		}
+
+		rowTop := -1.0
+		intersects := false
+		for idx := first; idx <= last && idx < len(res.Ops); idx++ {
+			posY := res.Ops[idx].Y
+			if rowTop < 0 || posY < rowTop {
+				rowTop = posY
+			}
+			if posY >= loBound && posY < hiBound {
+				intersects = true
+			}
+		}
+
+		if !intersects || rowTop < 0 {
+			continue
+		}
+
+		dy := target - rowTop
+		if dy <= layoutSlack {
+			continue
+		}
+
+		shiftFlowY(res, first, last, rowTop-layoutSlack, dy)
+		shiftTableRowBoxes(row, dy)
 	}
 }
 
@@ -571,17 +674,13 @@ func opBottomEdge(paintOp Op) (float64, float64) {
 	return posY, posY + height
 }
 
-// rowCellBounds widens the row band with the cells' own geometry.
+// rowCellBounds returns the row band top for rowYBounds. It keeps the
+// op-derived top and must not pull top upward from cell.y: after ops are
+// shifted by pagination, stale cell.y would report the wrong page for
+// header-repeat body detection (fixture-60 page-2 thead overlap).
 func rowCellBounds(row []*box, top, bottom float64) float64 {
-	for _, cell := range row {
-		if cell.height > 0 && cell.y+cell.height > bottom {
-			bottom = cell.y + cell.height
-		}
-
-		if cell.y < top && cell.y > 0 {
-			top = cell.y
-		}
-	}
+	_ = row
+	_ = bottom
 
 	return top
 }

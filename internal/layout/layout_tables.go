@@ -1252,11 +1252,14 @@ func (e *engine) emitCell(cell *box, skipBorders bool) {
 			e.scalePt(sty.PaddingBottom)+e.scalePt(sty.BorderBottom.Width))
 	}
 
-	// Table cells clip descendant paint to the padding box so background
-	// images / overflow from nested blocks cannot spill into neighbor cells
-	// (fixture-60 page-3 Effect/Description overlap).
-	if contentStart < len(e.ops) {
-		clipOpsRange(e.ops, contentStart, len(e.ops)-1, e.paddingBoxOf(cell))
+	// Clip only background-image layers to the cell padding box. Clipping all
+	// content chopped box-shadow / borders that intentionally paint outside
+	// the padding edge (fixture-60 row 14 truncation).
+	pad := e.paddingBoxOf(cell)
+	for i := contentStart; i < len(e.ops); i++ {
+		if e.ops[i].IsBackground {
+			clipPaintOp(&e.ops[i], pad)
+		}
 	}
 
 	cell.opStart, cell.opEnd = start, len(e.ops)-1
