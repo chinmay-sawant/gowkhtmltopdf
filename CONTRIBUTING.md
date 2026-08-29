@@ -31,18 +31,25 @@ Product design, fidelity tiers, and the support matrix live under
 ```sh
 git clone https://github.com/chinmay-sawant/gowkhtmltopdf.git
 cd gowkhtmltopdf
-go test ./...
+make test
 make build
 ```
 
 | Target | Purpose |
 |--------|---------|
-| `make test` | Full `go test ./...` |
+| `make test` | Full `go test ./...` with capped concurrency (`-p 2 -parallel 2`) so ~8 GiB machines do not thrash |
+| `make test-unit` | Same caps, every package except `internal/convert` (pair with `make golden` for convert/layout work) |
+| `make test-quick` | `make test` plus `-short` (skips long perf-budget tests) |
+| `make test-serial` | `-p 1 -parallel 1` when even capped runs freeze the desktop |
+| `make test-race` | `-race` on hot packages, same concurrency caps |
 | `make lint` | `golangci-lint run` (all linters via `.golangci.yml`) then `npm run lint` in `frontend/` |
 | `make build` | `bin/gowkhtmltopdf`, `bin/gowkhtmltoimage` |
-| `make golden` | Golden fixture corpus (`internal/convert`) |
+| `make golden` | Golden fixture corpus (`internal/convert`), capped parallelism |
 | `make samples` | Regenerate `output/` fixtures + optional live wiki smoke |
 | `make fmt` | `gofmt -w .` |
+
+Raise concurrency only when you have RAM: `make test TEST_P=4 TEST_PARALLEL=4`.
+Do not run bare `go test ./...` on a many-core laptop with ~8 GiB; that is what freezes the machine.
 
 Minimum: recent Go toolchain matching `go.mod`.
 

@@ -204,7 +204,8 @@ Worked programs: [`examples/pdf`](../examples/pdf/) and
 ## Run tests
 
 ```sh
-make test      # go test ./...
+make test      # go test ./... with -p 2 -parallel 2 (safe on ~8 GiB machines)
+make test-unit # skip internal/convert; use with make golden for layout work
 make lint      # golangci-lint, then frontend npm run lint (installs a pinned Go linter if missing)
 make golden    # fixture structure + feature checks
 make samples   # regenerate output/*.pdf (network only for the wiki smoke)
@@ -213,14 +214,23 @@ make samples   # regenerate output/*.pdf (network only for the wiki smoke)
 Layout / print changes should also open a regenerated PDF in a real viewer.
 See [samples.md](samples.md) and [CONTRIBUTING.md](../CONTRIBUTING.md).
 
+Bare `go test ./...` on a many-core host defaults to one package (and many
+parallel subtests) per CPU. Convert/layout/pdf fixtures then compete for RAM
+and can freeze the desktop. Prefer the Make targets above, or raise the caps
+explicitly: `make test TEST_P=4 TEST_PARALLEL=4`.
+
 ## Makefile targets
 
 | Target | Action |
 |--------|--------|
-| `make test` | `go test ./...` |
+| `make test` | `go test ./...` with `-p 2 -parallel 2` (override via `TEST_P` / `TEST_PARALLEL`) |
+| `make test-unit` | Same caps; all packages except `internal/convert` |
+| `make test-quick` | `make test` plus `-short` |
+| `make test-serial` | `-p 1 -parallel 1` for very low RAM |
+| `make test-race` | `-race` on convert/layout/pdf/imageout/load, same caps |
 | `make lint` | `golangci-lint run` via [`.golangci.yml`](../.golangci.yml), then `npm run lint` in `frontend/` (ESLint plus `src/data` content/config checks) |
 | `make build` | `bin/gowkhtmltopdf`, `bin/gowkhtmltoimage` (stamps `VERSION`) |
-| `make golden` | Golden corpus tests |
+| `make golden` | Golden corpus tests (capped parallelism) |
 | `make golden-update GOLDEN_FIXTURE=fixture-NN-name.html GOLDEN_APPROVE=1` | One reviewed PDF under ignored `testdata/golden/out/` |
 | `make samples` | Refresh [`output/`](../output/) |
 | `make fmt` | `gofmt -w .` |
