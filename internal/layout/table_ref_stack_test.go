@@ -143,11 +143,11 @@ td { border: 1px solid #999; padding: 2pt; font-size: 9pt; }
 `)
 	one := `<html><body><table><tr><td>` +
 		`<sup class="reference"><a href="#a"><span>[</span>127<span>]</span></a></sup></td></tr></table></body></html>`
-	2 := `<html><body><table><tr><td>` +
+	two := `<html><body><table><tr><td>` +
 		`<sup class="reference"><a href="#a"><span>[</span>127<span>]</span></a></sup>` +
 		`<sup class="reference"><a href="#b"><span>[</span>128<span>]</span></a></sup></td></tr></table></body></html>`
 	wOne := refCellWidth(t, one, cssSheet)
-	wTwo := refCellWidth(t, 2, cssSheet)
+	wTwo := refCellWidth(t, two, cssSheet)
 	t.Logf("one=%.1f two=%.1f", wOne, wTwo)
 
 	if wTwo < wOne+8 {
