@@ -144,6 +144,44 @@ func TestParseAtRulesSkipped(t *testing.T) {
 	if len(urls) != 1 || urls[0] != "x.woff" {
 		t.Fatalf("font-face urls = %v", urls)
 	}
+
+	if len(str.Imports) != 1 || str.Imports[0].URL != "other.css" || str.Imports[0].Media != "" {
+		t.Fatalf("imports = %+v", str.Imports)
+	}
+}
+
+func TestParseImport(t *testing.T) {
+	t.Parallel()
+
+	str := mustSheet(t, `
+		@import url("a.css");
+		@import url('b.css') print;
+		@import "c.css" screen and (max-width: 600px);
+		@import url(d.css);
+		@import ;
+		@import not-a-url;
+		@import url("");
+		p { color: red }
+	`)
+	if len(str.Rules) != 1 || str.Rules[0].Selectors[0].Parts[0].Tag != "p" {
+		t.Fatalf("rules = %+v", str.Rules)
+	}
+
+	want := []ImportRule{
+		{URL: "a.css", Media: ""},
+		{URL: "b.css", Media: "print"},
+		{URL: "c.css", Media: "screen and (max-width: 600px)"},
+		{URL: "d.css", Media: ""},
+	}
+	if len(str.Imports) != len(want) {
+		t.Fatalf("imports = %+v, want %+v", str.Imports, want)
+	}
+
+	for i, w := range want {
+		if str.Imports[i] != w {
+			t.Errorf("import %d = %+v, want %+v", i, str.Imports[i], w)
+		}
+	}
 }
 
 //nolint:varnamelen // short local mirrors the stylesheet vocabulary
@@ -157,6 +195,142 @@ func TestParsePageStyle(t *testing.T) {
 
 	if s.Page.Size != "A4" || s.Page.Margin != "0 2cm 4mm 6pt" {
 		t.Fatalf("page style = %+v", *s.Page)
+	}
+}
+
+type pageSelectorCase struct {
+	name    string
+	src     string
+	sel     string
+	margin  string
+	size    string
+	unnamed bool
+}
+
+func pageSelectorCases() []pageSelectorCase {
+	return []pageSelectorCase{
+		pageSelCase("unnamed", `@page { size: A4; margin: 2cm }`, "", "2cm", "A4", true),
+		pageSelCase("first", `@page :first { margin: 1cm }`, ":first", "1cm", "", false),
+		pageSelCase("left", `@page :left { margin: 3cm }`, ":left", "3cm", "", false),
+		pageSelCase("right", `@page :right { size: letter }`, ":right", "", "letter", false),
+		pageSelCase("named landscape", `@page landscape { size: landscape }`, "landscape", "", "landscape", false),
+		pageSelCase("first padded", `@page  :first  { margin: 1cm }`, ":first", "1cm", "", false),
+		pageSelCase("left no space", `@page:left { margin: 4mm }`, ":left", "4mm", "", false),
+		pageSelCase(
+			"unnamed nested margin box",
+			`@page { margin: 2cm; @top-center { content: "Header" } size: A4; }`,
+			"", "2cm", "A4", true,
+		),
+	}
+}
+
+func pageSelCase(name, src, sel, margin, size string, unnamed bool) pageSelectorCase {
+	return pageSelectorCase{
+		name:    name,
+		src:     src,
+		sel:     sel,
+		margin:  margin,
+		size:    size,
+		unnamed: unnamed,
+	}
+}
+
+func TestParsePageSelectors(t *testing.T) {
+	t.Parallel()
+
+	for _, testCase := range pageSelectorCases() {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			checkPageSelectorCase(t, testCase)
+		})
+	}
+
+	t.Run("mixed unnamed last wins", func(t *testing.T) {
+		t.Parallel()
+
+		checkMixedPageSelectors(t)
+	})
+}
+
+func TestParsePageSelectorRejectsTrailingTokens(t *testing.T) {
+	t.Parallel()
+
+	for _, src := range []string{
+		`@page chapter:first { margin: 40mm }`,
+		`@page chapter, appendix { margin: 40mm }`,
+		`@page :first later { margin: 40mm }`,
+	} {
+		str := mustSheet(t, src)
+		if len(str.Pages) != 0 || str.Page != nil {
+			t.Fatalf("%q parsed invalid page selector: Pages=%+v Page=%+v", src, str.Pages, str.Page)
+		}
+	}
+}
+
+func checkPageSelectorCase(t *testing.T, testCase pageSelectorCase) {
+	t.Helper()
+
+	str := mustSheet(t, testCase.src)
+	if len(str.Pages) != 1 {
+		t.Errorf("%q: Pages = %+v, want 1", testCase.src, str.Pages)
+
+		return
+	}
+
+	got := str.Pages[0]
+	if got.Sel != testCase.sel || got.Margin != testCase.margin || got.Size != testCase.size {
+		t.Errorf("%q: PageRule = %+v, want sel=%q margin=%q size=%q",
+			testCase.src, got, testCase.sel, testCase.margin, testCase.size)
+	}
+
+	checkUnnamedPage(t, str, testCase)
+}
+
+func checkUnnamedPage(t *testing.T, str *Stylesheet, testCase pageSelectorCase) {
+	t.Helper()
+
+	if testCase.unnamed {
+		if str.Page == nil {
+			t.Errorf("%q: Page = nil, want unnamed style", testCase.src)
+
+			return
+		}
+
+		if str.Page.Margin != testCase.margin || str.Page.Size != testCase.size {
+			t.Errorf("%q: Page = %+v, want margin=%q size=%q",
+				testCase.src, *str.Page, testCase.margin, testCase.size)
+		}
+
+		return
+	}
+
+	if str.Page != nil {
+		t.Errorf("%q: Page = %+v, want nil for sel %q", testCase.src, *str.Page, testCase.sel)
+	}
+}
+
+func checkMixedPageSelectors(t *testing.T) {
+	t.Helper()
+
+	mixed := mustSheet(t, `
+		@page landscape { size: landscape }
+		@page { margin: 12mm; size: A4 }
+		@page :first { margin: 0 }
+	`)
+	if mixed.Page == nil || mixed.Page.Margin != "12mm" || mixed.Page.Size != "A4" {
+		t.Fatalf("mixed unnamed Page = %+v", mixed.Page)
+	}
+
+	if len(mixed.Pages) != 3 {
+		t.Fatalf("mixed Pages = %+v, want 3", mixed.Pages)
+	}
+
+	wantSel := []string{"landscape", "", ":first"}
+	for idx, sel := range wantSel {
+		if mixed.Pages[idx].Sel != sel {
+			t.Errorf("mixed Pages[%d].Sel = %q, want %q", idx, mixed.Pages[idx].Sel, sel)
+		}
 	}
 }
 
@@ -764,6 +938,41 @@ func TestParseColor(t *testing.T) {
 		{"#12", 0, 0, 0, 0, false},
 		{"rgb(1,2)", 0, 0, 0, 0, false},
 		{"", 0, 0, 0, 0, false},
+	}
+	for _, tc := range cases {
+		r, g, b, a, ok := ParseColor(tc.src)
+		if ok != tc.ok || (ok && (r != tc.r || g != tc.g || b != tc.b || a != tc.alpha)) {
+			t.Errorf("ParseColor(%q) = (%d,%d,%d,%v,%v), want (%d,%d,%d,%v,%v)",
+				tc.src, r, g, b, a, ok, tc.r, tc.g, tc.b, tc.alpha, tc.ok)
+		}
+	}
+}
+
+func TestParseColorHsl(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		src     string
+		r, g, b int
+		alpha   float64
+		ok      bool
+	}{
+		{"hsl(0, 100%, 50%)", 255, 0, 0, 1, true},
+		{"hsl(120, 100%, 50%)", 0, 255, 0, 1, true},
+		{"hsl(240, 100%, 50%)", 0, 0, 255, 1, true},
+		{"hsl(60, 100%, 50%)", 255, 255, 0, 1, true},
+		{"hsl(0deg, 100%, 50%)", 255, 0, 0, 1, true},
+		{"hsl(0, 0%, 0%)", 0, 0, 0, 1, true},
+		{"hsl(0, 0%, 100%)", 255, 255, 255, 1, true},
+		{"hsl(0, 0%, 50%)", 128, 128, 128, 1, true},
+		{"hsla(0, 100%, 50%, 0.5)", 255, 0, 0, 0.5, true},
+		{"hsla(0, 100%, 50%, 50%)", 255, 0, 0, 0.5, true},
+		{"HSL(0, 100%, 50%)", 255, 0, 0, 1, true},
+		{"hsl(480, 100%, 50%)", 0, 255, 0, 1, true},
+		{"hsl(-120, 100%, 50%)", 0, 0, 255, 1, true},
+		{"hsl(0, 100%)", 0, 0, 0, 0, false},
+		{"hsl(0, 100, 50)", 0, 0, 0, 0, false},
+		{"hsl()", 0, 0, 0, 0, false},
 	}
 	for _, tc := range cases {
 		r, g, b, a, ok := ParseColor(tc.src)

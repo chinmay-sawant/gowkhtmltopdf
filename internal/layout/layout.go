@@ -41,6 +41,7 @@ const (
 	positionRelative        = "relative"
 	positionStatic          = "static"
 	positionSticky          = "sticky"
+	balanceKeyword          = "balance"
 	htmlMeter               = "meter"
 	displayBlock            = "block"
 	displayFlex             = "flex"
@@ -58,8 +59,16 @@ const (
 	displayFooterGroup      = "table-footer-group"
 	displayListItem         = "list-item"
 	listStyleDisc           = "disc"
+	listStyleSquare         = "square"
+	listStyleDecimal        = "decimal"
+	listPosInside           = "inside"
+	listPosOutside          = "outside"
+	htmlSection             = "section"
+	pseudoBefore            = "before"
+	pseudoAfter             = "after"
 	bulletDisc              = "\u2022"
 	borderCollapseValue     = "collapse"
+	marginBreakKeep         = "keep"
 	overflowWrapAnywhere    = "anywhere"
 	overflowWrapBreakWord   = "break-word"
 	borderStyleDashed       = "dashed"
@@ -69,6 +78,7 @@ const (
 	textTransformLowercase  = "lowercase"
 	textTransformCapitalize = "capitalize"
 	tableCellKind           = "cell"
+	defaultTabSize          = 8
 )
 
 // Options controls a Layout run.
@@ -315,6 +325,8 @@ type Op struct {
 	// TextTransform is applied when the text operation is painted.
 	TextTransform string
 	Bold          bool
+	NoFakeBold    bool
+	FontFeatures  string
 
 	URI string
 
@@ -323,6 +335,9 @@ type Op struct {
 	ImgH   int
 	IsJPEG bool
 	Alt    string // Alt text for Figure elements under PDF/UA-1
+
+	// IsBackground marks background/border images that belong to the chrome layer.
+	IsBackground bool
 
 	// Fixed marks ops from position:fixed boxes; Paint stamps them on every
 	// page at viewport-relative coordinates.
@@ -363,8 +378,11 @@ type Op struct {
 	// 0 or unset (≥1) means fully opaque. Nested opacities are multiplied.
 	PaintOpacity float64
 	// Radius is the uniform border radius for rounded fill/stroke rectangles.
-	Radius                                                             float64
-	RadiusTopLeft, RadiusTopRight, RadiusBottomRight, RadiusBottomLeft float64
+	// RadiusY is the vertical radius when corners are elliptical; 0 means ry=rx.
+	Radius                                                                 float64
+	RadiusTopLeft, RadiusTopRight, RadiusBottomRight, RadiusBottomLeft     float64
+	RadiusY                                                                float64
+	RadiusTopLeftY, RadiusTopRightY, RadiusBottomRightY, RadiusBottomLeftY float64
 
 	// StructElem is the PDF/UA-1 logical structure element associated with this op.
 	StructElem *pdf.StructElem
@@ -473,12 +491,17 @@ type chromeEntry struct {
 // faceFor selects the TrueType face for a resolved style (bold/italic),
 // preferring CSS font-family matches from the opt-in registry, then the
 // bundled Liberation FaceSet.
-func (e *engine) faceFor(sty ResolvedStyle) *pdf.Font {
+func (e *engine) faceFor(sty *ResolvedStyle) *pdf.Font {
+	if sty == nil {
+		return e.font
+	}
+
 	key := faceStyleKey{
 		famHash: sty.famHash,
 		weight:  sty.FontWeight,
 		italic:  sty.FontItalic,
 	}
+
 	if e.faceByStyle != nil {
 		if f, ok := e.faceByStyle[key]; ok {
 			return f
@@ -497,7 +520,11 @@ func (e *engine) faceFor(sty ResolvedStyle) *pdf.Font {
 }
 
 // lookupFaceFor is the uncached faceFor path.
-func (e *engine) lookupFaceFor(sty ResolvedStyle) *pdf.Font {
+func (e *engine) lookupFaceFor(sty *ResolvedStyle) *pdf.Font {
+	if sty == nil {
+		return e.font
+	}
+
 	if e.registry != nil {
 		if f := e.registry.Lookup(sty.FontFamily, sty.FontWeight, sty.FontItalic); f != nil {
 			return f
@@ -524,8 +551,13 @@ func (e *engine) lookupFaceFor(sty ResolvedStyle) *pdf.Font {
 // Fast path: when the primary face covers r (common for Latin/report text),
 // return it without a map lookup. Fallback faces are cached under a hash key
 // that does not allocate a joined family string.
-func (e *engine) faceForRune(sty ResolvedStyle, runeValue rune) *pdf.Font {
+func (e *engine) faceForRune(sty *ResolvedStyle, runeValue rune) *pdf.Font {
+	if sty == nil {
+		return e.font
+	}
+
 	primary := e.faceFor(sty)
+
 	if isRuneWhitespace(runeValue) {
 		return primary
 	}
@@ -538,13 +570,18 @@ func (e *engine) faceForRune(sty ResolvedStyle, runeValue rune) *pdf.Font {
 }
 
 // faceForRuneFallback resolves and caches a non-primary face for a missing glyph.
-func (e *engine) faceForRuneFallback(sty ResolvedStyle, runeValue rune, primary *pdf.Font) *pdf.Font {
+func (e *engine) faceForRuneFallback(sty *ResolvedStyle, runeValue rune, primary *pdf.Font) *pdf.Font {
+	if sty == nil {
+		return primary
+	}
+
 	key := faceRuneKey{
 		famHash: sty.famHash,
 		weight:  sty.FontWeight,
 		italic:  sty.FontItalic,
 		r:       runeValue,
 	}
+
 	if e.faceByRune != nil {
 		if f, ok := e.faceByRune[key]; ok {
 			return f
@@ -566,7 +603,11 @@ func (e *engine) faceForRuneFallback(sty ResolvedStyle, runeValue rune, primary 
 }
 
 // lookupFaceForRune is the uncached face resolution path.
-func (e *engine) lookupFaceForRune(sty ResolvedStyle, runeValue rune) *pdf.Font {
+func (e *engine) lookupFaceForRune(sty *ResolvedStyle, runeValue rune) *pdf.Font {
+	if sty == nil {
+		return e.font
+	}
+
 	if f := e.registryFamilyWithGlyph(sty, runeValue); f != nil {
 		return f
 	}
@@ -578,6 +619,7 @@ func (e *engine) lookupFaceForRune(sty ResolvedStyle, runeValue rune) *pdf.Font 
 	if e.font != nil && e.font.GlyphID(runeValue) != 0 {
 		return e.font
 	}
+
 	// Last resort: any opt-in registry face that covers this codepoint
 	// (DejaVu/Noto when --font-path / --use-system-fonts scanned them).
 	if f := e.registryGlyphFallback(sty, runeValue); f != nil {
@@ -594,8 +636,8 @@ func isRuneWhitespace(r rune) bool {
 
 // registryGlyphFallback is the last-resort registry lookup: any opt-in face
 // covering r, regardless of CSS font-family.
-func (e *engine) registryGlyphFallback(st ResolvedStyle, r rune) *pdf.Font {
-	if e.registry == nil {
+func (e *engine) registryGlyphFallback(st *ResolvedStyle, r rune) *pdf.Font {
+	if e.registry == nil || st == nil {
 		return nil
 	}
 
@@ -604,8 +646,8 @@ func (e *engine) registryGlyphFallback(st ResolvedStyle, r rune) *pdf.Font {
 
 // registryFamilyWithGlyph looks up the first CSS font-family face that has a
 // glyph for runeValue.
-func (e *engine) registryFamilyWithGlyph(style ResolvedStyle, runeValue rune) *pdf.Font {
-	if e.registry == nil {
+func (e *engine) registryFamilyWithGlyph(style *ResolvedStyle, runeValue rune) *pdf.Font {
+	if e.registry == nil || style == nil {
 		return nil
 	}
 
@@ -628,8 +670,8 @@ func (e *engine) registryFamilyWithGlyph(style ResolvedStyle, runeValue rune) *p
 // glyph for runeValue.
 //
 //nolint:cyclop,lll // ordered fallback search is intentionally explicit
-func (e *engine) facesWithGlyph(style ResolvedStyle, runeValue rune) *pdf.Font {
-	if e.faces == nil {
+func (e *engine) facesWithGlyph(style *ResolvedStyle, runeValue rune) *pdf.Font {
+	if e.faces == nil || style == nil {
 		return nil
 	}
 
@@ -954,6 +996,24 @@ func (e *engine) styleVal(node *html.Node) ResolvedStyle {
 	return *e.stylePtr(node)
 }
 
+// HorizChrome returns unscaled horizontal padding plus border width.
+func (s *ResolvedStyle) HorizChrome() float64 {
+	if s == nil {
+		return 0
+	}
+
+	return s.PaddingLeft + s.PaddingRight + s.BorderLeft.Width + s.BorderRight.Width
+}
+
+// VertChrome returns unscaled vertical padding plus border width.
+func (s *ResolvedStyle) VertChrome() float64 {
+	if s == nil {
+		return 0
+	}
+
+	return s.PaddingTop + s.PaddingBottom + s.BorderTop.Width + s.BorderBottom.Width
+}
+
 // buildWithStyle builds node with an engine-local style override. The override
 // remains live through the complete recursive build, so boxes created for node
 // can safely retain its pointer while descendants continue to read their own
@@ -1250,8 +1310,8 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 		e.paintValueWidget(node, style, boxNode.x, posY, boxNode.w, boxNode.height)
 	}
 
-	e.paintPositionedPseudo(node, style, boxNode, "before")
-	e.paintPositionedPseudo(node, style, boxNode, "after")
+	e.paintPositionedPseudo(node, style, boxNode, pseudoBefore)
+	e.paintPositionedPseudo(node, style, boxNode, pseudoAfter)
 
 	e.prependChrome(contentStart, boxNode, style, boxNode.x, posY, boxNode.w, boxNode.height)
 
@@ -1290,7 +1350,7 @@ func (e *engine) paintPositionedPseudo( //nolint:cyclop
 		return
 	}
 
-	face := e.faceFor(*style)
+	face := e.faceFor(style)
 	size := style.FontSize * e.scale
 
 	if face == nil || size <= 0 {
@@ -1303,10 +1363,10 @@ func (e *engine) paintPositionedPseudo( //nolint:cyclop
 	if !style.LeftAuto {
 		pseudoX = contentX + e.scalePt(style.Left)
 	} else if !style.RightAuto {
-		pseudoX = contentX + contentW - e.measureTextFace(text, *style) - e.scalePt(style.Right)
+		pseudoX = contentX + contentW - e.measureTextFace(text, style) - e.scalePt(style.Right)
 	}
 
-	staticAfter := pseudoElem == "after" && style.TopAuto && style.BottomAuto
+	staticAfter := pseudoElem == pseudoAfter && style.TopAuto && style.BottomAuto
 	pseudoY := boxNode.y + e.scalePt(host.PaddingTop) + e.scalePt(host.BorderTop.Width) +
 		e.scalePt(style.MarginTop)
 
@@ -1331,7 +1391,7 @@ func (e *engine) paintPositionedPseudo( //nolint:cyclop
 
 	prevZ, prevSet, prevPositioned := e.pushZ(*style)
 	e.add(Op{ //nolint:exhaustruct // generated pseudo text has no DOM box
-		Kind: OpText, X: pseudoX, Y: baseline, W: e.measureTextFace(text, *style),
+		Kind: OpText, X: pseudoX, Y: baseline, W: e.measureTextFace(text, style),
 		H: style.LineHeight * e.scale, Text: text, Font: face, Size: size,
 		InkDescent: e.fontDescentFace(face, size),
 		R:          style.Color[0], G: style.Color[1], B: style.Color[2],
@@ -1553,17 +1613,40 @@ func resolveDefiniteWidth(eng *engine, style ResolvedStyle, availW float64, widt
 
 // clampBlockMinMax applies the min/max-width constraints to w.
 func clampBlockMinMax(eng *engine, style ResolvedStyle, availW, width float64) float64 {
+	width = clampBlockMinWidth(eng, style, availW, width)
+
+	return clampBlockMaxWidth(eng, style, availW, width)
+}
+
+func clampBlockMinWidth(eng *engine, style ResolvedStyle, availW, width float64) float64 {
 	if style.MinWidthPercent >= 0 && availW > 0 && availW < 1e12 {
 		mn := availW * style.MinWidthPercent / cssPercent
 		if width < mn {
-			width = mn
+			return mn
 		}
-	} else if style.MinWidth > 0 && width < eng.scalePt(style.MinWidth) {
-		width = eng.scalePt(style.MinWidth)
+
+		return width
+	}
+
+	if style.MinWidth > 0 && width < eng.scalePt(style.MinWidth) {
+		return eng.scalePt(style.MinWidth)
+	}
+
+	return width
+}
+
+func clampBlockMaxWidth(eng *engine, style ResolvedStyle, availW, width float64) float64 {
+	if style.MaxWidthPercent >= 0 && availW > 0 && availW < 1e12 {
+		mx := availW * style.MaxWidthPercent / cssPercent
+		if width > mx {
+			return mx
+		}
+
+		return width
 	}
 
 	if style.MaxWidth >= 0 && width > eng.scalePt(style.MaxWidth) {
-		width = eng.scalePt(style.MaxWidth)
+		return eng.scalePt(style.MaxWidth)
 	}
 
 	return width

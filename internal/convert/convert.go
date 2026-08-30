@@ -380,7 +380,7 @@ func Run(ctx context.Context, req *Request, log io.Writer, progress func(phase s
 	}
 
 	registry := pdf.RegistryFromGlobal(req.Global)
-	logFontRegistryScan(req.Global, log)
+	pdf.LogFontRegistryScan(req.Global, log)
 	run := &runContext{
 		req:      req,
 		loader:   loader,
@@ -516,11 +516,12 @@ func renderObject(ctx context.Context, run *runContext, obj *settings.PdfObject,
 	}
 
 	printUL := run.req.Global.Web.PrintLinkUnderline || obj.Web.PrintLinkUnderline
+	header, footer := applyPageMarginBoxes(obj.HeaderFor(run.req.Global), obj.FooterFor(run.req.Global), geom.pageBoxes)
 	state := &objectState{ //nolint:exhaustruct // intentional zero-value fields
 		obj:           obj,
 		idx:           idx,
-		header:        obj.HeaderFor(run.req.Global),
-		footer:        obj.FooterFor(run.req.Global),
+		header:        header,
+		footer:        footer,
 		repl:          mergedReplaces(obj, run.req.Global),
 		base:          prep.Resource.Base,
 		lp:            obj.Load,
@@ -617,9 +618,10 @@ func renderObject(ctx context.Context, run *runContext, obj *settings.PdfObject,
 		return nil, fmt.Errorf("object %d (%s): paint: %w", idx+1, obj.Page, err)
 	}
 
+	state.geom.pageNames = layout.PageNames(lres, state.geom.contentH)
 	state.pages = run.doc.PageCount() - before
 	state.offset = before
-	state.headings = collectObjectHeadings(root, lres, before, run.req.Global, *obj, run.log)
+	state.headings = collectObjectHeadings(root, lres, *obj)
 	state.navigation = collectBodyNavigation(lres)
 
 	return state, nil

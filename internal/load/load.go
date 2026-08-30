@@ -58,8 +58,6 @@ var ErrInvalidProxy = errors.New("invalid proxy configuration")
 // Package-level sentinels for the loader's internal failure modes, so
 // dynamic messages wrap a static error and stay matchable with errors.Is.
 var (
-	errNilLoader           = errs.ErrNilLoader
-	errNilContext          = errs.ErrNilContext
 	errCannotLoad          = errors.New("cannot load")
 	errUnsupportedCharset  = errors.New("unsupported charset")
 	errBlockedFileAccess   = errors.New("blocked file access")
@@ -222,11 +220,11 @@ func (c ResourceContext) PageLoad() settings.LoadPage {
 // document's load policy.
 func (c ResourceContext) Fetch(ctx context.Context, ref string) (*Resource, error) {
 	if c.loader == nil {
-		return nil, errNilLoader
+		return nil, errs.ErrNilLoader
 	}
 
 	if ctx == nil {
-		return nil, errNilContext
+		return nil, errs.ErrNilContext
 	}
 
 	return c.loader.FetchSub(ctx, c.base, ref, c.pageLoad)
@@ -735,6 +733,13 @@ func sameNetworkHost(left, right *url.URL) bool {
 	return strings.EqualFold(left.Host, right.Host)
 }
 
+//nolint:gochecknoglobals // precomputed immutable CIDR and target IP values for SSRF filtering
+var (
+	cgnatCIDR    = mustCIDR("100.64.0.0/10")
+	metaCIDR     = mustCIDR("169.254.169.0/24")
+	metaTargetIP = net.ParseIP("169.254.169.254")
+)
+
 func mustCIDR(cidr string) *net.IPNet {
 	_, network, err := net.ParseCIDR(cidr)
 	if err != nil {
@@ -753,11 +758,11 @@ func isPrivateNetworkIP(addr net.IP) bool {
 		return true
 	}
 
-	if mustCIDR("100.64.0.0/10").Contains(addr) {
+	if cgnatCIDR.Contains(addr) {
 		return true
 	}
 
-	if mustCIDR("169.254.169.0/24").Contains(addr) || addr.Equal(net.ParseIP("169.254.169.254")) {
+	if metaCIDR.Contains(addr) || addr.Equal(metaTargetIP) {
 		return true
 	}
 
@@ -791,7 +796,7 @@ func parseProxy(raw string) (*url.URL, error) {
 //nolint:cyclop // multi-branch resource loader
 func (l *Loader) Load(ctx context.Context, input string, pageLoad settings.LoadPage) (*Resource, error) {
 	if l == nil {
-		return nil, errNilLoader
+		return nil, errs.ErrNilLoader
 	}
 
 	if l.initErr != nil {
@@ -803,7 +808,7 @@ func (l *Loader) Load(ctx context.Context, input string, pageLoad settings.LoadP
 	}
 
 	if ctx == nil {
-		return nil, errNilContext
+		return nil, errs.ErrNilContext
 	}
 
 	pageLoad = cloneLoadPage(pageLoad)
@@ -1131,7 +1136,7 @@ func readFileBody(ctx context.Context, file *os.File, maxBytes int64) ([]byte, e
 
 func (l *Loader) loadFile(ctx context.Context, path string, pageLoad settings.LoadPage) (*Resource, error) {
 	if ctx == nil {
-		return nil, errNilContext
+		return nil, errs.ErrNilContext
 	}
 
 	if err := ctx.Err(); err != nil {
@@ -1417,7 +1422,7 @@ func (l *Loader) loadErrorResponse(
 //nolint:cyclop // multi-branch subresource loader
 func (l *Loader) FetchSub(ctx context.Context, base, ref string, pageLoad settings.LoadPage) (*Resource, error) {
 	if l == nil {
-		return nil, errNilLoader
+		return nil, errs.ErrNilLoader
 	}
 
 	if l.initErr != nil {
@@ -1429,7 +1434,7 @@ func (l *Loader) FetchSub(ctx context.Context, base, ref string, pageLoad settin
 	}
 
 	if ctx == nil {
-		return nil, errNilContext
+		return nil, errs.ErrNilContext
 	}
 
 	pageLoad = cloneLoadPage(pageLoad)

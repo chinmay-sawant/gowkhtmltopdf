@@ -143,21 +143,19 @@ func drawTextHF(page *pdf.Page, hfVal settings.HeaderFooter, geom hfGeom, parms 
 
 	size := hfVal.FontSize
 	if size <= 0 {
-		size = 12
+		size = 8.5
 	}
 
 	spacing := hfVal.Spacing * mmToPt
 	ascent := float64(font.Ascent()) * size / float64(font.UnitsPerEm())
 	descent := float64(-font.Descent()) * size / float64(font.UnitsPerEm())
 
-	// Header text sits with its top edge `spacing` below the page top;
-	// footer text sits with its bottom edge `spacing` above the page bottom.
-	var baseY float64
-	if isHeader {
-		baseY = page.Height() - spacing - ascent
-	} else {
-		baseY = spacing + descent
+	margin := geom.marginTop
+	if !isHeader {
+		margin = geom.marginBottom
 	}
+
+	baseY := calcHFBaseY(isHeader, page.Height(), spacing, margin, ascent, descent)
 
 	left := parms.substitute(hfVal.Left)
 	center := parms.substitute(hfVal.Center)
@@ -381,9 +379,6 @@ type hfDrawResult struct {
 	warnings []hfDrawWarning
 }
 
-// Err returns the aggregate failure for strict conversion callers. The
-// compatibility adapter may still emit warnings, but the primary PDF engine
-// must not report success when required header/footer content was omitted.
 // Err returns the aggregate failure for strict conversion callers. The
 // compatibility adapter may still emit warnings, but the primary PDF engine
 // must not report success when required header/footer content was omitted.
@@ -616,7 +611,7 @@ func hfHeightFor(ctx context.Context, loader *load.Loader, font *pdf.Font, state
 
 	size := hfVal.FontSize
 	if size <= 0 {
-		size = 12
+		size = 8.5
 	}
 
 	if state != nil {
@@ -805,4 +800,28 @@ func planBodyStates(plan *pagePlan) []*objectState {
 	}
 
 	return out
+}
+
+func calcHFBaseY(isHeader bool, pageH, spacing, margin, ascent, descent float64) float64 {
+	const half = 2.0
+
+	if isHeader {
+		switch {
+		case spacing > 0:
+			return pageH - spacing - ascent
+		case margin > 0:
+			return pageH - margin/half - (ascent-descent)/half + descent
+		default:
+			return pageH - ascent
+		}
+	}
+
+	switch {
+	case spacing > 0:
+		return spacing + descent
+	case margin > 0:
+		return margin/half - (ascent-descent)/half + descent
+	default:
+		return descent
+	}
 }

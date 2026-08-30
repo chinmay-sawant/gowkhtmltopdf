@@ -57,8 +57,7 @@ this package.
 - Pagination: `page-break-*` / `break-*`, orphans/widows (Rule 3 + heuristic),
   table-row integrity, thead repeat
 
-**Not** in scope: JavaScript, general paint clipping (overflow is only parsed
-for sticky scrollports), full CSS2.1 float/positioning behavior, flexbox/grid
+**Not** in scope: JavaScript, `clip-path` and `mask-*` properties (overflow clipping of descendants to the padding box is implemented for `hidden`/`clip`/`auto`/`scroll` per `overflow_clip.go`), full CSS2.1 float/positioning behavior, flexbox/grid
 intrinsic multi-pass cycles, full Multicol L1/L2 balancing.
 
 ## 2. Package / file map
@@ -491,8 +490,9 @@ Cross-referenced with `documentation/compatibility-matrix.md` (normative),
   suppression only); `table-layout: fixed` parsed but auto-only; `<caption>`
   and `table-column(-group)` not rendered; rowspan limited (`table_rowspan_test.go`
   covers the supported subset).
-- **Overflow is not clipping**: `overflow` parsed only for sticky scrollport
-  selection; no general paint clipping.
+- **Overflow clipping**: descendant paint clipping to the padding box is
+  implemented for `hidden`/`clip`/`auto`/`scroll` (`overflow_clip.go`);
+  `clip-path` and `mask-*` are unsupported.
 - **Text**: no full hyphenation; justification expands inter-word spaces only
   (max 1em); `text-transform` variants limited; shaping fallback keeps
   combining marks after the base for non-Latin (`documentation/fonts.md` —

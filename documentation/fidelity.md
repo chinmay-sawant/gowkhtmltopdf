@@ -9,6 +9,8 @@ This guide is the product-facing fidelity story. The normative per-feature
 contract is the [compatibility matrix](compatibility-matrix.md). Post-MVP work
 is tracked in
 [`plans/0.2.0/10-canonical-post-mvp-roadmap.md`](../plans/0.2.0/10-canonical-post-mvp-roadmap.md).
+Print CSS coverage (phases 48-56) lives in
+[`plans/0.2.6/48-canonical-0.2.6-css-coverage.md`](../plans/0.2.6/48-canonical-0.2.6-css-coverage.md).
 
 ---
 
@@ -161,7 +163,7 @@ or converting untrusted HTML: [cli.md](cli.md#remote-url-security),
 
 ## Feature fidelity map (goals → status → phase)
 
-| User-facing goal | Status (2026-08-13) | Primary phase(s) |
+| User-facing goal | Status (2026-08-27) | Primary phase(s) |
 |------------------|---------------------|------------------|
 | Typography bold/italic | **Shipped** (Liberation Sans/Serif/Mono R/B/I/BI + DejaVu fallback) | 12, 19 |
 | Typography spacing | **Shipped** (coalesce + shared advances) | 13 |
@@ -174,6 +176,13 @@ or converting untrusted HTML: [cli.md](cli.md#remote-url-security),
 | `border-collapse` | **Shipped (lite)** — collapse sets spacing 0 and uses the grid emitter | 16+ |
 | `::before` / `::after` | **Shipped** (string / `attr()` generated content) | 16+ |
 | Selectors (`:nth-child`, attr, siblings) | **Shipped** | 16.1 |
+| `:is()` / `:where()` | **Shipped** - `:is()` matches, specificity is the most specific argument; `:where()` matches with specificity 0 (`css.go`; `TestParseIs`, `TestIsPseudo`, `TestWherePseudo`) | 49 |
+| `@import` | **Partial** - fetched under the same ACL as `<link>`, depth cap 8, cycle skip (`CollectSheets`; `TestImportStylesheet`) | 49 |
+| `clamp()` | **Partial** - `clamp(min, pref, max)` via `clampLength`; nested calc inside clamp out (`TestClampLength`) | 50 |
+| `background-image` | **Partial** - first `url(...)` layer, no-repeat at box origin; gradients ignored (`background_image.go`; `TestBackgroundImageLayoutPaints`) | 52 |
+| `outline` | **Partial** - stroke outside the border edge; does not change layout size (`TestOutlineStroke`) | 52 |
+| Overflow clip | **Partial** - `hidden`/`clip`/`auto`/`scroll` clip descendant paint to the padding box (`overflow_clip.go`; `TestOverflowClip`) | 52 |
+| Counters | **Partial** - `counter-reset` / `counter-increment` / `counter()` and nested `counters(name, ".")` on `::before`/`::after` (`TestCounterInBefore`) | 53 |
 | Floats / flex / position / grid | **Partial** — float lite; flex subset; grid lite; relative/absolute/fixed lite; sticky print scrollport (page content box) | 16–17 |
 | PDF images (logos/grids) | PNG/JPEG path + golden fixtures solid | 14 (docs polish remain) |
 | SVG-as-`<img>` | **Shipped** — rasterized via `internal/svg` then painted as PNG | 14+ |
@@ -235,5 +244,6 @@ after Phase 21 acceptance against vendored fixtures.
 | [architecture.md](architecture.md) | Pipeline packages |
 | [deferred.md](deferred.md) | Deferred features and workload priority |
 | [performance.md](performance.md) | Benchmarks and how to measure |
-| [../plans/0.2.0/10-canonical-post-mvp-roadmap.md](../plans/0.2.0/10-canonical-post-mvp-roadmap.md) | Active post-MVP ledger |
+| [../plans/0.2.0/10-canonical-post-mvp-roadmap.md](../plans/0.2.0/10-canonical-post-mvp-roadmap.md) | Post-MVP (0.2.0) ledger |
+| [../plans/0.2.6/48-canonical-0.2.6-css-coverage.md](../plans/0.2.6/48-canonical-0.2.6-css-coverage.md) | Active print CSS coverage ledger (phases 48-56) |
 | [../README.md](../README.md#deferred--not-planned) | Deferred table |

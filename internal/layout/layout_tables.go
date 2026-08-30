@@ -33,35 +33,61 @@ func (e *engine) buildTable(node *html.Node, style ResolvedStyle, availW, posX, 
 	// table width
 	// border-collapse: collapse suppresses the separate-border gap so colspan
 	// header rows and body cells share edges instead of looking double-lined.
-	spacing := e.tableSpacing(style)
-	chrome := spacing*float64(nCols+1) +
+	spacingH := e.tableHSpacing(style)
+	spacingV := e.tableVSpacing(style)
+	chrome := spacingH*float64(nCols+1) +
 		e.scalePt(style.BorderLeft.Width) + e.scalePt(style.BorderRight.Width) +
 		e.scalePt(style.PaddingLeft) + e.scalePt(style.PaddingRight)
 
 	tableHint := e.tableWidthHint(style, availW)
-	colW, tableW := sizeTableColumns(tableColumnEnv{
-		colMin: colMin, colW: colW, colPct: colPct, colAbs: colAbs,
-		chrome: chrome, availW: availW, tableW: tableHint,
-		fixed: style.TableLayout == positionFixed && tableHint >= 0,
-	})
-	tableBox.w = tableW
 
-	caption := e.buildTableCaption(node, tableW, posX, posY)
-	if caption != nil {
-		tableBox.children = append(tableBox.children, caption)
+	capNode := e.tableCaptionNode(node)
+
+	var capStyle *ResolvedStyle
+	if capNode != nil {
+		capStyle = e.stylePtr(capNode)
+	}
+
+	side := captionSideValue(style, capStyle)
+	gridHint, gridAvail, captionW := e.sideCaptionGridBudget(capNode, capStyle, side, tableHint, availW)
+	colW, gridW := sizeTableColumns(tableColumnEnv{
+		colMin: colMin, colW: colW, colPct: colPct, colAbs: colAbs,
+		chrome: chrome, availW: gridAvail, tableW: gridHint,
+		fixed: style.TableLayout == positionFixed && gridHint >= 0,
+	})
+	tableBox.w = gridW
+
+	gridX := posX
+	if side == floatLeft && captionW > 0 {
+		gridX = posX + captionW
 	}
 
 	tableY := posY
-	if caption != nil {
-		tableY += caption.height
+
+	if !captionSideHorizontal(side) && side != cssVerticalAlignBottom {
+		if caption := e.attachCaption(tableBox, capNode, gridW, posX, posY); caption != nil {
+			tableY = posY + caption.height
+		}
 	}
 
+	e.layoutTableGrid(tableBox, style, rows, cellData, colW, spacingH, spacingV, nCols, gridX, tableY)
+	e.placeTableCaption(tableBox, capNode, side, captionW, gridW, posX, posY)
+
+	return tableBox
+}
+
+func (e *engine) layoutTableGrid(
+	tableBox *box, style ResolvedStyle, rows [][]*html.Node, cellData [][]*box,
+	colW []float64, spacingH, spacingV float64, nCols int, posX, tableY float64,
+) {
 	padL := e.scalePt(style.PaddingLeft) + e.scalePt(style.BorderLeft.Width)
-	rowHeights, rowTops, curY := e.measureTableRows(tableBox, rows, cellData, colW, spacing, nCols, posX, tableY, padL)
+	rowHeights, rowTops, curY := e.measureTableRows(
+		tableBox, rows, cellData, colW, spacingH, spacingV, nCols, posX, tableY, padL,
+	)
 
 	tableBox.rows = cellData
 	tableHeight := curY + e.scalePt(style.PaddingBottom) + e.scalePt(style.BorderBottom.Width)
-	tableBox.height = tableY + tableHeight - posY
+	tableBox.height = tableY + tableHeight - tableBox.y
 
 	if style.BGColor[3] > 0 && e.opts.Background {
 		e.add(Op{ //nolint:exhaustruct // intentional zero fields
@@ -71,34 +97,167 @@ func (e *engine) buildTable(node *html.Node, style ResolvedStyle, availW, posX, 
 	}
 
 	e.emitTableCells(tableBox, style, posX, tableY, tableHeight, padL, colW, rowTops, rowHeights, cellData)
-
-	return tableBox
 }
 
-func (e *engine) buildTableCaption(node *html.Node, width, posX, posY float64) *box {
+func (e *engine) attachCaption(tableBox *box, capNode *html.Node, tableW, posX, posY float64) *box {
+	caption := e.buildCaptionAt(capNode, tableW, posX, posY)
+	if caption == nil {
+		return nil
+	}
+
+	tableBox.children = append(tableBox.children, caption)
+
+	return caption
+}
+
+func captionSideValue(tableStyle ResolvedStyle, captionStyle *ResolvedStyle) string {
+	if tableStyle.CaptionSide != "" {
+		return tableStyle.CaptionSide
+	}
+
+	if captionStyle != nil {
+		return captionStyle.CaptionSide
+	}
+
+	return ""
+}
+
+func captionSideHorizontal(side string) bool {
+	return side == floatLeft || side == floatRight
+}
+
+func (e *engine) sideCaptionGridBudget(
+	capNode *html.Node, capStyle *ResolvedStyle, side string, tableHint, availW float64,
+) (float64, float64, float64) {
+	gridHint, gridAvail := tableHint, availW
+	if !captionSideHorizontal(side) || capNode == nil {
+		return gridHint, gridAvail, 0
+	}
+
+	outer := tableHint
+	if outer < 0 {
+		outer = availW
+	}
+
+	captionW := e.sideCaptionUsedWidth(capNode, capStyle, outer)
+	if captionW <= 0 {
+		return gridHint, gridAvail, 0
+	}
+
+	if gridHint >= 0 {
+		gridHint -= captionW
+		if gridHint < 0 {
+			gridHint = 0
+		}
+	}
+
+	gridAvail -= captionW
+	if gridAvail < 0 {
+		gridAvail = 0
+	}
+
+	return gridHint, gridAvail, captionW
+}
+
+func (e *engine) sideCaptionUsedWidth(capNode *html.Node, capStyle *ResolvedStyle, outerW float64) float64 {
+	if capNode == nil || outerW <= 0 {
+		return 0
+	}
+
+	maxW := outerW * captionSideMaxFrac
+
+	if capStyle != nil && capStyle.Width >= 0 {
+		used := e.scalePt(capStyle.Width)
+		if used > maxW {
+			return maxW
+		}
+
+		return used
+	}
+
+	st := initialStyle()
+	if capStyle != nil {
+		st = *capStyle
+	}
+
+	_, maxC := e.measureCellMinMax(capNode, st)
+	if maxC > maxW {
+		return maxW
+	}
+
+	return maxC
+}
+
+func (e *engine) placeTableCaption(
+	tableBox *box, capNode *html.Node, side string, captionW, gridW, posX, posY float64,
+) {
+	switch {
+	case side == cssVerticalAlignBottom:
+		if caption := e.attachCaption(tableBox, capNode, tableBox.w, posX, posY+tableBox.height); caption != nil {
+			tableBox.height += caption.height
+		}
+	case captionSideHorizontal(side) && captionW > 0:
+		capX := posX
+		if side == floatRight {
+			capX = posX + gridW
+		}
+
+		caption := e.attachCaption(tableBox, capNode, captionW, capX, posY)
+		if caption == nil {
+			return
+		}
+
+		tableBox.w = gridW + captionW
+		if caption.height > tableBox.height {
+			tableBox.height = caption.height
+		}
+	}
+}
+
+func (e *engine) tableCaptionNode(node *html.Node) *html.Node {
 	for _, child := range node.Children {
 		if child.Type != html.ElementNode {
 			continue
 		}
 
-		style := e.styles[child]
-		if style != nil && style.Display != cssDisplayNone &&
+		style := e.stylePtr(child)
+		if style.Display != cssDisplayNone &&
 			(child.Name == htmlCaption || style.Display == displayTableCaption) {
-			return e.build(child, width, posX, posY)
+			return child
 		}
 	}
 
 	return nil
 }
 
-// tableSpacing is the inter-cell gap: border-collapse suppresses it.
-func (e *engine) tableSpacing(st ResolvedStyle) float64 {
-	spacing := e.scalePt(st.BorderSpacing)
-	if st.BorderCollapse != borderCollapseValue {
-		return spacing
+func (e *engine) buildCaptionAt(capNode *html.Node, width, posX, posY float64) *box {
+	if capNode == nil {
+		return nil
 	}
 
-	return 0
+	return e.build(capNode, width, posX, posY)
+}
+
+// tableHSpacing is the horizontal inter-cell gap: border-collapse suppresses it.
+func (e *engine) tableHSpacing(st ResolvedStyle) float64 {
+	if st.BorderCollapse == borderCollapseValue {
+		return 0
+	}
+
+	return e.scalePt(st.BorderSpacing)
+}
+
+// tableVSpacing is the vertical inter-cell gap: border-collapse suppresses it.
+func (e *engine) tableVSpacing(style ResolvedStyle) float64 {
+	if style.BorderCollapse == borderCollapseValue {
+		return 0
+	}
+
+	if style.BorderSpacingV != 0 {
+		return e.scalePt(style.BorderSpacingV)
+	}
+
+	return e.scalePt(style.BorderSpacing)
 }
 
 // emitTableCells paints the cell backgrounds/borders and the collapsed grid
@@ -123,7 +282,7 @@ func (e *engine) emitTableCells(
 	if collapse {
 		// Column boundaries are the same for every row; compute once instead
 		// of reallocating nCols+1 floats per row inside emitCollapsedRowGrid.
-		xList := gridColumnEdges(tableBox.x+padL, colW)
+		xList := gridColumnEdges(posX+padL, colW)
 
 		for rowIdx, cells := range cellData {
 			for _, cell := range cells {
@@ -173,8 +332,8 @@ func (e *engine) collectTableRows(node *html.Node) ([][]*html.Node, int) {
 				continue
 			}
 
-			cstate := e.styles[child]
-			if cstate.Display == cssDisplayNone {
+			cstate := e.stylePtr(child)
+			if cstate.Display == cssDisplayNone || cstate.Visibility == borderCollapseValue {
 				continue
 			}
 
@@ -202,7 +361,7 @@ func rowCellNodes(tr *html.Node, e *engine) []*html.Node {
 	cells := make([]*html.Node, 0, len(tr.Children))
 
 	for _, cell := range tr.Children {
-		if cell.Type == html.ElementNode && e.styles[cell].Display == displayTableCell {
+		if cell.Type == html.ElementNode && e.stylePtr(cell).Display == displayTableCell {
 			cells = append(cells, cell)
 		}
 	}
@@ -460,7 +619,7 @@ func (e *engine) tableWidthHint(st ResolvedStyle, availW float64) float64 {
 // and cell heights. Returns rowHeights, rowTops and the content height.
 func (e *engine) measureTableRows(
 	tableBox *box, rows [][]*html.Node, cellData [][]*box, colW []float64,
-	spacing float64, nCols int, posX, posY, padL float64,
+	spacingH, spacingV float64, nCols int, posX, posY, padL float64,
 ) ([]float64, []float64, float64) {
 	// rows stays for the layoutTable call contract; ink flags now live on the
 	// cell boxes in cellData (recorded once at build time), so the row loop
@@ -477,7 +636,7 @@ func (e *engine) measureTableRows(
 	// height 0 until rowspan growth — do not invent a 1pt phantom band.
 	for rowIdx, cells := range cellData {
 		rowTops[rowIdx] = posY + curY
-		rowH := e.measureRowCells(tableBox, cells, rowIdx, colW, spacing, nCols, posX, padL, rowTops)
+		rowH := e.measureRowCells(tableBox, cells, rowIdx, colW, spacingH, nCols, posX, padL, rowTops)
 		// Collapse rows whose cells have no ink (only padding/borders of empty
 		// th/td). Keep a hairline only when the row has cells that paint
 		// borders in separate-border mode and measured some chrome — pure
@@ -489,21 +648,21 @@ func (e *engine) measureTableRows(
 
 		rowHeights[rowIdx] = rowH
 
-		if rowH > 0 || spacing > 0 {
-			curY += rowH + spacing
+		if rowH > 0 || spacingV > 0 {
+			curY += rowH + spacingV
 		}
 	}
 
-	growRowspanRows(tableBox, nRows, rowHeights, spacing)
+	growRowspanRows(tableBox, nRows, rowHeights, spacingV)
 
 	// Recompute tops and assign final cell heights after rowspan growth.
 	curY = e.scalePt(tableBox.style.PaddingTop) + e.scalePt(tableBox.style.BorderTop.Width)
 	for rowIdx := range rowHeights {
 		rowTops[rowIdx] = posY + curY
-		curY += rowHeights[rowIdx] + spacing
+		curY += rowHeights[rowIdx] + spacingV
 	}
 
-	assignFinalCellHeights(tableBox, nRows, rowHeights, rowTops, spacing)
+	assignFinalCellHeights(tableBox, nRows, rowHeights, rowTops, spacingV)
 
 	return rowHeights, rowTops, curY
 }
@@ -749,48 +908,144 @@ func borderVisible(side border) bool {
 	return side.Width > 0 && side.Style != cssDisplayNone
 }
 
-//nolint:wsl // border precedence is easiest to read as ordered guards
-func horizontalTableBorder(tb *box, boundary, col int) (border, bool) {
-	for _, cell := range tb.children {
+//nolint:mnd // CSS 2.1 border-style precedence ranking
+func borderStyleRank(style string) int {
+	switch style {
+	case "double":
+		return 5
+	case solidKeyword:
+		return 4
+	case borderStyleDashed:
+		return 3
+	case borderStyleDotted:
+		return 2
+	case "ridge", "outset", "groove", "inset":
+		return 1
+	default:
+		return 0
+	}
+}
+
+func resolveBorderConflict(firstBorder, secondBorder border) border {
+	if firstBorder.Style == overflowHidden || secondBorder.Style == overflowHidden {
+		return border{Style: overflowHidden} //nolint:exhaustruct // intentional zero fields
+	}
+
+	firstVisible := borderVisible(firstBorder)
+	secondVisible := borderVisible(secondBorder)
+
+	if !firstVisible || !secondVisible {
+		return resolveOneVisibleBorder(firstBorder, secondBorder, firstVisible, secondVisible)
+	}
+
+	if firstBorder.Width != secondBorder.Width {
+		if firstBorder.Width > secondBorder.Width {
+			return firstBorder
+		}
+
+		return secondBorder
+	}
+
+	rank1 := borderStyleRank(firstBorder.Style)
+	rank2 := borderStyleRank(secondBorder.Style)
+
+	if rank1 != rank2 {
+		if rank1 > rank2 {
+			return firstBorder
+		}
+
+		return secondBorder
+	}
+
+	return secondBorder
+}
+
+func resolveOneVisibleBorder(firstBorder, secondBorder border, firstVisible, secondVisible bool) border {
+	if !firstVisible && !secondVisible {
+		return border{} //nolint:exhaustruct // intentional zero fields
+	}
+
+	if !firstVisible {
+		return secondBorder
+	}
+
+	return firstBorder
+}
+
+//nolint:cyclop,dupl // horizontal and vertical border scanning are symmetric axis routines
+func horizontalTableBorder(tableBox *box, boundary, col int) (border, bool) {
+	var (
+		best  border
+		found bool
+	)
+
+	for _, cell := range tableBox.children {
 		if cell.kind != tableCellKind {
 			continue
 		}
+
 		if cell.col > col || cell.col+cell.span <= col {
 			continue
 		}
 
 		if cell.row == boundary && borderVisible(cell.style.BorderTop) {
-			return cell.style.BorderTop, true
+			if !found {
+				best = cell.style.BorderTop
+				found = true
+			} else {
+				best = resolveBorderConflict(best, cell.style.BorderTop)
+			}
 		}
 
 		if cell.row+cell.rowSpan == boundary && borderVisible(cell.style.BorderBottom) {
-			return cell.style.BorderBottom, true
+			if !found {
+				best = cell.style.BorderBottom
+				found = true
+			} else {
+				best = resolveBorderConflict(best, cell.style.BorderBottom)
+			}
 		}
 	}
 
-	return border{}, false //nolint:exhaustruct // intentional zero fields
+	return best, found && borderVisible(best)
 }
 
-//nolint:wsl // border precedence is easiest to read as ordered guards
-func verticalTableBorder(tb *box, row, boundary int) (border, bool) {
-	for _, cell := range tb.children {
+//nolint:cyclop,dupl // horizontal and vertical border scanning are symmetric axis routines
+func verticalTableBorder(tableBox *box, row, boundary int) (border, bool) {
+	var (
+		best  border
+		found bool
+	)
+
+	for _, cell := range tableBox.children {
 		if cell.kind != tableCellKind {
 			continue
 		}
+
 		if cell.row > row || cell.row+cell.rowSpan <= row {
 			continue
 		}
 
 		if cell.col == boundary && borderVisible(cell.style.BorderLeft) {
-			return cell.style.BorderLeft, true
+			if !found {
+				best = cell.style.BorderLeft
+				found = true
+			} else {
+				best = resolveBorderConflict(best, cell.style.BorderLeft)
+			}
 		}
 
 		if cell.col+cell.span == boundary && borderVisible(cell.style.BorderRight) {
-			return cell.style.BorderRight, true
+			if !found {
+				best = cell.style.BorderRight
+				found = true
+			} else {
+				best = resolveBorderConflict(best, cell.style.BorderRight)
+			}
 		}
 	}
 
-	return border{}, false //nolint:exhaustruct // intentional zero fields
+	return best, found && borderVisible(best)
 }
 
 // expandRowOpRange includes [start,end] paint ops in every cell of the row so
@@ -934,8 +1189,8 @@ func (e *engine) cellBG(cell *box) (float64, float64, float64, float64, bool) {
 	}
 
 	if cell.node != nil && cell.node.Parent != nil {
-		ps, has := e.styles[cell.node.Parent]
-		if has && ps.Display == displayTableRow && ps.BGColor[3] > 0 {
+		ps := e.stylePtr(cell.node.Parent)
+		if ps.Display == displayTableRow && ps.BGColor[3] > 0 {
 			return ps.BGColor[0], ps.BGColor[1], ps.BGColor[2], ps.BGColor[3], true
 		}
 	}
@@ -963,6 +1218,7 @@ func (e *engine) emitCell(cell *box, skipBorders bool) {
 		e.emitBorders(sty, cell.x, cell.y, cell.w, cell.height)
 	}
 
+	contentStart := len(e.ops)
 	curX, contentW := e.contentBox(cell.x, cell.w, sty)
 	curY := cell.y + e.scalePt(sty.PaddingTop) + e.scalePt(sty.BorderTop.Width)
 	curY = cellVerticalAlignOffset(cell, curY)
@@ -994,6 +1250,17 @@ func (e *engine) emitCell(cell *box, skipBorders bool) {
 		distributeRowspanLines(e.ops, start, len(e.ops), cell.y, cell.height,
 			e.scalePt(sty.PaddingTop)+e.scalePt(sty.BorderTop.Width),
 			e.scalePt(sty.PaddingBottom)+e.scalePt(sty.BorderBottom.Width))
+	}
+
+	// Clip only background-image layers to the cell padding box. Clipping all
+	// content chopped box-shadow / borders that intentionally paint outside
+	// the padding edge (fixture-60 row 14 truncation).
+	pad := e.paddingBoxOf(cell)
+
+	for i := contentStart; i < len(e.ops); i++ {
+		if e.ops[i].IsBackground {
+			clipPaintOp(&e.ops[i], pad)
+		}
 	}
 
 	cell.opStart, cell.opEnd = start, len(e.ops)-1

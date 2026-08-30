@@ -307,7 +307,7 @@ Contributor setup and PR expectations: [`CONTRIBUTING.md`](../CONTRIBUTING.md).
 
 | Target | Action |
 |--------|--------|
-| `make test` | `go test ./...` |
+| `make test` | `go test ./...` with `-p 2 -parallel 2` (see [getting-started.md](getting-started.md)) |
 | `make lint` | `golangci-lint run` (all linters via `.golangci.yml`), then `npm run lint` in `frontend/` |
 | `make build` | `bin/gowkhtmltopdf`, `bin/gowkhtmltoimage` (version stamped from `VERSION`) |
 | `make fmt` | `gofmt -w .` |

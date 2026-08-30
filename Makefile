@@ -1,4 +1,4 @@
-.PHONY: test lint lint-frontend build fmt golden golden-update samples samples-python screenshots weasyprint clean claim-scan bench bench-engine bench-lib bench-inprocess bench-cli-compare c-shared bindings-clean check-versions python-binding-test python-benchmarks python-api
+.PHONY: test test-unit test-quick test-serial test-race lint lint-frontend build fmt golden golden-update samples samples-python screenshots weasyprint clean claim-scan bench bench-engine bench-lib bench-inprocess bench-cli-compare c-shared bindings-clean check-versions python-binding-test python-benchmarks python-api
 # Pure-Go runtime: the standard library plus the allowlisted direct modules
 # below. No cgo, browser, or native converter process is required.
 # Direct third-party requires must stay ⊆ {
@@ -15,8 +15,42 @@ GOLANGCI_LINT_VERSION ?= v1.64.8
 # WeasyPrint CLI used by the `weasyprint` samples target.
 WEASYPRINT ?= weasyprint
 
+# Cap package concurrency (-p) and within-package test concurrency (-parallel).
+# Uncapped go test ./... on a many-core / ~8 GiB host runs convert/layout/pdf
+# fixtures in parallel, thrashes swap, and freezes the desktop. Defaults keep
+# the same assertions; override when you have RAM to spare:
+#   make test TEST_P=4 TEST_PARALLEL=4
+#   make test GO_TEST_FLAGS='-count=1'
+TEST_P ?= 2
+TEST_PARALLEL ?= 2
+GO_TEST_FLAGS ?=
+
+# Packages under test for make test / test-quick / test-serial.
+TEST_PKGS ?= ./...
+
+# Hot packages used by the race job (matches .github/workflows/ci.yml).
+RACE_PKGS ?= ./internal/convert ./internal/layout ./internal/pdf ./internal/imageout ./internal/load
+
 test:
-	go test ./...
+	go test -p $(TEST_P) -parallel $(TEST_PARALLEL) $(GO_TEST_FLAGS) $(TEST_PKGS)
+
+# Skip long perf-budget tests (testing.Short). Same packages otherwise.
+test-quick:
+	go test -short -p $(TEST_P) -parallel $(TEST_PARALLEL) $(GO_TEST_FLAGS) $(TEST_PKGS)
+
+# Every package except internal/convert (golden + e2e convert live there).
+# Pair with `make golden` before a PR that touches convert/layout/paint.
+test-unit:
+	@pkgs=$$(go list ./... | grep -v '/internal/convert$$'); \
+	go test -p $(TEST_P) -parallel $(TEST_PARALLEL) $(GO_TEST_FLAGS) $$pkgs
+
+# One package and one test at a time. Use when even -p 2 freezes the machine.
+test-serial:
+	$(MAKE) test TEST_P=1 TEST_PARALLEL=1
+
+# Race detector on hot packages. Caps concurrency: -race roughly doubles RSS.
+test-race:
+	go test -race -count=1 -p $(TEST_P) -parallel $(TEST_PARALLEL) $(GO_TEST_FLAGS) $(RACE_PKGS)
 
 # Runs every linter enabled in .golangci.yml (enable-all), then frontend
 # `npm run lint` (ESLint plus src/data content/config checks). Installs the
@@ -76,7 +110,7 @@ fmt:
 # TestGoldenCorpus covers the first three fixtures plus the fixture-03
 # layout+paint performance budget.
 golden:
-	go test ./internal/convert/ -run 'TestGoldenCorpus' -v
+	go test -p 1 -parallel $(TEST_PARALLEL) ./internal/convert/ -run 'TestGoldenCorpus' -v
 
 golden-update:
 	@set -eu; \
@@ -146,6 +180,8 @@ samples:
 	# testdata/golden HTML (corpus fixture and api/ template) is not rewritten.
 	go run ./testdata/golden/api
 	go run ./cmd/gowkhtmltoimage --allow-local-files -o output/fixture-01-simple-invoice.png testdata/golden/fixture-01-simple-invoice.html
+	go run ./cmd/gowkhtmltoimage --allow-local-files -o output/fixture-57-vanguard-telemetry-audit.png testdata/golden/fixture-57-vanguard-telemetry-audit.html
+	go run ./cmd/gowkhtmltoimage --allow-local-files -o output/fixture-57.png testdata/golden/fixture-57-vanguard-telemetry-audit.html
 	go run ./examples/image --allow-local-files --width 1024 testdata/golden/fixture-21-detailed-report.html output/fixture-21-detailed-report.png
 	# Live Wikipedia smoke (network, raw — no --simplify-dom). Soft-fail so offline/CI hosts still get fixture samples.
 	# Operator recipe (not CSS fidelity): --use-system-fonts for IPA fallback; optional --zoom 2/3 densifies

@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<!--
+  fixture-59-apex-digital-landing
+  Apex Digital modern web experience — landing template exercising hero
+  grid, features/pricing/gallery auto-fit grids, CSS variables, remote
+  picsum images, and print pagination with Chrome parity.
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apex Digital | Modern Web Experience</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --dark: #0f172a;
+            --light: #f8fafc;
+            --text: #334155;
+            --text-light: #64748b;
+            --white: #ffffff;
+            --card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            scroll-behavior: smooth;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--light);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        /* Navigation */
+        nav {
+            position: sticky;
+            top: 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(8px);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.25rem 8%;
+            border-bottom: 1px solid #e2e8f0;
+            z-index: 1000;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--primary);
+            text-decoration: none;
+            letter-spacing: -0.5px;
+        }
+
+        .nav-links {
+            display: flex;
+            list-style: none;
+            gap: 2rem;
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            color: var(--text);
+            font-weight: 500;
+            font-size: 0.95rem;
+            transition: var(--transition);
+        }
+
+        .nav-links a:hover {
+            color: var(--primary);
+        }
+
+        /* Layout Helpers */
+        section {
+            padding: 6rem 8%;
+        }
+
+        .section-header {
+            text-align: center;
+            max-width: 600px;
+            margin: 0 auto 4rem;
+        }
+
+        .section-header h2 {
+            font-size: 2.25rem;
+            color: var(--dark);
+            margin-bottom: 0.75rem;
+        }
+
+        .section-header p {
+            color: var(--text-light);
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 0.85rem 1.75rem;
+            background-color: var(--primary);
+            color: var(--white);
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: var(--transition);
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn:hover {
+            background-color: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+
+        /* Section 1: Hero */
+        .hero {
+            display: grid;
+            grid-template-columns: 1.1fr 0.9fr;
+            align-items: center;
+            gap: 4rem;
+            min-height: 85vh;
+            background: linear-gradient(180deg, #eff6ff 0%, var(--light) 100%);
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            line-height: 1.15;
+            color: var(--dark);
+            margin-bottom: 1.5rem;
+        }
+
+        .hero p {
+            font-size: 1.15rem;
+            color: var(--text-light);
+            margin-bottom: 2rem;
+        }
+
+        .hero-img {
+            width: 100%;
+            height: 420px;
+            object-fit: cover;
+            border-radius: 12px;
+            box-shadow: 0 20px 30px -10px rgba(0, 0, 0, 0.15);
+        }
+
+        /* Section 2: Features */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 2rem;
+        }
+
+        .feature-card {
+            background: var(--white);
+            padding: 2.5rem;
+            border-radius: 10px;
+            box-shadow: var(--card-shadow);
+            transition: var(--transition);
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .feature-card h3 {
+            margin: 1rem 0 0.5rem;
+            color: var(--dark);
+        }
+
+        /* Section 3: About */
+        .about-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem;
+            align-items: center;
+        }
+
+        .about-img {
+            width: 100%;
+            height: 380px;
+            object-fit: cover;
+            border-radius: 12px;
+        }
+
+        .about-content h2 {
+            font-size: 2.25rem;
+            color: var(--dark);
+            margin-bottom: 1.25rem;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .stat-item h4 {
+            font-size: 1.75rem;
+            color: var(--primary);
+        }
+
+        /* Section 4: Portfolio */
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .gallery-item {
+            position: relative;
+            overflow: hidden;
+            border-radius: 8px;
+            height: 250px;
+        }
+
+        .gallery-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: var(--transition);
+        }
+
+        .gallery-item:hover img {
+            transform: scale(1.05);
+        }
+
+        /* Section 5: Pricing */
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+        }
+
+        .pricing-card {
+            background: var(--white);
+            padding: 3rem 2rem;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: var(--card-shadow);
+            border: 1px solid #e2e8f0;
+        }
+
+        .pricing-card.featured {
+            border: 2px solid var(--primary);
+            position: relative;
+        }
+
+        .price {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--dark);
+            margin: 1.5rem 0;
+        }
+
+        .pricing-features {
+            list-style: none;
+            margin-bottom: 2rem;
+            color: var(--text-light);
+        }
+
+        .pricing-features li {
+            padding: 0.5rem 0;
+        }
+
+        /* Section 6: Contact */
+        .contact-container {
+            max-width: 650px;
+            margin: 0 auto;
+            background: var(--white);
+            padding: 3rem;
+            border-radius: 10px;
+            box-shadow: var(--card-shadow);
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.85rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            outline: none;
+            font-size: 1rem;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            border-color: var(--primary);
+        }
+
+        /* Footer */
+        footer {
+            background: var(--dark);
+            color: #94a3b8;
+            padding: 4rem 8% 2rem;
+            text-align: center;
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            list-style: none;
+            margin-bottom: 2rem;
+        }
+
+        .footer-links a {
+            color: #94a3b8;
+            text-decoration: none;
+        }
+
+        .footer-links a:hover {
+            color: var(--white);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero, .about-container {
+                grid-template-columns: 1fr;
+            }
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+            .nav-links {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Navigation -->
+    <nav>
+        <a href="#" class="logo">Apex.</a>
+        <ul class="nav-links">
+            <li><a href="#hero">Home</a></li>
+            <li><a href="#services">Services</a></li>
+            <li><a href="#about">About</a></li>
+            <li><a href="#portfolio">Work</a></li>
+            <li><a href="#pricing">Pricing</a></li>
+            <li><a href="#contact">Contact</a></li>
+        </ul>
+    </nav>
+
+    <!-- 1. Hero Section -->
+    <section id="hero" class="hero">
+        <div>
+            <h1>Design and Build High-Performance Digital Products</h1>
+            <p>We combine design systems, responsive layouts, and performance architecture to scale modern web applications.</p>
+            <a href="#pricing" class="btn">View Plans</a>
+        </div>
+        <img class="hero-img" src="https://picsum.photos/seed/techhero/800/600" alt="Workspace display with code and mockups">
+    </section>
+
+    <!-- 2. Services Section -->
+    <section id="services">
+        <div class="section-header">
+            <h2>Core Solutions</h2>
+            <p>Engineered to deliver fast load times, accessible interfaces, and smooth interactions.</p>
+        </div>
+        <div class="features-grid">
+            <div class="feature-card">
+                <h3>UI/UX Architecture</h3>
+                <p>Component-driven interface designs tailored for accessibility, usability, and conversions.</p>
+            </div>
+            <div class="feature-card">
+                <h3>Front-End Systems</h3>
+                <p>Semantic HTML5 and modern CSS layouts built without unnecessary library bloat.</p>
+            </div>
+            <div class="feature-card">
+                <h3>Performance Tuning</h3>
+                <p>Optimization pipelines focusing on Core Web Vitals, asset minification, and caching.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- 3. About Section -->
+    <section id="about" style="background: #ffffff;">
+        <div class="about-container">
+            <img class="about-img" src="https://picsum.photos/seed/teamoffice/700/500" alt="Creative team collaboration">
+            <div class="about-content">
+                <h2>Bridging Creative Design & Strict Code Quality</h2>
+                <p>Our team builds high-speed websites that convert visitors. We strictly focus on maintainable, scalable static architecture.</p>
+                <div class="stats">
+                    <div class="stat-item">
+                        <h4>99.9%</h4>
+                        <p>Uptime Record</p>
+                    </div>
+                    <div class="stat-item">
+                        <h4>150+</h4>
+                        <p>Projects Launched</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 4. Portfolio Section -->
+    <section id="portfolio">
+        <div class="section-header">
+            <h2>Recent Work</h2>
+            <p>A look at recent layout implementations and product designs.</p>
+        </div>
+        <div class="gallery-grid">
+            <div class="gallery-item">
+                <img src="https://picsum.photos/seed/gallery1/600/400" alt="Digital project 1">
+            </div>
+            <div class="gallery-item">
+                <img src="https://picsum.photos/seed/gallery2/600/400" alt="Digital project 2">
+            </div>
+            <div class="gallery-item">
+                <img src="https://picsum.photos/seed/gallery3/600/400" alt="Digital project 3">
+            </div>
+            <div class="gallery-item">
+                <img src="https://picsum.photos/seed/gallery4/600/400" alt="Digital project 4">
+            </div>
+            <div class="gallery-item">
+                <img src="https://picsum.photos/seed/gallery5/600/400" alt="Digital project 5">
+            </div>
+            <div class="gallery-item">
+                <img src="https://picsum.photos/seed/gallery6/600/400" alt="Digital project 6">
+            </div>
+        </div>
+    </section>
+
+    <!-- 5. Pricing Section -->
+    <section id="pricing" style="background: #ffffff;">
+        <div class="section-header">
+            <h2>Transparent Pricing</h2>
+            <p>Choose a tier that fits your scope and deployment goals.</p>
+        </div>
+        <div class="pricing-grid">
+            <div class="pricing-card">
+                <h3>Starter</h3>
+                <div class="price">$499</div>
+                <ul class="pricing-features">
+                    <li>Single Page Website</li>
+                    <li>Responsive Mobile Layout</li>
+                    <li>Basic SEO Setup</li>
+                </ul>
+                <a href="#contact" class="btn">Get Started</a>
+            </div>
+            <div class="pricing-card featured">
+                <h3>Growth</h3>
+                <div class="price">$1,299</div>
+                <ul class="pricing-features">
+                    <li>Up to 6 Page Layouts</li>
+                    <li>Custom CSS Animations</li>
+                    <li>Full Speed Optimization</li>
+                </ul>
+                <a href="#contact" class="btn">Get Started</a>
+            </div>
+            <div class="pricing-card">
+                <h3>Scale</h3>
+                <div class="price">$2,499</div>
+                <ul class="pricing-features">
+                    <li>Multi-Section Application</li>
+                    <li>Complete Design System</li>
+                    <li>Priority Code Support</li>
+                </ul>
+                <a href="#contact" class="btn">Get Started</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- 6. Contact Section -->
+    <section id="contact">
+        <div class="section-header">
+            <h2>Let's Talk</h2>
+            <p>Send an inquiry to kick off your next project.</p>
+        </div>
+        <div class="contact-container">
+            <form action="#" method="POST" onsubmit="return false;">
+                <div class="form-group">
+                    <label for="name">Full Name</label>
+                    <input type="text" id="name" placeholder="Alex Morgan" required>
+                </div>
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" placeholder="alex@company.com" required>
+                </div>
+                <div class="form-group">
+                    <label for="message">Message</label>
+                    <textarea id="message" rows="5" placeholder="Tell us about your project..."></textarea>
+                </div>
+                <button type="submit" class="btn" style="width: 100%;">Send Message</button>
+            </form>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <ul class="footer-links">
+            <li><a href="#hero">Home</a></li>
+            <li><a href="#services">Services</a></li>
+            <li><a href="#about">About</a></li>
+            <li><a href="#portfolio">Work</a></li>
+            <li><a href="#pricing">Pricing</a></li>
+        </ul>
+        <p>&copy; 2026 Apex Digital Studio. All rights reserved.</p>
+    </footer>
+
+</body>
+</html>

@@ -4,6 +4,24 @@ All notable changes to gowkhtmltopdf are recorded here. This project follows
 semantic versioning; `VERSION` holds the current release and is stamped into
 binaries at build time (see README "Versioning").
 
+## 0.2.6 (2026-08-29)
+
+### Added
+
+- **Extended CSS Coverage (356 properties implemented):** full coverage program over W3C webref catalog (818 properties), bringing pure-Go layout and paint support to 356 properties with zero partial states and honest unsupported tracking for 462 non-goals.
+- **Logical Box & Border Radii:** full support for logical border longhands (`border-block-start/end`, `border-inline-start/end`) and logical corner radii (`border-start-start-radius`, `border-start-end-radius`, `border-end-start-radius`, `border-end-end-radius`) mapping onto physical display geometry across horizontal and vertical writing modes.
+- **Advanced Backgrounds & Borders:** support for multi-layer background images, `background-size` (`contain`, `cover`, explicit dimensions), `background-position`, `background-repeat`, `background-clip`, and `background-origin`, plus multi-layer `box-shadow` with `inset` and `border-image`.
+- **Text Styling & Typography:** added `text-shadow` rendering, `text-decoration-thickness`, `text-decoration-color`, `text-underline-offset`, `text-align-last`, `tab-size`, and `hyphens` (manual).
+- **Font Feature Settings & Kerning:** wired `font-feature-settings`, `font-kerning`, `font-variant-caps`, and synthesis weight gating directly into OpenType shaping and display lists.
+- **2D Transform Extensions:** individual transform properties (`translate`, `rotate`, `scale`, `transform-box`) alongside matrix operations with full PDF CTM integration.
+- **Vendor-Prefix Compatibility:** added automatic remaps for common `-webkit-*` prefix aliases (`-webkit-box-sizing`, `-webkit-text-fill-color`, `-webkit-box-shadow`, `-webkit-border-radius`, etc.).
+- **Golden Test Corpus:** split into fixture 57 (vanguard telemetry report proving all 356 implemented properties) and fixture 58 (unsupported worklist audit proving safe degradation for all 462 unsupported properties); total golden corpus stands at 62 verified fixtures.
+
+### Changed
+
+- **Catalog & Documentation Honesty:** reconciled `documentation/compatibility-matrix.md` and `documentation/deferred.md` with explicit non-goal classifications for screen-only UI, animation timelines, and 3D scenes.
+- **Mechanical Honesty Verification:** enforced catalog mapping integrity via `scripts/css-catalog-map.py --check` and `make claim-scan`.
+
 ## 0.2.5 (2026-08-26)
 
 ### Added
@@ -101,7 +119,7 @@ Compare:
   `ErrConformanceRequiresPDF17` / `ErrConformanceRequiresPDF20` (with
   `ErrProfileRequiresPDF17` / `ErrProfileRequiresPDF20` aliases).
   `ErrProfilePDF20Unsupported` remains defined for source compatibility but
-  is never returned — 2.0 profiles are supported.
+  is never returned - 2.0 profiles are supported.
 
 ### Fixed
 
@@ -160,7 +178,7 @@ PRs: [#7](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/7)–[#34](https:
   Identity-H for runes above U+00FF; local/HTTPS `@font-face` TTF/OTF/WOFF1
   (PDF and image). OpenType GSUB via allowlisted `go-text/typesetting` when
   the face has it; Arabic presentation-form + Lam-Alef fallback. No bundled
-  Noto CJK — pass a capable face or you still get tofu.
+  Noto CJK - pass a capable face or you still get tofu.
 - **Print CSS for templates:** attribute / `:nth-child` / sibling selectors; float
   lite; real `inline-block`; `box-sizing`; `text-align: justify`; cell
   `vertical-align`; flex Stage A; grid Stage B + Stage C lite (named areas,
@@ -179,7 +197,7 @@ PRs: [#7](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/7)–[#34](https:
   opt-in `--simplify-dom` chrome-strip (default off); `v*` tag workflow
   publishes linux/windows/darwin × amd64/arm64 binaries + `SHA256SUMS`.
 - **Documentation site:** https://chinmay-sawant.github.io/gowkhtmltopdf/
-  — Overview, Getting Started, sidebar docs, Issue Dossier (1,329 open
+  - Overview, Getting Started, sidebar docs, Issue Dossier (1,329 open
   wkhtmltopdf issues classified), Showcase gallery, Benchmarks tab.
 - **Docs:** fidelity guide, fonts guide, performance snapshots,
   comparison with SebastiaanKlippert/go-wkhtmltopdf, 2026 landscape note,

@@ -18,7 +18,7 @@ package layout
 // tagSticky records sticky insets and stamps StickyID on the box's ops so
 // pagination can find them after parent prependChrome shifts op indices.
 func (e *engine) tagSticky(boxNode *box) {
-	if boxNode == nil || boxNode.style.Position != positionSticky {
+	if boxNode == nil || boxNode.style == nil || boxNode.style.Position != positionSticky {
 		return
 	}
 
@@ -61,12 +61,20 @@ func applyStickyPrint(res *Result, contentH float64) {
 		return
 	}
 
+	stickies := collectStickyBoxes(res.root, res.Width, res.Height)
+
+	for _, b := range stickies {
+		applyOneSticky(res, b, contentH)
+	}
+}
+
+func collectStickyBoxes(root *box, resWidth, resHeight float64) []*box {
 	var stickies []*box
 
-	var walk func(b, parent, overflowPort *box)
+	var walk func(boxNode, parent, overflowPort *box)
 	walk = func(boxNode, parent, overflowPort *box) {
 		port := overflowPort
-		if overflowCreatesStickyScrollport(boxNode.style.Overflow) {
+		if boxNode.style != nil && overflowCreatesStickyScrollport(boxNode.style.Overflow) {
 			port = boxNode
 		}
 
@@ -74,12 +82,12 @@ func applyStickyPrint(res *Result, contentH float64) {
 			if parent != nil {
 				boxNode.cbX, boxNode.cbY, boxNode.cbW, boxNode.cbH = parent.x, parent.y, parent.w, parent.height
 			} else {
-				h := res.Height
+				h := resHeight
 				if h < boxNode.y+boxNode.height {
 					h = boxNode.y + boxNode.height
 				}
 
-				boxNode.cbX, boxNode.cbY, boxNode.cbW, boxNode.cbH = 0, 0, res.Width, h
+				boxNode.cbX, boxNode.cbY, boxNode.cbW, boxNode.cbH = 0, 0, resWidth, h
 			}
 
 			boxNode.stickyPort = port
@@ -90,11 +98,9 @@ func applyStickyPrint(res *Result, contentH float64) {
 			walk(c, boxNode, port)
 		}
 	}
-	walk(res.root, nil, nil)
+	walk(root, nil, nil)
 
-	for _, b := range stickies {
-		applyOneSticky(res, b, contentH)
-	}
+	return stickies
 }
 
 func applyOneSticky(res *Result, boxNode *box, contentH float64) {

@@ -9,8 +9,10 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 )
 
+//nolint:gochecknoglobals // precompiled regexes and pattern cache
 var (
 	semanticObjectHeaderRE = regexp.MustCompile(`^(\d+) 0 obj\n`)
 	semanticRefRE          = regexp.MustCompile(`(\d+) 0 R`)
@@ -18,7 +20,22 @@ var (
 	semanticNumberRE       = regexp.MustCompile(`[-+]?\d+(?:\.\d+)?`)
 	semanticLiteralRE      = regexp.MustCompile(`(?s)(\((?:\\.|[^\\)])*\))\s*Tj`)
 	semanticHexRE          = regexp.MustCompile(`(?s)<([0-9A-Fa-f]*)>\s*Tj`)
+	semanticDestRE         = regexp.MustCompile(`/Dest\s*\[\s*(\d+)\s+0\s+R`)
+	semanticRegexCache     sync.Map
 )
+
+func getOrCompileRE(patternStr string) *regexp.Regexp {
+	if val, ok := semanticRegexCache.Load(patternStr); ok {
+		if re, isRE := val.(*regexp.Regexp); isRE {
+			return re
+		}
+	}
+
+	re := regexp.MustCompile(patternStr)
+	semanticRegexCache.Store(patternStr, re)
+
+	return re
+}
 
 // SemanticDoc is a small, production-safe view of a PDF this package emits.
 // It exposes document-order page text, embedded image XObjects, and
@@ -731,7 +748,7 @@ func requiredRef(dict, key string) (int, error) {
 }
 
 func optionalRef(dict, key string) (int, bool) {
-	pattern := regexp.MustCompile(regexp.QuoteMeta(key) + `\s+(\d+)\s+0\s+R`)
+	pattern := getOrCompileRE(regexp.QuoteMeta(key) + `\s+(\d+)\s+0\s+R`)
 	match := pattern.FindStringSubmatch(dict)
 
 	if match == nil {
@@ -757,7 +774,7 @@ func requiredRefArray(dict, key string) ([]int, error) {
 }
 
 func optionalRefArray(dict, key string) ([]int, bool) {
-	pattern := regexp.MustCompile(regexp.QuoteMeta(key) + `\s*\[([^\]]*)\]`)
+	pattern := getOrCompileRE(regexp.QuoteMeta(key) + `\s*\[([^\]]*)\]`)
 	match := pattern.FindStringSubmatch(dict)
 
 	if match == nil {
@@ -779,7 +796,7 @@ func optionalRefArray(dict, key string) ([]int, bool) {
 }
 
 func requiredNumberArray(dict, key string, want int) ([]float64, error) {
-	pattern := regexp.MustCompile(regexp.QuoteMeta(key) + `\s*\[([^\]]*)\]`)
+	pattern := getOrCompileRE(regexp.QuoteMeta(key) + `\s*\[([^\]]*)\]`)
 	match := pattern.FindStringSubmatch(dict)
 
 	if match == nil {
@@ -808,7 +825,7 @@ func requiredNumberArray(dict, key string, want int) ([]float64, error) {
 }
 
 func requiredInt(dict, key string) (int, error) {
-	pattern := regexp.MustCompile(regexp.QuoteMeta(key) + `\s+(\d+)`)
+	pattern := getOrCompileRE(regexp.QuoteMeta(key) + `\s+(\d+)`)
 	match := pattern.FindStringSubmatch(dict)
 
 	if match == nil {
@@ -826,7 +843,7 @@ func requiredInt(dict, key string) (int, error) {
 }
 
 func optionalLiteral(dict, key string) (string, bool) {
-	pattern := regexp.MustCompile(regexp.QuoteMeta(key) + `\s+(\((?:\\.|[^\\)])*\))`)
+	pattern := getOrCompileRE(regexp.QuoteMeta(key) + `\s+(\((?:\\.|[^\\)])*\))`)
 	match := pattern.FindStringSubmatch(dict)
 
 	if match == nil {
@@ -837,8 +854,7 @@ func optionalLiteral(dict, key string) (string, bool) {
 }
 
 func optionalDestinationRef(dict string) (int, bool) {
-	pattern := regexp.MustCompile(`/Dest\s*\[\s*(\d+)\s+0\s+R`)
-	match := pattern.FindStringSubmatch(dict)
+	match := semanticDestRE.FindStringSubmatch(dict)
 
 	if match == nil {
 		return 0, false

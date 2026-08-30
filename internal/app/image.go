@@ -18,7 +18,7 @@ var ErrMultipleImageObjects = errors.New("app: multiple image objects")
 // RunImage is the command-facing image adapter. It keeps command parsing and
 // output ownership at the application boundary while imageout remains a
 // CLI-independent request engine.
-func RunImage(ctx context.Context, cmd *cli.Command, log io.Writer) error {
+func RunImage(ctx context.Context, cmd *cli.Command, log io.Writer) (err error) {
 	if cmd == nil {
 		return ErrNilCommand
 	}
@@ -54,12 +54,15 @@ func RunImage(ctx context.Context, cmd *cli.Command, log io.Writer) error {
 		return fmt.Errorf("app: open image output: %w", err)
 	}
 
-	request.Output = out
-	runErr := imageout.RunRequest(ctx, request, log)
+	defer func() {
+		err = errors.Join(err, closeOut())
+	}()
 
-	if runErr != nil {
-		runErr = fmt.Errorf("app: image: %w", runErr)
+	request.Output = out
+
+	if err = imageout.RunRequest(ctx, request, log); err != nil {
+		return fmt.Errorf("app: image: %w", err)
 	}
 
-	return errors.Join(runErr, closeOut())
+	return nil
 }

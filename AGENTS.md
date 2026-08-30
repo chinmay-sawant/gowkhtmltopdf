@@ -139,7 +139,7 @@ The real gates, in order of cost:
 
 | Gate | Command | What it proves |
 |------|---------|----------------|
-| Unit + integration | `make test` | Full suite green |
+| Unit + integration | `make test` | Full suite green (`-p 2 -parallel 2` by default; see Makefile) |
 | Claims | `make claim-scan` | No forbidden claims (stdlib-only, Qt WebKit, byte-identical determinism, etc.) in doc.go, README, documentation/, frontend content, cli help |
 | Lint | `make lint` | golangci-lint (pinned v1.64.8) clean; chains `lint-frontend` (npm) |
 | Golden corpus | `make golden` | All 61 fixtures convert with correct structure, page-count envelopes, embedded fonts, ordered text needles |
@@ -264,6 +264,8 @@ PR bodies live in `plans/PR/`. Phase checklist format comes from
 - `skills/release-note/` - cut a release: VERSION + CHANGELOG + notes + stamp
 - `skills/debug-html-template/` - diagnose a wrapping/misaligned template,
   propose fixes, wait for the pick
+- `skills/golang-anti-patterns/` - top 50 Go anti-patterns catalog, detection
+  heuristics, and idiomatic Go pattern replacements
 - `skills/ponytail*` - laziness protocol family (YAGNI reviews, debt ledger)
 
 ## Dependency policy

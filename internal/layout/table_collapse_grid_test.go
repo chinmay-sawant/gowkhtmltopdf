@@ -98,3 +98,80 @@ td { border: none; border-bottom: 1px dotted #bbb; padding: 2pt; }
 		t.Fatalf("bottom-only border produced %d vertical lines", vertical)
 	}
 }
+
+func TestCollapsedTableBorderConflictWiderWins(t *testing.T) {
+	t.Parallel()
+
+	cssSheet := sheet(t, `
+body { margin: 0; font-size: 10pt; }
+table { border-collapse: collapse; width: 200pt; }
+.thin { border-right: 1pt solid #000; }
+.thick { border-left: 4pt solid #000; }
+`)
+	res := layoutHTML(t, `<html><body>
+<table><tr><td class="thin">A</td><td class="thick">B</td></tr></table>
+</body></html>`, cssSheet)
+
+	var vlines []Op
+
+	for _, op := range res.Ops {
+		if op.Kind == OpLine && op.W == 0 && op.H > 0 {
+			vlines = append(vlines, op)
+		}
+	}
+
+	if len(vlines) == 0 {
+		t.Fatal("no vertical border lines painted")
+	}
+
+	foundThick := false
+
+	for _, line := range vlines {
+		if near(line.Width, 4) {
+			foundThick = true
+
+			break
+		}
+	}
+
+	if !foundThick {
+		t.Fatalf("expected 4pt winning border line in vertical borders, got: %+v", vlines)
+	}
+}
+
+//nolint:lll // test CSS strings and assertion messages
+func TestTableRowVisibilityCollapseReducesHeight(t *testing.T) {
+	t.Parallel()
+
+	sheetNormal := sheet(t,
+		`body { margin: 0; font-size: 10pt; } table { width: 200pt; } td { padding: 10pt; }`)
+	sheetHidden := sheet(t,
+		`body { margin: 0; font-size: 10pt; } table { width: 200pt; } td { padding: 10pt; } tr.target { visibility: hidden; }`)
+	sheetCollapse := sheet(t,
+		`body { margin: 0; font-size: 10pt; } table { width: 200pt; } td { padding: 10pt; } tr.target { visibility: collapse; }`)
+
+	htmlTable := `<html><body><table>
+<tr class="target"><td>Row 1 Content</td></tr>
+<tr><td>Row 2 Content</td></tr>
+</table></body></html>`
+
+	resNormal := layoutHTML(t, htmlTable, sheetNormal)
+	resHidden := layoutHTML(t, htmlTable, sheetHidden)
+	resCollapse := layoutHTML(t, htmlTable, sheetCollapse)
+
+	tableNormal := findBox(t, resNormal, "table")
+	tableHidden := findBox(t, resHidden, "table")
+	tableCollapse := findBox(t, resCollapse, "table")
+
+	// visibility: hidden keeps layout size
+	if !near(tableNormal.height, tableHidden.height) {
+		t.Fatalf("visibility: hidden changed table height: normal=%.1f, hidden=%.1f",
+			tableNormal.height, tableHidden.height)
+	}
+
+	// visibility: collapse removes row from layout and reduces table height
+	if tableCollapse.height >= tableNormal.height {
+		t.Fatalf("visibility: collapse should reduce table height: normal=%.1f, collapse=%.1f",
+			tableNormal.height, tableCollapse.height)
+	}
+}

@@ -1,0 +1,54 @@
+{
+  "generated": "2026-08-28",
+  "sources": {
+    "webref": "@webref/css (css.json via unpkg, captured 2026-08-27)",
+    "all_properties": "https://www.w3.org/Style/CSS/all-properties.en.json",
+    "mdn_units": "mdn/data css/units.json",
+    "mdn_properties": "mdn/data css/properties.json (overlay for mdn_url/groups)",
+    "engine": "honesty pass over 166 Implemented (4 subagents); 14 demoted to partial"
+  },
+  "counts": {
+    "webref_properties": 818,
+    "mapped_properties": 818,
+    "properties_by_engine_status": {
+      "implemented": 356,
+      "unsupported": 462,
+      "ignored": 0,
+      "partial": 0
+    },
+    "properties_print_relevant": 818,
+    "properties_goal_implement": 818,
+    "atrules": 55,
+    "atrules_by_engine_status": {
+      "ignored": 10,
+      "unsupported": 34,
+      "partial": 11
+    },
+    "selectors": 158,
+    "selectors_by_engine_status": {
+      "partial": 10,
+      "unsupported": 113,
+      "ignored": 21,
+      "implemented": 14
+    },
+    "functions": 162,
+    "functions_by_engine_status": {
+      "ignored": 24,
+      "unsupported": 109,
+      "partial": 24,
+      "implemented": 5
+    },
+    "units": 30,
+    "units_by_engine_status": {
+      "unsupported": 15,
+      "partial": 8,
+      "implemented": 7
+    }
+  },
+  "policy": {
+    "product": "print-oriented HTML to PDF moving toward browser-level print; catalog must not claim Implemented without code",
+    "no_javascript": true,
+    "no_chrome_print_parity": true,
+    "permanent_ignore": []
+  }
+}

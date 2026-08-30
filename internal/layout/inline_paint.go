@@ -100,9 +100,18 @@ func (e *engine) emitInlineImage(
 	imgX, imgY, imgW, imgH := e.applyInlineImageBorders(item, leftX, top)
 
 	if item.imgRef != nil && item.imgRef.data != nil && imgW > 0 && imgH > 0 {
+		imgData := item.imgRef.data
+		isJPEG := item.imgRef.isJPEG
+
+		if item.style != nil && item.style.Filter != "" {
+			filters := parseFilterList(item.style.Filter, item.style.Color, item.style.FontSize)
+			imgData = applyImageFilterToImage(imgData, filters)
+			isJPEG = false
+		}
+
 		e.add(Op{ //nolint:exhaustruct // intentional zero fields
 			Kind: OpImage, X: imgX, Y: imgY, W: imgW, H: imgH,
-			Image: item.imgRef.data, ImgW: item.imgRef.w, ImgH: item.imgRef.h, IsJPEG: item.imgRef.isJPEG,
+			Image: imgData, ImgW: item.imgRef.w, ImgH: item.imgRef.h, IsJPEG: isJPEG,
 			Alt: item.alt,
 		})
 	}
@@ -129,7 +138,7 @@ func (e *engine) emitInlineText( //nolint:funlen // text measurement, face-run e
 ) float64 {
 	child := item.style.Color
 	size := item.style.FontSize * e.scale
-	ascent, descent := e.inlineFontMetrics(item.text, *item.style)
+	ascent, descent := e.inlineFontMetrics(item.text, item.style)
 
 	if ascent+descent < size*0.5 {
 		// Fallback when font metrics are missing — keep hit targets usable.
@@ -166,7 +175,7 @@ func (e *engine) emitInlineText( //nolint:funlen // text measurement, face-run e
 
 	var runSpan float64
 
-	if run, ok := e.primaryFaceRun(item.text, *item.style); ok {
+	if run, ok := e.primaryFaceRun(item.text, item.style); ok {
 		e.emitInlineTextRun(
 			item,
 			run,
@@ -180,7 +189,7 @@ func (e *engine) emitInlineText( //nolint:funlen // text measurement, face-run e
 		leftX += run.w
 		runSpan = run.w
 	} else {
-		for _, run := range e.splitTextByFace(item.text, *item.style) {
+		for _, run := range e.splitTextByFace(item.text, item.style) {
 			e.emitInlineTextRun(
 				item,
 				run,
@@ -225,29 +234,33 @@ func (e *engine) paintInlineChrome(style *ResolvedStyle, leftX, baseline, ascent
 	}
 
 	if style.BGColor[3] > 0 && e.opts.Background {
-		radii := usedBorderRadii(*style, boxW, boxH)
-		e.add(Op{ //nolint:exhaustruct // intentional zero fields
+		radii, radiiY := usedBorderRadiiXY(*style, boxW, boxH)
+		fill := Op{ //nolint:exhaustruct // intentional zero fields
 			Kind: OpFillRect, X: leftX, Y: boxY, W: boxW, H: boxH,
 			R: style.BGColor[0], G: style.BGColor[1], B: style.BGColor[2], Alpha: style.BGColor[3],
 			Radius: uniformRadius(radii), RadiusTopLeft: radii[0], RadiusTopRight: radii[1],
 			RadiusBottomRight: radii[2], RadiusBottomLeft: radii[3],
-		})
+		}
+		stampOneOpRadiiY(&fill, radiiY)
+		e.add(fill)
 	}
 
 	if !inlineHasBorder(*style) {
 		return
 	}
 
-	radii := usedBorderRadii(*style, boxW, boxH)
+	radii, radiiY := usedBorderRadiiXY(*style, boxW, boxH)
 	radius := uniformRadius(radii)
 
 	if hasRoundedRadii(radii) && uniformRoundedBorder(*style) {
 		b := style.BorderTop
-		e.add(Op{ //nolint:exhaustruct // intentional zero fields
+		stroke := Op{ //nolint:exhaustruct // intentional zero fields
 			Kind: OpStrokeRect, X: leftX, Y: boxY, W: boxW, H: boxH,
 			R: b.Color[0], G: b.Color[1], B: b.Color[2], Width: e.scalePt(borderPaint(b)), Radius: radius,
 			RadiusTopLeft: radii[0], RadiusTopRight: radii[1], RadiusBottomRight: radii[2], RadiusBottomLeft: radii[3],
-		})
+		}
+		stampOneOpRadiiY(&stroke, radiiY)
+		e.add(stroke)
 
 		return
 	}
@@ -304,7 +317,7 @@ func (e *engine) emitInlineTextRun(
 	text := transformInlineText(run.text, item.style.TextTransform)
 	textWidth := run.w
 	if text != run.text {
-		textWidth = e.measureTextFace(text, *item.style)
+		textWidth = e.measureTextFace(text, item.style)
 	}
 
 	textX := leftX
@@ -314,6 +327,19 @@ func (e *engine) emitInlineTextRun(
 		textX -= textDelta
 	case fxCenter:
 		textX -= textDelta / 2
+	}
+
+	if item.style.TextShadowSet {
+		e.add(Op{ //nolint:exhaustruct // intentional zero fields
+			Kind: OpText, X: textX + item.style.TextShadowX, Y: baseline + item.style.TextShadowY, W: textWidth, H: item.h,
+			Text: run.text, Font: run.face, Size: size,
+			InkDescent:    descent,
+			LetterSpacing: item.style.LetterSpacing * e.scale,
+			TextTransform: item.style.TextTransform,
+			Bold:          item.style.FontWeight >= fontWeightBold,
+			R:             item.style.TextShadowColor[0], G: item.style.TextShadowColor[1], B: item.style.TextShadowColor[2],
+			RotateDeg: writingModeRotate(item.style.WritingMode),
+		})
 	}
 
 	e.add(Op{ //nolint:exhaustruct // intentional zero fields
@@ -337,6 +363,8 @@ func (e *engine) emitInlineTextRun(
 
 // paintDecoration draws the underline / line-through strokes for one text
 // item, extending the active underline run when the styling continues.
+//
+//nolint:cyclop // decoration painting
 func (e *engine) paintDecoration(
 	item *inlineItem, runStart, runSpan, size, ascent, descent, baseline float64,
 	child [3]float64, und *undRun,
@@ -365,17 +393,25 @@ func (e *engine) paintDecoration(
 		return
 	}
 
+	decColor := child
+	if item.style.TextDecorationColorSet {
+		decColor = item.style.TextDecorationColor
+	}
+
 	uWidth := underlineStrokeWidth(size)
+	if item.style.TextDecorationThickness > 0 {
+		uWidth = item.style.TextDecorationThickness
+	}
 
 	if wantUnderline {
 		// Sit clearly below glyph descenders (~1–2mm visual gap).
-		underY := baseline + descent + size*underlineOffsetRatio
-		e.paintUnderline(item, runStart, runSpan, underY, uWidth, size, wsOnly, child, und)
+		underY := baseline + descent + size*underlineOffsetRatio + item.style.TextUnderlineOffset
+		e.paintUnderline(item, runStart, runSpan, underY, uWidth, size, wsOnly, decColor, und)
 	} else {
 		und.flush(e)
 	}
 
-	e.paintLineThrough(item, runStart, runSpan, baseline, ascent, uWidth, wsOnly, child)
+	e.paintLineThrough(item, runStart, runSpan, baseline, ascent, uWidth, wsOnly, decColor)
 }
 
 // paintLineThrough strokes the strike-through rule for a decorated text item.
@@ -518,22 +554,40 @@ func nearUndY(a, b float64) bool {
 // Primary-face fast path: resolve the style face once and only consult the
 // fallback cache when a glyph is missing — Latin report text almost never
 // leaves the primary face.
-func (e *engine) measureTextFace(cssSheet string, sty ResolvedStyle) float64 {
-	if cssSheet == "" {
+func (e *engine) measureTextFace(cssSheet string, sty *ResolvedStyle) float64 {
+	if cssSheet == "" || sty == nil {
 		return 0
 	}
 
 	size := sty.FontSize * e.scale
 	lstyle := sty.LetterSpacing * e.scale
+	wstyle := sty.WordSpacing * e.scale
 	primary := e.faceFor(sty)
 
 	if primary == nil {
 		primary = e.font
 	}
 
+	total, runeCount, spaceCount := e.accumulateTextFaceWidth(cssSheet, sty, primary, size)
+
+	if lstyle != 0 && runeCount > 0 {
+		total += lstyle * float64(runeCount)
+	}
+
+	if wstyle != 0 && spaceCount > 0 {
+		total += wstyle * float64(spaceCount)
+	}
+
+	return total
+}
+
+func (e *engine) accumulateTextFaceWidth(
+	cssSheet string, sty *ResolvedStyle, primary *pdf.Font, size float64,
+) (float64, int, int) {
 	var total float64
 
 	runeCount := 0
+	spaceCount := 0
 
 	for _, runic := range cssSheet {
 		face := primary
@@ -546,18 +600,22 @@ func (e *engine) measureTextFace(cssSheet string, sty ResolvedStyle) float64 {
 
 		total += face.GlyphAdvancePoints(runic, size)
 		runeCount++
+
+		if runic == ' ' {
+			spaceCount++
+		}
 	}
 
-	if lstyle != 0 && runeCount > 0 {
-		total += lstyle * float64(runeCount)
-	}
-
-	return total
+	return total, runeCount, spaceCount
 }
 
 // measureRuneFace measures a single rune with the same face selection as
 // measureTextFace, without allocating string(r).
-func (e *engine) measureRuneFace(curRune rune, sty ResolvedStyle) float64 {
+func (e *engine) measureRuneFace(curRune rune, sty *ResolvedStyle) float64 {
+	if sty == nil {
+		return 0
+	}
+
 	size := sty.FontSize * e.scale
 	face := e.faceForRune(sty, curRune)
 
@@ -565,12 +623,16 @@ func (e *engine) measureRuneFace(curRune rune, sty ResolvedStyle) float64 {
 		face = e.font
 	}
 
-	w := face.GlyphAdvancePoints(curRune, size)
+	advance := face.GlyphAdvancePoints(curRune, size)
 	if sty.LetterSpacing != 0 {
-		w += sty.LetterSpacing * e.scale
+		advance += sty.LetterSpacing * e.scale
 	}
 
-	return w
+	if curRune == ' ' && sty.WordSpacing != 0 {
+		advance += sty.WordSpacing * e.scale
+	}
+
+	return advance
 }
 
 type faceRun struct {
@@ -583,8 +645,8 @@ type faceRun struct {
 // under CSS font-family fallback.
 //
 //nolint:cyclop,funlen,wsl // hot path: per-rune face-fallback run splitting
-func (e *engine) splitTextByFace(cssSheet string, sty ResolvedStyle) []faceRun {
-	if cssSheet == "" {
+func (e *engine) splitTextByFace(cssSheet string, sty *ResolvedStyle) []faceRun {
+	if cssSheet == "" || sty == nil {
 		return nil
 	}
 
@@ -609,6 +671,7 @@ func (e *engine) splitTextByFace(cssSheet string, sty ResolvedStyle) []faceRun {
 
 	var width float64
 	runeCount := 0
+	spaceCount := 0
 
 	for idx, runic := range cssSheet {
 		face := primary
@@ -625,11 +688,13 @@ func (e *engine) splitTextByFace(cssSheet string, sty ResolvedStyle) []faceRun {
 			runs = append(runs, faceRun{
 				text: cssSheet[start:idx],
 				face: current,
-				w:    width + sty.LetterSpacing*e.scale*float64(runeCount),
+				w: width + sty.LetterSpacing*e.scale*float64(runeCount) +
+					sty.WordSpacing*e.scale*float64(spaceCount),
 			})
 			start = idx
 			width = 0
 			runeCount = 0
+			spaceCount = 0
 		}
 
 		if current == nil {
@@ -639,13 +704,18 @@ func (e *engine) splitTextByFace(cssSheet string, sty ResolvedStyle) []faceRun {
 		current = face
 		width += face.AdvanceInPoints(runic, size)
 		runeCount++
+
+		if runic == ' ' {
+			spaceCount++
+		}
 	}
 
 	if current != nil {
 		runs = append(runs, faceRun{
 			text: cssSheet[start:],
 			face: current,
-			w:    width + sty.LetterSpacing*e.scale*float64(runeCount),
+			w: width + sty.LetterSpacing*e.scale*float64(runeCount) +
+				sty.WordSpacing*e.scale*float64(spaceCount),
 		})
 	}
 
@@ -653,8 +723,8 @@ func (e *engine) splitTextByFace(cssSheet string, sty ResolvedStyle) []faceRun {
 }
 
 //nolint:wsl // hot path keeps the primary-face fast path compact
-func (e *engine) primaryFaceRun(cssSheet string, sty ResolvedStyle) (faceRun, bool) {
-	if cssSheet == "" {
+func (e *engine) primaryFaceRun(cssSheet string, sty *ResolvedStyle) (faceRun, bool) {
+	if cssSheet == "" || sty == nil {
 		return faceRun{}, false //nolint:exhaustruct // intentional zero fields
 	}
 
@@ -672,32 +742,34 @@ func (e *engine) primaryFaceRun(cssSheet string, sty ResolvedStyle) (faceRun, bo
 
 	var width float64
 	runeCount := 0
+	spaceCount := 0
 
 	for _, runic := range paintText {
 		width += primary.AdvanceInPoints(runic, size)
 		runeCount++
+
+		if runic == ' ' {
+			spaceCount++
+		}
 	}
 
 	return faceRun{
 		text: cssSheet,
 		face: primary,
-		w:    width + sty.LetterSpacing*e.scale*float64(runeCount),
+		w: width + sty.LetterSpacing*e.scale*float64(runeCount) +
+			sty.WordSpacing*e.scale*float64(spaceCount),
 	}, true
 }
 
 // faceRunAllPrimary reports that every non-whitespace rune in s is covered by
 // primary (so splitTextByFace can emit a single run).
-func faceRunAllPrimary(s string, primary *pdf.Font) bool {
+func faceRunAllPrimary(cssSheet string, primary *pdf.Font) bool {
 	if primary == nil {
 		return false
 	}
 
-	for _, r := range s {
-		if isRuneWhitespace(r) {
-			continue
-		}
-
-		if primary.GlyphID(r) == 0 {
+	for _, runic := range cssSheet {
+		if !isRuneWhitespace(runic) && primary.GlyphID(runic) == 0 {
 			return false
 		}
 	}
@@ -729,7 +801,11 @@ func (e *engine) fontDescentFace(face *pdf.Font, size float64) float64 {
 // item. A line can contain a mix of sans, serif, mono, and fallback faces;
 // using the engine default face for all of them shifts baselines and gives
 // inline chrome the wrong height.
-func (e *engine) inlineFontMetrics(text string, style ResolvedStyle) (float64, float64) {
+func (e *engine) inlineFontMetrics(text string, style *ResolvedStyle) (float64, float64) {
+	if style == nil {
+		return 0, 0
+	}
+
 	size := style.FontSize * e.scale
 	runs := e.splitTextByFace(text, style)
 

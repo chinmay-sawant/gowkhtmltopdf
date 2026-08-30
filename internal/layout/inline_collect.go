@@ -60,8 +60,10 @@ func (e *engine) collectInlineText(node *html.Node, sty ResolvedStyle, out *[]in
 			atomicStyle := sty
 			atomicStyle.WhiteSpace = cssWhiteSpaceNowrap
 			e.collectWrappedText(node, atomicStyle, out)
-		case sty.WhiteSpace == cssWhiteSpacePre:
-			e.collectPreText(node, sty, out)
+		case sty.WhiteSpace == cssWhiteSpacePre,
+			sty.WhiteSpace == cssWhiteSpacePreWrap,
+			sty.WhiteSpace == cssWhiteSpacePreLine:
+			e.collectPreservingNewlines(node, sty, out)
 		default:
 			e.collectWrappedText(node, sty, out)
 		}
@@ -88,11 +90,12 @@ func isVerticalWritingMode(mode string) bool {
 // frame and inflate the item's measured size.
 func (e *engine) inlineChromeApplies(node *html.Node) bool {
 	parent := node.Parent
-	if parent == nil || parent.Type != html.ElementNode || e.styleVal(parent).Display != cssDisplayInline {
+	if parent == nil || parent.Type != html.ElementNode {
 		return false
 	}
 
-	if e.styleVal(parent).Position != "static" || isVerticalWritingMode(e.styleVal(parent).WritingMode) {
+	pStyle := e.stylePtr(parent)
+	if pStyle.Display != cssDisplayInline || pStyle.Position != "static" || isVerticalWritingMode(pStyle.WritingMode) {
 		return false
 	}
 
@@ -101,7 +104,7 @@ func (e *engine) inlineChromeApplies(node *html.Node) bool {
 		return true
 	}
 
-	switch e.styleVal(container).Display {
+	switch e.stylePtr(container).Display {
 	case displayFlex, displayInlineFlex, displayGrid, displayInlineGrid, displaySubgrid:
 		return false
 	default:
@@ -128,31 +131,111 @@ func (e *engine) inlineChromeIsAtomic(node *html.Node) bool {
 	return style.PaddingLeft > 0 || style.PaddingRight > 0 || inlineHasBorder(style)
 }
 
-// collectPreText splits a white-space:pre node on newlines.
-func (e *engine) collectPreText(node *html.Node, _ ResolvedStyle, out *[]inlineItem) {
+// collectPreservingNewlines splits on newlines for pre / pre-wrap / pre-line.
+// pre keeps each line as one unbreakable run; pre-wrap preserves spaces and
+// wraps; pre-line collapses spaces, preserves newlines, and wraps.
+func (e *engine) collectPreservingNewlines(node *html.Node, sty ResolvedStyle, out *[]inlineItem) {
 	style := e.stylePtr(node)
 	text := node.Text
+	collapse := sty.WhiteSpace == cssWhiteSpacePreLine
+	wrap := sty.WhiteSpace != cssWhiteSpacePre
 
 	for start := 0; ; {
 		end := strings.IndexByte(text[start:], '\n')
-		if end < 0 {
-			p := text[start:]
-			if p != "" {
-				*out = append(*out, e.textItem(p, style))
-			}
+		last := end < 0
 
+		var line string
+		if last {
+			line = text[start:]
+		} else {
+			line = text[start : start+end]
+		}
+
+		e.emitWhiteSpaceLine(line, style, collapse, wrap, out)
+
+		if last {
 			return
 		}
 
-		end += start
+		*out = append(*out, inlineItem{forceBreak: true}) //nolint:exhaustruct // intentional zero fields
+		start += end + 1
+	}
+}
 
-		p := text[start:end]
-		if p != "" {
-			*out = append(*out, e.textItem(p, style))
+func (e *engine) emitWhiteSpaceLine(line string, style *ResolvedStyle, collapse, wrap bool, out *[]inlineItem) {
+	if collapse {
+		line = collapseWS(line)
+	}
+
+	if line == "" {
+		return
+	}
+
+	if !wrap {
+		*out = append(*out, e.textItem(line, style))
+
+		return
+	}
+
+	if collapse {
+		e.emitCollapsedWords(line, style, out)
+
+		return
+	}
+
+	e.emitPreservedWrap(line, style, out)
+}
+
+func (e *engine) emitCollapsedWords(text string, style *ResolvedStyle, out *[]inlineItem) {
+	wordStart := 0
+
+	for wordStart < len(text) {
+		for wordStart < len(text) && text[wordStart] == ' ' {
+			wordStart++
 		}
 
-		*out = append(*out, inlineItem{forceBreak: true}) //nolint:exhaustruct // intentional zero fields
-		start = end + 1
+		if wordStart >= len(text) {
+			break
+		}
+
+		wordEnd := wordStart
+		for wordEnd < len(text) && text[wordEnd] != ' ' {
+			wordEnd++
+		}
+
+		end := wordEnd
+		if wordEnd < len(text) {
+			end = wordEnd + 1
+		}
+
+		*out = append(*out, e.textItem(text[wordStart:end], style))
+		wordStart = end
+	}
+}
+
+func (e *engine) emitPreservedWrap(line string, style *ResolvedStyle, out *[]inlineItem) {
+	idx := 0
+
+	for idx < len(line) {
+		if line[idx] == ' ' || line[idx] == '\t' {
+			end := idx + 1
+			for end < len(line) && (line[end] == ' ' || line[end] == '\t') {
+				end++
+			}
+
+			*out = append(*out, e.textItem(line[idx:end], style))
+			idx = end
+
+			continue
+		}
+
+		end := idx + 1
+		for end < len(line) && line[end] != ' ' && line[end] != '\t' {
+			end++
+		}
+
+		*out = append(*out, e.textItem(line[idx:end], style))
+		idx = end
 	}
 }
 
@@ -297,7 +380,8 @@ func (e *engine) collectInlineElement(node *html.Node, sty ResolvedStyle, out *[
 		return
 	}
 
-	if sty.Display == cssDisplayInlineBlock {
+	if sty.Display == cssDisplayInlineBlock || sty.Display == displayInlineFlex ||
+		sty.Display == displayInlineGrid {
 		e.collectInlineBlockItem(node, sty, out)
 
 		return
@@ -370,8 +454,8 @@ func (e *engine) collectInlineSpan(node *html.Node, sty ResolvedStyle, out *[]in
 
 	before := len(*out)
 
-	if txt := e.pseudoContent(node, "before"); txt != "" {
-		item := e.textItem(txt, e.pseudoStyle(node, "before", sty))
+	if txt := e.pseudoContent(node, pseudoBefore); txt != "" {
+		item := e.textItem(txt, e.pseudoStyle(node, pseudoBefore, sty))
 		e.enableInlineChrome(&item)
 		*out = append(*out, item)
 	}
@@ -380,8 +464,8 @@ func (e *engine) collectInlineSpan(node *html.Node, sty ResolvedStyle, out *[]in
 		e.collectInlineNode(c, out)
 	}
 
-	if txt := e.pseudoContent(node, "after"); txt != "" {
-		item := e.textItem(txt, e.pseudoStyle(node, "after", sty))
+	if txt := e.pseudoContent(node, pseudoAfter); txt != "" {
+		item := e.textItem(txt, e.pseudoStyle(node, pseudoAfter, sty))
 		e.enableInlineChrome(&item)
 		*out = append(*out, item)
 	}
@@ -456,7 +540,7 @@ func (e *engine) inlineBlockAvail(nodeN *html.Node, sty ResolvedStyle, cbW float
 func availWForInline() float64 { return 1 << maxIntShift }
 
 func (e *engine) textItem(text string, style *ResolvedStyle) inlineItem {
-	textWidth := e.measureTextFace(transformInlineText(text, style.TextTransform), *style)
+	textWidth := e.measureTextFace(transformInlineText(text, style.TextTransform), style)
 	lineHeight := lineHeightOf(style) * e.scale
 
 	if isVerticalWritingMode(style.WritingMode) {
@@ -483,7 +567,7 @@ func (e *engine) enableInlineChrome(item *inlineItem) {
 }
 
 func (e *engine) inlineTextWidth(text string, st *ResolvedStyle, chrome bool) float64 {
-	w := e.measureTextFace(text, *st)
+	w := e.measureTextFace(text, st)
 	if chrome {
 		w += e.inlineChromeLeft(st) + e.inlineChromeRight(st)
 	}
@@ -808,6 +892,8 @@ func sameInlineStyle(acc, boxN *ResolvedStyle) bool { //nolint:cyclop
 		acc.LineHeight == boxN.LineHeight &&
 		acc.TextTransform == boxN.TextTransform &&
 		acc.LetterSpacing == boxN.LetterSpacing &&
+		acc.WordSpacing == boxN.WordSpacing &&
+		acc.Visibility == boxN.Visibility &&
 		acc.Color == boxN.Color &&
 		acc.BGColor == boxN.BGColor &&
 		acc.PaddingTop == boxN.PaddingTop && acc.PaddingRight == boxN.PaddingRight &&

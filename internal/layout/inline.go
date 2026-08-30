@@ -15,6 +15,9 @@ const (
 	cssDisplayNone               = "none"
 	cssWhiteSpaceNowrap          = "nowrap"
 	cssWhiteSpacePre             = "pre"
+	cssWhiteSpacePreWrap         = "pre-wrap"
+	cssWhiteSpacePreLine         = "pre-line"
+	writingModeHorizontalTB      = "horizontal-tb"
 	cssTextAlignJustify          = "justify"
 	cssVerticalAlignBottom       = "bottom"
 	cssVerticalAlignMiddle       = "middle"
@@ -74,12 +77,47 @@ func (e *engine) collectAndPrepareInlineItems(nodes []*html.Node, contentW float
 	return items
 }
 
+func (e *engine) injectBlockPseudos(boxNode *box, items []inlineItem) []inlineItem {
+	if boxNode == nil || boxNode.node == nil || boxNode.style == nil || boxNode.kind != displayBlock {
+		return items
+	}
+
+	if item, ok := e.makeInflowPseudoItem(boxNode.node, pseudoBefore, *boxNode.style); ok {
+		items = append([]inlineItem{item}, items...)
+	}
+
+	if item, ok := e.makeInflowPseudoItem(boxNode.node, pseudoAfter, *boxNode.style); ok {
+		items = append(items, item)
+	}
+
+	return items
+}
+
+func (e *engine) makeInflowPseudoItem(
+	node *html.Node, pseudoEl string, host ResolvedStyle,
+) (inlineItem, bool) {
+	txt := e.pseudoContent(node, pseudoEl)
+	if txt == "" {
+		return inlineItem{}, false //nolint:exhaustruct
+	}
+
+	pstyle := e.pseudoStyle(node, pseudoEl, host)
+	if pstyle.Position == positionAbsolute || pstyle.Position == positionFixed {
+		return inlineItem{}, false //nolint:exhaustruct
+	}
+
+	item := e.textItem(txt, pstyle)
+	e.enableInlineChrome(&item)
+
+	return item, true
+}
+
 // layoutInlineFloats lays out inline content into line boxes and emits
 // text/image ops. It returns the consumed height and records the first line's
 // baseline on the box. When floats is non-nil, each line re-queries exclusion
 // at its canvas Y so text widens again after a float ends mid-paragraph.
 //
-//nolint:cyclop // hot path: per-line wrap against float exclusion zones
+//nolint:cyclop,gocognit,funlen // hot path: per-line wrap against float exclusion zones
 func (e *engine) layoutInlineFloats(
 	boxNode *box, nodes []*html.Node, contentW, contentX, lineY float64,
 	floats *floatState,
@@ -87,11 +125,23 @@ func (e *engine) layoutInlineFloats(
 	items := e.collectAndPrepareInlineItems(nodes, contentW)
 	defer e.releaseInlineItems(items)
 
+	items = e.injectBlockPseudos(boxNode, items)
+
 	if len(items) == 0 {
 		return 0
 	}
 
 	leftY := lineY
+	lineCount := 0
+	clampLimit := 0
+
+	if boxNode != nil && boxNode.style != nil {
+		if boxNode.style.LineClamp > 0 {
+			clampLimit = boxNode.style.LineClamp
+		} else if boxNode.style.MaxLines > 0 {
+			clampLimit = boxNode.style.MaxLines
+		}
+	}
 
 	idx := 0
 	for idx < len(items) {
@@ -132,8 +182,20 @@ func (e *engine) layoutInlineFloats(
 			}
 		}
 
-		lastLine := idx >= len(items)
+		lineCount++
+		lastLine := idx >= len(items) || (clampLimit > 0 && lineCount >= clampLimit)
+
+		if clampLimit > 0 && lineCount >= clampLimit && idx < len(items) {
+			if end > start && items[end-1].text != "" {
+				items[end-1].text += "…"
+			}
+		}
+
 		leftY += e.emitLine(boxNode, items, start, end, lineW, lineX, leftY, lastLine)
+
+		if clampLimit > 0 && lineCount >= clampLimit {
+			break
+		}
 	}
 
 	return leftY - lineY
@@ -144,6 +206,8 @@ const maxPooledInlineItems = 256
 // acquireInlineItems returns a reusable temporary item slice for one inline
 // formatting context. Nested contexts consume separate entries from the same
 // engine-local stack.
+const initialInlineItemCapacity = 32
+
 func (e *engine) acquireInlineItems() []inlineItem {
 	if n := len(e.inlineItemPool); n > 0 {
 		items := e.inlineItemPool[n-1]
@@ -152,7 +216,7 @@ func (e *engine) acquireInlineItems() []inlineItem {
 		return items[:0]
 	}
 
-	return make([]inlineItem, 0)
+	return make([]inlineItem, 0, initialInlineItemCapacity)
 }
 
 // releaseInlineItems returns a temporary item slice to the engine-local pool.
@@ -435,6 +499,10 @@ func (e *engine) breakOverflowItem(
 // allowMidTokenBreak applies the CSS wrapping policy to decide whether the
 // token may be split mid-word on the current line instead of wrapping whole.
 func allowMidTokenBreak(pol wordBreakPolicy, adv, fullLineW float64, aloneOnLine bool) bool {
+	if pol == breakKeepAll {
+		return false
+	}
+
 	tokenExceedsLine := adv > fullLineW
 	// Mid-line: a normal / break-word token that fits a full next line must
 	// wrap whole — not mid-break into a tight remainW (captions: "International").
@@ -529,7 +597,7 @@ func (e *engine) breakToken(cssSheet string, sty ResolvedStyle, firstMax, restMa
 		return []string{cssSheet}
 	}
 
-	return e.splitTextToWidth(cssSheet, sty, firstMax, restMax, softModeOf(pol))
+	return e.splitTextToWidth(cssSheet, &sty, firstMax, restMax, softModeOf(pol))
 }
 
 // preferFloatClearForTail reports whether remaining inline content from i
@@ -660,23 +728,22 @@ const (
 // splitTextToWidth breaks s into substrings that each fit max widths.
 // firstMax is for the first chunk (remaining space on the current line);
 // restMax is for subsequent chunks (full line content width).
+//
+//nolint:cyclop // multi-chunk text width splitting
 func (e *engine) splitTextToWidth(
-	text string, style ResolvedStyle, firstMax, restMax float64, mode softBreakMode,
+	text string, style *ResolvedStyle, firstMax, restMax float64, mode softBreakMode,
 ) []string {
-	if text == "" {
+	if text == "" || style == nil {
 		return nil
 	}
 
 	runes := []rune(text)
-	if len(runes) <= 1 {
-		return []string{text}
-	}
 
-	var out []string
+	var chunks []string
 
 	for len(runes) > 0 {
 		limit := restMax
-		if len(out) == 0 {
+		if len(chunks) == 0 && firstMax > 0 {
 			limit = firstMax
 		}
 
@@ -693,16 +760,21 @@ func (e *engine) splitTextToWidth(
 			}
 		}
 
-		out = append(out, string(runes[:node]))
+		chunks = append(chunks, string(runes[:node]))
 		runes = runes[node:]
 	}
 
-	return out
+	return chunks
 }
 
 // fittingPrefix returns the rune count of the longest prefix of runes that
-// fits within limit, always at least 1 so splitting makes progress.
-func (e *engine) fittingPrefix(runes []rune, limit float64, style ResolvedStyle) int {
+// fits within limit using the style's font-size. Takes at least 1 rune so
+// we always make progress.
+func (e *engine) fittingPrefix(runes []rune, limit float64, style *ResolvedStyle) int {
+	if style == nil {
+		return 1
+	}
+
 	node := 0
 	width := 0.0
 
@@ -754,9 +826,24 @@ func isSoftWrapRune(r rune, mode softBreakMode) bool {
 	return false
 }
 
+func hidesPaint(style *ResolvedStyle) bool {
+	if style == nil {
+		return false
+	}
+
+	switch style.Visibility {
+	case overflowHidden, borderCollapseValue:
+		return true
+	default:
+		return false
+	}
+}
+
 // emitLine renders items[start:end) as one line and returns its height.
 // lastLine is true for the final line of the inline formatting context (used
 // so text-align:justify leaves the last line start-aligned).
+//
+//nolint:cyclop // line emission and alignment dispatch
 func (e *engine) emitLine(
 	boxNode *box, items []inlineItem, start, end int,
 	availW, startX, lineY float64, lastLine bool,
@@ -772,6 +859,11 @@ func (e *engine) emitLine(
 	textAlign := floatLeft
 	if boxNode != nil && boxNode.style.TextAlign != "" {
 		textAlign = boxNode.style.TextAlign
+	}
+
+	if lastLine && boxNode != nil && boxNode.style != nil &&
+		boxNode.style.TextAlignLast != "" && boxNode.style.TextAlignLast != "auto" {
+		textAlign = boxNode.style.TextAlignLast
 	}
 
 	// Coalesce adjacent same-style text runs into one op so PDF/image paint
@@ -813,6 +905,18 @@ func (e *engine) emitLineItems(boxNode *box, line []inlineItem, leftX, baseline,
 
 		leftX += item.marginL
 
+		if hidesPaint(item.style) {
+			und.flush(e)
+
+			leftX += item.w + item.marginR
+
+			if idx < len(line)-1 && isJustifyGapAfter(*item) {
+				leftX += justifyGap
+			}
+
+			continue
+		}
+
 		switch {
 		case item.blockBox != nil:
 			leftX = e.emitInlineBlock(
@@ -843,7 +947,7 @@ func (e *engine) trimTrailingSpace(line []inlineItem) {
 	if trimmed != last.text {
 		spaceCount := len(last.text) - len(trimmed)
 		last.text = trimmed
-		last.w -= float64(spaceCount) * e.measureRuneFace(' ', *last.style)
+		last.w -= float64(spaceCount) * e.measureRuneFace(' ', last.style)
 	}
 }
 
@@ -872,7 +976,7 @@ func (e *engine) lineMetrics(line []inlineItem, lineY float64) (float64, float64
 			continue
 		}
 
-		ascent, descent := e.inlineFontMetrics(item.text, *item.style)
+		ascent, descent := e.inlineFontMetrics(item.text, item.style)
 		lh := lineHeightOf(item.style) * e.scale
 
 		extra := (lh - ascent - descent) / two
@@ -956,8 +1060,12 @@ func (e *engine) lineOriginAndGap(
 // CSS justify expands inter-word spaces only — not every inline box
 // boundary. Expanding after every item put rivers before commas, cites
 // ("word [1]"), and apostrophes ("Roth 's") on wiki print pages.
+//
+//nolint:cyclop // text justification spacing
 func (e *engine) justifyGapOf(line []inlineItem, availW, totalW float64, lastLine bool) float64 {
-	if lastLine || availW <= totalW || len(line) <= 1 {
+	allowLastLine := lastLine && len(line) > 0 &&
+		line[0].style != nil && line[0].style.TextAlignLast == cssTextAlignJustify
+	if (lastLine && !allowLastLine) || availW <= totalW || len(line) <= 1 {
 		return 0
 	}
 

@@ -12,23 +12,57 @@ import (
 
 // CSS keyword constants shared by the cascade (goconst).
 const (
-	inheritKeyword     = "inherit"
-	solidKeyword       = "solid"
-	clearKeyword       = "clear"
-	visibleKeyword     = "visible"
-	pageKeyword        = "page"
-	avoidKeyword       = "avoid"
-	avoidPageValue     = "avoid-page"
-	remUnit            = "rem"
-	divElementName     = "div"
-	styleElement       = "style"
-	borderWidthKeyword = "border-width"
-	borderStyleKeyword = "border-style"
-	borderColorKeyword = "border-color"
-	gapKeyword         = "gap"
-	containerKeyword   = "container"
-	flexKeyword        = "flex"
-	flexStartKeyword   = "flex-start"
+	inheritKeyword                = "inherit"
+	solidKeyword                  = "solid"
+	clearKeyword                  = "clear"
+	visibleKeyword                = "visible"
+	pageKeyword                   = "page"
+	avoidKeyword                  = "avoid"
+	avoidPageValue                = "avoid-page"
+	remUnit                       = "rem"
+	divElementName                = "div"
+	styleElement                  = "style"
+	borderWidthKeyword            = "border-width"
+	borderStyleKeyword            = "border-style"
+	borderColorKeyword            = "border-color"
+	gapKeyword                    = "gap"
+	containerKeyword              = "container"
+	flexKeyword                   = "flex"
+	flexStartKeyword              = "flex-start"
+	cssPropMarginInline           = "margin-inline"
+	cssPropMarginBlock            = "margin-block"
+	cssPropPaddingInline          = "padding-inline"
+	cssPropPaddingBlock           = "padding-block"
+	cssPropInsetBlock             = "inset-block"
+	cssPropInsetInline            = "inset-inline"
+	cssPropInsetBlockStart        = "inset-block-start"
+	cssPropInsetBlockEnd          = "inset-block-end"
+	cssPropInsetInlineStart       = "inset-inline-start"
+	cssPropInsetInlineEnd         = "inset-inline-end"
+	cssPropBorderBlock            = "border-block"
+	cssPropBorderInline           = "border-inline"
+	cssPropBorderBlockStart       = "border-block-start"
+	cssPropBorderBlockEnd         = "border-block-end"
+	cssPropBorderInlineStart      = "border-inline-start"
+	cssPropBorderInlineEnd        = "border-inline-end"
+	cssPropBorderBlockColor       = "border-block-color"
+	cssPropBorderInlineColor      = "border-inline-color"
+	cssPropBorderBlockStartColor  = "border-block-start-color"
+	cssPropBorderBlockEndColor    = "border-block-end-color"
+	cssPropBorderInlineStartColor = "border-inline-start-color"
+	cssPropBorderInlineEndColor   = "border-inline-end-color"
+	cssPropBorderBlockStyle       = "border-block-style"
+	cssPropBorderInlineStyle      = "border-inline-style"
+	cssPropBorderBlockStartStyle  = "border-block-start-style"
+	cssPropBorderBlockEndStyle    = "border-block-end-style"
+	cssPropBorderInlineStartStyle = "border-inline-start-style"
+	cssPropBorderInlineEndStyle   = "border-inline-end-style"
+	cssPropBorderBlockWidth       = "border-block-width"
+	cssPropBorderInlineWidth      = "border-inline-width"
+	cssPropBorderBlockStartWidth  = "border-block-start-width"
+	cssPropBorderBlockEndWidth    = "border-block-end-width"
+	cssPropBorderInlineStartWidth = "border-inline-start-width"
+	cssPropBorderInlineEndWidth   = "border-inline-end-width"
 )
 
 // hashFontFamily fingerprints a CSS font-family list without allocating.
@@ -67,91 +101,122 @@ const asciiFoldBit = 0x20
 //
 //nolint:lll // the resolved-style table keeps field comments beside each property
 type ResolvedStyle struct {
-	Display                                                                                    string
-	Position                                                                                   string  // "static" | "relative" | "absolute" | "fixed" | "sticky"
-	Float                                                                                      string  // cssDisplayNone | floatLeft | floatRight
-	Clear                                                                                      string  // cssDisplayNone | floatLeft | floatRight | "both"
-	BoxSizing                                                                                  string  // "content-box" | "border-box"
-	Top                                                                                        float64 // position offsets (pt); 0 = unset for absolute uses Auto flags
-	Right                                                                                      float64
-	Bottom                                                                                     float64
-	Left                                                                                       float64
-	TopAuto                                                                                    bool
-	RightAuto                                                                                  bool
-	BottomAuto                                                                                 bool
-	LeftAuto                                                                                   bool
-	FlexDirection                                                                              string  // "row" | fxCol | "row-reverse" | "column-reverse"
-	FlexWrap                                                                                   string  // "nowrap" | "wrap" | "wrap-reverse"
-	JustifyContent                                                                             string  // flex-start | flex-end | center | space-between | space-around | space-evenly
-	AlignItems                                                                                 string  // stretch | flex-start | center | flex-end
-	AlignContent                                                                               string  // flex-start | flex-end | center | space-between | space-around | space-evenly | stretch
-	AlignSelf                                                                                  string  // auto | stretch | flex-start | flex-end | center | start | end
-	JustifyItems                                                                               string  // grid: stretch | start | end | center
-	JustifySelf                                                                                string  // grid item: auto | stretch | start | end | center
-	Gap                                                                                        float64 // flex/grid gap shorthand (pt); kept for backward compat
-	RowGap                                                                                     float64 // pt; 0 with ColumnGap 0 → layout falls back to Gap
-	ColumnGap                                                                                  float64
-	ColumnGapNormal                                                                            bool    // true when column-gap is normal/initial (multicol → 1em; flex/grid → 0)
-	ColumnCount                                                                                int     // 0 = auto; ≥1 = used count hint
-	ColumnWidth                                                                                float64 // -1 = auto; else length in pt
-	ColumnSpan                                                                                 string  // cssDisplayNone | "all" (multicol spanner)
-	ColumnFill                                                                                 string  // "balance" | overflowAuto
-	FlexGrow                                                                                   float64
-	FlexShrink                                                                                 float64 // default 1; 0 disables shrink
-	FlexBasis                                                                                  float64 // -1 = auto
-	FlexBasisPercent                                                                           float64 // >=0 means % of flex container content main size (width/height)
-	FlexOrder                                                                                  int
-	ZIndex                                                                                     int
-	ZIndexSet                                                                                  bool
-	WritingMode                                                                                string // "" | "horizontal-tb" | "vertical-rl" | "vertical-lr"
-	GridTemplateColumns                                                                        string // raw grid-template-columns value
-	GridTemplateRows                                                                           string
-	GridTemplateAreas                                                                          string  // raw grid-template-areas value
-	GridArea                                                                                   string  // named area (custom-ident); empty = line-based placement
-	GridAutoFlow                                                                               string  // "row" | fxCol | "dense" | "row dense" | "column dense"
-	GridColumnSpan                                                                             int     // from grid-column: span N (default 1)
-	GridColumnStart                                                                            int     // 1-based; 0 = auto
-	GridRowSpan                                                                                int     // from grid-row: span N (default 1)
-	GridRowStart                                                                               int     // 1-based; 0 = auto
-	Width                                                                                      float64 // -1 = auto; absolute length in pt when WidthPercent < 0
-	WidthPercent                                                                               float64 // >=0 means width is that % of the containing block at layout time
-	Height                                                                                     float64 // -1 = auto; absolute length in pt when HeightPercent < 0
-	HeightPercent                                                                              float64 // >=0 means height is that % of the CB; indefinite CB → auto (cyclic honesty)
-	MinWidth                                                                                   float64 // absolute pt when MinWidthPercent < 0; 0 = auto (content min for flex)
-	MinWidthPercent                                                                            float64 // >=0 means % of containing block (deferred like WidthPercent)
-	MinWidthSet                                                                                bool    // true when min-width was explicitly declared, including 0
-	MaxWidth                                                                                   float64
-	MaxWidthPercent                                                                            float64 // >=0 means % of containing block / img clamp context
-	MinHeight                                                                                  float64
-	MinHeightPercent                                                                           float64 // >=0 means % of CB height; indefinite → ignore
-	MaxHeight                                                                                  float64
-	Overflow                                                                                   string // "visible" | "hidden" | "scroll" | "auto" | "clip" (non-visible = sticky scrollport)
-	MarginTop                                                                                  float64
-	MarginRight                                                                                float64
-	MarginBottom                                                                               float64
-	MarginLeft                                                                                 float64
-	MarginTopAuto                                                                              bool // margin-top: auto in a flex column
-	MarginBottomAuto                                                                           bool // margin-bottom: auto in a flex column
-	MarginLeftAuto                                                                             bool // margin-left: auto (horizontal centering with right auto)
-	MarginRightAuto                                                                            bool // margin-right: auto
-	PaddingTop                                                                                 float64
-	PaddingRight                                                                               float64
-	PaddingBottom                                                                              float64
-	PaddingLeft                                                                                float64
-	BorderTop                                                                                  border
-	BorderRight                                                                                border
-	BorderBottom                                                                               border
-	BorderLeft                                                                                 border
-	BorderRadius                                                                               float64
-	BorderRadiusPercent                                                                        float64
-	BorderRadiusTopLeft, BorderRadiusTopRight, BorderRadiusBottomRight, BorderRadiusBottomLeft float64
-	Color                                                                                      [3]float64
-	BGColor                                                                                    [4]float64 // rgba, 0..1
+	Display            string
+	Position           string  // "static" | "relative" | "absolute" | "fixed" | "sticky"
+	Float              string  // cssDisplayNone | floatLeft | floatRight
+	Clear              string  // cssDisplayNone | floatLeft | floatRight | "both"
+	BoxSizing          string  // "content-box" | "border-box"
+	Top                float64 // position offsets (pt); 0 = unset for absolute uses Auto flags
+	Right              float64
+	Bottom             float64
+	Left               float64
+	TopAuto            bool
+	RightAuto          bool
+	BottomAuto         bool
+	LeftAuto           bool
+	FlexDirection      string  // "row" | fxCol | "row-reverse" | "column-reverse"
+	FlexWrap           string  // "nowrap" | "wrap" | "wrap-reverse"
+	JustifyContent     string  // flex-start | flex-end | center | space-between | space-around | space-evenly
+	AlignItems         string  // stretch | flex-start | center | flex-end
+	AlignContent       string  // flex-start | flex-end | center | space-between | space-around | space-evenly | stretch
+	AlignSelf          string  // auto | stretch | flex-start | flex-end | center | start | end
+	JustifyItems       string  // grid: stretch | start | end | center
+	JustifySelf        string  // grid item: auto | stretch | start | end | center
+	Gap                float64 // flex/grid gap shorthand (pt); kept for backward compat
+	RowGap             float64 // pt; 0 with ColumnGap 0 → layout falls back to Gap
+	ColumnGap          float64
+	ColumnGapNormal    bool    // true when column-gap is normal/initial (multicol → 1em; flex/grid → 0)
+	ColumnCount        int     // 0 = auto; ≥1 = used count hint
+	ColumnWidth        float64 // -1 = auto; else length in pt
+	ColumnSpan         string  // cssDisplayNone | "all" (multicol spanner)
+	ColumnFill         string  // "balance" | overflowAuto
+	ColumnRuleWidth    float64 // pt; CSS initial medium
+	ColumnRuleStyle    string  // none | solid | dashed | dotted
+	ColumnRuleColor    [3]float64
+	ColumnRuleColorSet bool // false → paint uses currentColor (Color)
+	FlexGrow           float64
+	FlexShrink         float64 // default 1; 0 disables shrink
+	FlexBasis          float64 // -1 = auto
+	FlexBasisPercent   float64 // >=0 means % of flex container content main size (width/height)
+	FlexOrder          int
+	ZIndex             int
+	ZIndexSet          bool
+	// WritingMode is CSS writing-mode ("horizontal-tb" | "vertical-rl" | "vertical-lr").
+	WritingMode string
+	// Direction is CSS direction ("ltr" | "rtl").
+	Direction           string
+	Filter              string
+	GridTemplateColumns string // raw grid-template-columns value
+	GridTemplateRows    string
+	GridTemplateAreas   string  // raw grid-template-areas value
+	GridArea            string  // named area (custom-ident); empty = line-based placement
+	GridAutoFlow        string  // "row" | fxCol | "dense" | "row dense" | "column dense"
+	GridColumnSpan      int     // from grid-column: span N (default 1)
+	GridColumnStart     int     // 1-based; 0 = auto
+	GridRowSpan         int     // from grid-row: span N (default 1)
+	GridRowStart        int     // 1-based; 0 = auto
+	Width               float64 // -1 = auto; absolute length in pt when WidthPercent < 0
+	WidthPercent        float64 // >=0 means width is that % of the containing block at layout time
+	Height              float64 // -1 = auto; absolute length in pt when HeightPercent < 0
+	HeightPercent       float64 // >=0 means height is that % of the CB; indefinite CB → auto (cyclic honesty)
+	MinWidth            float64 // absolute pt when MinWidthPercent < 0; 0 = auto (content min for flex)
+	MinWidthPercent     float64 // >=0 means % of containing block (deferred like WidthPercent)
+	MinWidthSet         bool    // true when min-width was explicitly declared, including 0
+	MaxWidth            float64
+	MaxWidthPercent     float64 // >=0 means % of containing block / img clamp context
+	MinHeight           float64
+	MinHeightPercent    float64 // >=0 means % of CB height; indefinite → ignore
+	MaxHeight           float64
+	Overflow            string // "visible" | "hidden" | "scroll" | "auto" | "clip" (non-visible = sticky scrollport)
+	OverflowX           string
+	OverflowY           string
+	// Visibility is CSS visibility: "visible" | "hidden" | "collapse".
+	// Empty means visible. hidden and collapse skip paint and keep layout size.
+	Visibility                                                                                     string
+	MarginTop                                                                                      float64
+	MarginRight                                                                                    float64
+	MarginBottom                                                                                   float64
+	MarginLeft                                                                                     float64
+	MarginTopAuto                                                                                  bool // margin-top: auto in a flex column
+	MarginBottomAuto                                                                               bool // margin-bottom: auto in a flex column
+	MarginLeftAuto                                                                                 bool // margin-left: auto (horizontal centering with right auto)
+	MarginRightAuto                                                                                bool // margin-right: auto
+	PaddingTop                                                                                     float64
+	PaddingRight                                                                                   float64
+	PaddingBottom                                                                                  float64
+	PaddingLeft                                                                                    float64
+	BorderTop                                                                                      border
+	BorderRight                                                                                    border
+	BorderBottom                                                                                   border
+	BorderLeft                                                                                     border
+	BorderRadius                                                                                   float64
+	BorderRadiusPercent                                                                            float64
+	BorderRadiusTopLeft, BorderRadiusTopRight, BorderRadiusBottomRight, BorderRadiusBottomLeft     float64
+	BorderRadiusTopLeftY, BorderRadiusTopRightY, BorderRadiusBottomRightY, BorderRadiusBottomLeftY float64
+	Color                                                                                          [3]float64
+	BGColor                                                                                        [4]float64 // rgba, 0..1
 	// AccentColor is CSS accent-color when authored; AccentColorSet is false
 	// when the property is absent so widgets can keep their default fill.
-	AccentColor    [3]float64
-	AccentColorSet bool
-	FontFamily     []string
+	AccentColor            [3]float64
+	AccentColorSet         bool
+	FontFamily             []string
+	FontFeatureSettings    string
+	FontKerning            string
+	FontVariant            string
+	FontVariantCaps        string
+	FontVariantLigatures   string
+	FontVariantNumeric     string
+	FontVariantPosition    string
+	FontVariantEastAsian   string
+	FontVariantEmoji       string
+	FontVariantAlternates  string
+	FontStretch            string
+	FontSynthesis          string
+	FontSynthesisWeight    bool
+	FontSynthesisStyle     bool
+	FontSynthesisSmallCaps bool
+	FontSynthesisPosition  bool
+	FontSizeAdjust         float64
 	// famHash is the FNV-1a fingerprint of FontFamily, computed once during
 	// style resolution. Text measurement reuses
 	// it instead of re-hashing the family list per run.
@@ -162,34 +227,193 @@ type ResolvedStyle struct {
 	LineHeight         float64 // pts; 0 = "normal"
 	LineHeightUnitless float64 // multiplier when line-height was unitless; 0 otherwise
 	TextAlign          string  // floatLeft | floatRight | "center" | "justify"
+	TextAlignLast      string  // "auto" | "left" | "right" | "center" | "justify"
 	TextTransform      string  // "none" | "uppercase" | "lowercase" | "capitalize"
 	VerticalAlign      string  // "baseline" | "top" | "middle" | cssVerticalAlignBottom
 	VerticalAlignShift float64 // pt; CSS length vertical-align (positive raises)
-	WhiteSpace         string  // "normal" | "nowrap" | "pre"
+	WhiteSpace         string  // "normal" | "nowrap" | "pre" | "pre-wrap" | "pre-line"
+	WhiteSpaceCollapse string  // "collapse" | "preserve" | "preserve-breaks" | "preserve-spaces" | "break-spaces"
+	WhiteSpaceTrim     string  // "none" | "discard-before" | "discard-after" | "discard-inner"
+	TextWrap           string
+	TextWrapMode       string
+	TextWrapStyle      string
+	TabSize            float64
+	Hyphens            string
+	HyphenateCharacter string
+	TextJustify        string
+	LineBreak          string
 	// OverflowWrap is CSS overflow-wrap / word-wrap: "normal" | "break-word" | "anywhere".
 	OverflowWrap string
 	// WordBreak is CSS word-break: "normal" | "break-all" | "keep-all".
-	WordBreak       string
-	TextDecoration  string // cssDisplayNone | "underline" | "line-through"
-	LetterSpacing   float64
+	WordBreak               string
+	TextDecoration          string // cssDisplayNone | "underline" | "line-through"
+	TextDecorationLine      string
+	TextDecorationColor     [3]float64
+	TextDecorationColorSet  bool
+	TextDecorationStyle     string
+	TextDecorationThickness float64
+	TextUnderlineOffset     float64
+	TextUnderlinePosition   string
+	TextShadowX             float64
+	TextShadowY             float64
+	TextShadowBlur          float64
+	TextShadowColor         [3]float64
+	TextShadowSet           bool
+	LetterSpacing           float64
+	// WordSpacing is CSS word-spacing in points; 0 is normal.
+	WordSpacing     float64
 	TextIndent      float64
 	ListStyleType   string // "disc" | "circle" | "square" | "decimal" | cssDisplayNone | …
 	BorderCollapse  string // "separate" | "collapse"
 	BorderSpacing   float64
+	BorderSpacingV  float64
 	TableLayout     string // overflowAuto | "fixed"
+	CaptionSide     string // "top" | "bottom" | "left" | "right"; empty means top
 	IsReplaced      bool   // img, hr
 	PageBreakBefore string // "" | "always" | "avoid"
 	PageBreakAfter  string // "" | "always" | "avoid"
 	PageBreakInside string // "" | "always" | "avoid"
-	Orphans         int    // CSS orphans; inherited; initial 2; integer ≥ 1
-	Widows          int    // CSS widows; inherited; initial 2; integer ≥ 1
-	ContainerType   string // "" | "normal" | "inline-size" | "size"
-	ContainerName   string // space-separated lower-case names; empty = none
+	// MarginBreak is CSS margin-break ("auto" | "keep" | "discard") for page breaks.
+	MarginBreak string
+	// PageName is the CSS page used value: empty is auto, else a lower-case
+	// named page ident. Specified auto keeps the parent used value.
+	PageName      string
+	Orphans       int    // CSS orphans; inherited; initial 2; integer ≥ 1
+	Widows        int    // CSS widows; inherited; initial 2; integer ≥ 1
+	ContainerType string // "" | "normal" | "inline-size" | "size"
+	ContainerName string // space-separated lower-case names; empty = none
 	// Static 2D CSS transforms (paint-time CTM; sibling flow unchanged).
 	Transform       Matrix2D
 	HasTransform    bool
 	TransformOrigin transformOriginSpec
 	Opacity         float64 // 0..1; initial 1; also from filter:opacity()
+	Content         string
+	GridColumnEnd   int
+	GridRowEnd      int
+	// Outline* is CSS outline. Empty OutlineStyle means none. Does not affect layout size.
+	OutlineWidth    float64
+	OutlineStyle    string
+	OutlineColor    [3]float64
+	OutlineColorSet bool
+	OutlineOffset   float64
+	// BackgroundImage is a raw url(...) target for the first layer, empty if none.
+	BackgroundImage      string
+	BackgroundPosX       string
+	BackgroundPosY       string
+	BackgroundSize       string
+	BackgroundRepeat     string
+	BackgroundClip       string
+	BackgroundOrigin     string
+	BackgroundAttachment string
+	BorderImageSource    string
+	BorderImageSlice     string
+	BorderImageWidth     string
+	BorderImageOutset    string
+	BorderImageRepeat    string
+	// ListStylePosition is "inside" or "outside"; empty means outside.
+	ListStylePosition          string
+	QuotesRaw                  string
+	QuotesOpen                 string
+	QuotesClose                string
+	CounterReset               string
+	CounterIncrement           string
+	ListStyleImage             string
+	BoxShadowX                 float64
+	BoxShadowY                 float64
+	BoxShadowBlur              float64
+	BoxShadowSpread            float64
+	BoxShadowColor             [3]float64
+	BoxShadowSet               bool
+	BoxShadowInset             bool
+	BoxShadowRaw               string
+	Fill                       [3]float64
+	FillSet                    bool
+	FillOpacity                float64
+	Stroke                     [3]float64
+	StrokeSet                  bool
+	StrokeWidth                float64
+	StrokeWidthSet             bool
+	StrokeOpacity              float64
+	StrokeDashArray            []float64
+	StrokeDashOffset           float64
+	StrokeLineCap              string
+	StrokeLineJoin             string
+	StrokeMiterLimit           float64
+	FillRule                   string
+	ClipRule                   string
+	ColorInterpolation         string
+	ColorInterpolationFilters  string
+	ShapeRendering             string
+	TextAnchor                 string
+	DominantBaseline           string
+	AlignmentBaseline          string
+	ClipPath                   string
+	OverflowClipMargin         float64
+	ScrollMarginTop            float64
+	ScrollMarginRight          float64
+	ScrollMarginBottom         float64
+	ScrollMarginLeft           float64
+	TransformBox               string
+	TransformStyle             string
+	Perspective                float64
+	PerspectiveOrigin          [2]float64
+	BackfaceVisibility         string
+	RubyAlign                  string
+	RubyPosition               string
+	RubyMerge                  string
+	RubyOverhang               string
+	Page                       string
+	BookmarkLevel              int
+	BookmarkLabel              string
+	BookmarkState              string
+	FootnoteDisplay            string
+	FootnotePolicy             string
+	StringSet                  string
+	TextOverflow               string
+	LineClamp                  int
+	MaxLines                   int
+	MarginTrim                 string
+	BoxDecorationBreak         string
+	ImageOrientation           string
+	ImageResolution            float64
+	ObjectViewBox              string
+	PrintColorAdjust           string
+	ForcedColorAdjust          string
+	ColorScheme                string
+	DynamicRangeLimit          string
+	ContainIntrinsicSize       string
+	ContainIntrinsicWidth      float64
+	ContainIntrinsicHeight     float64
+	ContainIntrinsicInlineSize float64
+	ContainIntrinsicBlockSize  float64
+	Contain                    string
+	ContentVisibility          string
+	FontVariationSettings      string
+	FontOpticalSizing          string
+	FontLanguageOverride       string
+	FontPalette                string
+	MixBlendMode               string
+	BackgroundBlendMode        string
+	Isolation                  string
+	TextCombineUpright         string
+	TextOrientation            string
+	UnicodeBidi                string
+	TextEmphasis               string
+	TextEmphasisColor          [3]float64
+	TextEmphasisColorSet       bool
+	TextEmphasisPosition       string
+	TextEmphasisStyle          string
+	TextEmphasisSkip           string
+	TextDecorationSkip         string
+	TextDecorationSkipInk      string
+	TextDecorationSkipBox      string
+	TextDecorationSkipSelf     string
+	TextDecorationSkipSpaces   string
+	TextDecorationInset        string
+	OverflowClipMarginTop      float64
+	OverflowClipMarginRight    float64
+	OverflowClipMarginBottom   float64
+	OverflowClipMarginLeft     float64
 	// CustomProps holds resolved CSS custom properties (--*) for this element
 	// (inherited). Shared with the parent map when the element declares none.
 	CustomProps map[string]string
@@ -230,6 +454,8 @@ func initialStyle() ResolvedStyle { //nolint:funlen // complete CSS initial-valu
 		ColumnWidth:      -1,
 		ColumnSpan:       cssDisplayNone,
 		ColumnFill:       "balance",
+		ColumnRuleWidth:  borderWidth(mediumKeyword, 0),
+		ColumnRuleStyle:  cssDisplayNone,
 		Width:            -1,
 		WidthPercent:     -1,
 		Height:           -1,
@@ -242,32 +468,44 @@ func initialStyle() ResolvedStyle { //nolint:funlen // complete CSS initial-valu
 		MinHeightPercent: -1,
 		MaxHeight:        -1,
 		Overflow:         "visible",
+		OverflowX:        "visible",
+		OverflowY:        "visible",
+		Visibility:       visibleKeyword,
 		Color:            [3]float64{0, 0, 0},
 		BGColor:          [4]float64{0, 0, 0, 0},
 		FontFamily:       nil,
 		// Empty family hashes to the FNV-1a offset, matching what
 		// resolveElementStyle records for elements without font-family.
-		famHash:         hashFontFamily(nil),
-		FontSize:        defaultFontSizePt, // 16px at 96dpi
-		FontWeight:      fontWeightNormal,
-		TextTransform:   textTransformNone,
-		VerticalAlign:   "baseline",
-		WhiteSpace:      "normal",
-		OverflowWrap:    "normal",
-		WordBreak:       "normal",
-		TextDecoration:  cssDisplayNone,
-		ListStyleType:   "disc",
-		BorderCollapse:  "separate",
-		BorderSpacing:   0,
-		TableLayout:     overflowAuto,
-		GridColumnSpan:  1,
-		GridRowSpan:     1,
-		WritingMode:     "horizontal-tb",
-		Orphans:         two,
-		Widows:          two,
-		Transform:       IdentityMatrix(),
-		TransformOrigin: defaultTransformOrigin(),
-		Opacity:         1,
+		famHash:                hashFontFamily(nil),
+		FontSize:               defaultFontSizePt, // 16px at 96dpi
+		FontWeight:             fontWeightNormal,
+		TextTransform:          textTransformNone,
+		VerticalAlign:          "baseline",
+		WhiteSpace:             "normal",
+		TabSize:                defaultTabSize,
+		HyphenateCharacter:     "-",
+		OverflowWrap:           "normal",
+		WordBreak:              "normal",
+		TextDecoration:         cssDisplayNone,
+		ListStyleType:          "disc",
+		BorderCollapse:         "separate",
+		BorderSpacing:          0,
+		TableLayout:            overflowAuto,
+		GridColumnSpan:         1,
+		GridRowSpan:            1,
+		WritingMode:            writingModeHorizontalTB,
+		Direction:              "ltr",
+		FontSynthesisWeight:    true,
+		FontSynthesisStyle:     true,
+		FontSynthesisSmallCaps: true,
+		FontSynthesisPosition:  true,
+		Orphans:                two,
+		Widows:                 two,
+		Transform:              IdentityMatrix(),
+		TransformOrigin:        defaultTransformOrigin(),
+		Opacity:                1,
+		FillOpacity:            1,
+		StrokeOpacity:          1,
 	}
 }
 
@@ -585,60 +823,91 @@ func (s *styleStore) append(style ResolvedStyle) *ResolvedStyle {
 // exact interning comparison allocation-free while preserving used-style
 // identity.
 type comparableResolvedStyle struct {
-	Display, Position, Float, Clear, BoxSizing                                                 string
-	Top, Right, Bottom, Left                                                                   float64
-	TopAuto, RightAuto, BottomAuto, LeftAuto                                                   bool
-	FlexDirection, FlexWrap, JustifyContent, AlignItems, AlignContent, AlignSelf               string
-	JustifyItems, JustifySelf                                                                  string
-	Gap, RowGap, ColumnGap                                                                     float64
-	ColumnGapNormal                                                                            bool
-	ColumnCount                                                                                int
-	ColumnWidth                                                                                float64
-	ColumnSpan, ColumnFill                                                                     string
-	FlexGrow, FlexShrink, FlexBasis, FlexBasisPercent                                          float64
-	FlexOrder, ZIndex                                                                          int
-	ZIndexSet                                                                                  bool
-	WritingMode                                                                                string
-	GridTemplateColumns, GridTemplateRows, GridTemplateAreas, GridArea                         string
-	GridAutoFlow                                                                               string
-	GridColumnSpan, GridColumnStart, GridRowSpan, GridRowStart                                 int
-	Width, WidthPercent, Height, HeightPercent                                                 float64
-	MinWidth, MinWidthPercent, MaxWidth, MaxWidthPercent                                       float64
-	MinWidthSet                                                                                bool
-	MinHeight, MinHeightPercent, MaxHeight                                                     float64
-	Overflow                                                                                   string
-	MarginTop, MarginRight, MarginBottom, MarginLeft                                           float64
-	MarginTopAuto, MarginBottomAuto, MarginLeftAuto, MarginRightAuto                           bool
-	PaddingTop, PaddingRight, PaddingBottom, PaddingLeft                                       float64
-	BorderTop, BorderRight, BorderBottom, BorderLeft                                           border
-	BorderRadius, BorderRadiusPercent                                                          float64
-	BorderRadiusTopLeft, BorderRadiusTopRight, BorderRadiusBottomRight, BorderRadiusBottomLeft float64
-	Color                                                                                      [3]float64
-	BGColor                                                                                    [4]float64
-	AccentColor                                                                                [3]float64
-	AccentColorSet                                                                             bool
-	famHash                                                                                    uint64
-	FontSize                                                                                   float64
-	FontWeight                                                                                 int
-	FontItalic                                                                                 bool
-	LineHeight, LineHeightUnitless                                                             float64
-	TextAlign, TextTransform, VerticalAlign, WhiteSpace, OverflowWrap, WordBreak               string
-	VerticalAlignShift                                                                         float64
-	TextDecoration                                                                             string
-	LetterSpacing, TextIndent                                                                  float64
-	ListStyleType, BorderCollapse                                                              string
-	BorderSpacing                                                                              float64
-	TableLayout                                                                                string
-	IsReplaced                                                                                 bool
-	PageBreakBefore, PageBreakAfter, PageBreakInside                                           string
-	Orphans, Widows                                                                            int
-	ContainerType, ContainerName                                                               string
-	Transform                                                                                  Matrix2D
-	HasTransform                                                                               bool
-	TransformOrigin                                                                            transformOriginSpec
-	Opacity                                                                                    float64
+	Display, Position, Float, Clear, BoxSizing                                                     string
+	Top, Right, Bottom, Left                                                                       float64
+	TopAuto, RightAuto, BottomAuto, LeftAuto                                                       bool
+	FlexDirection, FlexWrap, JustifyContent, AlignItems, AlignContent, AlignSelf                   string
+	JustifyItems, JustifySelf                                                                      string
+	Gap, RowGap, ColumnGap                                                                         float64
+	ColumnGapNormal                                                                                bool
+	ColumnCount                                                                                    int
+	ColumnWidth                                                                                    float64
+	ColumnSpan, ColumnFill                                                                         string
+	ColumnRuleWidth                                                                                float64
+	ColumnRuleStyle                                                                                string
+	ColumnRuleColor                                                                                [3]float64
+	ColumnRuleColorSet                                                                             bool
+	FlexGrow, FlexShrink, FlexBasis, FlexBasisPercent                                              float64
+	FlexOrder, ZIndex                                                                              int
+	ZIndexSet                                                                                      bool
+	WritingMode                                                                                    string
+	GridTemplateColumns, GridTemplateRows, GridTemplateAreas, GridArea                             string
+	GridAutoFlow                                                                                   string
+	GridColumnSpan, GridColumnStart, GridRowSpan, GridRowStart                                     int
+	Width, WidthPercent, Height, HeightPercent                                                     float64
+	MinWidth, MinWidthPercent, MaxWidth, MaxWidthPercent                                           float64
+	MinWidthSet                                                                                    bool
+	MinHeight, MinHeightPercent, MaxHeight                                                         float64
+	Overflow, OverflowX, OverflowY, Visibility                                                     string
+	MarginTop, MarginRight, MarginBottom, MarginLeft                                               float64
+	MarginTopAuto, MarginBottomAuto, MarginLeftAuto, MarginRightAuto                               bool
+	PaddingTop, PaddingRight, PaddingBottom, PaddingLeft                                           float64
+	BorderTop, BorderRight, BorderBottom, BorderLeft                                               border
+	BorderRadius, BorderRadiusPercent                                                              float64
+	BorderRadiusTopLeft, BorderRadiusTopRight, BorderRadiusBottomRight, BorderRadiusBottomLeft     float64
+	BorderRadiusTopLeftY, BorderRadiusTopRightY, BorderRadiusBottomRightY, BorderRadiusBottomLeftY float64
+	Color                                                                                          [3]float64
+	BGColor                                                                                        [4]float64
+	AccentColor                                                                                    [3]float64
+	AccentColorSet                                                                                 bool
+	famHash                                                                                        uint64
+	FontSize                                                                                       float64
+	FontWeight                                                                                     int
+	FontItalic                                                                                     bool
+	LineHeight, LineHeightUnitless                                                                 float64
+	TextAlign, TextTransform, VerticalAlign, WhiteSpace, OverflowWrap, WordBreak                   string
+	VerticalAlignShift                                                                             float64
+	TextDecoration                                                                                 string
+	LetterSpacing, WordSpacing, TextIndent                                                         float64
+	ListStyleType, BorderCollapse                                                                  string
+	BorderSpacing, BorderSpacingV                                                                  float64
+	TableLayout, CaptionSide                                                                       string
+	IsReplaced                                                                                     bool
+	PageBreakBefore, PageBreakAfter, PageBreakInside                                               string
+	PageName                                                                                       string
+	Orphans, Widows                                                                                int
+	ContainerType, ContainerName                                                                   string
+	Transform                                                                                      Matrix2D
+	HasTransform                                                                                   bool
+	TransformOrigin                                                                                transformOriginSpec
+	Opacity                                                                                        float64
+	Filter, Content                                                                                string
+	GridColumnEnd, GridRowEnd                                                                      int
+	OutlineWidth                                                                                   float64
+	OutlineStyle                                                                                   string
+	OutlineColor                                                                                   [3]float64
+	OutlineColorSet                                                                                bool
+	OutlineOffset                                                                                  float64
+	BackgroundImage                                                                                string
+	ListStylePosition                                                                              string
+	QuotesRaw, QuotesOpen, QuotesClose                                                             string
+	CounterReset, CounterIncrement                                                                 string
+	ListStyleImage                                                                                 string
+	BoxShadowX, BoxShadowY, BoxShadowBlur, BoxShadowSpread                                         float64
+	BoxShadowColor                                                                                 [3]float64
+	BoxShadowSet, BoxShadowInset                                                                   bool
+	BoxShadowRaw                                                                                   string
+	Fill                                                                                           [3]float64
+	FillSet                                                                                        bool
+	FillOpacity                                                                                    float64
+	Stroke                                                                                         [3]float64
+	StrokeSet                                                                                      bool
+	StrokeWidth                                                                                    float64
+	StrokeWidthSet                                                                                 bool
+	StrokeOpacity                                                                                  float64
 }
 
+//nolint:funlen // struct field mapping of complete resolved style
 func comparableResolvedStyleFor(style ResolvedStyle) comparableResolvedStyle {
 	return comparableResolvedStyle{
 		Display: style.Display, Position: style.Position, Float: style.Float, Clear: style.Clear,
@@ -649,6 +918,8 @@ func comparableResolvedStyleFor(style ResolvedStyle) comparableResolvedStyle {
 		JustifyItems: style.JustifyItems, JustifySelf: style.JustifySelf, Gap: style.Gap, RowGap: style.RowGap,
 		ColumnGap: style.ColumnGap, ColumnGapNormal: style.ColumnGapNormal, ColumnCount: style.ColumnCount,
 		ColumnWidth: style.ColumnWidth, ColumnSpan: style.ColumnSpan, ColumnFill: style.ColumnFill,
+		ColumnRuleWidth: style.ColumnRuleWidth, ColumnRuleStyle: style.ColumnRuleStyle,
+		ColumnRuleColor: style.ColumnRuleColor, ColumnRuleColorSet: style.ColumnRuleColorSet,
 		FlexGrow: style.FlexGrow, FlexShrink: style.FlexShrink, FlexBasis: style.FlexBasis,
 		FlexBasisPercent: style.FlexBasisPercent, FlexOrder: style.FlexOrder, ZIndex: style.ZIndex,
 		ZIndexSet: style.ZIndexSet, WritingMode: style.WritingMode, GridTemplateColumns: style.GridTemplateColumns,
@@ -660,15 +931,18 @@ func comparableResolvedStyleFor(style ResolvedStyle) comparableResolvedStyle {
 		MaxWidthPercent: style.MaxWidthPercent, MinHeight: style.MinHeight,
 		MinWidthSet:      style.MinWidthSet,
 		MinHeightPercent: style.MinHeightPercent, MaxHeight: style.MaxHeight, Overflow: style.Overflow,
-		MarginTop: style.MarginTop, MarginRight: style.MarginRight, MarginBottom: style.MarginBottom,
-		MarginLeft: style.MarginLeft, MarginTopAuto: style.MarginTopAuto, MarginBottomAuto: style.MarginBottomAuto,
-		MarginLeftAuto: style.MarginLeftAuto, MarginRightAuto: style.MarginRightAuto,
-		PaddingTop: style.PaddingTop, PaddingRight: style.PaddingRight, PaddingBottom: style.PaddingBottom,
-		PaddingLeft: style.PaddingLeft, BorderTop: style.BorderTop, BorderRight: style.BorderRight,
-		BorderBottom: style.BorderBottom, BorderLeft: style.BorderLeft,
+		OverflowX: style.OverflowX, OverflowY: style.OverflowY,
+		Visibility: style.Visibility, MarginTop: style.MarginTop, MarginRight: style.MarginRight,
+		MarginBottom: style.MarginBottom, MarginLeft: style.MarginLeft, MarginTopAuto: style.MarginTopAuto,
+		MarginBottomAuto: style.MarginBottomAuto, MarginLeftAuto: style.MarginLeftAuto,
+		MarginRightAuto: style.MarginRightAuto, PaddingTop: style.PaddingTop, PaddingRight: style.PaddingRight,
+		PaddingBottom: style.PaddingBottom, PaddingLeft: style.PaddingLeft, BorderTop: style.BorderTop,
+		BorderRight: style.BorderRight, BorderBottom: style.BorderBottom, BorderLeft: style.BorderLeft,
 		BorderRadius: style.BorderRadius, BorderRadiusPercent: style.BorderRadiusPercent,
 		BorderRadiusTopLeft: style.BorderRadiusTopLeft, BorderRadiusTopRight: style.BorderRadiusTopRight,
 		BorderRadiusBottomRight: style.BorderRadiusBottomRight, BorderRadiusBottomLeft: style.BorderRadiusBottomLeft,
+		BorderRadiusTopLeftY: style.BorderRadiusTopLeftY, BorderRadiusTopRightY: style.BorderRadiusTopRightY,
+		BorderRadiusBottomRightY: style.BorderRadiusBottomRightY, BorderRadiusBottomLeftY: style.BorderRadiusBottomLeftY,
 		Color: style.Color, BGColor: style.BGColor,
 		AccentColor: style.AccentColor, AccentColorSet: style.AccentColorSet,
 		famHash: style.famHash, FontSize: style.FontSize, FontWeight: style.FontWeight, FontItalic: style.FontItalic,
@@ -676,13 +950,32 @@ func comparableResolvedStyleFor(style ResolvedStyle) comparableResolvedStyle {
 		TextAlign: style.TextAlign, TextTransform: style.TextTransform,
 		VerticalAlign: style.VerticalAlign, VerticalAlignShift: style.VerticalAlignShift,
 		WhiteSpace: style.WhiteSpace, OverflowWrap: style.OverflowWrap, WordBreak: style.WordBreak,
-		TextDecoration: style.TextDecoration, LetterSpacing: style.LetterSpacing, TextIndent: style.TextIndent,
-		ListStyleType: style.ListStyleType, BorderCollapse: style.BorderCollapse, BorderSpacing: style.BorderSpacing,
-		TableLayout: style.TableLayout, IsReplaced: style.IsReplaced, PageBreakBefore: style.PageBreakBefore,
-		PageBreakAfter: style.PageBreakAfter, PageBreakInside: style.PageBreakInside, Orphans: style.Orphans,
-		Widows: style.Widows, ContainerType: style.ContainerType, ContainerName: style.ContainerName,
+		TextDecoration: style.TextDecoration, LetterSpacing: style.LetterSpacing,
+		WordSpacing: style.WordSpacing, TextIndent: style.TextIndent,
+		ListStyleType: style.ListStyleType, BorderCollapse: style.BorderCollapse,
+		BorderSpacing: style.BorderSpacing, BorderSpacingV: style.BorderSpacingV,
+		TableLayout: style.TableLayout, CaptionSide: style.CaptionSide, IsReplaced: style.IsReplaced,
+		PageBreakBefore: style.PageBreakBefore,
+		PageBreakAfter:  style.PageBreakAfter, PageBreakInside: style.PageBreakInside, PageName: style.PageName,
+		Orphans: style.Orphans,
+		Widows:  style.Widows, ContainerType: style.ContainerType, ContainerName: style.ContainerName,
 		Transform: style.Transform, HasTransform: style.HasTransform, TransformOrigin: style.TransformOrigin,
-		Opacity: style.Opacity,
+		Opacity: style.Opacity, Filter: style.Filter, Content: style.Content,
+		GridColumnEnd: style.GridColumnEnd, GridRowEnd: style.GridRowEnd,
+		OutlineWidth: style.OutlineWidth, OutlineStyle: style.OutlineStyle,
+		OutlineColor: style.OutlineColor, OutlineColorSet: style.OutlineColorSet,
+		OutlineOffset: style.OutlineOffset, BackgroundImage: style.BackgroundImage,
+		ListStylePosition: style.ListStylePosition, QuotesRaw: style.QuotesRaw,
+		QuotesOpen: style.QuotesOpen, QuotesClose: style.QuotesClose,
+		CounterReset: style.CounterReset, CounterIncrement: style.CounterIncrement,
+		ListStyleImage: style.ListStyleImage,
+		BoxShadowX:     style.BoxShadowX, BoxShadowY: style.BoxShadowY, BoxShadowBlur: style.BoxShadowBlur,
+		BoxShadowSpread: style.BoxShadowSpread,
+		BoxShadowColor:  style.BoxShadowColor, BoxShadowSet: style.BoxShadowSet,
+		BoxShadowInset: style.BoxShadowInset, BoxShadowRaw: style.BoxShadowRaw,
+		Fill: style.Fill, FillSet: style.FillSet, FillOpacity: style.FillOpacity,
+		Stroke: style.Stroke, StrokeSet: style.StrokeSet, StrokeWidth: style.StrokeWidth,
+		StrokeWidthSet: style.StrokeWidthSet, StrokeOpacity: style.StrokeOpacity,
 	}
 }
 

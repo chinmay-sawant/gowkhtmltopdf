@@ -18,7 +18,7 @@ assertions, not binary PDF equality against this folder. See
 (fixture-21 and fixture-56), and (when the network works)
 `wiki-ana-de-armas.pdf`.
 
-## Fixture PDFs (`fixture-01` … `fixture-56`)
+## Fixture PDFs (`fixture-01` ... `fixture-58`)
 
 Each file is `testdata/golden/<same-basename>.html` converted with
 `--enable-local-file-access`. Companion `*-header.html` / `*-footer.html`
@@ -82,6 +82,8 @@ files are skipped as bodies; fixture-36 attaches them as HTML header/footer.
 | `fixture-54-ember-harbor-storybook.pdf` | Ember Harbor storybook (4 pages) |
 | `fixture-55-lantern-cooperative-report.pdf` | Northline operations brief |
 | `fixture-56-architecture-diagram.pdf` | Architecture diagram (20 pages) |
+| `fixture-57-vanguard-telemetry-audit.pdf` | Vanguard Telemetry Audit (356 implemented CSS properties) |
+| `fixture-58-unsupported-worklist-audit.pdf` | Unsupported CSS worklist audit (462 unsupported CSS properties) |
 
 ## Image smokes
 
@@ -95,7 +97,7 @@ files are skipped as bodies; fixture-36 attaches them as HTML header/footer.
 | File | Description |
 |------|-------------|
 | `showcase-toc-hf-outline.pdf` | TOC + text headers/footers + outline on fixture-16 |
-| `wiki-ana-de-armas.pdf` | Live Wikipedia **raw** smoke from `make samples` (no `--simplify-dom`; `--use-system-fonts --zoom 0.666667`; needs network; **soft-fail** if offline). Not a chrome-stripped “pretty” print — see [`documentation/cli.md`](../documentation/cli.md#url-mode--chrome-strip---simplify-dom). |
+| `wiki-ana-de-armas.pdf` | Live Wikipedia **raw** smoke from `make samples` (no `--simplify-dom`; `--use-system-fonts --zoom 0.666667`; needs network; **soft-fail** if offline). Not a chrome-stripped "pretty" print - see [`documentation/cli.md`](../documentation/cli.md#url-mode--chrome-strip---simplify-dom). |
 
 ## Library-API architecture diagram
 

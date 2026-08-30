@@ -943,6 +943,47 @@ func TestGridAutoFlowDenseFillsHole(t *testing.T) { //nolint:cyclop
 	}
 }
 
+//nolint:cyclop // placement proof checks both fills and coordinates
+func TestGridAutoFlowColumn(t *testing.T) {
+	t.Parallel()
+
+	cssSheet := sheet(t, `
+.g { display:grid; grid-template-columns:40pt 40pt; grid-template-rows:20pt 20pt; grid-auto-flow:column; gap:0 }
+.a { background:#fcc }
+.b { background:#cfc }
+`)
+	res := layoutHTML(t, `<html><body><div class="g">
+	<div class="a">A</div><div class="b">B</div>
+</div></body></html>`, cssSheet)
+
+	var firstX, firstY, secondX, secondY float64
+
+	var foundA, foundB bool
+
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpFillRect {
+			continue
+		}
+
+		if paintOp.R > 0.9 && paintOp.G < 0.9 && paintOp.B < 0.9 {
+			firstX, firstY, foundA = paintOp.X, paintOp.Y, true
+		}
+
+		if paintOp.G > 0.7 && paintOp.R < 0.9 && paintOp.B < 0.9 {
+			secondX, secondY, foundB = paintOp.X, paintOp.Y, true
+		}
+	}
+
+	if !foundA || !foundB {
+		t.Fatalf("column-flow fills A=%v B=%v", foundA, foundB)
+	}
+
+	if !near(firstX, secondX) || secondY <= firstY {
+		t.Fatalf("column-flow positions A=(%.1f,%.1f) B=(%.1f,%.1f), want same X and B below A",
+			firstX, firstY, secondX, secondY)
+	}
+}
+
 func TestParseGridTracksMinmax(t *testing.T) {
 	t.Parallel()
 
@@ -1068,6 +1109,8 @@ func TestIntrinsicHeightPercentCyclic(t *testing.T) {
 	}
 }
 
+const twoFrTracks = "1fr 1fr"
+
 func TestStripMasonryKeyword(t *testing.T) {
 	t.Parallel()
 
@@ -1075,7 +1118,63 @@ func TestStripMasonryKeyword(t *testing.T) {
 		t.Fatal("want empty after strip")
 	}
 
-	if stripMasonryKeyword("1fr 1fr") != "1fr 1fr" {
+	if stripMasonryKeyword(twoFrTracks) != twoFrTracks {
 		t.Fatal("non-masonry tracks must stay")
+	}
+}
+
+// TestInlineGridIsInlineLevel keeps display:inline-grid in the paragraph's
+// inline formatting context. display:grid still breaks to a block.
+//
+//nolint:cyclop // layout proof checks inline placement and generated ops
+func TestInlineGridIsInlineLevel(t *testing.T) {
+	t.Parallel()
+
+	cssSheet := sheet(t, `
+p { margin: 0; font-size: 12pt }
+.ig { display: inline-grid; width: 24pt; background: #f00 }
+.g { display: grid; width: 24pt; background: #00f }
+`)
+	res := layoutHTML(t, `<html><body>
+<p>AAA<span class="ig">I</span>BBB</p>
+<p>CCC<span class="g">G</span>DDD</p>
+</body></html>`, cssSheet)
+
+	posX := map[string]float64{}
+	posY := map[string]float64{}
+
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpText {
+			continue
+		}
+
+		for _, key := range []string{"AAA", "BBB", "CCC", "DDD"} {
+			if paintOp.Text == key || (len(paintOp.Text) >= len(key) && paintOp.Text[:len(key)] == key) {
+				posX[key] = paintOp.X
+				posY[key] = paintOp.Y
+			}
+		}
+	}
+
+	for _, key := range []string{"AAA", "BBB", "CCC", "DDD"} {
+		if _, ok := posX[key]; !ok {
+			t.Fatalf("missing text %s", key)
+		}
+	}
+
+	if posY["BBB"] > posY["AAA"]+4 {
+		t.Fatalf("inline-grid broke the line: AAA.y=%.1f BBB.y=%.1f", posY["AAA"], posY["BBB"])
+	}
+
+	if posX["BBB"] <= posX["AAA"]+10 {
+		t.Fatalf("inline-grid: BBB.x=%.1f should sit after AAA.x=%.1f", posX["BBB"], posX["AAA"])
+	}
+
+	if posY["DDD"] <= posY["CCC"]+4 {
+		t.Fatalf("display:grid should block-break: CCC.y=%.1f DDD.y=%.1f", posY["CCC"], posY["DDD"])
+	}
+
+	if posX["DDD"] > posX["CCC"]+20 {
+		t.Fatalf("display:grid DDD.x=%.1f should restart at the line start (CCC.x=%.1f)", posX["DDD"], posX["CCC"])
 	}
 }

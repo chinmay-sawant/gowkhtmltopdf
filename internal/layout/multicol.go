@@ -101,7 +101,7 @@ func (e *engine) collectMulticolSegs(n *html.Node) []multicolSeg {
 	var segs []multicolSeg
 
 	for _, kid := range multicolKids(n, e) {
-		spanAll := kid.Type == html.ElementNode && e.styles[kid].ColumnSpan == columnSpanAll
+		spanAll := kid.Type == html.ElementNode && e.stylePtr(kid).ColumnSpan == columnSpanAll
 		if spanAll {
 			segs = append(segs, multicolSeg{spanner: true, nodes: []*html.Node{kid}})
 
@@ -124,7 +124,7 @@ func multicolKids(n *html.Node, e *engine) []*html.Node {
 
 	for _, child := range n.Children {
 		if child.Type == html.ElementNode {
-			if e.styles[child].Display == displayNone {
+			if e.stylePtr(child).Display == displayNone {
 				continue
 			}
 
@@ -161,7 +161,7 @@ func (e *engine) flowMulticolSingleColumn(
 // content width. Returns the advanced content-relative cy.
 func (e *engine) flowMulticolSpanner(boxNode *box, nodes []*html.Node, contentW, contentX, yPos, curY float64) float64 {
 	for _, kid := range nodes {
-		cs := e.styles[kid]
+		cs := e.stylePtr(kid)
 		curY += collapseMargins(0, e.scalePt(cs.MarginTop))
 
 		cblock := e.build(kid, contentW, contentX, yPos+curY)
@@ -313,7 +313,9 @@ func (e *engine) flowMulticolSegment(
 			break
 		}
 
-		curY += e.placeMulticolLine(parent, batch, nCols, colW, gap, contentX, yPos, curY, maxColH, balance, totalH)
+		curY += e.placeMulticolLine(
+			parent, batch, style, nCols, colW, gap, contentX, yPos, curY, maxColH, balance, totalH,
+		)
 	}
 
 	return curY
@@ -425,7 +427,7 @@ func collectMulticolBatch(items []multicolItem, idx int, maxColH, capacity float
 // placeMulticolLine assigns items into columns (balance or auto fill) and
 // builds them. Returns the line's used height (max column stack).
 func (e *engine) placeMulticolLine(
-	parent *box, items []multicolItem, nCols int, colW, gap, contentX, yPos, curY, maxColH float64,
+	parent *box, items []multicolItem, style ResolvedStyle, nCols int, colW, gap, contentX, yPos, curY, maxColH float64,
 	balance bool, totalH float64,
 ) float64 {
 	colX := func(c int) float64 {
@@ -463,6 +465,8 @@ func (e *engine) placeMulticolLine(
 			lineH = h
 		}
 	}
+
+	e.paintColumnRules(style, nCols, colW, gap, contentX, yPos+curY, lineH)
 
 	return lineH
 }

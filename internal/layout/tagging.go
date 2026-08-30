@@ -56,107 +56,117 @@ func buildStructureTree(doc *pdf.Document, res *Result) error {
 
 // associateUnmappedOps associates any display ops that were not mapped by the
 // DOM box walk with appropriate semantic structure elements (e.g. Link, Figure, P).
-//
-//nolint:cyclop,gocyclo,funlen,gocognit,nestif,varnamelen,wsl // sequential fallback grouping over display list ops
 func associateUnmappedOps(doc *pdf.Document, ops []Op, docElem *pdf.StructElem) error {
 	var currentP *pdf.StructElem
 
-	for i := range ops {
-		op := &ops[i]
+	for idx := range ops {
+		oper := &ops[idx]
 
-		if op.Kind == OpLinkURI && op.URI != "" {
-			if op.StructElem != nil && op.StructElem.Tag == pdf.StructLink {
-				if i > 0 && ops[i-1].Kind == OpText && ops[i-1].StructElem != op.StructElem {
-					ops[i-1].StructElem = op.StructElem
-				}
-				currentP = nil
+		switch {
+		case oper.Kind == OpLinkURI && oper.URI != "":
+			associateUnmappedLink(ops, idx, docElem, currentP)
 
-				continue
-			}
-
-			if op.StructElem != nil {
-				linkElem := newLinkChild(op.StructElem)
-				op.StructElem = linkElem
-				if i > 0 && ops[i-1].Kind == OpText {
-					ops[i-1].StructElem = linkElem
-				}
-				currentP = nil
-
-				continue
-			}
-
-			if i > 0 && ops[i-1].Kind == OpText && ops[i-1].StructElem != nil {
-				if ops[i-1].StructElem.Tag == pdf.StructLink {
-					op.StructElem = ops[i-1].StructElem
-					currentP = nil
-
-					continue
-				}
-
-				linkElem := newLinkChild(ops[i-1].StructElem)
-				ops[i-1].StructElem = linkElem
-				op.StructElem = linkElem
-				currentP = nil
-
-				continue
-			}
-
-			parent := docElem
-			if currentP != nil {
-				parent = currentP
-			}
-
-			linkElem := newLinkChild(parent)
-			op.StructElem = linkElem
-
-			if i > 0 && ops[i-1].Kind == OpText && ops[i-1].StructElem == nil {
-				ops[i-1].StructElem = linkElem
-			}
-			if i+1 < len(ops) && ops[i+1].Kind == OpText && ops[i+1].StructElem == nil {
-				ops[i+1].StructElem = linkElem
+			currentP = nil
+		case oper.Kind == OpImage:
+			if err := associateUnmappedImage(doc, oper, docElem, currentP); err != nil {
+				return err
 			}
 
 			currentP = nil
-
-			continue
-		}
-
-		if op.Kind == OpImage {
-			if op.StructElem == nil {
-				if op.Alt == "" && doc.IsUA() {
-					return pdf.ErrPDFUAMissingAlt
-				}
-
-				parent := currentP
-				if parent == nil {
-					parent = docElem
-				}
-
-				figElem := parent.NewChild(pdf.StructFigure)
-				figElem.SetAlt(op.Alt)
-				op.StructElem = figElem
-			}
-
+		case oper.Kind == OpText || oper.Kind == OpBullet:
+			currentP = associateUnmappedText(oper, docElem, currentP)
+		default:
 			currentP = nil
+		}
+	}
 
-			continue
+	return nil
+}
+
+//nolint:cyclop // sequential fallback matching for unmapped link structure elements
+func associateUnmappedLink(ops []Op, idx int, docElem, currentP *pdf.StructElem) {
+	oper := &ops[idx]
+
+	if oper.StructElem != nil && oper.StructElem.Tag == pdf.StructLink {
+		if idx > 0 && ops[idx-1].Kind == OpText && ops[idx-1].StructElem != oper.StructElem {
+			ops[idx-1].StructElem = oper.StructElem
 		}
 
-		if op.Kind == OpText || op.Kind == OpBullet {
-			if op.StructElem == nil {
-				if currentP == nil {
-					currentP = docElem.NewChild(pdf.StructP)
-				}
+		return
+	}
 
-				op.StructElem = currentP
-			} else {
-				currentP = nil
-			}
+	if oper.StructElem != nil {
+		linkElem := newLinkChild(oper.StructElem)
+		oper.StructElem = linkElem
 
-			continue
+		if idx > 0 && ops[idx-1].Kind == OpText {
+			ops[idx-1].StructElem = linkElem
 		}
 
-		currentP = nil
+		return
+	}
+
+	if idx > 0 && ops[idx-1].Kind == OpText && ops[idx-1].StructElem != nil {
+		if ops[idx-1].StructElem.Tag == pdf.StructLink {
+			oper.StructElem = ops[idx-1].StructElem
+
+			return
+		}
+
+		linkElem := newLinkChild(ops[idx-1].StructElem)
+		ops[idx-1].StructElem = linkElem
+		oper.StructElem = linkElem
+
+		return
+	}
+
+	parent := docElem
+	if currentP != nil {
+		parent = currentP
+	}
+
+	linkElem := newLinkChild(parent)
+	oper.StructElem = linkElem
+
+	if idx > 0 && ops[idx-1].Kind == OpText && ops[idx-1].StructElem == nil {
+		ops[idx-1].StructElem = linkElem
+	}
+
+	if idx+1 < len(ops) && ops[idx+1].Kind == OpText && ops[idx+1].StructElem == nil {
+		ops[idx+1].StructElem = linkElem
+	}
+}
+
+func associateUnmappedImage(doc *pdf.Document, oper *Op, docElem, currentP *pdf.StructElem) error {
+	if oper.StructElem != nil {
+		return nil
+	}
+
+	if oper.Alt == "" && doc.IsUA() {
+		return pdf.ErrPDFUAMissingAlt
+	}
+
+	parent := currentP
+	if parent == nil {
+		parent = docElem
+	}
+
+	figElem := parent.NewChild(pdf.StructFigure)
+	figElem.SetAlt(oper.Alt)
+	oper.StructElem = figElem
+
+	return nil
+}
+
+func associateUnmappedText(oper *Op, docElem, currentP *pdf.StructElem) *pdf.StructElem {
+	if oper.StructElem == nil {
+		if currentP == nil {
+			currentP = docElem.NewChild(pdf.StructP)
+		}
+
+		oper.StructElem = currentP
+
+		return currentP
 	}
 
 	return nil

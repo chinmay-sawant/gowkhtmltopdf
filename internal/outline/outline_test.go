@@ -446,3 +446,31 @@ func TestNilPageAccessorUsesLocalPage(t *testing.T) {
 		t.Errorf("nil accessor should use local page:\n%s", xml)
 	}
 }
+
+func TestBookmarkLevelAndLabel(t *testing.T) {
+	t.Parallel()
+
+	htmlSrc := `<div>
+		<h1 style="bookmark-label: 'Executive Overview'">Default Title</h1>
+		<div style="bookmark-level: 2; bookmark-label: 'Section 1.1'">Custom Bookmark</div>
+		<h2 style="bookmark-level: none">Suppressed Heading</h2>
+	</div>`
+
+	root, err := html.Parse(htmlSrc)
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+
+	headings := outline.CollectHeadings(root)
+	if len(headings) != 2 {
+		t.Fatalf("len(headings) = %d, want 2", len(headings))
+	}
+
+	if headings[0].Level != 1 || headings[0].Title != "Executive Overview" {
+		t.Errorf("headings[0] = %+v, want Level 1 and 'Executive Overview'", headings[0])
+	}
+
+	if headings[1].Level != 2 || headings[1].Title != "Section 1.1" {
+		t.Errorf("headings[1] = %+v, want Level 2 and 'Section 1.1'", headings[1])
+	}
+}

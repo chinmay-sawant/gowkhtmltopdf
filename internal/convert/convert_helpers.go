@@ -2,119 +2,246 @@ package convert
 
 import (
 	"fmt"
-	"io"
 	"net/url"
 	"strings"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/layout"
-	"github.com/chinmay-sawant/gowkhtmltopdf/internal/line"
-	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
-// applyCSSPageMargins applies the unnamed @page margin shorthand and size to
-// the PDF viewport after stylesheets have been loaded. CSS page box properties
+// applyCSSPageMargins applies @page margin shorthand and size to the PDF
+// viewport after stylesheets have been loaded. CSS page box properties
 // describe the printable page box, so they must be resolved before body layout
 // rather than cascaded as ordinary element padding.
 //
-//nolint:cyclop,wsl,varnamelen,mnd,gocognit,nestif,gocyclo,funlen // compact CSS shorthand expansion
+// Unnamed @page (sheet.Page and Pages with Sel "") sets the default geometry
+// for every page. @page :left / :right override even / odd pages (LTR: page 1
+// is :right). @page :first then overrides page 1. Named @page ident rules
+// store per-name margins for pages that start with that name. Size is
+// unnamed-only: the writer paints one page size for the document.
 func applyCSSPageMargins(geom hfGeom, sheets []*css.Stylesheet) hfGeom {
-	var rawMargin, rawSize string
+	box := collectPageBox(sheets)
+	geom = applyPageSize(geom, box.size)
+	geom = applyPageMargin(geom, box.margin)
+	geom.recomputeContent()
+	geom.first = pageMarginOverride(geom, box.firstMargin)
+	geom.left = pageMarginOverride(geom, box.leftMargin)
+	geom.right = pageMarginOverride(geom, box.rightMargin)
+	geom.named = namedPageMarginOverrides(geom, box.named)
+	geom.pageBoxes = box.boxes
 
-	for _, sheet := range sheets {
-		if sheet != nil && sheet.Page != nil {
-			if strings.TrimSpace(sheet.Page.Margin) != "" {
-				rawMargin = sheet.Page.Margin
-			}
+	return geom
+}
 
-			if strings.TrimSpace(sheet.Page.Size) != "" {
-				rawSize = sheet.Page.Size
-			}
+func pageMarginOverride(geom hfGeom, raw string) *hfPageMargins {
+	applied, ok := tryApplyPageMargin(geom, raw)
+	if !ok {
+		return nil
+	}
+
+	return &hfPageMargins{
+		top:    applied.marginTop,
+		right:  applied.marginRight,
+		bottom: applied.marginBottom,
+		left:   applied.marginLeft,
+	}
+}
+
+func namedPageMarginOverrides(geom hfGeom, raw map[string]string) map[string]*hfPageMargins {
+	if len(raw) == 0 {
+		return nil
+	}
+
+	out := make(map[string]*hfPageMargins, len(raw))
+
+	for name, margin := range raw {
+		if over := pageMarginOverride(geom, margin); over != nil {
+			out[name] = over
 		}
 	}
 
-	if rawSize != "" {
-		parts := strings.Fields(rawSize)
-		switch len(parts) {
-		case 1:
-			if w, h, err := settings.ParsePageSize(parts[0]); err == nil && w > 0 && h > 0 {
+	if len(out) == 0 {
+		return nil
+	}
+
+	return out
+}
+
+type pageBoxRaw struct {
+	margin, size, firstMargin, leftMargin, rightMargin string
+	named                                              map[string]string
+	boxes                                              css.PageMarginBoxes
+}
+
+func collectPageBox(sheets []*css.Stylesheet) pageBoxRaw {
+	var box pageBoxRaw
+
+	for _, sheet := range sheets {
+		if sheet == nil {
+			continue
+		}
+
+		box = applyUnnamedPageBox(box, sheet.Page)
+		for _, rule := range sheet.Pages {
+			box = applyOnePageRule(box, rule)
+		}
+	}
+
+	return box
+}
+
+func applyUnnamedPageBox(box pageBoxRaw, page *css.PageStyle) pageBoxRaw {
+	if page == nil {
+		return box
+	}
+
+	if margin := strings.TrimSpace(page.Margin); margin != "" {
+		box.margin = margin
+	}
+
+	if size := strings.TrimSpace(page.Size); size != "" {
+		box.size = size
+	}
+
+	return box
+}
+
+func applyOnePageRule(box pageBoxRaw, rule css.PageRule) pageBoxRaw {
+	margin := strings.TrimSpace(rule.Margin)
+	size := strings.TrimSpace(rule.Size)
+	sel := strings.ToLower(strings.TrimSpace(rule.Sel))
+
+	switch sel {
+	case "":
+		return applyUnnamedPageRule(box, margin, size, rule.Boxes)
+	case ":first":
+		box.firstMargin = firstNonEmpty(margin, box.firstMargin)
+	case ":left":
+		box.leftMargin = firstNonEmpty(margin, box.leftMargin)
+	case ":right":
+		box.rightMargin = firstNonEmpty(margin, box.rightMargin)
+	default:
+		box = applyNamedPageRule(box, sel, margin)
+	}
+
+	return box
+}
+
+func applyUnnamedPageRule(box pageBoxRaw, margin, size string, boxes css.PageMarginBoxes) pageBoxRaw {
+	box.margin = firstNonEmpty(margin, box.margin)
+	box.size = firstNonEmpty(size, box.size)
+	box.boxes = mergePageMarginBoxes(box.boxes, boxes)
+
+	return box
+}
+
+func applyNamedPageRule(box pageBoxRaw, sel, margin string) pageBoxRaw {
+	if strings.HasPrefix(sel, ":") || margin == "" {
+		return box
+	}
+
+	if box.named == nil {
+		box.named = map[string]string{}
+	}
+
+	box.named[sel] = margin
+
+	return box
+}
+
+//nolint:cyclop,wsl,varnamelen,mnd,nestif // compact CSS size expansion
+func applyPageSize(geom hfGeom, rawSize string) hfGeom {
+	if rawSize == "" {
+		return geom
+	}
+
+	parts := strings.Fields(rawSize)
+	switch len(parts) {
+	case 1:
+		if w, h, err := settings.ParsePageSize(parts[0]); err == nil && w > 0 && h > 0 {
+			geom.pageW = w
+			geom.pageH = h
+		}
+	case 2:
+		if w, h, err := settings.ParsePageSize(parts[0]); err == nil && w > 0 && h > 0 {
+			if strings.EqualFold(parts[1], "landscape") {
+				geom.pageW = h
+				geom.pageH = w
+			} else {
 				geom.pageW = w
 				geom.pageH = h
 			}
-		case 2:
-			if w, h, err := settings.ParsePageSize(parts[0]); err == nil && w > 0 && h > 0 {
-				if strings.EqualFold(parts[1], "landscape") {
-					geom.pageW = h
-					geom.pageH = w
-				} else {
-					geom.pageW = w
-					geom.pageH = h
-				}
-			} else {
-				v1, u1, ok1 := css.ParseLength(parts[0])
-				v2, u2, ok2 := css.ParseLength(parts[1])
-				if ok1 && ok2 {
-					pt1, okPt1 := css.LengthToPt(v1, u1, 12)
-					pt2, okPt2 := css.LengthToPt(v2, u2, 12)
-					if okPt1 && okPt2 && pt1 > 0 && pt2 > 0 {
-						geom.pageW = pt1
-						geom.pageH = pt2
-					}
+		} else {
+			v1, u1, ok1 := css.ParseLength(parts[0])
+			v2, u2, ok2 := css.ParseLength(parts[1])
+			if ok1 && ok2 {
+				pt1, okPt1 := css.LengthToPt(v1, u1, 12)
+				pt2, okPt2 := css.LengthToPt(v2, u2, 12)
+				if okPt1 && okPt2 && pt1 > 0 && pt2 > 0 {
+					geom.pageW = pt1
+					geom.pageH = pt2
 				}
 			}
 		}
 	}
-
-	if rawMargin != "" {
-		parts := strings.Fields(rawMargin)
-		if len(parts) >= 1 && len(parts) <= 4 {
-			vals := make([]float64, len(parts))
-			valid := true
-
-			for idx, part := range parts {
-				value, unit, ok := css.ParseLength(part)
-				if !ok {
-					valid = false
-
-					break
-				}
-
-				pt, ok := css.LengthToPt(value, unit, 12)
-				if !ok || pt < 0 {
-					valid = false
-
-					break
-				}
-
-				vals[idx] = pt
-			}
-
-			if valid {
-				var top, right, bottom, left float64
-				switch len(vals) {
-				case 1:
-					top, right, bottom, left = vals[0], vals[0], vals[0], vals[0]
-				case 2:
-					top, bottom = vals[0], vals[0]
-					right, left = vals[1], vals[1]
-				case 3:
-					top, right, left, bottom = vals[0], vals[1], vals[1], vals[2]
-				case 4:
-					top, right, left, bottom = vals[0], vals[1], vals[2], vals[3]
-				}
-
-				geom.marginTop = top
-				geom.marginRight = right
-				geom.marginBottom = bottom
-				geom.marginLeft = left
-			}
-		}
-	}
-
-	geom.recomputeContent()
 
 	return geom
+}
+
+func applyPageMargin(geom hfGeom, rawMargin string) hfGeom {
+	out, _ := tryApplyPageMargin(geom, rawMargin)
+
+	return out
+}
+
+//nolint:cyclop,varnamelen,mnd // compact CSS margin shorthand expansion
+func tryApplyPageMargin(geom hfGeom, rawMargin string) (hfGeom, bool) {
+	if rawMargin == "" {
+		return geom, false
+	}
+
+	parts := strings.Fields(rawMargin)
+	if len(parts) == 0 || len(parts) > 4 {
+		return geom, false
+	}
+
+	vals := make([]float64, len(parts))
+
+	for idx, part := range parts {
+		value, unit, ok := css.ParseLength(part)
+		if !ok {
+			return geom, false
+		}
+
+		pt, ok := css.LengthToPt(value, unit, 12)
+		if !ok || pt < 0 {
+			return geom, false
+		}
+
+		vals[idx] = pt
+	}
+
+	var top, right, bottom, left float64
+
+	switch len(vals) {
+	case 1:
+		top, right, bottom, left = vals[0], vals[0], vals[0], vals[0]
+	case 2:
+		top, bottom = vals[0], vals[0]
+		right, left = vals[1], vals[1]
+	case 3:
+		top, right, left, bottom = vals[0], vals[1], vals[1], vals[2]
+	case 4:
+		top, right, left, bottom = vals[0], vals[1], vals[2], vals[3]
+	}
+
+	geom.marginTop = top
+	geom.marginRight = right
+	geom.marginBottom = bottom
+	geom.marginLeft = left
+
+	return geom, true
 }
 
 // measuredWidth returns the effective content width of a layout result: the
@@ -229,23 +356,4 @@ func resolveRelativeLinkURI(op layout.Op, base *url.URL) (string, bool) {
 	}
 
 	return base.ResolveReference(ref).String(), true
-}
-
-// logFontRegistryScan emits the shared font-path scan notice used by PDF and
-// image callers after pdf.RegistryFromGlobal.
-func logFontRegistryScan(glob settings.PdfGlobal, log io.Writer) {
-	if log == nil || log == io.Discard || glob.Quiet {
-		return
-	}
-
-	if len(glob.FontPaths) == 0 && !glob.UseSystemFonts {
-		return
-	}
-
-	count := len(glob.FontPaths)
-	if glob.UseSystemFonts {
-		count += len(pdf.DefaultSystemFontDirs())
-	}
-
-	line.Emit(log, line.Info, "scanned %d font path(s)", count)
 }

@@ -16,28 +16,40 @@ type Severity int
 const (
 	// Info is a plain log line (phases, progress, diagnostics).
 	Info Severity = iota
-	// Warn is a "warning: …" line: non-fatal, conversion continues.
+	// Warn is a warning line: non-fatal, conversion continues.
 	Warn
-	// Error is an "error: …" line: the failure was reported.
+	// Error is an error line: the failure was reported.
 	Error
 )
 
-// Emit writes one newline-terminated log line to w, prefixed with the
+// String returns the canonical name of the severity level.
+func (s Severity) String() string {
+	switch s {
+	case Info:
+		return "info"
+	case Warn:
+		return "warning"
+	case Error:
+		return "error"
+	default:
+		return "info"
+	}
+}
+
+// Prefix returns the formatted prefix marker for the severity level.
+func (s Severity) Prefix() string {
+	return s.String() + ": "
+}
+
+// Emit writes one newline-terminated log line to writer, prefixed with the
 // severity marker the engine's consumers understand ("info: ",
 // "warning: " or "error: ").
 func Emit(writer io.Writer, sev Severity, format string, args ...any) {
-	prefix := "info: "
-
-	switch sev {
-	case Info:
-		prefix = "info: "
-	case Warn:
-		prefix = "warning: "
-	case Error:
-		prefix = "error: "
+	if writer == nil {
+		return
 	}
 
-	fmt.Fprintf(writer, prefix+format+"\n", args...)
+	fmt.Fprintf(writer, sev.Prefix()+format+"\n", args...)
 }
 
 // SeverityOf classifies one engine log line by its leading marker token;

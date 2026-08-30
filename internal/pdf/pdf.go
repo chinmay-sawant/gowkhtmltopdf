@@ -8,6 +8,7 @@
 package pdf
 
 import (
+	"bufio"
 	"bytes"
 	"compress/zlib"
 	"crypto/md5" //nolint:gosec // MD5 is standard for PDF trailer /ID generation
@@ -663,12 +664,16 @@ func writePDFTrailer(out *countingWriter, doc *Document, offsets []int64) error 
 	return writePDFFormat(out, "startxref\n%d\n%%%%EOF\n", xrefPos)
 }
 
+const pdfBufferSize = 64 * 1024
+
 func (d *Document) writeTo(width io.Writer) (int64, error) {
 	if err := d.finalize(); err != nil {
 		return 0, err
 	}
 
-	out := &countingWriter{w: width} //nolint:exhaustruct // count starts at zero
+	bufWriter := bufio.NewWriterSize(width, pdfBufferSize)
+	out := &countingWriter{w: bufWriter} //nolint:exhaustruct // count starts at zero
+
 	if err := writePDFHeader(out, d.policy); err != nil {
 		return out.n, fmt.Errorf("pdf: write: %w", err)
 	}
@@ -693,6 +698,10 @@ func (d *Document) writeTo(width io.Writer) (int64, error) {
 
 	if err := writePDFTrailer(out, d, offsets); err != nil {
 		return out.n, fmt.Errorf("pdf: write: %w", err)
+	}
+
+	if err := bufWriter.Flush(); err != nil {
+		return out.n, fmt.Errorf("pdf: flush: %w", err)
 	}
 
 	return out.n, nil
@@ -1526,6 +1535,7 @@ var flatePool sync.Pool
 // latter and the page appears empty. The compressor is reused across page
 // streams; the returned copy owns its bytes before the state goes back to the
 // pool.
+const maxPooledFlateBufferSize = 16 * 1024 * 1024 // 16 MiB max retention
 func flateBytes(raw []byte) []byte {
 	state, _ := flatePool.Get().(*flateState)
 	if state == nil {
@@ -1540,7 +1550,11 @@ func flateBytes(raw []byte) []byte {
 	_ = state.zw.Close()
 
 	res := append([]byte(nil), state.buf.Bytes()...)
-	flatePool.Put(state)
+	stateBufCap := state.buf.Cap()
+
+	if stateBufCap <= maxPooledFlateBufferSize {
+		flatePool.Put(state)
+	}
 
 	return res
 }

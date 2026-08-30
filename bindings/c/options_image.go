@@ -39,7 +39,7 @@ type imageOptions struct {
 //
 //nolint:exhaustruct // optional ImageDocument fields stay zero to inherit engine defaults.
 func buildImageDocument(html []byte, opts imageOptions) *gowkhtmltopdf.ImageDocument {
-	doc := &gowkhtmltopdf.ImageDocument{Source: gowkhtmltopdf.HTML(html)}
+	doc := &gowkhtmltopdf.ImageDocument{Source: gowkhtmltopdf.Content{HTML: html}}
 
 	if opts.format != "" {
 		doc.Format = opts.format

@@ -362,12 +362,13 @@ func TestParseMatchesCollectedTokenBuilder(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	collected := &Node{Type: ElementNode, Name: "#document"} //nolint:exhaustruct
-	stack := []*Node{collected}
+	builder := newTreeBuilder()
 
 	for _, token := range tokens {
-		appendToken(&stack, token)
+		builder.appendToken(token)
 	}
+
+	collected := builder.root
 
 	if got, want := treeString(streamed), treeString(collected); got != want {
 		t.Fatalf("streamed Parse tree differs from collected-token builder:\nstreamed:\n%scollected:\n%s", got, want)

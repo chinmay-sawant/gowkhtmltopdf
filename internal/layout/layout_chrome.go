@@ -252,7 +252,7 @@ func chromeMustSpliceImmediately(st ResolvedStyle) bool {
 // Sticky/fixed/transform keep an immediate splice so mid-build StickyID/Fixed
 // stamps and transform exclusive ranges stay correct without re-derivation.
 //
-//nolint:cyclop,wsl // paint ordering and border geometry stay together
+//nolint:cyclop,wsl,funlen // paint ordering and border geometry stay together
 func (e *engine) prependChrome(insertAt int, boxNode *box, sty ResolvedStyle, posX, posY, width, height float64) {
 	if e.noEmit {
 		return
@@ -261,9 +261,16 @@ func (e *engine) prependChrome(insertAt int, boxNode *box, sty ResolvedStyle, po
 		sty.BorderTop = sty.BorderBottom
 	}
 
+	if overflowClipsPaint(sty.Overflow) && insertAt >= 0 && insertAt <= len(e.ops) {
+		clipOpsSlice(e.ops[insertAt:], e.paddingBoxRect(posX, posY, width, height, sty))
+	}
+
 	var chrome []Op
-	radii := usedBorderRadii(sty, width, height)
+	radii, radiiY := usedBorderRadiiXY(sty, width, height)
 	radius := uniformRadius(radii)
+	// Outset box-shadow paints behind the background so blur rings do not
+	// cover the border box.
+	chrome = e.appendBoxShadow(chrome, sty, posX, posY, width, height, radii, radiiY)
 	if sty.BGColor[3] > 0 && e.opts.Background {
 		chrome = append(chrome, Op{ //nolint:exhaustruct // intentional zero fields
 			Kind: OpFillRect, X: posX, Y: posY, W: width, H: height,
@@ -271,15 +278,22 @@ func (e *engine) prependChrome(insertAt int, boxNode *box, sty ResolvedStyle, po
 			RadiusTopLeft: radii[0], RadiusTopRight: radii[1], RadiusBottomRight: radii[2], RadiusBottomLeft: radii[3],
 		})
 	}
+	chrome = e.appendBackgroundImage(chrome, sty, posX, posY, width, height)
 
-	switch {
-	case hasRoundedRadii(radii) && roundedSolidBorder(sty):
-		chrome = append(chrome, e.roundedBorderOps(sty, posX, posY, width, height, radii)...)
-	case hasRoundedRadii(radii) && roundedAccentBorder(sty):
-		chrome = append(chrome, e.roundedAccentBorderOps(sty, posX, posY, width, height, radii)...)
-	default:
-		chrome = append(chrome, e.collapsedOrFullBorderOps(boxNode, sty, posX, posY, width, height)...)
+	if sty.BorderImageSource != "" {
+		chrome = e.appendBorderImage(chrome, sty, posX, posY, width, height)
+	} else {
+		switch {
+		case hasRoundedRadii(radii) && roundedSolidBorder(sty):
+			chrome = append(chrome, e.roundedBorderOps(sty, posX, posY, width, height, radii)...)
+		case hasRoundedRadii(radii) && roundedAccentBorder(sty):
+			chrome = append(chrome, e.roundedAccentBorderOps(sty, posX, posY, width, height, radii)...)
+		default:
+			chrome = append(chrome, e.collapsedOrFullBorderOps(boxNode, sty, posX, posY, width, height)...)
+		}
 	}
+	chrome = append(chrome, e.outlineOps(&sty, posX, posY, width, height)...)
+	stampOpRadiiY(chrome, radiiY)
 	if len(chrome) == 0 {
 		return
 	}
@@ -333,7 +347,7 @@ func (e *engine) collapsedOrFullBorderOps(
 //
 //nolint:wsl // generic frame checks remain adjacent to their border gates.
 func isNeutralFrameSection(node *html.Node, sty ResolvedStyle) bool {
-	if node == nil || node.Name != "section" {
+	if node == nil || node.Name != htmlSection {
 		return false
 	}
 	if sty.BorderTop.Style != solidKeyword || sty.BorderBottom.Style != solidKeyword {
@@ -341,88 +355,6 @@ func isNeutralFrameSection(node *html.Node, sty ResolvedStyle) bool {
 	}
 
 	return nearlyEqual(sty.BorderTop.Width, sty.BorderBottom.Width)
-}
-
-func usedBorderRadius(sty ResolvedStyle, width, height float64) float64 {
-	return uniformRadius(usedBorderRadii(sty, width, height))
-}
-
-func usedBorderRadii(sty ResolvedStyle, width, height float64) [4]float64 {
-	radii := borderRadiusValues(sty, width, height)
-	clampBorderRadii(radii[:], width, height)
-	scaleBorderRadii(radii[:], width, height)
-
-	return radii
-}
-
-const (
-	borderRadiusPercentBasis = 100.0
-	borderRadiusHalf         = 2.0
-)
-
-func borderRadiusValues(sty ResolvedStyle, width, height float64) [4]float64 {
-	var radii [4]float64
-
-	switch {
-	case sty.BorderRadiusPercent >= 0:
-		radius := math.Min(width, height) * sty.BorderRadiusPercent / borderRadiusPercentBasis
-		for i := range radii {
-			radii[i] = radius
-		}
-	case sty.BorderRadiusTopLeft != 0 || sty.BorderRadiusTopRight != 0 ||
-		sty.BorderRadiusBottomRight != 0 || sty.BorderRadiusBottomLeft != 0:
-		radii = [4]float64{
-			sty.BorderRadiusTopLeft, sty.BorderRadiusTopRight,
-			sty.BorderRadiusBottomRight, sty.BorderRadiusBottomLeft,
-		}
-	default:
-		for i := range radii {
-			radii[i] = sty.BorderRadius
-		}
-	}
-
-	return radii
-}
-
-//nolint:wsl // CSS radius clamping is a compact geometry loop
-func clampBorderRadii(radii []float64, width, height float64) {
-	short := math.Min(width, height)
-
-	for i := range radii {
-		if radii[i] < 0 {
-			radii[i] = 0
-		}
-		if radii[i] > short/borderRadiusHalf {
-			radii[i] = short / borderRadiusHalf
-		}
-	}
-}
-
-//nolint:wsl,mnd // CSS adjacent-radius scaling is expressed as four edge sums
-func scaleBorderRadii(radii []float64, width, height float64) {
-	if len(radii) < 4 {
-		return
-	}
-
-	scale := 1.0
-	for _, edge := range []struct {
-		sum   float64
-		limit float64
-	}{
-		{sum: radii[0] + radii[1], limit: width},
-		{sum: radii[3] + radii[2], limit: width},
-		{sum: radii[0] + radii[3], limit: height},
-		{sum: radii[1] + radii[2], limit: height},
-	} {
-		if edge.sum > edge.limit && edge.sum > 0 && edge.limit/edge.sum < scale {
-			scale = edge.limit / edge.sum
-		}
-	}
-	if scale < 1 {
-		for i := range radii {
-			radii[i] *= scale
-		}
-	}
 }
 
 func uniformRadius(radii [4]float64) float64 {
@@ -458,7 +390,10 @@ func roundedSolidBorder(sty ResolvedStyle) bool {
 }
 
 func roundedAccentBorder(sty ResolvedStyle) bool {
-	return sty.BorderTop.Width > 0 && sty.BorderTop.Style == solidKeyword
+	return (sty.BorderTop.Width > 0 && sty.BorderTop.Style == solidKeyword) ||
+		(sty.BorderRight.Width > 0 && sty.BorderRight.Style == solidKeyword) ||
+		(sty.BorderBottom.Width > 0 && sty.BorderBottom.Style == solidKeyword) ||
+		(sty.BorderLeft.Width > 0 && sty.BorderLeft.Style == solidKeyword)
 }
 
 func squareSideBorderRadii(side border, radii [4]float64, left bool) [4]float64 {
@@ -532,9 +467,8 @@ func (e *engine) roundedBorderOps(
 	return ops
 }
 
-// roundedAccentBorderOps keeps a solid top rail curved when the remaining
-// border sides use dotted or dashed styles. A complete rounded stroke cannot
-// represent those mixed styles, so the accent is a masked rounded path.
+// roundedAccentBorderOps keeps a solid accent rail curved when the remaining
+// border sides are absent or use dotted/dashed styles.
 // Solid remnant sides use StrokeMask* overlays; dashed/dotted sides stay as
 // segmented OpLines that stop at the corner radii.
 func (e *engine) roundedAccentBorderOps(
@@ -542,13 +476,7 @@ func (e *engine) roundedAccentBorderOps(
 	posX, posY, width, height float64,
 	radii [4]float64,
 ) []Op {
-	top := sty.BorderTop
-	ops := []Op{{ //nolint:exhaustruct // intentional zero fields
-		Kind: OpStrokeRect, X: posX, Y: posY, W: width, H: height,
-		R: top.Color[0], G: top.Color[1], B: top.Color[2], Width: e.scalePt(borderPaint(top)),
-		Radius: uniformRadius(radii), RadiusTopLeft: radii[0], RadiusTopRight: radii[1],
-		RadiusBottomRight: radii[2], RadiusBottomLeft: radii[3], StrokeMask: StrokeMaskTop,
-	}}
+	var ops []Op
 
 	appendSolidMask := func(side border, mask uint8, sideRadii [4]float64) {
 		if borderPaint(side) <= 0 || side.Style != solidKeyword {
@@ -566,7 +494,7 @@ func (e *engine) roundedAccentBorderOps(
 	}
 
 	appendDashedSide := func(sideX, sideY, sideW, sideH float64, side border) {
-		if side.Style == solidKeyword {
+		if borderPaint(side) <= 0 || side.Style == solidKeyword {
 			return
 		}
 
@@ -579,10 +507,12 @@ func (e *engine) roundedAccentBorderOps(
 
 	rightRadii := squareSideBorderRadii(sty.BorderRight, radii, false)
 	leftRadii := squareSideBorderRadii(sty.BorderLeft, radii, true)
+	appendSolidMask(sty.BorderTop, StrokeMaskTop, radii)
 	appendSolidMask(sty.BorderRight, StrokeMaskRight, rightRadii)
 	appendSolidMask(sty.BorderBottom, StrokeMaskBottom, radii)
 	appendSolidMask(sty.BorderLeft, StrokeMaskLeft, leftRadii)
 
+	appendDashedSide(posX+radii[0], posY, math.Max(width-radii[0]-radii[1], 0), 0, sty.BorderTop)
 	appendDashedSide(posX+width, posY+radii[1], 0, math.Max(height-radii[1]-radii[2], 0), sty.BorderRight)
 	appendDashedSide(posX+radii[3], posY+height, math.Max(width-radii[3]-radii[2], 0), 0, sty.BorderBottom)
 	appendDashedSide(posX, posY+radii[0], 0, math.Max(height-radii[0]-radii[3], 0), sty.BorderLeft)
@@ -595,26 +525,26 @@ func (e *engine) roundedAccentBorderOps(
 // at the same index matches immediate-splice nesting: later (outer) entries
 // paint first.
 func (e *engine) finalizeChrome(root *box) {
-	if len(e.deferredChrome) == 0 {
-		return
+	if len(e.deferredChrome) > 0 {
+		entries := e.deferredChrome
+		e.deferredChrome = nil
+
+		out, oldToNew, ownerChrome := mergeDeferredChrome(e.ops, entries)
+
+		e.ops = out
+
+		// Remap content op ranges, expand owners with their chrome, then union
+		// parent ranges over children so ancestor ranges still cover nested chrome.
+		remapBoxRangesWithChrome(root, oldToNew, ownerChrome)
+		unionChildOpRanges(root)
+
+		// Deferred chrome under sticky ancestors never received StickyID at build
+		// time; re-stamp from the box tree. Fixed content already marked Fixed -
+		// expand Fixed onto chrome in the same range when any op is Fixed.
+		restampStickyFixed(root, e.ops)
 	}
 
-	entries := e.deferredChrome
-	e.deferredChrome = nil
-
-	out, oldToNew, ownerChrome := mergeDeferredChrome(e.ops, entries)
-
-	e.ops = out
-
-	// Remap content op ranges, expand owners with their chrome, then union
-	// parent ranges over children so ancestor ranges still cover nested chrome.
-	remapBoxRangesWithChrome(root, oldToNew, ownerChrome)
-	unionChildOpRanges(root)
-
-	// Deferred chrome under sticky ancestors never received StickyID at build
-	// time; re-stamp from the box tree. Fixed content already marked Fixed —
-	// expand Fixed onto chrome in the same range when any op is Fixed.
-	restampStickyFixed(root, e.ops)
+	e.applyOverflowClips(root)
 }
 
 // chromeSpan is an inclusive op range owned by one box's chrome.

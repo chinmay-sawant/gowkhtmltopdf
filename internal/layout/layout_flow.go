@@ -62,6 +62,8 @@ func (e *engine) resolveImage(src string) *imageRef {
 }
 
 // isInlineChild reports whether n participates in an inline formatting context.
+//
+//nolint:cyclop // inline classification follows display and replaced-content rules
 func (e *engine) isInlineChild(node *html.Node) bool {
 	if node.Type == html.TextNode {
 		return true
@@ -71,7 +73,7 @@ func (e *engine) isInlineChild(node *html.Node) bool {
 		return false
 	}
 
-	cstate := e.styles[node]
+	cstate := e.stylePtr(node)
 	if cstate.Display == cssDisplayNone || cstate.Float != cssDisplayNone ||
 		cstate.Position == positionAbsolute || cstate.Position == positionFixed {
 		return false
@@ -83,7 +85,7 @@ func (e *engine) isInlineChild(node *html.Node) bool {
 	}
 
 	return cstate.Display == cssDisplayInline || cstate.Display == cssDisplayInlineBlock ||
-		cstate.Display == displayInlineFlex
+		cstate.Display == displayInlineFlex || cstate.Display == displayInlineGrid
 }
 
 // blockishDisplay reports display values that force a block formatting
@@ -211,7 +213,7 @@ func (e *engine) flowOneChild(
 	node := children[idx]
 	// Fetch the child's resolved style once; all flow-child predicates and
 	// the float branch reuse it (was four e.styles map lookups per child).
-	cst := e.styles[node]
+	cst := e.stylePtr(node)
 
 	switch {
 	case isSkippableFlowNode(node, cst):
@@ -321,14 +323,14 @@ func collectInlineRun(children []*html.Node, idx int, engine *engine) ([]*html.N
 
 	for idx < len(children) {
 		child := children[idx]
-		if child.Type == html.ElementNode && engine.styles[child].Display == cssDisplayNone {
+		if child.Type == html.ElementNode && engine.stylePtr(child).Display == cssDisplayNone {
 			hasDisplayNone = true
 			idx++
 
 			continue
 		}
 
-		if child.Type == html.ElementNode && engine.styles[child].Float != cssDisplayNone {
+		if child.Type == html.ElementNode && engine.stylePtr(child).Float != cssDisplayNone {
 			break
 		}
 
@@ -354,7 +356,7 @@ func collectInlineRun(children []*html.Node, idx int, engine *engine) ([]*html.N
 	run := make([]*html.Node, 0, idx-start)
 
 	for _, child := range children[start:idx] {
-		if child.Type == html.ElementNode && engine.styles[child].Display == cssDisplayNone {
+		if child.Type == html.ElementNode && engine.stylePtr(child).Display == cssDisplayNone {
 			continue
 		}
 
@@ -476,9 +478,17 @@ func (e *engine) popBFCFloats(enclose bool) {
 	e.bfcStack = e.bfcStack[:stackLen-1]
 }
 
-// emitListMarker paints the list marker in the marker area to the left of
-// the content edge so it does not overlap the principal text.
+// emitListMarker paints the list marker for an <li>.
+// list-style-image, when it resolves, replaces the type glyph. Missing images
+// fall back to list-style-type. list-style-position:inside places the marker
+// at contentX (start of the first line box). outside and empty hang in the
+// gutter at contentX - gap - marker width.
 func (e *engine) emitListMarker(node *html.Node, style ResolvedStyle, contentX, baseline float64) {
+	size := e.scalePt(style.FontSize)
+	if e.emitListStyleImageMarker(style, contentX, baseline, size) {
+		return
+	}
+
 	typ := style.ListStyleType
 	if typ == "" {
 		typ = listStyleDisc
@@ -488,8 +498,7 @@ func (e *engine) emitListMarker(node *html.Node, style ResolvedStyle, contentX, 
 		return
 	}
 
-	size := e.scalePt(style.FontSize)
-	face := e.faceFor(style)
+	face := e.faceFor(&style)
 
 	text := markerText(node, typ)
 
@@ -504,19 +513,76 @@ func (e *engine) emitListMarker(node *html.Node, style ResolvedStyle, contentX, 
 	if minW <= 0 {
 		minW = size * float64(len([]rune(text))) * halfRatio
 	}
-	// Outside marker: sit in the padding/margin gutter left of contentX.
-	gap := size * bulletGapRatio
 
-	posX := contentX - gap - minW
-	if posX < 0 {
-		posX = 0
-	}
+	posX := listMarkerX(style.ListStylePosition, contentX, size, minW)
 
 	e.add(Op{ //nolint:exhaustruct // intentional zero fields
 		Kind: OpBullet, X: posX, Y: baseline, Text: text, Font: face, Size: size,
 		InkDescent: e.fontDescentFace(face, size),
 		R:          style.Color[0], G: style.Color[1], B: style.Color[2],
 	})
+}
+
+// emitListStyleImageMarker paints a list-style-image via resolveImage. false
+// means the type marker should be used instead (no image, or fetch failed).
+func (e *engine) emitListStyleImageMarker(
+	style ResolvedStyle, contentX, baseline, size float64,
+) bool {
+	if style.ListStyleImage == "" {
+		return false
+	}
+
+	src := backgroundImageSrc(style.ListStyleImage)
+	if src == "" {
+		return false
+	}
+
+	ref := e.resolveImage(src)
+	if ref == nil || ref.data == nil {
+		return false
+	}
+
+	imgW := e.scalePt(pxToPt(float64(ref.w)))
+	imgH := e.scalePt(pxToPt(float64(ref.h)))
+
+	if imgW <= 0 {
+		imgW = size
+	}
+
+	if imgH <= 0 {
+		imgH = size
+	}
+
+	posX := listMarkerX(style.ListStylePosition, contentX, size, imgW)
+
+	e.add(Op{ //nolint:exhaustruct // intentional zero fields
+		Kind:   OpImage,
+		X:      posX,
+		Y:      baseline - imgH,
+		W:      imgW,
+		H:      imgH,
+		Image:  ref.data,
+		ImgW:   ref.w,
+		ImgH:   ref.h,
+		IsJPEG: ref.isJPEG,
+	})
+
+	return true
+}
+
+// listMarkerX is the left edge of a list marker of width markerW. inside sits
+// at the content edge; outside hangs in the gutter, clamped at 0.
+func listMarkerX(position string, contentX, emSize, markerW float64) float64 {
+	if position == listPosInside {
+		return contentX
+	}
+
+	posX := contentX - emSize*bulletGapRatio - markerW
+	if posX < 0 {
+		return 0
+	}
+
+	return posX
 }
 
 // markerText returns the glyph/string for a list-style-type keyword.
@@ -526,9 +592,9 @@ func markerText(node *html.Node, typ string) string {
 		return bulletDisc
 	case "circle":
 		return "\u25E6"
-	case "square":
+	case listStyleSquare:
 		return "\u25AA"
-	case "decimal", "decimal-leading-zero":
+	case listStyleDecimal, "decimal-leading-zero":
 		return strconv.Itoa(listItemIndex(node)) + "."
 	case "lower-alpha", "lower-latin":
 		return alphaMarker(listItemIndex(node), false) + "."

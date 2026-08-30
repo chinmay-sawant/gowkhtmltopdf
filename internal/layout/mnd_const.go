@@ -11,6 +11,7 @@ const (
 	bulletGapRatio            = 0.35
 	byteMax                   = 0xFF
 	byteShift                 = 8
+	captionSideMaxFrac        = 0.4
 	cssCenterPercent          = 50
 	cssPercent                = 100
 	cssPxRoot                 = 16

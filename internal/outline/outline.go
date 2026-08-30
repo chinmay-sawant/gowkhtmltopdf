@@ -24,9 +24,9 @@ type Location struct {
 	X, Y, W, H float64
 }
 
-// locationReader is implemented by layout metadata and by tests or other
+// LocationReader is implemented by layout metadata and by tests or other
 // callers that already have a compatible location value.
-type locationReader interface {
+type LocationReader interface {
 	NodeRef() *html.Node
 	PageIndex() int
 	Bounds() (float64, float64, float64, float64)
@@ -115,6 +115,41 @@ func headingLevel(name string) int {
 	return 0
 }
 
+// parseBookmarkStyle reads bookmark-level and bookmark-label from an inline style string.
+//
+//nolint:mnd // split limit and length count
+func parseBookmarkStyle(styleAttr string, baseLevel int) (int, string) {
+	if styleAttr == "" {
+		return baseLevel, ""
+	}
+
+	lvl := baseLevel
+	title := ""
+
+	for _, decl := range strings.Split(styleAttr, ";") {
+		parts := strings.SplitN(decl, ":", 2)
+		if len(parts) != 2 {
+			continue
+		}
+
+		key := strings.ToLower(strings.TrimSpace(parts[0]))
+		val := strings.TrimSpace(parts[1])
+
+		switch key {
+		case "bookmark-level":
+			if val == "none" {
+				lvl = 0
+			} else if n, err := strconv.Atoi(val); err == nil && n >= 0 {
+				lvl = n
+			}
+		case "bookmark-label":
+			title = strings.Trim(val, "'\"")
+		}
+	}
+
+	return lvl, title
+}
+
 // CollectHeadings walks root in document order and returns one Heading per
 // h1..h6 element with its whitespace-collapsed text title. Location fields
 // are zero until Lookup runs.
@@ -126,13 +161,20 @@ func CollectHeadings(root *html.Node) []*Heading {
 			return
 		}
 
-		if lvl := headingLevel(node.Name); lvl > 0 {
-			out = append(out, &Heading{ //nolint:exhaustruct // intentional zero/partial fields
-				Node:  node,
-				Title: CollapseWS(node.TextContent()),
-				Level: lvl,
-			})
+		lvl, title := parseBookmarkStyle(node.Attribute("style"), headingLevel(node.Name))
+		if lvl <= 0 {
+			return
 		}
+
+		if title == "" {
+			title = CollapseWS(node.TextContent())
+		}
+
+		out = append(out, &Heading{ //nolint:exhaustruct // intentional zero/partial fields
+			Node:  node,
+			Title: title,
+			Level: lvl,
+		})
 	})
 
 	return out
@@ -142,7 +184,7 @@ func CollectHeadings(root *html.Node) []*Heading {
 // (matched by node pointer) and returns the headings that have a location.
 // Headings without a location are skipped: they were laid out as display:none
 // or never emitted a box.
-func Lookup[T locationReader](headings []*Heading, locs []T) []*Heading {
+func Lookup[T LocationReader](headings []*Heading, locs []T) []*Heading {
 	byNode := make(map[*html.Node]Location, len(locs))
 
 	for _, l := range locs {
@@ -378,15 +420,15 @@ func dumpNode(node *Node, buf *strings.Builder, depth, pageOffset int, pageOf Pa
 		buf.WriteString(heading.Anchor)
 
 		if len(child.Children) == 0 {
-			buf.WriteString("\"/>\node")
+			buf.WriteString("\"/>\n")
 
 			continue
 		}
 
-		buf.WriteString("\">\node")
+		buf.WriteString("\">\n")
 		dumpNode(child, buf, depth+1, pageOffset, pageOf)
 		buf.WriteString(pad)
-		buf.WriteString("</item>\node")
+		buf.WriteString("</item>\n")
 	}
 }
 

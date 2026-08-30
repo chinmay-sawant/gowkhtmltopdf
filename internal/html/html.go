@@ -112,60 +112,76 @@ func (n *Node) appendText(buf *strings.Builder) {
 	}
 }
 
+// treeBuilder accumulates parsed tokens into a node tree.
+type treeBuilder struct {
+	root  *Node
+	stack []*Node
+}
+
+func newTreeBuilder() *treeBuilder {
+	root := &Node{Type: ElementNode, Name: "#document"} //nolint:exhaustruct
+
+	return &treeBuilder{
+		root:  root,
+		stack: []*Node{root},
+	}
+}
+
+func (b *treeBuilder) top() *Node {
+	return b.stack[len(b.stack)-1]
+}
+
 // Parse turns HTML source into a tree with a synthetic root. The source is
 // decoded UTF-8; charset detection happens at the load seam (internal/load).
 // Use ParseDocument for the bytes-to-tree path (it strips the BOM).
 func Parse(source string) (*Node, error) {
-	root := &Node{Type: ElementNode, Name: "#document"} //nolint:exhaustruct
-	stack := []*Node{root}
+	builder := newTreeBuilder()
 
-	err := scanTokens(source, func(tokItem token) {
-		appendToken(&stack, tokItem)
-	})
+	err := scanTokens(source, builder.appendToken)
 	if err != nil {
 		return nil, err
 	}
 
-	return root, nil
+	return builder.root, nil
 }
 
 // appendToken applies one scanned token to the tree builder stack.
-func appendToken(stack *[]*Node, tokItem token) {
+func (b *treeBuilder) appendToken(tokItem token) {
 	switch tokItem.kind {
 	case tokDoctype:
-		appendDoctypeToken(stack, tokItem.data)
+		b.appendDoctypeToken(tokItem.data)
 	case tokComment:
-		appendCommentToken(stack, tokItem.data)
+		b.appendCommentToken(tokItem.data)
 	case tokText:
-		appendTextToken(stack, tokItem.data)
+		b.appendTextToken(tokItem.data)
 	case tokStart:
-		openElement(stack, tokItem)
+		b.openElement(tokItem)
 	case tokEnd:
-		closeElement(stack, tokItem.data)
+		b.closeElement(tokItem.data)
 	}
 }
 
 // appendDoctypeToken attaches a doctype node to the current top of stack.
-func appendDoctypeToken(stack *[]*Node, data string) {
-	top := (*stack)[len(*stack)-1]
+func (b *treeBuilder) appendDoctypeToken(data string) {
+	top := b.top()
 	top.Children = append(top.Children, &Node{Type: DoctypeNode, Text: data}) //nolint:exhaustruct
 }
 
 // appendCommentToken attaches a comment node to the current top of stack.
-func appendCommentToken(stack *[]*Node, data string) {
-	top := (*stack)[len(*stack)-1]
+func (b *treeBuilder) appendCommentToken(data string) {
+	top := b.top()
 	top.Children = append(top.Children, &Node{Type: CommentNode, Text: data}) //nolint:exhaustruct
 }
 
 // appendTextToken attaches decoded text to the current top of stack, merging
 // into an adjacent text node when present.
-func appendTextToken(stack *[]*Node, data string) {
+func (b *treeBuilder) appendTextToken(data string) {
 	if data == "" {
 		return
 	}
 
 	decoded := UnescapeEntities(data)
-	top := (*stack)[len(*stack)-1]
+	top := b.top()
 
 	if len(top.Children) > 0 {
 		last := top.Children[len(top.Children)-1]
@@ -183,15 +199,15 @@ func appendTextToken(stack *[]*Node, data string) {
 
 // openElement applies one start tag to the open-element stack. Token data is
 // already lowercased by the tokenizer.
-func openElement(stack *[]*Node, tokItem token) {
+func (b *treeBuilder) openElement(tokItem token) {
 	name := tokItem.data
-	if mergeRootElement(stack, name) {
+	if b.mergeRootElement(name) {
 		return
 	}
 
-	autoCloseOpen(stack, name)
+	b.autoCloseOpen(name)
 
-	top := (*stack)[len(*stack)-1]
+	top := b.top()
 
 	node := &Node{Type: ElementNode, Name: name} //nolint:exhaustruct
 
@@ -209,24 +225,24 @@ func openElement(stack *[]*Node, tokItem token) {
 		return // no child content
 	}
 
-	*stack = append(*stack, node)
+	b.stack = append(b.stack, node)
 }
 
 // mergeRootElement handles html/head/body duplicates, which merge into the
 // existing element instead of nesting: the token is dropped when one is
 // already open, otherwise a closed same-level sibling is re-opened. It
 // reports whether the token was consumed.
-func mergeRootElement(stack *[]*Node, name string) bool {
+func (b *treeBuilder) mergeRootElement(name string) bool {
 	if name != "html" && name != "head" && name != "body" {
 		return false
 	}
 
-	if openInStack(*stack, name) {
+	if openInStack(b.stack, name) {
 		return true
 	}
 
-	if existing := findImplicit((*stack)[len(*stack)-1], name); existing != nil {
-		*stack = append(*stack, existing)
+	if existing := findImplicit(b.top(), name); existing != nil {
+		b.stack = append(b.stack, existing)
 
 		return true
 	}
@@ -236,11 +252,11 @@ func mergeRootElement(stack *[]*Node, name string) bool {
 
 // autoCloseOpen pops every open element that the start tag closes, and ends
 // the row when a new <td>/<th> follows an open cell.
-func autoCloseOpen(stack *[]*Node, name string) {
+func (b *treeBuilder) autoCloseOpen(name string) {
 	closedCell := false
 
-	for len(*stack) > 1 {
-		openName := (*stack)[len(*stack)-1].Name
+	for len(b.stack) > 1 {
+		openName := b.top().Name
 		if !shouldAutoClose(openName, name) {
 			break
 		}
@@ -249,12 +265,12 @@ func autoCloseOpen(stack *[]*Node, name string) {
 			closedCell = true
 		}
 
-		*stack = (*stack)[:len(*stack)-1]
+		b.stack = b.stack[:len(b.stack)-1]
 	}
 	// close-a-cell: a new <td>/<th> after an open cell ends the row too
-	if closedCell && (name == "td" || name == "th") && len(*stack) > 1 {
-		if (*stack)[len(*stack)-1].Name == "tr" {
-			*stack = (*stack)[:len(*stack)-1]
+	if closedCell && (name == "td" || name == "th") && len(b.stack) > 1 {
+		if b.top().Name == "tr" {
+			b.stack = b.stack[:len(b.stack)-1]
 		}
 	}
 }
@@ -275,12 +291,12 @@ func applyAttributes(node *Node, attrs []string) {
 // closeElement pops the open-element stack back to (and including) the
 // first element with name; a stray end tag is a no-op. Token data is already
 // lowercased by the tokenizer.
-func closeElement(stack *[]*Node, data string) {
+func (b *treeBuilder) closeElement(data string) {
 	name := data
 
-	for i := len(*stack) - 1; i > 0; i-- {
-		if (*stack)[i].Name == name {
-			*stack = (*stack)[:i]
+	for i := len(b.stack) - 1; i > 0; i-- {
+		if b.stack[i].Name == name {
+			b.stack = b.stack[:i]
 
 			break
 		}

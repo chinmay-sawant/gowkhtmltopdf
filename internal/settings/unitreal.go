@@ -23,7 +23,7 @@ type UnitReal struct {
 }
 
 // ErrInvalidUnitReal is returned by ParseUnitReal for unparseable input.
-var ErrInvalidUnitReal = errors.New("invalid unit real")
+var ErrInvalidUnitReal = errors.New("settings: invalid unit real")
 
 // ParseUnitReal parses a number with an optional unit suffix, e.g. "10mm",
 // "1.5in", "12pt", "100%". A bare number takes the implied unit.

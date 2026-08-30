@@ -23,6 +23,10 @@ var (
 	ErrEmptyContent = ErrEmptyHTML
 	// ErrInvalidOrientation identifies an unsupported Document orientation.
 	ErrInvalidOrientation = errors.New("gowkhtmltopdf: invalid orientation")
+	// ErrInvalidImageQuality reports an image quality outside 0 to 100.
+	ErrInvalidImageQuality = errors.New("gowkhtmltopdf: image quality must be between 0 and 100")
+	// ErrInvalidCrop reports negative crop dimensions or offsets.
+	ErrInvalidCrop = errors.New("gowkhtmltopdf: crop dimensions and offsets must be non-negative")
 )
 
 // Validate checks that Content identifies one valid source and that Base is
@@ -61,8 +65,6 @@ func (d *Document) Validate() error {
 	return nil
 }
 
-// Validate checks the single image source and image-only options before
-// engine execution.
 func (d *ImageDocument) Validate() error {
 	if d == nil {
 		return ErrNilImageDocument
@@ -74,10 +76,27 @@ func (d *ImageDocument) Validate() error {
 
 	switch format := strings.ToLower(strings.TrimSpace(d.Format)); format {
 	case "", "png", "jpg", "jpeg":
-		return nil
 	default:
 		return fmt.Errorf("%w: %q", ErrInvalidImageFormat, d.Format)
 	}
+
+	if d.Quality < 0 || d.Quality > 100 {
+		return fmt.Errorf("%w: got %d", ErrInvalidImageQuality, d.Quality)
+	}
+
+	return validateImageCrop(d.Crop)
+}
+
+func validateImageCrop(crop *Crop) error {
+	if crop == nil {
+		return nil
+	}
+
+	if crop.Width < 0 || crop.Height < 0 || crop.Left < 0 || crop.Top < 0 {
+		return ErrInvalidCrop
+	}
+
+	return nil
 }
 
 func validatePDFOptions(document *Document) error {

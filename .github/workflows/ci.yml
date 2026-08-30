@@ -96,7 +96,9 @@ jobs:
           go-version: '1.26'
           cache: true
       - name: Race
-        run: go test -race -count=1 ./internal/convert ./internal/layout ./internal/pdf ./internal/imageout ./internal/load
+        # Caps match make test / make test-race: -race roughly doubles RSS and
+        # uncapped parallel fixtures thrash ~7 GiB runners.
+        run: make test-race
 
   frontend:
     name: frontend production build

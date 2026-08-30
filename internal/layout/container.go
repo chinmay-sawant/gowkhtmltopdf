@@ -113,7 +113,7 @@ func measureSizeContainersContext(
 func contentInlineSize(sty ResolvedStyle, availW float64) float64 {
 	width, definite := contentBaseInlineSize(sty, availW)
 	if definite && sty.BoxSizing != borderBox {
-		width += sty.PaddingLeft + sty.PaddingRight + sty.BorderLeft.Width + sty.BorderRight.Width
+		width += sty.HorizChrome()
 	}
 
 	if sty.MinWidth > 0 && width < sty.MinWidth {
@@ -124,7 +124,7 @@ func contentInlineSize(sty ResolvedStyle, availW float64) float64 {
 		width = sty.MaxWidth
 	}
 
-	contentW := width - sty.PaddingLeft - sty.PaddingRight - sty.BorderLeft.Width - sty.BorderRight.Width
+	contentW := width - sty.HorizChrome()
 	if contentW < 0 {
 		contentW = 0
 	}

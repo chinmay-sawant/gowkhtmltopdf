@@ -3,21 +3,18 @@
 // specificity ordering, and value helpers (lengths, colors, font families).
 //
 // Scope: `*`, type, `.class`, `#id`, attribute selectors (`[attr]`, `=`, `~=`,
-// `*=`, `^=`, `$=`, `|=`),
-// :first-child/:last-child/:nth-child/:has()/:not(), descendant/child/sibling
-// combinators, `@media` type + size-feature matching (see MediaMatches),
+// `*=`, `^=`, `$=`, `|=`, ASCII `i` flag),
+// :first-child/:last-child/:nth-child/:first-of-type/:last-of-type/
+// :nth-of-type/:nth-last-of-type/:has()/:not()/:is()/:where(),
+// descendant/child/sibling combinators, `@media` type + size-feature matching
+// (see MediaMatches),
 // `@container` size queries (inline-size/width + and/or/not), `!important`,
 // inline style attributes. Unsupported constructs degrade without panicking.
 package css
 
 import (
 	"errors"
-	"strconv"
 	"strings"
-	"unicode"
-	"unicode/utf8"
-
-	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
 
 // Numeric constants used by the CSS parser and value helpers.
@@ -32,17 +29,34 @@ const (
 	maxRGBChannel     = 255
 	percentScale      = 100
 	rgbaChannelCount  = 4
-	hexLetterBase     = 10 // 'a'/'A' → 10 in hex
+	hexLetterBase     = 10 // 'a'/'A' -> 10 in hex
 	roundHalfUp       = 0.5
 	nonASCIIStart     = 0x80
+	hslChannelCount   = 3
+	hslCircleDeg      = 360
+	hslSectorDeg      = 60
+	hslEvenPeriod     = 2 // H' mod 2 in the second-largest HSL component
+	hslChromaHalf     = 2 // m = L - C/2
+	hslSectorYG       = 2 // yellow-green, H' in [1, 2)
+	hslSectorGC       = 3 // green-cyan
+	hslSectorCB       = 4 // cyan-blue
+	hslSectorBM       = 5 // blue-magenta
 )
 
 // Pseudo-class and pseudo-element names shared across selector parsing.
 const (
-	pseudoClassHas   = "has"
-	pseudoElemBefore = "before"
-	pseudoElemAfter  = "after"
-	nthChildPseudo   = "nth-child"
+	pseudoClassHas      = "has"
+	pseudoClassIs       = "is"
+	pseudoClassWhere    = "where"
+	pseudoElemBefore    = "before"
+	pseudoElemAfter     = "after"
+	nthChildPseudo      = "nth-child"
+	firstChildPseudo    = "first-child"
+	lastChildPseudo     = "last-child"
+	nthOfTypePseudo     = "nth-of-type"
+	nthLastOfTypePseudo = "nth-last-of-type"
+	firstOfTypePseudo   = "first-of-type"
+	lastOfTypePseudo    = "last-of-type"
 )
 
 // Stylesheet is a parsed stylesheet. Rules keep their source order.
@@ -50,6 +64,19 @@ type Stylesheet struct {
 	Rules     []Rule
 	FontFaces []FontFace
 	Page      *PageStyle
+	// Pages holds every @page rule in source order, including :first/:left/:right
+	// and named pages. Page remains the last unnamed @page for older callers.
+	Pages []PageRule
+	// Imports are @import url/media pairs in source order. Parse fills this;
+	// convert.prepare fetches each under the same ACL as <link rel=stylesheet>.
+	Imports []ImportRule
+}
+
+// ImportRule is one @import. URL is the raw url("...") or unquoted path.
+// Media is the optional prelude after the URL (empty means the sheet's media).
+type ImportRule struct {
+	URL   string
+	Media string
 }
 
 // PageStyle stores the unnamed @page declarations that affect the print
@@ -59,6 +86,16 @@ type Stylesheet struct {
 type PageStyle struct {
 	Margin string
 	Size   string
+}
+
+// PageRule is one @page block. Sel is "" (unnamed), ":first", ":left",
+// ":right", or a page name ident. Boxes holds lite margin-box content
+// strings (@top-center and friends); empty slots were not declared.
+type PageRule struct {
+	Sel    string
+	Margin string
+	Size   string
+	Boxes  PageMarginBoxes
 }
 
 // FontFace is one @font-face rule (local src subset).
@@ -98,17 +135,19 @@ type SelectorPart struct {
 	ID            string
 	Attrs         []AttrSelector
 	Pseudos       []PseudoClass
-	PseudoElement string // "before" | "after" | "" — never matches the host element
+	PseudoElement string // "before" | "after" | "" - never matches the host element
 	Combinator    string
 }
 
 // AttrSelector is [name], [name=value] (exact), [name~=word] (space-separated
 // word), [name*=substr] (substring), [name^=prefix], [name$=suffix], or
-// [name|=ident] (exact or prefix-plus-hyphen).
+// [name|=ident] (exact or prefix-plus-hyphen). IgnoreCase is the Selectors 4
+// ASCII i flag on valued selectors ([attr=value i]).
 type AttrSelector struct {
-	Name  string
-	Op    string // "", "=", "~=", "*=", "^=", "$=", "|="
-	Value string
+	Name       string
+	Op         string // "", "=", "~=", "*=", "^=", "$=", "|="
+	Value      string
+	IgnoreCase bool
 }
 
 // RelativeSelector is a complex selector interpreted relative to a subject
@@ -118,15 +157,16 @@ type RelativeSelector struct {
 	Parts   []SelectorPart
 }
 
-// PseudoClass is :first-child, :last-child, :nth-child(...), :has(...), or
-// :not(...). :is()/:where() are not implemented (unknown, never match).
+// PseudoClass is :first-child, :last-child, :nth-child(...), :nth-of-type(...),
+// :has(...), :not(...), :is(...), or :where(...).
 type PseudoClass struct {
 	Name string // lower-case, without leading ':'
-	Arg  string // nth-child argument, lower-case, trimmed
+	Arg  string // nth-child / nth-of-type argument, lower-case, trimmed
 	Has  []RelativeSelector
 	Not  []Selector
-	// nth caches the parsed :nth-child argument (see nthForm) so matching is
-	// pure integer arithmetic; kind zero (unparseable) never matches.
+	Is   []Selector // :is() / :where() argument list
+	// nth caches the parsed :nth-child / :nth-of-type argument (see nthForm)
+	// so matching is pure integer arithmetic; kind zero (unparseable) never matches.
 	nth nthForm `exhaustruct:"optional"`
 }
 
@@ -184,6 +224,8 @@ func parseAtRule(src string, str *Stylesheet, order *int) (string, error) {
 		return skipAtRule(src)
 	case strings.HasPrefix(low, "@font-face"):
 		return parseFontFaceRule(src, str)
+	case strings.HasPrefix(low, "@import"):
+		return parseImportRule(src, str)
 	default:
 		return skipAtRule(src)
 	}
@@ -200,22 +242,112 @@ func parsePageRule(src string, str *Stylesheet) (string, error) {
 		return "", err
 	}
 
-	page := str.Page
-	if page == nil {
-		page = &PageStyle{} //nolint:exhaustruct // zero values represent omitted @page properties
-		str.Page = page
+	prelude := src[len("@page"):open]
+
+	sel := parsePageSelector(prelude)
+	if strings.TrimSpace(prelude) != "" && sel == "" {
+		return rest, nil
 	}
 
-	for _, decl := range parseDeclarations(block) {
-		switch strings.ToLower(decl.Prop) {
-		case "margin":
-			page.Margin = decl.Value
-		case "size":
-			page.Size = decl.Value
-		}
+	boxes, declarations := parsePageBlock(block, sel == "")
+	margin, size := pageDescriptors(declarations)
+
+	str.Pages = append(str.Pages, PageRule{
+		Sel:    sel,
+		Margin: margin,
+		Size:   size,
+		Boxes:  boxes,
+	})
+
+	if sel == "" {
+		str.Page = applyPageDescriptors(str.Page, margin, size)
 	}
 
 	return rest, nil
+}
+
+func pageDescriptors(declarations string) (string, string) {
+	var margin, size string
+
+	for _, decl := range parseDeclarations(declarations) {
+		switch strings.ToLower(decl.Prop) {
+		case "margin":
+			margin = decl.Value
+		case "size":
+			size = decl.Value
+		}
+	}
+
+	return margin, size
+}
+
+func applyPageDescriptors(page *PageStyle, margin, size string) *PageStyle {
+	if page == nil {
+		page = &PageStyle{} //nolint:exhaustruct // zero values represent omitted @page properties
+	}
+
+	if margin != "" {
+		page.Margin = margin
+	}
+
+	if size != "" {
+		page.Size = size
+	}
+
+	return page
+}
+
+// parsePageSelector reads the @page prelude. Empty is unnamed; :first, :left,
+// and :right are the page pseudos (any ASCII case); any other single ident is
+// a named page. A compound, list, or unknown pseudo is invalid.
+func parsePageSelector(prelude string) string {
+	prelude = strings.TrimSpace(prelude)
+	if prelude == "" {
+		return ""
+	}
+
+	if prelude[0] == ':' {
+		pseudo := strings.TrimSpace(prelude[1:])
+		ident := strings.ToLower(pageIdent(pseudo))
+
+		if ident == "" || ident != pseudo {
+			return ""
+		}
+
+		switch ident {
+		case "first", "left", "right":
+			return ":" + ident
+		}
+
+		return ""
+	}
+
+	if !IsIdentToken(prelude) {
+		return ""
+	}
+
+	return prelude
+}
+
+// IsIdentToken reports that s is a single CSS ident with no leftover tokens.
+func IsIdentToken(s string) bool {
+	s = strings.TrimSpace(s)
+
+	return s != "" && pageIdent(s) == s
+}
+
+// pageIdent returns the leading CSS ident in src, or "" if src does not start with one.
+func pageIdent(src string) string {
+	if src == "" || !isIdentStart(src[0]) {
+		return ""
+	}
+
+	end := 1
+	for end < len(src) && isIdentChar(src[end]) {
+		end++
+	}
+
+	return src[:end]
 }
 
 func parseMediaRule(src string, str *Stylesheet, order *int) (string, error) {
@@ -348,11 +480,14 @@ func parseOneRule(selText, block, media string, contQ *ContainerQuery, order *in
 	return rVal, true
 }
 
-// skipAtRule consumes one at-rule from src: its braced block when present,
-// otherwise a ';'-terminated statement (or everything when neither exists).
-// Returns the remaining source.
+// skipAtRule consumes one at-rule from src. A ';' before the first '{' is a
+// statement at-rule (@charset, malformed @import); otherwise a braced block
+// is consumed. Returns the remaining source.
 func skipAtRule(src string) (string, error) {
-	if open := strings.IndexByte(src, '{'); open >= 0 {
+	semi := strings.IndexByte(src, ';')
+	open := strings.IndexByte(src, '{')
+
+	if open >= 0 && (semi < 0 || open < semi) {
 		_, rest, err := takeBlock(src, open)
 		if err != nil {
 			return "", err
@@ -361,8 +496,8 @@ func skipAtRule(src string) (string, error) {
 		return rest, nil
 	}
 
-	if end := strings.IndexByte(src, ';'); end >= 0 {
-		return src[end+1:], nil
+	if semi >= 0 {
+		return src[semi+1:], nil
 	}
 
 	return "", nil
@@ -699,1086 +834,4 @@ func splitTopLevel(str string, sep byte) []string {
 	out = append(out, strings.TrimSpace(str[start:]))
 
 	return out
-}
-
-// parseSelector parses one compound chain, e.g. "div.a#b > p.c" or
-// "tr:nth-child(even)".
-func parseSelector(s string) (Selector, bool) {
-	return parseSelectorCtx(s, false)
-}
-
-// splitSelectorChain splits a selector into compounds and combinators, e.g.
-// ["div.a", ">", "p", " ", "span"].
-func splitSelectorChain(sel string) []string {
-	var out []string
-
-	var cur strings.Builder
-
-	flush := func() {
-		if cur.Len() > 0 {
-			out = append(out, cur.String())
-			cur.Reset()
-		}
-	}
-
-	for idx := 0; idx < len(sel); idx++ {
-		cnt := sel[idx]
-
-		switch cnt {
-		case ' ', '\t', '\n', '\r':
-			// skip whitespace; it becomes a descendant combinator only when
-			// it sits between two compounds
-			flush()
-
-			idx = skipWhitespace(sel, idx)
-			out = addDescendantCombinator(out, sel, idx)
-		case '>', '+', '~':
-			flush()
-
-			out = append(out, string(cnt))
-		case '[':
-			idx = writeBracketLiteral(&cur, out, sel, idx)
-		case ':':
-			idx = writePseudoLiteral(&cur, out, sel, idx)
-		case '\\':
-			// escape: keep next char literally
-			if idx+1 < len(sel) {
-				cur.WriteByte(sel[idx+1])
-
-				idx++
-			}
-		default:
-			cur.WriteByte(cnt)
-		}
-	}
-
-	flush()
-
-	return out
-}
-
-func isSelBreak(b byte) bool {
-	switch b {
-	case '.', '#', '[', ':', '>', '+', '~', ' ', '\t', '\n', '\r':
-		return true
-	}
-
-	return false
-}
-
-func isWhitespace(b byte) bool {
-	return b == ' ' || b == '\t' || b == '\n' || b == '\r'
-}
-
-// skipWhitespace advances idx to the end of a run of whitespace starting at
-// idx (the character at idx is whitespace).
-func skipWhitespace(s string, idx int) int {
-	for idx+1 < len(s) && isWhitespace(s[idx+1]) {
-		idx++
-	}
-
-	return idx
-}
-
-// addDescendantCombinator appends a " " token when the whitespace run ending
-// at idx sits between two compounds (not after a combinator, not before '>').
-func addDescendantCombinator(out []string, s string, idx int) []string {
-	if len(out) > 0 && out[len(out)-1] != " " && out[len(out)-1] != ">" &&
-		out[len(out)-1] != "+" && out[len(out)-1] != "~" && idx+1 < len(s) && s[idx+1] != '>' {
-		return append(out, " ")
-	}
-
-	return out
-}
-
-// writeBracketLiteral keeps [attr] / [attr=value] inside the compound,
-// prefixed with '*' when the compound starts with the bracket. Returns the
-// index of the ']' (or the current idx when unterminated).
-func writeBracketLiteral(cur *strings.Builder, out []string, sel string, idx int) int {
-	jdx := strings.IndexByte(sel[idx:], ']')
-	if jdx < 0 {
-		cur.WriteByte('[')
-
-		return idx
-	}
-
-	writeStarPrefix(cur, out)
-	cur.WriteString(sel[idx : idx+jdx+1])
-
-	return idx + jdx
-}
-
-// writeStarPrefix prefixes the current compound with '*' when it starts at a
-// compound boundary (fresh compound after a combinator or list start).
-func writeStarPrefix(cur *strings.Builder, out []string) {
-	if cur.Len() == 0 && (len(out) == 0 || out[len(out)-1] == " " ||
-		out[len(out)-1] == ">" || out[len(out)-1] == "+" || out[len(out)-1] == "~") {
-		cur.WriteByte('*')
-	}
-}
-
-// writePseudoLiteral keeps :pseudo / :nth-child(n) / :has(...) and
-// ::pseudo-elements inside the compound so parseCompound can reject
-// unsupported pseudo-elements. Never strip ::before/::after — that used to
-// leave a bare host selector (Vector print `p::before{width:120pt}` became
-// `p{width:120pt}` and crushed wiki body columns). Returns the index of the
-// character after the pseudo (the caller's loop applies the final -1/+1).
-func writePseudoLiteral(cur *strings.Builder, out []string, sel string, idx int) int {
-	writeStarPrefix(cur, out)
-
-	start := idx
-
-	if idx+1 < len(sel) && sel[idx+1] == ':' {
-		idx += 2 // ::pseudo-element
-	} else {
-		idx++ // :pseudo-class or CSS2 :before/:after
-	}
-
-	for idx < len(sel) && !isSelBreak(sel[idx]) {
-		if sel[idx] == '(' {
-			_, end, ok := takeParenArg(sel, idx)
-			if ok {
-				cur.WriteString(sel[start:end])
-
-				return end - 1
-			}
-
-			cur.WriteString(sel[start:])
-
-			return len(sel) - 1
-		}
-
-		idx++
-	}
-
-	cur.WriteString(sel[start:idx])
-
-	return idx - 1
-}
-
-// parseCompoundCtx parses a compound ("tag#id.class[attr]:nth-child(even)").
-// A tag of "*" or "" means universal. When insideHas is true, nested :has()
-// and pseudo-elements are rejected as invalid.
-func parseCompoundCtx(sel string, insideHas bool) (SelectorPart, bool) {
-	sel = strings.TrimSpace(sel)
-	if sel == "" {
-		return SelectorPart{Tag: "*"}, true //nolint:exhaustruct // intentional zero-value fields
-	}
-
-	tag, idx, valid := parseCompoundTag(sel)
-	if !valid {
-		return SelectorPart{}, false //nolint:exhaustruct // intentional zero-value fields
-	}
-
-	part := SelectorPart{Tag: tag} //nolint:exhaustruct // intentional zero-value fields
-
-	for idx < len(sel) {
-		switch sel[idx] {
-		case '#':
-			part, idx, valid = parseCompoundID(sel, part, idx)
-		case '.':
-			part, idx, valid = parseCompoundClass(sel, part, idx)
-		case '[':
-			part, idx, valid = parseCompoundAttr(sel, part, idx)
-		case ':':
-			part, idx, valid = parseCompoundPseudo(sel, part, insideHas, idx)
-		default:
-			return SelectorPart{}, false //nolint:exhaustruct // intentional zero-value fields
-		}
-
-		if !valid {
-			return SelectorPart{}, false //nolint:exhaustruct // intentional zero-value fields
-		}
-	}
-
-	return part, true
-}
-
-// parseCompoundTag reads the tag name at the start of sel. An empty tag
-// ("*.cls", ".cls") means universal. Returns the tag and the scan index.
-func parseCompoundTag(sel string) (string, int, bool) {
-	idx := 0
-	for idx < len(sel) && !isCompoundBreak(sel[idx]) {
-		idx++
-	}
-
-	tag := sel[:idx]
-	if tag == "" {
-		return "*", 0, true
-	}
-
-	if tag != "*" && !validIdent(tag) {
-		return "", 0, false
-	}
-
-	return tag, idx, true
-}
-
-func parseCompoundID(sel string, part SelectorPart, idx int) (SelectorPart, int, bool) {
-	jdx := idx + 1
-	for jdx < len(sel) && !isCompoundBreak(sel[jdx]) {
-		jdx++
-	}
-
-	id := sel[idx+1 : jdx]
-	if !validIdent(id) {
-		return part, idx, false
-	}
-
-	part.ID = id
-
-	return part, jdx, true
-}
-
-func parseCompoundClass(sel string, part SelectorPart, idx int) (SelectorPart, int, bool) {
-	jdx := idx + 1
-	for jdx < len(sel) && !isCompoundBreak(sel[jdx]) {
-		jdx++
-	}
-
-	if jdx > idx+1 {
-		cls := sel[idx+1 : jdx]
-		if !validIdent(cls) {
-			return part, idx, false
-		}
-
-		part.Classes = append(part.Classes, cls)
-	}
-
-	return part, jdx, true
-}
-
-func parseCompoundAttr(sel string, part SelectorPart, idx int) (SelectorPart, int, bool) {
-	jdx := strings.IndexByte(sel[idx:], ']')
-	if jdx < 0 {
-		return part, idx, false
-	}
-
-	attr, ok := parseAttrSelector(sel[idx : idx+jdx+1])
-	if !ok {
-		return part, idx, false
-	}
-
-	part.Attrs = append(part.Attrs, attr)
-
-	return part, idx + jdx + 1, true
-}
-
-// parseCompoundPseudo parses one :pseudo or ::pseudo-element starting at idx
-// in sel and returns the updated part and the index of the next compound
-// break.
-func parseCompoundPseudo(sel string, part SelectorPart, insideHas bool, idx int) (SelectorPart, int, bool) {
-	if idx+1 < len(sel) && sel[idx+1] == ':' {
-		return parsePseudoElement(sel, part, idx)
-	}
-
-	return parsePseudoClass(sel, part, insideHas, idx)
-}
-
-// parsePseudoElement handles the ::pseudo-element form. Only ::before/::after
-// are supported; others reject the selector so declarations do not apply to
-// the host.
-func parsePseudoElement(sel string, part SelectorPart, idx int) (SelectorPart, int, bool) {
-	jdx := idx + doubleColonOffset
-	for jdx < len(sel) && sel[jdx] != '(' && !isCompoundBreak(sel[jdx]) {
-		jdx++
-	}
-
-	peVal := strings.ToLower(sel[idx+doubleColonOffset : jdx])
-	if peVal != pseudoElemBefore && peVal != pseudoElemAfter {
-		return part, idx, false
-	}
-
-	if jdx < len(sel) && sel[jdx] == '(' {
-		return part, idx, false
-	}
-
-	part.PseudoElement = peVal
-
-	return part, jdx, true
-}
-
-// parsePseudoClass handles the :pseudo-class form (including CSS2
-// single-colon :before/:after).
-func parsePseudoClass(sel string, part SelectorPart, insideHas bool, idx int) (SelectorPart, int, bool) {
-	jdx := idx + 1
-	for jdx < len(sel) && sel[jdx] != '(' && !isCompoundBreak(sel[jdx]) {
-		jdx++
-	}
-
-	name := strings.ToLower(sel[idx+1 : jdx])
-	arg := ""
-
-	var argRaw string
-
-	hasParen := jdx < len(sel) && sel[jdx] == '('
-	if hasParen {
-		raw, end, ok := takeParenArg(sel, jdx)
-		if !ok {
-			return part, idx, false
-		}
-
-		argRaw = raw
-		arg = strings.ToLower(strings.TrimSpace(raw))
-		jdx = end
-	}
-
-	part, ok := appendCompoundPseudo(part, name, arg, argRaw, hasParen, insideHas)
-
-	return part, jdx, ok
-}
-
-// appendCompoundPseudo records the parsed pseudo on the part. When insideHas
-// is true, nested :has() and pseudo-elements are rejected as invalid.
-func appendCompoundPseudo(part SelectorPart, name, arg, argRaw string, hasParen, insideHas bool) (SelectorPart, bool) {
-	if insideHas {
-		switch name {
-		case pseudoClassHas, pseudoElemBefore, pseudoElemAfter, "first-line", "first-letter":
-			return part, false
-		}
-	}
-
-	if name == pseudoClassHas || name == condKindNot {
-		return appendFunctionalPseudo(part, name, argRaw, hasParen, insideHas)
-	}
-
-	return appendSimplePseudo(part, name, arg)
-}
-
-// appendFunctionalPseudo handles :has(...) and :not(...).
-func appendFunctionalPseudo(part SelectorPart, name, argRaw string, hasParen, insideHas bool) (SelectorPart, bool) {
-	if !hasParen || strings.TrimSpace(argRaw) == "" {
-		return part, false
-	}
-
-	if name == pseudoClassHas {
-		lowArg := strings.ToLower(argRaw)
-		if strings.Contains(lowArg, ":has(") || strings.Contains(argRaw, "::") {
-			return part, false
-		}
-
-		rels, ok := parseRelativeSelectorList(argRaw)
-		if !ok {
-			return part, false
-		}
-
-		part.Pseudos = append(part.Pseudos, pseudoClass(pseudoClassHas, "", rels, nil))
-
-		return part, true
-	}
-
-	if name == condKindNot {
-		sels, ok := parseSelectorListStrict(argRaw, insideHas)
-		if !ok {
-			return part, false
-		}
-
-		part.Pseudos = append(part.Pseudos, pseudoClass(condKindNot, "", nil, sels))
-
-		return part, true
-	}
-
-	return part, false
-}
-
-// appendSimplePseudo handles the non-functional pseudo-classes and the
-// CSS2 single-colon pseudo-elements.
-func appendSimplePseudo(part SelectorPart, name, arg string) (SelectorPart, bool) {
-	switch name {
-	case "first-child", "last-child", nthChildPseudo:
-		part.Pseudos = append(part.Pseudos, pseudoClass(name, arg, nil, nil))
-	case "link", "visited":
-		// Print semantics: both mean "a[href]" (no browsing history).
-		part.Pseudos = append(part.Pseudos, pseudoClass(name, "", nil, nil))
-	case "hover", "active", "focus", "target":
-		// Accepted for parse/cascade structure but never match in print
-		// (static PDF has no pointer/focus/:target fragment state).
-		// Keeping them on the compound prevents li:target from
-		// degrading to bare `li` (wiki reflist highlight blue).
-		part.Pseudos = append(part.Pseudos, pseudoClass(name, "", nil, nil))
-	case pseudoElemBefore, pseudoElemAfter:
-		// CSS2 single-colon pseudo-elements.
-		part.PseudoElement = name
-	case "first-line", "first-letter":
-		return part, false
-	default:
-		// Keep unknown pseudos so they do not degrade to the host
-		// selector (same class of bug as stripping :target / ::before).
-		part.Pseudos = append(part.Pseudos, pseudoClass(name, arg, nil, nil))
-	}
-
-	return part, true
-}
-
-// pseudoClass builds a PseudoClass with explicit zero Has/Not slices so the
-// literal stays exhaustive without per-use nolint comments.
-func pseudoClass(name, arg string, has []RelativeSelector, not []Selector) PseudoClass {
-	pseudo := PseudoClass{Name: name, Arg: arg, Has: has, Not: not}
-
-	if name == nthChildPseudo {
-		pseudo.nth = parseNthArg(arg)
-	}
-
-	return pseudo
-}
-
-func parseAttrSelector(sel string) (AttrSelector, bool) {
-	// sel includes brackets: [href], [href="x"], [typeof~='mw:File/Thumb'], [class*="noprint"]
-	if len(sel) < 3 || sel[0] != '[' || sel[len(sel)-1] != ']' {
-		return AttrSelector{}, false //nolint:exhaustruct // intentional zero-value fields
-	}
-
-	inner := strings.TrimSpace(sel[1 : len(sel)-1])
-	if inner == "" {
-		return AttrSelector{}, false //nolint:exhaustruct // intentional zero-value fields
-	}
-	// Operator forms: ~= *= ^= $= |= =  (check multi-char before bare =)
-	nameEnd, oper := findAttrOperator(inner)
-
-	if nameEnd < 0 {
-		if !validIdent(inner) {
-			return AttrSelector{}, false //nolint:exhaustruct // intentional zero-value fields
-		}
-
-		return AttrSelector{Name: strings.ToLower(inner)}, true //nolint:exhaustruct // intentional zero-value fields
-	}
-
-	name := strings.TrimSpace(inner[:nameEnd])
-	val := stripAttrQuotes(strings.TrimSpace(inner[nameEnd+len(oper):]))
-
-	if !validIdent(name) {
-		return AttrSelector{}, false //nolint:exhaustruct // intentional zero-value fields
-	}
-
-	switch oper {
-	case "=", "~=", "*=", "^=", "$=", "|=":
-		return AttrSelector{Name: strings.ToLower(name), Op: oper, Value: val}, true
-	default:
-		return AttrSelector{}, false //nolint:exhaustruct // intentional zero-value fields
-	}
-}
-
-// findAttrOperator locates the first operator in an attribute selector's
-// inner text and returns its index and operator ("" when absent).
-func findAttrOperator(inner string) (int, string) {
-	for _, cand := range []string{"~=", "*=", "^=", "$=", "|="} {
-		if i := strings.Index(inner, cand); i > 0 {
-			return i, cand
-		}
-	}
-
-	if i := strings.IndexByte(inner, '='); i >= 0 {
-		return i, "="
-	}
-
-	return -1, ""
-}
-
-// stripAttrQuotes removes surrounding matching quotes from an attribute value.
-func stripAttrQuotes(val string) string {
-	if len(val) >= minQuotedLen {
-		if (val[0] == '"' && val[len(val)-1] == '"') || (val[0] == '\'' && val[len(val)-1] == '\'') {
-			return val[1 : len(val)-1]
-		}
-	}
-
-	return val
-}
-
-// validIdent reports whether sel is a valid CSS identifier (letters, digits,
-// '-', '_', and digits after the first character).
-func validIdent(sel string) bool {
-	if sel == "" {
-		return false
-	}
-
-	for i := range len(sel) {
-		if !isIdentChar(sel[i]) {
-			return false
-		}
-	}
-
-	if sel[0] >= '0' && sel[0] <= '9' {
-		return false
-	}
-
-	return true
-}
-
-func isCompoundBreak(b byte) bool {
-	return b == '#' || b == '.' || b == '[' || b == ':'
-}
-
-// Match reports whether the selector matches the element node. Matching runs
-// right to left: the last part must match n, earlier parts must match
-// ancestors/siblings per their combinators. Implemented via leftmostMatch
-// (same combinator walk; Match only needs success/failure).
-func Match(s Selector, n *html.Node) bool {
-	return leftmostMatch(s, n) != nil
-}
-
-// MatchPseudo reports whether s selects the ::before or ::after pseudo-element
-// of n (pe is "before" or "after").
-func MatchPseudo(sel Selector, count *html.Node, pseudo string) bool {
-	if count == nil || pseudo == "" || len(sel.Parts) == 0 {
-		return false
-	}
-
-	if sel.Parts[len(sel.Parts)-1].PseudoElement != pseudo {
-		return false
-	}
-
-	return matchPseudoWalk(sel, count)
-}
-
-// matchPseudoWalk mirrors leftmostMatch with the final part's PseudoElement
-// treated as cleared, without copying the parts slice (the host element must
-// match the pseudo's compound, not the pseudo itself).
-func matchPseudoWalk(sel Selector, node *html.Node) bool {
-	if node == nil || node.Type != html.ElementNode || len(sel.Parts) == 0 {
-		return false
-	}
-
-	last := sel.Parts[len(sel.Parts)-1]
-	last.PseudoElement = ""
-
-	if !matchPart(last, node) {
-		return false
-	}
-
-	cur := node
-
-	const prevPartOffset = 2 // walk left: last part is host, start at len-2
-
-	for i := len(sel.Parts) - prevPartOffset; i >= 0; i-- {
-		next := leftmostStep(sel.Parts[i+1].Combinator, sel.Parts[i], cur)
-		if next == nil {
-			return false
-		}
-
-		cur = next
-	}
-
-	return true
-}
-
-// matchPart matches one compound against an element.
-func matchPart(part SelectorPart, node *html.Node) bool {
-	if node.Type != html.ElementNode {
-		return false
-	}
-	// ::before/::after never match the host element (declarations apply to
-	// generated pseudo boxes via MatchPseudo).
-	if part.PseudoElement != "" {
-		return false
-	}
-
-	if part.Tag != "*" && !strings.EqualFold(part.Tag, node.Name) {
-		return false
-	}
-
-	if part.ID != "" && node.Attribute("id") != part.ID {
-		return false
-	}
-
-	if !hasClasses(part, node) {
-		return false
-	}
-
-	if !matchAttrs(part, node) {
-		return false
-	}
-
-	return matchPseudos(part.Pseudos, node)
-}
-
-// matchPseudos reports whether every pseudo-class of the part matches node.
-func matchPseudos(pseudos []PseudoClass, node *html.Node) bool {
-	for _, pseudo := range pseudos {
-		if !matchPseudo(pseudo, node) {
-			return false
-		}
-	}
-
-	return true
-}
-
-// hasClasses reports whether the element carries every class of the part.
-func hasClasses(part SelectorPart, node *html.Node) bool {
-	if len(part.Classes) == 0 {
-		return true
-	}
-
-	for _, c := range part.Classes {
-		if !hasClassToken(node.Attribute("class"), c) {
-			return false
-		}
-	}
-
-	return true
-}
-
-// matchAttrs matches every attribute selector of the part against node.
-func matchAttrs(part SelectorPart, node *html.Node) bool {
-	for _, arg := range part.Attrs {
-		val, found := "", false
-		if node.Attrs != nil {
-			val, found = node.Attrs[arg.Name]
-		}
-
-		if arg.Op == "" {
-			if !found {
-				return false
-			}
-
-			continue
-		}
-
-		if !found {
-			return false
-		}
-
-		if !attrValueMatches(arg.Op, val, arg.Value) {
-			return false
-		}
-	}
-
-	return true
-}
-
-// attrValueMatches evaluates one attribute operator against a value.
-func attrValueMatches(oper, val, want string) bool {
-	switch oper {
-	case "=":
-		return val == want
-	case "~=":
-		return containsWord(val, want)
-	case "*=", "^=", "$=", "|=":
-		if want == "" {
-			return false
-		}
-
-		switch oper {
-		case "*=":
-			return strings.Contains(val, want)
-		case "^=":
-			return strings.HasPrefix(val, want)
-		case "$=":
-			return strings.HasSuffix(val, want)
-		}
-		// |= : exact match or value followed by a hyphen (HTML lang / BCP47-style).
-		return val == want || strings.HasPrefix(val, want+"-")
-	}
-
-	return false
-}
-
-// containsWord reports whether want (a single space-free word) is one of the
-// space-separated words of val. Tokenizes val without allocating a fields
-// slice (same whitespace definition and Unicode fallback as hasClassToken).
-//
-//nolint:cyclop // two-zone token walk (ASCII, then Unicode fallback) stays linear
-func containsWord(val, want string) bool {
-	if want == "" || strings.Contains(want, " ") {
-		return false
-	}
-
-	for start := 0; start < len(val); {
-		for start < len(val) && isClassSpace(val[start]) {
-			start++
-		}
-
-		end := start
-		for end < len(val) && !isClassSpace(val[end]) {
-			if val[end] >= nonASCIIStart {
-				return hasUnicodeClassToken(val, want)
-			}
-
-			end++
-		}
-
-		if start < end && val[start:end] == want {
-			return true
-		}
-
-		start = end
-	}
-
-	return false
-}
-
-func matchPseudo(pseudo PseudoClass, node *html.Node) bool {
-	switch pseudo.Name {
-	case "first-child":
-		return previousElementSibling(node) == nil
-	case "last-child":
-		return nextElementSibling(node) == nil
-	case nthChildPseudo:
-		idx := elementIndex(node)
-
-		return matchNth(pseudo.nth, idx)
-	case pseudoClassHas:
-		return matchAnyRelative(pseudo.Has, node)
-	case condKindNot:
-		return matchNone(pseudo.Not, node)
-	case "link", "visited":
-		// Print: no link history — both match any anchor with an href.
-		return isLinkAnchor(node)
-	case "root":
-		return isRootElement(node)
-	case "hover", "active", "focus", "target":
-		return false
-	default:
-		// Unknown pseudo-classes never match in print (kept on the compound
-		// so selectors do not degrade to the host).
-		return false
-	}
-}
-
-// matchAnyRelative reports whether any relative selector applies to node.
-func matchAnyRelative(rels []RelativeSelector, node *html.Node) bool {
-	for _, rs := range rels {
-		if matchRelative(rs, node) {
-			return true
-		}
-	}
-
-	return false
-}
-
-// matchNone reports whether no selector of the list matches node.
-func matchNone(sels []Selector, node *html.Node) bool {
-	for _, sel := range sels {
-		if Match(sel, node) {
-			return false
-		}
-	}
-
-	return true
-}
-
-// isRootElement reports whether node is the document element (html in HTML).
-// html.Parse wraps the tree in a synthetic ElementNode named "#document" —
-// that must not match, and must not block <html> from matching.
-func isRootElement(node *html.Node) bool {
-	if node.Type != html.ElementNode || node.Name == "#document" || strings.HasPrefix(node.Name, "#") {
-		return false
-	}
-
-	for p := node.Parent; p != nil; p = p.Parent {
-		if p.Type == html.ElementNode && p.Name != "#document" && !strings.HasPrefix(p.Name, "#") {
-			return false
-		}
-	}
-
-	return true
-}
-
-// isLinkAnchor reports whether n is an <a> element with a non-empty href
-// (any scheme, including "#" fragments and relative paths).
-func isLinkAnchor(n *html.Node) bool {
-	if n == nil || n.Type != html.ElementNode || !strings.EqualFold(n.Name, "a") {
-		return false
-	}
-
-	href := strings.TrimSpace(n.Attribute("href"))
-
-	return href != ""
-}
-
-func previousElementSibling(count *html.Node) *html.Node {
-	if count == nil || count.Parent == nil {
-		return nil
-	}
-
-	var prev *html.Node
-
-	for _, cur := range count.Parent.Children {
-		if cur == count {
-			return prev
-		}
-
-		if cur.Type == html.ElementNode {
-			prev = cur
-		}
-	}
-
-	return nil
-}
-
-func nextElementSibling(count *html.Node) *html.Node {
-	if count == nil || count.Parent == nil {
-		return nil
-	}
-
-	seen := false
-
-	for _, cur := range count.Parent.Children {
-		if cur == count {
-			seen = true
-
-			continue
-		}
-
-		if seen && cur.Type == html.ElementNode {
-			return cur
-		}
-	}
-
-	return nil
-}
-
-// elementIndex is 1-based among element siblings.
-func elementIndex(count *html.Node) int {
-	if count == nil || count.Parent == nil {
-		return 1
-	}
-
-	idx := 0
-
-	for _, cur := range count.Parent.Children {
-		if cur.Type != html.ElementNode {
-			continue
-		}
-
-		idx++
-		if cur == count {
-			return idx
-		}
-	}
-
-	return 0
-}
-
-// nthKind discriminates the pre-parsed :nth-child() argument forms.
-type nthKind int
-
-const (
-	nthInvalid nthKind = iota // unparseable, or not a :nth-child pseudo
-	nthOdd
-	nthEven
-	nthInt
-	nthAnB
-)
-
-// nthForm is a :nth-child() argument parsed at selector-parse time so that
-// matching is pure integer arithmetic (see matchNth).
-type nthForm struct {
-	kind nthKind `exhaustruct:"optional"` // nthInt: exact index; nthAnB: coefficient
-	a    int     `exhaustruct:"optional"` // nthAnB: the constant
-	b    int     `exhaustruct:"optional"`
-}
-
-// parseNthArg pre-parses a :nth-child() argument into the form matchNth
-// evaluates. The argument is already lower-cased and trimmed at parse time;
-// normalizing again here keeps the acceptance rules identical to the former
-// string-based parser, including the never-match fallback.
-func parseNthArg(arg string) nthForm {
-	arg = strings.TrimSpace(strings.ToLower(arg))
-	if arg == "" {
-		return nthForm{}
-	}
-
-	if arg == "odd" {
-		return nthForm{kind: nthOdd}
-	}
-
-	if arg == "even" {
-		return nthForm{kind: nthEven}
-	}
-	// plain integer
-	if n, err := strconv.Atoi(arg); err == nil {
-		return nthForm{kind: nthInt, a: n}
-	}
-	// an+b / n+b / -n+b / an
-	if !strings.Contains(arg, "n") {
-		return nthForm{}
-	}
-
-	a, b, ok := parseAnPlusB(arg)
-	if !ok {
-		return nthForm{}
-	}
-
-	return nthForm{kind: nthAnB, a: a, b: b}
-}
-
-// matchNth implements :nth-child(an+b) / odd / even for 1-based index,
-// evaluating the pre-parsed argument form.
-func matchNth(nth nthForm, index int) bool {
-	switch nth.kind {
-	case nthOdd:
-		return index%2 == 1
-	case nthEven:
-		return index%2 == 0
-	case nthInt:
-		return index == nth.a
-	case nthAnB:
-		if nth.a == 0 {
-			return index == nth.b
-		}
-
-		if (index-nth.b)%nth.a != 0 {
-			return false
-		}
-
-		k := (index - nth.b) / nth.a
-
-		return k >= 0
-	case nthInvalid:
-		return false
-	}
-
-	return false
-}
-
-// parseAnPlusB parses the "an+b" form of a nth-child argument: "an", "n+b",
-// "-n+b", or "b". Returns ok=false for anything unrecognized.
-func parseAnPlusB(arg string) (int, int, bool) {
-	parts := strings.SplitN(arg, "n", anPlusBSplitParts)
-	asVal := strings.TrimSpace(parts[0])
-
-	specA := 1
-	if asVal == "-" {
-		specA = -1
-	} else if asVal != "" && asVal != "+" {
-		parsed, err := strconv.Atoi(asVal)
-		if err != nil {
-			return 0, 0, false
-		}
-
-		specA = parsed
-	}
-
-	if len(parts) != anPlusBSplitParts || strings.TrimSpace(parts[1]) == "" {
-		return specA, 0, true
-	}
-
-	specB, err := strconv.Atoi(strings.TrimSpace(parts[1]))
-	if err != nil {
-		return 0, 0, false
-	}
-
-	return specA, specB, true
-}
-
-// hasClassToken reports whether want is one whitespace-separated class token.
-// The ASCII path covers HTML/CSS's normal class syntax without allocating a
-// token slice or map. Non-ASCII whitespace falls back to the same Unicode
-// whitespace behavior previously provided by strings.Fields.
-func hasClassToken(value, want string) bool {
-	if want == "" {
-		return false
-	}
-
-	for start := 0; start < len(value); {
-		for start < len(value) && isClassSpace(value[start]) {
-			start++
-		}
-
-		end := start
-		for end < len(value) && !isClassSpace(value[end]) {
-			if value[end] >= nonASCIIStart {
-				return hasUnicodeClassToken(value, want)
-			}
-
-			end++
-		}
-
-		if start < end && value[start:end] == want {
-			return true
-		}
-
-		start = end
-	}
-
-	return false
-}
-
-func hasUnicodeClassToken(value, want string) bool {
-	for start := 0; start < len(value); {
-		for start < len(value) {
-			runeValue, size := utf8.DecodeRuneInString(value[start:])
-			if !unicode.IsSpace(runeValue) {
-				break
-			}
-
-			start += size
-		}
-
-		end := start
-		for end < len(value) {
-			runeValue, size := utf8.DecodeRuneInString(value[end:])
-			if unicode.IsSpace(runeValue) {
-				break
-			}
-
-			end += size
-		}
-
-		if start < end && value[start:end] == want {
-			return true
-		}
-
-		start = end
-	}
-
-	return false
-}
-
-func isClassSpace(value byte) bool {
-	return value == ' ' || value == '\t' || value == '\n' || value == '\v' || value == '\f' || value == '\r'
-}
-
-// Specificity returns (a, b, c): ID count, class/attribute/pseudo count, type count.
-// :has() / :not() contribute the specificity of their most specific argument
-// (Selectors 4), not a flat class-level count for the pseudo itself. Parsed
-// selectors return their cached triple; selectors built by hand (or by
-// wrappers that recombine parts) compute it on the fly.
-func Specificity(s Selector) (int, int, int) {
-	if s.specValid {
-		return s.spec[0], s.spec[1], s.spec[2]
-	}
-
-	return computeSpecificity(s)
-}
-
-// computeSpecificity walks the selector parts; see Specificity.
-func computeSpecificity(s Selector) (int, int, int) {
-	idCount, classCount, typeCount := 0, 0, 0
-
-	for _, page := range s.Parts {
-		if page.ID != "" {
-			idCount++
-		}
-
-		classCount += len(page.Classes) + len(page.Attrs)
-
-		if page.Tag != "*" {
-			typeCount++
-		}
-
-		if page.PseudoElement != "" {
-			typeCount++ // pseudo-elements count like type selectors
-		}
-
-		for _, pageSize := range page.Pseudos {
-			switch pageSize.Name {
-			case "has":
-				a2, b2, c2 := maxRelativeSpecificity(pageSize.Has)
-				idCount += a2
-				classCount += b2
-				typeCount += c2
-			case "not":
-				a2, b2, c2 := maxSelectorSpecificity(pageSize.Not)
-				idCount += a2
-				classCount += b2
-				typeCount += c2
-			default:
-				classCount++
-			}
-		}
-	}
-
-	return idCount, classCount, typeCount
 }

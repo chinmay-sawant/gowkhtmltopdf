@@ -62,7 +62,25 @@ func Rasterize(data []byte, maxSide int) ([]byte, int, int, error) {
 //
 // Canvas can panic on some malformed paths; recover turns that into a
 // clean error so <img src="bad.svg"> does not crash the converter.
-//
+const (
+	printSuperSample  = 4.0
+	minSuperSampleDim = 256
+)
+
+func dpmmScaleFactor(targetW, targetH, maxSide int) float64 {
+	maxDim := math.Max(float64(targetW), float64(targetH))
+	if maxDim <= 0 || maxDim >= minSuperSampleDim {
+		return 1.0
+	}
+
+	scale := math.Min(printSuperSample, float64(maxSide)/maxDim)
+	if scale < 1.0 {
+		return 1.0
+	}
+
+	return scale
+}
+
 //nolint:nonamedreturns // defer-recover must override the result values
 func rasterizeCanvas(data []byte, maxSide int) (pngBytes []byte, w, h int, err error) {
 	defer func() {
@@ -84,7 +102,7 @@ func rasterizeCanvas(data []byte, maxSide int) (pngBytes []byte, w, h int, err e
 
 	// Intrinsic CSS-pixel size from viewBox / width / height attributes.
 	targetW, targetH := svgCSSPixelSize(data, maxSide)
-	dpmm := canvasDPMM(canvasW, canvasH, targetW, targetH)
+	dpmm := canvasDPMM(canvasW, canvasH, targetW, targetH) * dpmmScaleFactor(targetW, targetH, maxSide)
 
 	img := rasterizer.Draw(svgCanvas, canvas.DPMM(dpmm), nil)
 	bounds := img.Bounds()
@@ -99,7 +117,7 @@ func rasterizeCanvas(data []byte, maxSide int) (pngBytes []byte, w, h int, err e
 		return nil, 0, 0, fmt.Errorf("svg canvas: encode: %w", err)
 	}
 
-	return buf.Bytes(), pixW, pixH, nil
+	return buf.Bytes(), targetW, targetH, nil
 }
 
 // canvasDPMM maps the canvas mm size to the target CSS-pixel size: it picks

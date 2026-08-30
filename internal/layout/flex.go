@@ -19,8 +19,10 @@ const (
 	fxFlexEnd   = "flex-end"
 	fxFlexStart = "flex-start"
 	fxRow       = "row"
+	fxRowRev    = "row-reverse"
 	fxStart     = "start"
 	fxStretch   = "stretch"
+	fxWrap      = "wrap"
 	fxWrapRev   = "wrap-reverse"
 )
 
@@ -203,8 +205,8 @@ func (e *engine) flowFlexRow(
 		return curY
 	}
 
-	wrap := style.FlexWrap == "wrap" || style.FlexWrap == fxWrapRev
-	reverse := style.FlexDirection == "row-reverse"
+	wrap := style.FlexWrap == fxWrap || style.FlexWrap == fxWrapRev
+	reverse := style.FlexDirection == fxRowRev
 	items := e.flexRowItems(kids, contentW)
 	lines := e.flexWrapLines(items, wrap, reverse, style.FlexWrap == fxWrapRev, colGap, contentW)
 
@@ -212,6 +214,10 @@ func (e *engine) flowFlexRow(
 	if !wrap {
 		lineCross = resolveContentHeight(style, e)
 	}
+
+	stretchCross := e.alignContentStretchLineCross(
+		style, lines, contentW, colGap, rowGap, contentX, topY, curY,
+	)
 
 	placed := make([]flexLinePlace, 0, len(lines))
 
@@ -222,7 +228,13 @@ func (e *engine) flowFlexRow(
 		}
 
 		yStart := curY
-		curY = e.placeFlexLineMeasured(parent, style, line, contentW, contentX, topY, curY, colGap, lineCross)
+		cross := lineCross
+
+		if stretchCross != nil {
+			cross = stretchCross[lidx]
+		}
+
+		curY = e.placeFlexLineMeasured(parent, style, line, contentW, contentX, topY, curY, colGap, cross)
 
 		endChild := startChild
 		if parent != nil {
@@ -427,6 +439,66 @@ func (e *engine) applyAlignContentRow(
 	last := placed[len(placed)-1]
 
 	return last.y0 + offsets[len(offsets)-1] + last.h
+}
+
+// alignContentStretchLineCross returns per-line cross sizes when
+// align-content:stretch (the initial value) should grow wrapped lines into
+// leftover definite cross space. nil means pack at start (height:auto, one
+// line, or a non-stretch alignment).
+func (e *engine) alignContentStretchLineCross(
+	style ResolvedStyle, lines [][]flexMeas, contentW, colGap, rowGap, contentX, topY, curY float64,
+) []float64 {
+	contentH := resolveContentHeight(style, e)
+	if contentH < 0 || len(lines) <= 1 {
+		return nil
+	}
+
+	align := style.AlignContent
+	if align != "" && align != fxStretch {
+		return nil
+	}
+
+	heights := make([]float64, len(lines))
+	sum := 0.0
+
+	for i, line := range lines {
+		heights[i] = e.flexLineNaturalCross(style, line, contentW, colGap, contentX, topY, curY)
+		sum += heights[i]
+	}
+
+	free := contentH - sum - rowGap*float64(len(lines)-1)
+	if free <= layoutEpsilon {
+		return nil
+	}
+
+	extra := free / float64(len(lines))
+	for i := range heights {
+		heights[i] += extra
+	}
+
+	return heights
+}
+
+func (e *engine) flexLineNaturalCross(
+	style ResolvedStyle, items []flexMeas, contentW, gap, contentX, topY, curY float64,
+) float64 {
+	widths := e.flexLineWidths(items, contentW, gap)
+	sumW := 0.0
+
+	for _, width := range widths {
+		sumW += width
+	}
+
+	gaps := gap * float64(len(items)-1)
+	if gaps < 0 {
+		gaps = 0
+	}
+
+	startX, justifyGap := justifyRowStart(
+		style.JustifyContent, contentX, contentW, sumW, gaps, gap, len(items),
+	)
+
+	return e.measureFlexCrossMax(items, widths, startX, topY, curY, justifyGap)
 }
 
 func (e *engine) shiftPlacedChildren(parent *box, startChild, endChild int, deltaY float64) {
@@ -1269,7 +1341,7 @@ func (e *engine) flexColumnItems(kids []*html.Node, contentW, contentH float64) 
 	}
 
 	sort.SliceStable(items, func(i, j int) bool {
-		return e.styles[items[i].n].FlexOrder < e.styles[items[j].n].FlexOrder
+		return e.stylePtr(items[i].n).FlexOrder < e.stylePtr(items[j].n).FlexOrder
 	})
 
 	return items
@@ -1362,34 +1434,8 @@ func justifyColumnStart(justify string, contentH, curY, totalH, sumH, gap float6
 		case fxCenter:
 			return curY + (contentH-totalH)/two, gap
 		case fxBetween, fxAround, fxEvenly:
-			return justifyColumnDistributed(justify, curY, contentH, sumH, gap, count)
+			return justifyDistributed(justify, curY, contentH, sumH, gap, count)
 		}
-	}
-
-	return curY, gap
-}
-
-func justifyColumnDistributed(justify string, curY, contentH, sumH, gap float64, count int) (float64, float64) {
-	rem := contentH - sumH
-	if rem < 0 {
-		rem = 0
-	}
-
-	switch justify {
-	case fxBetween:
-		if count > 1 && rem > 0 {
-			return curY, rem / float64(count-1)
-		}
-
-		return curY, gap
-	case fxAround:
-		unit := rem / float64(two*count)
-
-		return curY + unit, two * unit
-	case fxEvenly:
-		unit := rem / float64(count+1)
-
-		return curY + unit, unit
 	}
 
 	return curY, gap

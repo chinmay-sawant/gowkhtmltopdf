@@ -1,5 +1,12 @@
 # Pending phase items — Chrome-print gap (open-web decent print)
 
+> **CSS coverage after this folder:** remaining print CSS property work lives in
+> [`plans/0.2.6/48-canonical-0.2.6-css-coverage.md`](../../../0.2.6/48-canonical-0.2.6-css-coverage.md)
+> (phases 48-56). Do not add new CSS property rows here. Selector leftovers
+> (`:is()` / `:where()`) and template CSS (`word-spacing`, `background-image`,
+> …) moved to 0.2.6. This folder stays the open-web / Wikipedia-canary ledger
+> (density, SVG smoke, JS, Chrome harness).
+
 > **Parent:** [`plans/phases/phase-21-arbitrary-websites.md`](../phase-21-arbitrary-websites.md) · [`plans/10-canonical-post-mvp-roadmap.md`](../../10-canonical-post-mvp-roadmap.md)  
 > **Branch:** `feature/pending-phase-items`  
 > **Status:** executing (no deferrals — phases 1–11 active until closed with evidence)  

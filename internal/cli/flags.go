@@ -541,12 +541,18 @@ func tocFlagBool(field string, on bool) flagApplier {
 }
 
 func (c *Command) replaceHF(obj *settings.PdfObject, key, val string) error {
-	if obj.HeaderSet {
+	if obj.HeaderSet || obj.FooterSet {
 		if obj.Header.Replace == nil {
 			obj.Header.Replace = map[string]string{}
 		}
 
 		obj.Header.Replace[key] = val
+
+		if obj.Footer.Replace == nil {
+			obj.Footer.Replace = map[string]string{}
+		}
+
+		obj.Footer.Replace[key] = val
 
 		return nil
 	}

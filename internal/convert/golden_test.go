@@ -415,9 +415,34 @@ var fixturePageBounds = map[string]fixtureBounds{ //nolint:gochecknoglobals // i
 		minPages: 1, maxPages: 12, needles: []string{"Architecture"},
 	},
 	"fixture-56-architecture-diagram.html": { //nolint:exhaustruct // intentional zero-value fields
-		// Unitless line-height now scales with each descendant's font size;
-		// The explicit section page breaks make the architecture composition 20 pages.
-		minPages: 20, maxPages: 20,
+		// clamp() and logical margin/padding now apply, so type scale and
+		// inline spacing no longer use the old fallback-first drop. Explicit
+		// section page breaks still dominate; page count is 21.
+		minPages: 21, maxPages: 21,
+	},
+	"fixture-57-vanguard-telemetry-audit.html": { //nolint:exhaustruct // intentional zero-value fields
+		minPages: 9, maxPages: 9,
+		needles: []string{"VANGUARD", "TELEMETRY", "VANGUARD-CSS-356-IMPLEMENTED"},
+	},
+	"fixture-58-unsupported-worklist-audit.html": { //nolint:exhaustruct // intentional zero-value fields
+		minPages: 9, maxPages: 9,
+		needles: []string{"UNSUPPORTED-WORKLIST-AUDIT", "VANGUARD-CSS-UNSUPPORTED-SAFE"},
+	},
+	"fixture-59-apex-digital-landing.html": { //nolint:exhaustruct // intentional zero-value fields
+		minPages: 7, maxPages: 8, images: true,
+		needles: []string{"Core Solutions", "Recent Work", "Transparent Pricing"},
+	},
+	"fixture-60-implemented-props-a.html": { //nolint:exhaustruct // intentional zero-value fields
+		minPages: 7, maxPages: 9, images: true,
+		needles: []string{"IMPLEMENTED-PROPS-A"},
+	},
+	"fixture-61-implemented-props-b.html": { //nolint:exhaustruct // intentional zero-value fields
+		minPages: 7, maxPages: 9, images: true,
+		needles: []string{"IMPLEMENTED-PROPS-B"},
+	},
+	"fixture-62-implemented-props-c.html": { //nolint:exhaustruct // intentional zero-value fields
+		minPages: 7, maxPages: 9, images: true,
+		needles: []string{"IMPLEMENTED-PROPS-C"},
 	},
 }
 

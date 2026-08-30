@@ -1269,7 +1269,7 @@ func TestSplitCrossingFloatBoundaryNoHang(t *testing.T) {
 	done := make(chan struct{})
 
 	go func() {
-		splitCrossingRects(res, contentH, nil)
+		splitCrossingRects(res, contentH)
 		close(done)
 	}()
 	select {

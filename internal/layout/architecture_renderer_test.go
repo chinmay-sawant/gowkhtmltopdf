@@ -381,7 +381,8 @@ body { margin: 0; font-size: 10pt; }
 	railY := math.MaxFloat64
 	for i := noteBox.opStart; i <= noteBox.opEnd && i < len(res.Ops); i++ {
 		op := res.Ops[i]
-		if op.Kind == OpLine && op.W == 0 && op.H > 0 && op.R > 0.7 && op.G > 0.3 && op.B < 0.1 {
+		if (op.Kind == OpLine || (op.Kind == OpStrokeRect && op.StrokeMask&StrokeMaskLeft != 0)) &&
+			op.H > 0 && op.R > 0.7 && op.G > 0.3 && op.B < 0.1 {
 			railY = math.Min(railY, op.Y)
 		}
 	}

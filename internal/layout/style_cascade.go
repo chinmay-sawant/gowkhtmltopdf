@@ -1,6 +1,7 @@
 package layout
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
@@ -139,15 +140,59 @@ var inheritableProps = []inheritCopy{ //nolint:gochecknoglobals // static inheri
 	}},
 	{[]string{"font-family"}, func(dst, src *ResolvedStyle) { dst.FontFamily = src.FontFamily }},
 	{[]string{"font-size"}, func(dst, src *ResolvedStyle) { dst.FontSize = src.FontSize }},
+	{[]string{"font-size-adjust"}, func(dst, src *ResolvedStyle) { dst.FontSizeAdjust = src.FontSizeAdjust }},
 	{[]string{"font-weight"}, func(dst, src *ResolvedStyle) { dst.FontWeight = src.FontWeight }},
 	{[]string{"font-style"}, func(dst, src *ResolvedStyle) { dst.FontItalic = src.FontItalic }},
+	{[]string{"font-feature-settings"}, func(dst, src *ResolvedStyle) {
+		dst.FontFeatureSettings = src.FontFeatureSettings
+	}},
+	{[]string{"font-kerning"}, func(dst, src *ResolvedStyle) { dst.FontKerning = src.FontKerning }},
+	{[]string{"font-variant"}, func(dst, src *ResolvedStyle) { dst.FontVariant = src.FontVariant }},
+	{[]string{"font-variant-caps"}, func(dst, src *ResolvedStyle) { dst.FontVariantCaps = src.FontVariantCaps }},
+	{[]string{"font-variant-ligatures"}, func(dst, src *ResolvedStyle) {
+		dst.FontVariantLigatures = src.FontVariantLigatures
+	}},
+	{[]string{"font-variant-numeric"}, func(dst, src *ResolvedStyle) { dst.FontVariantNumeric = src.FontVariantNumeric }},
+	{[]string{"font-variant-position"}, func(dst, src *ResolvedStyle) {
+		dst.FontVariantPosition = src.FontVariantPosition
+	}},
+	{[]string{"font-variant-east-asian"}, func(dst, src *ResolvedStyle) {
+		dst.FontVariantEastAsian = src.FontVariantEastAsian
+	}},
+	{[]string{"font-variant-emoji"}, func(dst, src *ResolvedStyle) { dst.FontVariantEmoji = src.FontVariantEmoji }},
+	{[]string{"font-variant-alternates"}, func(dst, src *ResolvedStyle) {
+		dst.FontVariantAlternates = src.FontVariantAlternates
+	}},
+	{[]string{"font-stretch", "font-width"}, func(dst, src *ResolvedStyle) { dst.FontStretch = src.FontStretch }},
+	{[]string{"font-synthesis"}, func(dst, src *ResolvedStyle) { dst.FontSynthesis = src.FontSynthesis }},
+	{[]string{"font-synthesis-weight"}, func(dst, src *ResolvedStyle) {
+		dst.FontSynthesisWeight = src.FontSynthesisWeight
+	}},
+	{[]string{"font-synthesis-style"}, func(dst, src *ResolvedStyle) { dst.FontSynthesisStyle = src.FontSynthesisStyle }},
+	{[]string{"font-synthesis-small-caps"}, func(dst, src *ResolvedStyle) {
+		dst.FontSynthesisSmallCaps = src.FontSynthesisSmallCaps
+	}},
+	{[]string{"font-synthesis-position"}, func(dst, src *ResolvedStyle) {
+		dst.FontSynthesisPosition = src.FontSynthesisPosition
+	}},
 	{[]string{"line-height"}, func(dst, src *ResolvedStyle) {
 		dst.LineHeight = src.LineHeight
 		dst.LineHeightUnitless = src.LineHeightUnitless
 	}},
 	{[]string{"text-align"}, func(dst, src *ResolvedStyle) { dst.TextAlign = src.TextAlign }},
+	{[]string{"text-align-last"}, func(dst, src *ResolvedStyle) { dst.TextAlignLast = src.TextAlignLast }},
 	{[]string{"text-transform"}, func(dst, src *ResolvedStyle) { dst.TextTransform = src.TextTransform }},
 	{[]string{"white-space"}, func(dst, src *ResolvedStyle) { dst.WhiteSpace = src.WhiteSpace }},
+	{[]string{"white-space-collapse"}, func(dst, src *ResolvedStyle) { dst.WhiteSpaceCollapse = src.WhiteSpaceCollapse }},
+	{[]string{"white-space-trim"}, func(dst, src *ResolvedStyle) { dst.WhiteSpaceTrim = src.WhiteSpaceTrim }},
+	{[]string{"text-wrap"}, func(dst, src *ResolvedStyle) { dst.TextWrap = src.TextWrap }},
+	{[]string{"text-wrap-mode"}, func(dst, src *ResolvedStyle) { dst.TextWrapMode = src.TextWrapMode }},
+	{[]string{"text-wrap-style"}, func(dst, src *ResolvedStyle) { dst.TextWrapStyle = src.TextWrapStyle }},
+	{[]string{"tab-size"}, func(dst, src *ResolvedStyle) { dst.TabSize = src.TabSize }},
+	{[]string{"hyphens"}, func(dst, src *ResolvedStyle) { dst.Hyphens = src.Hyphens }},
+	{[]string{"hyphenate-character"}, func(dst, src *ResolvedStyle) { dst.HyphenateCharacter = src.HyphenateCharacter }},
+	{[]string{"text-justify"}, func(dst, src *ResolvedStyle) { dst.TextJustify = src.TextJustify }},
+	{[]string{"line-break"}, func(dst, src *ResolvedStyle) { dst.LineBreak = src.LineBreak }},
 	// overflow-wrap / word-wrap and word-break are inherited (CSS Text).
 	{
 		[]string{"overflow-wrap", "word-wrap"},
@@ -170,8 +215,26 @@ var inheritableProps = []inheritCopy{ //nolint:gochecknoglobals // static inheri
 		func(dst, src *ResolvedStyle) { dst.LetterSpacing = src.LetterSpacing },
 	},
 	{
+		[]string{"word-spacing"},
+		func(dst, src *ResolvedStyle) { dst.WordSpacing = src.WordSpacing },
+	},
+	{[]string{"visibility"}, func(dst, src *ResolvedStyle) { dst.Visibility = src.Visibility }},
+	{[]string{"caption-side"}, func(dst, src *ResolvedStyle) { dst.CaptionSide = src.CaptionSide }},
+	{
 		[]string{"list-style-type", "list-style"},
 		func(dst, src *ResolvedStyle) { dst.ListStyleType = src.ListStyleType },
+	},
+	{
+		[]string{"list-style-position", "list-style"},
+		func(dst, src *ResolvedStyle) { dst.ListStylePosition = src.ListStylePosition },
+	},
+	{
+		[]string{"quotes"},
+		func(dst, src *ResolvedStyle) {
+			dst.QuotesRaw = src.QuotesRaw
+			dst.QuotesOpen = src.QuotesOpen
+			dst.QuotesClose = src.QuotesClose
+		},
 	},
 	{
 		[]string{"border-collapse"},
@@ -179,12 +242,89 @@ var inheritableProps = []inheritCopy{ //nolint:gochecknoglobals // static inheri
 	},
 	{
 		[]string{"border-spacing"},
-		func(dst, src *ResolvedStyle) { dst.BorderSpacing = src.BorderSpacing },
+		func(dst, src *ResolvedStyle) {
+			dst.BorderSpacing = src.BorderSpacing
+			dst.BorderSpacingV = src.BorderSpacingV
+		},
 	},
 	{[]string{"orphans"}, func(dst, src *ResolvedStyle) { dst.Orphans = src.Orphans }},
 	{[]string{"widows"}, func(dst, src *ResolvedStyle) { dst.Widows = src.Widows }},
+	// CSS page is not inherited at computed-value time, but auto uses the
+	// parent used value. Copying when the property is unspecified matches that.
+	{[]string{pageKeyword}, func(dst, src *ResolvedStyle) { dst.PageName = src.PageName }},
 	{[]string{"writing-mode"}, func(dst, src *ResolvedStyle) { dst.WritingMode = src.WritingMode }},
+	{[]string{"direction"}, func(dst, src *ResolvedStyle) { dst.Direction = src.Direction }},
 	{[]string{"text-indent"}, func(dst, src *ResolvedStyle) { dst.TextIndent = src.TextIndent }},
+	{[]string{"fill"}, func(dst, src *ResolvedStyle) { dst.Fill = src.Fill; dst.FillSet = src.FillSet }},
+	{[]string{"stroke"}, func(dst, src *ResolvedStyle) { dst.Stroke = src.Stroke; dst.StrokeSet = src.StrokeSet }},
+	{[]string{"stroke-width"}, func(dst, src *ResolvedStyle) {
+		dst.StrokeWidth = src.StrokeWidth
+		dst.StrokeWidthSet = src.StrokeWidthSet
+	}},
+	{[]string{"stroke-linecap"}, func(dst, src *ResolvedStyle) { dst.StrokeLineCap = src.StrokeLineCap }},
+	{[]string{"stroke-linejoin"}, func(dst, src *ResolvedStyle) { dst.StrokeLineJoin = src.StrokeLineJoin }},
+	{[]string{"stroke-dasharray"}, func(dst, src *ResolvedStyle) { dst.StrokeDashArray = src.StrokeDashArray }},
+	{[]string{"stroke-dashoffset"}, func(dst, src *ResolvedStyle) { dst.StrokeDashOffset = src.StrokeDashOffset }},
+	{[]string{"stroke-miterlimit"}, func(dst, src *ResolvedStyle) { dst.StrokeMiterLimit = src.StrokeMiterLimit }},
+	{[]string{"fill-rule"}, func(dst, src *ResolvedStyle) { dst.FillRule = src.FillRule }},
+	{[]string{"clip-rule"}, func(dst, src *ResolvedStyle) { dst.ClipRule = src.ClipRule }},
+	{[]string{"color-interpolation"}, func(dst, src *ResolvedStyle) { dst.ColorInterpolation = src.ColorInterpolation }},
+	{[]string{"color-interpolation-filters"}, func(dst, src *ResolvedStyle) {
+		dst.ColorInterpolationFilters = src.ColorInterpolationFilters
+	}},
+	{[]string{"shape-rendering"}, func(dst, src *ResolvedStyle) { dst.ShapeRendering = src.ShapeRendering }},
+	{[]string{"text-anchor"}, func(dst, src *ResolvedStyle) { dst.TextAnchor = src.TextAnchor }},
+	{[]string{"dominant-baseline"}, func(dst, src *ResolvedStyle) { dst.DominantBaseline = src.DominantBaseline }},
+	{[]string{"alignment-baseline"}, func(dst, src *ResolvedStyle) { dst.AlignmentBaseline = src.AlignmentBaseline }},
+	{[]string{"ruby-align"}, func(dst, src *ResolvedStyle) { dst.RubyAlign = src.RubyAlign }},
+	{[]string{"ruby-position"}, func(dst, src *ResolvedStyle) { dst.RubyPosition = src.RubyPosition }},
+	{[]string{"ruby-merge"}, func(dst, src *ResolvedStyle) { dst.RubyMerge = src.RubyMerge }},
+	{[]string{"ruby-overhang"}, func(dst, src *ResolvedStyle) { dst.RubyOverhang = src.RubyOverhang }},
+	{[]string{"image-orientation"}, func(dst, src *ResolvedStyle) { dst.ImageOrientation = src.ImageOrientation }},
+	{[]string{"image-resolution"}, func(dst, src *ResolvedStyle) { dst.ImageResolution = src.ImageResolution }},
+	{[]string{"print-color-adjust", "color-adjust"}, func(dst, src *ResolvedStyle) {
+		dst.PrintColorAdjust = src.PrintColorAdjust
+	}},
+	{[]string{"forced-color-adjust"}, func(dst, src *ResolvedStyle) {
+		dst.ForcedColorAdjust = src.ForcedColorAdjust
+	}},
+	{[]string{"color-scheme"}, func(dst, src *ResolvedStyle) { dst.ColorScheme = src.ColorScheme }},
+	{[]string{"dynamic-range-limit"}, func(dst, src *ResolvedStyle) {
+		dst.DynamicRangeLimit = src.DynamicRangeLimit
+	}},
+	{[]string{"font-variation-settings"}, func(dst, src *ResolvedStyle) {
+		dst.FontVariationSettings = src.FontVariationSettings
+	}},
+	{[]string{"font-optical-sizing"}, func(dst, src *ResolvedStyle) {
+		dst.FontOpticalSizing = src.FontOpticalSizing
+	}},
+	{[]string{"font-language-override"}, func(dst, src *ResolvedStyle) {
+		dst.FontLanguageOverride = src.FontLanguageOverride
+	}},
+	{[]string{"font-palette"}, func(dst, src *ResolvedStyle) { dst.FontPalette = src.FontPalette }},
+	{[]string{"text-combine-upright"}, func(dst, src *ResolvedStyle) {
+		dst.TextCombineUpright = src.TextCombineUpright
+	}},
+	{[]string{"text-orientation"}, func(dst, src *ResolvedStyle) { dst.TextOrientation = src.TextOrientation }},
+	{[]string{"text-emphasis"}, func(dst, src *ResolvedStyle) { dst.TextEmphasis = src.TextEmphasis }},
+	{[]string{"text-emphasis-color"}, func(dst, src *ResolvedStyle) {
+		dst.TextEmphasisColor = src.TextEmphasisColor
+		dst.TextEmphasisColorSet = src.TextEmphasisColorSet
+	}},
+	{[]string{"text-emphasis-position"}, func(dst, src *ResolvedStyle) {
+		dst.TextEmphasisPosition = src.TextEmphasisPosition
+	}},
+	{[]string{"text-emphasis-style"}, func(dst, src *ResolvedStyle) {
+		dst.TextEmphasisStyle = src.TextEmphasisStyle
+	}},
+	{[]string{"text-emphasis-skip"}, func(dst, src *ResolvedStyle) { dst.TextEmphasisSkip = src.TextEmphasisSkip }},
+	{[]string{"text-decoration-skip-ink"}, func(dst, src *ResolvedStyle) {
+		dst.TextDecorationSkipInk = src.TextDecorationSkipInk
+	}},
+	{[]string{"text-decoration-skip"}, func(dst, src *ResolvedStyle) {
+		dst.TextDecorationSkip = src.TextDecorationSkip
+	}},
+	{[]string{"footnote-policy"}, func(dst, src *ResolvedStyle) { dst.FootnotePolicy = src.FootnotePolicy }},
 }
 
 // inheritProps copies inheritable properties from the parent, unless the
@@ -464,6 +604,14 @@ func applyCascadeDeclaration(
 	ids, classes, types, order int,
 	important bool,
 ) {
+	if expanded, ok := expandLogicalBoxDeclaration(prop, value); ok {
+		for _, item := range expanded {
+			applyCascadeDeclaration(wins, item.prop, item.val, ids, classes, types, order, important)
+		}
+
+		return
+	}
+
 	values, ok := expandBoxShorthand(prop, value)
 	if !ok {
 		applyCascadeWin(wins, prop, value, ids, classes, types, order, important)
@@ -473,6 +621,162 @@ func applyCascadeDeclaration(
 
 	for idx, side := range [...]string{"top", "right", "bottom", "left"} {
 		applyCascadeWin(wins, prop+"-"+side, values[idx], ids, classes, types, order, important)
+	}
+}
+
+type logicalPropDecl struct {
+	prop string
+	val  string
+}
+
+// expandLogicalBoxDeclaration expands logical margin/padding/inset/border
+// declarations to their physical counterpart properties for horizontal-tb.
+func expandLogicalBoxDeclaration(prop, value string) ([]logicalPropDecl, bool) {
+	if decls, ok := expandLogicalMarginPadding(prop, value); ok {
+		return decls, true
+	}
+
+	if decls, ok := expandLogicalInset(prop, value); ok {
+		return decls, true
+	}
+
+	return expandLogicalBorder(prop, value)
+}
+
+//nolint:cyclop // logical margin/padding mapping table
+func expandLogicalMarginPadding(prop, value string) ([]logicalPropDecl, bool) {
+	switch prop {
+	case cssPropMarginBlock:
+		start, end, ok := logicalPair(value)
+		if !ok {
+			return nil, false
+		}
+
+		return []logicalPropDecl{{"margin-top", start}, {"margin-bottom", end}}, true
+	case cssPropMarginInline:
+		start, end, ok := logicalPair(value)
+		if !ok {
+			return nil, false
+		}
+
+		return []logicalPropDecl{{"margin-left", start}, {"margin-right", end}}, true
+	case "margin-block-start":
+		return []logicalPropDecl{{"margin-top", value}}, true
+	case "margin-block-end":
+		return []logicalPropDecl{{"margin-bottom", value}}, true
+	case "margin-inline-start":
+		return []logicalPropDecl{{"margin-left", value}}, true
+	case "margin-inline-end":
+		return []logicalPropDecl{{"margin-right", value}}, true
+	case cssPropPaddingBlock:
+		start, end, ok := logicalPair(value)
+		if !ok {
+			return nil, false
+		}
+
+		return []logicalPropDecl{{"padding-top", start}, {"padding-bottom", end}}, true
+	case cssPropPaddingInline:
+		start, end, ok := logicalPair(value)
+		if !ok {
+			return nil, false
+		}
+
+		return []logicalPropDecl{{"padding-left", start}, {"padding-right", end}}, true
+	case "padding-block-start":
+		return []logicalPropDecl{{"padding-top", value}}, true
+	case "padding-block-end":
+		return []logicalPropDecl{{"padding-bottom", value}}, true
+	case "padding-inline-start":
+		return []logicalPropDecl{{"padding-left", value}}, true
+	case "padding-inline-end":
+		return []logicalPropDecl{{"padding-right", value}}, true
+	default:
+		return nil, false
+	}
+}
+
+func expandLogicalInset(prop, value string) ([]logicalPropDecl, bool) {
+	switch prop {
+	case cssPropInsetBlock:
+		start, end, ok := logicalPair(value)
+		if !ok {
+			return nil, false
+		}
+
+		return []logicalPropDecl{{"top", start}, {"bottom", end}}, true
+	case cssPropInsetInline:
+		start, end, ok := logicalPair(value)
+		if !ok {
+			return nil, false
+		}
+
+		return []logicalPropDecl{{"left", start}, {"right", end}}, true
+	case cssPropInsetBlockStart:
+		return []logicalPropDecl{{"top", value}}, true
+	case cssPropInsetBlockEnd:
+		return []logicalPropDecl{{"bottom", value}}, true
+	case cssPropInsetInlineStart:
+		return []logicalPropDecl{{"left", value}}, true
+	case cssPropInsetInlineEnd:
+		return []logicalPropDecl{{"right", value}}, true
+	default:
+		return nil, false
+	}
+}
+
+//nolint:cyclop,funlen // logical border mapping table
+func expandLogicalBorder(prop, value string) ([]logicalPropDecl, bool) {
+	switch prop {
+	case cssPropBorderBlock:
+		return []logicalPropDecl{{"border-top", value}, {"border-bottom", value}}, true
+	case cssPropBorderInline:
+		return []logicalPropDecl{{"border-left", value}, {"border-right", value}}, true
+	case cssPropBorderBlockStart:
+		return []logicalPropDecl{{"border-top", value}}, true
+	case cssPropBorderBlockEnd:
+		return []logicalPropDecl{{"border-bottom", value}}, true
+	case cssPropBorderInlineStart:
+		return []logicalPropDecl{{"border-left", value}}, true
+	case cssPropBorderInlineEnd:
+		return []logicalPropDecl{{"border-right", value}}, true
+	case cssPropBorderBlockColor:
+		return []logicalPropDecl{{"border-top-color", value}, {"border-bottom-color", value}}, true
+	case cssPropBorderInlineColor:
+		return []logicalPropDecl{{"border-left-color", value}, {"border-right-color", value}}, true
+	case cssPropBorderBlockStartColor:
+		return []logicalPropDecl{{"border-top-color", value}}, true
+	case cssPropBorderBlockEndColor:
+		return []logicalPropDecl{{"border-bottom-color", value}}, true
+	case cssPropBorderInlineStartColor:
+		return []logicalPropDecl{{"border-left-color", value}}, true
+	case cssPropBorderInlineEndColor:
+		return []logicalPropDecl{{"border-right-color", value}}, true
+	case cssPropBorderBlockStyle:
+		return []logicalPropDecl{{"border-top-style", value}, {"border-bottom-style", value}}, true
+	case cssPropBorderInlineStyle:
+		return []logicalPropDecl{{"border-left-style", value}, {"border-right-style", value}}, true
+	case cssPropBorderBlockStartStyle:
+		return []logicalPropDecl{{"border-top-style", value}}, true
+	case cssPropBorderBlockEndStyle:
+		return []logicalPropDecl{{"border-bottom-style", value}}, true
+	case cssPropBorderInlineStartStyle:
+		return []logicalPropDecl{{"border-left-style", value}}, true
+	case cssPropBorderInlineEndStyle:
+		return []logicalPropDecl{{"border-right-style", value}}, true
+	case cssPropBorderBlockWidth:
+		return []logicalPropDecl{{"border-top-width", value}, {"border-bottom-width", value}}, true
+	case cssPropBorderInlineWidth:
+		return []logicalPropDecl{{"border-left-width", value}, {"border-right-width", value}}, true
+	case cssPropBorderBlockStartWidth:
+		return []logicalPropDecl{{"border-top-width", value}}, true
+	case cssPropBorderBlockEndWidth:
+		return []logicalPropDecl{{"border-bottom-width", value}}, true
+	case cssPropBorderInlineStartWidth:
+		return []logicalPropDecl{{"border-left-width", value}}, true
+	case cssPropBorderInlineEndWidth:
+		return []logicalPropDecl{{"border-right-width", value}}, true
+	default:
+		return nil, false
 	}
 }
 
@@ -514,13 +818,14 @@ func expandBoxShorthand(prop, value string) ([4]string, bool) {
 	return values, true
 }
 
-// supportedDeclaration rejects modern value functions that this lite renderer
+// supportedDeclaration rejects modern color functions that this lite renderer
 // cannot compute. Excluding them from the cascade preserves an earlier valid
 // fallback declaration, matching the fixture's fallback-first contract.
+// clamp() is computed by clampLength and is therefore allowed.
 func supportedDeclaration(value string) bool {
 	value = strings.ToLower(value)
 
-	for _, unsupported := range []string{"clamp(", "color-mix(", "light-dark(", "oklch("} {
+	for _, unsupported := range []string{"color-mix(", "light-dark(", "oklch("} {
 		if strings.Contains(value, unsupported) {
 			return false
 		}
@@ -607,26 +912,61 @@ func applyFontProps(style *ResolvedStyle, raw map[string]string, parentSize floa
 		remBase = ctx.remBase
 	}
 
-	if v, ok := raw["font-size"]; ok {
-		style.FontSize = fontSize(v, parentSize, remBase)
+	applyFontSizeValue(style, raw, parentSize, ctx, remBase)
+	applyFontFamilyValue(style, raw)
+	applyFontWeightValue(style, raw)
+	applyFontStyleValue(style, raw)
+	applyFontPropsWave4(style, raw)
+
+	if val, found := raw["font"]; found {
+		parseFontShorthand(style, val, remBase)
+	}
+}
+
+func applyFontSizeValue(
+	style *ResolvedStyle, raw map[string]string, parentSize float64, ctx *styleContext, remBase float64,
+) {
+	val, found := raw["font-size"]
+	if !found {
+		return
 	}
 
-	if v, ok := raw["font-family"]; ok {
-		if fam := css.ParseFontFamily(v); len(fam) > 0 {
-			style.FontFamily = fam
-		}
+	containing := 0.0
+	if ctx != nil {
+		containing = ctx.viewportW
 	}
 
-	if val, ok := raw["font-weight"]; ok {
+	if pt, parsed := clampLength(val, parentSize, containing); parsed {
+		style.FontSize = pt
+
+		return
+	}
+
+	style.FontSize = fontSize(val, parentSize, remBase)
+}
+
+func applyFontFamilyValue(style *ResolvedStyle, raw map[string]string) {
+	val, found := raw["font-family"]
+	if !found {
+		return
+	}
+
+	if fam := css.ParseFontFamily(val); len(fam) > 0 {
+		style.FontFamily = fam
+	}
+}
+
+func applyFontWeightValue(style *ResolvedStyle, raw map[string]string) {
+	val, found := raw["font-weight"]
+	if found {
 		style.FontWeight = resolveFontWeight(style.FontWeight, val)
 	}
+}
 
-	if v, ok := raw["font-style"]; ok {
-		style.FontItalic = v == "italic" || v == "oblique"
-	}
-
-	if v, ok := raw["font"]; ok {
-		parseFontShorthand(style, v, remBase)
+func applyFontStyleValue(style *ResolvedStyle, raw map[string]string) {
+	val, found := raw["font-style"]
+	if found {
+		style.FontItalic = val == "italic" || val == "oblique"
 	}
 }
 
@@ -657,6 +997,11 @@ var restShorthandProps = [...]string{ //nolint:gochecknoglobals // static apply 
 	"margin", "padding", borderProperty, borderTopProperty, borderRightProperty, borderBottomProperty, borderLeftProperty,
 	borderWidthKeyword, borderStyleKeyword,
 	borderColorKeyword, gapKeyword, flexKeyword, containerKeyword,
+	cssPropMarginInline, cssPropMarginBlock, cssPropPaddingInline, cssPropPaddingBlock,
+	insetKeyword, cssPropInsetBlock, cssPropInsetInline, "column-rule",
+	cssPropBorderBlock, cssPropBorderInline, cssPropBorderBlockStart, cssPropBorderBlockEnd,
+	cssPropBorderInlineStart, cssPropBorderInlineEnd, cssPropBorderBlockWidth, cssPropBorderBlockStyle,
+	cssPropBorderBlockColor, cssPropBorderInlineWidth, cssPropBorderInlineStyle, cssPropBorderInlineColor,
 }
 
 // applyRestProps resolves every non-font property once the font size is known.
@@ -674,9 +1019,7 @@ func applyRestProps(
 	fsize := style.FontSize
 	hasParent := parent != nil
 
-	for i := range restShorthandProps {
-		prop := restShorthandProps[i]
-
+	for _, prop := range restShorthandProps {
 		value, ok := raw[prop]
 		if !ok {
 			continue
@@ -690,7 +1033,12 @@ func applyRestProps(
 		case "margin", "padding", borderProperty, borderTopProperty,
 			borderRightProperty, borderBottomProperty, borderLeftProperty,
 			borderWidthKeyword, borderStyleKeyword,
-			borderColorKeyword, gapKeyword, flexKeyword, containerKeyword:
+			borderColorKeyword, gapKeyword, flexKeyword, containerKeyword,
+			cssPropMarginInline, cssPropMarginBlock, cssPropPaddingInline, cssPropPaddingBlock,
+			insetKeyword, cssPropInsetBlock, cssPropInsetInline, "column-rule",
+			cssPropBorderBlock, cssPropBorderInline, cssPropBorderBlockStart, cssPropBorderBlockEnd,
+			cssPropBorderInlineStart, cssPropBorderInlineEnd, cssPropBorderBlockWidth, cssPropBorderBlockStyle,
+			cssPropBorderBlockColor, cssPropBorderInlineWidth, cssPropBorderInlineStyle, cssPropBorderInlineColor:
 			continue
 		}
 
@@ -722,18 +1070,152 @@ var styleGroups = [...]styleGroupFn{ //nolint:gochecknoglobals // static dispatc
 	applyTransformGroup,
 }
 
+//nolint:cyclop,goconst,funlen // vendor prefix lookup map
+func normalizeVendorPrefix(prop string) string {
+	if !strings.HasPrefix(prop, "-webkit-") {
+		return prop
+	}
+
+	switch prop {
+	case "-webkit-box-sizing":
+		return "box-sizing"
+	case "-webkit-border-radius":
+		return "border-radius"
+	case "-webkit-border-top-left-radius":
+		return "border-top-left-radius"
+	case "-webkit-border-top-right-radius":
+		return "border-top-right-radius"
+	case "-webkit-border-bottom-left-radius":
+		return "border-bottom-left-radius"
+	case "-webkit-border-bottom-right-radius":
+		return "border-bottom-right-radius"
+	case "-webkit-transform":
+		return "transform"
+	case "-webkit-transform-origin":
+		return "transform-origin"
+	case "-webkit-flex":
+		return "flex"
+	case "-webkit-flex-basis":
+		return "flex-basis"
+	case "-webkit-flex-direction":
+		return "flex-direction"
+	case "-webkit-flex-flow":
+		return "flex-flow"
+	case "-webkit-flex-grow":
+		return "flex-grow"
+	case "-webkit-flex-shrink":
+		return "flex-shrink"
+	case "-webkit-flex-wrap":
+		return "flex-wrap"
+	case "-webkit-justify-content":
+		return "justify-content"
+	case "-webkit-align-content":
+		return "align-content"
+	case "-webkit-align-items":
+		return "align-items"
+	case "-webkit-align-self":
+		return "align-self"
+	case "-webkit-order":
+		return "order"
+	case "-webkit-box-shadow":
+		return "box-shadow"
+	case "-webkit-filter":
+		return "filter"
+	case "-webkit-box-align":
+		return "align-items"
+	case "-webkit-box-flex":
+		return "flex-grow"
+	case "-webkit-box-ordinal-group":
+		return "order"
+	case "-webkit-box-orient":
+		return "flex-direction"
+	case "-webkit-box-pack":
+		return "justify-content"
+	case "-webkit-text-fill-color":
+		return "color"
+	default:
+		return prop
+	}
+}
+
 // applyStyleProp routes one cascaded property to the group that owns it.
+//
+//nolint:wsl // branching on effectiveProp
 func applyStyleProp(
 	style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext,
 	parent *ResolvedStyle, hasParent bool,
 ) {
+	effectiveProp := normalizeVendorPrefix(prop)
+	effectiveValue := value
+	if effectiveProp != prop {
+		effectiveValue = remapWebkitValue(prop, value)
+	}
 	for _, group := range styleGroups {
-		if group(style, prop, value, fsize, ctx, parent, hasParent) {
+		if group(style, effectiveProp, effectiveValue, fsize, ctx, parent, hasParent) {
 			return
 		}
 	}
 
 	applyIgnoredGroup(style, prop, value)
+}
+
+//nolint:cyclop,goconst,wsl,nlreturn,funlen // 2009 box value remaps
+func remapWebkitValue(prop, value string) string {
+	trimmed := strings.TrimSpace(value)
+	low := strings.ToLower(trimmed)
+	switch prop {
+	case "-webkit-box-align":
+		switch low {
+		case "start":
+			return flexStartKeyword
+		case "end":
+			return fxFlexEnd
+		case "center":
+			return fxCenter
+		case "stretch":
+			return fxStretch
+		case "baseline":
+			return "baseline"
+		default:
+			return low
+		}
+	case "-webkit-box-pack":
+		switch low {
+		case "start":
+			return flexStartKeyword
+		case "end":
+			return fxFlexEnd
+		case "center":
+			return fxCenter
+		case "justify":
+			return fxBetween
+		default:
+			return low
+		}
+	case "-webkit-box-orient":
+		switch low {
+		case "horizontal":
+			return fxRow
+		case "vertical":
+			return fxCol
+		case "inline-axis":
+			return fxRow
+		case "block-axis":
+			return fxCol
+		default:
+			return low
+		}
+	case "-webkit-box-ordinal-group":
+		if n, err := strconv.Atoi(trimmed); err == nil {
+			if n > 0 {
+				n--
+			}
+			return strconv.Itoa(n)
+		}
+		return trimmed
+	default:
+		return value
+	}
 }
 
 // applyDisplayGroup handles display, position-adjacent flow and stacking props.

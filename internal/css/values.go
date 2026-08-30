@@ -1,6 +1,7 @@
 package css
 
 import (
+	"math"
 	"strconv"
 	"strings"
 )
@@ -175,8 +176,8 @@ func ParseNumber(val string) (float64, bool) {
 }
 
 // ParseColor parses #rgb, #rrggbb, #rrggbbaa, rgb()/rgba() with integer,
-// float or percentage channels, and a named-color subset. It returns RGB in
-// 0..255 and alpha in 0..1; ok=false for anything unrecognized.
+// float or percentage channels, hsl()/hsla(), and a named-color subset. It
+// returns RGB in 0..255 and alpha in 0..1; ok=false for anything unrecognized.
 //
 //nolint:cyclop // linear dispatch across color forms; extraction would obscure it
 func ParseColor(val string) (int, int, int, float64, bool) {
@@ -220,6 +221,10 @@ func ParseColor(val string) (int, int, int, float64, bool) {
 
 	if strings.HasPrefix(low, "rgb") {
 		return parseRGBColor(val, low)
+	}
+
+	if strings.HasPrefix(low, "hsl") {
+		return parseHSLColor(val, low)
 	}
 
 	return 0, 0, 0, 0, false
@@ -322,6 +327,165 @@ func parseRGBColor(val, low string) (int, int, int, float64, bool) {
 	}
 
 	return red, green, blue, clampAlpha(alpha), true
+}
+
+// parseHSLColor parses hsl()/hsla() with hue in degrees (optional deg suffix),
+// saturation and lightness as percentages, and optional alpha like rgba().
+func parseHSLColor(val, low string) (int, int, int, float64, bool) {
+	open := strings.IndexByte(val, '(')
+	closeIdx := strings.LastIndexByte(val, ')')
+
+	if open < 0 || closeIdx < open {
+		return 0, 0, 0, 0, false
+	}
+
+	channels := hslChannelCount
+	if strings.HasPrefix(low, "hsla") {
+		channels = rgbaChannelCount
+	}
+
+	hue, sat, light, alpha, alphaRaw, parsed := parseHSLChannels(val, open+1, closeIdx, channels)
+	if !parsed {
+		return 0, 0, 0, 0, false
+	}
+
+	red, green, blue := hslToRGB(hue, sat, light)
+
+	if channels != rgbaChannelCount {
+		return red, green, blue, 1, true
+	}
+
+	if strings.HasSuffix(strings.TrimSpace(alphaRaw), "%") {
+		alpha /= maxRGBChannel
+	}
+
+	return red, green, blue, clampAlpha(alpha), true
+}
+
+func parseHSLChannels(val string, idx, closeIdx, channels int) (float64, float64, float64, float64, string, bool) {
+	var chans [rgbaChannelCount]float64
+
+	alphaRaw := ""
+
+	for channel := range channels {
+		start := idx
+
+		for idx < closeIdx && val[idx] != ',' {
+			idx++
+		}
+
+		raw := val[start:idx]
+		if channel == rgbaChannelCount-1 {
+			alphaRaw = raw
+		}
+
+		chVal, parsed := parseOneHSLChannel(channel, raw)
+		if !parsed {
+			return 0, 0, 0, 0, "", false
+		}
+
+		chans[channel] = chVal
+		idx++
+	}
+
+	if idx != closeIdx+1 {
+		return 0, 0, 0, 0, "", false
+	}
+
+	return chans[0], chans[1], chans[hslChannelCount-1], chans[rgbaChannelCount-1], alphaRaw, true
+}
+
+func parseOneHSLChannel(channel int, raw string) (float64, bool) {
+	switch channel {
+	case 0:
+		return parseHueChannel(raw)
+	case 1, hslChannelCount - 1:
+		return parsePercentUnit(raw)
+	default:
+		return parseColorChannel(raw)
+	}
+}
+
+func parseHueChannel(chVal string) (float64, bool) {
+	chVal = strings.TrimSpace(chVal)
+	if strings.HasSuffix(strings.ToLower(chVal), "deg") {
+		chVal = strings.TrimSpace(chVal[:len(chVal)-3])
+	}
+
+	if chVal == "" || strings.Contains(chVal, "%") {
+		return 0, false
+	}
+
+	f, err := strconv.ParseFloat(chVal, 64)
+	if err != nil {
+		return 0, false
+	}
+
+	return f, true
+}
+
+func parsePercentUnit(chVal string) (float64, bool) {
+	chVal = strings.TrimSpace(chVal)
+	if !strings.HasSuffix(chVal, "%") {
+		return 0, false
+	}
+
+	f, err := strconv.ParseFloat(strings.TrimSuffix(chVal, "%"), 64)
+	if err != nil {
+		return 0, false
+	}
+
+	return f, true
+}
+
+func hslToRGB(hue, sat, light float64) (int, int, int) {
+	hue = math.Mod(hue, hslCircleDeg)
+	if hue < 0 {
+		hue += hslCircleDeg
+	}
+
+	sat = clampUnit(sat / percentScale)
+	light = clampUnit(light / percentScale)
+
+	chroma := (1 - math.Abs(2*light-1)) * sat
+	hSector := hue / hslSectorDeg
+	xVal := chroma * (1 - math.Abs(math.Mod(hSector, hslEvenPeriod)-1))
+	mVal := light - chroma/hslChromaHalf
+
+	red, green, blue := hslSectorRGB(hSector, chroma, xVal)
+
+	return clampByte((red + mVal) * maxRGBChannel),
+		clampByte((green + mVal) * maxRGBChannel),
+		clampByte((blue + mVal) * maxRGBChannel)
+}
+
+func hslSectorRGB(hSector, chroma, xVal float64) (float64, float64, float64) {
+	switch {
+	case hSector < 1:
+		return chroma, xVal, 0
+	case hSector < hslSectorYG:
+		return xVal, chroma, 0
+	case hSector < hslSectorGC:
+		return 0, chroma, xVal
+	case hSector < hslSectorCB:
+		return 0, xVal, chroma
+	case hSector < hslSectorBM:
+		return xVal, 0, chroma
+	default:
+		return chroma, 0, xVal
+	}
+}
+
+func clampUnit(fVal float64) float64 {
+	if fVal < 0 {
+		return 0
+	}
+
+	if fVal > 1 {
+		return 1
+	}
+
+	return fVal
 }
 
 // parseColorChannel parses one rgb()/rgba() channel: a number with an

@@ -250,94 +250,6 @@ func matchRelativeFrom(sel Selector, anchor *html.Node) bool {
 	return false
 }
 
-// leftmostMatch walks the selector combinator chain right-to-left (same walk
-// as Match) and returns the element that matched the leftmost compound, or nil
-// if the selector does not match node.
-func leftmostMatch(sel Selector, node *html.Node) *html.Node {
-	if node == nil || node.Type != html.ElementNode || len(sel.Parts) == 0 {
-		return nil
-	}
-
-	if !matchPart(sel.Parts[len(sel.Parts)-1], node) {
-		return nil
-	}
-
-	cur := node
-	// Combinator is stored on the right-hand part of each pair (how that
-	// part attaches to the previous). Walk left using Parts[i+1].Combinator.
-	const prevPartOffset = 2 // walk left: last part is host, start at len-2
-
-	for i := len(sel.Parts) - prevPartOffset; i >= 0; i-- {
-		next := leftmostStep(sel.Parts[i+1].Combinator, sel.Parts[i], cur)
-		if next == nil {
-			return nil
-		}
-
-		cur = next
-	}
-
-	return cur
-}
-
-// leftmostStep advances cur one step left through the combinator chain: it
-// returns the element that must match part, or nil when none exists.
-func leftmostStep(combinator string, part SelectorPart, cur *html.Node) *html.Node {
-	switch combinator {
-	case ">":
-		return matchLeftChild(part, cur)
-	case "+":
-		return matchLeftAdjacent(part, cur)
-	case "~":
-		return matchLeftSibling(part, cur)
-	default: // descendant
-		return matchLeftAncestor(part, cur)
-	}
-}
-
-// matchLeftChild returns cur's element parent when it matches part, else nil.
-func matchLeftChild(part SelectorPart, cur *html.Node) *html.Node {
-	cur = cur.Parent
-	if cur == nil || cur.Type != html.ElementNode || !matchPart(part, cur) {
-		return nil
-	}
-
-	return cur
-}
-
-// matchLeftAdjacent returns cur's previous element sibling when it matches
-// part, else nil.
-func matchLeftAdjacent(part SelectorPart, cur *html.Node) *html.Node {
-	prev := previousElementSibling(cur)
-	if prev == nil || !matchPart(part, prev) {
-		return nil
-	}
-
-	return prev
-}
-
-// matchLeftSibling returns the nearest previous element sibling of cur that
-// matches part, else nil.
-func matchLeftSibling(part SelectorPart, cur *html.Node) *html.Node {
-	for sib := previousElementSibling(cur); sib != nil; sib = previousElementSibling(sib) {
-		if matchPart(part, sib) {
-			return sib
-		}
-	}
-
-	return nil
-}
-
-// matchLeftAncestor returns the nearest element ancestor of cur that matches
-// part, else nil.
-func matchLeftAncestor(part SelectorPart, cur *html.Node) *html.Node {
-	cur = cur.Parent
-	for cur != nil && (cur.Type != html.ElementNode || !matchPart(part, cur)) {
-		cur = cur.Parent
-	}
-
-	return cur
-}
-
 func elementDescendants(count *html.Node) []*html.Node {
 	var out []*html.Node
 
@@ -398,6 +310,23 @@ func maxSelectorSpecificity(sels []Selector) (int, int, int) {
 	}
 
 	return maxA, maxB, maxC
+}
+
+// pseudoSpecificityDelta is the (a, b, c) contribution of one pseudo-class.
+// :has/:not/:is use the most specific argument; :where is 0; others count as a class.
+func pseudoSpecificityDelta(pseudo PseudoClass) (int, int, int) {
+	switch pseudo.Name {
+	case pseudoClassHas:
+		return maxRelativeSpecificity(pseudo.Has)
+	case condKindNot:
+		return maxSelectorSpecificity(pseudo.Not)
+	case pseudoClassIs:
+		return maxSelectorSpecificity(pseudo.Is)
+	case pseudoClassWhere:
+		return 0, 0, 0
+	default:
+		return 0, 1, 0
+	}
 }
 
 // betterSpec reports whether (a1,b1,c1) is more specific than (a2,b2,c2).

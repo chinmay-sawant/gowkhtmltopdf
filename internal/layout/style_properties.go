@@ -13,6 +13,20 @@ const (
 	borderRadiusValueCount  = 4
 	borderRadiusPairCount   = 2
 	borderRadiusTripleCount = 3
+	twoTokens               = 2
+	propMarginInlineStart   = "margin-inline-start"
+	propMarginInlineEnd     = "margin-inline-end"
+	propMarginBlockStart    = "margin-block-start"
+	propMarginBlockEnd      = "margin-block-end"
+	propPaddingInlineStart  = "padding-inline-start"
+	propPaddingInlineEnd    = "padding-inline-end"
+	propPaddingBlockStart   = "padding-block-start"
+	propPaddingBlockEnd     = "padding-block-end"
+	propBlockSize           = "block-size"
+	propMinInlineSize       = "min-inline-size"
+	propMaxInlineSize       = "max-inline-size"
+	propMinBlockSize        = "min-block-size"
+	propMaxBlockSize        = "max-block-size"
 )
 
 func applyDisplayGroup(
@@ -27,6 +41,8 @@ func applyDisplayGroup(
 
 // applyDisplayFlowProps owns the display/position/float/clear/box-sizing/
 // writing-mode/overflow keyword properties.
+//
+//nolint:cyclop // display/flow keyword properties
 func applyDisplayFlowProps(style *ResolvedStyle, prop, value string) bool {
 	switch prop {
 	case "display":
@@ -41,6 +57,11 @@ func applyDisplayFlowProps(style *ResolvedStyle, prop, value string) bool {
 		setBoxSizingKeyword(style, value)
 	case "writing-mode":
 		setWritingModeKeyword(style, value)
+	case "direction":
+		val := strings.ToLower(strings.TrimSpace(value))
+		if val == "ltr" || val == "rtl" {
+			style.Direction = val
+		}
 	case "overflow", "overflow-x", "overflow-y":
 		setOverflowKeyword(style, prop, value)
 	default:
@@ -57,12 +78,16 @@ func setDisplayKeyword(style *ResolvedStyle, value string) {
 		cssDisplayInlineBlock, displayTableCaption, "table-column", "table-column-group",
 		displayFlex, displayInlineFlex, displayGrid, displayInlineGrid, displaySubgrid, displayFlowRoot:
 		style.Display = value
+	case "-webkit-box":
+		style.Display = displayFlex
+	case "-webkit-inline-box":
+		style.Display = displayInlineFlex
 	}
 }
 
 func setPositionKeyword(style *ResolvedStyle, value string) {
 	switch value {
-	case "static", "relative", "absolute", "fixed", "sticky":
+	case "static", "relative", "absolute", positionFixed, "sticky":
 		style.Position = value
 	}
 }
@@ -96,19 +121,32 @@ func setOverflowKeyword(style *ResolvedStyle, prop, value string) {
 		return
 	}
 
-	if prop == "overflow" || overflow != visibleKeyword {
+	switch prop {
+	case "overflow":
 		style.Overflow = overflow
+		style.OverflowX = overflow
+		style.OverflowY = overflow
+	case "overflow-x":
+		style.OverflowX = overflow
+		if overflow != visibleKeyword {
+			style.Overflow = overflow
+		}
+	case "overflow-y":
+		style.OverflowY = overflow
+		if overflow != visibleKeyword {
+			style.Overflow = overflow
+		}
 	}
 }
 
 func setWritingModeKeyword(style *ResolvedStyle, value string) {
 	switch value {
-	case "horizontal-tb", writingModeVerticalRL, writingModeVerticalLR:
+	case writingModeHorizontalTB, writingModeVerticalRL, writingModeVerticalLR:
 		style.WritingMode = value
 	}
 }
 
-// applyDisplayEffectProps owns z-index, opacity and filter:opacity().
+// applyDisplayEffectProps owns z-index, opacity, filter:opacity() and visibility.
 func applyDisplayEffectProps(style *ResolvedStyle, prop, value string) bool {
 	switch prop {
 	case "z-index":
@@ -117,6 +155,8 @@ func applyDisplayEffectProps(style *ResolvedStyle, prop, value string) bool {
 		setOpacityValue(style, value)
 	case "filter":
 		setFilterValue(style, value)
+	case "visibility":
+		setVisibilityValue(style, value)
 	default:
 		return false
 	}
@@ -141,9 +181,16 @@ func setOpacityValue(style *ResolvedStyle, value string) {
 }
 
 func setFilterValue(style *ResolvedStyle, value string) {
-	// opacity() via ExtGState; blur/drop-shadow permanent non-goals.
+	style.Filter = value
 	if v, ok := parseFilterOpacity(value); ok {
 		style.Opacity *= v
+	}
+}
+
+func setVisibilityValue(style *ResolvedStyle, value string) {
+	switch value {
+	case visibleKeyword, overflowHidden, borderCollapseValue:
+		style.Visibility = value
 	}
 }
 
@@ -151,6 +198,10 @@ func setFilterValue(style *ResolvedStyle, value string) {
 func applyPositionGroup(
 	style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext, _ *ResolvedStyle, _ bool,
 ) bool {
+	if applyLogicalInset(style, prop, value, fsize, ctx) {
+		return true
+	}
+
 	switch prop {
 	case cssVerticalAlignTop:
 		style.Top, style.TopAuto = marginLenAuto(value, fsize, ctx.viewportH)
@@ -175,7 +226,8 @@ func applyFlexGroup(
 	case gapKeyword, "row-gap", "column-gap":
 		return applyGapProps(style, prop, value, fsize, ctx)
 	case "flex-direction", "flex-wrap", "justify-content", "align-items",
-		"align-content", "align-self", "justify-items", "justify-self":
+		"align-content", "align-self", "justify-items", "justify-self",
+		"flex-flow", "place-content", "place-items", "place-self":
 		return applyFlexAlignmentProps(style, prop, value)
 	case flexKeyword, "flex-grow", "flex-shrink", "flex-basis", "order":
 		return applyFlexBasisProps(style, prop, value, fsize, ctx)
@@ -237,6 +289,14 @@ func applyColumnGap(style *ResolvedStyle, value string, fsize, viewportW float64
 
 // applyFlexAlignmentProps owns the flex/grid alignment keywords.
 func applyFlexAlignmentProps(style *ResolvedStyle, prop, value string) bool {
+	if applyPlaceAndFlowShorthands(style, prop, value) {
+		return true
+	}
+
+	return applyFlexKeywordProps(style, prop, value)
+}
+
+func applyFlexKeywordProps(style *ResolvedStyle, prop, value string) bool {
 	switch prop {
 	case "flex-direction":
 		setFlexDirectionValue(style, value)
@@ -261,15 +321,32 @@ func applyFlexAlignmentProps(style *ResolvedStyle, prop, value string) bool {
 	return true
 }
 
+func applyPlaceAndFlowShorthands(style *ResolvedStyle, prop, value string) bool {
+	switch prop {
+	case "flex-flow":
+		parseFlexFlow(style, value)
+	case "place-content":
+		parsePlaceContent(style, value)
+	case "place-items":
+		parsePlaceItems(style, value)
+	case "place-self":
+		parsePlaceSelf(style, value)
+	default:
+		return false
+	}
+
+	return true
+}
+
 func setFlexDirectionValue(style *ResolvedStyle, value string) {
 	switch value {
-	case fxRow, fxCol, "row-reverse", fxColRev:
+	case fxRow, fxCol, fxRowRev, fxColRev:
 		style.FlexDirection = value
 	}
 }
 
 func setFlexWrapValue(style *ResolvedStyle, value string) {
-	if value == "nowrap" || value == "wrap" || value == "wrap-reverse" {
+	if value == cssWhiteSpaceNowrap || value == fxWrap || value == fxWrapRev {
 		style.FlexWrap = value
 	}
 }
@@ -283,7 +360,7 @@ func setJustifyContentValue(style *ResolvedStyle, value string) {
 
 func setAlignItemsValue(style *ResolvedStyle, value string) {
 	switch value {
-	case fxStretch, flexStartKeyword, fxFlexEnd, fxCenter, fxStart, fxEnd:
+	case fxStretch, flexStartKeyword, fxFlexEnd, fxCenter, fxStart, fxEnd, "baseline":
 		style.AlignItems = value
 	}
 }
@@ -376,7 +453,47 @@ func applyMulticolGroup(
 		return true
 	}
 
+	if applyColumnRuleProps(style, prop, value, fsize) {
+		return true
+	}
+
 	return applyColumnFillSpanProps(style, prop, value)
+}
+
+func applyColumnRuleProps(style *ResolvedStyle, prop, value string, fsize float64) bool {
+	switch prop {
+	case "column-rule":
+		applyColumnRuleShorthand(style, value, fsize)
+	case "column-rule-width":
+		if width, parsed := parseOutlineWidth(value, fsize); parsed {
+			style.ColumnRuleWidth = width
+		}
+	case "column-rule-style":
+		if ruleStyle, parsed := parseOutlineStyle(value); parsed {
+			style.ColumnRuleStyle = ruleStyle
+		}
+	case "column-rule-color":
+		if color, parsed := parseUsedColor(value, style.Color); parsed {
+			style.ColumnRuleColor = color
+			style.ColumnRuleColorSet = true
+		}
+	default:
+		return false
+	}
+
+	return true
+}
+
+func applyColumnRuleShorthand(style *ResolvedStyle, value string, fsize float64) {
+	width, ruleStyle, color, ok := parseRuleShorthand(value, fsize, style.Color)
+	if !ok {
+		return
+	}
+
+	style.ColumnRuleWidth = width
+	style.ColumnRuleStyle = ruleStyle
+	style.ColumnRuleColor = color
+	style.ColumnRuleColorSet = true
 }
 
 func applyColumnCountWidthProps(style *ResolvedStyle, prop, value string, fsize, viewportW float64) bool {
@@ -423,7 +540,7 @@ func applyColumnFillSpanProps(style *ResolvedStyle, prop, value string) bool {
 		}
 	case "column-fill":
 		switch value {
-		case "balance", overflowAuto:
+		case balanceKeyword, overflowAuto:
 			style.ColumnFill = value
 		}
 	default:
@@ -456,6 +573,10 @@ func applyGridTemplateProps(style *ResolvedStyle, prop, value string) bool {
 		parseGridArea(style, value)
 	case "grid-auto-flow":
 		style.GridAutoFlow = parseGridAutoFlowValue(value)
+	case "grid-template":
+		parseGridTemplateShorthand(style, value)
+	case "grid":
+		parseGridShorthand(style, value)
 	default:
 		return false
 	}
@@ -465,14 +586,18 @@ func applyGridTemplateProps(style *ResolvedStyle, prop, value string) bool {
 
 func applyGridPlacementProps(style *ResolvedStyle, prop, value string) bool {
 	switch prop {
-	case "grid-column", "grid-column-end":
+	case "grid-column":
 		parseGridColumn(style, value)
 	case "grid-column-start":
 		setGridStartIndex(style, "grid-column-start", value)
-	case "grid-row", "grid-row-end":
+	case "grid-column-end":
+		applyGridEndOnly(style, false, value)
+	case "grid-row":
 		parseGridRow(style, value)
 	case "grid-row-start":
 		setGridStartIndex(style, "grid-row-start", value)
+	case "grid-row-end":
+		applyGridEndOnly(style, true, value)
 	default:
 		return false
 	}
@@ -499,6 +624,10 @@ func applyBoxGroup(
 	style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext, _ *ResolvedStyle, _ bool,
 ) bool {
 	if applyBoxSizingProps(style, prop, value, fsize, ctx) {
+		return true
+	}
+
+	if applyLogicalBoxProps(style, prop, value, fsize, ctx) {
 		return true
 	}
 
@@ -538,24 +667,27 @@ func applyBoxSpacingProps(style *ResolvedStyle, prop, value string, fsize, viewp
 func applyBoxMainSizeProps(style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext) bool {
 	switch prop {
 	case "width":
-		return setWidthValue(style, value, fsize, ctx.viewportW)
+		return setWidthValue(style, value, fsize, ctx)
 	case "height":
-		return setHeightValue(style, value, fsize, ctx.viewportH)
+		return setHeightValue(style, value, fsize, ctx)
 	default:
 		return false
 	}
 }
 
-func setWidthValue(style *ResolvedStyle, value string, fsize, viewportW float64) bool {
+func setWidthValue(style *ResolvedStyle, value string, fsize float64, ctx *styleContext) bool {
 	if value == overflowAuto {
 		style.Width = -1
+		style.WidthPercent = -1
+	} else if v, ok := vminVmaxPt(value, ctx.viewportW, ctx.viewportH); ok {
+		style.Width = v
 		style.WidthPercent = -1
 	} else if v, unit, ok := css.ParseLength(value); ok && unit == "%" {
 		// Resolve % against the layout containing block (availW), not
 		// the viewport — nested width:100% must fill the parent cell.
 		style.WidthPercent = v
 		style.Width = -1
-	} else if v, ok := lengthBox(value, fsize, viewportW, overflowAuto); ok {
+	} else if v, ok := lengthBox(value, fsize, ctx.viewportW, overflowAuto); ok {
 		style.Width = v
 		style.WidthPercent = -1
 	}
@@ -563,16 +695,19 @@ func setWidthValue(style *ResolvedStyle, value string, fsize, viewportW float64)
 	return true
 }
 
-func setHeightValue(style *ResolvedStyle, value string, fsize, viewportH float64) bool {
+func setHeightValue(style *ResolvedStyle, value string, fsize float64, ctx *styleContext) bool {
 	if value == overflowAuto {
 		style.Height = -1
+		style.HeightPercent = -1
+	} else if v, ok := vminVmaxPt(value, ctx.viewportW, ctx.viewportH); ok {
+		style.Height = v
 		style.HeightPercent = -1
 	} else if v, unit, ok := css.ParseLength(value); ok && unit == "%" {
 		// Defer % height to layout; indefinite containing block → auto
 		// (cyclic percentage honesty for flex/grid children).
 		style.HeightPercent = v
 		style.Height = -1
-	} else if v, ok := lengthBox(value, fsize, viewportH, overflowAuto); ok {
+	} else if v, ok := lengthBox(value, fsize, ctx.viewportH, overflowAuto); ok {
 		style.Height = v
 		style.HeightPercent = -1
 	}
@@ -714,10 +849,383 @@ func applyPaddingSideProps(style *ResolvedStyle, prop, value string, fsize, view
 	return true
 }
 
+func mapsLogicalToPhysical(style *ResolvedStyle) bool {
+	return style.WritingMode == "" || style.WritingMode == writingModeHorizontalTB
+}
+
+func applyLogicalBoxProps(style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext) bool {
+	switch prop {
+	case cssPropMarginInline, propMarginInlineStart, propMarginInlineEnd,
+		cssPropMarginBlock, propMarginBlockStart, propMarginBlockEnd:
+		return applyLogicalMargin(style, prop, value, fsize, ctx.viewportW)
+	case cssPropPaddingInline, propPaddingInlineStart, propPaddingInlineEnd,
+		cssPropPaddingBlock, propPaddingBlockStart, propPaddingBlockEnd:
+		return applyLogicalPadding(style, prop, value, fsize, ctx.viewportW)
+	case containerInlineSize, propBlockSize,
+		propMinInlineSize, propMaxInlineSize,
+		propMinBlockSize, propMaxBlockSize:
+		return applyLogicalSize(style, prop, value, fsize, ctx)
+	default:
+		return false
+	}
+}
+
+func applyLogicalMargin(style *ResolvedStyle, prop, value string, fsize, viewportW float64) bool {
+	if applyLogicalMarginPair(style, prop, value, fsize, viewportW) {
+		return true
+	}
+
+	switch style.WritingMode {
+	case writingModeVerticalRL:
+		return applyLogicalMarginVerticalRL(style, prop, value, fsize, viewportW)
+	case writingModeVerticalLR:
+		return applyLogicalMarginVerticalLR(style, prop, value, fsize, viewportW)
+	default:
+		return applyLogicalMarginHorizontal(style, prop, value, fsize, viewportW)
+	}
+}
+
+func applyLogicalMarginVerticalRL(style *ResolvedStyle, prop, value string, fsize, viewportW float64) bool {
+	switch prop {
+	case propMarginInlineStart:
+		style.MarginTop, style.MarginTopAuto = marginLenAuto(value, fsize, viewportW)
+	case propMarginInlineEnd:
+		style.MarginBottom, style.MarginBottomAuto = marginLenAuto(value, fsize, viewportW)
+	case propMarginBlockStart:
+		style.MarginRight, style.MarginRightAuto = marginLenAuto(value, fsize, viewportW)
+	case propMarginBlockEnd:
+		style.MarginLeft, style.MarginLeftAuto = marginLenAuto(value, fsize, viewportW)
+	default:
+		return false
+	}
+
+	return true
+}
+
+func applyLogicalMarginVerticalLR(style *ResolvedStyle, prop, value string, fsize, viewportW float64) bool {
+	switch prop {
+	case propMarginInlineStart:
+		style.MarginTop, style.MarginTopAuto = marginLenAuto(value, fsize, viewportW)
+	case propMarginInlineEnd:
+		style.MarginBottom, style.MarginBottomAuto = marginLenAuto(value, fsize, viewportW)
+	case propMarginBlockStart:
+		style.MarginLeft, style.MarginLeftAuto = marginLenAuto(value, fsize, viewportW)
+	case propMarginBlockEnd:
+		style.MarginRight, style.MarginRightAuto = marginLenAuto(value, fsize, viewportW)
+	default:
+		return false
+	}
+
+	return true
+}
+
+func applyLogicalMarginHorizontal(style *ResolvedStyle, prop, value string, fsize, viewportW float64) bool {
+	switch prop {
+	case propMarginInlineStart:
+		style.MarginLeft, style.MarginLeftAuto = marginLenAuto(value, fsize, viewportW)
+	case propMarginInlineEnd:
+		style.MarginRight, style.MarginRightAuto = marginLenAuto(value, fsize, viewportW)
+	case propMarginBlockStart:
+		style.MarginTop, style.MarginTopAuto = marginLenAuto(value, fsize, viewportW)
+	case propMarginBlockEnd:
+		style.MarginBottom, style.MarginBottomAuto = marginLenAuto(value, fsize, viewportW)
+	default:
+		return false
+	}
+
+	return true
+}
+
+func applyLogicalMarginPair(style *ResolvedStyle, prop, value string, fsize, viewportW float64) bool {
+	switch prop {
+	case cssPropMarginInline:
+		start, end, parsed := logicalPair(value)
+		if parsed {
+			if isVerticalWritingMode(style.WritingMode) {
+				style.MarginTop, style.MarginTopAuto = marginLenAuto(start, fsize, viewportW)
+				style.MarginBottom, style.MarginBottomAuto = marginLenAuto(end, fsize, viewportW)
+			} else {
+				style.MarginLeft, style.MarginLeftAuto = marginLenAuto(start, fsize, viewportW)
+				style.MarginRight, style.MarginRightAuto = marginLenAuto(end, fsize, viewportW)
+			}
+		}
+	case cssPropMarginBlock:
+		applyLogicalMarginBlockPair(style, value, fsize, viewportW)
+	default:
+		return false
+	}
+
+	return true
+}
+
+func applyLogicalMarginBlockPair(style *ResolvedStyle, value string, fsize, viewportW float64) {
+	start, end, parsed := logicalPair(value)
+	if !parsed {
+		return
+	}
+
+	switch style.WritingMode {
+	case writingModeVerticalRL:
+		style.MarginRight, style.MarginRightAuto = marginLenAuto(start, fsize, viewportW)
+		style.MarginLeft, style.MarginLeftAuto = marginLenAuto(end, fsize, viewportW)
+	case writingModeVerticalLR:
+		style.MarginLeft, style.MarginLeftAuto = marginLenAuto(start, fsize, viewportW)
+		style.MarginRight, style.MarginRightAuto = marginLenAuto(end, fsize, viewportW)
+	default:
+		style.MarginTop, style.MarginTopAuto = marginLenAuto(start, fsize, viewportW)
+		style.MarginBottom, style.MarginBottomAuto = marginLenAuto(end, fsize, viewportW)
+	}
+}
+
+func applyLogicalPadding(style *ResolvedStyle, prop, value string, fsize, viewportW float64) bool {
+	if applyLogicalPaddingPair(style, prop, value, fsize, viewportW) {
+		return true
+	}
+
+	switch style.WritingMode {
+	case writingModeVerticalRL:
+		return applyLogicalPaddingVerticalRL(style, prop, value, fsize, viewportW)
+	case writingModeVerticalLR:
+		return applyLogicalPaddingVerticalLR(style, prop, value, fsize, viewportW)
+	default:
+		return applyLogicalPaddingHorizontal(style, prop, value, fsize, viewportW)
+	}
+}
+
+func applyLogicalPaddingVerticalRL(style *ResolvedStyle, prop, value string, fsize, viewportW float64) bool {
+	switch prop {
+	case propPaddingInlineStart:
+		style.PaddingTop = marginLen(value, fsize, viewportW)
+	case propPaddingInlineEnd:
+		style.PaddingBottom = marginLen(value, fsize, viewportW)
+	case propPaddingBlockStart:
+		style.PaddingRight = marginLen(value, fsize, viewportW)
+	case propPaddingBlockEnd:
+		style.PaddingLeft = marginLen(value, fsize, viewportW)
+	default:
+		return false
+	}
+
+	return true
+}
+
+func applyLogicalPaddingVerticalLR(style *ResolvedStyle, prop, value string, fsize, viewportW float64) bool {
+	switch prop {
+	case propPaddingInlineStart:
+		style.PaddingTop = marginLen(value, fsize, viewportW)
+	case propPaddingInlineEnd:
+		style.PaddingBottom = marginLen(value, fsize, viewportW)
+	case propPaddingBlockStart:
+		style.PaddingLeft = marginLen(value, fsize, viewportW)
+	case propPaddingBlockEnd:
+		style.PaddingRight = marginLen(value, fsize, viewportW)
+	default:
+		return false
+	}
+
+	return true
+}
+
+func applyLogicalPaddingHorizontal(style *ResolvedStyle, prop, value string, fsize, viewportW float64) bool {
+	switch prop {
+	case propPaddingInlineStart:
+		style.PaddingLeft = marginLen(value, fsize, viewportW)
+	case propPaddingInlineEnd:
+		style.PaddingRight = marginLen(value, fsize, viewportW)
+	case propPaddingBlockStart:
+		style.PaddingTop = marginLen(value, fsize, viewportW)
+	case propPaddingBlockEnd:
+		style.PaddingBottom = marginLen(value, fsize, viewportW)
+	default:
+		return false
+	}
+
+	return true
+}
+
+func applyLogicalPaddingPair(style *ResolvedStyle, prop, value string, fsize, viewportW float64) bool {
+	switch prop {
+	case cssPropPaddingInline:
+		start, end, parsed := logicalPair(value)
+		if parsed {
+			if isVerticalWritingMode(style.WritingMode) {
+				style.PaddingTop = marginLen(start, fsize, viewportW)
+				style.PaddingBottom = marginLen(end, fsize, viewportW)
+			} else {
+				style.PaddingLeft = marginLen(start, fsize, viewportW)
+				style.PaddingRight = marginLen(end, fsize, viewportW)
+			}
+		}
+	case cssPropPaddingBlock:
+		applyLogicalPaddingBlockPair(style, value, fsize, viewportW)
+	default:
+		return false
+	}
+
+	return true
+}
+
+func applyLogicalPaddingBlockPair(style *ResolvedStyle, value string, fsize, viewportW float64) {
+	start, end, parsed := logicalPair(value)
+	if !parsed {
+		return
+	}
+
+	switch style.WritingMode {
+	case writingModeVerticalRL:
+		style.PaddingRight = marginLen(start, fsize, viewportW)
+		style.PaddingLeft = marginLen(end, fsize, viewportW)
+	case writingModeVerticalLR:
+		style.PaddingLeft = marginLen(start, fsize, viewportW)
+		style.PaddingRight = marginLen(end, fsize, viewportW)
+	default:
+		style.PaddingTop = marginLen(start, fsize, viewportW)
+		style.PaddingBottom = marginLen(end, fsize, viewportW)
+	}
+}
+
+func applyLogicalSize(style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext) bool {
+	if isVerticalWritingMode(style.WritingMode) {
+		return applyLogicalSizeVertical(style, prop, value, fsize, ctx)
+	}
+
+	return applyLogicalSizeHorizontal(style, prop, value, fsize, ctx)
+}
+
+func applyLogicalSizeVertical(style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext) bool {
+	switch prop {
+	case containerInlineSize:
+		return setHeightValue(style, value, fsize, ctx)
+	case propBlockSize:
+		return setWidthValue(style, value, fsize, ctx)
+	case propMinInlineSize:
+		return setMinHeightValue(style, value, fsize, ctx.viewportH)
+	case propMaxInlineSize:
+		return setMaxHeightValue(style, value, fsize, ctx.viewportH)
+	case propMinBlockSize:
+		return setMinWidthValue(style, value, fsize, ctx.viewportW)
+	case propMaxBlockSize:
+		return setMaxWidthValue(style, value, fsize, ctx.viewportW)
+	default:
+		return false
+	}
+}
+
+func applyLogicalSizeHorizontal(style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext) bool {
+	switch prop {
+	case containerInlineSize:
+		return setWidthValue(style, value, fsize, ctx)
+	case propBlockSize:
+		return setHeightValue(style, value, fsize, ctx)
+	case propMinInlineSize:
+		return setMinWidthValue(style, value, fsize, ctx.viewportW)
+	case propMaxInlineSize:
+		return setMaxWidthValue(style, value, fsize, ctx.viewportW)
+	case propMinBlockSize:
+		return setMinHeightValue(style, value, fsize, ctx.viewportH)
+	case propMaxBlockSize:
+		return setMaxHeightValue(style, value, fsize, ctx.viewportH)
+	default:
+		return false
+	}
+}
+
+func applyLogicalInset(style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext) bool {
+	switch prop {
+	case insetKeyword, cssPropInsetBlock, cssPropInsetInline,
+		"inset-block-start", "inset-block-end",
+		"inset-inline-start", "inset-inline-end":
+		if mapsLogicalToPhysical(style) {
+			assignLogicalInset(style, prop, value, fsize, ctx.viewportW, ctx.viewportH)
+		}
+
+		return true
+	default:
+		return false
+	}
+}
+
+func assignLogicalInset(style *ResolvedStyle, prop, value string, fsize, viewportW, viewportH float64) {
+	switch prop {
+	case insetKeyword:
+		applyInsetShorthand(style, value, fsize, viewportW, viewportH)
+	case cssPropInsetBlock:
+		start, end, parsed := logicalPair(value)
+		if parsed {
+			style.Top, style.TopAuto = marginLenAuto(start, fsize, viewportH)
+			style.Bottom, style.BottomAuto = marginLenAuto(end, fsize, viewportH)
+		}
+	case cssPropInsetInline:
+		start, end, parsed := logicalPair(value)
+		if parsed {
+			style.Left, style.LeftAuto = marginLenAuto(start, fsize, viewportW)
+			style.Right, style.RightAuto = marginLenAuto(end, fsize, viewportW)
+		}
+	case "inset-block-start":
+		style.Top, style.TopAuto = marginLenAuto(value, fsize, viewportH)
+	case "inset-block-end":
+		style.Bottom, style.BottomAuto = marginLenAuto(value, fsize, viewportH)
+	case "inset-inline-start":
+		style.Left, style.LeftAuto = marginLenAuto(value, fsize, viewportW)
+	case "inset-inline-end":
+		style.Right, style.RightAuto = marginLenAuto(value, fsize, viewportW)
+	}
+}
+
+func applyInsetShorthand(style *ResolvedStyle, value string, fsize, viewportW, viewportH float64) {
+	var val [4]string
+
+	count := splitSpaceTokens(value, val[:])
+	if count == 0 {
+		return
+	}
+
+	top, right, bottom, left := val[0], val[0], val[0], val[0]
+
+	switch {
+	case count > three:
+		top, right, bottom, left = val[0], val[1], val[2], val[3]
+	case count == three:
+		top, right, bottom, left = val[0], val[1], val[2], val[1]
+	case count == two:
+		top, right, bottom, left = val[0], val[1], val[0], val[1]
+	}
+
+	style.Top, style.TopAuto = marginLenAuto(top, fsize, viewportH)
+	style.Right, style.RightAuto = marginLenAuto(right, fsize, viewportW)
+	style.Bottom, style.BottomAuto = marginLenAuto(bottom, fsize, viewportH)
+	style.Left, style.LeftAuto = marginLenAuto(left, fsize, viewportW)
+}
+
+func logicalPair(value string) (string, string, bool) {
+	var tok [2]string
+
+	n := splitSpaceTokens(value, tok[:])
+	if n == 0 {
+		return "", "", false
+	}
+
+	if n == 1 {
+		return tok[0], tok[0], true
+	}
+
+	return tok[0], tok[1], true
+}
+
 // applyBorderGroup handles the border shorthand and per-side props.
+//
+//nolint:cyclop // border shorthand and per-side props
 func applyBorderGroup(
 	style *ResolvedStyle, prop, value string, fsize float64, _ *styleContext, _ *ResolvedStyle, _ bool,
 ) bool {
+	if applyOutlineProps(style, prop, value, fsize) {
+		return true
+	}
+
+	if applyRadiusLonghand(style, prop, value, fsize) {
+		return true
+	}
+
 	switch prop {
 	case "border":
 		return applyBorderAllSides(style, value, fsize)
@@ -726,72 +1234,26 @@ func applyBorderGroup(
 	case borderWidthKeyword, "border-top-width", "border-right-width", "border-bottom-width", "border-left-width":
 		return applyBorderWidthProps(style, prop, value, fsize)
 	case borderStyleKeyword, borderColorKeyword,
-		"border-top-color", "border-right-color", "border-bottom-color", "border-left-color":
+		"border-top-color", "border-right-color", "border-bottom-color", "border-left-color",
+		"border-top-style", "border-right-style", "border-bottom-style", "border-left-style":
 		return applyBorderStyleColorProps(style, prop, value)
+	case "border-block", "border-block-start", "border-block-end",
+		"border-block-width", "border-block-start-width", "border-block-end-width",
+		"border-block-style", "border-block-start-style", "border-block-end-style",
+		"border-block-color", "border-block-start-color", "border-block-end-color",
+		"border-inline", "border-inline-start", "border-inline-end",
+		"border-inline-width", "border-inline-start-width", "border-inline-end-width",
+		"border-inline-style", "border-inline-start-style", "border-inline-end-style",
+		"border-inline-color", "border-inline-start-color", "border-inline-end-color":
+		return applyLogicalBorder(style, prop, value, fsize)
+	case "border-image", "border-image-source", "border-image-slice",
+		"border-image-width", "border-image-outset", "border-image-repeat":
+		return applyBorderImageProps(style, prop, value)
 	case "border-radius":
 		return setBorderRadius(style, value, fsize)
 	default:
 		return false
 	}
-}
-
-//nolint:cyclop // CSS shorthand parsing and expansion are one atomic property operation
-func setBorderRadius(style *ResolvedStyle, value string, fsize float64) bool {
-	parts := strings.Fields(value)
-	if len(parts) == 0 {
-		return true
-	}
-
-	values := make([]float64, 0, len(parts))
-
-	for _, part := range parts {
-		if _, unit, ok := css.ParseLength(part); ok && unit == "%" {
-			// Percentage corner radii retain the existing uniform fallback;
-			// absolute asymmetric radii are represented independently below.
-			if v, _, ok := css.ParseLength(part); ok && v >= 0 {
-				style.BorderRadius = 0
-				style.BorderRadiusPercent = v
-			}
-
-			return true
-		}
-
-		radius, ok := lengthBox(part, fsize, 0, cssDisplayNone)
-		if !ok || radius < 0 {
-			return true
-		}
-
-		values = append(values, radius)
-	}
-
-	if len(values) == 0 {
-		return true
-	}
-
-	for len(values) < borderRadiusValueCount {
-		switch len(values) {
-		case 1:
-			values = append(values, values[0], values[0], values[0])
-		case borderRadiusPairCount:
-			values = append(values, values[0], values[1])
-		case borderRadiusTripleCount:
-			values = append(values, values[1])
-		}
-	}
-
-	style.BorderRadiusTopLeft = values[0]
-	style.BorderRadiusTopRight = values[1]
-	style.BorderRadiusBottomRight = values[2]
-	style.BorderRadiusBottomLeft = values[3]
-	style.BorderRadiusPercent = -1
-
-	if values[0] == values[1] && values[1] == values[2] && values[2] == values[3] {
-		style.BorderRadius = values[0]
-	} else {
-		style.BorderRadius = 0
-	}
-
-	return true
 }
 
 func applyBorderAllSides(style *ResolvedStyle, value string, fsize float64) bool {
@@ -802,7 +1264,7 @@ func applyBorderAllSides(style *ResolvedStyle, value string, fsize float64) bool
 		return true
 	}
 
-	if b, ok := parseBorder(value, fsize); ok {
+	if b, ok := parseBorder(value, fsize, style.Color); ok {
 		style.BorderTop, style.BorderRight, style.BorderBottom, style.BorderLeft = b, b, b, b
 	}
 
@@ -826,14 +1288,14 @@ func applyBorderOneSide(style *ResolvedStyle, prop, value string, fsize float64)
 	return true
 }
 
-func setBorderSide(_ *ResolvedStyle, side *border, value string, fsize float64) {
+func setBorderSide(style *ResolvedStyle, side *border, value string, fsize float64) {
 	if strings.EqualFold(strings.TrimSpace(value), cssDisplayNone) || strings.TrimSpace(value) == "0" {
 		*side = border{Width: 0, PaintWidth: 0, Style: "", Color: [3]float64{0, 0, 0}}
 
 		return
 	}
 
-	if b, ok := parseBorder(value, fsize); ok {
+	if b, ok := parseBorder(value, fsize, style.Color); ok {
 		*side = b
 	}
 }
@@ -872,24 +1334,31 @@ func applyBorderStyleColorProps(style *ResolvedStyle, prop, value string) bool {
 	switch prop {
 	case borderStyleKeyword:
 		s := value
-		if s != solidKeyword && s != "dashed" && s != "dotted" {
+		if s != solidKeyword && s != borderStyleDashed && s != borderStyleDotted {
 			s = cssDisplayNone
 		}
 
 		style.BorderTop.Style, style.BorderRight.Style, style.BorderBottom.Style, style.BorderLeft.Style = s, s, s, s
 	case borderColorKeyword:
-		if r, g, b, _, ok := css.ParseColor(value); ok {
-			c := [3]float64{float64(r) / 255, float64(g) / 255, float64(b) / 255}
+		if c, ok := parseUsedColor(value, style.Color); ok {
 			style.BorderTop.Color, style.BorderRight.Color, style.BorderBottom.Color, style.BorderLeft.Color = c, c, c, c
 		}
 	case "border-top-color":
-		setBorderColor(&style.BorderTop, value)
+		setBorderColor(&style.BorderTop, value, style.Color)
 	case "border-right-color":
-		setBorderColor(&style.BorderRight, value)
+		setBorderColor(&style.BorderRight, value, style.Color)
 	case "border-bottom-color":
-		setBorderColor(&style.BorderBottom, value)
+		setBorderColor(&style.BorderBottom, value, style.Color)
 	case "border-left-color":
-		setBorderColor(&style.BorderLeft, value)
+		setBorderColor(&style.BorderLeft, value, style.Color)
+	case "border-top-style":
+		setBorderStyleSide(&style.BorderTop, value)
+	case "border-right-style":
+		setBorderStyleSide(&style.BorderRight, value)
+	case "border-bottom-style":
+		setBorderStyleSide(&style.BorderBottom, value)
+	case "border-left-style":
+		setBorderStyleSide(&style.BorderLeft, value)
 	default:
 		return false
 	}
@@ -897,9 +1366,18 @@ func applyBorderStyleColorProps(style *ResolvedStyle, prop, value string) bool {
 	return true
 }
 
-func setBorderColor(side *border, value string) {
-	if r, g, b, _, ok := css.ParseColor(value); ok {
-		side.Color = [3]float64{float64(r) / 255, float64(g) / 255, float64(b) / 255}
+func setBorderStyleSide(side *border, value string) {
+	s := strings.ToLower(strings.TrimSpace(value))
+	if s != solidKeyword && s != borderStyleDashed && s != borderStyleDotted {
+		s = cssDisplayNone
+	}
+
+	side.Style = s
+}
+
+func setBorderColor(side *border, value string, current [3]float64) {
+	if c, ok := parseUsedColor(value, current); ok {
+		side.Color = c
 	}
 }
 
@@ -918,16 +1396,16 @@ func applyColorGroup(
 func applyColorForegroundProps(style *ResolvedStyle, prop, value string, parent *ResolvedStyle, hasParent bool) bool {
 	switch prop {
 	case "color":
-		if value == inheritKeyword {
+		if value == inheritKeyword || isCurrentColor(value) {
 			if hasParent && parent != nil {
 				style.Color = parent.Color
 			}
-		} else if r, g, b, _, ok := css.ParseColor(value); ok {
-			style.Color = [3]float64{float64(r) / 255, float64(g) / 255, float64(b) / 255}
+		} else if c, ok := parseUsedColor(value, style.Color); ok {
+			style.Color = c
 		}
 	case "accent-color":
-		if value == inheritKeyword {
-			if hasParent && parent != nil && parent.AccentColorSet {
+		if value == inheritKeyword || isCurrentColor(value) {
+			if hasParent && parent != nil {
 				style.AccentColor = parent.AccentColor
 				style.AccentColorSet = true
 			}
@@ -946,6 +1424,7 @@ func applyColorForegroundProps(style *ResolvedStyle, prop, value string, parent 
 	return true
 }
 
+//nolint:cyclop,mnd // color background properties
 func applyColorBackgroundProps(style *ResolvedStyle, prop, value string) bool {
 	switch prop {
 	case "background-color":
@@ -953,9 +1432,36 @@ func applyColorBackgroundProps(style *ResolvedStyle, prop, value string) bool {
 			style.BGColor = [4]float64{float64(r) / 255, float64(g) / 255, float64(b) / 255, a}
 		}
 	case "background":
-		if r, g, b, a, ok := firstBackgroundColor(value); ok {
-			style.BGColor = [4]float64{float64(r) / 255, float64(g) / 255, float64(b) / 255, a}
+		applyBackgroundShorthand(style, value)
+	case "background-image":
+		applyBackgroundImageValue(style, value)
+	case "background-position":
+		parts := strings.Fields(strings.TrimSpace(value))
+		if len(parts) >= 2 {
+			style.BackgroundPosX = parts[0]
+			style.BackgroundPosY = parts[1]
+		} else if len(parts) == 1 {
+			style.BackgroundPosX = parts[0]
+			style.BackgroundPosY = parts[0]
 		}
+	case "background-position-x", "background-position-inline":
+		style.BackgroundPosX = strings.TrimSpace(value)
+	case "background-position-y", "background-position-block":
+		style.BackgroundPosY = strings.TrimSpace(value)
+	case "background-size":
+		style.BackgroundSize = strings.TrimSpace(value)
+	case "background-repeat":
+		style.BackgroundRepeat = strings.TrimSpace(value)
+	case "background-repeat-x", "background-repeat-inline":
+		style.BackgroundRepeat = "repeat-x"
+	case "background-repeat-y", "background-repeat-block":
+		style.BackgroundRepeat = "repeat-y"
+	case "background-clip":
+		style.BackgroundClip = strings.ToLower(strings.TrimSpace(value))
+	case "background-origin":
+		style.BackgroundOrigin = strings.ToLower(strings.TrimSpace(value))
+	case "background-attachment":
+		style.BackgroundAttachment = strings.ToLower(strings.TrimSpace(value))
 	default:
 		return false
 	}
@@ -1009,6 +1515,15 @@ func applyTextGroup(
 	style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext,
 	parent *ResolvedStyle, hasParent bool,
 ) bool {
+	switch prop {
+	case "text-align-last", "text-align-all", "tab-size", "text-wrap", "text-wrap-mode", "text-wrap-style",
+		"white-space-collapse", "white-space-trim", "hyphens", "hyphenate-character",
+		"text-justify", "line-break", "text-decoration-line", "text-decoration-color",
+		"text-decoration-style", "text-decoration-thickness", "text-underline-offset",
+		"text-underline-position", "text-shadow":
+		return applyTextPropsWave3(style, prop, value, fsize, parent, hasParent)
+	}
+
 	if applyTextLayoutProps(style, prop, value) {
 		return true
 	}
@@ -1022,6 +1537,10 @@ func applyTextGroup(
 	}
 
 	if applyListProps(style, prop, value) {
+		return true
+	}
+
+	if applyGeneratedContentProps(style, prop, value) {
 		return true
 	}
 
@@ -1085,10 +1604,9 @@ func setVerticalAlignValue(style *ResolvedStyle, value string) {
 
 func setWhiteSpaceValue(style *ResolvedStyle, value string) {
 	switch value {
-	case contentNormal, "nowrap":
+	case contentNormal, cssWhiteSpaceNowrap, cssWhiteSpacePre,
+		cssWhiteSpacePreWrap, cssWhiteSpacePreLine:
 		style.WhiteSpace = value
-	case "pre", "pre-wrap", "pre-line":
-		style.WhiteSpace = "pre"
 	}
 }
 
@@ -1132,8 +1650,8 @@ func applyTextDecorationProps(style *ResolvedStyle, prop, value string, parent *
 		switch value {
 		case cssTextDecorationUnderline:
 			style.TextDecoration = cssTextDecorationUnderline
-		case "line-through":
-			style.TextDecoration = "line-through"
+		case cssTextDecorationLineThrough:
+			style.TextDecoration = cssTextDecorationLineThrough
 		case cssDisplayNone:
 			style.TextDecoration = cssDisplayNone
 		case inheritKeyword:
@@ -1154,11 +1672,20 @@ func applyListProps(style *ResolvedStyle, prop, value string) bool {
 		if t := parseListStyleType(value); t != "" {
 			style.ListStyleType = t
 		}
+	case "list-style-position":
+		if pos := parseListStylePosition(value); pos != "" {
+			style.ListStylePosition = pos
+		}
 	case "list-style":
-		// Shorthand: accept type keywords; ignore position/image for now.
+		applyListStyleImageValue(style, value)
+
 		for _, tok := range strings.Fields(value) {
 			if t := parseListStyleType(tok); t != "" {
 				style.ListStyleType = t
+			}
+
+			if pos := parseListStylePosition(tok); pos != "" {
+				style.ListStylePosition = pos
 			}
 		}
 	default:
@@ -1172,6 +1699,12 @@ func applyTextSpacingProps(style *ResolvedStyle, prop, value string, fsize float
 	switch prop {
 	case "letter-spacing":
 		style.LetterSpacing = marginLen(value, fsize, ctx.viewportW)
+	case "word-spacing":
+		if value == contentNormal {
+			style.WordSpacing = 0
+		} else {
+			style.WordSpacing = marginLen(value, fsize, ctx.viewportW)
+		}
 	case "text-indent":
 		style.TextIndent = marginLen(value, fsize, ctx.viewportW)
 	default:
@@ -1181,16 +1714,19 @@ func applyTextSpacingProps(style *ResolvedStyle, prop, value string, fsize float
 	return true
 }
 
-// applyTableBreakGroup handles table borders/spacing and page-break props.
+// applyTableBreakGroup handles table layout, page-break, orphans/widows, and container queries.
 func applyTableBreakGroup(
-	style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext, _ *ResolvedStyle, _ bool,
+	style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext,
+	parent *ResolvedStyle, _ bool,
 ) bool {
 	switch prop {
-	case "border-collapse", "border-spacing", "table-layout":
+	case "border-collapse", "border-spacing", "table-layout", "caption-side":
 		return applyTableProps(style, prop, value, fsize, ctx.viewportW)
 	case "page-break-before", "break-before", "page-break-after", "break-after",
-		"page-break-inside", "break-inside":
+		"page-break-inside", "break-inside", "margin-break":
 		return applyPageBreakProps(style, prop, value)
+	case pageKeyword:
+		return applyPageNameProp(style, value, parent)
 	case "orphans", "widows":
 		return applyOrphansWidowsProps(style, prop, value)
 	case "container-type", "container-name", containerKeyword:
@@ -1203,20 +1739,42 @@ func applyTableBreakGroup(
 func applyTableProps(style *ResolvedStyle, prop, value string, fsize, viewportW float64) bool {
 	switch prop {
 	case "border-collapse":
-		if value == "collapse" || value == "separate" {
+		if value == borderCollapseValue || value == "separate" {
 			style.BorderCollapse = value
 		}
 	case "border-spacing":
-		style.BorderSpacing = marginLen(value, fsize, viewportW)
+		applyBorderSpacingValue(style, value, fsize, viewportW)
 	case "table-layout":
 		if value == positionFixed || value == overflowAuto {
 			style.TableLayout = value
 		}
+	case "caption-side":
+		applyCaptionSideValue(style, value)
 	default:
 		return false
 	}
 
 	return true
+}
+
+func applyBorderSpacingValue(style *ResolvedStyle, value string, fsize, viewportW float64) {
+	fields := strings.Fields(strings.TrimSpace(value))
+	if len(fields) >= twoTokens {
+		style.BorderSpacing = marginLen(fields[0], fsize, viewportW)
+		style.BorderSpacingV = marginLen(fields[1], fsize, viewportW)
+	} else if len(fields) == 1 {
+		sp := marginLen(fields[0], fsize, viewportW)
+		style.BorderSpacing = sp
+		style.BorderSpacingV = sp
+	}
+}
+
+func applyCaptionSideValue(style *ResolvedStyle, value string) {
+	value = strings.ToLower(strings.TrimSpace(value))
+	switch value {
+	case cssVerticalAlignTop, cssVerticalAlignBottom, floatLeft, floatRight:
+		style.CaptionSide = value
+	}
 }
 
 func applyPageBreakProps(style *ResolvedStyle, prop, value string) bool {
@@ -1227,6 +1785,17 @@ func applyPageBreakProps(style *ResolvedStyle, prop, value string) bool {
 		return applyBreakAfterProps(style, value)
 	case "page-break-inside", "break-inside":
 		return applyBreakInsideProps(style, value)
+	case "margin-break":
+		val := strings.ToLower(strings.TrimSpace(value))
+		if val == marginBreakKeep || val == "discard" || val == "auto" {
+			style.MarginBreak = val
+
+			return true
+		}
+
+		return false
+	case "page":
+		return applyLeftoversProps(style, prop, value, 0)
 	default:
 		return false
 	}
@@ -1272,6 +1841,36 @@ func applyBreakInsideProps(style *ResolvedStyle, value string) bool {
 	default:
 		return false
 	}
+
+	return true
+}
+
+func applyPageNameProp(style *ResolvedStyle, value string, parent *ResolvedStyle) bool {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return true
+	}
+
+	low := strings.ToLower(value)
+	switch low {
+	case "auto", inheritKeyword:
+		if parent != nil {
+			style.PageName = parent.PageName
+		}
+
+		return true
+	case "initial", "unset":
+		style.PageName = ""
+
+		return true
+	}
+
+	if !css.IsIdentToken(value) {
+		return false
+	}
+
+	style.PageName = low
+	style.Page = low
 
 	return true
 }
@@ -1331,7 +1930,14 @@ func applyTransformGroup(
 		if spec, ok := parseTransformOrigin(value, fsize); ok {
 			style.TransformOrigin = spec
 		}
+	case "transform-box", "transform-style", "perspective", "perspective-origin",
+		"backface-visibility", "rotate", "scale", "translate":
+		return applyLeftoversProps(style, prop, value, fsize)
 	default:
+		if applyAdvancedProps(style, prop, value, fsize) {
+			return true
+		}
+
 		return false
 	}
 

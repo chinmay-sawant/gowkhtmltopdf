@@ -1,0 +1,2475 @@
+<!DOCTYPE html>
+<!--
+  fixture-58-unsupported-worklist-audit
+  Proves: safe parsing, cascade degrade, and crash resilience for all 462
+  unsupported CSS properties in gowkhtmltopdf (animations, scroll snap,
+  pointer UI, speech, 3D, and experimental drafts).
+  Expected: multi-page; envelope in fixturePageBounds.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Unsupported CSS Worklist Audit (462 Properties)</title>
+  <style>
+
+
+    @page {
+      size: A4;
+      margin: 12mm;
+      @top-left {
+        content: "VANGUARD SYSTEMS · TELEMETRY DIGEST";
+      }
+      @bottom-center {
+        content: "CONFIDENTIAL · FLIGHT ENGINEERING AUDIT";
+      }
+    }
+
+    @page :first {
+      margin-top: 14mm;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: clamp(9pt, 1.6vw, 10.5pt);
+      line-height: 1.48;
+      color: hsl(220, 24%, 18%);
+      background-color: hsl(216, 28%, 97%);
+      padding: 0;
+    }
+
+    .document-container {
+      width: 100%;
+      margin-inline: auto;
+    }
+
+    /* Page container with explicit page-break-after */
+    .audit-page {
+      position: relative;
+      width: 100%;
+      min-height: 270mm;
+      padding-block: 6mm 10mm;
+      padding-inline: 4mm;
+      background-color: hsl(0, 0%, 100%);
+      page-break-after: always;
+    }
+
+    .audit-page:last-of-type {
+      page-break-after: auto;
+    }
+
+    /* Header banner with background-image data URI and logical borders */
+    .masthead-banner {
+      background-color: hsl(222, 64%, 16%);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Cpath d='M0 20 L20 0 L40 20 L20 40 Z' fill='none' stroke='%232a3f66' stroke-width='1'/%3E%3C/svg%3E");
+      background-repeat: repeat;
+      background-size: 20px 20px;
+      color: hsl(210, 40%, 98%);
+      padding-block: 16px 14px;
+      padding-inline: 20px;
+      border-top-left-radius: 12px;
+      border-top-right-radius: 4px;
+      border-bottom-right-radius: 12px;
+      border-bottom-left-radius: 4px;
+      border-block-start: 3px solid hsl(196, 92%, 46%);
+      box-shadow: 0 4px 14px hsla(222, 50%, 10%, 0.16);
+      margin-block-end: 18px;
+    }
+
+    .masthead-top {
+      display: flex;
+      flex-flow: row wrap;
+      place-content: space-between center;
+      margin-block-end: 8px;
+    }
+
+    .system-badge {
+      font-size: 8.5pt;
+      font-weight: bold;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: hsl(196, 92%, 46%);
+      background-color: hsla(196, 92%, 46%, 0.15);
+      padding-block: 3px 2px;
+      padding-inline: 8px;
+      border-radius: 4px / 2px;
+      outline: 1px solid hsl(196, 85%, 40%);
+      outline-offset: 1px;
+    }
+
+    .document-ref {
+      font-size: 8pt;
+      color: hsl(215, 30%, 75%);
+    }
+
+    .masthead-title {
+      font-size: clamp(16pt, 3.2vw, 22pt);
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      word-spacing: 0.08em;
+      color: hsl(0, 0%, 100%);
+      margin-block-end: 6px;
+    }
+
+    .masthead-sub {
+      font-size: 9.5pt;
+      color: hsl(215, 30%, 82%);
+      max-width: 72ch;
+      line-height: 1.4;
+    }
+
+    /* Counter setup for numbered sections and requirement clauses */
+    body {
+      counter-reset: audit-section req-clause;
+    }
+
+    .section-block {
+      counter-increment: audit-section;
+      margin-block-end: 18px;
+    }
+
+    .section-heading {
+      font-size: 13pt;
+      font-weight: 700;
+      color: hsl(222, 60%, 20%);
+      padding-block-end: 5px;
+      border-block-end: 1.5px solid hsl(218, 25%, 85%);
+      margin-block-end: 12px;
+      word-spacing: 0.12em;
+    }
+
+    .section-heading::before {
+      content: "§ " counter(audit-section) " · ";
+      color: hsl(196, 90%, 38%);
+      font-weight: 600;
+    }
+
+    /* Selectors :is() and :where() */
+    :is(.spec-card, .metric-panel, .kpi-block) {
+      background-color: hsl(0, 0%, 100%);
+      border: 1px solid hsl(216, 24%, 88%);
+      padding-block: 10px 12px;
+      padding-inline: 14px;
+      margin-block-end: 10px;
+    }
+
+    :where(.callout-box, .status-pill) {
+      font-size: 8.5pt;
+      border-radius: 4px;
+    }
+
+    /* KPI Grid using flex-flow and place-content */
+    .kpi-row {
+      display: flex;
+      flex-flow: row wrap;
+      place-content: space-between stretch;
+      gap: 12px;
+      margin-block-end: 16px;
+    }
+
+    .kpi-card {
+      flex: 1 1 22%;
+      min-width: 110px;
+      background-color: hsl(216, 32%, 98%);
+      border-block-start: 3px solid hsl(222, 50%, 35%);
+      border-top-left-radius: 6px;
+      border-top-right-radius: 6px;
+      border-bottom-left-radius: 4px;
+      border-bottom-right-radius: 4px;
+      padding: 1.5ex 1.5ch;
+      box-shadow: 0 2px 6px hsla(220, 20%, 30%, 0.08);
+    }
+
+    .kpi-card:nth-of-type(2) {
+      border-block-start-color: hsl(160, 68%, 36%);
+    }
+
+    .kpi-card:nth-of-type(3) {
+      border-block-start-color: hsl(38, 92%, 46%);
+    }
+
+    .kpi-card:nth-of-type(4) {
+      border-block-start-color: hsl(196, 90%, 42%);
+    }
+
+    .kpi-label {
+      font-size: 7.5pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: hsl(215, 20%, 48%);
+      margin-block-end: 4px;
+    }
+
+    .kpi-val {
+      font-size: 14pt;
+      font-weight: 700;
+      color: hsl(222, 60%, 18%);
+    }
+
+    .kpi-delta {
+      font-size: 7.5pt;
+      font-weight: 600;
+      color: hsl(160, 68%, 32%);
+      margin-block-start: 3px;
+    }
+
+    /* Attribute selector with case-insensitive flag [data-status="certified" i] */
+    .status-tag[data-status="certified" i] {
+      background-color: hsla(160, 68%, 36%, 0.12);
+      color: hsl(160, 72%, 28%);
+      border: 1px solid hsl(160, 60%, 45%);
+      padding-inline: 6px;
+      padding-block: 2px;
+      font-weight: bold;
+      border-radius: 3px;
+      display: inline-block;
+    }
+
+    .status-tag[data-status="nominal" i] {
+      background-color: hsla(196, 90%, 42%, 0.12);
+      color: hsl(196, 92%, 30%);
+      border: 1px solid hsl(196, 75%, 50%);
+      padding-inline: 6px;
+      padding-block: 2px;
+      font-weight: bold;
+      border-radius: 3px;
+      display: inline-block;
+    }
+
+    /* Two-column layout with outline and box-shadow */
+    .grid-duo {
+      display: flex;
+      flex-flow: row wrap;
+      gap: 14px;
+      margin-block-end: 16px;
+    }
+
+    .grid-duo > .col-left {
+      flex: 1 1 58%;
+    }
+
+    .grid-duo > .col-right {
+      flex: 1 1 38%;
+    }
+
+    .panel-featured {
+      background-color: hsl(0, 0%, 100%);
+      border: 1px solid hsl(216, 20%, 84%);
+      border-radius: 8px;
+      padding: 12px 14px;
+      outline: 2px solid hsl(196, 85%, 44%);
+      outline-offset: 3px;
+      box-shadow: 0 4px 12px hsla(220, 30%, 20%, 0.08);
+      margin-block: 4px 10px;
+    }
+
+    /* Quotes and pseudo-elements */
+    q {
+      quotes: "«" "»" "‹" "›";
+      font-style: italic;
+      color: hsl(222, 50%, 24%);
+    }
+
+    q::before {
+      content: open-quote;
+      font-weight: bold;
+      color: hsl(196, 90%, 38%);
+    }
+
+    q::after {
+      content: close-quote;
+      font-weight: bold;
+      color: hsl(196, 90%, 38%);
+    }
+
+    .quote-box {
+      background-color: hsl(216, 35%, 97%);
+      border-inline-start: 4px solid hsl(196, 90%, 42%);
+      padding-block: 8px 10px;
+      padding-inline: 12px;
+      margin-block: 10px;
+      border-radius: 0 6px 6px 0;
+    }
+
+    /* Telemetry dump with white-space: pre-wrap and overflow: hidden */
+    .telemetry-dump {
+      font-family: monospace;
+      font-size: 8pt;
+      background-color: hsl(222, 45%, 12%);
+      color: hsl(160, 80%, 75%);
+      padding: 10px 12px;
+      border-radius: 6px;
+      white-space: pre-wrap;
+      overflow: hidden;
+      line-height: 1.4;
+      margin-block: 8px;
+    }
+
+    /* Lists with list-style-position: inside and list-style-image data URI */
+    .audit-list {
+      list-style-position: inside;
+      list-style-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpolygon points='1,2 8,5 1,8' fill='%230b7285'/%3E%3C/svg%3E");
+      margin-block: 8px;
+      padding-inline-start: 4px;
+    }
+
+    .audit-list li {
+      margin-block-end: 6px;
+      color: hsl(220, 25%, 25%);
+    }
+
+    /* List item counter numbering */
+    .req-list {
+      list-style-type: none;
+      margin-block: 8px;
+      padding-inline-start: 0;
+    }
+
+    .req-list li {
+      counter-increment: req-clause;
+      margin-block-end: 8px;
+      padding-block: 6px 7px;
+      padding-inline: 10px;
+      background-color: hsl(216, 30%, 97%);
+      border-radius: 4px;
+      border-inline-start: 3px solid hsl(222, 50%, 45%);
+    }
+
+    .req-list li::before {
+      content: "REQ-" counter(audit-section) "." counter(req-clause) " · ";
+      font-weight: bold;
+      color: hsl(222, 60%, 25%);
+    }
+
+    /* Table styling with table-layout: fixed and caption-side: bottom */
+    .audit-table {
+      width: 100%;
+      table-layout: fixed;
+      border-collapse: collapse;
+      margin-block: 10px 12px;
+      font-size: 8.5pt;
+    }
+
+    .audit-table caption {
+      caption-side: bottom;
+      font-size: 7.5pt;
+      color: hsl(215, 20%, 50%);
+      text-align: right;
+      padding-block-start: 6px;
+      font-style: italic;
+    }
+
+    .audit-table th,
+    .audit-table td {
+      padding-block: 6px 7px;
+      padding-inline: 8px;
+      text-align: left;
+      border-block-end: 1px solid hsl(216, 20%, 88%);
+      word-wrap: break-word;
+    }
+
+    .audit-table th {
+      background-color: hsl(222, 55%, 22%);
+      color: hsl(0, 0%, 100%);
+      font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+
+    .audit-table tr:nth-of-type(even) td {
+      background-color: hsl(216, 30%, 98%);
+    }
+
+    .audit-table tr:last-of-type td {
+      border-block-end: 2px solid hsl(222, 50%, 35%);
+      font-weight: 600;
+    }
+
+    /* Visibility hidden spacer vs visible item */
+    .spacer-cell {
+      visibility: hidden;
+    }
+
+    /* Multi-column layout with column-rule */
+    .multi-column-text {
+      column-count: 2;
+      column-gap: 20px;
+      column-rule: 1.5px solid hsl(218, 25%, 85%);
+      margin-block: 10px 14px;
+      font-size: 8.5pt;
+      text-align: justify;
+    }
+
+    .multi-column-text p {
+      margin-block-end: 8px;
+    }
+
+    /* Sign-off footer */
+    .signoff-box {
+      margin-block-start: 16px;
+      padding-block: 10px 12px;
+      padding-inline: 14px;
+      background-color: hsl(216, 32%, 97%);
+      border: 1px solid hsl(216, 20%, 85%);
+      border-radius: 6px;
+      display: flex;
+      flex-flow: row wrap;
+      place-content: space-between center;
+    }
+
+    .signoff-col {
+      flex: 1 1 45%;
+    }
+
+    .signoff-label {
+      font-size: 7.5pt;
+      font-weight: bold;
+      color: hsl(215, 20%, 45%);
+      text-transform: uppercase;
+    }
+
+    .signoff-val {
+      font-size: 9pt;
+      font-weight: bold;
+      color: hsl(222, 60%, 20%);
+    }
+  
+
+    /* ===== Fixture-57 browser-print probe gallery (571 goal:implement) ===== */
+    .probe-page {
+      position: relative;
+      width: 100%;
+      padding-block: 6mm 8mm;
+      padding-inline: 3mm;
+      background-color: hsl(0, 0%, 100%);
+      page-break-after: always;
+    }
+    .probe-page:last-of-type {
+      page-break-after: auto;
+    }
+    .probe-heading {
+      font-size: 12pt;
+      font-weight: 700;
+      color: hsl(222, 55%, 22%);
+      margin-block-end: 6px;
+      padding-block-end: 3px;
+      border-block-end: 2px solid hsl(196, 80%, 42%);
+    }
+    .probe-note {
+      font-size: 8pt;
+      color: hsl(215, 18%, 40%);
+      margin-block-end: 8px;
+    }
+    .probe-grid {
+      display: flex;
+      flex-flow: row wrap;
+      gap: 3pt;
+      align-items: stretch;
+    }
+    .probe {
+      flex: 0 0 auto;
+      min-width: 88pt;
+      max-width: 120pt;
+      padding: 3pt 4pt;
+      border: 0.5pt solid hsl(210, 20%, 82%);
+      border-radius: 2pt;
+      background: hsl(210, 40%, 98%);
+      font-size: 6.5pt;
+      line-height: 1.25;
+    }
+    .probe code {
+      display: block;
+      font-family: "Courier New", Courier, monospace;
+      color: hsl(222, 50%, 25%);
+      word-break: break-all;
+    }
+    .probe .badge {
+      display: inline-block;
+      margin-block-start: 1pt;
+      font-size: 5.5pt;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 0 3pt;
+      border-radius: 2pt;
+    }
+    .badge.impl {
+      background: hsl(150, 45%, 88%);
+      color: hsl(150, 50%, 25%);
+    }
+    .badge.todo {
+      background: hsl(35, 80%, 90%);
+      color: hsl(25, 60%, 30%);
+    }
+    .isolate-frame {
+      margin-block: 6pt;
+      padding: 6pt;
+      border: 1pt dashed hsl(210, 25%, 70%);
+      background: hsl(210, 30%, 97%);
+    }
+    .isolate-frame .probe {
+      max-width: none;
+      width: 100%;
+    }
+
+
+
+    .p--webkit-animation {
+      -webkit-animation: initial;
+    }
+    .p--webkit-animation-delay {
+      -webkit-animation-delay: initial;
+    }
+    .p--webkit-animation-direction {
+      -webkit-animation-direction: initial;
+    }
+    .p--webkit-animation-duration {
+      -webkit-animation-duration: initial;
+    }
+    .p--webkit-animation-fill-mode {
+      -webkit-animation-fill-mode: hsl(210, 55%, 35%);
+    }
+    .p--webkit-animation-iteration-count {
+      -webkit-animation-iteration-count: initial;
+    }
+    .p--webkit-animation-name {
+      -webkit-animation-name: initial;
+    }
+    .p--webkit-animation-play-state {
+      -webkit-animation-play-state: initial;
+    }
+    .p--webkit-animation-timing-function {
+      -webkit-animation-timing-function: initial;
+    }
+    .p--webkit-appearance {
+      -webkit-appearance: initial;
+    }
+    .p--webkit-backface-visibility {
+      -webkit-backface-visibility: initial;
+    }
+    .p--webkit-background-clip {
+      -webkit-background-clip: initial;
+    }
+    .p--webkit-background-origin {
+      -webkit-background-origin: initial;
+    }
+    .p--webkit-background-size {
+      -webkit-background-size: initial;
+    }
+    .p--webkit-line-clamp {
+      -webkit-line-clamp: initial;
+    }
+    .p--webkit-mask {
+      -webkit-mask: initial;
+    }
+    .p--webkit-mask-box-image {
+      -webkit-mask-box-image: initial;
+    }
+    .p--webkit-mask-box-image-outset {
+      -webkit-mask-box-image-outset: initial;
+    }
+    .p--webkit-mask-box-image-repeat {
+      -webkit-mask-box-image-repeat: initial;
+    }
+    .p--webkit-mask-box-image-slice {
+      -webkit-mask-box-image-slice: initial;
+    }
+    .p--webkit-mask-box-image-source {
+      -webkit-mask-box-image-source: initial;
+    }
+    .p--webkit-mask-box-image-width {
+      -webkit-mask-box-image-width: initial;
+    }
+    .p--webkit-mask-clip {
+      -webkit-mask-clip: initial;
+    }
+    .p--webkit-mask-composite {
+      -webkit-mask-composite: initial;
+    }
+    .p--webkit-mask-image {
+      -webkit-mask-image: initial;
+    }
+    .p--webkit-mask-origin {
+      -webkit-mask-origin: initial;
+    }
+    .p--webkit-mask-position {
+      -webkit-mask-position: initial;
+    }
+    .p--webkit-mask-repeat {
+      -webkit-mask-repeat: initial;
+    }
+    .p--webkit-mask-size {
+      -webkit-mask-size: initial;
+    }
+    .p--webkit-perspective {
+      -webkit-perspective: initial;
+    }
+    .p--webkit-perspective-origin {
+      -webkit-perspective-origin: initial;
+    }
+    .p--webkit-text-size-adjust {
+      -webkit-text-size-adjust: initial;
+    }
+    .p--webkit-text-stroke {
+      -webkit-text-stroke: hsl(210, 55%, 35%);
+    }
+    .p--webkit-text-stroke-color {
+      -webkit-text-stroke-color: hsl(210, 55%, 35%);
+    }
+    .p--webkit-text-stroke-width {
+      -webkit-text-stroke-width: hsl(210, 55%, 35%);
+    }
+    .p--webkit-transform-style {
+      -webkit-transform-style: rotate(0deg);
+    }
+    .p--webkit-transition {
+      -webkit-transition: initial;
+    }
+    .p--webkit-transition-delay {
+      -webkit-transition-delay: initial;
+    }
+    .p--webkit-transition-duration {
+      -webkit-transition-duration: initial;
+    }
+    .p--webkit-transition-property {
+      -webkit-transition-property: initial;
+    }
+    .p--webkit-transition-timing-function {
+      -webkit-transition-timing-function: initial;
+    }
+    .p--webkit-user-select {
+      -webkit-user-select: initial;
+    }
+    .p-alignment-baseline {
+      alignment-baseline: initial;
+    }
+    .p-all {
+      all: initial;
+    }
+    .p-anchor-name {
+      anchor-name: initial;
+    }
+    .p-anchor-scope {
+      anchor-scope: initial;
+    }
+    .p-animation {
+      animation: initial;
+    }
+    .p-animation-composition {
+      animation-composition: initial;
+    }
+    .p-animation-delay {
+      animation-delay: initial;
+    }
+    .p-animation-delay-end {
+      animation-delay-end: initial;
+    }
+    .p-animation-delay-start {
+      animation-delay-start: initial;
+    }
+    .p-animation-direction {
+      animation-direction: initial;
+    }
+    .p-animation-duration {
+      animation-duration: initial;
+    }
+    .p-animation-fill-mode {
+      animation-fill-mode: hsl(210, 55%, 35%);
+    }
+    .p-animation-iteration-count {
+      animation-iteration-count: initial;
+    }
+    .p-animation-name {
+      animation-name: initial;
+    }
+    .p-animation-play-state {
+      animation-play-state: initial;
+    }
+    .p-animation-range {
+      animation-range: initial;
+    }
+    .p-animation-range-center {
+      animation-range-center: initial;
+    }
+    .p-animation-range-end {
+      animation-range-end: initial;
+    }
+    .p-animation-range-start {
+      animation-range-start: initial;
+    }
+    .p-animation-timeline {
+      animation-timeline: initial;
+    }
+    .p-animation-timing-function {
+      animation-timing-function: initial;
+    }
+    .p-animation-trigger {
+      animation-trigger: initial;
+    }
+    .p-appearance {
+      appearance: initial;
+    }
+    .p-aspect-ratio {
+      aspect-ratio: initial;
+    }
+    .p-backdrop-filter {
+      backdrop-filter: opacity(0.95);
+    }
+    .p-backface-visibility {
+      backface-visibility: initial;
+    }
+    .p-background-tbd {
+      background-tbd: initial;
+    }
+    .p-baseline-shift {
+      baseline-shift: initial;
+    }
+    .p-baseline-source {
+      baseline-source: initial;
+    }
+    .p-block-ellipsis {
+      block-ellipsis: initial;
+    }
+    .p-block-step {
+      block-step: initial;
+    }
+    .p-block-step-align {
+      block-step-align: initial;
+    }
+    .p-block-step-insert {
+      block-step-insert: initial;
+    }
+    .p-block-step-round {
+      block-step-round: initial;
+    }
+    .p-block-step-size {
+      block-step-size: initial;
+    }
+    .p-border-block-clip {
+      border-block-clip: 1px solid hsl(210, 20%, 82%);
+    }
+    .p-border-block-end-clip {
+      border-block-end-clip: 1px solid hsl(210, 20%, 82%);
+    }
+    .p-border-block-start-clip {
+      border-block-start-clip: 1px solid hsl(210, 20%, 82%);
+    }
+    .p-border-bottom-clip {
+      border-bottom-clip: 1px solid hsl(210, 20%, 82%);
+    }
+    .p-border-boundary {
+      border-boundary: 1px solid hsl(210, 20%, 82%);
+    }
+    .p-border-clip {
+      border-clip: 1px solid hsl(210, 20%, 82%);
+    }
+    .p-border-inline-clip {
+      border-inline-clip: 1px solid hsl(210, 20%, 82%);
+    }
+    .p-border-inline-end-clip {
+      border-inline-end-clip: 1px solid hsl(210, 20%, 82%);
+    }
+    .p-border-inline-start-clip {
+      border-inline-start-clip: 1px solid hsl(210, 20%, 82%);
+    }
+    .p-border-left-clip {
+      border-left-clip: 1px solid hsl(210, 20%, 82%);
+    }
+    .p-border-limit {
+      border-limit: 1px solid hsl(210, 20%, 82%);
+    }
+    .p-border-right-clip {
+      border-right-clip: 1px solid hsl(210, 20%, 82%);
+    }
+    .p-border-shape {
+      border-shape: 1px solid hsl(210, 20%, 82%);
+    }
+    .p-border-top-clip {
+      border-top-clip: 1px solid hsl(210, 20%, 82%);
+    }
+    .p-box-snap {
+      box-snap: initial;
+    }
+    .p-caret {
+      caret: initial;
+    }
+    .p-caret-animation {
+      caret-animation: initial;
+    }
+    .p-caret-color {
+      caret-color: hsl(210, 55%, 35%);
+    }
+    .p-caret-shape {
+      caret-shape: initial;
+    }
+    .p-clip {
+      clip: initial;
+    }
+    .p-clip-path {
+      clip-path: initial;
+    }
+    .p-clip-rule {
+      clip-rule: initial;
+    }
+    .p-color-interpolation {
+      color-interpolation: hsl(210, 55%, 35%);
+    }
+    .p-color-interpolation-filters {
+      color-interpolation-filters: hsl(210, 55%, 35%);
+    }
+    .p-column-height {
+      column-height: initial;
+    }
+    .p-column-rule-break {
+      column-rule-break: initial;
+    }
+    .p-column-rule-inset {
+      column-rule-inset: initial;
+    }
+    .p-column-rule-inset-cap {
+      column-rule-inset-cap: initial;
+    }
+    .p-column-rule-inset-cap-end {
+      column-rule-inset-cap-end: initial;
+    }
+    .p-column-rule-inset-cap-start {
+      column-rule-inset-cap-start: initial;
+    }
+    .p-column-rule-inset-end {
+      column-rule-inset-end: initial;
+    }
+    .p-column-rule-inset-junction {
+      column-rule-inset-junction: initial;
+    }
+    .p-column-rule-inset-junction-end {
+      column-rule-inset-junction-end: initial;
+    }
+    .p-column-rule-inset-junction-start {
+      column-rule-inset-junction-start: initial;
+    }
+    .p-column-rule-inset-start {
+      column-rule-inset-start: initial;
+    }
+    .p-column-rule-visibility-items {
+      column-rule-visibility-items: initial;
+    }
+    .p-column-wrap {
+      column-wrap: initial;
+    }
+    .p-continue {
+      continue: initial;
+    }
+    .p-copy-into {
+      copy-into: initial;
+    }
+    .p-corner {
+      corner: initial;
+    }
+    .p-corner-block-end {
+      corner-block-end: initial;
+    }
+    .p-corner-block-end-shape {
+      corner-block-end-shape: initial;
+    }
+    .p-corner-block-start {
+      corner-block-start: initial;
+    }
+    .p-corner-block-start-shape {
+      corner-block-start-shape: initial;
+    }
+    .p-corner-bottom {
+      corner-bottom: initial;
+    }
+    .p-corner-bottom-left {
+      corner-bottom-left: initial;
+    }
+    .p-corner-bottom-left-shape {
+      corner-bottom-left-shape: initial;
+    }
+    .p-corner-bottom-right {
+      corner-bottom-right: initial;
+    }
+    .p-corner-bottom-right-shape {
+      corner-bottom-right-shape: initial;
+    }
+    .p-corner-bottom-shape {
+      corner-bottom-shape: initial;
+    }
+    .p-corner-end-end {
+      corner-end-end: initial;
+    }
+    .p-corner-end-end-shape {
+      corner-end-end-shape: initial;
+    }
+    .p-corner-end-start {
+      corner-end-start: initial;
+    }
+    .p-corner-end-start-shape {
+      corner-end-start-shape: initial;
+    }
+    .p-corner-inline-end {
+      corner-inline-end: initial;
+    }
+    .p-corner-inline-end-shape {
+      corner-inline-end-shape: initial;
+    }
+    .p-corner-inline-start {
+      corner-inline-start: initial;
+    }
+    .p-corner-inline-start-shape {
+      corner-inline-start-shape: initial;
+    }
+    .p-corner-left {
+      corner-left: initial;
+    }
+    .p-corner-left-shape {
+      corner-left-shape: initial;
+    }
+    .p-corner-right {
+      corner-right: initial;
+    }
+    .p-corner-right-shape {
+      corner-right-shape: initial;
+    }
+    .p-corner-shape {
+      corner-shape: initial;
+    }
+    .p-corner-start-end {
+      corner-start-end: initial;
+    }
+    .p-corner-start-end-shape {
+      corner-start-end-shape: initial;
+    }
+    .p-corner-start-start {
+      corner-start-start: initial;
+    }
+    .p-corner-start-start-shape {
+      corner-start-start-shape: initial;
+    }
+    .p-corner-top {
+      corner-top: initial;
+    }
+    .p-corner-top-left {
+      corner-top-left: initial;
+    }
+    .p-corner-top-left-shape {
+      corner-top-left-shape: initial;
+    }
+    .p-corner-top-right {
+      corner-top-right: initial;
+    }
+    .p-corner-top-right-shape {
+      corner-top-right-shape: initial;
+    }
+    .p-corner-top-shape {
+      corner-top-shape: initial;
+    }
+    .p-counter-set {
+      counter-set: initial;
+    }
+    .p-cue {
+      cue: initial;
+    }
+    .p-cue-after {
+      cue-after: initial;
+    }
+    .p-cue-before {
+      cue-before: initial;
+    }
+    .p-cursor {
+      cursor: initial;
+    }
+    .p-cx {
+      cx: initial;
+    }
+    .p-cy {
+      cy: initial;
+    }
+    .p-d {
+      d: initial;
+    }
+    .p-dominant-baseline {
+      dominant-baseline: initial;
+    }
+    .p-empty-cells {
+      empty-cells: initial;
+    }
+    .p-event-trigger {
+      event-trigger: initial;
+    }
+    .p-event-trigger-name {
+      event-trigger-name: initial;
+    }
+    .p-event-trigger-source {
+      event-trigger-source: initial;
+    }
+    .p-field-sizing {
+      field-sizing: initial;
+    }
+    .p-fill-break {
+      fill-break: hsl(210, 55%, 35%);
+    }
+    .p-fill-color {
+      fill-color: hsl(210, 55%, 35%);
+    }
+    .p-fill-image {
+      fill-image: hsl(210, 55%, 35%);
+    }
+    .p-fill-origin {
+      fill-origin: hsl(210, 55%, 35%);
+    }
+    .p-fill-position {
+      fill-position: hsl(210, 55%, 35%);
+    }
+    .p-fill-repeat {
+      fill-repeat: hsl(210, 55%, 35%);
+    }
+    .p-fill-rule {
+      fill-rule: hsl(210, 55%, 35%);
+    }
+    .p-fill-size {
+      fill-size: hsl(210, 55%, 35%);
+    }
+    .p-flex-line-count {
+      flex-line-count: initial;
+    }
+    .p-float-defer {
+      float-defer: initial;
+    }
+    .p-float-offset {
+      float-offset: initial;
+    }
+    .p-float-reference {
+      float-reference: initial;
+    }
+    .p-flood-color {
+      flood-color: hsl(210, 55%, 35%);
+    }
+    .p-flood-opacity {
+      flood-opacity: initial;
+    }
+    .p-flow-from {
+      flow-from: initial;
+    }
+    .p-flow-into {
+      flow-into: initial;
+    }
+    .p-flow-tolerance {
+      flow-tolerance: initial;
+    }
+    .p-font-feature-settings {
+      font-feature-settings: inherit;
+    }
+    .p-font-kerning {
+      font-kerning: inherit;
+    }
+    .p-font-size-adjust {
+      font-size-adjust: inherit;
+    }
+    .p-font-stretch {
+      font-stretch: inherit;
+    }
+    .p-font-synthesis {
+      font-synthesis: inherit;
+    }
+    .p-font-synthesis-position {
+      font-synthesis-position: inherit;
+    }
+    .p-font-synthesis-small-caps {
+      font-synthesis-small-caps: inherit;
+    }
+    .p-font-synthesis-style {
+      font-synthesis-style: inherit;
+    }
+    .p-font-synthesis-weight {
+      font-synthesis-weight: inherit;
+    }
+    .p-font-variant {
+      font-variant: inherit;
+    }
+    .p-font-variant-alternates {
+      font-variant-alternates: inherit;
+    }
+    .p-font-variant-caps {
+      font-variant-caps: inherit;
+    }
+    .p-font-variant-east-asian {
+      font-variant-east-asian: inherit;
+    }
+    .p-font-variant-emoji {
+      font-variant-emoji: inherit;
+    }
+    .p-font-variant-ligatures {
+      font-variant-ligatures: inherit;
+    }
+    .p-font-variant-numeric {
+      font-variant-numeric: inherit;
+    }
+    .p-font-variant-position {
+      font-variant-position: inherit;
+    }
+    .p-font-width {
+      font-width: inherit;
+    }
+    .p-frame-sizing {
+      frame-sizing: initial;
+    }
+    .p-glyph-orientation-vertical {
+      glyph-orientation-vertical: initial;
+    }
+    .p-grid-auto-columns {
+      grid-auto-columns: initial;
+    }
+    .p-grid-auto-rows {
+      grid-auto-rows: initial;
+    }
+    .p-grid-column-gap {
+      grid-column-gap: initial;
+    }
+    .p-grid-gap {
+      grid-gap: initial;
+    }
+    .p-grid-row-gap {
+      grid-row-gap: initial;
+    }
+    .p-hanging-punctuation {
+      hanging-punctuation: initial;
+    }
+    .p-hyphenate-limit-chars {
+      hyphenate-limit-chars: initial;
+    }
+    .p-hyphenate-limit-last {
+      hyphenate-limit-last: initial;
+    }
+    .p-hyphenate-limit-lines {
+      hyphenate-limit-lines: initial;
+    }
+    .p-hyphenate-limit-zone {
+      hyphenate-limit-zone: initial;
+    }
+    .p-image-animation {
+      image-animation: initial;
+    }
+    .p-image-rendering {
+      image-rendering: initial;
+    }
+    .p-initial-letter {
+      initial-letter: initial;
+    }
+    .p-initial-letter-align {
+      initial-letter-align: initial;
+    }
+    .p-initial-letter-wrap {
+      initial-letter-wrap: initial;
+    }
+    .p-inline-sizing {
+      inline-sizing: initial;
+    }
+    .p-input-security {
+      input-security: initial;
+    }
+    .p-interactivity {
+      interactivity: initial;
+    }
+    .p-interest-delay {
+      interest-delay: initial;
+    }
+    .p-interest-delay-end {
+      interest-delay-end: initial;
+    }
+    .p-interest-delay-start {
+      interest-delay-start: initial;
+    }
+    .p-interpolate-size {
+      interpolate-size: initial;
+    }
+    .p-lighting-color {
+      lighting-color: hsl(210, 55%, 35%);
+    }
+    .p-line-fit-edge {
+      line-fit-edge: initial;
+    }
+    .p-line-grid {
+      line-grid: initial;
+    }
+    .p-line-height-step {
+      line-height-step: initial;
+    }
+    .p-line-padding {
+      line-padding: 4px;
+    }
+    .p-line-snap {
+      line-snap: initial;
+    }
+    .p-link-parameters {
+      link-parameters: initial;
+    }
+    .p-marker {
+      marker: initial;
+    }
+    .p-marker-end {
+      marker-end: initial;
+    }
+    .p-marker-mid {
+      marker-mid: initial;
+    }
+    .p-marker-side {
+      marker-side: initial;
+    }
+    .p-marker-start {
+      marker-start: initial;
+    }
+    .p-mask {
+      mask: initial;
+    }
+    .p-mask-border {
+      mask-border: 1px solid hsl(210, 20%, 82%);
+    }
+    .p-mask-border-mode {
+      mask-border-mode: 1px solid hsl(210, 20%, 82%);
+    }
+    .p-mask-border-outset {
+      mask-border-outset: 1px solid hsl(210, 20%, 82%);
+    }
+    .p-mask-border-repeat {
+      mask-border-repeat: 1px solid hsl(210, 20%, 82%);
+    }
+    .p-mask-border-slice {
+      mask-border-slice: 1px solid hsl(210, 20%, 82%);
+    }
+    .p-mask-border-source {
+      mask-border-source: 1px solid hsl(210, 20%, 82%);
+    }
+    .p-mask-border-width {
+      mask-border-width: 1px solid hsl(210, 20%, 82%);
+    }
+    .p-mask-clip {
+      mask-clip: initial;
+    }
+    .p-mask-composite {
+      mask-composite: initial;
+    }
+    .p-mask-image {
+      mask-image: initial;
+    }
+    .p-mask-mode {
+      mask-mode: initial;
+    }
+    .p-mask-origin {
+      mask-origin: initial;
+    }
+    .p-mask-position {
+      mask-position: initial;
+    }
+    .p-mask-repeat {
+      mask-repeat: initial;
+    }
+    .p-mask-size {
+      mask-size: initial;
+    }
+    .p-mask-type {
+      mask-type: initial;
+    }
+    .p-math-depth {
+      math-depth: initial;
+    }
+    .p-math-shift {
+      math-shift: initial;
+    }
+    .p-math-style {
+      math-style: initial;
+    }
+    .p-min-intrinsic-sizing {
+      min-intrinsic-sizing: initial;
+    }
+    .p-nav-down {
+      nav-down: initial;
+    }
+    .p-nav-left {
+      nav-left: initial;
+    }
+    .p-nav-right {
+      nav-right: initial;
+    }
+    .p-nav-up {
+      nav-up: initial;
+    }
+    .p-object-fit {
+      object-fit: initial;
+    }
+    .p-object-position {
+      object-position: initial;
+    }
+    .p-offset {
+      offset: initial;
+    }
+    .p-offset-anchor {
+      offset-anchor: initial;
+    }
+    .p-offset-distance {
+      offset-distance: initial;
+    }
+    .p-offset-path {
+      offset-path: initial;
+    }
+    .p-offset-position {
+      offset-position: initial;
+    }
+    .p-offset-rotate {
+      offset-rotate: initial;
+    }
+    .p-overflow-anchor {
+      overflow-anchor: initial;
+    }
+    .p-overflow-block {
+      overflow-block: initial;
+    }
+    .p-overflow-inline {
+      overflow-inline: initial;
+    }
+    .p-overlay {
+      overlay: initial;
+    }
+    .p-overscroll-behavior {
+      overscroll-behavior: initial;
+    }
+    .p-overscroll-behavior-block {
+      overscroll-behavior-block: initial;
+    }
+    .p-overscroll-behavior-inline {
+      overscroll-behavior-inline: initial;
+    }
+    .p-overscroll-behavior-x {
+      overscroll-behavior-x: initial;
+    }
+    .p-overscroll-behavior-y {
+      overscroll-behavior-y: initial;
+    }
+    .p-paint-order {
+      paint-order: initial;
+    }
+    .p-path-length {
+      path-length: initial;
+    }
+    .p-pause {
+      pause: initial;
+    }
+    .p-pause-after {
+      pause-after: initial;
+    }
+    .p-pause-before {
+      pause-before: initial;
+    }
+    .p-perspective {
+      perspective: initial;
+    }
+    .p-perspective-origin {
+      perspective-origin: initial;
+    }
+    .p-pointer-events {
+      pointer-events: initial;
+    }
+    .p-pointer-timeline {
+      pointer-timeline: initial;
+    }
+    .p-pointer-timeline-axis {
+      pointer-timeline-axis: initial;
+    }
+    .p-pointer-timeline-name {
+      pointer-timeline-name: initial;
+    }
+    .p-position-anchor {
+      position-anchor: initial;
+    }
+    .p-position-area {
+      position-area: initial;
+    }
+    .p-position-try {
+      position-try: initial;
+    }
+    .p-position-try-fallbacks {
+      position-try-fallbacks: initial;
+    }
+    .p-position-try-order {
+      position-try-order: initial;
+    }
+    .p-position-visibility {
+      position-visibility: initial;
+    }
+    .p-r {
+      r: initial;
+    }
+    .p-reading-flow {
+      reading-flow: initial;
+    }
+    .p-reading-order {
+      reading-order: initial;
+    }
+    .p-region-fragment {
+      region-fragment: initial;
+    }
+    .p-resize {
+      resize: initial;
+    }
+    .p-rest {
+      rest: initial;
+    }
+    .p-rest-after {
+      rest-after: initial;
+    }
+    .p-rest-before {
+      rest-before: initial;
+    }
+    .p-row-rule {
+      row-rule: initial;
+    }
+    .p-row-rule-break {
+      row-rule-break: initial;
+    }
+    .p-row-rule-color {
+      row-rule-color: hsl(210, 55%, 35%);
+    }
+    .p-row-rule-inset {
+      row-rule-inset: initial;
+    }
+    .p-row-rule-inset-cap {
+      row-rule-inset-cap: initial;
+    }
+    .p-row-rule-inset-cap-end {
+      row-rule-inset-cap-end: initial;
+    }
+    .p-row-rule-inset-cap-start {
+      row-rule-inset-cap-start: initial;
+    }
+    .p-row-rule-inset-end {
+      row-rule-inset-end: initial;
+    }
+    .p-row-rule-inset-junction {
+      row-rule-inset-junction: initial;
+    }
+    .p-row-rule-inset-junction-end {
+      row-rule-inset-junction-end: initial;
+    }
+    .p-row-rule-inset-junction-start {
+      row-rule-inset-junction-start: initial;
+    }
+    .p-row-rule-inset-start {
+      row-rule-inset-start: initial;
+    }
+    .p-row-rule-style {
+      row-rule-style: initial;
+    }
+    .p-row-rule-visibility-items {
+      row-rule-visibility-items: initial;
+    }
+    .p-row-rule-width {
+      row-rule-width: initial;
+    }
+    .p-ruby-align {
+      ruby-align: initial;
+    }
+    .p-ruby-merge {
+      ruby-merge: initial;
+    }
+    .p-ruby-overhang {
+      ruby-overhang: initial;
+    }
+    .p-ruby-position {
+      ruby-position: initial;
+    }
+    .p-rule {
+      rule: initial;
+    }
+    .p-rule-break {
+      rule-break: initial;
+    }
+    .p-rule-color {
+      rule-color: hsl(210, 55%, 35%);
+    }
+    .p-rule-inset {
+      rule-inset: initial;
+    }
+    .p-rule-inset-cap {
+      rule-inset-cap: initial;
+    }
+    .p-rule-inset-end {
+      rule-inset-end: initial;
+    }
+    .p-rule-inset-junction {
+      rule-inset-junction: initial;
+    }
+    .p-rule-inset-start {
+      rule-inset-start: initial;
+    }
+    .p-rule-overlap {
+      rule-overlap: initial;
+    }
+    .p-rule-style {
+      rule-style: initial;
+    }
+    .p-rule-visibility-items {
+      rule-visibility-items: initial;
+    }
+    .p-rule-width {
+      rule-width: initial;
+    }
+    .p-rx {
+      rx: initial;
+    }
+    .p-ry {
+      ry: initial;
+    }
+    .p-scroll-axis-lock {
+      scroll-axis-lock: initial;
+    }
+    .p-scroll-behavior {
+      scroll-behavior: initial;
+    }
+    .p-scroll-initial-target {
+      scroll-initial-target: initial;
+    }
+    .p-scroll-margin {
+      scroll-margin: 4px;
+    }
+    .p-scroll-margin-block {
+      scroll-margin-block: 4px;
+    }
+    .p-scroll-margin-block-end {
+      scroll-margin-block-end: 4px;
+    }
+    .p-scroll-margin-block-start {
+      scroll-margin-block-start: 4px;
+    }
+    .p-scroll-margin-bottom {
+      scroll-margin-bottom: 4px;
+    }
+    .p-scroll-margin-inline {
+      scroll-margin-inline: 4px;
+    }
+    .p-scroll-margin-inline-end {
+      scroll-margin-inline-end: 4px;
+    }
+    .p-scroll-margin-inline-start {
+      scroll-margin-inline-start: 4px;
+    }
+    .p-scroll-margin-left {
+      scroll-margin-left: 4px;
+    }
+    .p-scroll-margin-right {
+      scroll-margin-right: 4px;
+    }
+    .p-scroll-margin-top {
+      scroll-margin-top: 4px;
+    }
+    .p-scroll-marker-group {
+      scroll-marker-group: initial;
+    }
+    .p-scroll-padding {
+      scroll-padding: 4px;
+    }
+    .p-scroll-padding-block {
+      scroll-padding-block: 4px;
+    }
+    .p-scroll-padding-block-end {
+      scroll-padding-block-end: 4px;
+    }
+    .p-scroll-padding-block-start {
+      scroll-padding-block-start: 4px;
+    }
+    .p-scroll-padding-bottom {
+      scroll-padding-bottom: 4px;
+    }
+    .p-scroll-padding-inline {
+      scroll-padding-inline: 4px;
+    }
+    .p-scroll-padding-inline-end {
+      scroll-padding-inline-end: 4px;
+    }
+    .p-scroll-padding-inline-start {
+      scroll-padding-inline-start: 4px;
+    }
+    .p-scroll-padding-left {
+      scroll-padding-left: 4px;
+    }
+    .p-scroll-padding-right {
+      scroll-padding-right: 4px;
+    }
+    .p-scroll-padding-top {
+      scroll-padding-top: 4px;
+    }
+    .p-scroll-snap-align {
+      scroll-snap-align: initial;
+    }
+    .p-scroll-snap-stop {
+      scroll-snap-stop: initial;
+    }
+    .p-scroll-snap-type {
+      scroll-snap-type: initial;
+    }
+    .p-scroll-target-group {
+      scroll-target-group: initial;
+    }
+    .p-scroll-timeline {
+      scroll-timeline: initial;
+    }
+    .p-scroll-timeline-axis {
+      scroll-timeline-axis: initial;
+    }
+    .p-scroll-timeline-name {
+      scroll-timeline-name: initial;
+    }
+    .p-scrollbar-color {
+      scrollbar-color: hsl(210, 55%, 35%);
+    }
+    .p-scrollbar-gutter {
+      scrollbar-gutter: initial;
+    }
+    .p-scrollbar-width {
+      scrollbar-width: initial;
+    }
+    .p-shape-image-threshold {
+      shape-image-threshold: initial;
+    }
+    .p-shape-inside {
+      shape-inside: initial;
+    }
+    .p-shape-margin {
+      shape-margin: 4px;
+    }
+    .p-shape-outside {
+      shape-outside: initial;
+    }
+    .p-shape-padding {
+      shape-padding: 4px;
+    }
+    .p-shape-rendering {
+      shape-rendering: initial;
+    }
+    .p-slider-orientation {
+      slider-orientation: initial;
+    }
+    .p-spatial-navigation-action {
+      spatial-navigation-action: initial;
+    }
+    .p-spatial-navigation-contain {
+      spatial-navigation-contain: initial;
+    }
+    .p-spatial-navigation-function {
+      spatial-navigation-function: initial;
+    }
+    .p-speak {
+      speak: initial;
+    }
+    .p-speak-as {
+      speak-as: initial;
+    }
+    .p-stop-color {
+      stop-color: hsl(210, 55%, 35%);
+    }
+    .p-stop-opacity {
+      stop-opacity: initial;
+    }
+    .p-stroke-align {
+      stroke-align: hsl(210, 55%, 35%);
+    }
+    .p-stroke-alignment {
+      stroke-alignment: hsl(210, 55%, 35%);
+    }
+    .p-stroke-break {
+      stroke-break: hsl(210, 55%, 35%);
+    }
+    .p-stroke-color {
+      stroke-color: hsl(210, 55%, 35%);
+    }
+    .p-stroke-dash-corner {
+      stroke-dash-corner: hsl(210, 55%, 35%);
+    }
+    .p-stroke-dash-justify {
+      stroke-dash-justify: hsl(210, 55%, 35%);
+    }
+    .p-stroke-dashadjust {
+      stroke-dashadjust: hsl(210, 55%, 35%);
+    }
+    .p-stroke-dasharray {
+      stroke-dasharray: hsl(210, 55%, 35%);
+    }
+    .p-stroke-dashcorner {
+      stroke-dashcorner: hsl(210, 55%, 35%);
+    }
+    .p-stroke-dashoffset {
+      stroke-dashoffset: hsl(210, 55%, 35%);
+    }
+    .p-stroke-image {
+      stroke-image: hsl(210, 55%, 35%);
+    }
+    .p-stroke-linecap {
+      stroke-linecap: hsl(210, 55%, 35%);
+    }
+    .p-stroke-linejoin {
+      stroke-linejoin: hsl(210, 55%, 35%);
+    }
+    .p-stroke-miterlimit {
+      stroke-miterlimit: hsl(210, 55%, 35%);
+    }
+    .p-stroke-origin {
+      stroke-origin: hsl(210, 55%, 35%);
+    }
+    .p-stroke-position {
+      stroke-position: hsl(210, 55%, 35%);
+    }
+    .p-stroke-repeat {
+      stroke-repeat: hsl(210, 55%, 35%);
+    }
+    .p-stroke-size {
+      stroke-size: hsl(210, 55%, 35%);
+    }
+    .p-text-anchor {
+      text-anchor: initial;
+    }
+    .p-text-autospace {
+      text-autospace: initial;
+    }
+    .p-text-box {
+      text-box: initial;
+    }
+    .p-text-box-edge {
+      text-box-edge: initial;
+    }
+    .p-text-box-trim {
+      text-box-trim: initial;
+    }
+    .p-text-fit {
+      text-fit: initial;
+    }
+    .p-text-group-align {
+      text-group-align: initial;
+    }
+    .p-text-rendering {
+      text-rendering: initial;
+    }
+    .p-text-size-adjust {
+      text-size-adjust: initial;
+    }
+    .p-text-spacing {
+      text-spacing: initial;
+    }
+    .p-text-spacing-trim {
+      text-spacing-trim: initial;
+    }
+    .p-timeline-scope {
+      timeline-scope: initial;
+    }
+    .p-timeline-trigger {
+      timeline-trigger: initial;
+    }
+    .p-timeline-trigger-activation-range {
+      timeline-trigger-activation-range: initial;
+    }
+    .p-timeline-trigger-activation-range-end {
+      timeline-trigger-activation-range-end: initial;
+    }
+    .p-timeline-trigger-activation-range-start {
+      timeline-trigger-activation-range-start: initial;
+    }
+    .p-timeline-trigger-active-range {
+      timeline-trigger-active-range: initial;
+    }
+    .p-timeline-trigger-active-range-end {
+      timeline-trigger-active-range-end: initial;
+    }
+    .p-timeline-trigger-active-range-start {
+      timeline-trigger-active-range-start: initial;
+    }
+    .p-timeline-trigger-name {
+      timeline-trigger-name: initial;
+    }
+    .p-timeline-trigger-source {
+      timeline-trigger-source: initial;
+    }
+    .p-touch-action {
+      touch-action: initial;
+    }
+    .p-transform-style {
+      transform-style: rotate(0deg);
+    }
+    .p-transition {
+      transition: initial;
+    }
+    .p-transition-behavior {
+      transition-behavior: initial;
+    }
+    .p-transition-delay {
+      transition-delay: initial;
+    }
+    .p-transition-duration {
+      transition-duration: initial;
+    }
+    .p-transition-property {
+      transition-property: initial;
+    }
+    .p-transition-timing-function {
+      transition-timing-function: initial;
+    }
+    .p-trigger-scope {
+      trigger-scope: initial;
+    }
+    .p-user-select {
+      user-select: initial;
+    }
+    .p-vector-effect {
+      vector-effect: initial;
+    }
+    .p-view-timeline {
+      view-timeline: initial;
+    }
+    .p-view-timeline-axis {
+      view-timeline-axis: initial;
+    }
+    .p-view-timeline-inset {
+      view-timeline-inset: initial;
+    }
+    .p-view-timeline-name {
+      view-timeline-name: initial;
+    }
+    .p-view-transition-class {
+      view-transition-class: initial;
+    }
+    .p-view-transition-group {
+      view-transition-group: initial;
+    }
+    .p-view-transition-name {
+      view-transition-name: initial;
+    }
+    .p-view-transition-scope {
+      view-transition-scope: initial;
+    }
+    .p-voice-balance {
+      voice-balance: initial;
+    }
+    .p-voice-duration {
+      voice-duration: initial;
+    }
+    .p-voice-family {
+      voice-family: initial;
+    }
+    .p-voice-pitch {
+      voice-pitch: initial;
+    }
+    .p-voice-range {
+      voice-range: initial;
+    }
+    .p-voice-rate {
+      voice-rate: initial;
+    }
+    .p-voice-stress {
+      voice-stress: initial;
+    }
+    .p-voice-volume {
+      voice-volume: initial;
+    }
+    .p-will-change {
+      will-change: initial;
+    }
+    .p-window-drag {
+      window-drag: initial;
+    }
+    .p-word-space-transform {
+      word-space-transform: rotate(0deg);
+    }
+    .p-wrap-after {
+      wrap-after: initial;
+    }
+    .p-wrap-before {
+      wrap-before: initial;
+    }
+    .p-wrap-flow {
+      wrap-flow: initial;
+    }
+    .p-wrap-inside {
+      wrap-inside: initial;
+    }
+    .p-wrap-through {
+      wrap-through: initial;
+    }
+    .p-x {
+      x: initial;
+    }
+    .p-y {
+      y: initial;
+    }
+    .p-zoom {
+      zoom: initial;
+    }
+  </style>
+</head>
+<body>
+<div class="document-container">
+
+  <div class="audit-page">
+    <div class="masthead-banner">
+      <div class="masthead-top">
+        <span class="system-badge">VANGUARD LABS · AUDIT REPO</span>
+        <span class="document-ref">DOC-REF: CSS-UNSUPP-462-AUDIT</span>
+      </div>
+      <h1 class="masthead-title">UNSUPPORTED-WORKLIST-AUDIT</h1>
+      <p class="masthead-sub">
+        Catalog isolation and crash resilience verification harness for all 462 unsupported and deferred CSS properties.
+      </p>
+    </div>
+
+    <div class="section-block">
+      <h2 class="section-heading">Triage Rationale and Technical Scope</h2>
+      <p style="margin-bottom: 10px; font-size: 9pt; line-height: 1.5;">
+        Static print PDF documents have no continuous JavaScript runtime loop, no interactive mouse pointer, no scroll viewport, and no audio speaker device. The following categories are formally classified as unsupported print non-goals or browser-only features:
+      </p>
+      <div class="kpi-row">
+        <div class="kpi-card">
+          <div class="kpi-label">Animation &amp; Timelines</div>
+          <div class="kpi-val">45 Props</div>
+          <div class="kpi-delta">Static print captures t=0</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Interactive Scroll</div>
+          <div class="kpi-val">41 Props</div>
+          <div class="kpi-delta">Paginated sheets</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Pointer &amp; UI Chrome</div>
+          <div class="kpi-val">25 Props</div>
+          <div class="kpi-delta">No mouse / caret</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Speech &amp; Aural</div>
+          <div class="kpi-val">19 Props</div>
+          <div class="kpi-delta">Visual PDF stream</div>
+        </div>
+      </div>
+      <p class="probe-note">NEEDLE-MARK: VANGUARD-CSS-UNSUPPORTED-SAFE</p>
+    </div>
+  </div>
+
+
+  <div class="probe-page">
+    <h2 class="probe-heading">Unsupported CSS probe gallery 1/8 (462 properties)</h2>
+    <p class="probe-note">Each chip sets one unsupported property to verify safe cascade ignore and layout crash resilience.</p>
+    <div class="probe-grid">
+        <div class="probe p--webkit-animation" data-prop="-webkit-animation" data-status="unsupported"><code>-webkit-animation</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-animation-delay" data-prop="-webkit-animation-delay" data-status="unsupported"><code>-webkit-animation-delay</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-animation-direction" data-prop="-webkit-animation-direction" data-status="unsupported"><code>-webkit-animation-direction</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-animation-duration" data-prop="-webkit-animation-duration" data-status="unsupported"><code>-webkit-animation-duration</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-animation-fill-mode" data-prop="-webkit-animation-fill-mode" data-status="unsupported"><code>-webkit-animation-fill-mode</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-animation-iteration-count" data-prop="-webkit-animation-iteration-count" data-status="unsupported"><code>-webkit-animation-iteration-count</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-animation-name" data-prop="-webkit-animation-name" data-status="unsupported"><code>-webkit-animation-name</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-animation-play-state" data-prop="-webkit-animation-play-state" data-status="unsupported"><code>-webkit-animation-play-state</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-animation-timing-function" data-prop="-webkit-animation-timing-function" data-status="unsupported"><code>-webkit-animation-timing-function</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-appearance" data-prop="-webkit-appearance" data-status="unsupported"><code>-webkit-appearance</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-backface-visibility" data-prop="-webkit-backface-visibility" data-status="unsupported"><code>-webkit-backface-visibility</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-background-clip" data-prop="-webkit-background-clip" data-status="unsupported"><code>-webkit-background-clip</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-background-origin" data-prop="-webkit-background-origin" data-status="unsupported"><code>-webkit-background-origin</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-background-size" data-prop="-webkit-background-size" data-status="unsupported"><code>-webkit-background-size</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-line-clamp" data-prop="-webkit-line-clamp" data-status="unsupported"><code>-webkit-line-clamp</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-mask" data-prop="-webkit-mask" data-status="unsupported"><code>-webkit-mask</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-mask-box-image" data-prop="-webkit-mask-box-image" data-status="unsupported"><code>-webkit-mask-box-image</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-mask-box-image-outset" data-prop="-webkit-mask-box-image-outset" data-status="unsupported"><code>-webkit-mask-box-image-outset</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-mask-box-image-repeat" data-prop="-webkit-mask-box-image-repeat" data-status="unsupported"><code>-webkit-mask-box-image-repeat</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-mask-box-image-slice" data-prop="-webkit-mask-box-image-slice" data-status="unsupported"><code>-webkit-mask-box-image-slice</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-mask-box-image-source" data-prop="-webkit-mask-box-image-source" data-status="unsupported"><code>-webkit-mask-box-image-source</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-mask-box-image-width" data-prop="-webkit-mask-box-image-width" data-status="unsupported"><code>-webkit-mask-box-image-width</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-mask-clip" data-prop="-webkit-mask-clip" data-status="unsupported"><code>-webkit-mask-clip</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-mask-composite" data-prop="-webkit-mask-composite" data-status="unsupported"><code>-webkit-mask-composite</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-mask-image" data-prop="-webkit-mask-image" data-status="unsupported"><code>-webkit-mask-image</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-mask-origin" data-prop="-webkit-mask-origin" data-status="unsupported"><code>-webkit-mask-origin</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-mask-position" data-prop="-webkit-mask-position" data-status="unsupported"><code>-webkit-mask-position</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-mask-repeat" data-prop="-webkit-mask-repeat" data-status="unsupported"><code>-webkit-mask-repeat</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-mask-size" data-prop="-webkit-mask-size" data-status="unsupported"><code>-webkit-mask-size</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-perspective" data-prop="-webkit-perspective" data-status="unsupported"><code>-webkit-perspective</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-perspective-origin" data-prop="-webkit-perspective-origin" data-status="unsupported"><code>-webkit-perspective-origin</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-text-size-adjust" data-prop="-webkit-text-size-adjust" data-status="unsupported"><code>-webkit-text-size-adjust</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-text-stroke" data-prop="-webkit-text-stroke" data-status="unsupported"><code>-webkit-text-stroke</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-text-stroke-color" data-prop="-webkit-text-stroke-color" data-status="unsupported"><code>-webkit-text-stroke-color</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-text-stroke-width" data-prop="-webkit-text-stroke-width" data-status="unsupported"><code>-webkit-text-stroke-width</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-transform-style" data-prop="-webkit-transform-style" data-status="unsupported"><code>-webkit-transform-style</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-transition" data-prop="-webkit-transition" data-status="unsupported"><code>-webkit-transition</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-transition-delay" data-prop="-webkit-transition-delay" data-status="unsupported"><code>-webkit-transition-delay</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-transition-duration" data-prop="-webkit-transition-duration" data-status="unsupported"><code>-webkit-transition-duration</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-transition-property" data-prop="-webkit-transition-property" data-status="unsupported"><code>-webkit-transition-property</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-transition-timing-function" data-prop="-webkit-transition-timing-function" data-status="unsupported"><code>-webkit-transition-timing-function</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p--webkit-user-select" data-prop="-webkit-user-select" data-status="unsupported"><code>-webkit-user-select</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-alignment-baseline" data-prop="alignment-baseline" data-status="unsupported"><code>alignment-baseline</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-all" data-prop="all" data-status="unsupported"><code>all</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-anchor-name" data-prop="anchor-name" data-status="unsupported"><code>anchor-name</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-anchor-scope" data-prop="anchor-scope" data-status="unsupported"><code>anchor-scope</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-animation" data-prop="animation" data-status="unsupported"><code>animation</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-animation-composition" data-prop="animation-composition" data-status="unsupported"><code>animation-composition</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-animation-delay" data-prop="animation-delay" data-status="unsupported"><code>animation-delay</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-animation-delay-end" data-prop="animation-delay-end" data-status="unsupported"><code>animation-delay-end</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-animation-delay-start" data-prop="animation-delay-start" data-status="unsupported"><code>animation-delay-start</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-animation-direction" data-prop="animation-direction" data-status="unsupported"><code>animation-direction</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-animation-duration" data-prop="animation-duration" data-status="unsupported"><code>animation-duration</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-animation-fill-mode" data-prop="animation-fill-mode" data-status="unsupported"><code>animation-fill-mode</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-animation-iteration-count" data-prop="animation-iteration-count" data-status="unsupported"><code>animation-iteration-count</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-animation-name" data-prop="animation-name" data-status="unsupported"><code>animation-name</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-animation-play-state" data-prop="animation-play-state" data-status="unsupported"><code>animation-play-state</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-animation-range" data-prop="animation-range" data-status="unsupported"><code>animation-range</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-animation-range-center" data-prop="animation-range-center" data-status="unsupported"><code>animation-range-center</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-animation-range-end" data-prop="animation-range-end" data-status="unsupported"><code>animation-range-end</code><span class="badge todo">unsupported</span></div>
+    </div>
+  </div>
+
+  <div class="probe-page">
+    <h2 class="probe-heading">Unsupported CSS probe gallery 2/8 (462 properties)</h2>
+    <p class="probe-note">Each chip sets one unsupported property to verify safe cascade ignore and layout crash resilience.</p>
+    <div class="probe-grid">
+        <div class="probe p-animation-range-start" data-prop="animation-range-start" data-status="unsupported"><code>animation-range-start</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-animation-timeline" data-prop="animation-timeline" data-status="unsupported"><code>animation-timeline</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-animation-timing-function" data-prop="animation-timing-function" data-status="unsupported"><code>animation-timing-function</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-animation-trigger" data-prop="animation-trigger" data-status="unsupported"><code>animation-trigger</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-appearance" data-prop="appearance" data-status="unsupported"><code>appearance</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-aspect-ratio" data-prop="aspect-ratio" data-status="unsupported"><code>aspect-ratio</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-backdrop-filter" data-prop="backdrop-filter" data-status="unsupported"><code>backdrop-filter</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-backface-visibility" data-prop="backface-visibility" data-status="unsupported"><code>backface-visibility</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-background-tbd" data-prop="background-tbd" data-status="unsupported"><code>background-tbd</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-baseline-shift" data-prop="baseline-shift" data-status="unsupported"><code>baseline-shift</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-baseline-source" data-prop="baseline-source" data-status="unsupported"><code>baseline-source</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-block-ellipsis" data-prop="block-ellipsis" data-status="unsupported"><code>block-ellipsis</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-block-step" data-prop="block-step" data-status="unsupported"><code>block-step</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-block-step-align" data-prop="block-step-align" data-status="unsupported"><code>block-step-align</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-block-step-insert" data-prop="block-step-insert" data-status="unsupported"><code>block-step-insert</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-block-step-round" data-prop="block-step-round" data-status="unsupported"><code>block-step-round</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-block-step-size" data-prop="block-step-size" data-status="unsupported"><code>block-step-size</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-border-block-clip" data-prop="border-block-clip" data-status="unsupported"><code>border-block-clip</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-border-block-end-clip" data-prop="border-block-end-clip" data-status="unsupported"><code>border-block-end-clip</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-border-block-start-clip" data-prop="border-block-start-clip" data-status="unsupported"><code>border-block-start-clip</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-border-bottom-clip" data-prop="border-bottom-clip" data-status="unsupported"><code>border-bottom-clip</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-border-boundary" data-prop="border-boundary" data-status="unsupported"><code>border-boundary</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-border-clip" data-prop="border-clip" data-status="unsupported"><code>border-clip</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-border-inline-clip" data-prop="border-inline-clip" data-status="unsupported"><code>border-inline-clip</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-border-inline-end-clip" data-prop="border-inline-end-clip" data-status="unsupported"><code>border-inline-end-clip</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-border-inline-start-clip" data-prop="border-inline-start-clip" data-status="unsupported"><code>border-inline-start-clip</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-border-left-clip" data-prop="border-left-clip" data-status="unsupported"><code>border-left-clip</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-border-limit" data-prop="border-limit" data-status="unsupported"><code>border-limit</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-border-right-clip" data-prop="border-right-clip" data-status="unsupported"><code>border-right-clip</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-border-shape" data-prop="border-shape" data-status="unsupported"><code>border-shape</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-border-top-clip" data-prop="border-top-clip" data-status="unsupported"><code>border-top-clip</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-box-snap" data-prop="box-snap" data-status="unsupported"><code>box-snap</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-caret" data-prop="caret" data-status="unsupported"><code>caret</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-caret-animation" data-prop="caret-animation" data-status="unsupported"><code>caret-animation</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-caret-color" data-prop="caret-color" data-status="unsupported"><code>caret-color</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-caret-shape" data-prop="caret-shape" data-status="unsupported"><code>caret-shape</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-clip" data-prop="clip" data-status="unsupported"><code>clip</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-clip-path" data-prop="clip-path" data-status="unsupported"><code>clip-path</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-clip-rule" data-prop="clip-rule" data-status="unsupported"><code>clip-rule</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-color-interpolation" data-prop="color-interpolation" data-status="unsupported"><code>color-interpolation</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-color-interpolation-filters" data-prop="color-interpolation-filters" data-status="unsupported"><code>color-interpolation-filters</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-column-height" data-prop="column-height" data-status="unsupported"><code>column-height</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-column-rule-break" data-prop="column-rule-break" data-status="unsupported"><code>column-rule-break</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-column-rule-inset" data-prop="column-rule-inset" data-status="unsupported"><code>column-rule-inset</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-column-rule-inset-cap" data-prop="column-rule-inset-cap" data-status="unsupported"><code>column-rule-inset-cap</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-column-rule-inset-cap-end" data-prop="column-rule-inset-cap-end" data-status="unsupported"><code>column-rule-inset-cap-end</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-column-rule-inset-cap-start" data-prop="column-rule-inset-cap-start" data-status="unsupported"><code>column-rule-inset-cap-start</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-column-rule-inset-end" data-prop="column-rule-inset-end" data-status="unsupported"><code>column-rule-inset-end</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-column-rule-inset-junction" data-prop="column-rule-inset-junction" data-status="unsupported"><code>column-rule-inset-junction</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-column-rule-inset-junction-end" data-prop="column-rule-inset-junction-end" data-status="unsupported"><code>column-rule-inset-junction-end</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-column-rule-inset-junction-start" data-prop="column-rule-inset-junction-start" data-status="unsupported"><code>column-rule-inset-junction-start</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-column-rule-inset-start" data-prop="column-rule-inset-start" data-status="unsupported"><code>column-rule-inset-start</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-column-rule-visibility-items" data-prop="column-rule-visibility-items" data-status="unsupported"><code>column-rule-visibility-items</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-column-wrap" data-prop="column-wrap" data-status="unsupported"><code>column-wrap</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-continue" data-prop="continue" data-status="unsupported"><code>continue</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-copy-into" data-prop="copy-into" data-status="unsupported"><code>copy-into</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-corner" data-prop="corner" data-status="unsupported"><code>corner</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-corner-block-end" data-prop="corner-block-end" data-status="unsupported"><code>corner-block-end</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-corner-block-end-shape" data-prop="corner-block-end-shape" data-status="unsupported"><code>corner-block-end-shape</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-corner-block-start" data-prop="corner-block-start" data-status="unsupported"><code>corner-block-start</code><span class="badge todo">unsupported</span></div>
+    </div>
+  </div>
+
+  <div class="probe-page">
+    <h2 class="probe-heading">Unsupported CSS probe gallery 3/8 (462 properties)</h2>
+    <p class="probe-note">Each chip sets one unsupported property to verify safe cascade ignore and layout crash resilience.</p>
+    <div class="probe-grid">
+        <div class="probe p-corner-block-start-shape" data-prop="corner-block-start-shape" data-status="unsupported"><code>corner-block-start-shape</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-corner-bottom" data-prop="corner-bottom" data-status="unsupported"><code>corner-bottom</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-corner-bottom-left" data-prop="corner-bottom-left" data-status="unsupported"><code>corner-bottom-left</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-corner-bottom-left-shape" data-prop="corner-bottom-left-shape" data-status="unsupported"><code>corner-bottom-left-shape</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-corner-bottom-right" data-prop="corner-bottom-right" data-status="unsupported"><code>corner-bottom-right</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-corner-bottom-right-shape" data-prop="corner-bottom-right-shape" data-status="unsupported"><code>corner-bottom-right-shape</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-corner-bottom-shape" data-prop="corner-bottom-shape" data-status="unsupported"><code>corner-bottom-shape</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-corner-end-end" data-prop="corner-end-end" data-status="unsupported"><code>corner-end-end</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-corner-end-end-shape" data-prop="corner-end-end-shape" data-status="unsupported"><code>corner-end-end-shape</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-corner-end-start" data-prop="corner-end-start" data-status="unsupported"><code>corner-end-start</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-corner-end-start-shape" data-prop="corner-end-start-shape" data-status="unsupported"><code>corner-end-start-shape</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-corner-inline-end" data-prop="corner-inline-end" data-status="unsupported"><code>corner-inline-end</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-corner-inline-end-shape" data-prop="corner-inline-end-shape" data-status="unsupported"><code>corner-inline-end-shape</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-corner-inline-start" data-prop="corner-inline-start" data-status="unsupported"><code>corner-inline-start</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-corner-inline-start-shape" data-prop="corner-inline-start-shape" data-status="unsupported"><code>corner-inline-start-shape</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-corner-left" data-prop="corner-left" data-status="unsupported"><code>corner-left</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-corner-left-shape" data-prop="corner-left-shape" data-status="unsupported"><code>corner-left-shape</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-corner-right" data-prop="corner-right" data-status="unsupported"><code>corner-right</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-corner-right-shape" data-prop="corner-right-shape" data-status="unsupported"><code>corner-right-shape</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-corner-shape" data-prop="corner-shape" data-status="unsupported"><code>corner-shape</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-corner-start-end" data-prop="corner-start-end" data-status="unsupported"><code>corner-start-end</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-corner-start-end-shape" data-prop="corner-start-end-shape" data-status="unsupported"><code>corner-start-end-shape</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-corner-start-start" data-prop="corner-start-start" data-status="unsupported"><code>corner-start-start</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-corner-start-start-shape" data-prop="corner-start-start-shape" data-status="unsupported"><code>corner-start-start-shape</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-corner-top" data-prop="corner-top" data-status="unsupported"><code>corner-top</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-corner-top-left" data-prop="corner-top-left" data-status="unsupported"><code>corner-top-left</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-corner-top-left-shape" data-prop="corner-top-left-shape" data-status="unsupported"><code>corner-top-left-shape</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-corner-top-right" data-prop="corner-top-right" data-status="unsupported"><code>corner-top-right</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-corner-top-right-shape" data-prop="corner-top-right-shape" data-status="unsupported"><code>corner-top-right-shape</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-corner-top-shape" data-prop="corner-top-shape" data-status="unsupported"><code>corner-top-shape</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-counter-set" data-prop="counter-set" data-status="unsupported"><code>counter-set</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-cue" data-prop="cue" data-status="unsupported"><code>cue</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-cue-after" data-prop="cue-after" data-status="unsupported"><code>cue-after</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-cue-before" data-prop="cue-before" data-status="unsupported"><code>cue-before</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-cursor" data-prop="cursor" data-status="unsupported"><code>cursor</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-cx" data-prop="cx" data-status="unsupported"><code>cx</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-cy" data-prop="cy" data-status="unsupported"><code>cy</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-d" data-prop="d" data-status="unsupported"><code>d</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-dominant-baseline" data-prop="dominant-baseline" data-status="unsupported"><code>dominant-baseline</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-empty-cells" data-prop="empty-cells" data-status="unsupported"><code>empty-cells</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-event-trigger" data-prop="event-trigger" data-status="unsupported"><code>event-trigger</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-event-trigger-name" data-prop="event-trigger-name" data-status="unsupported"><code>event-trigger-name</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-event-trigger-source" data-prop="event-trigger-source" data-status="unsupported"><code>event-trigger-source</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-field-sizing" data-prop="field-sizing" data-status="unsupported"><code>field-sizing</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-fill-break" data-prop="fill-break" data-status="unsupported"><code>fill-break</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-fill-color" data-prop="fill-color" data-status="unsupported"><code>fill-color</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-fill-image" data-prop="fill-image" data-status="unsupported"><code>fill-image</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-fill-origin" data-prop="fill-origin" data-status="unsupported"><code>fill-origin</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-fill-position" data-prop="fill-position" data-status="unsupported"><code>fill-position</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-fill-repeat" data-prop="fill-repeat" data-status="unsupported"><code>fill-repeat</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-fill-rule" data-prop="fill-rule" data-status="unsupported"><code>fill-rule</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-fill-size" data-prop="fill-size" data-status="unsupported"><code>fill-size</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-flex-line-count" data-prop="flex-line-count" data-status="unsupported"><code>flex-line-count</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-float-defer" data-prop="float-defer" data-status="unsupported"><code>float-defer</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-float-offset" data-prop="float-offset" data-status="unsupported"><code>float-offset</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-float-reference" data-prop="float-reference" data-status="unsupported"><code>float-reference</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-flood-color" data-prop="flood-color" data-status="unsupported"><code>flood-color</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-flood-opacity" data-prop="flood-opacity" data-status="unsupported"><code>flood-opacity</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-flow-from" data-prop="flow-from" data-status="unsupported"><code>flow-from</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-flow-into" data-prop="flow-into" data-status="unsupported"><code>flow-into</code><span class="badge todo">unsupported</span></div>
+    </div>
+  </div>
+
+  <div class="probe-page">
+    <h2 class="probe-heading">Unsupported CSS probe gallery 4/8 (462 properties)</h2>
+    <p class="probe-note">Each chip sets one unsupported property to verify safe cascade ignore and layout crash resilience.</p>
+    <div class="probe-grid">
+        <div class="probe p-flow-tolerance" data-prop="flow-tolerance" data-status="unsupported"><code>flow-tolerance</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-font-feature-settings" data-prop="font-feature-settings" data-status="unsupported"><code>font-feature-settings</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-font-kerning" data-prop="font-kerning" data-status="unsupported"><code>font-kerning</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-font-size-adjust" data-prop="font-size-adjust" data-status="unsupported"><code>font-size-adjust</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-font-stretch" data-prop="font-stretch" data-status="unsupported"><code>font-stretch</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-font-synthesis" data-prop="font-synthesis" data-status="unsupported"><code>font-synthesis</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-font-synthesis-position" data-prop="font-synthesis-position" data-status="unsupported"><code>font-synthesis-position</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-font-synthesis-small-caps" data-prop="font-synthesis-small-caps" data-status="unsupported"><code>font-synthesis-small-caps</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-font-synthesis-style" data-prop="font-synthesis-style" data-status="unsupported"><code>font-synthesis-style</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-font-synthesis-weight" data-prop="font-synthesis-weight" data-status="unsupported"><code>font-synthesis-weight</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-font-variant" data-prop="font-variant" data-status="unsupported"><code>font-variant</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-font-variant-alternates" data-prop="font-variant-alternates" data-status="unsupported"><code>font-variant-alternates</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-font-variant-caps" data-prop="font-variant-caps" data-status="unsupported"><code>font-variant-caps</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-font-variant-east-asian" data-prop="font-variant-east-asian" data-status="unsupported"><code>font-variant-east-asian</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-font-variant-emoji" data-prop="font-variant-emoji" data-status="unsupported"><code>font-variant-emoji</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-font-variant-ligatures" data-prop="font-variant-ligatures" data-status="unsupported"><code>font-variant-ligatures</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-font-variant-numeric" data-prop="font-variant-numeric" data-status="unsupported"><code>font-variant-numeric</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-font-variant-position" data-prop="font-variant-position" data-status="unsupported"><code>font-variant-position</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-font-width" data-prop="font-width" data-status="unsupported"><code>font-width</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-frame-sizing" data-prop="frame-sizing" data-status="unsupported"><code>frame-sizing</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-glyph-orientation-vertical" data-prop="glyph-orientation-vertical" data-status="unsupported"><code>glyph-orientation-vertical</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-grid-auto-columns" data-prop="grid-auto-columns" data-status="unsupported"><code>grid-auto-columns</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-grid-auto-rows" data-prop="grid-auto-rows" data-status="unsupported"><code>grid-auto-rows</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-grid-column-gap" data-prop="grid-column-gap" data-status="unsupported"><code>grid-column-gap</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-grid-gap" data-prop="grid-gap" data-status="unsupported"><code>grid-gap</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-grid-row-gap" data-prop="grid-row-gap" data-status="unsupported"><code>grid-row-gap</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-hanging-punctuation" data-prop="hanging-punctuation" data-status="unsupported"><code>hanging-punctuation</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-hyphenate-limit-chars" data-prop="hyphenate-limit-chars" data-status="unsupported"><code>hyphenate-limit-chars</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-hyphenate-limit-last" data-prop="hyphenate-limit-last" data-status="unsupported"><code>hyphenate-limit-last</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-hyphenate-limit-lines" data-prop="hyphenate-limit-lines" data-status="unsupported"><code>hyphenate-limit-lines</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-hyphenate-limit-zone" data-prop="hyphenate-limit-zone" data-status="unsupported"><code>hyphenate-limit-zone</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-image-animation" data-prop="image-animation" data-status="unsupported"><code>image-animation</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-image-rendering" data-prop="image-rendering" data-status="unsupported"><code>image-rendering</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-initial-letter" data-prop="initial-letter" data-status="unsupported"><code>initial-letter</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-initial-letter-align" data-prop="initial-letter-align" data-status="unsupported"><code>initial-letter-align</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-initial-letter-wrap" data-prop="initial-letter-wrap" data-status="unsupported"><code>initial-letter-wrap</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-inline-sizing" data-prop="inline-sizing" data-status="unsupported"><code>inline-sizing</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-input-security" data-prop="input-security" data-status="unsupported"><code>input-security</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-interactivity" data-prop="interactivity" data-status="unsupported"><code>interactivity</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-interest-delay" data-prop="interest-delay" data-status="unsupported"><code>interest-delay</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-interest-delay-end" data-prop="interest-delay-end" data-status="unsupported"><code>interest-delay-end</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-interest-delay-start" data-prop="interest-delay-start" data-status="unsupported"><code>interest-delay-start</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-interpolate-size" data-prop="interpolate-size" data-status="unsupported"><code>interpolate-size</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-lighting-color" data-prop="lighting-color" data-status="unsupported"><code>lighting-color</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-line-fit-edge" data-prop="line-fit-edge" data-status="unsupported"><code>line-fit-edge</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-line-grid" data-prop="line-grid" data-status="unsupported"><code>line-grid</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-line-height-step" data-prop="line-height-step" data-status="unsupported"><code>line-height-step</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-line-padding" data-prop="line-padding" data-status="unsupported"><code>line-padding</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-line-snap" data-prop="line-snap" data-status="unsupported"><code>line-snap</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-link-parameters" data-prop="link-parameters" data-status="unsupported"><code>link-parameters</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-marker" data-prop="marker" data-status="unsupported"><code>marker</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-marker-end" data-prop="marker-end" data-status="unsupported"><code>marker-end</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-marker-mid" data-prop="marker-mid" data-status="unsupported"><code>marker-mid</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-marker-side" data-prop="marker-side" data-status="unsupported"><code>marker-side</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-marker-start" data-prop="marker-start" data-status="unsupported"><code>marker-start</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-mask" data-prop="mask" data-status="unsupported"><code>mask</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-mask-border" data-prop="mask-border" data-status="unsupported"><code>mask-border</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-mask-border-mode" data-prop="mask-border-mode" data-status="unsupported"><code>mask-border-mode</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-mask-border-outset" data-prop="mask-border-outset" data-status="unsupported"><code>mask-border-outset</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-mask-border-repeat" data-prop="mask-border-repeat" data-status="unsupported"><code>mask-border-repeat</code><span class="badge todo">unsupported</span></div>
+    </div>
+  </div>
+
+  <div class="probe-page">
+    <h2 class="probe-heading">Unsupported CSS probe gallery 5/8 (462 properties)</h2>
+    <p class="probe-note">Each chip sets one unsupported property to verify safe cascade ignore and layout crash resilience.</p>
+    <div class="probe-grid">
+        <div class="probe p-mask-border-slice" data-prop="mask-border-slice" data-status="unsupported"><code>mask-border-slice</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-mask-border-source" data-prop="mask-border-source" data-status="unsupported"><code>mask-border-source</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-mask-border-width" data-prop="mask-border-width" data-status="unsupported"><code>mask-border-width</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-mask-clip" data-prop="mask-clip" data-status="unsupported"><code>mask-clip</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-mask-composite" data-prop="mask-composite" data-status="unsupported"><code>mask-composite</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-mask-image" data-prop="mask-image" data-status="unsupported"><code>mask-image</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-mask-mode" data-prop="mask-mode" data-status="unsupported"><code>mask-mode</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-mask-origin" data-prop="mask-origin" data-status="unsupported"><code>mask-origin</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-mask-position" data-prop="mask-position" data-status="unsupported"><code>mask-position</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-mask-repeat" data-prop="mask-repeat" data-status="unsupported"><code>mask-repeat</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-mask-size" data-prop="mask-size" data-status="unsupported"><code>mask-size</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-mask-type" data-prop="mask-type" data-status="unsupported"><code>mask-type</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-math-depth" data-prop="math-depth" data-status="unsupported"><code>math-depth</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-math-shift" data-prop="math-shift" data-status="unsupported"><code>math-shift</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-math-style" data-prop="math-style" data-status="unsupported"><code>math-style</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-min-intrinsic-sizing" data-prop="min-intrinsic-sizing" data-status="unsupported"><code>min-intrinsic-sizing</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-nav-down" data-prop="nav-down" data-status="unsupported"><code>nav-down</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-nav-left" data-prop="nav-left" data-status="unsupported"><code>nav-left</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-nav-right" data-prop="nav-right" data-status="unsupported"><code>nav-right</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-nav-up" data-prop="nav-up" data-status="unsupported"><code>nav-up</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-object-fit" data-prop="object-fit" data-status="unsupported"><code>object-fit</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-object-position" data-prop="object-position" data-status="unsupported"><code>object-position</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-offset" data-prop="offset" data-status="unsupported"><code>offset</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-offset-anchor" data-prop="offset-anchor" data-status="unsupported"><code>offset-anchor</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-offset-distance" data-prop="offset-distance" data-status="unsupported"><code>offset-distance</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-offset-path" data-prop="offset-path" data-status="unsupported"><code>offset-path</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-offset-position" data-prop="offset-position" data-status="unsupported"><code>offset-position</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-offset-rotate" data-prop="offset-rotate" data-status="unsupported"><code>offset-rotate</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-overflow-anchor" data-prop="overflow-anchor" data-status="unsupported"><code>overflow-anchor</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-overflow-block" data-prop="overflow-block" data-status="unsupported"><code>overflow-block</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-overflow-inline" data-prop="overflow-inline" data-status="unsupported"><code>overflow-inline</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-overlay" data-prop="overlay" data-status="unsupported"><code>overlay</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-overscroll-behavior" data-prop="overscroll-behavior" data-status="unsupported"><code>overscroll-behavior</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-overscroll-behavior-block" data-prop="overscroll-behavior-block" data-status="unsupported"><code>overscroll-behavior-block</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-overscroll-behavior-inline" data-prop="overscroll-behavior-inline" data-status="unsupported"><code>overscroll-behavior-inline</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-overscroll-behavior-x" data-prop="overscroll-behavior-x" data-status="unsupported"><code>overscroll-behavior-x</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-overscroll-behavior-y" data-prop="overscroll-behavior-y" data-status="unsupported"><code>overscroll-behavior-y</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-paint-order" data-prop="paint-order" data-status="unsupported"><code>paint-order</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-path-length" data-prop="path-length" data-status="unsupported"><code>path-length</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-pause" data-prop="pause" data-status="unsupported"><code>pause</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-pause-after" data-prop="pause-after" data-status="unsupported"><code>pause-after</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-pause-before" data-prop="pause-before" data-status="unsupported"><code>pause-before</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-perspective" data-prop="perspective" data-status="unsupported"><code>perspective</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-perspective-origin" data-prop="perspective-origin" data-status="unsupported"><code>perspective-origin</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-pointer-events" data-prop="pointer-events" data-status="unsupported"><code>pointer-events</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-pointer-timeline" data-prop="pointer-timeline" data-status="unsupported"><code>pointer-timeline</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-pointer-timeline-axis" data-prop="pointer-timeline-axis" data-status="unsupported"><code>pointer-timeline-axis</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-pointer-timeline-name" data-prop="pointer-timeline-name" data-status="unsupported"><code>pointer-timeline-name</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-position-anchor" data-prop="position-anchor" data-status="unsupported"><code>position-anchor</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-position-area" data-prop="position-area" data-status="unsupported"><code>position-area</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-position-try" data-prop="position-try" data-status="unsupported"><code>position-try</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-position-try-fallbacks" data-prop="position-try-fallbacks" data-status="unsupported"><code>position-try-fallbacks</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-position-try-order" data-prop="position-try-order" data-status="unsupported"><code>position-try-order</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-position-visibility" data-prop="position-visibility" data-status="unsupported"><code>position-visibility</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-r" data-prop="r" data-status="unsupported"><code>r</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-reading-flow" data-prop="reading-flow" data-status="unsupported"><code>reading-flow</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-reading-order" data-prop="reading-order" data-status="unsupported"><code>reading-order</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-region-fragment" data-prop="region-fragment" data-status="unsupported"><code>region-fragment</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-resize" data-prop="resize" data-status="unsupported"><code>resize</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-rest" data-prop="rest" data-status="unsupported"><code>rest</code><span class="badge todo">unsupported</span></div>
+    </div>
+  </div>
+
+  <div class="probe-page">
+    <h2 class="probe-heading">Unsupported CSS probe gallery 6/8 (462 properties)</h2>
+    <p class="probe-note">Each chip sets one unsupported property to verify safe cascade ignore and layout crash resilience.</p>
+    <div class="probe-grid">
+        <div class="probe p-rest-after" data-prop="rest-after" data-status="unsupported"><code>rest-after</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-rest-before" data-prop="rest-before" data-status="unsupported"><code>rest-before</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-row-rule" data-prop="row-rule" data-status="unsupported"><code>row-rule</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-row-rule-break" data-prop="row-rule-break" data-status="unsupported"><code>row-rule-break</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-row-rule-color" data-prop="row-rule-color" data-status="unsupported"><code>row-rule-color</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-row-rule-inset" data-prop="row-rule-inset" data-status="unsupported"><code>row-rule-inset</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-row-rule-inset-cap" data-prop="row-rule-inset-cap" data-status="unsupported"><code>row-rule-inset-cap</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-row-rule-inset-cap-end" data-prop="row-rule-inset-cap-end" data-status="unsupported"><code>row-rule-inset-cap-end</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-row-rule-inset-cap-start" data-prop="row-rule-inset-cap-start" data-status="unsupported"><code>row-rule-inset-cap-start</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-row-rule-inset-end" data-prop="row-rule-inset-end" data-status="unsupported"><code>row-rule-inset-end</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-row-rule-inset-junction" data-prop="row-rule-inset-junction" data-status="unsupported"><code>row-rule-inset-junction</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-row-rule-inset-junction-end" data-prop="row-rule-inset-junction-end" data-status="unsupported"><code>row-rule-inset-junction-end</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-row-rule-inset-junction-start" data-prop="row-rule-inset-junction-start" data-status="unsupported"><code>row-rule-inset-junction-start</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-row-rule-inset-start" data-prop="row-rule-inset-start" data-status="unsupported"><code>row-rule-inset-start</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-row-rule-style" data-prop="row-rule-style" data-status="unsupported"><code>row-rule-style</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-row-rule-visibility-items" data-prop="row-rule-visibility-items" data-status="unsupported"><code>row-rule-visibility-items</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-row-rule-width" data-prop="row-rule-width" data-status="unsupported"><code>row-rule-width</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-ruby-align" data-prop="ruby-align" data-status="unsupported"><code>ruby-align</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-ruby-merge" data-prop="ruby-merge" data-status="unsupported"><code>ruby-merge</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-ruby-overhang" data-prop="ruby-overhang" data-status="unsupported"><code>ruby-overhang</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-ruby-position" data-prop="ruby-position" data-status="unsupported"><code>ruby-position</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-rule" data-prop="rule" data-status="unsupported"><code>rule</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-rule-break" data-prop="rule-break" data-status="unsupported"><code>rule-break</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-rule-color" data-prop="rule-color" data-status="unsupported"><code>rule-color</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-rule-inset" data-prop="rule-inset" data-status="unsupported"><code>rule-inset</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-rule-inset-cap" data-prop="rule-inset-cap" data-status="unsupported"><code>rule-inset-cap</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-rule-inset-end" data-prop="rule-inset-end" data-status="unsupported"><code>rule-inset-end</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-rule-inset-junction" data-prop="rule-inset-junction" data-status="unsupported"><code>rule-inset-junction</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-rule-inset-start" data-prop="rule-inset-start" data-status="unsupported"><code>rule-inset-start</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-rule-overlap" data-prop="rule-overlap" data-status="unsupported"><code>rule-overlap</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-rule-style" data-prop="rule-style" data-status="unsupported"><code>rule-style</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-rule-visibility-items" data-prop="rule-visibility-items" data-status="unsupported"><code>rule-visibility-items</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-rule-width" data-prop="rule-width" data-status="unsupported"><code>rule-width</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-rx" data-prop="rx" data-status="unsupported"><code>rx</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-ry" data-prop="ry" data-status="unsupported"><code>ry</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-scroll-axis-lock" data-prop="scroll-axis-lock" data-status="unsupported"><code>scroll-axis-lock</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-scroll-behavior" data-prop="scroll-behavior" data-status="unsupported"><code>scroll-behavior</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-scroll-initial-target" data-prop="scroll-initial-target" data-status="unsupported"><code>scroll-initial-target</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-scroll-margin" data-prop="scroll-margin" data-status="unsupported"><code>scroll-margin</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-scroll-margin-block" data-prop="scroll-margin-block" data-status="unsupported"><code>scroll-margin-block</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-scroll-margin-block-end" data-prop="scroll-margin-block-end" data-status="unsupported"><code>scroll-margin-block-end</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-scroll-margin-block-start" data-prop="scroll-margin-block-start" data-status="unsupported"><code>scroll-margin-block-start</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-scroll-margin-bottom" data-prop="scroll-margin-bottom" data-status="unsupported"><code>scroll-margin-bottom</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-scroll-margin-inline" data-prop="scroll-margin-inline" data-status="unsupported"><code>scroll-margin-inline</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-scroll-margin-inline-end" data-prop="scroll-margin-inline-end" data-status="unsupported"><code>scroll-margin-inline-end</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-scroll-margin-inline-start" data-prop="scroll-margin-inline-start" data-status="unsupported"><code>scroll-margin-inline-start</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-scroll-margin-left" data-prop="scroll-margin-left" data-status="unsupported"><code>scroll-margin-left</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-scroll-margin-right" data-prop="scroll-margin-right" data-status="unsupported"><code>scroll-margin-right</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-scroll-margin-top" data-prop="scroll-margin-top" data-status="unsupported"><code>scroll-margin-top</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-scroll-marker-group" data-prop="scroll-marker-group" data-status="unsupported"><code>scroll-marker-group</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-scroll-padding" data-prop="scroll-padding" data-status="unsupported"><code>scroll-padding</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-scroll-padding-block" data-prop="scroll-padding-block" data-status="unsupported"><code>scroll-padding-block</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-scroll-padding-block-end" data-prop="scroll-padding-block-end" data-status="unsupported"><code>scroll-padding-block-end</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-scroll-padding-block-start" data-prop="scroll-padding-block-start" data-status="unsupported"><code>scroll-padding-block-start</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-scroll-padding-bottom" data-prop="scroll-padding-bottom" data-status="unsupported"><code>scroll-padding-bottom</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-scroll-padding-inline" data-prop="scroll-padding-inline" data-status="unsupported"><code>scroll-padding-inline</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-scroll-padding-inline-end" data-prop="scroll-padding-inline-end" data-status="unsupported"><code>scroll-padding-inline-end</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-scroll-padding-inline-start" data-prop="scroll-padding-inline-start" data-status="unsupported"><code>scroll-padding-inline-start</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-scroll-padding-left" data-prop="scroll-padding-left" data-status="unsupported"><code>scroll-padding-left</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-scroll-padding-right" data-prop="scroll-padding-right" data-status="unsupported"><code>scroll-padding-right</code><span class="badge todo">unsupported</span></div>
+    </div>
+  </div>
+
+  <div class="probe-page">
+    <h2 class="probe-heading">Unsupported CSS probe gallery 7/8 (462 properties)</h2>
+    <p class="probe-note">Each chip sets one unsupported property to verify safe cascade ignore and layout crash resilience.</p>
+    <div class="probe-grid">
+        <div class="probe p-scroll-padding-top" data-prop="scroll-padding-top" data-status="unsupported"><code>scroll-padding-top</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-scroll-snap-align" data-prop="scroll-snap-align" data-status="unsupported"><code>scroll-snap-align</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-scroll-snap-stop" data-prop="scroll-snap-stop" data-status="unsupported"><code>scroll-snap-stop</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-scroll-snap-type" data-prop="scroll-snap-type" data-status="unsupported"><code>scroll-snap-type</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-scroll-target-group" data-prop="scroll-target-group" data-status="unsupported"><code>scroll-target-group</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-scroll-timeline" data-prop="scroll-timeline" data-status="unsupported"><code>scroll-timeline</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-scroll-timeline-axis" data-prop="scroll-timeline-axis" data-status="unsupported"><code>scroll-timeline-axis</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-scroll-timeline-name" data-prop="scroll-timeline-name" data-status="unsupported"><code>scroll-timeline-name</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-scrollbar-color" data-prop="scrollbar-color" data-status="unsupported"><code>scrollbar-color</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-scrollbar-gutter" data-prop="scrollbar-gutter" data-status="unsupported"><code>scrollbar-gutter</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-scrollbar-width" data-prop="scrollbar-width" data-status="unsupported"><code>scrollbar-width</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-shape-image-threshold" data-prop="shape-image-threshold" data-status="unsupported"><code>shape-image-threshold</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-shape-inside" data-prop="shape-inside" data-status="unsupported"><code>shape-inside</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-shape-margin" data-prop="shape-margin" data-status="unsupported"><code>shape-margin</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-shape-outside" data-prop="shape-outside" data-status="unsupported"><code>shape-outside</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-shape-padding" data-prop="shape-padding" data-status="unsupported"><code>shape-padding</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-shape-rendering" data-prop="shape-rendering" data-status="unsupported"><code>shape-rendering</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-slider-orientation" data-prop="slider-orientation" data-status="unsupported"><code>slider-orientation</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-spatial-navigation-action" data-prop="spatial-navigation-action" data-status="unsupported"><code>spatial-navigation-action</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-spatial-navigation-contain" data-prop="spatial-navigation-contain" data-status="unsupported"><code>spatial-navigation-contain</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-spatial-navigation-function" data-prop="spatial-navigation-function" data-status="unsupported"><code>spatial-navigation-function</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-speak" data-prop="speak" data-status="unsupported"><code>speak</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-speak-as" data-prop="speak-as" data-status="unsupported"><code>speak-as</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-stop-color" data-prop="stop-color" data-status="unsupported"><code>stop-color</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-stop-opacity" data-prop="stop-opacity" data-status="unsupported"><code>stop-opacity</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-stroke-align" data-prop="stroke-align" data-status="unsupported"><code>stroke-align</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-stroke-alignment" data-prop="stroke-alignment" data-status="unsupported"><code>stroke-alignment</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-stroke-break" data-prop="stroke-break" data-status="unsupported"><code>stroke-break</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-stroke-color" data-prop="stroke-color" data-status="unsupported"><code>stroke-color</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-stroke-dash-corner" data-prop="stroke-dash-corner" data-status="unsupported"><code>stroke-dash-corner</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-stroke-dash-justify" data-prop="stroke-dash-justify" data-status="unsupported"><code>stroke-dash-justify</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-stroke-dashadjust" data-prop="stroke-dashadjust" data-status="unsupported"><code>stroke-dashadjust</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-stroke-dasharray" data-prop="stroke-dasharray" data-status="unsupported"><code>stroke-dasharray</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-stroke-dashcorner" data-prop="stroke-dashcorner" data-status="unsupported"><code>stroke-dashcorner</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-stroke-dashoffset" data-prop="stroke-dashoffset" data-status="unsupported"><code>stroke-dashoffset</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-stroke-image" data-prop="stroke-image" data-status="unsupported"><code>stroke-image</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-stroke-linecap" data-prop="stroke-linecap" data-status="unsupported"><code>stroke-linecap</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-stroke-linejoin" data-prop="stroke-linejoin" data-status="unsupported"><code>stroke-linejoin</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-stroke-miterlimit" data-prop="stroke-miterlimit" data-status="unsupported"><code>stroke-miterlimit</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-stroke-origin" data-prop="stroke-origin" data-status="unsupported"><code>stroke-origin</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-stroke-position" data-prop="stroke-position" data-status="unsupported"><code>stroke-position</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-stroke-repeat" data-prop="stroke-repeat" data-status="unsupported"><code>stroke-repeat</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-stroke-size" data-prop="stroke-size" data-status="unsupported"><code>stroke-size</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-text-anchor" data-prop="text-anchor" data-status="unsupported"><code>text-anchor</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-text-autospace" data-prop="text-autospace" data-status="unsupported"><code>text-autospace</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-text-box" data-prop="text-box" data-status="unsupported"><code>text-box</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-text-box-edge" data-prop="text-box-edge" data-status="unsupported"><code>text-box-edge</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-text-box-trim" data-prop="text-box-trim" data-status="unsupported"><code>text-box-trim</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-text-fit" data-prop="text-fit" data-status="unsupported"><code>text-fit</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-text-group-align" data-prop="text-group-align" data-status="unsupported"><code>text-group-align</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-text-rendering" data-prop="text-rendering" data-status="unsupported"><code>text-rendering</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-text-size-adjust" data-prop="text-size-adjust" data-status="unsupported"><code>text-size-adjust</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-text-spacing" data-prop="text-spacing" data-status="unsupported"><code>text-spacing</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-text-spacing-trim" data-prop="text-spacing-trim" data-status="unsupported"><code>text-spacing-trim</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-timeline-scope" data-prop="timeline-scope" data-status="unsupported"><code>timeline-scope</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-timeline-trigger" data-prop="timeline-trigger" data-status="unsupported"><code>timeline-trigger</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-timeline-trigger-activation-range" data-prop="timeline-trigger-activation-range" data-status="unsupported"><code>timeline-trigger-activation-range</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-timeline-trigger-activation-range-end" data-prop="timeline-trigger-activation-range-end" data-status="unsupported"><code>timeline-trigger-activation-range-end</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-timeline-trigger-activation-range-start" data-prop="timeline-trigger-activation-range-start" data-status="unsupported"><code>timeline-trigger-activation-range-start</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-timeline-trigger-active-range" data-prop="timeline-trigger-active-range" data-status="unsupported"><code>timeline-trigger-active-range</code><span class="badge todo">unsupported</span></div>
+    </div>
+  </div>
+
+  <div class="probe-page">
+    <h2 class="probe-heading">Unsupported CSS probe gallery 8/8 (462 properties)</h2>
+    <p class="probe-note">Each chip sets one unsupported property to verify safe cascade ignore and layout crash resilience.</p>
+    <div class="probe-grid">
+        <div class="probe p-timeline-trigger-active-range-end" data-prop="timeline-trigger-active-range-end" data-status="unsupported"><code>timeline-trigger-active-range-end</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-timeline-trigger-active-range-start" data-prop="timeline-trigger-active-range-start" data-status="unsupported"><code>timeline-trigger-active-range-start</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-timeline-trigger-name" data-prop="timeline-trigger-name" data-status="unsupported"><code>timeline-trigger-name</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-timeline-trigger-source" data-prop="timeline-trigger-source" data-status="unsupported"><code>timeline-trigger-source</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-touch-action" data-prop="touch-action" data-status="unsupported"><code>touch-action</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-transform-style" data-prop="transform-style" data-status="unsupported"><code>transform-style</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-transition" data-prop="transition" data-status="unsupported"><code>transition</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-transition-behavior" data-prop="transition-behavior" data-status="unsupported"><code>transition-behavior</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-transition-delay" data-prop="transition-delay" data-status="unsupported"><code>transition-delay</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-transition-duration" data-prop="transition-duration" data-status="unsupported"><code>transition-duration</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-transition-property" data-prop="transition-property" data-status="unsupported"><code>transition-property</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-transition-timing-function" data-prop="transition-timing-function" data-status="unsupported"><code>transition-timing-function</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-trigger-scope" data-prop="trigger-scope" data-status="unsupported"><code>trigger-scope</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-user-select" data-prop="user-select" data-status="unsupported"><code>user-select</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-vector-effect" data-prop="vector-effect" data-status="unsupported"><code>vector-effect</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-view-timeline" data-prop="view-timeline" data-status="unsupported"><code>view-timeline</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-view-timeline-axis" data-prop="view-timeline-axis" data-status="unsupported"><code>view-timeline-axis</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-view-timeline-inset" data-prop="view-timeline-inset" data-status="unsupported"><code>view-timeline-inset</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-view-timeline-name" data-prop="view-timeline-name" data-status="unsupported"><code>view-timeline-name</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-view-transition-class" data-prop="view-transition-class" data-status="unsupported"><code>view-transition-class</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-view-transition-group" data-prop="view-transition-group" data-status="unsupported"><code>view-transition-group</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-view-transition-name" data-prop="view-transition-name" data-status="unsupported"><code>view-transition-name</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-view-transition-scope" data-prop="view-transition-scope" data-status="unsupported"><code>view-transition-scope</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-voice-balance" data-prop="voice-balance" data-status="unsupported"><code>voice-balance</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-voice-duration" data-prop="voice-duration" data-status="unsupported"><code>voice-duration</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-voice-family" data-prop="voice-family" data-status="unsupported"><code>voice-family</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-voice-pitch" data-prop="voice-pitch" data-status="unsupported"><code>voice-pitch</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-voice-range" data-prop="voice-range" data-status="unsupported"><code>voice-range</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-voice-rate" data-prop="voice-rate" data-status="unsupported"><code>voice-rate</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-voice-stress" data-prop="voice-stress" data-status="unsupported"><code>voice-stress</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-voice-volume" data-prop="voice-volume" data-status="unsupported"><code>voice-volume</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-will-change" data-prop="will-change" data-status="unsupported"><code>will-change</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-window-drag" data-prop="window-drag" data-status="unsupported"><code>window-drag</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-word-space-transform" data-prop="word-space-transform" data-status="unsupported"><code>word-space-transform</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-wrap-after" data-prop="wrap-after" data-status="unsupported"><code>wrap-after</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-wrap-before" data-prop="wrap-before" data-status="unsupported"><code>wrap-before</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-wrap-flow" data-prop="wrap-flow" data-status="unsupported"><code>wrap-flow</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-wrap-inside" data-prop="wrap-inside" data-status="unsupported"><code>wrap-inside</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-wrap-through" data-prop="wrap-through" data-status="unsupported"><code>wrap-through</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-x" data-prop="x" data-status="unsupported"><code>x</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-y" data-prop="y" data-status="unsupported"><code>y</code><span class="badge todo">unsupported</span></div>
+        <div class="probe p-zoom" data-prop="zoom" data-status="unsupported"><code>zoom</code><span class="badge todo">unsupported</span></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

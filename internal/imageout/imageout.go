@@ -350,7 +350,13 @@ func rasterizeContext(ctx context.Context, res *layout.Result, height float64, t
 		clear(pBuf.b)
 	}
 
-	defer supersamplePixPool.Put(pBuf)
+	const maxPooledRasterBytes = 32 << 20 // 32 MiB
+
+	defer func() {
+		if cap(pBuf.b) <= maxPooledRasterBytes {
+			supersamplePixPool.Put(pBuf)
+		}
+	}()
 
 	img := &image.NRGBA{
 		Pix:    pBuf.b,
@@ -942,13 +948,13 @@ func paintRoundedFill(
 	pxPerPt float64,
 	col color.NRGBA,
 ) {
-	radii := scaledRadii(paintOp, pxPerPt)
+	radiusX, radiusY := scaledRadiiXY(paintOp, pxPerPt)
 	mask := image.NewAlpha(rect)
 
 	for y := rect.Min.Y; y < rect.Max.Y; y++ {
 		for x := rect.Min.X; x < rect.Max.X; x++ {
 			if roundedContains(float64(x)+pixelCenter, float64(y)+pixelCenter, float64(rect.Min.X),
-				float64(rect.Min.Y), float64(rect.Dx()), float64(rect.Dy()), radii) {
+				float64(rect.Min.Y), float64(rect.Dx()), float64(rect.Dy()), radiusX, radiusY) {
 				mask.SetAlpha(x, y, color.Alpha{A: opaqueAlpha})
 			}
 		}
@@ -965,21 +971,22 @@ func paintRoundedTopStroke(
 	lineWidth int,
 	pxPerPt float64,
 ) {
-	radii := scaledRadii(paintOp, pxPerPt)
+	rx, ry := scaledRadiiXY(paintOp, pxPerPt)
 	x := paintOp.X * pxPerPt
 	y := paintOp.Y * pxPerPt
 	w := paintOp.W * pxPerPt
-	leftRadius, rightRadius := radii[0], radii[1]
 	strokeInset := float64(lineWidth) / boxFilterFactor2
-	leftRadius = max(leftRadius-strokeInset, 0)
-	rightRadius = max(rightRadius-strokeInset, 0)
+	leftRX := max(rx[0]-strokeInset, 0)
+	leftRY := max(ry[0]-strokeInset, 0)
+	rightRX := max(rx[1]-strokeInset, 0)
+	rightRY := max(ry[1]-strokeInset, 0)
 
 	points := make([]rasterPoint, 0, roundedArcSteps*2+3) //nolint:mnd // two arcs plus their joins
-	points = append(points, rasterPoint{X: x, Y: y + leftRadius})
-	points = appendArc(points, x+leftRadius, y+leftRadius, leftRadius, math.Pi, 1.5*math.Pi)
-	points = append(points, rasterPoint{X: x + w - rightRadius, Y: y})
-	points = appendArc(points, x+w-rightRadius, y+rightRadius, rightRadius, 1.5*math.Pi, 2*math.Pi)
-	points = append(points, rasterPoint{X: x + w, Y: y + rightRadius})
+	points = append(points, rasterPoint{X: x, Y: y + leftRY})
+	points = appendArc(points, x+leftRX, y+leftRY, leftRX, leftRY, math.Pi, 1.5*math.Pi)
+	points = append(points, rasterPoint{X: x + w - rightRX, Y: y})
+	points = appendArc(points, x+w-rightRX, y+rightRY, rightRX, rightRY, 1.5*math.Pi, 2*math.Pi)
+	points = append(points, rasterPoint{X: x + w, Y: y + rightRY})
 
 	paintPolyline(img, points, col, lineWidth)
 }
@@ -992,20 +999,22 @@ func paintRoundedLeftStroke(
 	lineWidth int,
 	pxPerPt float64,
 ) {
-	radii := scaledRadii(paintOp, pxPerPt)
+	rx, ry := scaledRadiiXY(paintOp, pxPerPt)
 	x := paintOp.X * pxPerPt
 	y := paintOp.Y * pxPerPt
 	h := paintOp.H * pxPerPt
 	strokeInset := float64(lineWidth) / boxFilterFactor2
 	x += strokeInset
-	topRadius := max(radii[0]-strokeInset, 0)
-	bottomRadius := max(radii[3]-strokeInset, 0)
+	topRX := max(rx[0]-strokeInset, 0)
+	topRY := max(ry[0]-strokeInset, 0)
+	bottomRX := max(rx[3]-strokeInset, 0)
+	bottomRY := max(ry[3]-strokeInset, 0)
 
 	points := make([]rasterPoint, 0, roundedArcSteps*2+3) //nolint:mnd // two arcs plus their joins
-	points = append(points, rasterPoint{X: x + bottomRadius, Y: y + h})
-	points = appendArc(points, x+bottomRadius, y+h-bottomRadius, bottomRadius, 0.5*math.Pi, math.Pi)
-	points = append(points, rasterPoint{X: x, Y: y + topRadius})
-	points = appendArc(points, x+topRadius, y+topRadius, topRadius, math.Pi, 1.5*math.Pi)
+	points = append(points, rasterPoint{X: x + bottomRX, Y: y + h})
+	points = appendArc(points, x+bottomRX, y+h-bottomRY, bottomRX, bottomRY, 0.5*math.Pi, math.Pi)
+	points = append(points, rasterPoint{X: x, Y: y + topRY})
+	points = appendArc(points, x+topRX, y+topRY, topRX, topRY, math.Pi, 1.5*math.Pi)
 
 	paintPolyline(img, points, col, lineWidth)
 }
@@ -1018,22 +1027,24 @@ func paintRoundedBottomStroke(
 	lineWidth int,
 	pxPerPt float64,
 ) {
-	radii := scaledRadii(paintOp, pxPerPt)
+	rx, ry := scaledRadiiXY(paintOp, pxPerPt)
 	x := paintOp.X * pxPerPt
 	y := paintOp.Y * pxPerPt
 	w := paintOp.W * pxPerPt
 	h := paintOp.H * pxPerPt
 	strokeInset := float64(lineWidth) / boxFilterFactor2
-	leftRadius := max(radii[3]-strokeInset, 0)
-	rightRadius := max(radii[2]-strokeInset, 0)
+	leftRX := max(rx[3]-strokeInset, 0)
+	leftRY := max(ry[3]-strokeInset, 0)
+	rightRX := max(rx[2]-strokeInset, 0)
+	rightRY := max(ry[2]-strokeInset, 0)
 	bottomY := y + h
 
 	points := make([]rasterPoint, 0, roundedArcSteps*2+3) //nolint:mnd // two arcs plus their joins
-	points = append(points, rasterPoint{X: x, Y: bottomY - leftRadius})
-	points = appendArc(points, x+leftRadius, bottomY-leftRadius, leftRadius, math.Pi, 0.5*math.Pi)
-	points = append(points, rasterPoint{X: x + w - rightRadius, Y: bottomY})
-	points = appendArc(points, x+w-rightRadius, bottomY-rightRadius, rightRadius, 0.5*math.Pi, 0)
-	points = append(points, rasterPoint{X: x + w, Y: bottomY - rightRadius})
+	points = append(points, rasterPoint{X: x, Y: bottomY - leftRY})
+	points = appendArc(points, x+leftRX, bottomY-leftRY, leftRX, leftRY, math.Pi, 0.5*math.Pi)
+	points = append(points, rasterPoint{X: x + w - rightRX, Y: bottomY})
+	points = appendArc(points, x+w-rightRX, bottomY-rightRY, rightRX, rightRY, 0.5*math.Pi, 0)
+	points = append(points, rasterPoint{X: x + w, Y: bottomY - rightRY})
 
 	paintPolyline(img, points, col, lineWidth)
 }
@@ -1046,21 +1057,23 @@ func paintRoundedRightStroke(
 	lineWidth int,
 	pxPerPt float64,
 ) {
-	radii := scaledRadii(paintOp, pxPerPt)
+	rx, ry := scaledRadiiXY(paintOp, pxPerPt)
 	x := paintOp.X * pxPerPt
 	y := paintOp.Y * pxPerPt
 	w := paintOp.W * pxPerPt
 	h := paintOp.H * pxPerPt
 	strokeInset := float64(lineWidth) / boxFilterFactor2
 	rightX := x + w - strokeInset
-	topRadius := max(radii[1]-strokeInset, 0)
-	bottomRadius := max(radii[2]-strokeInset, 0)
+	topRX := max(rx[1]-strokeInset, 0)
+	topRY := max(ry[1]-strokeInset, 0)
+	bottomRX := max(rx[2]-strokeInset, 0)
+	bottomRY := max(ry[2]-strokeInset, 0)
 
 	points := make([]rasterPoint, 0, roundedArcSteps*2+3) //nolint:mnd // two arcs plus their joins
-	points = append(points, rasterPoint{X: rightX - topRadius, Y: y})
-	points = appendArc(points, rightX-topRadius, y+topRadius, topRadius, 1.5*math.Pi, 2*math.Pi)
-	points = append(points, rasterPoint{X: rightX, Y: y + h - bottomRadius})
-	points = appendArc(points, rightX-bottomRadius, y+h-bottomRadius, bottomRadius, 0, 0.5*math.Pi)
+	points = append(points, rasterPoint{X: rightX - topRX, Y: y})
+	points = appendArc(points, rightX-topRX, y+topRY, topRX, topRY, 1.5*math.Pi, 2*math.Pi)
+	points = append(points, rasterPoint{X: rightX, Y: y + h - bottomRY})
+	points = appendArc(points, rightX-bottomRX, y+h-bottomRY, bottomRX, bottomRY, 0, 0.5*math.Pi)
 
 	paintPolyline(img, points, col, lineWidth)
 }
@@ -1073,27 +1086,28 @@ func paintRoundedStroke(
 	lineWidth int,
 	pxPerPt float64,
 ) {
-	radii := scaledRadii(paintOp, pxPerPt)
+	rx, ry := scaledRadiiXY(paintOp, pxPerPt)
 	x := paintOp.X * pxPerPt
 	y := paintOp.Y * pxPerPt
 	w := paintOp.W * pxPerPt
 	h := paintOp.H * pxPerPt
 	strokeInset := float64(lineWidth) / boxFilterFactor2
 
-	for i := range radii {
-		radii[i] = max(radii[i]-strokeInset, 0)
+	for i := range rx {
+		rx[i] = max(rx[i]-strokeInset, 0)
+		ry[i] = max(ry[i]-strokeInset, 0)
 	}
 
 	points := make([]rasterPoint, 0, roundedArcSteps*4+4) //nolint:mnd // four arcs plus their joins
-	points = append(points, rasterPoint{X: x + radii[0], Y: y})
-	points = append(points, rasterPoint{X: x + w - radii[1], Y: y})
-	points = appendArc(points, x+w-radii[1], y+radii[1], radii[1], 1.5*math.Pi, 2*math.Pi)
-	points = append(points, rasterPoint{X: x + w, Y: y + h - radii[2]})
-	points = appendArc(points, x+w-radii[2], y+h-radii[2], radii[2], 0, 0.5*math.Pi)
-	points = append(points, rasterPoint{X: x + radii[3], Y: y + h})
-	points = appendArc(points, x+radii[3], y+h-radii[3], radii[3], 0.5*math.Pi, math.Pi)
-	points = append(points, rasterPoint{X: x, Y: y + radii[0]})
-	points = appendArc(points, x+radii[0], y+radii[0], radii[0], math.Pi, 1.5*math.Pi)
+	points = append(points, rasterPoint{X: x + rx[0], Y: y})
+	points = append(points, rasterPoint{X: x + w - rx[1], Y: y})
+	points = appendArc(points, x+w-rx[1], y+ry[1], rx[1], ry[1], 1.5*math.Pi, 2*math.Pi)
+	points = append(points, rasterPoint{X: x + w, Y: y + h - ry[2]})
+	points = appendArc(points, x+w-rx[2], y+h-ry[2], rx[2], ry[2], 0, 0.5*math.Pi)
+	points = append(points, rasterPoint{X: x + rx[3], Y: y + h})
+	points = appendArc(points, x+rx[3], y+h-ry[3], rx[3], ry[3], 0.5*math.Pi, math.Pi)
+	points = append(points, rasterPoint{X: x, Y: y + ry[0]})
+	points = appendArc(points, x+rx[0], y+ry[0], rx[0], ry[0], math.Pi, 1.5*math.Pi)
 
 	paintPolyline(img, points, col, lineWidth)
 }
@@ -1104,16 +1118,16 @@ type rasterPoint struct {
 	X, Y float64
 }
 
-func appendArc(points []rasterPoint, centerX, centerY, radius, start, end float64) []rasterPoint {
-	if radius <= 0 {
+func appendArc(points []rasterPoint, centerX, centerY, radiusX, radiusY, start, end float64) []rasterPoint {
+	if radiusX <= 0 || radiusY <= 0 {
 		return points
 	}
 
 	for step := 1; step <= roundedArcSteps; step++ {
 		angle := start + (end-start)*float64(step)/roundedArcSteps
 		points = append(points, rasterPoint{
-			X: centerX + radius*math.Cos(angle),
-			Y: centerY + radius*math.Sin(angle),
+			X: centerX + radiusX*math.Cos(angle),
+			Y: centerY + radiusY*math.Sin(angle),
 		})
 	}
 
@@ -1174,26 +1188,64 @@ func scaledRadii(paintOp *layout.Op, pxPerPt float64) [4]float64 {
 	return radii
 }
 
+func scaledRadiiXY(paintOp *layout.Op, pxPerPt float64) ([4]float64, [4]float64) {
+	radiusX := scaledRadii(paintOp, pxPerPt)
+	radiusY := [4]float64{
+		paintOp.RadiusTopLeftY, paintOp.RadiusTopRightY,
+		paintOp.RadiusBottomRightY, paintOp.RadiusBottomLeftY,
+	}
+
+	if radiusY == [4]float64{} {
+		if paintOp.RadiusY > 0 {
+			radiusY = [4]float64{paintOp.RadiusY, paintOp.RadiusY, paintOp.RadiusY, paintOp.RadiusY}
+		} else {
+			return radiusX, radiusX
+		}
+	}
+
+	for idx := range radiusY {
+		radiusY[idx] *= pxPerPt
+		if radiusX[idx] <= 0 {
+			radiusY[idx] = 0
+		} else if radiusY[idx] <= 0 {
+			radiusY[idx] = radiusX[idx]
+		}
+	}
+
+	return radiusX, radiusY
+}
+
+func inEllipse(pointX, pointY, centerX, centerY, radiusX, radiusY float64) bool {
+	if radiusX <= 0 || radiusY <= 0 {
+		return false
+	}
+
+	deltaX := (pointX - centerX) / radiusX
+	deltaY := (pointY - centerY) / radiusY
+
+	return deltaX*deltaX+deltaY*deltaY <= 1
+}
+
 //nolint:cyclop,varnamelen,wsl // four corner regions are explicit
 func roundedContains(
 	x, y, originX, originY, width, height float64,
-	radii [4]float64,
+	rx, ry [4]float64,
 ) bool {
 	if x < originX || x >= originX+width || y < originY || y >= originY+height {
 		return false
 	}
 
-	if x < originX+radii[0] && y < originY+radii[0] {
-		return math.Hypot(x-(originX+radii[0]), y-(originY+radii[0])) <= radii[0]
+	if x < originX+rx[0] && y < originY+ry[0] {
+		return inEllipse(x, y, originX+rx[0], originY+ry[0], rx[0], ry[0])
 	}
-	if x >= originX+width-radii[1] && y < originY+radii[1] {
-		return math.Hypot(x-(originX+width-radii[1]), y-(originY+radii[1])) <= radii[1]
+	if x >= originX+width-rx[1] && y < originY+ry[1] {
+		return inEllipse(x, y, originX+width-rx[1], originY+ry[1], rx[1], ry[1])
 	}
-	if x >= originX+width-radii[2] && y >= originY+height-radii[2] {
-		return math.Hypot(x-(originX+width-radii[2]), y-(originY+height-radii[2])) <= radii[2]
+	if x >= originX+width-rx[2] && y >= originY+height-ry[2] {
+		return inEllipse(x, y, originX+width-rx[2], originY+height-ry[2], rx[2], ry[2])
 	}
-	if x < originX+radii[3] && y >= originY+height-radii[3] {
-		return math.Hypot(x-(originX+radii[3]), y-(originY+height-radii[3])) <= radii[3]
+	if x < originX+rx[3] && y >= originY+height-ry[3] {
+		return inEllipse(x, y, originX+rx[3], originY+height-ry[3], rx[3], ry[3])
 	}
 
 	return true
@@ -1547,7 +1599,7 @@ func RunRequest(ctx context.Context, req *Request, log io.Writer) error {
 	}
 
 	registry := pdf.RegistryFromGlobal(req.Global)
-	logFontRegistryScan(req.Global, log)
+	pdf.LogFontRegistryScan(req.Global, log)
 
 	pipeline := &imagePipeline{ //nolint:exhaustruct // image is populated during RenderObjects
 		req:      req,
@@ -1747,25 +1799,6 @@ func makeImageFetcher(
 
 		return res.Body, nil
 	}
-}
-
-// logFontRegistryScan emits the shared font-path scan notice after
-// pdf.RegistryFromGlobal.
-func logFontRegistryScan(global settings.PdfGlobal, log io.Writer) {
-	if log == nil || log == io.Discard || global.Quiet {
-		return
-	}
-
-	if len(global.FontPaths) == 0 && !global.UseSystemFonts {
-		return
-	}
-
-	count := len(global.FontPaths)
-	if global.UseSystemFonts {
-		count += len(pdf.DefaultSystemFontDirs())
-	}
-
-	line.Emit(log, line.Info, "scanned %d font path(s)", count)
 }
 
 // imageLoadGlobal resolves the shared and image-owned load settings before

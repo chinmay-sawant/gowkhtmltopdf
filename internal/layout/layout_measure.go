@@ -197,6 +197,7 @@ type cellMeasure struct {
 	spaceItalic   bool
 	spaceFontSize float64
 	spaceLSpacing float64
+	spaceWSpacing float64
 	spaceW        float64
 }
 
@@ -228,13 +229,18 @@ func (m *cellMeasure) flushLine() {
 // advance depends only on the style's family hash, weight/italic face
 // variant, font size and letter-spacing, so the result is cached per style
 // identity and reused across text nodes in one cell.
-func (m *cellMeasure) spaceWidth(sty ResolvedStyle) float64 {
+func (m *cellMeasure) spaceWidth(sty *ResolvedStyle) float64 {
+	if sty == nil {
+		return 0
+	}
+
 	if m.spaceSet &&
 		m.spaceFamHash == sty.famHash &&
 		m.spaceWeight == sty.FontWeight &&
 		m.spaceItalic == sty.FontItalic &&
 		m.spaceFontSize == sty.FontSize &&
-		m.spaceLSpacing == sty.LetterSpacing {
+		m.spaceLSpacing == sty.LetterSpacing &&
+		m.spaceWSpacing == sty.WordSpacing {
 		return m.spaceW
 	}
 
@@ -245,15 +251,20 @@ func (m *cellMeasure) spaceWidth(sty ResolvedStyle) float64 {
 	m.spaceItalic = sty.FontItalic
 	m.spaceFontSize = sty.FontSize
 	m.spaceLSpacing = sty.LetterSpacing
+	m.spaceWSpacing = sty.WordSpacing
 
 	return m.spaceW
 }
 
 // walk measures one node's contribution to the current line.
 func (m *cellMeasure) walk(nodeN *html.Node, cstate ResolvedStyle, nowrap bool) {
+	if nodeN == nil {
+		return
+	}
+
 	switch nodeN.Type {
 	case html.TextNode:
-		m.measureText(nodeN.Text, cstate, nowrap)
+		m.measureText(nodeN.Text, &cstate, nowrap)
 	case html.ElementNode:
 		m.measureElement(nodeN, cstate, nowrap)
 	case html.CommentNode, html.DoctypeNode:
@@ -262,23 +273,27 @@ func (m *cellMeasure) walk(nodeN *html.Node, cstate ResolvedStyle, nowrap bool) 
 }
 
 // measureText accumulates a text run into the current line, using the same
-// face selection as paint (measureTextFace) — mismatched metrics undersize
+// face selection as paint (measureTextFace) - mismatched metrics undersize
 // columns and force emergency wraps on words that should fit.
 //
-//nolint:cyclop // word-scan and nowrap paths share state; splitting hurts readability
-func (m *cellMeasure) measureText(text string, cstate ResolvedStyle, nowrap bool) {
+//nolint:cyclop,funlen // word-scan and nowrap paths share state; splitting hurts readability
+func (m *cellMeasure) measureText(text string, cstate *ResolvedStyle, nowrap bool) {
+	if cstate == nil {
+		return
+	}
+
 	eng := m.engine
 
 	if !nowrap {
 		// Walk words without strings.Fields: no []string or word copies.
-		// Matching white-space:normal — runs of HTML space collapse to one gap.
+		// Matching white-space:normal - runs of HTML space collapse to one gap.
 		if !hasNonHTMLSpace(text) {
 			return
 		}
 
 		m.lineOnlyNowrap = false
 		m.lineHasInk = true
-		chromeW := inlineMeasurementChromeWidth(eng, cstate)
+		chromeW := inlineMeasurementChromeWidth(eng, *cstate)
 		m.lineW += chromeW
 
 		spaceW := m.spaceWidth(cstate)
@@ -323,7 +338,7 @@ func (m *cellMeasure) measureText(text string, cstate ResolvedStyle, nowrap bool
 	}
 
 	full := eng.measureTextFace(transformInlineText(text, cstate.TextTransform), cstate) +
-		inlineMeasurementChromeWidth(eng, cstate)
+		inlineMeasurementChromeWidth(eng, *cstate)
 	m.lineW += full
 	m.noteWord(eng.minContentWidth(text, cstate, full))
 
@@ -452,10 +467,11 @@ func (m *cellMeasure) walkBlockChildren(nodeN *html.Node, childCS ResolvedStyle,
 type wordBreakPolicy int
 
 const (
-	breakNormal wordBreakPolicy = iota
-	breakAll                    // word-break:break-all / overflow-wrap:anywhere
-	breakWord                   // overflow-wrap:break-word (soft only)
-	breakNever                  // white-space:nowrap|pre
+	breakNormal  wordBreakPolicy = iota
+	breakAll                     // word-break:break-all / overflow-wrap:anywhere
+	breakWord                    // overflow-wrap:break-word (soft only)
+	breakNever                   // white-space:nowrap|pre
+	breakKeepAll                 // word-break:keep-all
 )
 
 func wordBreakOf(sty ResolvedStyle) wordBreakPolicy {
@@ -465,6 +481,10 @@ func wordBreakOf(sty ResolvedStyle) wordBreakPolicy {
 
 	if sty.WordBreak == "break-all" || sty.OverflowWrap == overflowWrapAnywhere {
 		return breakAll
+	}
+
+	if sty.WordBreak == "keep-all" {
+		return breakKeepAll
 	}
 
 	if sty.OverflowWrap == overflowWrapBreakWord {
@@ -483,7 +503,7 @@ func softModeOf(pol wordBreakPolicy) softBreakMode {
 		return softBreakNone
 	case breakWord:
 		return softBreakWord
-	case breakNever:
+	case breakNever, breakKeepAll:
 		return softBreakURL
 	case breakNormal:
 		return softBreakURL
@@ -498,31 +518,35 @@ func softModeOf(pol wordBreakPolicy) softBreakMode {
 // line anyway), so breakNormal/breakNever return it without re-measuring.
 // Emergency print wrapping (tokens wider than the used line) is layout-only
 // and must not shrink table column mins to a single rune.
-func (e *engine) minContentWidth(cssSheet string, sty ResolvedStyle, full float64) float64 {
-	if cssSheet == "" {
+func (e *engine) minContentWidth(cssSheet string, sty *ResolvedStyle, full float64) float64 {
+	if cssSheet == "" || sty == nil {
 		return 0
 	}
 
-	switch wordBreakOf(sty) {
+	switch wordBreakOf(*sty) {
 	case breakNever:
 		return full
 	case breakAll:
 		return e.maxRuneWidth(cssSheet, sty)
 	case breakWord:
-		// Soft opportunities (/, ?, &, …) split the token for min-content.
+		// Soft opportunities (/, ?, &, ...) split the token for min-content.
 		return e.maxSoftSegmentWidth(cssSheet, sty)
-	case breakNormal:
+	case breakNormal, breakKeepAll:
 		return full
 	}
 
 	return full
 }
 
-func (e *engine) maxRuneWidth(s string, st ResolvedStyle) float64 {
+func (e *engine) maxRuneWidth(text string, style *ResolvedStyle) float64 {
+	if style == nil {
+		return 0
+	}
+
 	var widest float64
 
-	for _, r := range s {
-		w := e.measureRuneFace(r, st)
+	for _, r := range text {
+		w := e.measureRuneFace(r, style)
 		if w > widest {
 			widest = w
 		}
@@ -531,8 +555,8 @@ func (e *engine) maxRuneWidth(s string, st ResolvedStyle) float64 {
 	return widest
 }
 
-func (e *engine) maxSoftSegmentWidth(cssS string, sty ResolvedStyle) float64 {
-	if cssS == "" {
+func (e *engine) maxSoftSegmentWidth(cssS string, sty *ResolvedStyle) float64 {
+	if cssS == "" || sty == nil {
 		return 0
 	}
 

@@ -545,7 +545,7 @@ func parseTransformLength(cssS string, fontSize float64) (float64, bool) {
 		return pxToPt(cssPxRoot) * val, true
 	}
 
-	if pt, ok := css.LengthToPt(val, unit, fontSize); ok {
+	if pt, ok := lengthToPt(val, unit, fontSize); ok {
 		return pt, true
 	}
 

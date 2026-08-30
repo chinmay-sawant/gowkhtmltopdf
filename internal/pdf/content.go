@@ -420,9 +420,12 @@ func (c *Content) TextShow(text string) {
 	}
 }
 
-// splitType0Runs breaks s into simple vs Type0 segments: codes above
-// Latin-1 take the Type0 path, missing Latin glyphs on a CJK face fall back
-// to the Liberation face.
+// splitType0Runs breaks s into simple vs Type0 segments. Type0 is used only
+// for non-Latin-1 runes the face actually provides (see TextShow). Missing
+// Latin glyphs on a CJK face fall back to Liberation; missing non-Latin
+// glyphs stay on the simple path (folded to '?' at show time) so Write does
+// not fail building an empty Type0 cmap (fixture-61 line-break katakana on
+// Liberation).
 func splitType0Runs(text string, fnt *Font) []textRun {
 	var runs []textRun
 
@@ -439,12 +442,16 @@ func splitType0Runs(text string, fnt *Font) []textRun {
 	}
 
 	for _, rVal := range text {
-		has := fnt.GlyphID(rVal) != 0
+		has := fnt != nil && fnt.GlyphID(rVal) != 0
 
 		next := 0
-		if rVal > maxLatin1Code {
+
+		switch {
+		case rVal > maxLatin1Code && has:
 			next = 1
-		} else if !has {
+		case rVal > maxLatin1Code:
+			next = 0 // face lacks glyph → simple/'?' not empty Type0
+		case !has:
 			next = 0 // missing Latin on CJK face → Liberation
 		}
 

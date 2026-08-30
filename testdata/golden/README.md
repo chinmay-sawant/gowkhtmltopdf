@@ -16,7 +16,7 @@ testdata/golden/
   fixture-01-simple-invoice.html       # single page, minimal CSS
   fixture-02-table-heavy-invoice.html  # wide table, borders, many rows
   fixture-03-multi-page-invoice.html   # >1 page, page-break usage
-  fixture-04-*.html .. fixture-56-*.html   # phase-9.1+ corpus (skip *-header/footer companions)
+  fixture-04-*.html .. fixture-62-*.html   # phase-9.1+ corpus (skip *-header/footer companions)
   fixture-36-header.html / fixture-36-footer.html  # nested HF companions for fixture-36
   fixture-49-night-train-poster.html       # one-page illustrated poster
   fixture-50-letter-template.html           # one-page stationery template
@@ -114,7 +114,12 @@ proves. Page envelopes are pinned in `internal/convert/golden_test.go`
 | 54 | Ember Harbor storybook: cover + three chapter pages, shared `theme-print-stories.css`, local illustrations (needle `Ember Harbor`) | 4 |
 | 55 | Self-contained operations brief: inline CSS, status cards, route table, action plan, and page breaks | 3 |
 | 56 | Architecture diagram: hero, pipeline strip, TOC, 10 domain sections (modern semantic tags: `dialog`, `details/summary`, `mark`, `meter`, `progress`, `output`, `time`, `data`, `kbd`, `samp`, `var`, `dfn`, `cite`, `ruby`, `rt`, `rp`, `bdi`, `bdo`, `wbr`, `ins`, `del`, `sub`, `sup`, `aside`, `address`, `fieldset`, `legend`, `picture`, `search`; modern CSS: `oklch()`/`color-mix()`/`clamp()`/logical properties with graceful-degrade fallbacks), linked `fixture-56-architecture-diagram.css`, dependency DAG, PDF-vs-image, security; derived from `documentation/architecture/` (commit ef526f9) | 20 |
-| font-examples | Font showcase: 1,125 free Google Fonts (fonts.google.com Feeling/Calligraphy filters + top-trending modern/display/script/handwriting) — randomized sampler: every font appears exactly once, each line in a random text style (regular, bold, italic, bold-italic, underline, strikethrough, underline+strikethrough, bold+underline, bold-italic+underline+strikethrough, letter-spaced, uppercase), rows span 100% width in a single column; inline `<style>`; fonts intentionally NOT bundled — render with `--font-path <dir>` or `Global().Set("fontpath", dir)`; falls back to Liberation Sans without font flags | 25 (with fonts, single column, number+name inline, overflow-wrap) |
+| 57 | Vanguard telemetry audit narrative plus browser-print probe gallery for all 356 implemented CSS properties (each declared with representative print styling; needle VANGUARD-CSS-356-IMPLEMENTED). | 9 |
+| 58 | Unsupported CSS worklist audit: safe parsing, cascade degrade, and crash resilience verification gallery for all 462 unsupported CSS properties (needle UNSUPPORTED-WORKLIST-AUDIT). | 9 |
+| 60 | Implemented CSS props audit slice A (~1/3): property/description/effect gallery; Liberation via `--font-path testdata/fonts/implemented-audit`; needle `IMPLEMENTED-PROPS-A`. | 8 |
+| 61 | Implemented CSS props audit slice B (~1/3): same pattern; needle `IMPLEMENTED-PROPS-B`. | 8 |
+| 62 | Implemented CSS props audit slice C (~1/3): same pattern; needle `IMPLEMENTED-PROPS-C`. | 8 |
+| font-examples | Font showcase: 1,125 free Google Fonts (fonts.google.com Feeling/Calligraphy filters + top-trending modern/display/script/handwriting) - randomized sampler: every font appears exactly once, each line in a random text style (regular, bold, italic, bold-italic, underline, strikethrough, underline+strikethrough, bold+underline, bold-italic+underline+strikethrough, letter-spaced, uppercase), rows span 100% width in a single column; inline `<style>`; fonts intentionally NOT bundled - render with `--font-path <dir>` or `Global().Set("fontpath", dir)`; falls back to Liberation Sans without font flags | 25 (with fonts, single column, number+name inline, overflow-wrap) |
 
 ## Pass criteria
 
@@ -126,8 +131,8 @@ A fixture passes `TestGoldenCorpusAllFixtures` when the generated PDF:
    `pdf.ParseSemantic` (01 Invoice/total, 06 Partner Handbook, 07 Nordwind,
    24 Internal link report, 54 Ember Harbor, 55 Northline).
 3. **Features:** `images` / `uris` flags require `/Subtype /Image` or `/S /URI`.
-4. **Geometry / visual:** layout unit tests and crop checks — not byte-identical
-   PDFs and not a ±1 px golden for every box.
+4. **Geometry / visual:** layout unit tests and crop checks - not byte-identical
+   PDFs and not a +-1 px golden for every box.
 
 ### Visual inspection (2026-08-12)
 
