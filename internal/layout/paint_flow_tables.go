@@ -85,9 +85,34 @@ func normalizeTableRowGaps(res *Result, contentH float64) {
 				}
 			}
 
-			shiftOpsOnly(res, first, last, -gap)
-			shiftTableRowBoxes(table.rows[rowIndex], -gap)
+			// Pull this row and every later same-page body row up together.
+			// shiftOpsOnly on only the gapped row leaves following rows behind
+			// (fixture-56 Surface/Contract: ImageConverter crushed into
+			// Converter while RunPDF kept the stale gap below).
+			shiftTableRowsUp(res, table.rows[rowIndex:], currentPage, contentH, gap)
 		}
+	}
+}
+
+// shiftTableRowsUp moves consecutive same-page table rows up by gap, stopping
+// at the first row that sits on another page or has no geometry.
+func shiftTableRowsUp(res *Result, rows [][]*box, page int, contentH, gap float64) {
+	if gap <= 1e-6 {
+		return
+	}
+
+	for _, row := range rows {
+		first, last, top, _, ok := rowOpGeometry(row)
+		if !ok || first < 0 || last < first {
+			return
+		}
+
+		if int(top/contentH) != page {
+			return
+		}
+
+		shiftOpsOnly(res, first, last, -gap)
+		shiftTableRowBoxes(row, -gap)
 	}
 }
 
@@ -149,10 +174,11 @@ func shiftRowToPage(res *Result, row []*box, contentH float64) bool {
 	// rows / chrome below) shift with the cells - otherwise
 	// content moves and the grid stays behind (gapped /
 	// misaligned music-video tables across page breaks).
+	// shiftFlowY already updates table cell boxes via
+	// shiftFlowBoxes; do not shiftTableRowBoxes again or
+	// cell.y advances twice while ops advance once (fixture-56
+	// Surface/Contract ImageConverter desync / crush).
 	shiftFlowY(res, first, last, rowTop-0.01, deltaY)
-	// Keep cell.y in sync with ops so later header-repeat / gap
-	// logic (rowYBounds) does not read stale pre-pagination tops.
-	shiftTableRowBoxes(row, deltaY)
 	for _, cell := range row {
 		if cell != nil {
 			cell.paginationShifted = true
