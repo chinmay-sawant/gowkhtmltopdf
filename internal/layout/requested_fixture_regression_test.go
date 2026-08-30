@@ -33,7 +33,7 @@ func TestFixture21ParagraphAfterForcedBreakStaysContiguous(t *testing.T) {
 		if pages[i] != pages[0] {
 			t.Fatalf("second resource paragraph split across pages: pages=%v ys=%v", pages, ys)
 		}
-		if ys[i]-ys[i-1] > 2*defaultLineHeightRatio*9.5+1 {
+		if ys[i]-ys[i-1] > 2*1.2*9.5+1 {
 			t.Fatalf("second resource paragraph has excess vertical gap: ys=%v", ys)
 		}
 	}

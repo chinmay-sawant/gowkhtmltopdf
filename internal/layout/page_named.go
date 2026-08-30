@@ -74,12 +74,12 @@ func namedPageNames(res *Result, contentH float64) []string {
 			continue
 		}
 
-		start, startOK := checkedFlowPageOfY(boxNode.y+layoutEpsilon, contentH)
+		start, startOK := checkedFlowPageOfY(boxNode.y+1e-6, contentH)
 		if !startOK {
 			continue
 		}
 
-		endY := boxNode.y + boxNode.height - layoutEpsilon
+		endY := boxNode.y + boxNode.height - 1e-6
 		if endY < boxNode.y {
 			endY = boxNode.y
 		}

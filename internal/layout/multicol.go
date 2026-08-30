@@ -84,7 +84,7 @@ func (e *engine) multicolAutoMargin(style ResolvedStyle, availW, boxW float64) f
 
 		switch {
 		case style.MarginLeftAuto && style.MarginRightAuto:
-			margL = free / two
+			margL = free / 2
 		case style.MarginLeftAuto:
 			margL = free - margR
 			if margL < 0 {
@@ -354,7 +354,7 @@ func (e *engine) multicolColumnHeight(
 	pageTop := float64(pageIdx) * pageH
 	boundary := pageTop + pageH
 	remain := boundary - absTop
-	minUseful := e.scalePt(style.FontSize) * defaultLineHeightRatio
+	minUseful := e.scalePt(style.FontSize) * 1.2
 	// Snap to the next page when little/no room remains. Guard against
 	// float edges where absTop/pageH truncates just below an integer and
 	// remain≈0 (would spin forever on cy += remain).

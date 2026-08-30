@@ -155,7 +155,7 @@ func opInPaintRange(index int, ranges []paintRange) bool {
 // snapOpToBoundary shifts one crossing op (and the row chrome under it) onto
 // the next page, leaving ascender room above the boundary.
 func snapOpToBoundary(res *Result, idx int, paintOp *Op, boundary float64) {
-	if boundary-paintOp.Y > layoutEpsilon {
+	if boundary-paintOp.Y > 1e-6 {
 		snapOpForward(res, idx, paintOp, boundary)
 
 		return
@@ -180,14 +180,14 @@ func snapOpForward(res *Result, idx int, paintOp *Op, boundary float64) {
 	// lines do not paint into the top margin (page-4/5 bleed).
 	lead := 0.0
 	if paintOp.Kind == OpText || paintOp.Kind == OpBullet {
-		lead = paintOp.Size * pxToPtFactor
-		if lead < maxGlueEm {
+		lead = paintOp.Size * 0.75
+		if lead < 8 {
 			lead = 8
 		}
 	}
 
 	deltaY := boundary + lead - minY
-	shiftFlowY(res, idx, idx, oldY-layoutSlack, deltaY)
+	shiftFlowY(res, idx, idx, oldY-0.01, deltaY)
 	shiftNearestOwnedChrome(res, idx, oldY, deltaY)
 
 	for _, j := range chrome {

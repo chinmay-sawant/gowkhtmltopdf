@@ -57,6 +57,10 @@ var ErrNetworkPolicy = errors.New("network policy denied request")
 // fail-fast form for new callers.
 var ErrInvalidProxy = errors.New("invalid proxy configuration")
 
+// ErrNilLoader is returned when a load operation is attempted with a nil Loader.
+// Primary definition (migrated from internal/errs, PT-GO-28).
+var ErrNilLoader = errors.New("gowkhtmltopdf: nil loader")
+
 // Package-level sentinels for the loader's internal failure modes, so
 // dynamic messages wrap a static error and stay matchable with errors.Is.
 var (
@@ -222,7 +226,7 @@ func (c ResourceContext) PageLoad() settings.LoadPage {
 // document's load policy.
 func (c ResourceContext) Fetch(ctx context.Context, ref string) (*Resource, error) {
 	if c.loader == nil {
-		return nil, errs.ErrNilLoader
+		return nil, ErrNilLoader
 	}
 
 	if ctx == nil {
@@ -798,7 +802,7 @@ func parseProxy(raw string) (*url.URL, error) {
 //nolint:cyclop // multi-branch resource loader
 func (l *Loader) Load(ctx context.Context, input string, pageLoad settings.LoadPage) (*Resource, error) {
 	if l == nil {
-		return nil, errs.ErrNilLoader
+		return nil, ErrNilLoader
 	}
 
 	if l.initErr != nil {
@@ -1394,7 +1398,7 @@ func (l *Loader) loadErrorResponse(
 //nolint:cyclop // multi-branch subresource loader
 func (l *Loader) FetchSub(ctx context.Context, base, ref string, pageLoad settings.LoadPage) (*Resource, error) {
 	if l == nil {
-		return nil, errs.ErrNilLoader
+		return nil, ErrNilLoader
 	}
 
 	if l.initErr != nil {

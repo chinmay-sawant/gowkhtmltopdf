@@ -64,7 +64,7 @@ func normalizeTableRowGaps(res *Result, contentH float64) {
 			}
 
 			gap := currentTop - previousBottom
-			if gap <= layoutEpsilon {
+			if gap <= 1e-6 {
 				continue
 			}
 
@@ -79,7 +79,7 @@ func normalizeTableRowGaps(res *Result, contentH float64) {
 				minTop := pageTop + hdrH
 				if currentTop-gap < minTop {
 					gap = currentTop - minTop
-					if gap <= layoutEpsilon {
+					if gap <= 1e-6 {
 						continue
 					}
 				}
@@ -141,7 +141,7 @@ func shiftRowToPage(res *Result, row []*box, contentH float64) bool {
 	// paint height leaking into rowBoxH) skipped blank pages
 	// between filmography and awards on long wiki tables.
 	deltaY := float64(layoutOut+1)*contentH - rowTop
-	if deltaY <= layoutSlack {
+	if deltaY <= 0.01 {
 		return false
 	}
 	// fromY slightly above rowTop so border-collapse grid
@@ -149,7 +149,7 @@ func shiftRowToPage(res *Result, row []*box, contentH float64) bool {
 	// rows / chrome below) shift with the cells - otherwise
 	// content moves and the grid stays behind (gapped /
 	// misaligned music-video tables across page breaks).
-	shiftFlowY(res, first, last, rowTop-layoutSlack, deltaY)
+	shiftFlowY(res, first, last, rowTop-0.01, deltaY)
 	// Keep cell.y in sync with ops so later header-repeat / gap
 	// logic (rowYBounds) does not read stale pre-pagination tops.
 	shiftTableRowBoxes(row, deltaY)
@@ -294,7 +294,7 @@ func repeatTableHeaderOnPages(res *Result, tblBox *box, contentH float64) {
 		if shiftFrom >= 0 && bodyTop >= 0 && bodyTop < pageTop+hdrH-0.5 {
 			dy := pageTop + hdrH - bodyTop
 			if dy > 0 {
-				shiftFlowY(res, shiftFrom, shiftTo, bodyTop-layoutSlack, dy)
+				shiftFlowY(res, shiftFrom, shiftTo, bodyTop-0.01, dy)
 				// Table cells are not always in the flow-box index, so
 				// shiftFlowY alone can leave cell.y behind the ops.
 				shiftTableBodyBoxesFrom(tblBox, page, contentH, dy)
@@ -358,13 +358,13 @@ func ensureBodyBelowRepeatedHeader(
 		return
 	}
 
-	if bodyTop >= minTop-layoutEpsilon {
+	if bodyTop >= minTop-1e-6 {
 		return
 	}
 
 	deltaY := minTop - bodyTop
 	if deltaY > 0 {
-		shiftFlowY(res, shiftFrom, shiftTo, bodyTop-layoutSlack, deltaY)
+		shiftFlowY(res, shiftFrom, shiftTo, bodyTop-0.01, deltaY)
 		shiftTableBodyBoxesFrom(tblBox, page, contentH, deltaY)
 	}
 }
@@ -415,11 +415,11 @@ func placeSliverBodyBelowHeader(res *Result, tblBox *box, pageTop, hdrH float64)
 		}
 
 		deltaY := target - rowTop
-		if deltaY <= layoutSlack {
+		if deltaY <= 0.01 {
 			continue
 		}
 
-		shiftFlowY(res, first, last, rowTop-layoutSlack, deltaY)
+		shiftFlowY(res, first, last, rowTop-0.01, deltaY)
 		shiftTableRowBoxes(row, deltaY)
 	}
 }

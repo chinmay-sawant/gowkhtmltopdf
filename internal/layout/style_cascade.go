@@ -463,7 +463,7 @@ func cascadeRaw( //nolint:funlen // cascade tiers are deliberately visible in on
 			continue
 		}
 
-		applyCascadeDeclaration(wins, d.Prop, d.Value, 1<<maxIntShift, 0, 0, 1<<maxIntShift, d.Important)
+		applyCascadeDeclaration(wins, d.Prop, d.Value, 1<<30, 0, 0, 1<<30, d.Important)
 	}
 
 	if len(wins) == 0 {
@@ -724,7 +724,7 @@ func expandBoxShorthand(prop, value string) ([4]string, bool) {
 	var values [4]string
 
 	switch prop {
-	case marginProperty, paddingProperty:
+	case "margin", "padding":
 		// 1–4 space-separated sides (CSS box shorthand).
 	case borderProperty:
 		// border: <width> <style> <color> applies the same value to every side.
@@ -747,9 +747,9 @@ func expandBoxShorthand(prop, value string) ([4]string, bool) {
 	switch count {
 	case 1:
 		values = [4]string{tokens[0], tokens[0], tokens[0], tokens[0]}
-	case two:
+	case 2:
 		values = [4]string{tokens[0], tokens[1], tokens[0], tokens[1]}
-	case three:
+	case 3:
 		values = [4]string{tokens[0], tokens[1], tokens[2], tokens[1]}
 	default:
 		values = tokens
@@ -847,7 +847,7 @@ func specificityBeats(cur [4]int, ids, classes, types, order, curOrder int) bool
 // applyFontProps resolves font-size/family/weight/style/font first, using the
 // parent's size for percentages and em, and ctx.remBase for rem.
 func applyFontProps(style *ResolvedStyle, raw map[string]string, parentSize float64, ctx *styleContext) {
-	remBase := pxToPt(cssPxRoot)
+	remBase := pxToPt(16)
 	if ctx != nil && ctx.remBase > 0 {
 		remBase = ctx.remBase
 	}
@@ -914,9 +914,9 @@ func applyFontStyleValue(style *ResolvedStyle, raw map[string]string) {
 func resolveFontWeight(current int, val string) int {
 	switch val {
 	case contentNormal:
-		return fontWeightNormal
+		return 400
 	case "bold":
-		return fontWeightBold
+		return 700
 	case "bolder":
 		return current + fontWeightStep
 	case "lighter":

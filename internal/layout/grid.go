@@ -419,7 +419,7 @@ func resolveUsedWidth(sty ResolvedStyle, availW float64, engN *engine) float64 {
 	if sty.WidthPercent >= 0 {
 		// Cyclic % -> auto (keep fill-remaining width).
 		if availW > 0 && !math.IsInf(availW, 0) && availW < 1e12 {
-			width = availW * sty.WidthPercent / cssPercent
+			width = availW * sty.WidthPercent / 100
 		}
 	} else if sty.Width >= 0 {
 		width = engN.scalePt(sty.Width)
@@ -483,7 +483,7 @@ func gridAlignOffset(value string, cell, item float64) float64 {
 		}
 	case fxCenter:
 		if cell > item {
-			return (cell - item) / two
+			return (cell - item) / 2
 		}
 	}
 

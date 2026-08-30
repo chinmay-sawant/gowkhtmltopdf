@@ -50,7 +50,7 @@ func (e *engine) resolveImage(src string) *imageRef {
 	}
 
 	ref := &imageRef{src: src, data: data} //nolint:exhaustruct // intentional zero fields
-	if png, pw, ph, err := svg.Rasterize(data, svgRasterMax); err == nil {
+	if png, pw, ph, err := svg.Rasterize(data, 1024); err == nil {
 		ref.data, ref.w, ref.h = png, pw, ph
 	} else if w, h, jpeg, ok := imageDims(data); ok {
 		ref.w, ref.h, ref.isJPEG = w, h, jpeg
@@ -511,7 +511,7 @@ func (e *engine) emitListMarker(node *html.Node, style ResolvedStyle, contentX, 
 	}
 
 	if minW <= 0 {
-		minW = size * float64(len([]rune(text))) * halfRatio
+		minW = size * float64(len([]rune(text))) * 0.5
 	}
 
 	posX := listMarkerX(style.ListStylePosition, contentX, size, minW)
@@ -577,7 +577,7 @@ func listMarkerX(position string, contentX, emSize, markerW float64) float64 {
 		return contentX
 	}
 
-	posX := contentX - emSize*bulletGapRatio - markerW
+	posX := contentX - emSize*0.35 - markerW
 	if posX < 0 {
 		return 0
 	}
@@ -645,9 +645,9 @@ func alphaMarker(node int, upper bool) string {
 	for node > 0 {
 		node--
 
-		ch := byte('a' + (node % alphabetLen))
+		ch := byte('a' + (node % 26))
 		if upper {
-			ch = byte('A' + (node % alphabetLen))
+			ch = byte('A' + (node % 26))
 		}
 
 		chars = append(chars, ch)
@@ -747,7 +747,7 @@ func (e *engine) setFloatImgMaxW(cs ResolvedStyle, contentW, avail float64) {
 	case cs.Width >= 0:
 		e.imgMaxW = e.scalePt(cs.Width)
 	case cs.WidthPercent >= 0 && contentW > 0:
-		e.imgMaxW = contentW * cs.WidthPercent / cssPercent
+		e.imgMaxW = contentW * cs.WidthPercent / 100
 	case avail > 0 && avail < contentW:
 		e.imgMaxW = avail
 	}
@@ -768,7 +768,7 @@ func packFloatPosition(
 		}
 
 		room := floatsPackRoom(floats, contentX, contentW, true)
-		if room >= avail*halfRatio { // enough room to attempt side-by-side
+		if room >= avail*0.5 { // enough room to attempt side-by-side
 			fixX = floats.leftEdge
 			fromY = maxY(floats.leftTop, flowY)
 			packedAvail = minY(avail, room)
@@ -786,7 +786,7 @@ func packFloatPosition(
 	}
 
 	room := floatsPackRoom(floats, contentX, contentW, false)
-	if room >= avail*halfRatio {
+	if room >= avail*0.5 {
 		fromY = maxY(floats.rightTop, flowY)
 		packedAvail = minY(avail, room)
 

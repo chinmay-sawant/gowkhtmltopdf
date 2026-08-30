@@ -44,7 +44,7 @@ func parseBoxShadowLayer(value string, current [3]float64, fsize float64) (parse
 	var tokens [boxShadowMaxTokens]string
 
 	tokenCount := splitSpaceTokens(value, tokens[:])
-	if tokenCount < pairLen || tokenCount > len(tokens) {
+	if tokenCount < 2 || tokenCount > len(tokens) {
 		return parsedBoxShadow{}, false //nolint:exhaustruct // invalid layer
 	}
 
@@ -103,23 +103,23 @@ func collectBoxShadowTokens(
 func boxShadowFromLengths(
 	lengths [boxShadowMaxLengths]float64, lengthCount int, color [3]float64, alpha float64, inset bool,
 ) (parsedBoxShadow, bool) {
-	if lengthCount < pairLen {
+	if lengthCount < 2 {
 		return parsedBoxShadow{}, false //nolint:exhaustruct // invalid layer
 	}
 
 	blur := 0.0
 	spread := 0.0
 
-	if lengthCount >= three {
-		if lengths[two] < 0 {
+	if lengthCount >= 3 {
+		if lengths[2] < 0 {
 			return parsedBoxShadow{}, false //nolint:exhaustruct // invalid layer
 		}
 
-		blur = lengths[two]
+		blur = lengths[2]
 	}
 
 	if lengthCount >= boxShadowMaxLengths {
-		spread = lengths[three]
+		spread = lengths[3]
 	}
 
 	return parsedBoxShadow{
@@ -172,8 +172,8 @@ func (e *engine) appendOuterBoxShadow(
 	offY := e.scalePt(shadow.y)
 	originX := posX + offX - spread
 	originY := posY + offY - spread
-	shadowW := width + spread*two
-	shadowH := height + spread*two
+	shadowW := width + spread*2
+	shadowH := height + spread*2
 
 	if shadowW <= 0 || shadowH <= 0 {
 		return dst
@@ -189,7 +189,7 @@ func (e *engine) appendOuterBoxShadow(
 			expand := blur * float64(step) / float64(boxShadowBlurSteps)
 			layerAlpha := baseAlpha * (float64(boxShadowBlurSteps-step+1) / float64(boxShadowBlurSteps*3))
 			op := shadowFillOp(
-				originX-expand, originY-expand, shadowW+expand*two, shadowH+expand*two, shadow.color, radiusX, radiusY,
+				originX-expand, originY-expand, shadowW+expand*2, shadowH+expand*2, shadow.color, radiusX, radiusY,
 			)
 			op.Alpha = layerAlpha
 			dst = append(dst, op)

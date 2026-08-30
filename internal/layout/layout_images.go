@@ -65,7 +65,7 @@ func (e *engine) usedImageSize(
 
 	if style.WidthPercent >= 0 {
 		if cb := e.imageContainingWidth(); cb > 0 {
-			size.w = cb * style.WidthPercent / cssPercent
+			size.w = cb * style.WidthPercent / 100
 			cssW = true
 		}
 	} else if cssW {
@@ -179,7 +179,7 @@ func (e *engine) imageMaxWidth(style ResolvedStyle, cssW bool) float64 {
 
 	if style.MaxWidthPercent >= 0 {
 		if cb := e.imageContainingWidth(); cb > 0 {
-			pct := cb * style.MaxWidthPercent / cssPercent
+			pct := cb * style.MaxWidthPercent / 100
 			if maxW < 0 || pct < maxW {
 				maxW = pct
 			}
@@ -368,7 +368,7 @@ func imageDims(data []byte) (int, int, bool, bool) {
 func jpegDims(data []byte) (int, int, bool, bool) {
 	pos := 2
 	for pos+4 <= len(data) {
-		if data[pos] != byteMax {
+		if data[pos] != 0xFF {
 			pos++
 
 			continue
@@ -396,12 +396,12 @@ func jpegDims(data []byte) (int, int, bool, bool) {
 			return width, height, true, true
 		}
 
-		segLen := int(data[pos+2])<<byteShift | int(data[pos+3])
-		if segLen < jpegSegHeaderLen {
+		segLen := int(data[pos+2])<<8 | int(data[pos+3])
+		if segLen < 2 {
 			return 0, 0, false, false
 		}
 
-		pos += jpegSegHeaderLen + segLen
+		pos += 2 + segLen
 	}
 
 	return 0, 0, false, false

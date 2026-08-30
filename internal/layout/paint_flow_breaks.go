@@ -150,13 +150,13 @@ func keepTogetherForAvoid(res *Result, boxNode *box, contentH float64) bool {
 	}
 
 	deltaY := float64(layoutOut+1)*contentH - boxNode.y
-	if deltaY <= layoutSlack {
+	if deltaY <= 0.01 {
 		return false
 	}
 
 	if implicitAtomicBox(boxNode) {
 		beforeY := nextForcedBreakY(res, boxNode.y)
-		if boxNode.y+height+deltaY > beforeY-layoutSlack {
+		if boxNode.y+height+deltaY > beforeY-0.01 {
 			return false
 		}
 
@@ -284,7 +284,7 @@ func rejectKeepTogetherShift(boxNode *box, remaining, contentH float64) bool {
 		// Only lift a card that starts in the last band of the page.
 		// Mid-page cards that barely overflow would blank too much and
 		// shove following in-section content onto an extra page.
-		return remaining > contentH*keepTogetherMaxBlankRatio
+		return remaining > contentH*0.2
 	}
 
 	if preferSplitOverBlank(remaining, boxNode.height, contentH) {
@@ -293,7 +293,7 @@ func rejectKeepTogetherShift(boxNode *box, remaining, contentH float64) bool {
 
 	// Large explicit-avoid boxes: prefer split when less than half the box
 	// fits (rowspan tables / tall avoid blocks).
-	return remaining < boxNode.height*halfRatio && boxNode.height > contentH*0.35
+	return remaining < boxNode.height*0.5 && boxNode.height > contentH*0.35
 }
 
 // boxInkExtent returns the bottom edge of the box's ink ops (boxNode.y when
@@ -335,7 +335,7 @@ func opInkHeight(paintOp Op) float64 {
 	}
 
 	if paintOp.Kind == OpText || paintOp.Kind == OpBullet {
-		return paintOp.Size * defaultLineHeightRatio
+		return paintOp.Size * 1.2
 	}
 
 	return 0
@@ -517,7 +517,7 @@ func processBeforeAlwaysTarget(
 	}
 
 	deltaY := targetY - boxY
-	if math.Abs(deltaY) <= layoutSlack {
+	if math.Abs(deltaY) <= 0.01 {
 		return false
 	}
 
@@ -546,13 +546,13 @@ func forcedBreakTargetY(boxY, maxEff, contentH float64) (float64, bool) {
 	}
 
 	loPage := int(boxY / contentH)
-	if contentH-pageOff <= layoutSlack {
+	if contentH-pageOff <= 0.01 {
 		loPage++
 		pageOff = 0
 	}
 
 	onLaterPage := loPage > lastPage
-	if onLaterPage && pageOff <= layoutSlack {
+	if onLaterPage && pageOff <= 0.01 {
 		return boxY, true
 	}
 
@@ -734,7 +734,7 @@ func keepAfterAvoid(res *Result, boxNode, next *box, lastPage int, contentH floa
 
 	if minIdx >= 0 && minY < bandTop-0.01 {
 		push := bandTop - minY
-		shiftFlowY(res, minIdx, minIdx, minY-layoutSlack, push)
+		shiftFlowY(res, minIdx, minIdx, minY-0.01, push)
 	}
 
 	target := bandTop - need // == pageStart when band was cleared
@@ -751,7 +751,7 @@ func keepAfterAvoid(res *Result, boxNode, next *box, lastPage int, contentH floa
 	}
 
 	deltaY := target - boxNode.y
-	if deltaY <= layoutSlackFine {
+	if deltaY <= 0.001 {
 		return false
 	}
 
@@ -831,8 +831,8 @@ func opInkEdges(paintOp Op) (float64, float64) {
 
 	switch paintOp.Kind {
 	case OpText, OpBullet:
-		yStart = paintOp.Y - paintOp.Size*ascentRatio
-		yEnd = paintOp.Y + paintOp.Size*bulletGapRatio
+		yStart = paintOp.Y - paintOp.Size*0.8
+		yEnd = paintOp.Y + paintOp.Size*0.35
 	case OpLine:
 		if paintOp.H == 0 {
 			yEnd = paintOp.Y + math.Max(paintOp.Width, 1)
@@ -867,7 +867,7 @@ func keepHeadingWithNext(res *Result, contentH float64) bool {
 		page := int(boxNode.y / contentH)
 
 		room := float64(page+1)*contentH - (boxNode.y + boxNode.height)
-		if room >= twoLineRoomPt { // ~2 lines at 12pt
+		if room >= 24 { // ~2 lines at 12pt
 			continue
 		}
 		// Find next flow sibling with ops.
@@ -929,20 +929,20 @@ func normalizeLeadingRoundedCallouts(res *Result, contentH float64) {
 
 		// Match pageBuckets / shiftSamePageFromY: boundary-aligned Y must not
 		// fall into the previous page via float truncation.
-		page, ok := checkedFlowPageOfY(boxNode.y+layoutEpsilon, contentH)
+		page, ok := checkedFlowPageOfY(boxNode.y+1e-6, contentH)
 		if !ok {
 			continue
 		}
 
 		pageTop := float64(page) * contentH
 		leadingOffset := boxNode.y - pageTop
-		if leadingOffset <= layoutEpsilon || leadingOffset > 32 {
+		if leadingOffset <= 1e-6 || leadingOffset > 32 {
 			continue
 		}
 
 		// Same-page only. shiftFlowY would also pull later pages backward
 		// and can undo page-break-before:always (fixture-56 domain-05).
-		shiftSamePageFromY(res, boxNode.y-layoutSlack, page, contentH, pageTop-boxNode.y)
+		shiftSamePageFromY(res, boxNode.y-0.01, page, contentH, pageTop-boxNode.y)
 	}
 }
 
@@ -952,7 +952,7 @@ func shiftSamePageOps(res *Result, fromY float64, page int, contentH, deltaY flo
 			continue
 		}
 
-		opPage, ok := checkedFlowPageOfY(res.Ops[idx].Y+layoutEpsilon, contentH)
+		opPage, ok := checkedFlowPageOfY(res.Ops[idx].Y+1e-6, contentH)
 		if !ok || opPage != page {
 			continue
 		}
@@ -967,7 +967,7 @@ func shiftSamePageBoxes(res *Result, fromY float64, page int, contentH, deltaY f
 			continue
 		}
 
-		boxPage, ok := checkedFlowPageOfY(boxNode.y+layoutEpsilon, contentH)
+		boxPage, ok := checkedFlowPageOfY(boxNode.y+1e-6, contentH)
 		if !ok || boxPage != page {
 			continue
 		}
@@ -1049,7 +1049,7 @@ func preferSplitOverBlank(remaining, height, contentH float64) bool {
 		// never keep short avoid siblings apart.
 		maxBlank := 14.0
 		if height*0.5 > maxBlank {
-			maxBlank = height * halfRatio
+			maxBlank = height * 0.5
 		}
 
 		if remaining > maxBlank {

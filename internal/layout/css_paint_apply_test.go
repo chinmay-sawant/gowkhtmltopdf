@@ -96,15 +96,15 @@ func TestOutlineParse(t *testing.T) {
 		t.Fatalf("outline color = %v set=%v, want red", sh.OutlineColor, sh.OutlineColorSet)
 	}
 
-	if !near(styleByClass(t, styles, "width").OutlineWidth, borderWidth(mediumKeyword, defaultFontSizePt)) {
+	if !near(styleByClass(t, styles, "width").OutlineWidth, borderWidth(mediumKeyword, 12)) {
 		t.Fatalf("outline-width:medium = %.3f, want medium", styleByClass(t, styles, "width").OutlineWidth)
 	}
 
-	if !near(styleByClass(t, styles, "thin").OutlineWidth, borderWidth("thin", defaultFontSizePt)) {
+	if !near(styleByClass(t, styles, "thin").OutlineWidth, borderWidth("thin", 12)) {
 		t.Fatalf("outline-width:thin = %.3f", styleByClass(t, styles, "thin").OutlineWidth)
 	}
 
-	if !near(styleByClass(t, styles, "thick").OutlineWidth, borderWidth("thick", defaultFontSizePt)) {
+	if !near(styleByClass(t, styles, "thick").OutlineWidth, borderWidth("thick", 12)) {
 		t.Fatalf("outline-width:thick = %.3f", styleByClass(t, styles, "thick").OutlineWidth)
 	}
 

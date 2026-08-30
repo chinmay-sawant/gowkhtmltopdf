@@ -142,8 +142,8 @@ func (e *engine) emitInlineText( //nolint:funlen // text measurement, face-run e
 
 	if ascent+descent < size*0.5 {
 		// Fallback when font metrics are missing — keep hit targets usable.
-		ascent = size * ascentRatio
-		descent = size * descentRatio
+		ascent = size * 0.8
+		descent = size * 0.2
 	}
 
 	chromeLeft, chromeRight := 0.0, 0.0
@@ -224,7 +224,7 @@ func (e *engine) paintInlineChrome(style *ResolvedStyle, leftX, baseline, ascent
 	top := e.inlineChromeTop(style)
 	bottom := e.inlineChromeBottom(style)
 	lh := lineHeightOf(style) * e.scale
-	extra := (lh - ascent - descent) / two
+	extra := (lh - ascent - descent) / 2
 	boxY := baseline - ascent - extra - top
 	boxH := ascent + extra + top + descent + extra + bottom
 	boxW := contentWidth + e.inlineChromeLeft(style) + e.inlineChromeRight(style)
@@ -295,7 +295,7 @@ func (e *engine) alignedInlineTop(item *inlineItem, lineY, lineH, baseline float
 	case cssVerticalAlignTop:
 		return lineY
 	case cssVerticalAlignMiddle:
-		return lineY + (lineH-item.h)/two
+		return lineY + (lineH-item.h)/2
 	case cssVerticalAlignBottom:
 		return lineY + lineH - item.h
 	default:
@@ -336,7 +336,7 @@ func (e *engine) emitInlineTextRun(
 			InkDescent:    descent,
 			LetterSpacing: item.style.LetterSpacing * e.scale,
 			TextTransform: item.style.TextTransform,
-			Bold:          item.style.FontWeight >= fontWeightBold,
+			Bold:          item.style.FontWeight >= 700,
 			R:             item.style.TextShadowColor[0], G: item.style.TextShadowColor[1], B: item.style.TextShadowColor[2],
 			RotateDeg: writingModeRotate(item.style.WritingMode),
 		})
@@ -348,7 +348,7 @@ func (e *engine) emitInlineTextRun(
 		InkDescent:    descent,
 		LetterSpacing: item.style.LetterSpacing * e.scale,
 		TextTransform: item.style.TextTransform,
-		Bold:          item.style.FontWeight >= fontWeightBold,
+		Bold:          item.style.FontWeight >= 700,
 		R:             child[0], G: child[1], B: child[2],
 		RotateDeg: writingModeRotate(item.style.WritingMode),
 	})
@@ -378,7 +378,7 @@ func (e *engine) paintDecoration(
 			(item.href != "" && item.style.TextDecoration != cssTextDecorationLineThrough))
 	wsOnly := strings.TrimSpace(item.text) == ""
 
-	if runSpan <= layoutSlack {
+	if runSpan <= 0.01 {
 		if !wantUnderline {
 			und.flush(e)
 		}
@@ -404,7 +404,7 @@ func (e *engine) paintDecoration(
 
 	if wantUnderline {
 		// Sit clearly below glyph descenders (~1–2mm visual gap).
-		underY := baseline + descent + size*underlineOffsetRatio + item.style.TextUnderlineOffset
+		underY := baseline + descent + size*0.22 + item.style.TextUnderlineOffset
 		e.paintUnderline(item, runStart, runSpan, underY, uWidth, size, wsOnly, decColor, und)
 	} else {
 		und.flush(e)
@@ -490,12 +490,12 @@ func extendUnder(und *undRun, runStart, runSpan, uWidth float64) {
 // underlineStrokeWidth returns a light print-friendly underline thickness.
 // ~5% em, clamped so small ref text stays visible without dense double-rules.
 func underlineStrokeWidth(em float64) float64 {
-	uWidth := em * underlineWidthEm
-	if uWidth < baselineInsetRatio {
+	uWidth := em * 0.05
+	if uWidth < 0.25 {
 		uWidth = 0.25
 	}
 
-	if uWidth > underlineWidthMax {
+	if uWidth > 0.45 {
 		uWidth = 0.45
 	}
 
@@ -508,7 +508,7 @@ func nearUndY(a, b float64) bool {
 		d = -d
 	}
 
-	return d < halfRatio
+	return d < 0.5
 }
 
 // measureTextFace measures s using per-rune CSS font-family fallback
@@ -746,7 +746,7 @@ func (e *engine) fontAscent(size float64) float64 {
 
 func (e *engine) fontAscentFace(face *pdf.Font, size float64) float64 {
 	if face == nil || face.UnitsPerEm() <= 0 {
-		return size * ascentRatio
+		return size * 0.8
 	}
 
 	return float64(face.Ascent()) * size / float64(face.UnitsPerEm())
@@ -754,7 +754,7 @@ func (e *engine) fontAscentFace(face *pdf.Font, size float64) float64 {
 
 func (e *engine) fontDescentFace(face *pdf.Font, size float64) float64 {
 	if face == nil || face.UnitsPerEm() <= 0 {
-		return size * descentRatio
+		return size * 0.2
 	}
 
 	return float64(-face.Descent()) * size / float64(face.UnitsPerEm())

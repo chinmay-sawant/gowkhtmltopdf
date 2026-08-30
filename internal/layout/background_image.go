@@ -222,7 +222,7 @@ func parseBgDim(token string, containerDim, fallback float64) float64 {
 		}
 	}
 	if val, unit, ok := css.ParseLength(token); ok {
-		if pt, converted := lengthToPt(val, unit, defaultFontSizePt); converted {
+		if pt, converted := lengthToPt(val, unit, 12); converted {
 			return pt
 		}
 		return val
@@ -248,7 +248,7 @@ func resolveBackgroundPosition(
 				offX = (originW - destW) * val / 100.0
 			}
 		} else if val, unit, ok := css.ParseLength(specX); ok {
-			if pt, converted := lengthToPt(val, unit, defaultFontSizePt); converted {
+			if pt, converted := lengthToPt(val, unit, 12); converted {
 				offX = pt
 			}
 		}
@@ -269,7 +269,7 @@ func resolveBackgroundPosition(
 				offY = (originH - destH) * val / 100.0
 			}
 		} else if val, unit, ok := css.ParseLength(specY); ok {
-			if pt, converted := lengthToPt(val, unit, defaultFontSizePt); converted {
+			if pt, converted := lengthToPt(val, unit, 12); converted {
 				offY = pt
 			}
 		}

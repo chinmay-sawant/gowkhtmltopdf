@@ -66,7 +66,7 @@ func (e *engine) collectAndPrepareInlineItems(nodes []*html.Node, contentW float
 	e.imgMaxW = oldMax
 	e.inlineCBW = oldCB
 
-	if len(items) >= two {
+	if len(items) >= 2 {
 		items = squeezeInlineSpaces(items)
 	}
 
@@ -275,7 +275,7 @@ func (e *engine) packInlineLine(
 		// that already has content and overflow into a float (wiki .IPA).
 		// Exception: never break before attaching punctuation / mid-cite
 		// (")[37]" → ")\n[" or "[\n37]" or "saying.[\n7]").
-		if lineAdv > 0 && lineAdv+adv > lineW+layoutEpsilon {
+		if lineAdv > 0 && lineAdv+adv > lineW+1e-6 {
 			idx, _ = e.glueStickyTail(*items, idx, start, adv)
 
 			break
@@ -386,10 +386,10 @@ func (e *engine) glueStickyTail(items []inlineItem, idx, start int, adv float64)
 // glueLimit returns the max advance that may stick to the current line for
 // the item pair: nowrap clusters (multi-cite / IPA fragments) may glue more.
 func glueLimit(prev, cur inlineItem, emSize float64) float64 {
-	limit := emSize * glueEmSoft
+	limit := emSize * 2.5
 
 	if isNowrapCluster(prev, cur) {
-		limit = emSize * maxGlueEm // multi-cite / IPA fragments
+		limit = emSize * 8 // multi-cite / IPA fragments
 	}
 
 	return limit
@@ -475,7 +475,7 @@ func (e *engine) breakOverflowItem(
 		return nil
 	}
 
-	if !allowMidTokenBreak(pol, adv, fullLineW+layoutSlack, aloneOnLine) {
+	if !allowMidTokenBreak(pol, adv, fullLineW+0.01, aloneOnLine) {
 		return nil
 	}
 
@@ -609,7 +609,7 @@ func (e *engine) preferFloatClearForTail(
 
 	next := floats.clearY(lineY)
 
-	if next-lineY <= halfRatio {
+	if next-lineY <= 0.5 {
 		return lineY, false
 	}
 
@@ -631,9 +631,9 @@ func (e *engine) preferFloatClearForTail(
 	// float so we do not leave "…destined for the" beside + orphan
 	// "big time."[71] under. Allow a slightly larger jump when the tail would
 	// need multiple narrow lines but only one full-width line.
-	maxGap := estLH * glueEmSoft
+	maxGap := estLH * 2.5
 	if rem > lineW+0.01 {
-		maxGap = estLH * glueEmHard
+		maxGap = estLH * 3.5
 	}
 
 	if next-lineY <= maxGap {
@@ -929,7 +929,7 @@ func (e *engine) lineMetrics(line []inlineItem, lineY float64) (float64, float64
 		ascent, descent := e.inlineFontMetrics(item.text, item.style)
 		lh := lineHeightOf(item.style) * e.scale
 
-		extra := (lh - ascent - descent) / two
+		extra := (lh - ascent - descent) / 2
 		itemAscent := ascent + extra
 		itemDescent := descent + extra
 
@@ -997,7 +997,7 @@ func (e *engine) lineOriginAndGap(
 	case floatRight:
 		return originX + availW - totalW, 0
 	case fxCenter:
-		return originX + (availW-totalW)/two, 0
+		return originX + (availW-totalW)/2, 0
 	case cssTextAlignJustify:
 		return originX, e.justifyGapOf(line, availW, totalW, lastLine)
 	default:

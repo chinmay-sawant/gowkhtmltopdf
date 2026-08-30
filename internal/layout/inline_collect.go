@@ -490,11 +490,11 @@ func (e *engine) inlineBlockAvail(nodeN *html.Node, sty ResolvedStyle, cbW float
 	if sty.WidthPercent >= 0 {
 		// Prefer the inline formatting-context width; fall back to viewport.
 		if cbW > 0 {
-			return cbW * sty.WidthPercent / cssPercent
+			return cbW * sty.WidthPercent / 100
 		}
 
 		if e.opts.Width > 0 {
-			return e.opts.Width * sty.WidthPercent / cssPercent
+			return e.opts.Width * sty.WidthPercent / 100
 		}
 	}
 
@@ -537,7 +537,7 @@ func (e *engine) inlineBlockAvail(nodeN *html.Node, sty ResolvedStyle, cbW float
 }
 
 // availWForInline is a generous width for block-in-inline measurement.
-func availWForInline() float64 { return 1 << maxIntShift }
+func availWForInline() float64 { return 1 << 30 }
 
 func (e *engine) textItem(text string, style *ResolvedStyle) inlineItem {
 	textWidth := e.measureTextFace(transformInlineText(text, style.TextTransform), style)
@@ -639,7 +639,7 @@ func capitalizeInlineText(text string) string {
 // redundant after a trailing space already on the previous item. Survivors
 // are compacted in place; the surviving prefix is returned.
 func squeezeInlineSpaces(items []inlineItem) []inlineItem {
-	if len(items) < two {
+	if len(items) < 2 {
 		return items
 	}
 
@@ -821,7 +821,7 @@ func isAllWhitespace(s string) bool {
 //
 //nolint:cyclop // per-item merge decision: image/break/href/style compare plus in-place compaction
 func (e *engine) coalesceTextItems(line []inlineItem) []inlineItem {
-	if len(line) < two {
+	if len(line) < 2 {
 		return line
 	}
 
@@ -909,7 +909,7 @@ func lineHeightOf(st *ResolvedStyle) float64 {
 		return st.LineHeight
 	}
 
-	return defaultLineHeightRatio * st.FontSize
+	return 1.2 * st.FontSize
 }
 
 func borderPaint(side border) float64 {

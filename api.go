@@ -54,7 +54,7 @@ var (
 	ErrMissingPDFOutput         = convert.ErrMissingOutput
 	ErrInvalidPDFCopies         = convert.ErrInvalidCopies
 	ErrMissingPDFOutlineOutput  = convert.ErrMissingOutlineOutput
-	ErrMissingImageOutput       = errs.ErrMissingImageOutput
+	ErrMissingImageOutput       = imageout.ErrMissingOutput
 	ErrNilContext               = errs.ErrNilContext
 	ErrInvalidPDFVersion        = settings.ErrInvalidPDFVersion
 	ErrInvalidPDFProfile        = settings.ErrInvalidPDFProfile

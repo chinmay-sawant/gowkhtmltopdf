@@ -5,7 +5,7 @@ Review ledger folder for the leftover print CSS in commit `48e06dbc` (`feat(css)
 | File | Role |
 |------|------|
 | [phase-wise-checklist.md](phase-wise-checklist.md) | Canonical execution ledger for the 2026-08-28 review wave (24 rows, closed) |
-| [ponytail-go-audit-2026-08-30.md](ponytail-go-audit-2026-08-30.md) | Whole-tree ponytail Go audit (2026-08-30, 9 agents, 40 `PT-GO-*` rows, 37 rows shipped on `chore/026-review` wave3) |
+| [ponytail-go-audit-2026-08-30.md](ponytail-go-audit-2026-08-30.md) | Whole-tree ponytail Go audit (2026-08-30, 9 agents, 40 `PT-GO-*` rows, 39 shipped + 1 parked [~] on `chore/026-review` wave4, 0 [ ] left) |
 
 Parent: [`../48-canonical-0.2.6-css-coverage.md`](../48-canonical-0.2.6-css-coverage.md).
 

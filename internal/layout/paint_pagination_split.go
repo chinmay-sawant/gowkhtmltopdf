@@ -32,7 +32,7 @@ func splitCrossingRects(res *Result, contentH float64) {
 			continue
 		}
 
-		page, ok := checkedFlowPageOfY(paintOp.Y+layoutEpsilon, contentH)
+		page, ok := checkedFlowPageOfY(paintOp.Y+1e-6, contentH)
 		if !ok {
 			continue
 		}
@@ -99,13 +99,13 @@ func collectOpFragments(paintOp Op, contentH float64) []opFragment {
 
 	for rest.H > 1e-9 {
 		guard++
-		if guard > paginationGuardMax {
+		if guard > 10000 {
 			frags = append(frags, opFragment{y: rest.Y, h: rest.H})
 
 			break
 		}
 
-		page, ok := checkedFlowPageOfY(rest.Y+layoutEpsilon, contentH)
+		page, ok := checkedFlowPageOfY(rest.Y+1e-6, contentH)
 		if !ok {
 			frags = append(frags, opFragment{y: rest.Y, h: rest.H})
 
@@ -120,7 +120,7 @@ func collectOpFragments(paintOp Op, contentH float64) []opFragment {
 		}
 
 		firstH := boundary - rest.Y
-		if firstH <= layoutEpsilon {
+		if firstH <= 1e-6 {
 			rest.Y = float64(page+1) * contentH
 
 			continue

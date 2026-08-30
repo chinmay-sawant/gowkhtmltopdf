@@ -54,7 +54,7 @@ func sealBorderGap(
 		return
 	}
 
-	if borderW < minBorderWidthPt {
+	if borderW < 0.3 {
 		borderW = 0.5
 	}
 	// Avoid exact duplicates.
@@ -86,7 +86,7 @@ func sealPageTopClusters(
 	seal func(gVal, minX, maxX, borderW, red, green, blue float64),
 ) {
 	for _, child := range clusterVerticals(vertStarts, vertEnds, true) {
-		if child.n < three || child.maxX-child.minX < 20 {
+		if child.n < 3 || child.maxX-child.minX < 20 {
 			continue
 		}
 
@@ -122,11 +122,11 @@ func sealPageBottomClusters(
 	eps float64,
 ) {
 	for _, child := range clusterVerticals(vertStarts, vertEnds, false) {
-		if child.n < three || child.maxX-child.minX < 20 {
+		if child.n < 3 || child.maxX-child.minX < 20 {
 			continue
 		}
 
-		page := int((child.y - layoutSlack) / contentH)
+		page := int((child.y - 0.01) / contentH)
 		pageBot := float64(page+1) * contentH
 		// Seal last-row bottoms that sit in the lower band of the page.
 		// A tight 40pt window missed fixture-60 row 14 (room ≈ 40.9pt),
@@ -239,7 +239,7 @@ func collectBorderSegmentOps(ops []Op) ([]vseg, []hseg) {
 }
 
 // roundY bins a canvas Y into 0.5pt buckets.
-func roundY(y float64) int { return int(math.Round(y * two)) }
+func roundY(y float64) int { return int(math.Round(y * 2)) }
 
 // clusterVerticals merges vertical segments sharing a start (byStart) or end
 // Y into clusters with the min/max x and dominant stroke.
@@ -293,7 +293,7 @@ func hCoverage(horizByY map[int][]hseg, posY, minX, maxX float64) (bool, float64
 	has := false
 
 	key := roundY(posY)
-	for k := key - int(eps*two) - 1; k <= key+int(eps*two)+1; k++ {
+	for k := key - int(eps*2) - 1; k <= key+int(eps*2)+1; k++ {
 		for _, height := range horizByY[k] {
 			covMin, covMax, has = mergeCoverageSeg(height, posY, minX, maxX, eps, covMin, covMax, has)
 		}
@@ -349,7 +349,7 @@ func sealPageTopStubs(
 
 		minX, maxX, borderW, redN, green, blueN, node := pageTopStubBounds(vertStarts, pageTop, eps)
 
-		if node < two {
+		if node < 2 {
 			continue
 		}
 
@@ -371,7 +371,7 @@ func pageTopStubBounds(
 	node := 0
 
 	key := roundY(pageTop)
-	for k := key - int(eps*two) - 1; k <= key+int(eps*two)+1; k++ {
+	for k := key - int(eps*2) - 1; k <= key+int(eps*2)+1; k++ {
 		for _, val := range vertStarts[k] {
 			if val.y0 < pageTop-eps || val.y0 > pageTop+eps {
 				continue
@@ -427,7 +427,7 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 		// (TestBoundaryFillSplit) are left to the normal page-split remnant.
 		contentBot := sectionContentBottom(res, pageOps[page], pageTop, pageBot, lastInkBot)
 
-		if pageBot-contentBot < maxGlueEm {
+		if pageBot-contentBot < 8 {
 			continue
 		}
 
@@ -547,7 +547,7 @@ func lastInkBottom(res *Result, idxs []int, pageTop, pageBot float64) (float64, 
 		case OpText, OpBullet:
 			height := opInkHeight(*paintOp)
 
-			if height < minBoxPt {
+			if height < 4 {
 				height = 4
 			}
 

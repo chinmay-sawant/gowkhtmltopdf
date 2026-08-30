@@ -127,7 +127,7 @@ func TestWhiteSpacePreWrap(t *testing.T) {
 		t.Fatalf("pre-line should collapse spaces, got %q", joined)
 	}
 
-	if len(lineTexts) < two {
+	if len(lineTexts) < 2 {
 		t.Fatalf("pre-line should keep the newline, got %+v", lineTexts)
 	}
 

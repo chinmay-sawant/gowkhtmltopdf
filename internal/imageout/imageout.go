@@ -61,9 +61,9 @@ var (
 	errNilRoot         = errors.New("imageout: nil root")
 	errNilContext      = errs.ErrNilContext
 	errCropNoIntersect = errors.New("imageout: crop rectangle does not intersect the canvas")
-	errNilRequest      = errs.ErrNilRequest
+	errNilRequest      = errors.New("gowkhtmltopdf: nil request")
 	errNothingToRender = errors.New("load-error policy is skip; nothing to render")
-	errImagesDisabled  = errs.ErrImagesDisabled
+	errImagesDisabled  = errors.New("gowkhtmltopdf: images disabled")
 	errNilOutput       = ErrMissingOutput
 	errUnsupportedFmt  = errors.New("unsupported format")
 	errRasterTooLarge  = errors.New("imageout: raster exceeds resource budget")

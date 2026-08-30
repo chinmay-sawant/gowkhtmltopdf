@@ -90,7 +90,7 @@ func enforceOrphansWidows(res *Result, boxNode *box, lines []float64, contentH f
 	}
 
 	dy := float64(hIdx)*contentH - boxNode.y
-	if dy <= layoutEpsilon {
+	if dy <= 1e-6 {
 		return false
 	}
 
@@ -103,12 +103,12 @@ func enforceOrphansWidows(res *Result, boxNode *box, lines []float64, contentH f
 func resolveOrphansWidows(boxNode *box) (int, int) {
 	orphans := boxNode.style.Orphans
 	if orphans < 1 {
-		orphans = defaultOrphansWidows
+		orphans = 2
 	}
 
 	widows := boxNode.style.Widows
 	if widows < 1 {
-		widows = defaultOrphansWidows
+		widows = 2
 	}
 
 	return orphans, widows
@@ -149,7 +149,7 @@ func orphansWidowsHeuristic(res *Result, boxNode *box, contentH float64) bool {
 	}
 
 	dy := float64(hIdx)*contentH - boxNode.y
-	if dy <= layoutEpsilon {
+	if dy <= 1e-6 {
 		return false
 	}
 
@@ -175,7 +175,7 @@ func countBlockLineYs(res *Result, boxNode *box) []float64 {
 		return nil
 	}
 
-	yCoords := make([]float64, 0, maxGlueEm)
+	yCoords := make([]float64, 0, 8)
 	seen := make(map[float64]bool)
 
 	end := boxNode.opEnd

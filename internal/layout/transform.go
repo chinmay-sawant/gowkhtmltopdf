@@ -60,7 +60,7 @@ func Scale(sx, sy float64) Matrix2D {
 
 // RotateDeg returns a rotation by deg degrees about the origin (CSS y-down).
 func RotateDeg(deg float64) Matrix2D {
-	rad := deg * math.Pi / degHalfCircle
+	rad := deg * math.Pi / 180
 	c, s := math.Cos(rad), math.Sin(rad)
 
 	return Matrix2D{A: c, B: s, C: -s, D: c} //nolint:exhaustruct // intentional zero fields
@@ -68,14 +68,14 @@ func RotateDeg(deg float64) Matrix2D {
 
 // SkewXDeg returns a skewX matrix (CSS degrees).
 func SkewXDeg(deg float64) Matrix2D {
-	t := math.Tan(deg * math.Pi / degHalfCircle)
+	t := math.Tan(deg * math.Pi / 180)
 
 	return Matrix2D{A: 1, D: 1, C: t} //nolint:exhaustruct // intentional zero fields
 }
 
 // SkewYDeg returns a skewY matrix (CSS degrees).
 func SkewYDeg(deg float64) Matrix2D {
-	t := math.Tan(deg * math.Pi / degHalfCircle)
+	t := math.Tan(deg * math.Pi / 180)
 
 	return Matrix2D{A: 1, D: 1, B: t} //nolint:exhaustruct // intentional zero fields
 }
@@ -99,7 +99,7 @@ type transformOriginSpec struct {
 }
 
 func defaultTransformOrigin() transformOriginSpec {
-	return transformOriginSpec{X: cssCenterPercent, Y: cssCenterPercent, XPercent: true, YPercent: true}
+	return transformOriginSpec{X: 50, Y: 50, XPercent: true, YPercent: true}
 }
 
 func resolveTransformOrigin(spec transformOriginSpec, boxNode *box) (float64, float64) {
@@ -110,13 +110,13 @@ func resolveTransformOrigin(spec transformOriginSpec, boxNode *box) (float64, fl
 	var originX, originY float64
 
 	if spec.XPercent {
-		originX = boxNode.x + boxNode.w*spec.X/cssPercent
+		originX = boxNode.x + boxNode.w*spec.X/100
 	} else {
 		originX = boxNode.x + spec.X
 	}
 
 	if spec.YPercent {
-		originY = boxNode.y + boxNode.height*spec.Y/cssPercent
+		originY = boxNode.y + boxNode.height*spec.Y/100
 	} else {
 		originY = boxNode.y + spec.Y
 	}
@@ -240,11 +240,11 @@ func parseOneTransformFunc(name, args string, fontSize float64) (Matrix2D, bool)
 
 // parseMatrixFunc parses matrix(a,b,c,d,e,f) coefficients.
 func parseMatrixFunc(parts []string) (Matrix2D, bool) {
-	if len(parts) != matrixCoeffCount {
+	if len(parts) != 6 {
 		return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
 	}
 
-	vals := make([]float64, matrixCoeffCount)
+	vals := make([]float64, 6)
 
 	for idx, p := range parts {
 		// CSS matrix() takes six <number>s (user units ≈ px at 96dpi).
@@ -253,7 +253,7 @@ func parseMatrixFunc(parts []string) (Matrix2D, bool) {
 			return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
 		}
 
-		if idx >= minBoxPt {
+		if idx >= 4 {
 			// e,f: translate in px → pt for our canvas.
 			vals[idx] = pxToPt(val)
 		} else {
@@ -304,7 +304,7 @@ func parseTwoArgTranslate(parts []string, fontSize float64) (Matrix2D, bool) {
 	}
 
 	yLen := 0.0
-	if len(parts) == two {
+	if len(parts) == 2 {
 		yLen, isOK = parseTransformLength(parts[1], fontSize)
 		if !isOK {
 			return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
@@ -354,7 +354,7 @@ func parseTwoArgScale(parts []string) (Matrix2D, bool) {
 	}
 
 	yScale := xScale
-	if len(parts) == two {
+	if len(parts) == 2 {
 		yScale, isOK = parseUnitless(parts[1])
 		if !isOK {
 			return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
@@ -417,7 +417,7 @@ func parseTwoArgSkew(parts []string) (Matrix2D, bool) {
 	}
 
 	yDeg := 0.0
-	if len(parts) == two {
+	if len(parts) == 2 {
 		yDeg, isOK = parseAngleDeg(parts[1])
 		if !isOK {
 			return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
@@ -497,14 +497,14 @@ func parseAngleDeg(cssSheet string) (float64, bool) {
 			return 0, false
 		}
 
-		return v * turnScale, true
+		return v * 0.9, true
 	case strings.HasSuffix(cssSheet, "turn"):
 		v, err := strconv.ParseFloat(strings.TrimSpace(cssSheet[:len(cssSheet)-4]), 64)
 		if err != nil {
 			return 0, false
 		}
 
-		return v * degFullCircle, true
+		return v * 360, true
 	default:
 		// Unitless angles are invalid in modern CSS; accept bare numbers as deg
 		// for authoring convenience in fixtures.
@@ -581,7 +581,7 @@ func parseTransformOrigin(value string, fontSize float64) (transformOriginSpec, 
 			spec.X, spec.XPercent = val, pct
 			spec.Y, spec.YPercent = 50, true
 		}
-	case two, three:
+	case 2, 3:
 		// Optional third value (z) ignored for 2D print.
 		if !applyTransformOriginPair(&spec, parts[0], parts[1], fontSize) {
 			return transformOriginSpec{}, false //nolint:exhaustruct // intentional zero fields
@@ -599,9 +599,9 @@ func parseTransformOriginToken(tok string, fontSize float64) (float64, bool, boo
 	case floatLeft, cssVerticalAlignTop:
 		return 0, true, true
 	case fxCenter:
-		return cssCenterPercent, true, true
+		return 50, true, true
 	case floatRight, cssVerticalAlignBottom:
-		return cssPercent, true, true
+		return 100, true, true
 	}
 
 	if lv, unit, lok := css.ParseLength(tok); lok && unit == "%" {
@@ -655,7 +655,7 @@ func parseOpacityValue(value string) (float64, bool) {
 			return 1, false
 		}
 
-		return clamp01(v / cssPercent), true
+		return clamp01(v / 100), true
 	}
 
 	v, err := strconv.ParseFloat(value, 64)

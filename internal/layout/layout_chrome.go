@@ -48,7 +48,7 @@ func appendDashedLineSegments(
 
 	drawLen, gap := width*3, width*2 // three=3, two=2 inlined; remaining two/three usages parked
 	if dotted {
-		drawLen, gap = width, width*dashGapMul
+		drawLen, gap = width, width*1.5
 	}
 
 	if drawLen < 0.5 { // halfRatio 0.5 inlined

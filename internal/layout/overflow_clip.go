@@ -234,7 +234,7 @@ func (e *engine) isOwnOutlineLine(op *Op, boxNode *box) bool {
 	return lineOnRectEdges(
 		op,
 		boxNode.x-inflate, boxNode.y-inflate,
-		boxNode.w+two*inflate, boxNode.height+two*inflate,
+		boxNode.w+2*inflate, boxNode.height+2*inflate,
 	)
 }
 
@@ -243,10 +243,10 @@ func nearRectOp(op *Op, x, y, w, h float64) bool {
 		return false
 	}
 
-	return math.Abs(op.X-x) <= layoutSlack &&
-		math.Abs(op.Y-y) <= layoutSlack &&
-		math.Abs(op.W-w) <= layoutSlack &&
-		math.Abs(op.H-h) <= layoutSlack
+	return math.Abs(op.X-x) <= 0.01 &&
+		math.Abs(op.Y-y) <= 0.01 &&
+		math.Abs(op.W-w) <= 0.01 &&
+		math.Abs(op.H-h) <= 0.01
 }
 
 func lineOnRectEdges(op *Op, x, y, w, h float64) bool {
@@ -254,11 +254,11 @@ func lineOnRectEdges(op *Op, x, y, w, h float64) bool {
 		return false
 	}
 
-	if math.Abs(op.H) <= layoutSlack && op.W > 0 {
+	if math.Abs(op.H) <= 0.01 && op.W > 0 {
 		return horizontalOnRectEdges(op, x, y, w, h)
 	}
 
-	if math.Abs(op.W) <= layoutSlack && op.H > 0 {
+	if math.Abs(op.W) <= 0.01 && op.H > 0 {
 		return verticalOnRectEdges(op, x, y, w, h)
 	}
 
@@ -270,14 +270,14 @@ func horizontalOnRectEdges(op *Op, x, y, w, h float64) bool {
 		return false
 	}
 
-	onTop := math.Abs(op.Y-y) <= layoutSlack
-	onBot := math.Abs(op.Y-(y+h)) <= layoutSlack
+	onTop := math.Abs(op.Y-y) <= 0.01
+	onBot := math.Abs(op.Y-(y+h)) <= 0.01
 
 	if !onTop && !onBot {
 		return false
 	}
 
-	return op.X+op.W >= x-layoutSlack && op.X <= x+w+layoutSlack
+	return op.X+op.W >= x-0.01 && op.X <= x+w+0.01
 }
 
 func verticalOnRectEdges(op *Op, x, y, w, h float64) bool {
@@ -285,14 +285,14 @@ func verticalOnRectEdges(op *Op, x, y, w, h float64) bool {
 		return false
 	}
 
-	onLeft := math.Abs(op.X-x) <= layoutSlack
-	onRight := math.Abs(op.X-(x+w)) <= layoutSlack
+	onLeft := math.Abs(op.X-x) <= 0.01
+	onRight := math.Abs(op.X-(x+w)) <= 0.01
 
 	if !onLeft && !onRight {
 		return false
 	}
 
-	return op.Y+op.H >= y-layoutSlack && op.Y <= y+h+layoutSlack
+	return op.Y+op.H >= y-0.01 && op.Y <= y+h+0.01
 }
 
 func clipPaintOp(op *Op, clip clipRect) {
@@ -317,7 +317,7 @@ func clipRectOp(op *Op, clip clipRect) {
 	x2 := math.Min(op.X+op.W, clip.x+clip.w)
 	y2 := math.Min(op.Y+op.H, clip.y+clip.h)
 
-	if x2-x1 <= layoutSlack || y2-y1 <= layoutSlack {
+	if x2-x1 <= 0.01 || y2-y1 <= 0.01 {
 		DeactivateOp(op)
 
 		return
@@ -330,13 +330,13 @@ func clipLineOp(op *Op, clip clipRect) {
 	x0, y0 := op.X, op.Y
 	x1, y1 := op.X+op.W, op.Y+op.H
 
-	if math.Abs(op.H) <= layoutEpsilon {
+	if math.Abs(op.H) <= 1e-6 {
 		clipHorizontalLine(op, clip, x0, x1, y0)
 
 		return
 	}
 
-	if math.Abs(op.W) <= layoutEpsilon {
+	if math.Abs(op.W) <= 1e-6 {
 		clipVerticalLine(op, clip, y0, y1, x0)
 
 		return
@@ -348,7 +348,7 @@ func clipLineOp(op *Op, clip clipRect) {
 }
 
 func clipHorizontalLine(op *Op, clip clipRect, x0, x1, y0 float64) {
-	if y0 < clip.y-layoutSlack || y0 > clip.y+clip.h+layoutSlack {
+	if y0 < clip.y-0.01 || y0 > clip.y+clip.h+0.01 {
 		DeactivateOp(op)
 
 		return
@@ -369,7 +369,7 @@ func clipHorizontalLine(op *Op, clip clipRect, x0, x1, y0 float64) {
 }
 
 func clipVerticalLine(op *Op, clip clipRect, y0, y1, x0 float64) {
-	if x0 < clip.x-layoutSlack || x0 > clip.x+clip.w+layoutSlack {
+	if x0 < clip.x-0.01 || x0 > clip.x+clip.w+0.01 {
 		DeactivateOp(op)
 
 		return

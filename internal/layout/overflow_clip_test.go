@@ -139,8 +139,8 @@ func fillOutsideClip(op Op, clip clipRect) bool {
 		return false
 	}
 
-	return op.X < clip.x-layoutSlack ||
-		op.Y < clip.y-layoutSlack ||
-		op.X+op.W > clip.x+clip.w+layoutSlack ||
-		op.Y+op.H > clip.y+clip.h+layoutSlack
+	return op.X < clip.x-0.01 ||
+		op.Y < clip.y-0.01 ||
+		op.X+op.W > clip.x+clip.w+0.01 ||
+		op.Y+op.H > clip.y+clip.h+0.01
 }

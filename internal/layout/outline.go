@@ -33,7 +33,7 @@ func outlineStrokeColor(sty *ResolvedStyle) (float64, float64, float64) {
 // centerline: offset (gap from the border edge) plus half the outline width
 // so the inner edge of the stroke sits at outline-offset.
 func outlineInflate(width, offset float64) float64 {
-	return offset + width/halfDivisor
+	return offset + width/2
 }
 
 // appendOutlineOps strokes an outline outside the border box by inflating the
@@ -54,8 +54,8 @@ func appendOutlineOps(
 	inflate := outlineInflate(width, offset)
 	outX := posX - inflate
 	outY := posY - inflate
-	outW := boxW + two*inflate
-	outH := boxH + two*inflate
+	outW := boxW + 2*inflate
+	outH := boxH + 2*inflate
 
 	if outW <= 0 || outH <= 0 {
 		return dst
@@ -88,8 +88,8 @@ func (e *engine) roundedOutlineOp(
 	inflate := outlineInflate(outlineWidth, outlineOff)
 	outX := posX - inflate
 	outY := posY - inflate
-	outW := width + two*inflate
-	outH := height + two*inflate
+	outW := width + 2*inflate
+	outH := height + 2*inflate
 
 	if outW <= 0 || outH <= 0 {
 		return Op{}, false //nolint:exhaustruct

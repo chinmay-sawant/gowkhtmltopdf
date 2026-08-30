@@ -84,7 +84,7 @@ func applyFontStyleKeyword(style *ResolvedStyle, page string) bool {
 	case "italic", "oblique":
 		style.FontItalic = true
 	case "bold":
-		style.FontWeight = fontWeightBold
+		style.FontWeight = 700
 	default:
 		return false
 	}
@@ -114,7 +114,7 @@ func parseFlexShorthand(style *ResolvedStyle, value string, fontSize, pctBase fl
 		return
 	case 1:
 		parseFlexOne(style, parts[0], fontSize, pctBase)
-	case two:
+	case 2:
 		parseFlexTwo(style, parts, fontSize, pctBase)
 	default:
 		parseFlexThree(style, parts, fontSize, pctBase)
@@ -242,7 +242,7 @@ func splitPlacePair(value string) (string, string, bool) {
 	switch len(parts) {
 	case 1:
 		return parts[0], parts[0], true
-	case two:
+	case 2:
 		return parts[0], parts[1], true
 	default:
 		return "", "", false
@@ -310,12 +310,12 @@ func setFourMargin(sty *ResolvedStyle, value string, fsize, ctxW float64) {
 		sty.MarginRight, sty.MarginRightAuto = marginLenAuto(val[0], fsize, ctxW)
 		sty.MarginBottom, sty.MarginBottomAuto = marginLenAuto(val[0], fsize, ctxW)
 		sty.MarginLeft, sty.MarginLeftAuto = marginLenAuto(val[0], fsize, ctxW)
-	case two:
+	case 2:
 		sty.MarginTop, sty.MarginTopAuto = marginLenAuto(val[0], fsize, ctxW)
 		sty.MarginRight, sty.MarginRightAuto = marginLenAuto(val[1], fsize, ctxW)
 		sty.MarginBottom, sty.MarginBottomAuto = marginLenAuto(val[0], fsize, ctxW)
 		sty.MarginLeft, sty.MarginLeftAuto = marginLenAuto(val[1], fsize, ctxW)
-	case three:
+	case 3:
 		sty.MarginTop, sty.MarginTopAuto = marginLenAuto(val[0], fsize, ctxW)
 		sty.MarginRight, sty.MarginRightAuto = marginLenAuto(val[1], fsize, ctxW)
 		sty.MarginBottom, sty.MarginBottomAuto = marginLenAuto(val[2], fsize, ctxW)
@@ -343,7 +343,7 @@ func setFour(_ *ResolvedStyle, value string, top, right, bottom, left *float64, 
 		return
 	}
 
-	if count == two {
+	if count == 2 {
 		*top = marginLen(val[0], fsVal, ctxW)
 		*right = marginLen(val[1], fsVal, ctxW)
 		*bottom, *left = *top, *right
@@ -351,7 +351,7 @@ func setFour(_ *ResolvedStyle, value string, top, right, bottom, left *float64, 
 		return
 	}
 
-	if count == three {
+	if count == 3 {
 		*top = marginLen(val[0], fsVal, ctxW)
 		*right = marginLen(val[1], fsVal, ctxW)
 		*bottom = marginLen(val[2], fsVal, ctxW)
@@ -468,9 +468,9 @@ func borderWidth(value string, _ float64) float64 {
 	case thinKeyword:
 		return pxToPt(1)
 	case mediumKeyword:
-		return pxToPt(three)
+		return pxToPt(3)
 	case thickKeyword:
-		return pxToPt(borderWidthMediumPx)
+		return pxToPt(5)
 	}
 
 	if v, _, ok := css.ParseLength(value); ok {
@@ -519,7 +519,7 @@ func fontSize(value string, parent, remBase float64) float64 {
 	if val, unit, ok := css.ParseLength(value); ok {
 		switch unit {
 		case "%":
-			return parent * val / cssPercent
+			return parent * val / 100
 		case remUnit:
 			return remBase * val
 		default:
@@ -536,23 +536,23 @@ func fontSize(value string, parent, remBase float64) float64 {
 func fontSizeKeyword(value string, parent float64) (float64, bool) {
 	switch value {
 	case "xx-small":
-		return pxToPt(fontSizeXSmallPx), true
+		return pxToPt(9), true
 	case "x-small":
-		return pxToPt(fontSizeSmallPx), true
+		return pxToPt(10), true
 	case "small":
-		return pxToPt(fontSizeMediumPx), true
+		return pxToPt(13), true
 	case mediumKeyword:
-		return pxToPt(cssPxRoot), true
+		return pxToPt(16), true
 	case "large":
-		return pxToPt(fontSizeLargePx), true
+		return pxToPt(18), true
 	case "x-large":
-		return pxToPt(twoLineRoomPt), true
+		return pxToPt(24), true
 	case "xx-large":
-		return pxToPt(fontSizeXXXLargePx), true
+		return pxToPt(32), true
 	case "smaller":
-		return parent * smallerFontRatio, true
+		return parent * 0.833, true
 	case "larger":
-		return parent * defaultLineHeightRatio, true
+		return parent * 1.2, true
 	}
 
 	return 0, false
@@ -569,7 +569,7 @@ func lineHeight(value string, fsize float64) float64 {
 
 	if v, unit, ok := css.ParseLength(value); ok {
 		if unit == "%" {
-			return fsize * v / cssPercent
+			return fsize * v / 100
 		}
 
 		if pt, ok := lengthToPt(v, unit, fsize); ok {
@@ -726,7 +726,7 @@ func vminVmaxPt(value string, viewportW, viewportH float64) (float64, bool) {
 		base = viewportH
 	}
 
-	return base * parsed / cssPercent, true
+	return base * parsed / 100, true
 }
 
 // lengthBox parses a length for box-sizing properties. "auto" maps to -1,
@@ -764,7 +764,7 @@ func lengthBoxFromUnit(value string, fsize, containing float64) (float64, bool) 
 
 	switch unit {
 	case "%", "vw", "vh":
-		return containing * val / cssPercent, true
+		return containing * val / 100, true
 	default:
 		point, converted := lengthToPt(val, unit, fsize)
 		if !converted {
@@ -774,7 +774,7 @@ func lengthBoxFromUnit(value string, fsize, containing float64) (float64, bool) 
 		// rem uses LengthToPt's 16px root; keep remBase-independent path
 		// matching prior lengthBox (rem → 12pt * v via pxToPt(16)).
 		if unit == remUnit {
-			return pxToPt(cssPxRoot) * val, true
+			return pxToPt(16) * val, true
 		}
 
 		return point, true
@@ -823,11 +823,11 @@ func marginLenFromUnit(value string, fsize, ctxW float64) float64 {
 	}
 
 	if unit == "%" {
-		return ctxW * val / cssPercent
+		return ctxW * val / 100
 	}
 
 	if unit == remUnit {
-		return pxToPt(cssPxRoot) * val
+		return pxToPt(16) * val
 	}
 
 	if pt, converted := lengthToPt(val, unit, fsize); converted {
@@ -845,7 +845,7 @@ func clampLength(value string, fsize, containing float64) (float64, bool) {
 }
 
 func splitCommaArgs(value string) []string { //nolint:unused
-	parts := make([]string, 0, three)
+	parts := make([]string, 0, 3)
 	depth := 0
 	start := 0
 
@@ -878,9 +878,9 @@ func resolvedLength(value string, fsize, containing float64) (float64, bool) { /
 
 	switch unit {
 	case "%", "vw", "vh":
-		return containing * val / cssPercent, true
+		return containing * val / 100, true
 	case remUnit:
-		return pxToPt(cssPxRoot) * val, true
+		return pxToPt(16) * val, true
 	default:
 		return lengthToPt(val, unit, fsize)
 	}
@@ -938,17 +938,17 @@ func plainLength(value string, fsize, containing float64) (float64, bool) {
 	}
 
 	if unit == "%" {
-		return containing * val / cssPercent, true
+		return containing * val / 100, true
 	}
 
 	if unit == remUnit {
-		return pxToPt(cssPxRoot) * val, true
+		return pxToPt(16) * val, true
 	}
 
 	return lengthToPt(val, unit, fsize)
 }
 
-func pxToPt(px float64) float64 { return px * pxToPtFactor }
+func pxToPt(px float64) float64 { return px * 0.75 }
 
 // parseGridAutoFlowValue normalizes grid-auto-flow to one of:
 // "row", "column", "dense", "row dense", "column dense".
@@ -1251,11 +1251,11 @@ func parseGridArea(sty *ResolvedStyle, value string) {
 	sty.GridArea = ""
 
 	switch len(parts) {
-	case two:
+	case 2:
 		// CSS: row-start / column-start (omitted ends copy starts → span 1).
 		parseGridRow(sty, parts[0])
 		parseGridColumn(sty, parts[1])
-	case three:
+	case 3:
 		// row-start / column-start / row-end
 		parseGridRow(sty, parts[0])
 		parseGridColumn(sty, parts[1])

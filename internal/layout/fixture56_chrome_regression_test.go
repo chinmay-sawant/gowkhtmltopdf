@@ -326,7 +326,7 @@ func checkDomain08NoStrayUnderline(t *testing.T, res *Result, d08 *box, contentW
 	t.Helper()
 
 	// domain-08 may span two pages; use the page of its bottom.
-	endPage := int((d08.y + d08.height - layoutEpsilon) / contentH)
+	endPage := int((d08.y + d08.height - 1e-6) / contentH)
 	pageTop := float64(endPage) * contentH
 	pageBot := float64(endPage+1) * contentH
 	d08Bot := d08.y + d08.height

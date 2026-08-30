@@ -283,7 +283,7 @@ func TestColumnRuleParse(t *testing.T) {
 	}
 
 	styleB := styleByClass(t, styles, "b")
-	if !near(styleB.ColumnRuleWidth, borderWidth(mediumKeyword, defaultFontSizePt)) {
+	if !near(styleB.ColumnRuleWidth, borderWidth(mediumKeyword, 12)) {
 		t.Fatalf("b width:medium = %.3f", styleB.ColumnRuleWidth)
 	}
 
@@ -295,11 +295,11 @@ func TestColumnRuleParse(t *testing.T) {
 		t.Fatalf("b currentColor=%v, want blue", styleB.ColumnRuleColor)
 	}
 
-	if !near(styleByClass(t, styles, "c").ColumnRuleWidth, borderWidth(thinKeyword, defaultFontSizePt)) {
+	if !near(styleByClass(t, styles, "c").ColumnRuleWidth, borderWidth(thinKeyword, 12)) {
 		t.Fatalf("c thin width=%.3f", styleByClass(t, styles, "c").ColumnRuleWidth)
 	}
 
-	if !near(styleByClass(t, styles, "d").ColumnRuleWidth, borderWidth(thickKeyword, defaultFontSizePt)) {
+	if !near(styleByClass(t, styles, "d").ColumnRuleWidth, borderWidth(thickKeyword, 12)) {
 		t.Fatalf("d thick width=%.3f", styleByClass(t, styles, "d").ColumnRuleWidth)
 	}
 
@@ -312,7 +312,7 @@ func TestColumnRuleParse(t *testing.T) {
 		t.Fatalf("f shorthand style=%q, want dotted", styleF.ColumnRuleStyle)
 	}
 
-	if !near(styleF.ColumnRuleWidth, borderWidth(mediumKeyword, defaultFontSizePt)) {
+	if !near(styleF.ColumnRuleWidth, borderWidth(mediumKeyword, 12)) {
 		t.Fatalf("f shorthand width=%.3f, want medium", styleF.ColumnRuleWidth)
 	}
 }

@@ -19,7 +19,7 @@ import (
 
 var (
 	errNoResourceLoader = errors.New("convert: resource context has no loader")
-	errNilLoader        = errs.ErrNilLoader
+	errNilLoader        = load.ErrNilLoader
 	errNilContext       = errs.ErrNilContext
 )
 

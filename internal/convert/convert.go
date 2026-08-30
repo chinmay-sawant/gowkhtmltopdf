@@ -93,13 +93,15 @@ var ErrInvalidCopies = errors.New("convert: copies must be at least one")
 var ErrNoRenderableObjects = settings.ErrNoRenderableObjects
 
 // errNilRequest reports a nil Request at a method boundary.
-var errNilRequest = errs.ErrNilRequest
+// Primary definition (migrated from internal/errs, PT-GO-28).
+var errNilRequest = errors.New("gowkhtmltopdf: nil request")
 
 // errNilContext reports a nil context at the conversion boundary.
 var errNilContext = errs.ErrNilContext
 
 // errImagesDisabled reports an image request made while images are disabled.
-var errImagesDisabled = errs.ErrImagesDisabled
+// Primary definition (migrated from internal/errs, PT-GO-28).
+var errImagesDisabled = errors.New("gowkhtmltopdf: images disabled")
 
 var (
 	errTooManyObjects = errors.New("convert: object limit exceeded")

@@ -683,7 +683,7 @@ func (e *engine) facesWithGlyph(style *ResolvedStyle, runeValue rune) *pdf.Font 
 		return f
 	}
 
-	if style.FontWeight >= fontWeightBold && e.faces.UnicodeFallbackBold != nil && e.faces.UnicodeFallbackBold.GlyphID(runeValue) != 0 {
+	if style.FontWeight >= 700 && e.faces.UnicodeFallbackBold != nil && e.faces.UnicodeFallbackBold.GlyphID(runeValue) != 0 {
 		return e.faces.UnicodeFallbackBold
 	}
 
@@ -1055,8 +1055,8 @@ func estimateOpCapacity(root *html.Node) int {
 
 	root.Walk(func(*html.Node) { nodes++ })
 
-	capacity := nodes * opsPerNodeHint / two
-	if capacity < minOpsCapacity {
+	capacity := nodes * 3 / 2
+	if capacity < 64 {
 		capacity = 64
 	}
 
@@ -1395,7 +1395,7 @@ func (e *engine) paintPositionedPseudo( //nolint:cyclop
 		H: style.LineHeight * e.scale, Text: text, Font: face, Size: size,
 		InkDescent: e.fontDescentFace(face, size),
 		R:          style.Color[0], G: style.Color[1], B: style.Color[2],
-		Bold: style.FontWeight >= fontWeightBold,
+		Bold: style.FontWeight >= 700,
 	})
 	e.popZ(prevZ, prevSet, prevPositioned)
 }
@@ -1465,7 +1465,7 @@ func (e *engine) paintValueWidget(node *html.Node, style ResolvedStyle, leftX, t
 		indicatorH = contentH
 	}
 
-	indicatorY := contentY + (contentH-indicatorH)/two
+	indicatorY := contentY + (contentH-indicatorH)/2
 
 	e.add(Op{ //nolint:exhaustruct // intentional zero fields
 		Kind: OpFillRect, X: contentX, Y: indicatorY, W: contentW * ratio, H: indicatorH,
@@ -1579,7 +1579,7 @@ func resolveAutoMargins(style ResolvedStyle, definiteW bool, width, availW, marg
 
 		switch {
 		case style.MarginLeftAuto && style.MarginRightAuto:
-			margL = free / two
+			margL = free / 2
 		case style.MarginLeftAuto:
 			margL = free - margR
 			if margL < 0 {
@@ -1600,7 +1600,7 @@ func resolveDefiniteWidth(eng *engine, style ResolvedStyle, availW float64, widt
 	case style.WidthPercent >= 0:
 		// Cyclic % honesty: indefinite containing block → treat as auto.
 		if availW > 0 && availW < 1e12 {
-			*width = availW * style.WidthPercent / cssPercent
+			*width = availW * style.WidthPercent / 100
 		} else {
 			definiteW = false
 		}
@@ -1620,7 +1620,7 @@ func clampBlockMinMax(eng *engine, style ResolvedStyle, availW, width float64) f
 
 func clampBlockMinWidth(eng *engine, style ResolvedStyle, availW, width float64) float64 {
 	if style.MinWidthPercent >= 0 && availW > 0 && availW < 1e12 {
-		mn := availW * style.MinWidthPercent / cssPercent
+		mn := availW * style.MinWidthPercent / 100
 		if width < mn {
 			return mn
 		}
@@ -1637,7 +1637,7 @@ func clampBlockMinWidth(eng *engine, style ResolvedStyle, availW, width float64)
 
 func clampBlockMaxWidth(eng *engine, style ResolvedStyle, availW, width float64) float64 {
 	if style.MaxWidthPercent >= 0 && availW > 0 && availW < 1e12 {
-		mx := availW * style.MaxWidthPercent / cssPercent
+		mx := availW * style.MaxWidthPercent / 100
 		if width > mx {
 			return mx
 		}
@@ -1661,7 +1661,7 @@ func resolveUsedHeight(sty ResolvedStyle, cbH float64, engN *engine) (float64, b
 			return 0, false
 		}
 
-		height := cbH * sty.HeightPercent / cssPercent
+		height := cbH * sty.HeightPercent / 100
 		if sty.BoxSizing != borderBox {
 			height += engN.scalePt(sty.PaddingTop) + engN.scalePt(sty.PaddingBottom) +
 				engN.scalePt(sty.BorderTop.Width) + engN.scalePt(sty.BorderBottom.Width)

@@ -236,7 +236,7 @@ func pageBuckets(ops []Op, contentH float64) ([]int, []int) {
 			continue
 		}
 
-		pageVal, ok := checkedFlowPageOfY(ops[idx].Y+layoutEpsilon, contentH)
+		pageVal, ok := checkedFlowPageOfY(ops[idx].Y+1e-6, contentH)
 		if !ok {
 			return nil, nil
 		}
@@ -254,7 +254,7 @@ func pageBuckets(ops []Op, contentH float64) ([]int, []int) {
 			continue
 		}
 
-		pageVal, ok := checkedFlowPageOfY(ops[idx].Y+layoutEpsilon, contentH)
+		pageVal, ok := checkedFlowPageOfY(ops[idx].Y+1e-6, contentH)
 		if !ok {
 			return nil, nil
 		}
@@ -531,7 +531,7 @@ func FakeBoldFor(op *Op) bool {
 	}
 
 	for _, r := range op.Text {
-		if r > byteMax {
+		if r > 0xFF {
 			return false
 		}
 	}
@@ -1152,8 +1152,8 @@ func drawText(
 	// Stroking CJK/Type0 outlines creates horizontal streak artifacts.
 	fakeBold := FakeBoldFor(paintOp)
 	if fakeBold {
-		chld.SetLineWidth(paintOp.Size * outlineStrokeRatio)
-		chld.TextRenderMode(two) // fill + stroke
+		chld.SetLineWidth(paintOp.Size * 0.06)
+		chld.TextRenderMode(2) // fill + stroke
 	}
 
 	chld.TextShow(transformInlineText(paintOp.Text, paintOp.TextTransform))

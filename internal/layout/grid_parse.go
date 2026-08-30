@@ -114,7 +114,7 @@ func expandRepeatFunctions(raw string) string {
 		inner := raw[start:end]
 
 		parts := splitTopLevelComma(inner)
-		if len(parts) != two {
+		if len(parts) != 2 {
 			return raw
 		}
 
@@ -220,7 +220,7 @@ func parseOneTrackDef(tok string) gridTrackDef {
 		inner := tok[len("minmax(") : len(tok)-1]
 
 		parts := splitTopLevelComma(inner)
-		if len(parts) == two {
+		if len(parts) == 2 {
 			minS := parseTrackSize(strings.TrimSpace(parts[0]))
 			maxS := parseTrackSize(strings.TrimSpace(parts[1]))
 			// Spec: if max < min for fixed/fixed, use min for both (lite).
@@ -290,7 +290,7 @@ func parseTrackSize(tok string) gridTrackSize {
 		return size
 	}
 
-	if val, ok := lengthBox(tok, defaultFontSizePt, 0, overflowAuto); ok && val >= 0 {
+	if val, ok := lengthBox(tok, 12, 0, overflowAuto); ok && val >= 0 {
 		// Percentages are re-resolved in resolveGridTrackSizes against the
 		// definite container; store raw % as a sentinel via kind+val.
 		if pctSize, ok := parseTrackPct(tok); ok {

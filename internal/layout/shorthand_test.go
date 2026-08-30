@@ -186,12 +186,12 @@ func TestVminVmax(t *testing.T) {
 		t.Fatalf("margin-left 5vmin = %.2f, want 20", box.MarginLeft)
 	}
 
-	got, ok := lengthBox("20vmin", defaultFontSizePt, 500, overflowAuto)
+	got, ok := lengthBox("20vmin", 12, 500, overflowAuto)
 	if !ok || !near(got, 100) {
 		t.Fatalf("lengthBox 20vmin against 500 = (%v, %v), want 100", got, ok)
 	}
 
-	if got := marginLen("10vmax", defaultFontSizePt, 200); !near(got, 20) {
+	if got := marginLen("10vmax", 12, 200); !near(got, 20) {
 		t.Fatalf("marginLen 10vmax against 200 = %.2f, want 20", got)
 	}
 }

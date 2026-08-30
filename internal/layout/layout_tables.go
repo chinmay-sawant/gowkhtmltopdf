@@ -165,7 +165,7 @@ func (e *engine) sideCaptionUsedWidth(capNode *html.Node, capStyle *ResolvedStyl
 		return 0
 	}
 
-	maxW := outerW * captionSideMaxFrac
+	maxW := outerW * 0.4
 
 	if capStyle != nil && capStyle.Width >= 0 {
 		used := e.scalePt(capStyle.Width)
@@ -289,12 +289,12 @@ func (e *engine) emitTableCells(
 			for _, cell := range cells {
 				// Skip paint for collapsed empty rows (h≈0); content was
 				// ink-less and would only re-inflate phantom bands.
-				if cell.height > layoutSlack {
+				if cell.height > 0.01 {
 					e.emitCell(cell, true)
 				}
 			}
 
-			if rowHeights[rowIdx] > layoutSlack {
+			if rowHeights[rowIdx] > 0.01 {
 				e.emitCollapsedRowGrid(tableBox, rowIdx, rowIdx == lastNonEmpty, xList, rowTops, rowHeights)
 			}
 		}
@@ -306,7 +306,7 @@ func (e *engine) emitTableCells(
 		if cell.kind != tableCellKind {
 			continue
 		}
-		if cell.height > layoutSlack {
+		if cell.height > 0.01 {
 			e.emitCell(cell, false)
 		}
 	}
@@ -604,7 +604,7 @@ func distributeSpanColumns(cell *box, page tcell, colW, colMin []float64, nCols 
 func (e *engine) tableWidthHint(st ResolvedStyle, availW float64) float64 {
 	var hint float64 = -1 // auto
 	if st.WidthPercent >= 0 {
-		hint = availW * st.WidthPercent / cssPercent
+		hint = availW * st.WidthPercent / 100
 	} else if st.Width >= 0 {
 		hint = e.scalePt(st.Width)
 		if hint > availW && availW > 0 {
@@ -790,7 +790,7 @@ func lastNonEmptyRow(rowHeights []float64) int {
 	last := -1
 
 	for ri := range rowHeights {
-		if rowHeights[ri] > layoutSlack {
+		if rowHeights[ri] > 0.01 {
 			last = ri
 		}
 	}
@@ -805,7 +805,7 @@ func lastNonEmptyRow(rowHeights []float64) int {
 func (e *engine) emitCollapsedRowGrid(
 	tableBox *box, rowIdx int, lastRow bool, xList []float64, rowTops, rowHeights []float64,
 ) {
-	if rowIdx < 0 || rowIdx >= len(rowHeights) || rowHeights[rowIdx] <= 0.01 || len(xList) < two {
+	if rowIdx < 0 || rowIdx >= len(rowHeights) || rowHeights[rowIdx] <= 0.01 || len(xList) < 2 {
 		return
 	}
 
@@ -1267,7 +1267,7 @@ func cellVerticalAlignOffset(cell *box, curY float64) float64 {
 
 	switch cell.style.VerticalAlign {
 	case cssVerticalAlignMiddle:
-		return curY + extra/two
+		return curY + extra/2
 	case cssVerticalAlignBottom:
 		return curY + extra
 	default:

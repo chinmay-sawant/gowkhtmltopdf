@@ -74,9 +74,9 @@ func isSideVerticalDash(operation Op, host *box) (bool, bool) {
 func verifyVerticalDashHeight(t *testing.T, operation Op, boxBottom float64, className string) {
 	t.Helper()
 
-	maxSeg := operation.Width*three + 1
+	maxSeg := operation.Width*3 + 1
 	if operation.Width <= 0 {
-		maxSeg = three + 1
+		maxSeg = 3 + 1
 	}
 
 	if operation.H > maxSeg {

@@ -163,7 +163,7 @@ func fixture56PageLead(y, contentH float64) float64 {
 		offset += contentH
 	}
 
-	if contentH-offset <= layoutSlack {
+	if contentH-offset <= 0.01 {
 		return 0
 	}
 
@@ -820,12 +820,12 @@ func countSplitNotes(t *testing.T, res *Result, notes []*html.Node, contentHeigh
 
 	for _, node := range notes {
 		box := fixture56BoxByNode(res.root, node)
-		if box == nil || box.height <= layoutSlack || box.height > contentHeight {
+		if box == nil || box.height <= 0.01 || box.height > contentHeight {
 			continue
 		}
 
-		start := int((box.y + layoutSlack) / contentHeight)
-		end := int((box.y + box.height - layoutSlack) / contentHeight)
+		start := int((box.y + 0.01) / contentHeight)
+		end := int((box.y + box.height - 0.01) / contentHeight)
 		section := findAncestorSectionID(node)
 		t.Logf("notes %s y=%.2f h=%.2f pages=%d-%d", section, box.y, box.height, start+1, end+1)
 
@@ -839,7 +839,7 @@ func countSplitNotes(t *testing.T, res *Result, notes []*html.Node, contentHeigh
 		// later snap can still leave the box Y straddling; that is not a
 		// mid-page keep miss.
 		if remaining > 0 && remaining < box.height &&
-			remaining <= contentHeight*keepTogetherMaxBlankRatio {
+			remaining <= contentHeight*0.2 {
 			t.Logf("notes %s overflow remaining=%.2f in keep-together band", section, remaining)
 
 			continue
@@ -1182,7 +1182,7 @@ func TestFixture56PaginationChromeAndWidgetGeometry(t *testing.T) { //nolint:par
 
 	for _, child := range gaugeBox.children {
 		const authoredGaugeWidthPercent = 46.0
-		wantWidth := gaugeBox.w * authoredGaugeWidthPercent / cssPercent
+		wantWidth := gaugeBox.w * authoredGaugeWidthPercent / 100
 		if math.Abs(child.w-wantWidth) > 0.01 {
 			t.Fatalf("D03 gauge width = %.2f, want authored %.2f%% of row %.2f", child.w, authoredGaugeWidthPercent, gaugeBox.w)
 		}

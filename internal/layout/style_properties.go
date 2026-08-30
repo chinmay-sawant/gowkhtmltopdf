@@ -655,7 +655,7 @@ func applyBoxSpacingProps(style *ResolvedStyle, prop, value string, fsize, viewp
 		return applyMarginVerticalProps(style, prop, value, fsize, viewportW)
 	case "margin-right", "margin-left":
 		return applyMarginHorizontalProps(style, prop, value, fsize, viewportW)
-	case paddingProperty:
+	case "padding":
 		return applyPaddingShorthandProps(style, value, fsize, viewportW)
 	case "padding-top", "padding-right", "padding-bottom", "padding-left":
 		return applyPaddingSideProps(style, prop, value, fsize, viewportW)
@@ -1183,11 +1183,11 @@ func applyInsetShorthand(style *ResolvedStyle, value string, fsize, viewportW, v
 	top, right, bottom, left := val[0], val[0], val[0], val[0]
 
 	switch {
-	case count > three:
+	case count > 3:
 		top, right, bottom, left = val[0], val[1], val[2], val[3]
-	case count == three:
+	case count == 3:
 		top, right, bottom, left = val[0], val[1], val[2], val[1]
-	case count == two:
+	case count == 2:
 		top, right, bottom, left = val[0], val[1], val[0], val[1]
 	}
 

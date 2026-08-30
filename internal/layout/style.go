@@ -422,8 +422,8 @@ func initialStyle() ResolvedStyle { //nolint:funlen // complete CSS initial-valu
 		// Empty family hashes to the FNV-1a offset, matching what
 		// resolveElementStyle records for elements without font-family.
 		famHash:            hashFontFamily(nil),
-		FontSize:           defaultFontSizePt, // 16px at 96dpi
-		FontWeight:         fontWeightNormal,
+		FontSize:           12, // 16px at 96dpi
+		FontWeight:         400,
 		TextTransform:      textTransformNone,
 		VerticalAlign:      "baseline",
 		WhiteSpace:         "normal",
@@ -440,8 +440,8 @@ func initialStyle() ResolvedStyle { //nolint:funlen // complete CSS initial-valu
 		GridRowSpan:        1,
 		WritingMode:        writingModeHorizontalTB,
 		Direction:          "ltr",
-		Orphans:            two,
-		Widows:             two,
+		Orphans:            2,
+		Widows:             2,
 		Transform:          IdentityMatrix(),
 		TransformOrigin:    defaultTransformOrigin(),
 		Opacity:            1,
@@ -523,7 +523,7 @@ func sameSizeContainerState(a, b sizeContainer) bool {
 }
 
 func nearlyEqual(a, b float64) bool {
-	return math.Abs(a-b) <= styleEpsilon
+	return math.Abs(a-b) <= 1e-9
 }
 
 // resolveStylesWith is the single cascade entry: Options + optional size

@@ -274,7 +274,7 @@ func scanContentIdent(value string, idx int, env *contentEnv, boxNode *strings.B
 // singleQuotedContent returns the inner text when value is exactly one quoted
 // string with no inner unescaped quote.
 func singleQuotedContent(value string) (string, bool) {
-	if len(value) < two {
+	if len(value) < 2 {
 		return "", false
 	}
 

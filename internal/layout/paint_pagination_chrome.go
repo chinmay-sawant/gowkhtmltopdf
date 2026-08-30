@@ -196,7 +196,7 @@ func normalizeOwnVerticalChrome(ops []Op, boxNode *box) {
 	}
 
 	delta := boxNode.y - minY
-	if math.Abs(delta) <= layoutEpsilon {
+	if math.Abs(delta) <= 1e-6 {
 		return
 	}
 	for _, idx := range verticalIndexes {
@@ -229,10 +229,10 @@ func isVerticalChromeForBox(operation Op, boxNode *box, leftBorder, rightBorder 
 	}
 
 	return operation.H > 0 &&
-		operation.H <= boxNode.height+layoutEpsilon &&
+		operation.H <= boxNode.height+1e-6 &&
 		((leftBorder && nearLayout(operation.X, boxNode.x) && (line || maskedLeft)) ||
 			(rightBorder && nearLayout(operation.X, boxNode.x+boxNode.w) && (line || maskedRight))) &&
-		operation.Y >= boxNode.y-layoutEpsilon && operation.Y <= boxNode.y+boxNode.height+layoutEpsilon
+		operation.Y >= boxNode.y-1e-6 && operation.Y <= boxNode.y+boxNode.height+1e-6
 }
 
 // isDashedOrDottedStyle reports border styles expanded into multi-segment OpLines.
@@ -247,7 +247,7 @@ func looksLikeDashSegmentLength(segLen, strokeWidth float64) bool {
 		return false
 	}
 
-	maxSeg := math.Max(strokeWidth*3, minDashPt) + 0.5 //nolint:mnd // three=3, halfRatio=0.5
+	maxSeg := math.Max(strokeWidth*3, 0.5) + 0.5 //nolint:mnd // three=3, halfRatio=0.5
 	if strokeWidth <= 0 {
 		maxSeg = 3 + 0.5 //nolint:mnd // three=3, halfRatio=0.5
 	}
@@ -302,8 +302,8 @@ func isHorizontalChromeForBox(operation Op, boxNode *box, oldBottom float64) boo
 	}
 
 	// Dashed/dotted fragments sit on the edge with dash-sized W.
-	inside := operation.X >= boxNode.x-layoutEpsilon &&
-		operation.X+operation.W <= boxNode.x+boxNode.w+layoutEpsilon
+	inside := operation.X >= boxNode.x-1e-6 &&
+		operation.X+operation.W <= boxNode.x+boxNode.w+1e-6
 	if !inside {
 		return false
 	}
@@ -369,7 +369,7 @@ func isOwnBoxRectFragment(operation Op, boxNode *box, oldBottom float64) bool {
 		return false
 	}
 
-	return operation.Y >= boxNode.y-layoutEpsilon && operation.Y+operation.H <= oldBottom+1
+	return operation.Y >= boxNode.y-1e-6 && operation.Y+operation.H <= oldBottom+1
 }
 
 // isOwnBoxChromeFragment reports page-split fill/stroke/rail pieces of the
@@ -420,7 +420,7 @@ func stretchOwnBoxChrome(operation *Op, boxNode *box, oldBottom, newBottom float
 	if operation.Kind == OpLine && operation.W == 0 && operation.H > 0 &&
 		((boxNode.style != nil && boxNode.style.BorderLeft.Width > 0 && nearLayout(operation.X, boxNode.x)) ||
 			(boxNode.style != nil && boxNode.style.BorderRight.Width > 0 && nearLayout(operation.X, boxNode.x+boxNode.w))) &&
-		operation.Y >= boxNode.y-layoutEpsilon && operation.Y <= boxNode.y+boxNode.height+layoutEpsilon &&
+		operation.Y >= boxNode.y-1e-6 && operation.Y <= boxNode.y+boxNode.height+1e-6 &&
 		nearLayout(operation.Y+operation.H, oldBottom) {
 		// Never elongate a dash/dot segment into a solid stub.
 		if isDashLikeVerticalRail(*operation, boxNode) {

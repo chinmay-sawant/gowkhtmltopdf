@@ -780,7 +780,7 @@ func applyFixedColumnHints(colW, colPct, colAbs []float64, inner float64) (float
 	for idx := range colW {
 		switch {
 		case colPct[idx] >= 0:
-			colW[idx] = inner * colPct[idx] / cssPercent
+			colW[idx] = inner * colPct[idx] / 100
 			used += colW[idx]
 		case colAbs[idx] >= 0:
 			colW[idx] = colAbs[idx]
@@ -893,7 +893,7 @@ func applyHintedColumns(colW, colMin, colPct, colAbs []float64, inner float64) (
 	for idx := range colW {
 		switch {
 		case colPct[idx] >= 0:
-			colW[idx] = maxF(inner*colPct[idx]/cssPercent, colMin[idx])
+			colW[idx] = maxF(inner*colPct[idx]/100, colMin[idx])
 			used += colW[idx]
 		case colAbs[idx] >= 0:
 			colW[idx] = maxF(colAbs[idx], colMin[idx])

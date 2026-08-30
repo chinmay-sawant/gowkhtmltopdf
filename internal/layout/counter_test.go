@@ -26,7 +26,7 @@ func TestCounterResetIncrementLayout(t *testing.T) { //nolint:funlen // parse, m
 		t.Parallel()
 
 		ops := parseCounterList(htmlSection+" 1 item", counterResetDefault)
-		if len(ops) != pairLen || ops[0].name != htmlSection || ops[0].value != 1 ||
+		if len(ops) != 2 || ops[0].name != htmlSection || ops[0].value != 1 ||
 			ops[1].name != "item" || ops[1].value != 0 {
 			t.Fatalf("parse reset: %+v", ops)
 		}
@@ -53,7 +53,7 @@ func TestCounterResetIncrementLayout(t *testing.T) { //nolint:funlen // parse, m
 		}
 
 		cmap.applyIncrement("section")
-		if cmap.value("section") != pairLen {
+		if cmap.value("section") != 2 {
 			t.Fatalf("second increment want 2 got %d", cmap.value("section"))
 		}
 
@@ -66,7 +66,7 @@ func TestCounterResetIncrementLayout(t *testing.T) { //nolint:funlen // parse, m
 		}
 
 		cmap.pop(inner)
-		if cmap.value("section") != pairLen {
+		if cmap.value("section") != 2 {
 			t.Fatalf("after pop want 2 got %d", cmap.value("section"))
 		}
 
