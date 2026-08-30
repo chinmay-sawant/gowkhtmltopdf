@@ -74,6 +74,38 @@ section.d03 { border-top: 3px solid #2563eb }
 	}
 }
 
+// TestCascadeClampFallbackKeepsEarlierWidth: while clampLength is gated off,
+// clamp() must stay out of the cascade so width:100% survives (fixture-56
+// .d01-exit). Wave2 left clamp allowed in supportedDeclaration but made
+// clampLength always fail, which discarded the fallback and shrink-wrapped
+// the exit-code table.
+func TestCascadeClampFallbackKeepsEarlierWidth(t *testing.T) {
+	t.Parallel()
+
+	root, err := html.Parse(`<html><body><table class="d01-exit"><tr><td>x</td></tr></table></body></html>`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cssSheet := sheet(t, `
+table.d01-exit {
+  width: 100%;
+  width: clamp(24rem, 70%, 46rem);
+}
+`)
+	styles := resolveStyles(root, []*css.Stylesheet{cssSheet}, "print", testViewport, 800)
+	tbl := findElementByName(root, "table")
+	sty := styles[tbl]
+
+	if sty.WidthPercent < 99.5 || sty.WidthPercent > 100.5 {
+		t.Fatalf("WidthPercent = %.2f, want 100 (clamp must not win cascade)", sty.WidthPercent)
+	}
+
+	if sty.Width > 0 {
+		t.Fatalf("Width = %.2fpt set from clamp path, want percent-only fallback", sty.Width)
+	}
+}
+
 func TestWritingModeInherits(t *testing.T) {
 	t.Parallel()
 

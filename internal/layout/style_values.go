@@ -839,7 +839,9 @@ func marginLenFromUnit(value string, fsize, ctxW float64) float64 {
 
 const clampPrefix = "clamp(" //nolint:unused
 
-// clampLength is gated: clamp() is treated as unsupported and ignored (fallback wins).
+// clampLength is gated off. Keep "clamp(" in supportedDeclaration's reject
+// list so an earlier fallback (e.g. width:100%) wins the cascade; otherwise
+// clamp wins as a string, fails here, and the fallback is already gone.
 func clampLength(value string, fsize, containing float64) (float64, bool) {
 	return 0, false
 }
