@@ -3,6 +3,7 @@ package pdf
 import (
 	"bytes"
 	"fmt"
+	"maps"
 	"strconv"
 	"strings"
 )
@@ -148,21 +149,11 @@ func cloneContent(cur *Content) *Content {
 }
 
 func cloneStringMap(src map[string]string) map[string]string {
-	dst := make(map[string]string, len(src))
-	for k, v := range src {
-		dst[k] = v
-	}
-
-	return dst
+	return maps.Clone(src)
 }
 
 func cloneFontMap(src map[string]*Font) map[string]*Font {
-	dst := make(map[string]*Font, len(src))
-	for k, v := range src {
-		dst[k] = v
-	}
-
-	return dst
+	return maps.Clone(src)
 }
 
 func cloneImageMap(src map[string]*imageResource) map[string]*imageResource {

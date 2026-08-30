@@ -1,6 +1,7 @@
 package layout
 
 import (
+	"slices"
 	"sort"
 	"strings"
 
@@ -323,9 +324,7 @@ func (e *engine) flexWrapLines(
 	}
 
 	if wrapReverse {
-		for i, j := 0, len(lines)-1; i < j; i, j = i+1, j-1 {
-			lines[i], lines[j] = lines[j], lines[i]
-		}
+		slices.Reverse(lines)
 	}
 
 	return lines
@@ -397,9 +396,7 @@ func finalizeFlexLine(line []flexMeas, reverse bool) []flexMeas {
 }
 
 func reverseFlexMeas(line []flexMeas) {
-	for i, j := 0, len(line)-1; i < j; i, j = i+1, j-1 {
-		line[i], line[j] = line[j], line[i]
-	}
+	slices.Reverse(line)
 }
 
 // applyAlignContentRow distributes free cross space between wrapped flex
@@ -1271,9 +1268,7 @@ func (e *engine) flowFlexColumn(
 	}
 
 	if style.FlexDirection == fxColRev {
-		for i, j := 0, len(items)-1; i < j; i, j = i+1, j-1 {
-			items[i], items[j] = items[j], items[i]
-		}
+		slices.Reverse(items)
 	}
 
 	heights := e.flexColumnHeights(items, contentH, gap)

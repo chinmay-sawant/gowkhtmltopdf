@@ -70,10 +70,6 @@ func (e *engine) collectAndPrepareInlineItems(nodes []*html.Node, contentW float
 		items = squeezeInlineSpaces(items)
 	}
 
-	if len(items) >= two {
-		items = separateAdjacentCites(items, e)
-	}
-
 	return items
 }
 
@@ -668,52 +664,6 @@ func tailRemaining(items []inlineItem, i int) (float64, float64) {
 	}
 
 	return rem, estLH
-}
-
-// separateAdjacentCites inserts a thin space between consecutive citation
-// markers ("][") so [90][91][92] are not painted as a cramped cluster. Does
-// not touch spaces inside a single marker ([111]). Items are mutated in
-// place (only the current item's text/w change), so no copy slice is needed.
-func separateAdjacentCites(items []inlineItem, eng *engine) []inlineItem {
-	if len(items) < two {
-		return items
-	}
-
-	for i := 1; i < len(items); i++ {
-		cur := &items[i]
-		prev := &items[i-1]
-
-		if isCiteBoundary(*prev, *cur) {
-			// Prefer a hair space so markers stay visually tight but not
-			// colliding; fall back to a normal space if measure fails.
-			gap := "\u200a" // hair space
-
-			cur.text = gap + cur.text
-			if eng != nil {
-				cur.w = eng.inlineTextWidth(cur.text, cur.style, cur.chrome)
-			}
-		}
-	}
-
-	return items
-}
-
-// isCiteBoundary reports that prev followed by cur are two adjacent citation
-// markers ("][") that would paint as a cramped cluster.
-func isCiteBoundary(prev, cur inlineItem) bool {
-	if prev.img || cur.img || prev.forceBreak || cur.forceBreak {
-		return false
-	}
-
-	if prev.blockBox != nil || cur.blockBox != nil {
-		return false
-	}
-
-	pt := strings.TrimRight(prev.text, " ")
-	ct := strings.TrimLeft(cur.text, " ")
-
-	return strings.HasSuffix(pt, "]") && strings.HasPrefix(ct, "[") &&
-		!strings.HasSuffix(prev.text, " ") && !strings.HasPrefix(cur.text, " ")
 }
 
 // softBreakMode selects where splitTextToWidth may insert breaks inside a token.

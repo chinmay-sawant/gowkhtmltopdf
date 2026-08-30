@@ -45,30 +45,7 @@ func MediaMatches(query, mediaType string, widthPt, heightPt float64) bool {
 }
 
 func splitMediaList(str string) []string {
-	var parts []string
-
-	depth := 0
-	start := 0
-
-	for idx := range len(str) {
-		switch str[idx] {
-		case '(':
-			depth++
-		case ')':
-			if depth > 0 {
-				depth--
-			}
-		case ',':
-			if depth == 0 {
-				parts = append(parts, strings.TrimSpace(str[start:idx]))
-				start = idx + 1
-			}
-		}
-	}
-
-	parts = append(parts, strings.TrimSpace(str[start:]))
-
-	return parts
+	return splitTopLevel(str, ',')
 }
 
 func matchOneMediaQuery(query, mediaType string, widthPt, heightPt float64) bool {

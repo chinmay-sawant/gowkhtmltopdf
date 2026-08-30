@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"image"
 	"image/color"
 	"image/draw"
@@ -537,18 +538,13 @@ func rasterImageHash(data []byte, isJPEG bool) uint64 {
 	// FNV-1a is sufficient as a lookup accelerator; bytes.Equal below keeps
 	// collisions correct. Include the source kind because PNG and JPEG have
 	// different decoders even if their payloads happen to match.
-	hash := uint64(fnvOffsetBasis)
+	h := fnv.New64a()
 	if isJPEG {
-		hash ^= 1
-		hash *= 1099511628211
+		_, _ = h.Write([]byte{1})
 	}
+	_, _ = h.Write(data)
 
-	for _, b := range data {
-		hash ^= uint64(b)
-		hash *= 1099511628211
-	}
-
-	return hash
+	return h.Sum64()
 }
 
 //nolint:cyclop // raster image decoding pipeline

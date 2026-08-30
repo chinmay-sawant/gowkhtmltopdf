@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"mime"
 	"net"
 	"net/http"
@@ -18,6 +19,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -1296,49 +1298,19 @@ func cloneLoadPage(src settings.LoadPage) settings.LoadPage {
 }
 
 func cloneStringMap(src map[string]string) map[string]string {
-	if src == nil {
-		return nil
-	}
-
-	dst := make(map[string]string, len(src))
-	for key, value := range src {
-		dst[key] = value
-	}
-
-	return dst
+	return maps.Clone(src)
 }
 
 func cloneStrings(src []string) []string {
-	if src == nil {
-		return nil
-	}
-
-	dst := make([]string, len(src))
-	copy(dst, src)
-
-	return dst
+	return slices.Clone(src)
 }
 
 func clonePostItems(src []settings.PostItem) []settings.PostItem {
-	if src == nil {
-		return nil
-	}
-
-	dst := make([]settings.PostItem, len(src))
-	copy(dst, src)
-
-	return dst
+	return slices.Clone(src)
 }
 
 func cloneBytes(src []byte) []byte {
-	if src == nil {
-		return nil
-	}
-
-	dst := make([]byte, len(src))
-	copy(dst, src)
-
-	return dst
+	return slices.Clone(src)
 }
 
 // buildHTTPRequest assembles the request for target according to the page

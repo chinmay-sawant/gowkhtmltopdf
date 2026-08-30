@@ -846,19 +846,11 @@ func floatsPackRoom(floats *floatState, contentX, contentW float64, isLeft bool)
 }
 
 func maxY(a, b float64) float64 {
-	if a > b {
-		return a
-	}
-
-	return b
+	return max(a, b)
 }
 
 func minY(a, b float64) float64 {
-	if a < b {
-		return a
-	}
-
-	return b
+	return min(a, b)
 }
 
 // shiftBoxOps translates every op in b's op range by (dx, dy).

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -41,9 +40,6 @@ func isKnownPlaceholder(token string) bool {
 	}
 }
 
-// placeholderToken matches one [name] token.
-var placeholderToken = regexp.MustCompile(`\[[a-z]+\]`)
-
 // substitute applies the --replace map first, then every known [placeholder]
 // token. Unknown placeholders stay literal, matching wkhtmltopdf.
 func (p hfParms) substitute(src string) string { //nolint:cyclop // per-token switch over known placeholders
@@ -55,45 +51,98 @@ func (p hfParms) substitute(src string) string { //nolint:cyclop // per-token sw
 		src = strings.ReplaceAll(src, k, v)
 	}
 
-	return placeholderToken.ReplaceAllStringFunc(src, func(tok string) string {
-		name := tok[1 : len(tok)-1]
+	var out strings.Builder
+	out.Grow(len(src))
+	for i := 0; i < len(src); {
+		open := strings.IndexByte(src[i:], '[')
+		if open < 0 {
+			out.WriteString(src[i:])
 
+			break
+		}
+		open += i
+		out.WriteString(src[i:open])
+		closeIdx := strings.IndexByte(src[open:], ']')
+		if closeIdx < 0 {
+			out.WriteString(src[open:])
+
+			break
+		}
+		closeIdx += open
+		tok := src[open : closeIdx+1]
+		name := tok[1 : len(tok)-1]
+		isToken := len(name) > 0
+		for _, ch := range name {
+			if ch < 'a' || ch > 'z' {
+				isToken = false
+
+				break
+			}
+		}
+		if !isToken {
+			out.WriteString(tok)
+			i = closeIdx + 1
+
+			continue
+		}
 		switch name {
 		case "page":
-			return strconv.Itoa(p.page)
+			out.WriteString(strconv.Itoa(p.page))
 		case "frompage":
-			return strconv.Itoa(p.frompage)
+			out.WriteString(strconv.Itoa(p.frompage))
 		case "topage":
-			return strconv.Itoa(p.topage)
+			out.WriteString(strconv.Itoa(p.topage))
 		case "date":
-			return p.date
+			out.WriteString(p.date)
 		case "time":
-			return p.clock
+			out.WriteString(p.clock)
 		case "title":
-			return p.title
+			out.WriteString(p.title)
 		case "doctitle":
-			return p.doctitle
+			out.WriteString(p.doctitle)
 		case "webpage":
-			return p.webpage
+			out.WriteString(p.webpage)
 		case "section":
-			return p.section
+			out.WriteString(p.section)
 		case "subsection":
-			return p.subsection
+			out.WriteString(p.subsection)
 		case "subject":
-			return "" // no Subject setting in this build; expands to empty
+			// no Subject setting in this build; expands to empty
+		default:
+			out.WriteString(tok)
 		}
+		i = closeIdx + 1
+	}
 
-		return tok
-	})
+	return out.String()
 }
 
 // knownIn reports whether s contains at least one known placeholder name.
 func knownIn(s string) bool {
-	for _, m := range placeholderToken.FindAllString(s, -1) {
-		name := m[1 : len(m)-1]
-		if isKnownPlaceholder(name) {
+	for i := 0; i < len(s); {
+		open := strings.IndexByte(s[i:], '[')
+		if open < 0 {
+			return false
+		}
+		open += i
+		closeIdx := strings.IndexByte(s[open:], ']')
+		if closeIdx < 0 {
+			return false
+		}
+		closeIdx += open
+		name := s[open+1 : closeIdx]
+		isToken := len(name) > 0
+		for _, ch := range name {
+			if ch < 'a' || ch > 'z' {
+				isToken = false
+
+				break
+			}
+		}
+		if isToken && isKnownPlaceholder(name) {
 			return true
 		}
+		i = closeIdx + 1
 	}
 
 	return false

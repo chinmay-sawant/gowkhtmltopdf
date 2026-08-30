@@ -309,7 +309,7 @@ func splitCSSList(val string) []string {
 }
 
 func trimSpace(s string) string {
-	return strings.Trim(s, " \t\n\r")
+	return strings.TrimSpace(s)
 }
 
 // parseFeatureTag splits an optional quoted tag from the trailing value

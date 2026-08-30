@@ -1,9 +1,5 @@
 package layout
 
-import (
-	"math"
-)
-
 // orphansWidows enforces CSS Fragmentation Level 3 Rule 3 (widows/orphans)
 // when a leaf block has countable line boxes, and falls back to a geometric
 // short-block heuristic when line counts are unavailable.
@@ -178,9 +174,8 @@ func countBlockLineYs(res *Result, boxNode *box) []float64 {
 		return nil
 	}
 
-	const eps = 0.5
-
 	yCoords := make([]float64, 0, maxGlueEm)
+	seen := make(map[float64]bool)
 
 	end := boxNode.opEnd
 	if end >= len(res.Ops) {
@@ -193,7 +188,8 @@ func countBlockLineYs(res *Result, boxNode *box) []float64 {
 			continue
 		}
 
-		if !hasLineY(yCoords, paintOp.Y, eps) {
+		if !seen[paintOp.Y] {
+			seen[paintOp.Y] = true
 			yCoords = append(yCoords, paintOp.Y)
 		}
 	}
@@ -202,12 +198,13 @@ func countBlockLineYs(res *Result, boxNode *box) []float64 {
 }
 
 // hasLineY reports whether a baseline Y is already recorded within eps.
-func hasLineY(yCoords []float64, y, eps float64) bool {
+func hasLineY(yCoords []float64, y, _ float64) bool {
+	seen := make(map[float64]bool, len(yCoords))
 	for _, ey := range yCoords {
-		if math.Abs(ey-y) <= eps {
-			return true
-		}
+		seen[ey] = true
 	}
 
-	return false
+	_, ok := seen[y]
+
+	return ok
 }

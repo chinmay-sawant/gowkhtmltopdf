@@ -1242,16 +1242,6 @@ func (e *engine) emitCell(cell *box, skipBorders bool) {
 	e.popBFCFloats(enclose)
 
 	e.imgMaxW = oldMax
-	// Rowspan cells with forced multi-line content (wiki Ref: [127]<br>[128]
-	// in rowspan=2) pack lines at the top with normal line-height, so both
-	// markers sit in the first row band and look overlapped. Spread line
-	// boxes evenly across the full cell height when we have room.
-	if cell.rowSpan > 1 {
-		distributeRowspanLines(e.ops, start, len(e.ops), cell.y, cell.height,
-			e.scalePt(sty.PaddingTop)+e.scalePt(sty.BorderTop.Width),
-			e.scalePt(sty.PaddingBottom)+e.scalePt(sty.BorderBottom.Width))
-	}
-
 	// Clip only background-image layers to the cell padding box. Clipping all
 	// content chopped box-shadow / borders that intentionally paint outside
 	// the padding edge (fixture-60 row 14 truncation).
@@ -1284,48 +1274,4 @@ func cellVerticalAlignOffset(cell *box, curY float64) float64 {
 	}
 }
 
-// distributeRowspanLines remaps distinct text/bullet baselines in ops[start:end)
-// so they span the cell's content box evenly (top line near top, bottom near
-// bottom). Non-text ops (underlines, links) ride with the nearest baseline.
-func distributeRowspanLines(ops []Op, start, end int, cellY, cellH, padTop, padBot float64) {
-	if end <= start || cellH <= 0 || ops == nil {
-		return
-	}
 
-	const yEps = 0.75
-
-	bands := collectTextBands(ops, start, end, yEps)
-
-	if len(bands) < two {
-		return
-	}
-	// Sort bands top→bottom.
-	sortBandsTopDown(bands)
-
-	innerTop := cellY + padTop
-	innerBot := cellY + cellH - padBot
-
-	if innerBot-innerTop < minBoxPt {
-		return
-	}
-	// Only redistribute when natural packing is much shorter than the cell
-	// (typical rowspan>1 with few <br> lines).
-	natural := bands[len(bands)-1].y - bands[0].y
-	if natural >= (innerBot-innerTop)*0.55 {
-		return
-	}
-
-	targets := interpolatedBandTargets(ops, bands, innerTop, innerBot)
-	if targets == nil {
-		return
-	}
-	// Map old baseline → dy, apply to all ops near that baseline.
-	shifts := make([]bandShift, len(bands))
-	for i, b := range bands {
-		shifts[i] = bandShift{y0: b.y, dy: targets[i] - b.y}
-	}
-
-	applyBandShifts(ops, start, end, shifts, bandEmSize(ops, bands[0].idx))
-}
-
-// bandEmSize estimates the em size from the first band's text ops.

@@ -68,13 +68,6 @@ type PageMargins struct {
 //
 // After pagination Paint fills res.Pages (page → op indices) and res.Locations
 // (element boxes in document order with their page and canvas rect).
-// beginPaintContext is the single context-normalization boundary owned by
-// this painting slice. Both legacy and cancellation-aware entrypoints use it,
-// so nil-context compatibility does not leak into the paint implementation.
-func beginPaintContext(ctx context.Context) (context.Context, context.CancelFunc) {
-	return context.WithCancel(ctx)
-}
-
 func Paint(doc *pdf.Document, res *Result, opts PaintOptions) error {
 	return PaintContext(context.Background(), doc, res, opts)
 }
@@ -89,7 +82,7 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 		return errNilContext
 	}
 
-	ctx, cancel := beginPaintContext(ctx)
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	if doc == nil || res == nil {
@@ -574,7 +567,7 @@ func PaintBandContext(ctx context.Context, page *pdf.Page, chld *pdf.Content, op
 		return errNilContext
 	}
 
-	ctx, cancel := beginPaintContext(ctx)
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	if page == nil || chld == nil {
@@ -714,15 +707,10 @@ func drawBandOp(
 		name := "I" + strconv.Itoa(*nextImg)
 		*nextImg++
 
-		recordBandError(firstErr, drawImage(page, chld, paintOp, 0, contentH, margins, pageH, name))
+		if err := drawImage(page, chld, paintOp, 0, contentH, margins, pageH, name); err != nil && *firstErr == nil {
+			*firstErr = err
+		}
 	case OpLinkURI, opKindNoop:
-	}
-}
-
-// recordBandError keeps the first image-embed error.
-func recordBandError(firstErr *error, err error) {
-	if err != nil && *firstErr == nil {
-		*firstErr = err
 	}
 }
 

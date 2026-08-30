@@ -466,8 +466,6 @@ func (e *engine) placeMulticolLine(
 		}
 	}
 
-	e.paintColumnRules(style, nCols, colW, gap, contentX, yPos+curY, lineH)
-
 	return lineH
 }
 

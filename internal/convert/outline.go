@@ -101,32 +101,29 @@ func docLang(root *html.Node) string {
 		return ""
 	}
 
-	var walk func(node *html.Node) string
-	walk = func(node *html.Node) string {
-		if node == nil {
-			return ""
+	if root.Type == html.ElementNode {
+		if l := root.Attribute("lang"); l != "" {
+			return l
 		}
 
-		if node.Type == html.ElementNode {
-			if l := node.Attribute("lang"); l != "" {
-				return l
-			}
-
-			if l := node.Attribute("xml:lang"); l != "" {
-				return l
-			}
+		if l := root.Attribute("xml:lang"); l != "" {
+			return l
 		}
-
-		for _, child := range node.Children {
-			if l := walk(child); l != "" {
-				return l
-			}
-		}
-
-		return ""
 	}
 
-	return walk(root)
+	for _, child := range root.Children {
+		if child.Type == html.ElementNode && child.Name == "html" {
+			if l := child.Attribute("lang"); l != "" {
+				return l
+			}
+
+			if l := child.Attribute("xml:lang"); l != "" {
+				return l
+			}
+		}
+	}
+
+	return ""
 }
 
 // collectObjectHeadings gathers the h1..h6 elements of one painted object and

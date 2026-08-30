@@ -186,41 +186,9 @@ func capTableMaxPage(res *Result, contentH float64) int {
 func collectTableBorderSegments(res *Result) ([]vseg, []hseg, map[int][]vseg, map[int][]vseg, map[int][]hseg) {
 	verts, horiz := collectBorderSegmentOps(res.Ops)
 
-	// Count each rounded-Y bucket first so the segment slices grow once. A
-	// table-heavy document has many repeated Y keys; appending directly to the
-	// maps makes each bucket repeatedly reallocate as rows accumulate.
-	startCounts := make(map[int]int)
-	endCounts := make(map[int]int)
-	horizCounts := make(map[int]int)
-
-	for i := range verts {
-		v := verts[i]
-		k0, k1 := roundY(v.y0), roundY(v.y1)
-		startCounts[k0]++
-		endCounts[k1]++
-	}
-
-	for i := range horiz {
-		h := horiz[i]
-		ky := roundY(h.y)
-		horizCounts[ky]++
-	}
-
-	vertStarts := make(map[int][]vseg, len(startCounts))
-	vertEnds := make(map[int][]vseg, len(endCounts))
-	horizByY := make(map[int][]hseg, len(horizCounts))
-
-	for key, count := range startCounts {
-		vertStarts[key] = make([]vseg, 0, count)
-	}
-
-	for key, count := range endCounts {
-		vertEnds[key] = make([]vseg, 0, count)
-	}
-
-	for key, count := range horizCounts {
-		horizByY[key] = make([]hseg, 0, count)
-	}
+	vertStarts := make(map[int][]vseg)
+	vertEnds := make(map[int][]vseg)
+	horizByY := make(map[int][]hseg)
 
 	for i := range verts {
 		v := verts[i]
@@ -240,29 +208,9 @@ func collectTableBorderSegments(res *Result) ([]vseg, []hseg, map[int][]vseg, ma
 
 // collectBorderSegmentOps gathers non-fixed line ops as vertical or horizontal
 // border segments.
-func collectBorderSegmentOps(ops []Op) ([]vseg, []hseg) { //nolint:cyclop // two-pass classify-then-build
-	// First pass: count so we allocate exact-capacity slices once.
-	nVert, nHoriz := 0, 0
-
-	for i := range ops {
-		paintOp := &ops[i]
-		if paintOp.Fixed || paintOp.Kind != OpLine {
-			continue
-		}
-
-		if paintOp.H > 2 && (paintOp.W < 1 || paintOp.W < paintOp.H*0.05) {
-			nVert++
-
-			continue
-		}
-
-		if paintOp.W > 2 && paintOp.H < 1 {
-			nHoriz++
-		}
-	}
-
-	verts := make([]vseg, 0, nVert)
-	horiz := make([]hseg, 0, nHoriz)
+func collectBorderSegmentOps(ops []Op) ([]vseg, []hseg) {
+	verts := make([]vseg, 0)
+	horiz := make([]hseg, 0)
 
 	for i := range ops {
 		paintOp := &ops[i]

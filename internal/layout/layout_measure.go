@@ -2,6 +2,7 @@ package layout
 
 import (
 	"math"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -20,26 +21,6 @@ func bandEmSize(ops []Op, indices []int) float64 {
 	}
 
 	return emSize
-}
-
-// applyBandShifts moves every op onto the baseline of the nearest band.
-func applyBandShifts(ops []Op, start, end int, shifts []bandShift, emSize float64) {
-	for idx := start; idx < end && idx < len(ops); idx++ {
-		posY := ops[idx].Y
-		// Nearest band baseline.
-		best, bestD := 0, math.Abs(posY-shifts[0].y0)
-
-		for si := 1; si < len(shifts); si++ {
-			d := math.Abs(posY - shifts[si].y0)
-			if d < bestD {
-				bestD, best = d, si
-			}
-		}
-
-		if bestD <= emSize*1.5 {
-			ops[idx].Y += shifts[best].dy
-		}
-	}
 }
 
 // band is a group of op indices sharing a baseline Y (average kept coherent).
@@ -85,46 +66,7 @@ func collectTextBands(ops []Op, start, end int, yEps float64) []band {
 
 // sortBandsTopDown sorts bands by Y ascending.
 func sortBandsTopDown(bands []band) {
-	for i := 0; i < len(bands); i++ {
-		for j := i + 1; j < len(bands); j++ {
-			if bands[j].y < bands[i].y {
-				bands[i], bands[j] = bands[j], bands[i]
-			}
-		}
-	}
-}
-
-// interpolatedBandTargets places the first baseline ~0.7em into the cell, the
-// last near the bottom, and interpolates the rest; nil when the cell is too
-// small to redistribute.
-func interpolatedBandTargets(ops []Op, bands []band, innerTop, innerBot float64) []float64 {
-	if len(bands) == 1 {
-		return nil
-	}
-	// Use first text size as em estimate.
-	emSize := 8.0
-
-	for _, i := range bands[0].idx {
-		if ops[i].Size > 0 {
-			emSize = ops[i].Size
-
-			break
-		}
-	}
-
-	first := innerTop + emSize*firstLineEm
-	last := innerBot - emSize*baselineInsetRatio
-
-	if last <= first {
-		return nil
-	}
-
-	targets := make([]float64, len(bands))
-	for i := range bands {
-		targets[i] = first + (last-first)*float64(i)/float64(len(bands)-1)
-	}
-
-	return targets
+	sort.Slice(bands, func(i, j int) bool { return bands[i].y < bands[j].y })
 }
 
 // measureCellContent returns the max-content border-box width of the cell
@@ -1035,11 +977,7 @@ func spreadRemainderOverHinted(colW, colPct []float64, remain float64, nCols int
 }
 
 func maxF(a, b float64) float64 {
-	if a > b {
-		return a
-	}
-
-	return b
+	return max(a, b)
 }
 
 // distributeColumnExtra spreads a surplus evenly across all columns.

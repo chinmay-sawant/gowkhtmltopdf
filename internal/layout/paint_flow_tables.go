@@ -2,6 +2,7 @@ package layout
 
 import (
 	"math"
+	"sort"
 )
 
 // rowsIntact keeps each table row on a single page: a row spanning multiple
@@ -335,13 +336,7 @@ func sortedPageKeys(pages map[int]bool) []int {
 		out = append(out, page)
 	}
 
-	for i := 0; i < len(out); i++ {
-		for j := i + 1; j < len(out); j++ {
-			if out[j] < out[i] {
-				out[i], out[j] = out[j], out[i]
-			}
-		}
-	}
+	sort.Ints(out)
 
 	return out
 }

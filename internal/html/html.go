@@ -537,54 +537,9 @@ func scanEndTag(src string, pos int, emit tokenSink) (int, error) {
 }
 
 // endTagName trims surrounding whitespace from an end-tag name and
-// lowercases it, copying only when the name actually differs from the source
-// (the common "</name>" form returns a zero-copy substring of src). Names
-// with non-ASCII bytes keep the Unicode behavior of TrimSpace/ToLower.
-//
-//nolint:cyclop // trim, classify, and fold passes share the same body slice
+// lowercases it.
 func endTagName(body string) string {
-	start := 0
-	for start < len(body) && isTrimSpace(body[start]) {
-		start++
-	}
-
-	end := len(body)
-	for end > start && isTrimSpace(body[end-1]) {
-		end--
-	}
-
-	hasNonASCII := false
-	hasUpper := false
-
-	for idx := start; idx < end; idx++ {
-		switch {
-		case body[idx] >= nonASCIIStart:
-			hasNonASCII = true
-		case body[idx] >= 'A' && body[idx] <= 'Z':
-			hasUpper = true
-		}
-	}
-
-	if hasNonASCII {
-		return strings.ToLower(strings.TrimSpace(body))
-	}
-
-	if !hasUpper {
-		return body[start:end]
-	}
-
-	out := make([]byte, end-start)
-
-	for idx := start; idx < end; idx++ {
-		bodyByte := body[idx]
-		if bodyByte >= 'A' && bodyByte <= 'Z' {
-			bodyByte |= asciiFoldBit
-		}
-
-		out[idx-start] = bodyByte
-	}
-
-	return string(out)
+	return strings.ToLower(strings.TrimSpace(body))
 }
 
 // isTrimSpace reports whether b is one of the ASCII whitespace bytes

@@ -369,12 +369,11 @@ func (e *engine) paintDecoration(
 	item *inlineItem, runStart, runSpan, size, ascent, descent, baseline float64,
 	child [3]float64, und *undRun,
 ) {
-	bareURL := isBareURLText(item.text)
 	// A visible border-bottom is already the link affordance (wiki
 	// `.mw-body a:not(.image){border-bottom:1px solid #aaa}`). Painting the
 	// forced href underline on top makes every link look double.
 	hasBottomBorder := inlineBorderVisible(item.style.BorderBottom)
-	wantUnderline := !bareURL && !hasBottomBorder &&
+	wantUnderline := !hasBottomBorder &&
 		(item.style.TextDecoration == cssTextDecorationUnderline ||
 			(item.href != "" && item.style.TextDecoration != cssTextDecorationLineThrough))
 	wsOnly := strings.TrimSpace(item.text) == ""
@@ -501,42 +500,6 @@ func underlineStrokeWidth(em float64) float64 {
 	}
 
 	return uWidth
-}
-
-// isBareURLText reports that s is essentially a URL (optional leading
-// punctuation from "(https://…)" wrappers). Used to skip force-underlines on
-// raw link text in reference lists.
-func isBareURLText(s string) bool {
-	tmp := strings.TrimSpace(s)
-	tmp = strings.TrimLeft(tmp, "([\"' \t")
-
-	if tmp == "" {
-		return false
-	}
-
-	low := strings.ToLower(tmp)
-	if strings.HasPrefix(low, "https://") || strings.HasPrefix(low, "http://") ||
-		strings.HasPrefix(low, "www.") {
-		return true
-	}
-	// Continuation fragment of a wrapped URL (no scheme on later lines).
-	return hasURLFragmentMarker(tmp)
-}
-
-// hasURLFragmentMarker applies the tail heuristics for wrapped URLs whose
-// scheme ended up on an earlier line.
-func hasURLFragmentMarker(text string) bool {
-	if !strings.Contains(text, "/") || strings.ContainsAny(text, " \t") {
-		return false
-	}
-
-	for _, marker := range []string{".com", ".org", "archive.", ".html", ".php"} {
-		if strings.Contains(text, marker) {
-			return true
-		}
-	}
-
-	return strings.Count(text, "/") >= two
 }
 
 func nearUndY(a, b float64) bool {

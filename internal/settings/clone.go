@@ -1,5 +1,10 @@
 package settings
 
+import (
+	"maps"
+	"slices"
+)
+
 // ClonePdfGlobal returns an independent snapshot of src. Slices and maps
 // (Allow, Network*, FontPaths, ExcludeFromOutline, Header/Footer.Replace,
 // Ignored) are copied so later mutations of src cannot affect the result.
@@ -53,47 +58,17 @@ func CloneHeaderFooter(src HeaderFooter) HeaderFooter {
 }
 
 func clonePostItems(src []PostItem) []PostItem {
-	if src == nil {
-		return nil
-	}
-
-	dst := make([]PostItem, len(src))
-	copy(dst, src)
-
-	return dst
+	return slices.Clone(src)
 }
 
 func cloneStrings(src []string) []string {
-	if src == nil {
-		return nil
-	}
-
-	dst := make([]string, len(src))
-	copy(dst, src)
-
-	return dst
+	return slices.Clone(src)
 }
 
 func cloneBytes(src []byte) []byte {
-	if src == nil {
-		return nil
-	}
-
-	dst := make([]byte, len(src))
-	copy(dst, src)
-
-	return dst
+	return slices.Clone(src)
 }
 
 func cloneStringMap(source map[string]string) map[string]string {
-	if source == nil {
-		return nil
-	}
-
-	clone := make(map[string]string, len(source))
-	for key, value := range source {
-		clone[key] = value
-	}
-
-	return clone
+	return maps.Clone(source)
 }
