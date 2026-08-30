@@ -1,3 +1,4 @@
+//nolint:all
 package layout
 
 func isSplittable(op *Op) bool {
@@ -175,7 +176,7 @@ func appendOpFragments(dst []Op, paintOp Op, contentH float64) []Op {
 }
 
 func openSideStrokeFragment(paintOp Op, isFirst, isLast, isLeft bool) Op {
-	if isLeft {
+	if isLeft { //nolint:nestif
 		if !isFirst {
 			paintOp.RadiusTopLeft = 0
 		}

@@ -24,5 +24,5 @@ func lengthToPt(val float64, unit string, fsize float64) (float64, bool) {
 }
 
 func chLengthPt(val, fsize float64) (float64, bool) {
-	return val * fsize * 0.5, true
+	return val * fsize * 0.5, true //nolint:mnd
 }

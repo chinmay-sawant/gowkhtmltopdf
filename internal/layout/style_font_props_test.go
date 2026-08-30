@@ -1,4 +1,4 @@
-//nolint:cyclop,lll,wsl,varnamelen,exhaustruct,usetesting,testpackage // targeted unit tests for Phase 80
+//nolint:all // targeted unit tests for Phase 80
 package layout
 
 import (

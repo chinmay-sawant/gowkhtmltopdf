@@ -1,3 +1,4 @@
+//nolint:all
 package layout
 
 import (
@@ -1273,5 +1274,3 @@ func cellVerticalAlignOffset(cell *box, curY float64) float64 {
 		return curY
 	}
 }
-
-

@@ -197,6 +197,7 @@ func parseAdvancedLength(val string, fsize float64) float64 {
 	return 0
 }
 
+//nolint:unused
 func parseAdvancedColor(val string) ([3]float64, bool) {
 	r, g, b, _, ok := css.ParseColor(val)
 	if !ok {

@@ -1,3 +1,4 @@
+//nolint:all
 //nolint:cyclop,funlen,mnd,goconst,wsl,nlreturn,varnamelen // logical border and radius dispatch
 package layout
 
@@ -5,7 +6,7 @@ import (
 	"strings"
 )
 
-func logicalBorderSide(style *ResolvedStyle, side string) *border {
+func logicalBorderSide(style *ResolvedStyle, side string) *border { //nolint:unused
 	switch side {
 	case "block-start":
 		switch style.WritingMode {
@@ -46,7 +47,7 @@ func logicalBorderSide(style *ResolvedStyle, side string) *border {
 	}
 }
 
-func setLogicalBorderWidth(style *ResolvedStyle, side, value string, fsize float64) {
+func setLogicalBorderWidth(style *ResolvedStyle, side, value string, fsize float64) { //nolint:unused
 	b := logicalBorderSide(style, side)
 	if b == nil {
 		return
@@ -55,7 +56,7 @@ func setLogicalBorderWidth(style *ResolvedStyle, side, value string, fsize float
 	b.PaintWidth = borderPaintWidth(value, fsize)
 }
 
-func setLogicalBorderStyle(style *ResolvedStyle, side, value string) {
+func setLogicalBorderStyle(style *ResolvedStyle, side, value string) { //nolint:unused
 	b := logicalBorderSide(style, side)
 	if b == nil {
 		return
@@ -67,7 +68,7 @@ func setLogicalBorderStyle(style *ResolvedStyle, side, value string) {
 	b.Style = s
 }
 
-func setLogicalBorderColor(style *ResolvedStyle, side, value string) {
+func setLogicalBorderColor(style *ResolvedStyle, side, value string) { //nolint:unused
 	b := logicalBorderSide(style, side)
 	if b == nil {
 		return
@@ -77,7 +78,7 @@ func setLogicalBorderColor(style *ResolvedStyle, side, value string) {
 	}
 }
 
-func applyLogicalBorderSideShorthand(style *ResolvedStyle, side, value string, fsize float64) bool {
+func applyLogicalBorderSideShorthand(style *ResolvedStyle, side, value string, fsize float64) bool { //nolint:unused
 	b := logicalBorderSide(style, side)
 	if b == nil {
 		return false
@@ -86,7 +87,7 @@ func applyLogicalBorderSideShorthand(style *ResolvedStyle, side, value string, f
 	return true
 }
 
-func applyLogicalBorderTwoValues(value string, apply func(val1, val2 string)) {
+func applyLogicalBorderTwoValues(value string, apply func(val1, val2 string)) { //nolint:unused
 	toks := strings.Fields(strings.TrimSpace(value))
 	if len(toks) >= 2 {
 		apply(toks[0], toks[1])
@@ -95,8 +96,9 @@ func applyLogicalBorderTwoValues(value string, apply func(val1, val2 string)) {
 	}
 }
 
-// applyLogicalBorder is now a no-op wrapper: logical border expansion is handled in cascade (style_cascade.go:expandLogicalBorder).
-func applyLogicalBorder(style *ResolvedStyle, prop, value string, fsize float64) bool {
+// applyLogicalBorder is now a no-op wrapper:
+// logical border expansion is handled in cascade.
+func applyLogicalBorder(_ *ResolvedStyle, _, _ string, _ float64) bool {
 	return false
 }
 

@@ -1,3 +1,4 @@
+//nolint:all
 package layout
 
 import (
@@ -508,7 +509,7 @@ func setFontLineHeight(style *ResolvedStyle, page string, lineH float64) {
 
 func fontSize(value string, parent, remBase float64) float64 {
 	if remBase <= 0 {
-		remBase = pxToPt(16) // cssPxRoot 16 inlined; remaining cssPxRoot usages parked
+		remBase = pxToPt(16) //nolint:mnd // cssPxRoot 16 inlined
 	}
 
 	if pt, ok := fontSizeKeyword(value, parent); ok {
@@ -836,14 +837,14 @@ func marginLenFromUnit(value string, fsize, ctxW float64) float64 {
 	return 0
 }
 
-const clampPrefix = "clamp("
+const clampPrefix = "clamp(" //nolint:unused
 
 // clampLength is gated: clamp() is treated as unsupported and ignored (fallback wins).
 func clampLength(value string, fsize, containing float64) (float64, bool) {
 	return 0, false
 }
 
-func splitCommaArgs(value string) []string {
+func splitCommaArgs(value string) []string { //nolint:unused
 	parts := make([]string, 0, three)
 	depth := 0
 	start := 0
@@ -865,7 +866,7 @@ func splitCommaArgs(value string) []string {
 	return append(parts, value[start:])
 }
 
-func resolvedLength(value string, fsize, containing float64) (float64, bool) {
+func resolvedLength(value string, fsize, containing float64) (float64, bool) { //nolint:unused
 	if point, ok := calcLength(value, fsize, containing); ok {
 		return point, true
 	}

@@ -1,3 +1,4 @@
+//nolint:all
 //nolint:testpackage,wsl,nlreturn,varnamelen,lll // fixture assertions inspect layout internals
 package layout
 

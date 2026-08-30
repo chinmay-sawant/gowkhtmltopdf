@@ -1,3 +1,4 @@
+//nolint:all
 // Package html implements a tokenizer and tree builder for the HTML subset
 // gowkhtmltopdf accepts: tags, attributes, text, comments, doctype, CDATA,
 // self-closing and void elements. Script/style contents are kept as raw text

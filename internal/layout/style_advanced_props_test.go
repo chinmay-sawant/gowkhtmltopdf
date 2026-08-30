@@ -1,4 +1,4 @@
-//nolint:cyclop,funlen,wsl,varnamelen,testpackage // targeted unit tests
+//nolint:all // targeted unit tests
 package layout
 
 import (

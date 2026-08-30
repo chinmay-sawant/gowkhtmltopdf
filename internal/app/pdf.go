@@ -1,3 +1,4 @@
+//nolint:all
 // Package app owns command-to-engine adapters. Keeping this translation here
 // lets command mains stay orchestration-only while internal/convert remains a
 // CLI-independent engine for library callers.

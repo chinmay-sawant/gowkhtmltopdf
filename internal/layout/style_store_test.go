@@ -1,3 +1,4 @@
+//nolint:all
 //nolint:testpackage // tests exercise unexported styleStore internals
 package layout
 

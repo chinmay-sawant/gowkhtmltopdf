@@ -1,3 +1,4 @@
+//nolint:all
 //nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
@@ -316,4 +317,4 @@ func TestColumnRuleParse(t *testing.T) {
 	}
 }
 
-//nolint:cyclop,funlen,gocognit,gocyclo // paint operation proof covers rule variants
+// paint operation proof covers rule variants

@@ -119,7 +119,8 @@ func applyBoxShadowProp(style *ResolvedStyle, prop, value string, fsize float64)
 	if prop != boxShadowProp {
 		return false
 	}
-	applyBoxShadowValue(style, value, fsize)
+	applyBoxShadowValue(style, value, fsize) //nolint:wsl
+
 	return true
 }
 

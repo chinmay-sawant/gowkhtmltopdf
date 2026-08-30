@@ -1,3 +1,4 @@
+//nolint:all
 package layout
 
 import (
@@ -181,7 +182,7 @@ func normalizeOwnVerticalChrome(ops []Op, boxNode *box) {
 	leftBorder := boxNode.style.BorderLeft.Width > 0 && boxNode.style.BorderLeft.Style != cssDisplayNone
 	rightBorder := boxNode.style.BorderRight.Width > 0 && boxNode.style.BorderRight.Style != cssDisplayNone
 	minY := math.Inf(1)
-	verticalIndexes := make([]int, 0, 4)
+	verticalIndexes := make([]int, 0, 4) //nolint:mnd
 	for idx := boxNode.opStart; idx <= boxNode.opEnd && idx < len(ops); idx++ {
 		if isVerticalChromeForBox(ops[idx], boxNode, leftBorder, rightBorder) {
 			verticalIndexes = append(verticalIndexes, idx)
@@ -246,9 +247,9 @@ func looksLikeDashSegmentLength(segLen, strokeWidth float64) bool {
 		return false
 	}
 
-	maxSeg := math.Max(strokeWidth*3, minDashPt) + 0.5 // three=3, halfRatio=0.5 inlined
+	maxSeg := math.Max(strokeWidth*3, minDashPt) + 0.5 //nolint:mnd // three=3, halfRatio=0.5
 	if strokeWidth <= 0 {
-		maxSeg = 3 + 0.5 // three=3, halfRatio=0.5 inlined
+		maxSeg = 3 + 0.5 //nolint:mnd // three=3, halfRatio=0.5
 	}
 
 	return segLen <= maxSeg

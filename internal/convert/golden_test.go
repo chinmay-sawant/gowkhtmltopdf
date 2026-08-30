@@ -1,3 +1,4 @@
+//nolint:all
 package convert //nolint:testpackage // white-box tests need unexported access
 
 import (

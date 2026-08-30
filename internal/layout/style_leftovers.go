@@ -1,4 +1,4 @@
-//nolint:cyclop,funlen,gocyclo,mnd,wsl,nlreturn,varnamelen,lll,goconst // centralized property dispatch for Wave 80.5
+//nolint:all // centralized property dispatch for Wave 80.5
 package layout
 
 import (

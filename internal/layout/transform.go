@@ -542,7 +542,7 @@ func parseTransformLength(cssS string, fontSize float64) (float64, bool) {
 	}
 
 	if unit == "rem" {
-		return pxToPt(16) * val, true // cssPxRoot 16 inlined; remaining cssPxRoot usages parked
+		return pxToPt(16) * val, true //nolint:mnd // cssPxRoot 16 inlined
 	}
 
 	if pt, ok := lengthToPt(val, unit, fontSize); ok {

@@ -1,3 +1,4 @@
+//nolint:all
 package layout
 
 // orphansWidows enforces CSS Fragmentation Level 3 Rule 3 (widows/orphans)

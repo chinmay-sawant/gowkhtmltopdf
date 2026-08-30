@@ -179,6 +179,7 @@ func refCellWidth(t *testing.T, src string, cssSheet *css.Stylesheet) float64 {
 	return tb.rows[0][0].w
 }
 
+//nolint:unused
 func containsCite(text, num string) bool {
 	if text == num || text == "["+num+"]" {
 		return true

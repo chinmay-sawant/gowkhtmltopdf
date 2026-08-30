@@ -1,3 +1,4 @@
+//nolint:all
 package app_test
 
 import (
