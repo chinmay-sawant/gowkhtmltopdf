@@ -1,4 +1,4 @@
-package layout
+package layout_test
 
 import (
 	"os"
@@ -8,10 +8,13 @@ import (
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/layout"
 )
 
 // TestTableCellBackgroundImageClipped: a cover-sized background inside a td
 // must not paint into the neighboring cell (fixture-60 page-3 spill).
+//
+//nolint:cyclop,funlen // cell background clip assertion keeps full table layout check
 func TestTableCellBackgroundImageClipped(t *testing.T) {
 	t.Parallel()
 
@@ -43,9 +46,10 @@ td.b { width: 50%; }
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	logoPath := filepath.Join(rootDir, "testdata/golden/logo.png")
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct
+	res, err := layout.Layout(root, layout.Options{ //nolint:exhaustruct
 		Width: 400, Height: 200, Background: true, Media: "print",
 		Sheets: []*css.Stylesheet{sheet},
 		Images: func(src string) ([]byte, error) {
@@ -53,6 +57,7 @@ td.b { width: 50%; }
 			if !filepath.IsAbs(src) {
 				src = filepath.Join(filepath.Dir(logoPath), filepath.Base(src))
 			}
+
 			return os.ReadFile(src)
 		},
 	})
@@ -61,27 +66,32 @@ td.b { width: 50%; }
 	}
 
 	var rightX float64
-	for _, op := range res.Ops {
-		if op.Kind == OpText && strings.Contains(op.Text, "RIGHT") {
-			rightX = op.X
+
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind == layout.OpText && strings.Contains(paintOp.Text, "RIGHT") {
+			rightX = paintOp.X
+
 			break
 		}
 	}
+
 	if rightX < 100 {
 		t.Fatalf("RIGHT text x=%.1f, want in second column", rightX)
 	}
 
-	for _, op := range res.Ops {
-		if op.Kind != OpImage || !op.IsBackground {
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != layout.OpImage || !paintOp.IsBackground {
 			continue
 		}
-		if op.X+op.W > rightX-1 {
+
+		if paintOp.X+paintOp.W > rightX-1 {
 			t.Fatalf("background image spills into RIGHT column: img=[%.1f..%.1f] rightTextX=%.1f",
-				op.X, op.X+op.W, rightX)
+				paintOp.X, paintOp.X+paintOp.W, rightX)
 		}
-		if op.X+op.W > 160 { // mid table ~150
+
+		if paintOp.X+paintOp.W > 160 { // mid table ~150
 			// soft check: image should stay in first half
-			t.Logf("img x=%.1f w=%.1f rightX=%.1f", op.X, op.W, rightX)
+			t.Logf("img x=%.1f w=%.1f rightX=%.1f", paintOp.X, paintOp.W, rightX)
 		}
 	}
 }

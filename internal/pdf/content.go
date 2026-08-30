@@ -445,6 +445,7 @@ func splitType0Runs(text string, fnt *Font) []textRun {
 		has := fnt != nil && fnt.GlyphID(rVal) != 0
 
 		next := 0
+
 		switch {
 		case rVal > maxLatin1Code && has:
 			next = 1

@@ -33,7 +33,7 @@ func rowsIntact(res *Result, contentH float64) bool {
 // moves a row to the next page and a later fixpoint pulls the table back.
 // Collapsed table rows should remain adjacent when both rows fit on one page.
 //
-//nolint:cyclop,wsl // table-row geometry checks intentionally stay together
+//nolint:cyclop,wsl,gocognit // table-row geometry checks intentionally stay together; complexity from table geometry
 func normalizeTableRowGaps(res *Result, contentH float64) {
 	if res == nil || res.root == nil || contentH <= 0 {
 		return
@@ -309,8 +309,8 @@ func repeatTableHeaderOnPages(res *Result, tblBox *box, contentH float64) {
 
 // shiftTableBodyBoxesFrom updates cell.y for body rows whose top is on or
 // after page, matching a shiftFlowY applied to those rows' ops.
-func shiftTableBodyBoxesFrom(tblBox *box, page int, contentH, dy float64) {
-	if tblBox == nil || dy == 0 || contentH <= 0 {
+func shiftTableBodyBoxesFrom(tblBox *box, page int, contentH, deltaY float64) {
+	if tblBox == nil || deltaY == 0 || contentH <= 0 {
 		return
 	}
 
@@ -325,7 +325,7 @@ func shiftTableBodyBoxesFrom(tblBox *box, page int, contentH, dy float64) {
 			continue
 		}
 
-		shiftTableRowBoxes(row, dy)
+		shiftTableRowBoxes(row, deltaY)
 	}
 }
 
@@ -334,6 +334,7 @@ func sortedPageKeys(pages map[int]bool) []int {
 	for page := range pages {
 		out = append(out, page)
 	}
+
 	for i := 0; i < len(out); i++ {
 		for j := i + 1; j < len(out); j++ {
 			if out[j] < out[i] {
@@ -355,18 +356,21 @@ func ensureBodyBelowRepeatedHeader(
 	}
 
 	minTop := pageTop + hdrH
+
 	shiftFrom, shiftTo, bodyTop := tableBodyRange(tblBox, page, res, contentH)
+
 	if shiftFrom < 0 || bodyTop < 0 {
 		return
 	}
+
 	if bodyTop >= minTop-layoutEpsilon {
 		return
 	}
 
-	dy := minTop - bodyTop
-	if dy > 0 {
-		shiftFlowY(res, shiftFrom, shiftTo, bodyTop-layoutSlack, dy)
-		shiftTableBodyBoxesFrom(tblBox, page, contentH, dy)
+	deltaY := minTop - bodyTop
+	if deltaY > 0 {
+		shiftFlowY(res, shiftFrom, shiftTo, bodyTop-layoutSlack, deltaY)
+		shiftTableBodyBoxesFrom(tblBox, page, contentH, deltaY)
 	}
 }
 
@@ -380,6 +384,8 @@ const (
 // header. It must move each row's full op range together: shifting only the
 // ops that sit inside the band splits borders from text (fixture-60 page-3
 // empty gap under thead with body text starting a row-height lower).
+//
+//nolint:cyclop // table header sliver handling has exhaustive intersecting-row checks
 func placeSliverBodyBelowHeader(res *Result, tblBox *box, pageTop, hdrH float64) {
 	if res == nil || tblBox == nil || hdrH <= 0 {
 		return
@@ -397,11 +403,13 @@ func placeSliverBodyBelowHeader(res *Result, tblBox *box, pageTop, hdrH float64)
 
 		rowTop := -1.0
 		intersects := false
+
 		for idx := first; idx <= last && idx < len(res.Ops); idx++ {
 			posY := res.Ops[idx].Y
 			if rowTop < 0 || posY < rowTop {
 				rowTop = posY
 			}
+
 			if posY >= loBound && posY < hiBound {
 				intersects = true
 			}
@@ -411,13 +419,13 @@ func placeSliverBodyBelowHeader(res *Result, tblBox *box, pageTop, hdrH float64)
 			continue
 		}
 
-		dy := target - rowTop
-		if dy <= layoutSlack {
+		deltaY := target - rowTop
+		if deltaY <= layoutSlack {
 			continue
 		}
 
-		shiftFlowY(res, first, last, rowTop-layoutSlack, dy)
-		shiftTableRowBoxes(row, dy)
+		shiftFlowY(res, first, last, rowTop-layoutSlack, deltaY)
+		shiftTableRowBoxes(row, deltaY)
 	}
 }
 
@@ -463,68 +471,6 @@ func sliverBodyOps(tblBox *box, pageTop, hdrH float64, res *Result) (int, int, f
 	}
 
 	return fromIdx, toIdx, top, bottom
-}
-
-func accumulateNextBodyOp(posY float64, idx int, pageTop float64, fromIdx *int, top *float64) {
-	if posY < pageTop-0.5 {
-		return
-	}
-
-	if *fromIdx < 0 || idx < *fromIdx {
-		*fromIdx = idx
-	}
-
-	if *top < 0 || posY < *top {
-		*top = posY
-	}
-}
-
-// nextBodyAfterSliver is the first body op on this page that is not in the sliver.
-func nextBodyAfterSliver(tblBox *box, pageTop float64, sliverFrom, sliverTo int, res *Result) (int, float64) {
-	fromIdx := -1
-	top := -1.0
-
-	for _, row := range tblBox.rows[tblBox.headerRows:] {
-		first, last := rowOpRange(row)
-		if first < 0 {
-			continue
-		}
-
-		for idx := first; idx <= last && idx < len(res.Ops); idx++ {
-			if idx < sliverFrom || idx > sliverTo {
-				accumulateNextBodyOp(res.Ops[idx].Y, idx, pageTop, &fromIdx, &top)
-			}
-		}
-	}
-
-	return fromIdx, top
-}
-
-func shiftTableBoxesInOpRange(tblBox *box, fromIdx, toIdx int, deltaY float64) {
-	if tblBox == nil || deltaY == 0 {
-		return
-	}
-
-	var walk func(*box)
-	walk = func(boxNode *box) {
-		if boxNode == nil {
-			return
-		}
-
-		if boxNode.opStart <= boxNode.opEnd && boxNode.opStart >= fromIdx && boxNode.opEnd <= toIdx {
-			boxNode.y += deltaY
-		}
-
-		for _, child := range boxNode.children {
-			walk(child)
-		}
-	}
-
-	for _, row := range tblBox.rows {
-		for _, cell := range row {
-			walk(cell)
-		}
-	}
 }
 
 // headerContinuationPages is the set of pages holding table body rows.

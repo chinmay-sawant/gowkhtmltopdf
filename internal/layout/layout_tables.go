@@ -1256,6 +1256,7 @@ func (e *engine) emitCell(cell *box, skipBorders bool) {
 	// content chopped box-shadow / borders that intentionally paint outside
 	// the padding edge (fixture-60 row 14 truncation).
 	pad := e.paddingBoxOf(cell)
+
 	for i := contentStart; i < len(e.ops); i++ {
 		if e.ops[i].IsBackground {
 			clipPaintOp(&e.ops[i], pad)

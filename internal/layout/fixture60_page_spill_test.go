@@ -1,3 +1,4 @@
+//nolint:testpackage // intimate engine test needs unexported helpers
 package layout
 
 import (
@@ -11,24 +12,32 @@ import (
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
 )
 
+//nolint:cyclop,funlen // fixture regression keeps full page-spill assertion together
 func TestFixture60BackgroundImagesStayWithTheirRows(t *testing.T) {
+	t.Parallel()
+
 	rootDir, err := filepath.Abs("../..")
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	raw, err := os.ReadFile(filepath.Join(rootDir, "testdata/golden/fixture-60-implemented-props-a.html"))
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	doc, err := html.Parse(string(raw))
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	styleText := extractStyleContent(doc)
+
 	sheet, err := css.Parse(styleText)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	base := filepath.Join(rootDir, "testdata/golden")
 	margin := 12 * 72 / 25.4
 	pageW, pageH := 595.28, 841.89
@@ -43,17 +52,21 @@ func TestFixture60BackgroundImagesStayWithTheirRows(t *testing.T) {
 			if strings.HasPrefix(src, "data:") {
 				return nil, os.ErrNotExist
 			}
+
 			if !filepath.IsAbs(src) {
 				src = filepath.Join(base, src)
 			}
+
 			return os.ReadFile(src)
 		},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	pdfDoc := pdf.NewDocument()
-	if err := Paint(pdfDoc, res, PaintOptions{ //nolint:exhaustruct
+
+	if err := Paint(pdfDoc, res, PaintOptions{ //nolint:exhaustruct,nolintlint // PaintOptions has optional fields
 		PageWidth: pageW, PageHeight: pageH,
 		MarginTop: margin, MarginBottom: margin, MarginLeft: margin, MarginRight: margin,
 	}); err != nil {
@@ -62,20 +75,25 @@ func TestFixture60BackgroundImagesStayWithTheirRows(t *testing.T) {
 
 	// Find Y of "background-image" property text and Y of align-content text
 	var bgImageY, alignY float64
+
 	var bgImagePage, alignPage int
-	for _, op := range res.Ops {
-		if op.Kind != OpText {
+
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpText {
 			continue
 		}
-		if op.Text == "background-image" {
-			bgImageY = op.Y
-			bgImagePage = int(op.Y / contentH)
+
+		if paintOp.Text == "background-image" {
+			bgImageY = paintOp.Y
+			bgImagePage = int(paintOp.Y / contentH)
 		}
-		if op.Text == "align-content" {
-			alignY = op.Y
-			alignPage = int(op.Y / contentH)
+
+		if paintOp.Text == "align-content" {
+			alignY = paintOp.Y
+			alignPage = int(paintOp.Y / contentH)
 		}
 	}
+
 	t.Logf("align-content y=%.1f page=%d", alignY, alignPage)
 	t.Logf("background-image y=%.1f page=%d", bgImageY, bgImagePage)
 
@@ -84,19 +102,26 @@ func TestFixture60BackgroundImagesStayWithTheirRows(t *testing.T) {
 	// Count IsBackground images on align page vs bg page.
 	imgsOnAlignPage := 0
 	imgsOnBgPage := 0
-	for _, op := range res.Ops {
-		if op.Kind != OpImage {
+
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpImage {
 			continue
 		}
-		p := int(op.Y / contentH)
-		if p == alignPage {
+
+		pageIdx := int(paintOp.Y / contentH)
+
+		if pageIdx == alignPage {
 			imgsOnAlignPage++
-			t.Logf("  img on align page: y=%.1f x=%.1f w=%.1f h=%.1f bg=%v", op.Y, op.X, op.W, op.H, op.IsBackground)
+
+			t.Logf("  img on align page: y=%.1f x=%.1f w=%.1f h=%.1f bg=%v",
+				paintOp.Y, paintOp.X, paintOp.W, paintOp.H, paintOp.IsBackground)
 		}
-		if p == bgImagePage {
+
+		if pageIdx == bgImagePage {
 			imgsOnBgPage++
 		}
 	}
+
 	t.Logf("images on align page=%d bg page=%d", imgsOnAlignPage, imgsOnBgPage)
 
 	// align-content page should not have many background logos (only maybe filter img)

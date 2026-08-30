@@ -414,15 +414,18 @@ func TestType0MissingGlyphsDoNotEmptyCmap(t *testing.T) {
 	cur.EndText()
 
 	out := writePDF(t, dVal)
-	s := string(out)
+	pdfStr := string(out)
+
 	if !bytes.Contains(out, []byte("%PDF-")) {
 		t.Fatal("expected a PDF")
 	}
+
 	// No Type0 sibling when Liberation has no katakana glyphs.
-	if strings.Contains(s, "/F0_u") {
+	if strings.Contains(pdfStr, "/F0_u") {
 		t.Fatal("Liberation must not grow F0_u for missing katakana glyphs")
 	}
-	if !strings.Contains(s, "(super)") && !strings.Contains(s, "super") {
+
+	if !strings.Contains(pdfStr, "(super)") && !strings.Contains(pdfStr, "super") {
 		t.Fatal("expected Latin run to survive")
 	}
 }

@@ -147,33 +147,29 @@ func backgroundSizeForLayer(sizeSpec string, layerIndex int) string {
 func resolveBackgroundClipBox(
 	sty ResolvedStyle, posX, posY, width, height float64,
 ) (float64, float64, float64, float64) {
-	switch strings.ToLower(strings.TrimSpace(sty.BackgroundClip)) {
-	case "content-box":
-		x := posX + sty.BorderLeft.Width + sty.PaddingLeft
-		y := posY + sty.BorderTop.Width + sty.PaddingTop
-		w := width - sty.BorderLeft.Width - sty.BorderRight.Width - sty.PaddingLeft - sty.PaddingRight
-		h := height - sty.BorderTop.Width - sty.BorderBottom.Width - sty.PaddingTop - sty.PaddingBottom
-		return x, y, math.Max(0, w), math.Max(0, h)
-	case "border-box":
-		return posX, posY, width, height
-	default: // padding-box (initial)
-		x := posX + sty.BorderLeft.Width
-		y := posY + sty.BorderTop.Width
-		w := width - sty.BorderLeft.Width - sty.BorderRight.Width
-		h := height - sty.BorderTop.Width - sty.BorderBottom.Width
-		return x, y, math.Max(0, w), math.Max(0, h)
-	}
+	keyword := strings.ToLower(strings.TrimSpace(sty.BackgroundClip))
+
+	return backgroundBoxForKeyword(keyword, sty, posX, posY, width, height)
 }
 
 func resolveBackgroundOriginBox(
 	sty ResolvedStyle, posX, posY, width, height float64,
 ) (float64, float64, float64, float64) {
-	switch sty.BackgroundOrigin {
+	keyword := strings.ToLower(strings.TrimSpace(sty.BackgroundOrigin))
+
+	return backgroundBoxForKeyword(keyword, sty, posX, posY, width, height)
+}
+
+func backgroundBoxForKeyword(
+	keyword string, sty ResolvedStyle, posX, posY, width, height float64,
+) (float64, float64, float64, float64) {
+	switch keyword {
 	case "content-box":
 		x := posX + sty.BorderLeft.Width + sty.PaddingLeft
 		y := posY + sty.BorderTop.Width + sty.PaddingTop
 		w := width - sty.BorderLeft.Width - sty.BorderRight.Width - sty.PaddingLeft - sty.PaddingRight
 		h := height - sty.BorderTop.Width - sty.BorderBottom.Width - sty.PaddingTop - sty.PaddingBottom
+
 		return x, y, math.Max(0, w), math.Max(0, h)
 	case "border-box":
 		return posX, posY, width, height
@@ -182,6 +178,7 @@ func resolveBackgroundOriginBox(
 		y := posY + sty.BorderTop.Width
 		w := width - sty.BorderLeft.Width - sty.BorderRight.Width
 		h := height - sty.BorderTop.Width - sty.BorderBottom.Width
+
 		return x, y, math.Max(0, w), math.Max(0, h)
 	}
 }
@@ -288,106 +285,136 @@ func tileBackgroundRepeat(
 	spec := strings.ToLower(strings.TrimSpace(repeatSpec))
 	switch spec {
 	case "no-repeat", "":
+		return appendBackgroundTileNoRepeat(dst, baseOp, originX, originY, originW, originH)
+	case "repeat-x":
+		return appendBackgroundTileRepeatX(dst, baseOp, originX, originY, originW, originH, destY, destW)
+	case "repeat-y":
+		return appendBackgroundTileRepeatY(dst, baseOp, originX, originY, originW, originH, destX, destH)
+	case "repeat":
+		return appendBackgroundTileRepeat(dst, baseOp, originX, originY, originW, originH, destW, destH)
+	default:
+		dst = append(dst, baseOp)
+
+		return dst
+	}
+}
+
+func appendBackgroundTileNoRepeat(dst []Op, baseOp Op, originX, originY, originW, originH float64) []Op {
+	op := baseOp
+	if op.X < originX {
+		op.W -= originX - op.X
+		op.X = originX
+	}
+
+	if op.Y < originY {
+		op.H -= originY - op.Y
+		op.Y = originY
+	}
+
+	if op.X+op.W > originX+originW {
+		op.W = originX + originW - op.X
+	}
+
+	if op.Y+op.H > originY+originH {
+		op.H = originY + originH - op.Y
+	}
+
+	if op.W > 0 && op.H > 0 {
+		dst = append(dst, op)
+	}
+
+	return dst
+}
+
+func appendBackgroundTileRepeatX(dst []Op, baseOp Op, originX, originY, originW, originH, destY, destW float64) []Op {
+	if destW <= 0 {
+		dst = append(dst, baseOp)
+
+		return dst
+	}
+
+	count := int(math.Ceil(originW / destW))
+	if count > maxBackgroundTiles {
+		count = maxBackgroundTiles
+	}
+
+	for k := 0; k < count; k++ {
 		op := baseOp
-		// Cover / positioned layers can extend past the origin; clip to it
-		// before background-clip is applied by the caller.
-		if op.X < originX {
-			op.W -= originX - op.X
-			op.X = originX
-		}
-		if op.Y < originY {
-			op.H -= originY - op.Y
-			op.Y = originY
-		}
-		if op.X+op.W > originX+originW {
-			op.W = originX + originW - op.X
-		}
-		if op.Y+op.H > originY+originH {
-			op.H = originY + originH - op.Y
-		}
+		op.X = originX + float64(k)*destW
+		op.Y = destY
+		clipBackgroundTileTrailing(&op, originX, originY, originW, originH)
+
 		if op.W > 0 && op.H > 0 {
 			dst = append(dst, op)
 		}
-		return dst
-	case "repeat-x":
-		if destW <= 0 {
-			dst = append(dst, baseOp)
-			return dst
-		}
-		count := int(math.Ceil(originW / destW))
-		if count > maxBackgroundTiles {
-			count = maxBackgroundTiles
-		}
-		for k := 0; k < count; k++ {
-			op := baseOp
-			op.X = originX + float64(k)*destW
-			op.Y = destY
-			if op.X+op.W > originX+originW {
-				op.W = originX + originW - op.X
-			}
-			if op.Y+op.H > originY+originH {
-				op.H = originY + originH - op.Y
-			}
-			if op.W > 0 && op.H > 0 {
-				dst = append(dst, op)
-			}
-		}
-		return dst
-	case "repeat-y":
-		if destH <= 0 {
-			dst = append(dst, baseOp)
-			return dst
-		}
-		count := int(math.Ceil(originH / destH))
-		if count > maxBackgroundTiles {
-			count = maxBackgroundTiles
-		}
-		for k := 0; k < count; k++ {
-			op := baseOp
-			op.X = destX
-			op.Y = originY + float64(k)*destH
-			if op.X+op.W > originX+originW {
-				op.W = originX + originW - op.X
-			}
-			if op.Y+op.H > originY+originH {
-				op.H = originY + originH - op.Y
-			}
-			if op.W > 0 && op.H > 0 {
-				dst = append(dst, op)
-			}
-		}
-		return dst
-	case "repeat":
-		if (destW >= originW && destH >= originH) || destW <= 0 || destH <= 0 {
-			dst = append(dst, baseOp)
-			return dst
-		}
-		countX := int(math.Ceil(originW / destW))
-		countY := int(math.Ceil(originH / destH))
-		if countX*countY > maxBackgroundTiles {
-			countX = int(math.Sqrt(maxBackgroundTiles))
-			countY = countX
-		}
-		for yk := 0; yk < countY; yk++ {
-			for xk := 0; xk < countX; xk++ {
-				op := baseOp
-				op.X = originX + float64(xk)*destW
-				op.Y = originY + float64(yk)*destH
-				if op.X+op.W > originX+originW {
-					op.W = originX + originW - op.X
-				}
-				if op.Y+op.H > originY+originH {
-					op.H = originY + originH - op.Y
-				}
-				if op.W > 0 && op.H > 0 {
-					dst = append(dst, op)
-				}
-			}
-		}
-		return dst
-	default:
+	}
+
+	return dst
+}
+
+func appendBackgroundTileRepeatY(dst []Op, baseOp Op, originX, originY, originW, originH, destX, destH float64) []Op {
+	if destH <= 0 {
 		dst = append(dst, baseOp)
+
 		return dst
+	}
+
+	count := int(math.Ceil(originH / destH))
+	if count > maxBackgroundTiles {
+		count = maxBackgroundTiles
+	}
+
+	for k := 0; k < count; k++ {
+		op := baseOp
+		op.X = destX
+		op.Y = originY + float64(k)*destH
+		clipBackgroundTileTrailing(&op, originX, originY, originW, originH)
+
+		if op.W > 0 && op.H > 0 {
+			dst = append(dst, op)
+		}
+	}
+
+	return dst
+}
+
+func appendBackgroundTileRepeat(dst []Op, baseOp Op, originX, originY, originW, originH, destW, destH float64) []Op {
+	if (destW >= originW && destH >= originH) || destW <= 0 || destH <= 0 {
+		dst = append(dst, baseOp)
+
+		return dst
+	}
+
+	countX := int(math.Ceil(originW / destW))
+	countY := int(math.Ceil(originH / destH))
+	if countX*countY > maxBackgroundTiles {
+		countX = int(math.Sqrt(maxBackgroundTiles))
+		countY = countX
+	}
+
+	for yk := 0; yk < countY; yk++ {
+		for xk := 0; xk < countX; xk++ {
+			op := baseOp
+			op.X = originX + float64(xk)*destW
+			op.Y = originY + float64(yk)*destH
+			clipBackgroundTileTrailing(&op, originX, originY, originW, originH)
+
+			if op.W > 0 && op.H > 0 {
+				dst = append(dst, op)
+			}
+		}
+	}
+
+	return dst
+}
+
+func clipBackgroundTileTrailing(op *Op, originX, originY, originW, originH float64) {
+	if op.X+op.W > originX+originW {
+		op.W = originX + originW - op.X
+	}
+
+	if op.Y+op.H > originY+originH {
+		op.H = originY + originH - op.Y
 	}
 }
 
