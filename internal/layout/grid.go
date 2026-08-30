@@ -18,7 +18,30 @@ const (
 // minmax/fr/auto/min-content/max-content lite), independent gaps, template
 // areas + named grid-area, auto-flow row/column (sparse or dense), column/row
 // spanning, and justify/align-items/self.
+//
+// display:subgrid copy-inherits the parent's template columns (and
+// unspecified gaps). Tracks are re-resolved against the subgrid's own
+// content box - not shared parent sizing.
+// grid-template-rows: masonry packs items into the shortest column and
+// keeps intrinsic heights (no shared row stretch).
+func prepareGridTemplateStyles(sty *ResolvedStyle) bool {
+	masonryRows := isMasonryTrackList(sty.GridTemplateRows)
+	sty.GridTemplateColumns = stripMasonryKeyword(sty.GridTemplateColumns)
+
+	if masonryRows {
+		sty.GridTemplateRows = ""
+	} else {
+		sty.GridTemplateRows = stripMasonryKeyword(sty.GridTemplateRows)
+	}
+
+	return masonryRows
+}
+
 func (e *engine) buildGrid(node *html.Node, sty ResolvedStyle, availW, posX, posY float64) *box {
+	inheritSubgridFromParent(e, node, &sty)
+
+	masonryRows := prepareGridTemplateStyles(&sty)
+
 	ml := e.scalePt(sty.MarginLeft)
 	boxNode := &box{ //nolint:exhaustruct // intentional zero fields
 		node: node, style: e.stylePtr(node), kind: displayBlock, x: posX + ml, y: posY,
@@ -36,6 +59,14 @@ func (e *engine) buildGrid(node *html.Node, sty ResolvedStyle, availW, posX, pos
 
 	kids := collectGridKids(e, node)
 
+	// Handle repeat(auto-fit/auto-fill, minmax(..., 1fr)) which parseGridTrackDefs collapses to auto.
+	// Expand at layout time when contentW is known: n = floor((contentW+gap)/(min+gap)), min from minmax.
+	if len(colDefs) == 1 && colDefs[0].min.kind == trackAuto && colDefs[0].max.kind == trackAuto {
+		if autoDefs := parseAutoFitDefs(sty.GridTemplateColumns, contentW, columnGap, e, len(kids)); len(autoDefs) > 0 {
+			colDefs = autoDefs
+		}
+	}
+
 	// Intrinsic measure lite for min-content / max-content column mins.
 	colIntrinsics := measureTrackIntrinsics(e, kids, len(colDefs), true)
 
@@ -45,6 +76,15 @@ func (e *engine) buildGrid(node *html.Node, sty ResolvedStyle, availW, posX, pos
 	}
 
 	contentH := resolveContentHeight(sty, e)
+
+	if masonryRows {
+		usedH := e.emitMasonryItems(boxNode, kids, cols, columnGap, rowGap, contentX, posY, curY)
+		usedH = resolveGridUsedHeight(e, sty, usedH, contentH)
+		boxNode.height = usedH
+		e.prependChrome(contentStart, boxNode, sty, boxNode.x, posY, boxNode.w, boxNode.height)
+
+		return boxNode
+	}
 
 	return e.layoutStandardGrid(
 		boxNode, sty, kids, areas, cols, columnGap, rowGap, contentX, curY, posY, contentH, contentStart,
@@ -86,6 +126,38 @@ func (e *engine) layoutStandardGrid(
 	return boxNode
 }
 
+func inheritSubgridTracksAndGaps(sty, parentStyle *ResolvedStyle) {
+	if strings.TrimSpace(sty.GridTemplateColumns) == "" &&
+		strings.TrimSpace(parentStyle.GridTemplateColumns) != "" {
+		sty.GridTemplateColumns = parentStyle.GridTemplateColumns
+	}
+
+	if sty.RowGap == 0 && sty.ColumnGap == 0 && sty.Gap == 0 {
+		sty.RowGap = parentStyle.RowGap
+		sty.ColumnGap = parentStyle.ColumnGap
+		sty.Gap = parentStyle.Gap
+	}
+}
+
+func inheritSubgridFromParent(eng *engine, node *html.Node, sty *ResolvedStyle) {
+	if eng == nil || node == nil || sty == nil || sty.Display != displaySubgrid {
+		return
+	}
+
+	sty.Display = displayGrid
+
+	if node.Parent == nil {
+		return
+	}
+
+	parentStyle := eng.stylePtr(node.Parent)
+	if parentStyle == nil || parentStyle == &zeroResolvedStyle {
+		return
+	}
+
+	inheritSubgridTracksAndGaps(sty, parentStyle)
+}
+
 // gridColumnDefs expands the column track list, padding with flexible tracks
 // when fewer defs than template-area columns are declared.
 func gridColumnDefs(raw string, areaCols int) []gridTrackDef {
@@ -117,6 +189,88 @@ func gridColumnDefs(raw string, areaCols int) []gridTrackDef {
 	}
 
 	return colDefs
+}
+
+//nolint:cyclop,funlen,mnd // auto-fit calculation handles balanced track distribution
+func parseAutoFitDefs(raw string, contentW, gap float64, eng *engine, kidCount int) []gridTrackDef {
+	lower := strings.ToLower(strings.TrimSpace(raw))
+
+	idx := strings.Index(lower, "repeat(")
+	if idx < 0 {
+		return nil
+	}
+
+	end := -1
+	depth := 0
+
+	for scanIdx := idx; scanIdx < len(raw); scanIdx++ {
+		if raw[scanIdx] == '(' {
+			depth++
+		} else if raw[scanIdx] == ')' {
+			depth--
+			if depth == 0 {
+				end = scanIdx
+
+				break
+			}
+		}
+	}
+
+	if end < 0 {
+		return nil
+	}
+
+	inner := raw[idx+len("repeat(") : end]
+	parts := splitTopLevelComma(inner)
+
+	if len(parts) != 2 {
+		return nil
+	}
+
+	first := strings.TrimSpace(strings.ToLower(parts[0]))
+	if first != "auto-fit" && first != "auto-fill" {
+		return nil
+	}
+
+	trackStr := strings.TrimSpace(parts[1])
+	def := parseOneTrackDef(trackStr)
+
+	minW := 200.0
+
+	switch {
+	case def.min.kind == trackFixed && def.min.val >= 0:
+		minW = eng.scalePt(def.min.val)
+	case def.min.kind == trackFixed && def.min.val < 0:
+		pct := -def.min.val
+		minW = contentW * pct / 100.0
+	}
+
+	if minW <= 0 {
+		minW = 200.0
+	}
+
+	cols := 1
+	if contentW > 0 && minW+gap > 0 {
+		cols = int((contentW + gap) / (minW + gap))
+		if cols < 1 {
+			cols = 1
+		}
+
+		if kidCount > 0 && cols > kidCount {
+			cols = kidCount
+		}
+
+		if cols > 12 {
+			cols = 12
+		}
+	}
+
+	out := make([]gridTrackDef, cols)
+	for i := range out {
+		out[i] = def
+	}
+
+	return out
 }
 
 // collectGridKids returns the element children that participate in grid
@@ -483,7 +637,7 @@ func gridAlignOffset(value string, cell, item float64) float64 {
 		}
 	case fxCenter:
 		if cell > item {
-			return (cell - item) / 2
+			return (cell - item) / two
 		}
 	}
 
