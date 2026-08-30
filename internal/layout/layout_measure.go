@@ -130,17 +130,6 @@ type cellMeasure struct {
 	longestWord    float64
 	lineOnlyNowrap bool
 	lineHasInk     bool
-	// spaceW is the memoized width of one ASCII space for the last measured
-	// style identity, so a cell with many text nodes does not re-measure " "
-	// per node.
-	spaceSet      bool
-	spaceFamHash  uint64
-	spaceWeight   int
-	spaceItalic   bool
-	spaceFontSize float64
-	spaceLSpacing float64
-	spaceWSpacing float64
-	spaceW        float64
 }
 
 // flushLine folds the current line into maxW and resets the line state.
@@ -165,37 +154,6 @@ func (m *cellMeasure) flushLine() {
 	m.lineW = 0
 	m.lineOnlyNowrap = true
 	m.lineHasInk = false
-}
-
-// spaceWidth returns the measured width of one ASCII space for sty. The
-// advance depends only on the style's family hash, weight/italic face
-// variant, font size and letter-spacing, so the result is cached per style
-// identity and reused across text nodes in one cell.
-func (m *cellMeasure) spaceWidth(sty *ResolvedStyle) float64 {
-	if sty == nil {
-		return 0
-	}
-
-	if m.spaceSet &&
-		m.spaceFamHash == sty.famHash &&
-		m.spaceWeight == sty.FontWeight &&
-		m.spaceItalic == sty.FontItalic &&
-		m.spaceFontSize == sty.FontSize &&
-		m.spaceLSpacing == sty.LetterSpacing &&
-		m.spaceWSpacing == sty.WordSpacing {
-		return m.spaceW
-	}
-
-	m.spaceW = m.engine.measureTextFace(" ", sty)
-	m.spaceSet = true
-	m.spaceFamHash = sty.famHash
-	m.spaceWeight = sty.FontWeight
-	m.spaceItalic = sty.FontItalic
-	m.spaceFontSize = sty.FontSize
-	m.spaceLSpacing = sty.LetterSpacing
-	m.spaceWSpacing = sty.WordSpacing
-
-	return m.spaceW
 }
 
 // walk measures one node's contribution to the current line.
@@ -238,7 +196,7 @@ func (m *cellMeasure) measureText(text string, cstate *ResolvedStyle, nowrap boo
 		chromeW := inlineMeasurementChromeWidth(eng, *cstate)
 		m.lineW += chromeW
 
-		spaceW := m.spaceWidth(cstate)
+		spaceW := m.engine.measureTextFace(" ", cstate)
 
 		// Leading space if original had leading WS and line already started.
 		if m.lineW > 0 && len(text) > 0 && isHTMLSpace(text[0]) {

@@ -174,33 +174,31 @@ func appendOpFragments(dst []Op, paintOp Op, contentH float64) []Op {
 	return dst
 }
 
-func openLeftStrokeFragment(paintOp Op, isFirst, isLast bool) Op {
-	if !isFirst {
-		paintOp.RadiusTopLeft = 0
-	}
+func openSideStrokeFragment(paintOp Op, isFirst, isLast, isLeft bool) Op {
+	if isLeft {
+		if !isFirst {
+			paintOp.RadiusTopLeft = 0
+		}
 
-	if !isLast {
-		paintOp.RadiusBottomLeft = 0
-	}
+		if !isLast {
+			paintOp.RadiusBottomLeft = 0
+		}
 
-	if paintOp.RadiusTopLeft == 0 && paintOp.RadiusBottomLeft == 0 {
-		paintOp.Radius = 0
-	}
+		if paintOp.RadiusTopLeft == 0 && paintOp.RadiusBottomLeft == 0 {
+			paintOp.Radius = 0
+		}
+	} else {
+		if !isFirst {
+			paintOp.RadiusTopRight = 0
+		}
 
-	return paintOp
-}
+		if !isLast {
+			paintOp.RadiusBottomRight = 0
+		}
 
-func openRightStrokeFragment(paintOp Op, isFirst, isLast bool) Op {
-	if !isFirst {
-		paintOp.RadiusTopRight = 0
-	}
-
-	if !isLast {
-		paintOp.RadiusBottomRight = 0
-	}
-
-	if paintOp.RadiusTopRight == 0 && paintOp.RadiusBottomRight == 0 {
-		paintOp.Radius = 0
+		if paintOp.RadiusTopRight == 0 && paintOp.RadiusBottomRight == 0 {
+			paintOp.Radius = 0
+		}
 	}
 
 	return paintOp
@@ -234,9 +232,9 @@ func openStrokeFragment(paintOp Op, isFirst, isLast bool) Op {
 	case StrokeMaskTop:
 		return paintOp
 	case StrokeMaskLeft:
-		return openLeftStrokeFragment(paintOp, isFirst, isLast)
+		return openSideStrokeFragment(paintOp, isFirst, isLast, true)
 	case StrokeMaskRight:
-		return openRightStrokeFragment(paintOp, isFirst, isLast)
+		return openSideStrokeFragment(paintOp, isFirst, isLast, false)
 	case 0:
 		return openFullFrameStrokeFragment(paintOp, isFirst, isLast)
 	default:

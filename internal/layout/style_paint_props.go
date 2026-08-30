@@ -115,50 +115,11 @@ func applyOutlineLonghands(style *ResolvedStyle, prop, value string, fsize float
 	return true
 }
 
-//nolint:cyclop,mnd,wsl // box shadow longhand dispatch
 func applyBoxShadowProp(style *ResolvedStyle, prop, value string, fsize float64) bool {
-	switch prop {
-	case boxShadowProp:
-		applyBoxShadowValue(style, value, fsize)
-	case "box-shadow-color":
-		if c, ok := parseUsedColor(value, style.Color); ok {
-			style.BoxShadowColor = c
-			style.BoxShadowSet = true
-		}
-	case "box-shadow-offset":
-		parts := strings.Fields(strings.TrimSpace(value))
-		if len(parts) >= 2 {
-			if x, ok := plainLength(parts[0], fsize, 0); ok {
-				style.BoxShadowX = x
-			}
-			if y, ok := plainLength(parts[1], fsize, 0); ok {
-				style.BoxShadowY = y
-			}
-			style.BoxShadowSet = true
-		}
-	case "box-shadow-blur":
-		if b, ok := plainLength(value, fsize, 0); ok && b >= 0 {
-			style.BoxShadowBlur = b
-			style.BoxShadowSet = true
-		}
-	case "box-shadow-spread":
-		if s, ok := plainLength(value, fsize, 0); ok {
-			style.BoxShadowSpread = s
-			style.BoxShadowSet = true
-		}
-	case "box-shadow-position":
-		val := strings.ToLower(strings.TrimSpace(value))
-		if val == "inset" {
-			style.BoxShadowInset = true
-			style.BoxShadowSet = true
-		} else if val == "outset" {
-			style.BoxShadowInset = false
-			style.BoxShadowSet = true
-		}
-	default:
+	if prop != boxShadowProp {
 		return false
 	}
-
+	applyBoxShadowValue(style, value, fsize)
 	return true
 }
 

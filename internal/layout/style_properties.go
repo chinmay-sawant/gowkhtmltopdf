@@ -1245,7 +1245,7 @@ func applyBorderGroup(
 		"border-inline-width", "border-inline-start-width", "border-inline-end-width",
 		"border-inline-style", "border-inline-start-style", "border-inline-end-style",
 		"border-inline-color", "border-inline-start-color", "border-inline-end-color":
-		return applyLogicalBorder(style, prop, value, fsize)
+		return false // logical border expanded in cascade (style_cascade.go:expandLogicalBorder)
 	case "border-image", "border-image-source", "border-image-slice",
 		"border-image-width", "border-image-outset", "border-image-repeat":
 		return applyBorderImageProps(style, prop, value)

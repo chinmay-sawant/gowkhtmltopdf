@@ -2,20 +2,17 @@ package layout
 
 import (
 	"strings"
-	"sync"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
-	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
 )
 
 const (
 	unitCh    = "ch"
-	digitZero = '0' // U+0030 DIGIT ZERO; CSS ch is this glyph's advance
+	digitZero = '0' // kept for style_ch_test.go; ch layout now uses 0.5em
 )
 
-// lengthToPt converts a CSS length to points. ch uses the default Liberation
-// face's U+0030 advance at fsize; other units go through css.LengthToPt
-// (ex stays 0.5em). Falls back to 0.5em when the face or advance is missing.
+// lengthToPt converts a CSS length to points. ch is 0.5em (same fallback
+// already in css.LengthToPt); other units go through css.LengthToPt.
 func lengthToPt(val float64, unit string, fsize float64) (float64, bool) {
 	if strings.EqualFold(unit, unitCh) {
 		if pt, ok := chLengthPt(val, fsize); ok {
@@ -27,33 +24,5 @@ func lengthToPt(val float64, unit string, fsize float64) (float64, bool) {
 }
 
 func chLengthPt(val, fsize float64) (float64, bool) {
-	face := defaultChFace()
-	if face == nil {
-		return 0, false
-	}
-
-	adv := face.GlyphAdvancePoints(digitZero, fsize)
-	if adv <= 0 {
-		return 0, false
-	}
-
-	return val * adv, true
-}
-
-var (
-	chFaceOnce sync.Once //nolint:gochecknoglobals // one immutable default-face cache
-	chFace     *pdf.Font //nolint:gochecknoglobals // one immutable default-face cache
-)
-
-func defaultChFace() *pdf.Font {
-	chFaceOnce.Do(func() {
-		faces, err := pdf.LoadDefaultFaces()
-		if err != nil || faces == nil {
-			return
-		}
-
-		chFace = faces.Regular
-	})
-
-	return chFace
+	return val * fsize * 0.5, true
 }

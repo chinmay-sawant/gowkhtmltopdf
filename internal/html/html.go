@@ -360,34 +360,33 @@ func findImplicit(top *Node, name string) *Node {
 	return nil
 }
 
-// autoClose lists, per start tag, the open elements that the tag closes.
-var autoClose = map[string][]string{ //nolint:gochecknoglobals // immutable auto-close vocabulary
-	"li":     {"li"},
-	"p":      {"p"},
-	"tr":     {"tr", "td", "th"},
-	"td":     {"td", "th"},
-	"th":     {"td", "th"},
-	"option": {"option"},
-	"dd":     {"dd", "dt"},
-	"dt":     {"dd", "dt"},
-	"thead":  {"thead", "tbody", "tfoot"},
-	"tbody":  {"thead", "tbody", "tfoot"},
-	"tfoot":  {"thead", "tbody", "tfoot"},
-	"head":   {"body", "head"},
-	"body":   {"head", "body"},
-	"html":   {"html", "head", "body"},
-}
-
 // shouldAutoClose reports whether a start tag next closes the open element
 // open.
 func shouldAutoClose(open, next string) bool {
-	for _, n := range autoClose[next] {
-		if n == open {
-			return true
-		}
+	switch next {
+	case "li":
+		return open == "li"
+	case "p":
+		return open == "p"
+	case "tr":
+		return open == "tr" || open == "td" || open == "th"
+	case "td", "th":
+		return open == "td" || open == "th"
+	case "option":
+		return open == "option"
+	case "dd", "dt":
+		return open == "dd" || open == "dt"
+	case "thead", "tbody", "tfoot":
+		return open == "thead" || open == "tbody" || open == "tfoot"
+	case "head":
+		return open == "body" || open == "head"
+	case "body":
+		return open == "head" || open == "body"
+	case "html":
+		return open == "html" || open == "head" || open == "body"
+	default:
+		return false
 	}
-
-	return false
 }
 
 // tokenKind discriminates token types.

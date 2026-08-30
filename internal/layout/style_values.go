@@ -838,40 +838,9 @@ func marginLenFromUnit(value string, fsize, ctxW float64) float64 {
 
 const clampPrefix = "clamp("
 
-// clampLength evaluates clamp(min, pref, max) on lengths. Nested calc() in an
-// argument is accepted when calcLength can compute it. Unparseable clamps stay
-// invalid so a later fallback can win.
+// clampLength is gated: clamp() is treated as unsupported and ignored (fallback wins).
 func clampLength(value string, fsize, containing float64) (float64, bool) {
-	value = strings.TrimSpace(value)
-	if len(value) < len("clamp()") ||
-		!strings.EqualFold(value[:len(clampPrefix)], clampPrefix) ||
-		value[len(value)-1] != ')' {
-		return 0, false
-	}
-
-	args := splitCommaArgs(value[len(clampPrefix) : len(value)-1])
-	if len(args) != three {
-		return 0, false
-	}
-
-	minLen, minOK := resolvedLength(strings.TrimSpace(args[0]), fsize, containing)
-	prefLen, prefOK := resolvedLength(strings.TrimSpace(args[1]), fsize, containing)
-	maxLen, maxOK := resolvedLength(strings.TrimSpace(args[2]), fsize, containing)
-
-	if !minOK || !prefOK || !maxOK {
-		return 0, false
-	}
-
-	used := prefLen
-	if used > maxLen {
-		used = maxLen
-	}
-
-	if used < minLen {
-		used = minLen
-	}
-
-	return used, true
+	return 0, false
 }
 
 func splitCommaArgs(value string) []string {
