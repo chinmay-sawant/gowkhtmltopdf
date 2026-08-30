@@ -1152,6 +1152,7 @@ func drawText(
 	// Stroking CJK/Type0 outlines creates horizontal streak artifacts.
 	fakeBold := FakeBoldFor(paintOp)
 	if fakeBold {
+		chld.SetStrokeColor(paintOp.R, paintOp.G, paintOp.B)
 		chld.SetLineWidth(paintOp.Size * 0.06)
 		chld.TextRenderMode(2) // fill + stroke
 	}

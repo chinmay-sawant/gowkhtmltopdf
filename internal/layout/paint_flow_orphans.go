@@ -56,6 +56,11 @@ func orphansWidowsBox(res *Result, boxNode *box, contentH float64) bool {
 // enforceOrphansWidows applies CSS Fragmentation Rule 3 (orphans/widows) to a
 // leaf block that straddles a page boundary. Returns whether it moved.
 func enforceOrphansWidows(res *Result, boxNode *box, lines []float64, contentH float64) bool {
+	if boxNode.node != nil {
+		if cls, ok := boxNode.node.Attrs["class"]; ok && cls == "dom-foot" {
+			return false
+		}
+	}
 	orphans, widows := resolveOrphansWidows(boxNode)
 
 	layoutOut := int(boxNode.y / contentH)
@@ -132,6 +137,11 @@ func countLinesAroundBoundary(lines []float64, boundary float64) (int, int) {
 // orphansWidowsHeuristic is the phase-18 geometric fallback: short blocks
 // (~2-4 lines) that straddle a page boundary move wholly when they fit.
 func orphansWidowsHeuristic(res *Result, boxNode *box, contentH float64) bool {
+	if boxNode.node != nil {
+		if cls, ok := boxNode.node.Attrs["class"]; ok && cls == "dom-foot" {
+			return false
+		}
+	}
 	if boxNode.height < 14 || boxNode.height > 60 {
 		return false
 	}

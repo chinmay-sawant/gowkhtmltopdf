@@ -416,10 +416,9 @@ var fixturePageBounds = map[string]fixtureBounds{ //nolint:gochecknoglobals // i
 		minPages: 1, maxPages: 12, needles: []string{"Architecture"},
 	},
 	"fixture-56-architecture-diagram.html": { //nolint:exhaustruct // intentional zero-value fields
-		// clamp() and logical margin/padding now apply, so type scale and
-		// inline spacing no longer use the old fallback-first drop. Explicit
-		// section page breaks still dominate; page count is 21.
-		minPages: 21, maxPages: 21,
+		// gap and logical margin/padding now apply, but dom-foot orphans are
+		// excluded so the footer stays with its section; page count is 20.
+		minPages: 20, maxPages: 20,
 	},
 	"fixture-57-vanguard-telemetry-audit.html": { //nolint:exhaustruct // intentional zero-value fields
 		minPages: 9, maxPages: 9,
