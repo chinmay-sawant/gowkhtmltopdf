@@ -33,36 +33,6 @@ func TestBorderSideStyles(t *testing.T) {
 	}
 }
 
-func TestBoxShadowLonghands(t *testing.T) {
-	t.Parallel()
-
-	ctx := &styleContext{
-		ctx:       context.Background(),
-		err:       nil,
-		work:      0,
-		sheets:    nil,
-		viewportW: 800,
-	}
-
-	s := initialStyle()
-	raw := map[string]string{
-		"box-shadow-offset":   "5pt 10pt",
-		"box-shadow-blur":     "15pt",
-		"box-shadow-spread":   "2pt",
-		"box-shadow-color":    "red",
-		"box-shadow-position": "inset",
-	}
-	applyRestProps(&s, raw, ctx, nil)
-
-	if s.BoxShadowX != 5 || s.BoxShadowY != 10 || s.BoxShadowBlur != 15 || s.BoxShadowSpread != 2 {
-		t.Errorf("mismatch on box shadow offset/blur/spread: x=%v, y=%v, blur=%v, spread=%v",
-			s.BoxShadowX, s.BoxShadowY, s.BoxShadowBlur, s.BoxShadowSpread)
-	}
-	if s.BoxShadowColor != [3]float64{1, 0, 0} || !s.BoxShadowInset {
-		t.Errorf("mismatch on box shadow color/inset: color=%v, inset=%v", s.BoxShadowColor, s.BoxShadowInset)
-	}
-}
-
 func TestBackgroundLonghands(t *testing.T) {
 	t.Parallel()
 

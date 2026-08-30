@@ -167,12 +167,9 @@ func applyAdvancedProps(style *ResolvedStyle, prop, value string, fsize float64)
 	case "overflow-clip-margin-left":
 		style.OverflowClipMarginLeft = parseAdvancedLength(val, fsize)
 		return true
-	case "overflow-clip-margin-inline", "overflow-clip-margin-inline-start", "overflow-clip-margin-inline-end":
-		style.OverflowClipMargin = parseAdvancedLength(val, fsize)
-		return true
-	case "overflow-clip-margin-block", "overflow-clip-margin-block-start", "overflow-clip-margin-block-end":
-		style.OverflowClipMargin = parseAdvancedLength(val, fsize)
-		return true
+	case "overflow-clip-margin-inline", "overflow-clip-margin-inline-start", "overflow-clip-margin-inline-end",
+		"overflow-clip-margin-block", "overflow-clip-margin-block-start", "overflow-clip-margin-block-end":
+		return false
 	}
 
 	return false
