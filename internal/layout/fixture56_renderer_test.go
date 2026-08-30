@@ -240,6 +240,23 @@ func fixture56PaintOptions() PaintOptions {
 	}
 }
 
+func fixture56Result(t *testing.T, zoom float64) (*html.Node, *Result) {
+	t.Helper()
+	root, sheet := loadFixture56(t)
+	const contentHeight = 841.89 - 2*28.35
+	res, err := Layout(root, Options{ //nolint:exhaustruct // fixture uses the standard print layout path
+		Width: 595.28 - 2*28.35, Height: contentHeight,
+		Background: true, Sheets: []*css.Stylesheet{sheet}, Media: "print", Zoom: zoom,
+	})
+	if err != nil {
+		t.Fatalf("fixture56 layout: %v", err)
+	}
+	if err := Paint(pdf.NewDocument(), res, fixture56PaintOptions()); err != nil {
+		t.Fatalf("fixture56 paint: %v", err)
+	}
+	return root, res
+}
+
 //nolint:gocognit,gocyclo,cyclop,funlen // fixture seam assertions intentionally remain together
 func TestFixture56RendererSeams(t *testing.T) { //nolint:maintidx,paralleltest // fixture seam assertions intentionally remain together
 	root, sheet := loadFixture56(t)
@@ -563,18 +580,7 @@ func TestFixture56PageBackgroundDoesNotUseHeroFill(t *testing.T) { //nolint:para
 }
 
 func TestFixture56D02PageStartHasWhiteSectionBackground(t *testing.T) { //nolint:paralleltest,cyclop // renderer fixture uses shared font state
-	root, sheet := loadFixture56(t)
-	contentHeight := 841.89 - 2*28.35
-	res, err := Layout(root, Options{ //nolint:exhaustruct // fixture uses the standard print layout path
-		Width: 595.28 - 2*28.35, Height: contentHeight,
-		Background: true, Sheets: []*css.Stylesheet{sheet}, Media: "print", Zoom: 0.98,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := Paint(pdf.NewDocument(), res, fixture56PaintOptions()); err != nil {
-		t.Fatal(err)
-	}
+	root, res := fixture56Result(t, 0.98)
 
 	d02 := fixture56Node(root, func(node *html.Node) bool { return node.Attribute("id") == "domain-02" })
 	d02Box := fixture56BoxByNode(res.root, d02)
@@ -593,18 +599,7 @@ func TestFixture56D02PageStartHasWhiteSectionBackground(t *testing.T) { //nolint
 
 //nolint:cyclop,paralleltest // renderer fixture assertions intentionally stay together
 func TestFixture56D02VerticalTabBaselineMatchesBoxTop(t *testing.T) {
-	root, sheet := loadFixture56(t)
-	contentHeight := 841.89 - 2*28.35
-	res, err := Layout(root, Options{ //nolint:exhaustruct // fixture uses the standard print layout path
-		Width: 595.28 - 2*28.35, Height: contentHeight,
-		Background: true, Sheets: []*css.Stylesheet{sheet}, Media: "print", Zoom: 0.98,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := Paint(pdf.NewDocument(), res, fixture56PaintOptions()); err != nil {
-		t.Fatal(err)
-	}
+	root, res := fixture56Result(t, 0.98)
 
 	tab := fixture56Node(root, func(node *html.Node) bool { return fixture56Class(node) == "d02-tab" })
 	tabBox := fixture56BoxByNode(res.root, tab)
@@ -695,18 +690,7 @@ func TestFixture56DoesNotRepeatAncestorSideRails(t *testing.T) { //nolint:parall
 }
 
 func TestFixture56SectionRailsFlushWithFrame(t *testing.T) { //nolint:cyclop,paralleltest // fixture seam assertions intentionally remain together
-	root, sheet := loadFixture56(t)
-	contentHeight := 841.89 - 2*28.35
-	res, err := Layout(root, Options{ //nolint:exhaustruct // fixture uses the standard print layout path
-		Width: 595.28 - 2*28.35, Height: contentHeight,
-		Background: true, Sheets: []*css.Stylesheet{sheet}, Media: "print", Zoom: 0.98,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := Paint(pdf.NewDocument(), res, fixture56PaintOptions()); err != nil {
-		t.Fatal(err)
-	}
+	root, res := fixture56Result(t, 0.98)
 
 	for _, id := range []string{"dependency-dag", "divergence", "security"} {
 		node := fixture56Node(root, func(node *html.Node) bool { return node.Attribute("id") == id })

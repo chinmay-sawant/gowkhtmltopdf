@@ -162,28 +162,7 @@ func findMatchingParen(s string, openIdx int) int {
 }
 
 func splitTopLevelComma(cssSheet string) []string {
-	var parts []string
-
-	depth := 0
-	start := 0
-
-	for idx := range len(cssSheet) {
-		switch cssSheet[idx] {
-		case '(':
-			depth++
-		case ')':
-			depth--
-		case ',':
-			if depth == 0 {
-				parts = append(parts, cssSheet[start:idx])
-				start = idx + 1
-			}
-		}
-	}
-
-	parts = append(parts, cssSheet[start:])
-
-	return parts
+	return splitParenArgs(cssSheet, ',')
 }
 
 // isTrackWhitespace reports CSS whitespace between grid track tokens.

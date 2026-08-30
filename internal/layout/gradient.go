@@ -282,29 +282,7 @@ func parseGradientPosComponent(tok string) float64 {
 }
 
 func splitFunctionArgs(args string) []string {
-	var parts []string
-	depth := 0
-	start := 0
-	for i := 0; i < len(args); i++ {
-		ch := args[i]
-		switch ch {
-		case '(':
-			depth++
-		case ')':
-			if depth > 0 {
-				depth--
-			}
-		case ',':
-			if depth == 0 {
-				parts = append(parts, strings.TrimSpace(args[start:i]))
-				start = i + 1
-			}
-		}
-	}
-	if start < len(args) {
-		parts = append(parts, strings.TrimSpace(args[start:]))
-	}
-	return parts
+	return splitParenArgs(args, ',')
 }
 
 func sampleStops(stops []gradientStop, t float64) (r, g, b, a float64) {

@@ -11,7 +11,6 @@ import (
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/app"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/cli"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/convert"
-	"github.com/chinmay-sawant/gowkhtmltopdf/internal/errs"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/load"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
@@ -79,13 +78,16 @@ func TestRunPDFValidatesBeforeOpeningOutput(t *testing.T) {
 func TestNilCommandUsesCanonicalSentinel(t *testing.T) {
 	t.Parallel()
 
-	if _, err := app.BuildPDFRequest(nil, nil, nil); !errors.Is(err, errs.ErrNilCommand) {
-		t.Fatalf("BuildPDFRequest(nil) = %v, want errors.Is(..., %v)", err, errs.ErrNilCommand)
+	if _, err := app.BuildPDFRequest(nil, nil, nil); !errors.Is(err, app.ErrNilCommand) {
+		t.Fatalf("BuildPDFRequest(nil) = %v, want errors.Is(..., %v)", err, app.ErrNilCommand)
 	}
 
-	if err := app.RunPDF(t.Context(), nil, nil, nil, nil); !errors.Is(err, errs.ErrNilCommand) {
-		t.Fatalf("RunPDF(nil command) = %v, want errors.Is(..., %v)", err, errs.ErrNilCommand)
+	if err := app.RunPDF(t.Context(), nil, nil, nil, nil); !errors.Is(err, app.ErrNilCommand) {
+		t.Fatalf("RunPDF(nil command) = %v, want errors.Is(..., %v)", err, app.ErrNilCommand)
 	}
+	// Parked: errs.ErrNilCommand is now a distinct instance from app.ErrNilCommand
+	// (duplicate errors.New). Full hub deletion requires migrating all consumers to
+	// app.ErrNilCommand so errors.Is stays coherent.
 }
 
 //nolint:wsl // assertions intentionally follow the side-effect checks.

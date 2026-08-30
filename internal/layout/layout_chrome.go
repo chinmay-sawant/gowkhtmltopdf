@@ -45,16 +45,16 @@ func appendDashedLineSegments(
 		length = boxH
 	}
 
-	drawLen, gap := width*three, width*two
+	drawLen, gap := width*3, width*2 // three=3, two=2 inlined; remaining two/three usages parked
 	if dotted {
 		drawLen, gap = width, width*dashGapMul
 	}
 
-	if drawLen < halfRatio {
+	if drawLen < 0.5 { // halfRatio 0.5 inlined
 		drawLen = 0.5
 	}
 
-	if gap < halfRatio {
+	if gap < 0.5 { // halfRatio 0.5 inlined
 		gap = 0.5
 	}
 

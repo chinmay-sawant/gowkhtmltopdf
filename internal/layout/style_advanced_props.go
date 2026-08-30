@@ -17,38 +17,6 @@ func applyAdvancedProps(style *ResolvedStyle, prop, value string, fsize float64)
 	}
 
 	switch prop {
-	// Wave A: Paged Media & Bookmarks
-	case "bookmark-level":
-		if val == "none" {
-			style.BookmarkLevel = 0
-			return true
-		}
-		if n, err := strconv.Atoi(val); err == nil && n >= 0 {
-			style.BookmarkLevel = n
-			return true
-		}
-	case "bookmark-label":
-		style.BookmarkLabel = strings.Trim(value, "'\"")
-		return true
-	case "bookmark-state":
-		if val == "open" || val == "closed" {
-			style.BookmarkState = val
-			return true
-		}
-	case "footnote-display":
-		if val == "block" || val == "inline" || val == "compact" {
-			style.FootnoteDisplay = val
-			return true
-		}
-	case "footnote-policy":
-		if val == "auto" || val == "line" || val == "block" {
-			style.FootnotePolicy = val
-			return true
-		}
-	case "string-set":
-		style.StringSet = value
-		return true
-
 	// Wave B: Text Truncation, Clamping, Margins
 	case "text-overflow":
 		if val == "clip" || val == "ellipsis" {
@@ -156,17 +124,6 @@ func applyAdvancedProps(style *ResolvedStyle, prop, value string, fsize float64)
 	case "font-palette":
 		style.FontPalette = val
 		return true
-	case "mix-blend-mode":
-		style.MixBlendMode = val
-		return true
-	case "background-blend-mode":
-		style.BackgroundBlendMode = val
-		return true
-	case "isolation":
-		if val == "auto" || val == "isolate" {
-			style.Isolation = val
-			return true
-		}
 	case "text-combine-upright", "-webkit-text-combine":
 		style.TextCombineUpright = val
 		return true
@@ -177,24 +134,6 @@ func applyAdvancedProps(style *ResolvedStyle, prop, value string, fsize float64)
 		}
 	case "unicode-bidi":
 		style.UnicodeBidi = val
-		return true
-	case "text-emphasis":
-		style.TextEmphasis = value
-		return true
-	case "text-emphasis-color":
-		if col, ok := parseAdvancedColor(val); ok {
-			style.TextEmphasisColor = col
-			style.TextEmphasisColorSet = true
-			return true
-		}
-	case "text-emphasis-position":
-		style.TextEmphasisPosition = val
-		return true
-	case "text-emphasis-style":
-		style.TextEmphasisStyle = value
-		return true
-	case "text-emphasis-skip":
-		style.TextEmphasisSkip = val
 		return true
 	case "text-decoration-skip":
 		style.TextDecorationSkip = val

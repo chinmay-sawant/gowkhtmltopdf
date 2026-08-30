@@ -448,47 +448,9 @@ func backgroundImageSrc(layer string) string {
 }
 
 // splitCommaLayers splits raw by top-level commas, not splitting commas inside
-// quotes or parentheses.
+// quotes or parentheses. Delegates to splitParenArgs helper.
 func splitCommaLayers(raw string) []string {
-	var layers []string
-	depth := 0
-	inQuote := byte(0)
-	start := 0
-
-	for idx := 0; idx < len(raw); idx++ {
-		char := raw[idx]
-		if inQuote != 0 {
-			if char == inQuote {
-				inQuote = 0
-			}
-			continue
-		}
-
-		switch char {
-		case '"', '\'':
-			inQuote = char
-		case '(':
-			depth++
-		case ')':
-			if depth > 0 {
-				depth--
-			}
-		case ',':
-			if depth == 0 {
-				layers = append(layers, strings.TrimSpace(raw[start:idx]))
-				start = idx + 1
-			}
-		}
-	}
-
-	if start < len(raw) {
-		trimmed := strings.TrimSpace(raw[start:])
-		if trimmed != "" {
-			layers = append(layers, trimmed)
-		}
-	}
-
-	return layers
+	return splitParenArgs(raw, ',')
 }
 
 func urlFunctionTarget(layer string) string {

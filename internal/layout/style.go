@@ -199,24 +199,7 @@ type ResolvedStyle struct {
 	// when the property is absent so widgets can keep their default fill.
 	AccentColor            [3]float64
 	AccentColorSet         bool
-	FontFamily             []string
-	FontFeatureSettings    string
-	FontKerning            string
-	FontVariant            string
-	FontVariantCaps        string
-	FontVariantLigatures   string
-	FontVariantNumeric     string
-	FontVariantPosition    string
-	FontVariantEastAsian   string
-	FontVariantEmoji       string
-	FontVariantAlternates  string
-	FontStretch            string
-	FontSynthesis          string
-	FontSynthesisWeight    bool
-	FontSynthesisStyle     bool
-	FontSynthesisSmallCaps bool
-	FontSynthesisPosition  bool
-	FontSizeAdjust         float64
+	FontFamily []string
 	// famHash is the FNV-1a fingerprint of FontFamily, computed once during
 	// style resolution. Text measurement reuses
 	// it instead of re-hashing the family list per run.
@@ -339,36 +322,6 @@ type ResolvedStyle struct {
 	StrokeLineCap              string
 	StrokeLineJoin             string
 	StrokeMiterLimit           float64
-	FillRule                   string
-	ClipRule                   string
-	ColorInterpolation         string
-	ColorInterpolationFilters  string
-	ShapeRendering             string
-	TextAnchor                 string
-	DominantBaseline           string
-	AlignmentBaseline          string
-	ClipPath                   string
-	OverflowClipMargin         float64
-	ScrollMarginTop            float64
-	ScrollMarginRight          float64
-	ScrollMarginBottom         float64
-	ScrollMarginLeft           float64
-	TransformBox               string
-	TransformStyle             string
-	Perspective                float64
-	PerspectiveOrigin          [2]float64
-	BackfaceVisibility         string
-	RubyAlign                  string
-	RubyPosition               string
-	RubyMerge                  string
-	RubyOverhang               string
-	Page                       string
-	BookmarkLevel              int
-	BookmarkLabel              string
-	BookmarkState              string
-	FootnoteDisplay            string
-	FootnotePolicy             string
-	StringSet                  string
 	TextOverflow               string
 	LineClamp                  int
 	MaxLines                   int
@@ -391,20 +344,11 @@ type ResolvedStyle struct {
 	FontVariationSettings      string
 	FontOpticalSizing          string
 	FontLanguageOverride       string
-	FontPalette                string
-	MixBlendMode               string
-	BackgroundBlendMode        string
-	Isolation                  string
-	TextCombineUpright         string
-	TextOrientation            string
-	UnicodeBidi                string
-	TextEmphasis               string
-	TextEmphasisColor          [3]float64
-	TextEmphasisColorSet       bool
-	TextEmphasisPosition       string
-	TextEmphasisStyle          string
-	TextEmphasisSkip           string
-	TextDecorationSkip         string
+	FontPalette        string
+	TextCombineUpright string
+	TextOrientation    string
+	UnicodeBidi        string
+	TextDecorationSkip string
 	TextDecorationSkipInk      string
 	TextDecorationSkipBox      string
 	TextDecorationSkipSelf     string
@@ -493,13 +437,9 @@ func initialStyle() ResolvedStyle { //nolint:funlen // complete CSS initial-valu
 		TableLayout:            overflowAuto,
 		GridColumnSpan:         1,
 		GridRowSpan:            1,
-		WritingMode:            writingModeHorizontalTB,
-		Direction:              "ltr",
-		FontSynthesisWeight:    true,
-		FontSynthesisStyle:     true,
-		FontSynthesisSmallCaps: true,
-		FontSynthesisPosition:  true,
-		Orphans:                two,
+		WritingMode: writingModeHorizontalTB,
+		Direction:   "ltr",
+		Orphans:     two,
 		Widows:                 two,
 		Transform:              IdentityMatrix(),
 		TransformOrigin:        defaultTransformOrigin(),
@@ -781,30 +721,16 @@ func styleStoreKeyFor(style ResolvedStyle) styleStoreKey {
 	}
 }
 
-// intern returns a stable canonical pointer for styles without custom
-// properties. Custom-property maps are intentionally left unique until they
-// have a value-semantic representation; sharing them would expose mutability.
+// intern allocates a fresh canonical style without deduplication (PT-GO-16).
+// Previous implementation interned identical ResolvedStyle values via
+// styleStoreKey / comparableResolvedStyle / resolvedStylesEqual map buckets
+// to share canonical pointers. That saved allocations on repetitive templates
+// but added ~260 lines of projection and chunked-map logic. The store now
+// only owns stable backing storage via append; each candidate gets its own
+// allocation. The key/comparable types below are retained as dead code for
+// a follow-up deletion pass and do not affect correctness.
 func (s *styleStore) intern(candidate ResolvedStyle) *ResolvedStyle {
-	if candidate.CustomProps != nil {
-		return s.append(candidate)
-	}
-
-	key := styleStoreKeyFor(candidate)
-	for _, canonical := range s.interned[key] {
-		if resolvedStylesEqual(*canonical, candidate) {
-			return canonical
-		}
-	}
-
-	canonical := s.append(candidate)
-
-	if s.interned == nil {
-		s.interned = make(map[styleStoreKey][]*ResolvedStyle)
-	}
-
-	s.interned[key] = append(s.interned[key], canonical)
-
-	return canonical
+	return s.append(candidate)
 }
 
 func (s *styleStore) append(style ResolvedStyle) *ResolvedStyle {

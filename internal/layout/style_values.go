@@ -508,7 +508,7 @@ func setFontLineHeight(style *ResolvedStyle, page string, lineH float64) {
 
 func fontSize(value string, parent, remBase float64) float64 {
 	if remBase <= 0 {
-		remBase = pxToPt(cssPxRoot)
+		remBase = pxToPt(16) // cssPxRoot 16 inlined; remaining cssPxRoot usages parked
 	}
 
 	if pt, ok := fontSizeKeyword(value, parent); ok {

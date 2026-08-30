@@ -7,34 +7,9 @@ import (
 	"strings"
 )
 
-// applyLeftoversProps handles SVG presentation, visual overflow, transforms, page, and ruby properties.
+// applyLeftoversProps handles SVG presentation and individual transform properties.
 func applyLeftoversProps(style *ResolvedStyle, prop, value string, fsize float64) bool {
 	switch prop {
-	case "clip-path", "clip":
-		style.ClipPath = strings.TrimSpace(value)
-	case "overflow-clip-margin":
-		if m, ok := plainLength(value, fsize, 0); ok && m >= 0 {
-			style.OverflowClipMargin = m
-		}
-	case "scroll-margin":
-		applyScrollMarginShorthand(style, value, fsize)
-	case "scroll-margin-top":
-		if m, ok := plainLength(value, fsize, 0); ok {
-			style.ScrollMarginTop = m
-		}
-	case "scroll-margin-right":
-		if m, ok := plainLength(value, fsize, 0); ok {
-			style.ScrollMarginRight = m
-		}
-	case "scroll-margin-bottom":
-		if m, ok := plainLength(value, fsize, 0); ok {
-			style.ScrollMarginBottom = m
-		}
-	case "scroll-margin-left":
-		if m, ok := plainLength(value, fsize, 0); ok {
-			style.ScrollMarginLeft = m
-		}
-
 	case "stroke-dasharray":
 		applyStrokeDashArray(style, value, fsize)
 	case "stroke-dashoffset":
@@ -49,35 +24,6 @@ func applyLeftoversProps(style *ResolvedStyle, prop, value string, fsize float64
 		if n, err := strconv.ParseFloat(strings.TrimSpace(value), 64); err == nil && n >= 1 {
 			style.StrokeMiterLimit = n
 		}
-	case "fill-rule":
-		style.FillRule = strings.ToLower(strings.TrimSpace(value))
-	case "clip-rule":
-		style.ClipRule = strings.ToLower(strings.TrimSpace(value))
-	case "color-interpolation":
-		style.ColorInterpolation = strings.TrimSpace(value)
-	case "color-interpolation-filters":
-		style.ColorInterpolationFilters = strings.TrimSpace(value)
-	case "shape-rendering":
-		style.ShapeRendering = strings.TrimSpace(value)
-	case "text-anchor":
-		style.TextAnchor = strings.ToLower(strings.TrimSpace(value))
-	case "dominant-baseline":
-		style.DominantBaseline = strings.ToLower(strings.TrimSpace(value))
-	case "alignment-baseline":
-		style.AlignmentBaseline = strings.ToLower(strings.TrimSpace(value))
-
-	case "transform-box":
-		style.TransformBox = strings.ToLower(strings.TrimSpace(value))
-	case "transform-style":
-		style.TransformStyle = strings.ToLower(strings.TrimSpace(value))
-	case "perspective":
-		if p, ok := plainLength(value, fsize, 0); ok && p > 0 {
-			style.Perspective = p
-		}
-	case "perspective-origin":
-		applyPerspectiveOrigin(style, value, fsize)
-	case "backface-visibility":
-		style.BackfaceVisibility = strings.ToLower(strings.TrimSpace(value))
 	case "rotate":
 		applyRotateProperty(style, value)
 	case "scale":
@@ -85,49 +31,11 @@ func applyLeftoversProps(style *ResolvedStyle, prop, value string, fsize float64
 	case "translate":
 		applyTranslateProperty(style, value, fsize)
 
-	case "page":
-		style.Page = strings.TrimSpace(value)
-
-	case "ruby-align":
-		style.RubyAlign = strings.ToLower(strings.TrimSpace(value))
-	case "ruby-position":
-		style.RubyPosition = strings.ToLower(strings.TrimSpace(value))
-	case "ruby-merge":
-		style.RubyMerge = strings.ToLower(strings.TrimSpace(value))
-	case "ruby-overhang":
-		style.RubyOverhang = strings.ToLower(strings.TrimSpace(value))
-
 	default:
 		return false
 	}
 
 	return true
-}
-
-func applyScrollMarginShorthand(style *ResolvedStyle, value string, fsize float64) {
-	parts := strings.Fields(value)
-	if len(parts) == 0 {
-		return
-	}
-	var vals []float64
-	for _, p := range parts {
-		if m, ok := plainLength(p, fsize, 0); ok {
-			vals = append(vals, m)
-		}
-	}
-	switch len(vals) {
-	case 1:
-		style.ScrollMarginTop, style.ScrollMarginRight, style.ScrollMarginBottom, style.ScrollMarginLeft = vals[0], vals[0], vals[0], vals[0]
-	case 2:
-		style.ScrollMarginTop, style.ScrollMarginBottom = vals[0], vals[0]
-		style.ScrollMarginRight, style.ScrollMarginLeft = vals[1], vals[1]
-	case 3:
-		style.ScrollMarginTop = vals[0]
-		style.ScrollMarginRight, style.ScrollMarginLeft = vals[1], vals[1]
-		style.ScrollMarginBottom = vals[2]
-	case 4:
-		style.ScrollMarginTop, style.ScrollMarginRight, style.ScrollMarginBottom, style.ScrollMarginLeft = vals[0], vals[1], vals[2], vals[3]
-	}
 }
 
 func applyStrokeDashArray(style *ResolvedStyle, value string, fsize float64) {
@@ -142,18 +50,6 @@ func applyStrokeDashArray(style *ResolvedStyle, value string, fsize float64) {
 			style.StrokeDashArray = append(style.StrokeDashArray, length)
 		} else if n, err := strconv.ParseFloat(tok, 64); err == nil && n >= 0 {
 			style.StrokeDashArray = append(style.StrokeDashArray, n)
-		}
-	}
-}
-
-func applyPerspectiveOrigin(style *ResolvedStyle, value string, fsize float64) {
-	parts := strings.Fields(value)
-	if len(parts) >= 2 {
-		if x, ok := plainLength(parts[0], fsize, 0); ok {
-			style.PerspectiveOrigin[0] = x
-		}
-		if y, ok := plainLength(parts[1], fsize, 0); ok {
-			style.PerspectiveOrigin[1] = y
 		}
 	}
 }

@@ -140,41 +140,8 @@ var inheritableProps = []inheritCopy{ //nolint:gochecknoglobals // static inheri
 	}},
 	{[]string{"font-family"}, func(dst, src *ResolvedStyle) { dst.FontFamily = src.FontFamily }},
 	{[]string{"font-size"}, func(dst, src *ResolvedStyle) { dst.FontSize = src.FontSize }},
-	{[]string{"font-size-adjust"}, func(dst, src *ResolvedStyle) { dst.FontSizeAdjust = src.FontSizeAdjust }},
 	{[]string{"font-weight"}, func(dst, src *ResolvedStyle) { dst.FontWeight = src.FontWeight }},
 	{[]string{"font-style"}, func(dst, src *ResolvedStyle) { dst.FontItalic = src.FontItalic }},
-	{[]string{"font-feature-settings"}, func(dst, src *ResolvedStyle) {
-		dst.FontFeatureSettings = src.FontFeatureSettings
-	}},
-	{[]string{"font-kerning"}, func(dst, src *ResolvedStyle) { dst.FontKerning = src.FontKerning }},
-	{[]string{"font-variant"}, func(dst, src *ResolvedStyle) { dst.FontVariant = src.FontVariant }},
-	{[]string{"font-variant-caps"}, func(dst, src *ResolvedStyle) { dst.FontVariantCaps = src.FontVariantCaps }},
-	{[]string{"font-variant-ligatures"}, func(dst, src *ResolvedStyle) {
-		dst.FontVariantLigatures = src.FontVariantLigatures
-	}},
-	{[]string{"font-variant-numeric"}, func(dst, src *ResolvedStyle) { dst.FontVariantNumeric = src.FontVariantNumeric }},
-	{[]string{"font-variant-position"}, func(dst, src *ResolvedStyle) {
-		dst.FontVariantPosition = src.FontVariantPosition
-	}},
-	{[]string{"font-variant-east-asian"}, func(dst, src *ResolvedStyle) {
-		dst.FontVariantEastAsian = src.FontVariantEastAsian
-	}},
-	{[]string{"font-variant-emoji"}, func(dst, src *ResolvedStyle) { dst.FontVariantEmoji = src.FontVariantEmoji }},
-	{[]string{"font-variant-alternates"}, func(dst, src *ResolvedStyle) {
-		dst.FontVariantAlternates = src.FontVariantAlternates
-	}},
-	{[]string{"font-stretch", "font-width"}, func(dst, src *ResolvedStyle) { dst.FontStretch = src.FontStretch }},
-	{[]string{"font-synthesis"}, func(dst, src *ResolvedStyle) { dst.FontSynthesis = src.FontSynthesis }},
-	{[]string{"font-synthesis-weight"}, func(dst, src *ResolvedStyle) {
-		dst.FontSynthesisWeight = src.FontSynthesisWeight
-	}},
-	{[]string{"font-synthesis-style"}, func(dst, src *ResolvedStyle) { dst.FontSynthesisStyle = src.FontSynthesisStyle }},
-	{[]string{"font-synthesis-small-caps"}, func(dst, src *ResolvedStyle) {
-		dst.FontSynthesisSmallCaps = src.FontSynthesisSmallCaps
-	}},
-	{[]string{"font-synthesis-position"}, func(dst, src *ResolvedStyle) {
-		dst.FontSynthesisPosition = src.FontSynthesisPosition
-	}},
 	{[]string{"line-height"}, func(dst, src *ResolvedStyle) {
 		dst.LineHeight = src.LineHeight
 		dst.LineHeightUnitless = src.LineHeightUnitless
@@ -266,20 +233,6 @@ var inheritableProps = []inheritCopy{ //nolint:gochecknoglobals // static inheri
 	{[]string{"stroke-dasharray"}, func(dst, src *ResolvedStyle) { dst.StrokeDashArray = src.StrokeDashArray }},
 	{[]string{"stroke-dashoffset"}, func(dst, src *ResolvedStyle) { dst.StrokeDashOffset = src.StrokeDashOffset }},
 	{[]string{"stroke-miterlimit"}, func(dst, src *ResolvedStyle) { dst.StrokeMiterLimit = src.StrokeMiterLimit }},
-	{[]string{"fill-rule"}, func(dst, src *ResolvedStyle) { dst.FillRule = src.FillRule }},
-	{[]string{"clip-rule"}, func(dst, src *ResolvedStyle) { dst.ClipRule = src.ClipRule }},
-	{[]string{"color-interpolation"}, func(dst, src *ResolvedStyle) { dst.ColorInterpolation = src.ColorInterpolation }},
-	{[]string{"color-interpolation-filters"}, func(dst, src *ResolvedStyle) {
-		dst.ColorInterpolationFilters = src.ColorInterpolationFilters
-	}},
-	{[]string{"shape-rendering"}, func(dst, src *ResolvedStyle) { dst.ShapeRendering = src.ShapeRendering }},
-	{[]string{"text-anchor"}, func(dst, src *ResolvedStyle) { dst.TextAnchor = src.TextAnchor }},
-	{[]string{"dominant-baseline"}, func(dst, src *ResolvedStyle) { dst.DominantBaseline = src.DominantBaseline }},
-	{[]string{"alignment-baseline"}, func(dst, src *ResolvedStyle) { dst.AlignmentBaseline = src.AlignmentBaseline }},
-	{[]string{"ruby-align"}, func(dst, src *ResolvedStyle) { dst.RubyAlign = src.RubyAlign }},
-	{[]string{"ruby-position"}, func(dst, src *ResolvedStyle) { dst.RubyPosition = src.RubyPosition }},
-	{[]string{"ruby-merge"}, func(dst, src *ResolvedStyle) { dst.RubyMerge = src.RubyMerge }},
-	{[]string{"ruby-overhang"}, func(dst, src *ResolvedStyle) { dst.RubyOverhang = src.RubyOverhang }},
 	{[]string{"image-orientation"}, func(dst, src *ResolvedStyle) { dst.ImageOrientation = src.ImageOrientation }},
 	{[]string{"image-resolution"}, func(dst, src *ResolvedStyle) { dst.ImageResolution = src.ImageResolution }},
 	{[]string{"print-color-adjust", "color-adjust"}, func(dst, src *ResolvedStyle) {
@@ -306,25 +259,12 @@ var inheritableProps = []inheritCopy{ //nolint:gochecknoglobals // static inheri
 		dst.TextCombineUpright = src.TextCombineUpright
 	}},
 	{[]string{"text-orientation"}, func(dst, src *ResolvedStyle) { dst.TextOrientation = src.TextOrientation }},
-	{[]string{"text-emphasis"}, func(dst, src *ResolvedStyle) { dst.TextEmphasis = src.TextEmphasis }},
-	{[]string{"text-emphasis-color"}, func(dst, src *ResolvedStyle) {
-		dst.TextEmphasisColor = src.TextEmphasisColor
-		dst.TextEmphasisColorSet = src.TextEmphasisColorSet
-	}},
-	{[]string{"text-emphasis-position"}, func(dst, src *ResolvedStyle) {
-		dst.TextEmphasisPosition = src.TextEmphasisPosition
-	}},
-	{[]string{"text-emphasis-style"}, func(dst, src *ResolvedStyle) {
-		dst.TextEmphasisStyle = src.TextEmphasisStyle
-	}},
-	{[]string{"text-emphasis-skip"}, func(dst, src *ResolvedStyle) { dst.TextEmphasisSkip = src.TextEmphasisSkip }},
 	{[]string{"text-decoration-skip-ink"}, func(dst, src *ResolvedStyle) {
 		dst.TextDecorationSkipInk = src.TextDecorationSkipInk
 	}},
 	{[]string{"text-decoration-skip"}, func(dst, src *ResolvedStyle) {
 		dst.TextDecorationSkip = src.TextDecorationSkip
 	}},
-	{[]string{"footnote-policy"}, func(dst, src *ResolvedStyle) { dst.FootnotePolicy = src.FootnotePolicy }},
 }
 
 // inheritProps copies inheritable properties from the parent, unless the

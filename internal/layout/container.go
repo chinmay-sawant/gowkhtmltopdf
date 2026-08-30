@@ -110,6 +110,14 @@ func measureSizeContainersContext(
 // contentInlineSize returns the used content-box inline size (pt) for a block
 // given containing-block availW, mirroring buildBlock without laying out
 // children. Size-contained boxes use this definite width for @container.
+//
+// PT-GO-19 parked: contentInlineSize/contentBaseInlineSize intentionally
+// duplicate the width-resolution logic in layout.go:resolveBlockWidth /
+// resolveDefiniteWidth. Container measurement runs on unscaled style lengths
+// (pt as authored) for @container, while layout.go applies engine.scalePt
+// zoom scaling and resolves auto margins. Sharing a single helper would
+// either couple container measurement to engine state or silently drop
+// scaling, so the duplication is kept and documented here.
 func contentInlineSize(sty ResolvedStyle, availW float64) float64 {
 	width, definite := contentBaseInlineSize(sty, availW)
 	if definite && sty.BoxSizing != borderBox {

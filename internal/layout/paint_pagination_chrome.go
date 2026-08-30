@@ -246,9 +246,9 @@ func looksLikeDashSegmentLength(segLen, strokeWidth float64) bool {
 		return false
 	}
 
-	maxSeg := math.Max(strokeWidth*three, minDashPt) + halfRatio
+	maxSeg := math.Max(strokeWidth*3, minDashPt) + 0.5 // three=3, halfRatio=0.5 inlined
 	if strokeWidth <= 0 {
-		maxSeg = three + halfRatio
+		maxSeg = 3 + 0.5 // three=3, halfRatio=0.5 inlined
 	}
 
 	return segLen <= maxSeg

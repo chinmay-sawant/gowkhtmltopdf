@@ -1870,7 +1870,6 @@ func applyPageNameProp(style *ResolvedStyle, value string, parent *ResolvedStyle
 	}
 
 	style.PageName = low
-	style.Page = low
 
 	return true
 }

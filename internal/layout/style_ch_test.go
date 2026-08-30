@@ -19,7 +19,7 @@ func TestChUsesZeroGlyphAdvance(t *testing.T) {
 	fontSize := float64(defaultFontSizePt)
 	zeroAdv := faces.Regular.GlyphAdvancePoints(digitZero, fontSize)
 	want := 10 * zeroAdv
-	halfEm := 10 * halfRatio * fontSize
+	halfEm := 10 * 0.5 * fontSize // halfRatio 0.5 inlined; remaining halfRatio usages parked
 
 	cssSheet := sheet(t, `
 body { margin: 0; font-size: 12pt; }
