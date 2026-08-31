@@ -56,12 +56,76 @@ func applyTextPropsWave3(
 		style.TextUnderlinePosition = strings.ToLower(strings.TrimSpace(value))
 	case "text-shadow":
 		applyTextShadow(style, value, fsize)
+	case "text-emphasis":
+		setTextEmphasis(style, value)
+	case "text-emphasis-style":
+		setTextEmphasisStyle(style, value)
+	case "text-emphasis-color":
+		setTextEmphasisColor(style, value)
+	case "text-emphasis-position":
+		setTextEmphasisPosition(style, value)
+	case "text-emphasis-skip":
+		ensureEmphasisMap(style)
+		style.CustomProps["__emph_skip"] = strings.ToLower(strings.TrimSpace(value))
 
 	default:
 		return false
 	}
 
 	return true
+}
+
+func ensureEmphasisMap(style *ResolvedStyle) {
+	if style.CustomProps == nil {
+		style.CustomProps = make(map[string]string)
+	}
+}
+
+func setTextEmphasis(style *ResolvedStyle, value string) {
+	ensureEmphasisMap(style)
+	val := strings.TrimSpace(value)
+	low := strings.ToLower(val)
+	if low == "" || low == "none" {
+		style.CustomProps["__emph_style"] = "none"
+		return
+	}
+	parts := strings.Fields(val)
+	for _, tok := range parts {
+		if c, ok := parseUsedColor(tok, style.Color); ok {
+			style.CustomProps["__emph_color"] = tok
+			_ = c
+			continue
+		}
+		tl := strings.ToLower(tok)
+		if tl == "filled" || tl == "open" || tl == "dot" || tl == "circle" || tl == "double-circle" || tl == "triangle" || tl == "sesame" || tl == "wavy" || tl == "none" {
+			style.CustomProps["__emph_style"] = tl
+		} else if tl != "" {
+			style.CustomProps["__emph_style"] = tl
+		}
+	}
+	if style.CustomProps["__emph_style"] == "" {
+		style.CustomProps["__emph_style"] = "filled"
+	}
+}
+
+func setTextEmphasisStyle(style *ResolvedStyle, value string) {
+	ensureEmphasisMap(style)
+	style.CustomProps["__emph_style"] = strings.ToLower(strings.TrimSpace(value))
+}
+
+func setTextEmphasisColor(style *ResolvedStyle, value string) {
+	ensureEmphasisMap(style)
+	if c, ok := parseUsedColor(value, style.Color); ok {
+		_ = c
+		style.CustomProps["__emph_color"] = strings.TrimSpace(value)
+	} else {
+		style.CustomProps["__emph_color"] = strings.TrimSpace(value)
+	}
+}
+
+func setTextEmphasisPosition(style *ResolvedStyle, value string) {
+	ensureEmphasisMap(style)
+	style.CustomProps["__emph_position"] = strings.ToLower(strings.TrimSpace(value))
 }
 
 func setTextAlignLast(style *ResolvedStyle, value string) {

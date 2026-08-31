@@ -1453,9 +1453,19 @@ func applyColorBackgroundProps(style *ResolvedStyle, prop, value string) bool {
 	case "background-repeat":
 		style.BackgroundRepeat = strings.TrimSpace(value)
 	case "background-repeat-x", "background-repeat-inline":
-		style.BackgroundRepeat = "repeat-x"
+		bgRepeatX := strings.TrimSpace(value)
+		if bgRepeatX == "repeat" {
+			bgRepeatX = "repeat-x"
+		}
+
+		style.BackgroundRepeat = bgRepeatX
 	case "background-repeat-y", "background-repeat-block":
-		style.BackgroundRepeat = "repeat-y"
+		bgRepeatY := strings.TrimSpace(value)
+		if bgRepeatY == "repeat" {
+			bgRepeatY = "repeat-y"
+		}
+
+		style.BackgroundRepeat = bgRepeatY
 	case "background-clip":
 		style.BackgroundClip = strings.ToLower(strings.TrimSpace(value))
 	case "background-origin":
@@ -1929,8 +1939,17 @@ func applyTransformGroup(
 		if spec, ok := parseTransformOrigin(value, fsize); ok {
 			style.TransformOrigin = spec
 		}
+	case "rotate":
+		ApplyRotate(style, value)
+		return true
+	case "scale":
+		ApplyScale(style, value)
+		return true
+	case "translate":
+		ApplyTranslate(style, value, fsize)
+		return true
 	case "transform-box", "transform-style", "perspective", "perspective-origin",
-		"backface-visibility", "rotate", "scale", "translate":
+		"backface-visibility":
 		return applyLeftoversProps(style, prop, value, fsize)
 	default:
 		if applyAdvancedProps(style, prop, value, fsize) {

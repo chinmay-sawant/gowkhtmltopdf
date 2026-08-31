@@ -52,7 +52,26 @@ func (e *engine) paddingBoxRect(posX, posY, width, height float64, sty ResolvedS
 		h = 0
 	}
 
-	return clipRect{x: posX + left, y: posY + top, w: w, h: h}
+	rect := clipRect{x: posX + left, y: posY + top, w: w, h: h}
+
+	// Inflate for overflow-clip-margin (used by fixture-62 rows 27-37).
+	// Values are in points already via parseAdvancedLength.
+	if sty.OverflowClipMarginTop != 0 || sty.OverflowClipMarginRight != 0 ||
+		sty.OverflowClipMarginBottom != 0 || sty.OverflowClipMarginLeft != 0 {
+		rect.x -= sty.OverflowClipMarginLeft
+		rect.y -= sty.OverflowClipMarginTop
+		rect.w += sty.OverflowClipMarginLeft + sty.OverflowClipMarginRight
+		rect.h += sty.OverflowClipMarginTop + sty.OverflowClipMarginBottom
+		if rect.w < 0 {
+			rect.w = 0
+		}
+
+		if rect.h < 0 {
+			rect.h = 0
+		}
+	}
+
+	return rect
 }
 
 func (e *engine) paddingBoxOf(boxNode *box) clipRect {

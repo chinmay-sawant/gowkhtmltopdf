@@ -116,10 +116,22 @@ func applyOutlineLonghands(style *ResolvedStyle, prop, value string, fsize float
 }
 
 func applyBoxShadowProp(style *ResolvedStyle, prop, value string, fsize float64) bool {
-	if prop != boxShadowProp {
+	switch prop {
+	case boxShadowProp:
+		applyBoxShadowValue(style, value, fsize)
+	case "box-shadow-blur":
+		ApplyBoxShadowBlur(style, value, fsize)
+	case "box-shadow-spread":
+		ApplyBoxShadowSpread(style, value, fsize)
+	case "box-shadow-color":
+		ApplyBoxShadowColor(style, value)
+	case "box-shadow-offset":
+		ApplyBoxShadowOffset(style, value, fsize)
+	case "box-shadow-position", "box-shadow-inset":
+		ApplyBoxShadowPosition(style, value)
+	default:
 		return false
 	}
-	applyBoxShadowValue(style, value, fsize) //nolint:wsl
 
 	return true
 }

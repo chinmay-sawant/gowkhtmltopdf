@@ -133,6 +133,193 @@ func boxShadowFromLengths(
 	}, true
 }
 
+// ParseBoxShadowBlur parses a CSS blur radius (third length) for box-shadow-blur.
+// It returns the length in points and ok==true when the value is a valid
+// non-negative length (em/rem/px/pt etc resolved against fsize). A missing or
+// invalid value returns ok==false so the caller keeps the prior style.
+func ParseBoxShadowBlur(value string, fsize float64) (float64, bool) {
+	value = strings.TrimSpace(value)
+	if value == "" || strings.EqualFold(value, cssDisplayNone) || strings.EqualFold(value, "initial") {
+		return 0, false
+	}
+	v, ok := plainLength(value, fsize, 0)
+	if !ok || v < 0 {
+		return 0, false
+	}
+	return v, true
+}
+
+// ApplyBoxShadowBlur parses value and, when valid, writes it to style.
+// It sets BoxShadowSet so the shadow layer is painted even when the shorthand
+// raw is empty (longhand-only authoring). Returns true when handled.
+func ApplyBoxShadowBlur(style *ResolvedStyle, value string, fsize float64) bool {
+	if style == nil {
+		return false
+	}
+	v, ok := ParseBoxShadowBlur(value, fsize)
+	if !ok {
+		if strings.EqualFold(strings.TrimSpace(value), cssDisplayNone) {
+			clearBoxShadow(style)
+			return true
+		}
+		return false
+	}
+	style.BoxShadowBlur = v
+	style.BoxShadowSet = true
+	return true
+}
+
+// ParseBoxShadowSpread parses a CSS spread radius (fourth length) for
+// box-shadow-spread. Negative values are allowed per CSS; they shrink the
+// shadow. Returns ok==false for missing/invalid.
+func ParseBoxShadowSpread(value string, fsize float64) (float64, bool) {
+	value = strings.TrimSpace(value)
+	if value == "" || strings.EqualFold(value, cssDisplayNone) || strings.EqualFold(value, "initial") {
+		return 0, false
+	}
+	v, ok := plainLength(value, fsize, 0)
+	if !ok {
+		return 0, false
+	}
+	return v, true
+}
+
+// ApplyBoxShadowSpread parses value and writes style.BoxShadowSpread.
+func ApplyBoxShadowSpread(style *ResolvedStyle, value string, fsize float64) bool {
+	if style == nil {
+		return false
+	}
+	v, ok := ParseBoxShadowSpread(value, fsize)
+	if !ok {
+		if strings.EqualFold(strings.TrimSpace(value), cssDisplayNone) {
+			clearBoxShadow(style)
+			return true
+		}
+		return false
+	}
+	style.BoxShadowSpread = v
+	style.BoxShadowSet = true
+	return true
+}
+
+// ParseBoxShadowColor parses a CSS color for box-shadow-color against the
+// element's current color. It returns the 0..1 RGB triple, alpha, and ok.
+func ParseBoxShadowColor(value string, current [3]float64) ([3]float64, float64, bool) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return [3]float64{}, 0, false
+	}
+	if strings.EqualFold(value, "currentcolor") {
+		return current, 1.0, true
+	}
+	if strings.EqualFold(value, "initial") || strings.EqualFold(value, cssDisplayNone) {
+		return [3]float64{}, 0, false
+	}
+	r, g, b, a, ok := css.ParseColor(value)
+	if !ok {
+		return [3]float64{}, 0, false
+	}
+	return [3]float64{float64(r) / 255.0, float64(g) / 255.0, float64(b) / 255.0}, a, true
+}
+
+// ApplyBoxShadowColor parses value and writes style.BoxShadowColor.
+func ApplyBoxShadowColor(style *ResolvedStyle, value string) bool {
+	if style == nil {
+		return false
+	}
+	c, _, ok := ParseBoxShadowColor(value, style.Color)
+	if !ok {
+		return false
+	}
+	style.BoxShadowColor = c
+	style.BoxShadowSet = true
+	return true
+}
+
+// ParseBoxShadowOffset parses box-shadow-offset which may be one or two
+// lengths (x y). A single length sets both axes (common authoring shorthand
+// for symmetric offset). Returns x, y in points.
+func ParseBoxShadowOffset(value string, fsize float64) (float64, float64, bool) {
+	value = strings.TrimSpace(value)
+	if value == "" || strings.EqualFold(value, cssDisplayNone) || strings.EqualFold(value, "initial") {
+		return 0, 0, false
+	}
+	var toks [2]string
+	n := splitSpaceTokens(value, toks[:])
+	if n == 0 || n > 2 {
+		return 0, 0, false
+	}
+	x, ok := plainLength(toks[0], fsize, 0)
+	if !ok {
+		return 0, 0, false
+	}
+	if n == 1 {
+		// Single token: treat as uniform offset for both axes so that
+		// "box-shadow-offset: 2pt" matches shorthand 2px 2px expectation.
+		return x, x, true
+	}
+	y, ok := plainLength(toks[1], fsize, 0)
+	if !ok {
+		return 0, 0, false
+	}
+	return x, y, true
+}
+
+// ApplyBoxShadowOffset parses value and writes style.BoxShadowX/Y.
+func ApplyBoxShadowOffset(style *ResolvedStyle, value string, fsize float64) bool {
+	if style == nil {
+		return false
+	}
+	x, y, ok := ParseBoxShadowOffset(value, fsize)
+	if !ok {
+		return false
+	}
+	style.BoxShadowX = x
+	style.BoxShadowY = y
+	style.BoxShadowSet = true
+	return true
+}
+
+// ParseBoxShadowInset parses box-shadow-position / box-shadow-inset. The CSS
+// value "inset" yields true; "outset", "initial", or empty yields false.
+// "none" is handled by the caller as a full clear.
+func ParseBoxShadowInset(value string) (bool, bool) {
+	v := strings.ToLower(strings.TrimSpace(value))
+	switch v {
+	case insetKeyword:
+		return true, true
+	case "outset", "initial", "":
+		return false, true
+	case cssDisplayNone:
+		return false, true
+	default:
+		return false, false
+	}
+}
+
+// ParseBoxShadowPosition is an alias for ParseBoxShadowInset for the
+// box-shadow-position longhand (inset vs outset). See ParseBoxShadowInset.
+func ParseBoxShadowPosition(value string) (bool, bool) { return ParseBoxShadowInset(value) }
+
+// ApplyBoxShadowPosition parses box-shadow-position (inset/outset) and writes
+// style.BoxShadowInset.
+func ApplyBoxShadowPosition(style *ResolvedStyle, value string) bool {
+	if style == nil {
+		return false
+	}
+	if strings.EqualFold(strings.TrimSpace(value), cssDisplayNone) {
+		clearBoxShadow(style)
+		return true
+	}
+	inset, ok := ParseBoxShadowInset(value)
+	if !ok {
+		return false
+	}
+	style.BoxShadowInset = inset
+	style.BoxShadowSet = true
+	return true
+}
+
 // appendBoxShadow paints all box-shadow layers in reverse order so layer 0 is on top.
 func (e *engine) appendBoxShadow(
 	dst []Op, sty ResolvedStyle, posX, posY, width, height float64,

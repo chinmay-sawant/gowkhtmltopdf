@@ -2,14 +2,48 @@ package layout
 
 const outlineSideHint = 4 // four sides of a rectangular outline
 
+// effectiveOutline returns the effective outline width/style after applying
+// CSS initial values for isolated longhands: width defaults to medium (3px)
+// when style is solid but width is 0, and style defaults to solid when
+// width>0 or color is set but style is empty/none. This makes
+// outline-color/style/width demos visible (fixture-62 rows 22,24,25).
+func effectiveOutline(sty *ResolvedStyle) (float64, string) {
+	if sty == nil {
+		return 0, ""
+	}
+
+	w := sty.OutlineWidth
+	s := sty.OutlineStyle
+
+	if s == "" || s == "none" {
+		if w > 0 || sty.OutlineColorSet {
+			s = solidKeyword
+		}
+	}
+
+	if w <= 0 && (s == solidKeyword || s == borderStyleDashed || s == borderStyleDotted) {
+		w = borderWidth("medium", sty.FontSize)
+		if w <= 0 {
+			w = 3
+		}
+	}
+
+	return w, s
+}
+
 // outlinePaints reports a CSS outline that should stroke. Empty or "none"
 // OutlineStyle means no outline. Outline never changes the layout box size.
 func outlinePaints(sty *ResolvedStyle) bool {
-	if sty == nil || sty.OutlineWidth <= 0 {
+	if sty == nil {
 		return false
 	}
 
-	switch sty.OutlineStyle {
+	w, s := effectiveOutline(sty)
+	if w <= 0 {
+		return false
+	}
+
+	switch s {
 	case solidKeyword, borderStyleDashed, borderStyleDotted:
 		return true
 	}
@@ -122,11 +156,12 @@ func (e *engine) outlineOps(sty *ResolvedStyle, posX, posY, width, height float6
 		return nil
 	}
 
-	outlineWidth := e.scalePt(sty.OutlineWidth)
+	effW, effStyle := effectiveOutline(sty)
+	outlineWidth := e.scalePt(effW)
 	outlineOff := e.scalePt(sty.OutlineOffset)
 	red, green, blue := outlineStrokeColor(sty)
 
-	if sty.OutlineStyle == solidKeyword && hasRoundedCorners(sty) {
+	if effStyle == solidKeyword && hasRoundedCorners(sty) {
 		if op, ok := e.roundedOutlineOp(sty, posX, posY, width, height, outlineWidth, outlineOff, red, green, blue); ok {
 			return []Op{op}
 		}
@@ -134,6 +169,6 @@ func (e *engine) outlineOps(sty *ResolvedStyle, posX, posY, width, height float6
 
 	return appendOutlineOps(
 		make([]Op, 0, outlineSideHint),
-		posX, posY, width, height, outlineWidth, outlineOff, sty.OutlineStyle, red, green, blue,
+		posX, posY, width, height, outlineWidth, outlineOff, effStyle, red, green, blue,
 	)
 }

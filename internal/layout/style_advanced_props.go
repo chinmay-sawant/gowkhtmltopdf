@@ -167,9 +167,31 @@ func applyAdvancedProps(style *ResolvedStyle, prop, value string, fsize float64)
 	case "overflow-clip-margin-left":
 		style.OverflowClipMarginLeft = parseAdvancedLength(val, fsize)
 		return true
-	case "overflow-clip-margin-inline", "overflow-clip-margin-inline-start", "overflow-clip-margin-inline-end",
+	case "overflow-clip-margin", "overflow-clip-margin-inline", "overflow-clip-margin-inline-start", "overflow-clip-margin-inline-end",
 		"overflow-clip-margin-block", "overflow-clip-margin-block-start", "overflow-clip-margin-block-end":
-		return false
+		v := parseAdvancedLength(val, fsize)
+		// Shorthand and logical variants map to physical sides for horizontal-tb.
+		switch prop {
+		case "overflow-clip-margin", "overflow-clip-margin-inline":
+			style.OverflowClipMarginLeft = v
+			style.OverflowClipMarginRight = v
+			if prop == "overflow-clip-margin" {
+				style.OverflowClipMarginTop = v
+				style.OverflowClipMarginBottom = v
+			}
+		case "overflow-clip-margin-inline-start":
+			style.OverflowClipMarginLeft = v
+		case "overflow-clip-margin-inline-end":
+			style.OverflowClipMarginRight = v
+		case "overflow-clip-margin-block":
+			style.OverflowClipMarginTop = v
+			style.OverflowClipMarginBottom = v
+		case "overflow-clip-margin-block-start":
+			style.OverflowClipMarginTop = v
+		case "overflow-clip-margin-block-end":
+			style.OverflowClipMarginBottom = v
+		}
+		return true
 	}
 
 	return false

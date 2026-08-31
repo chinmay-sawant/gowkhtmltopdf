@@ -200,12 +200,19 @@ func clampMulticolHeight(curY float64, style ResolvedStyle, eng *engine) float64
 
 // multicolGap returns the used column-gap for a multicol container.
 // column-gap: normal (initial) computes to 1em; flex/grid treat normal as 0.
+// Explicit ColumnGap wins over the generic Gap shorthand so the result is
+// deterministic even when map iteration order is stable-random (style_cascade
+// nondeterminism lives outside this package).
 func (e *engine) multicolGap(st ResolvedStyle) float64 {
-	if st.ColumnGapNormal {
-		return e.scalePt(st.FontSize)
+	if !st.ColumnGapNormal {
+		return e.scalePt(st.ColumnGap)
 	}
 
-	return e.scalePt(st.ColumnGap)
+	if st.Gap != 0 {
+		return e.scalePt(st.Gap)
+	}
+
+	return e.scalePt(st.FontSize)
 }
 
 // usedColumnCountWidth resolves used column count and width from container
@@ -314,9 +321,12 @@ func (e *engine) flowMulticolSegment(
 			break
 		}
 
-		curY += e.placeMulticolLine(
+		lineTop := yPos + curY
+		lineH := e.placeMulticolLine(
 			parent, batch, style, nCols, colW, gap, contentX, yPos, curY, maxColH, balance, totalH,
 		)
+		e.emitColumnRules(style, contentX, colW, gap, nCols, lineTop, lineH)
+		curY += lineH
 	}
 
 	return curY
@@ -504,4 +514,33 @@ func (e *engine) measureMulticolChildHeight(n *html.Node, availW float64) float6
 	}
 
 	return boxNode.height
+}
+
+// emitColumnRules paints the column rules between columns for one multicol
+// line. The rule is centered in the gap and spans lineH.
+func (e *engine) emitColumnRules(style ResolvedStyle, contentX, colW, gap float64, nCols int, yTop, lineH float64) {
+	if e == nil || e.noEmit || nCols <= 1 || lineH <= 0 {
+		return
+	}
+
+	if style.ColumnRuleStyle == "" || style.ColumnRuleStyle == cssDisplayNone {
+		return
+	}
+
+	ruleW := e.scalePt(style.ColumnRuleWidth)
+	if ruleW <= 0 {
+		return
+	}
+
+	var col [3]float64
+	if style.ColumnRuleColorSet {
+		col = style.ColumnRuleColor
+	} else {
+		col = style.Color
+	}
+
+	for i := 0; i < nCols-1; i++ {
+		ruleX := contentX + float64(i+1)*(colW+gap) - gap/2
+		e.emitBorderLine(ruleX, yTop, 0, lineH, ruleW, style.ColumnRuleStyle, col[0], col[1], col[2])
+	}
 }

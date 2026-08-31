@@ -27,6 +27,9 @@ func contentNeedsEnv(value string) bool {
 }
 
 func (e *engine) pseudoContent(node *html.Node, pseudoEl string) string {
+	// content on regular elements (e.g. div with content:none or counter-increment)
+	// intentionally has no effect – only ::before/::after generate content.
+	// List markers for display:list-item are handled via OpBullet (see inline_paint.go).
 	if e == nil || node == nil || (pseudoEl != pseudoBefore && pseudoEl != pseudoAfter) {
 		return ""
 	}
@@ -467,4 +470,49 @@ func decodeHexEscape(value string, start int) (rune, int) {
 
 func isHex(c byte) bool {
 	return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
+}
+
+// listItemMarkerText returns the marker for a display:list-item element
+// based on its ListStyleType. Used by inline_paint when parent is display:list-item.
+//
+func listItemMarkerText(style ResolvedStyle, node *html.Node) string {
+	typ := style.ListStyleType
+	if typ == "" {
+		typ = "disc"
+	}
+	// Reuse layout's markerText logic for disc/circle/square/decimal etc.
+	// When node is available, counter-based types could use its position.
+	// For inline-paint fallback, use simple glyphs.
+	switch typ {
+	case "disc":
+		return "•"
+	case "circle":
+		return "○"
+	case "square":
+		return "■"
+	case "decimal", "decimal-leading-zero":
+		// Inline fallback without counter context – markerText in layout_flow would compute index.
+		// Use generic "1."; real <ol> path uses emitListMarker with correct counter.
+		if node != nil {
+			return markerText(node, typ)
+		}
+		return "1."
+	case "lower-alpha", "lower-latin":
+		return "a."
+	case "upper-alpha", "upper-latin":
+		return "A."
+	case "lower-roman":
+		return "i."
+	case "upper-roman":
+		return "I."
+	default:
+		if node != nil {
+			return markerText(node, typ)
+		}
+		return "•"
+	}
+}
+
+func isDisplayListItem(style *ResolvedStyle) bool {
+	return style != nil && style.Display == "list-item"
 }

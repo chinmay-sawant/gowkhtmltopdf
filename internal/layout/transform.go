@@ -714,6 +714,127 @@ func clamp01(val float64) float64 {
 	return val
 }
 
+// ApplyRotate implements the CSS `rotate` longhand (CSS Transforms Level 2).
+// It parses a single angle (deg/rad/grad/turn or bare number as deg) and
+// composes it into style.Transform / style.HasTransform. On invalid input the
+// style is unchanged and false is returned. The composition uses post-multiply
+// (style.Transform = style.Transform * RotateDeg) to match parseTransformList
+// ordering and to allow successive individual properties to accumulate.
+func ApplyRotate(style *ResolvedStyle, value string) bool {
+	if style == nil {
+		return false
+	}
+	v := strings.TrimSpace(value)
+	if v == "" || strings.EqualFold(v, cssDisplayNone) || strings.EqualFold(v, "initial") {
+		return false
+	}
+	// CSS rotate may be "<angle>" or "z <angle>" or "<axis> <angle>" (3d is ignored).
+	// For 2D print we take the last angle token.
+	fields := strings.Fields(v)
+	if len(fields) == 0 {
+		return false
+	}
+	angleTok := fields[len(fields)-1]
+	// Axis tokens (x/y/z) are ignored for 2D; 3d rotate is out of scope.
+	if len(fields) > 1 {
+		last := strings.ToLower(angleTok)
+		if last == "x" || last == "y" || last == "z" {
+			// e.g. "rotate: z 12deg" weird order – fall back to first angle
+			angleTok = fields[0]
+		}
+	}
+	deg, ok := parseAngleDeg(angleTok)
+	if !ok {
+		// Try legacy bare numbers that parseAngleDeg already handles; second fallback
+		// via parseUnitless (treat as deg) for author convenience.
+		if f, err := strconv.ParseFloat(strings.TrimSpace(angleTok), 64); err == nil {
+			deg = f
+			ok = true
+		}
+	}
+	if !ok {
+		return false
+	}
+	rot := RotateDeg(deg)
+	style.Transform = style.Transform.Mul(rot)
+	style.HasTransform = true
+	return true
+}
+
+// ApplyScale implements the CSS `scale` longhand. It parses one or two
+// unitless numbers (sx [sy]); a single number yields uniform scale.
+// Invalid input leaves style unchanged. Composition is post-multiply like
+// parseTransformList.
+func ApplyScale(style *ResolvedStyle, value string) bool {
+	if style == nil {
+		return false
+	}
+	v := strings.TrimSpace(value)
+	if v == "" || strings.EqualFold(v, cssDisplayNone) || strings.EqualFold(v, "initial") {
+		return false
+	}
+	// scale may be comma-separated in some authoring; normalize to spaces.
+	v = strings.ReplaceAll(v, ",", " ")
+	parts := strings.Fields(v)
+	if len(parts) == 0 || len(parts) > 3 {
+		return false
+	}
+	sx, ok := parseUnitless(parts[0])
+	if !ok {
+		return false
+	}
+	sy := sx
+	if len(parts) >= 2 {
+		if s2, ok2 := parseUnitless(parts[1]); ok2 {
+			sy = s2
+		} else {
+			return false
+		}
+	}
+	// Third value (z) ignored for 2D print.
+	sc := Scale(sx, sy)
+	style.Transform = style.Transform.Mul(sc)
+	style.HasTransform = true
+	return true
+}
+
+// ApplyTranslate implements the CSS `translate` longhand (CSS Transforms Level 2).
+// It parses one or two lengths (tx [ty]); percentages resolve to 0 at parse time
+// (like parseTransformLength) and bare numbers are treated as px. The resulting
+// translation is post-multiplied into style.Transform. fsize is the element's
+// used font-size for em units.
+func ApplyTranslate(style *ResolvedStyle, value string, fsize float64) bool {
+	if style == nil {
+		return false
+	}
+	v := strings.TrimSpace(value)
+	if v == "" || strings.EqualFold(v, cssDisplayNone) || strings.EqualFold(v, "initial") {
+		return false
+	}
+	v = strings.ReplaceAll(v, ",", " ")
+	parts := strings.Fields(v)
+	if len(parts) == 0 || len(parts) > 3 {
+		return false
+	}
+	tx, ok := parseTransformLength(parts[0], fsize)
+	if !ok {
+		return false
+	}
+	ty := 0.0
+	if len(parts) >= 2 {
+		var ok2 bool
+		ty, ok2 = parseTransformLength(parts[1], fsize)
+		if !ok2 {
+			return false
+		}
+	}
+	// Third value (z) ignored for 2D print.
+	tr := Translate(tx, ty)
+	style.Transform = style.Transform.Mul(tr)
+	style.HasTransform = true
+	return true
+}
+
 // stampBoxTransforms walks the laid-out tree and stamps composed 2D
 // transform matrices (origin baked) onto display-list ops. Parent transforms
 // compose around children; sibling flow geometry is unchanged.

@@ -163,6 +163,9 @@ func (e *engine) emitInlineText( //nolint:funlen // text measurement, face-run e
 
 	leftX += chromeLeft
 
+	if item.style.TextOverflow == "ellipsis" {
+		e.applyEllipsis(item)
+	}
 	runStart := leftX
 	textBaseline := baseline
 
@@ -509,6 +512,239 @@ func nearUndY(a, b float64) bool {
 	}
 
 	return d < 0.5
+}
+
+func (e *engine) emitDashedLine(x, y, w, width float64, col [3]float64) {
+	dash := width * 4
+	if dash < 3 {
+		dash = 3
+	}
+	gap := width * 2.8
+	if gap < 2 {
+		gap = 2
+	}
+	for cur := x; cur < x+w; {
+		seg := dash
+		if cur+seg > x+w {
+			seg = x + w - cur
+		}
+		if seg > 0.2 {
+			e.add(Op{Kind: OpLine, X: cur, Y: y, W: seg, H: 0, Width: width, R: col[0], G: col[1], B: col[2]})
+		}
+		cur += dash + gap
+	}
+}
+
+func (e *engine) emitDottedLine(x, y, w, width float64, col [3]float64) {
+	dot := width
+	if dot < 1 {
+		dot = 1
+	}
+	gap := width * 2.5
+	if gap < 2.5 {
+		gap = 2.5
+	}
+	for cur := x; cur < x+w; {
+		seg := dot
+		if cur+seg > x+w {
+			seg = x + w - cur
+		}
+		if seg > 0.2 {
+			e.add(Op{Kind: OpLine, X: cur, Y: y, W: seg, H: 0, Width: width, R: col[0], G: col[1], B: col[2]})
+		}
+		cur += dot + gap
+	}
+}
+
+func (e *engine) emitWavyLine(x, y, w, width float64, col [3]float64) {
+	amp := width * 1.2
+	if amp < 0.8 {
+		amp = 0.8
+	}
+	if amp > 1.8 {
+		amp = 1.8
+	}
+	segW := width * 2.6
+	if segW < 3 {
+		segW = 3
+	}
+	steps := int(w / segW)
+	if steps < 1 {
+		steps = 1
+	}
+	step := w / float64(steps)
+	for i := 0; i < steps; i++ {
+		x0 := x + float64(i)*step
+		x1 := x0 + step
+		if x1 > x+w {
+			x1 = x + w
+		}
+		y0 := y
+		y1 := y
+		if i%2 == 0 {
+			y0 -= amp
+			y1 += amp
+		} else {
+			y0 += amp
+			y1 -= amp
+		}
+		segWidth := x1 - x0
+		if segWidth < 0.2 {
+			continue
+		}
+		// approximate wave with two diagonals
+		midX := (x0 + x1) / 2
+		e.add(Op{Kind: OpLine, X: x0, Y: y0, W: midX - x0, H: y - y0, Width: width, R: col[0], G: col[1], B: col[2]})
+		e.add(Op{Kind: OpLine, X: midX, Y: y, W: x1 - midX, H: y1 - y, Width: width, R: col[0], G: col[1], B: col[2]})
+	}
+}
+
+func (e *engine) emitDoubleLine(x, y, w, width float64, col [3]float64) {
+	gap := width + 1.0
+	e.add(Op{Kind: OpLine, X: x, Y: y - gap/2, W: w, H: 0, Width: width, R: col[0], G: col[1], B: col[2]})
+	e.add(Op{Kind: OpLine, X: x, Y: y + gap/2, W: w, H: 0, Width: width, R: col[0], G: col[1], B: col[2]})
+}
+
+func (e *engine) paintEmphasis(item *inlineItem, runStart, runSpan, baseline, ascent, descent, size float64) {
+	if item.style == nil || item.style.CustomProps == nil {
+		return
+	}
+	styleVal := item.style.CustomProps["__emph_style"]
+	colorStr := item.style.CustomProps["__emph_color"]
+	posStr := item.style.CustomProps["__emph_position"]
+	skipVal := item.style.CustomProps["__emph_skip"]
+	if styleVal == "" && colorStr == "" && posStr == "" && skipVal == "" {
+		return
+	}
+	if strings.EqualFold(styleVal, "none") {
+		return
+	}
+	if styleVal == "" {
+		styleVal = "filled"
+	}
+	r, g, b := item.style.Color[0], item.style.Color[1], item.style.Color[2]
+	if colorStr != "" {
+		if c, ok := parseUsedColor(colorStr, item.style.Color); ok {
+			r, g, b = c[0], c[1], c[2]
+		}
+	}
+	isUnder := strings.Contains(strings.ToLower(posStr), "under")
+	dotD := size * 0.18
+	if dotD < 1.1 {
+		dotD = 1.1
+	}
+	if dotD > 2.4 {
+		dotD = 2.4
+	}
+	var dotY float64
+	if isUnder {
+		dotY = baseline + descent + dotD + 1.2
+	} else {
+		dotY = baseline - ascent - dotD - 1.0
+	}
+	curX := runStart
+	for _, rn := range item.text {
+		if rn == ' ' {
+			curX += e.measureRuneFace(rn, item.style)
+			continue
+		}
+		adv := e.measureRuneFace(rn, item.style)
+		if adv <= 0 {
+			adv = size * 0.5
+		}
+		cx := curX + adv/2 - dotD/2
+		e.add(Op{Kind: OpFillRect, X: cx, Y: dotY, W: dotD, H: dotD, R: r, G: g, B: b, Alpha: 1})
+		curX += adv
+		if curX > runStart+runSpan+0.5 {
+			break
+		}
+	}
+}
+
+func (e *engine) applyEllipsis(item *inlineItem) {
+	if item.style == nil {
+		return
+	}
+	if item.text == "" {
+		return
+	}
+	if item.style.Width <= 0 {
+		return
+	}
+	avail := e.scalePt(item.style.Width)
+	if avail < 10 {
+		return
+	}
+	totalW := e.measureTextFace(item.text, item.style)
+	if totalW <= avail+0.5 {
+		return
+	}
+	ellipsis := "..."
+	ellipsisW := e.measureTextFace(ellipsis, item.style)
+	budget := avail - ellipsisW - 1
+	if budget <= 0 {
+		item.text = ellipsis
+		item.w = ellipsisW
+		return
+	}
+	trimmed := e.truncateForEllipsis(item.text, budget, item.style)
+	if trimmed == "" {
+		item.text = ellipsis
+		item.w = ellipsisW
+		return
+	}
+	item.text = trimmed + ellipsis
+	item.w = e.measureTextFace(item.text, item.style)
+}
+
+func (e *engine) truncateForEllipsis(text string, budget float64, sty *ResolvedStyle) string {
+	var w float64
+	end := 0
+	for idx, rn := range text {
+		adv := e.measureRuneFace(rn, sty)
+		if w+adv > budget {
+			break
+		}
+		w += adv
+		end = idx + len(string(rn))
+	}
+	if end <= 0 {
+		return ""
+	}
+	// avoid cutting mid-word leaving trailing space
+	res := strings.TrimRight(text[:end], " ")
+	return res
+}
+
+func (e *engine) emitInlineBullet(item *inlineItem, leftX, baseline, size float64) {
+	if item.style == nil {
+		return
+	}
+	typ := strings.ToLower(strings.TrimSpace(item.style.ListStyleType))
+	if typ == "" || typ == "none" {
+		return
+	}
+	// Only for display:list-item; text items inherit that display from parent div
+	if !isDisplayListItem(item.style) {
+		return
+	}
+	// Dedupe: avoid double bullet when emitInlineText is called per word on same line.
+	for i := len(e.ops) - 1; i >= 0 && i >= len(e.ops)-4; i-- {
+		if e.ops[i].Kind == OpBullet && e.ops[i].Y == baseline && e.ops[i].Text != "" {
+			return
+		}
+	}
+	text := listItemMarkerText(*item.style, nil)
+	face := e.faceFor(item.style)
+	if face == nil {
+		face = e.font
+	}
+	markerW := e.measureTextFace(text, item.style)
+	posX := leftX - markerW - size*0.35
+	if posX < 0 {
+		posX = 0
+	}
+	e.add(Op{Kind: OpBullet, X: posX, Y: baseline, Text: text, Font: face, Size: size, InkDescent: e.fontDescentFace(face, size), R: item.style.Color[0], G: item.style.Color[1], B: item.style.Color[2]})
 }
 
 // measureTextFace measures s using per-rune CSS font-family fallback

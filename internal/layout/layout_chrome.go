@@ -4,6 +4,7 @@ package layout
 import (
 	"math"
 	"sort"
+	"strings"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
@@ -273,11 +274,25 @@ func (e *engine) prependChrome(insertAt int, boxNode *box, sty ResolvedStyle, po
 	// cover the border box.
 	chrome = e.appendBoxShadow(chrome, sty, posX, posY, width, height, radii, radiiY)
 	if sty.BGColor[3] > 0 && e.opts.Background {
-		chrome = append(chrome, Op{ //nolint:exhaustruct // intentional zero fields
+		bgOp := Op{ //nolint:exhaustruct // intentional zero fields
 			Kind: OpFillRect, X: posX, Y: posY, W: width, H: height,
 			R: sty.BGColor[0], G: sty.BGColor[1], B: sty.BGColor[2], Alpha: sty.BGColor[3], Radius: radius,
 			RadiusTopLeft: radii[0], RadiusTopRight: radii[1], RadiusBottomRight: radii[2], RadiusBottomLeft: radii[3],
-		})
+		}
+
+		bgClip := strings.ToLower(strings.TrimSpace(sty.BackgroundClip))
+		if bgClip == "content-box" || bgClip == "padding-box" {
+			cx, cy, cw, ch := resolveBackgroundClipBox(sty, posX, posY, width, height)
+			clip := clipRect{x: cx, y: cy, w: cw, h: ch}
+			if !clip.empty() {
+				clipRectOp(&bgOp, clip)
+				if bgOp.W > 0 && bgOp.H > 0 {
+					chrome = append(chrome, bgOp)
+				}
+			}
+		} else {
+			chrome = append(chrome, bgOp)
+		}
 	}
 	chrome = e.appendBackgroundImage(chrome, sty, posX, posY, width, height)
 

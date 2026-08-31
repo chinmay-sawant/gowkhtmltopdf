@@ -1,6 +1,7 @@
 package layout
 
 import (
+	"sort"
 	"strconv"
 	"strings"
 
@@ -968,8 +969,10 @@ func applyRestProps(
 		applyStyleProp(style, prop, value, fsize, ctx, parent, hasParent)
 	}
 
-	for prop, value := range raw {
-		switch prop {
+	// Deterministic iteration for remaining longhands (map iteration is random).
+	keys := make([]string, 0, len(raw))
+	for key := range raw {
+		switch key {
 		case "margin", "padding", borderProperty, borderTopProperty,
 			borderRightProperty, borderBottomProperty, borderLeftProperty,
 			borderWidthKeyword, borderStyleKeyword,
@@ -980,9 +983,15 @@ func applyRestProps(
 			cssPropBorderInlineStart, cssPropBorderInlineEnd, cssPropBorderBlockWidth, cssPropBorderBlockStyle,
 			cssPropBorderBlockColor, cssPropBorderInlineWidth, cssPropBorderInlineStyle, cssPropBorderInlineColor:
 			continue
+		default:
+			keys = append(keys, key)
 		}
+	}
 
-		applyStyleProp(style, prop, value, fsize, ctx, parent, hasParent)
+	sort.Strings(keys)
+
+	for _, prop := range keys {
+		applyStyleProp(style, prop, raw[prop], fsize, ctx, parent, hasParent)
 	}
 }
 
