@@ -255,14 +255,8 @@ func parsePlaceContent(style *ResolvedStyle, value string) {
 		return
 	}
 
-	if isPlaceDistributionKeyword(align) && (isPlaceAlignmentKeyword(justify) || justify == fxStretch) {
-		setJustifyContentValue(style, align)
-		setAlignContentValue(style, justify)
-		setAlignItemsValue(style, justify)
-
-		return
-	}
-
+	// CSS place-content: first token is align-content, second is justify-content.
+	// No AlignItems side-effect.
 	setAlignContentValue(style, align)
 	setJustifyContentValue(style, justify)
 }
@@ -1275,7 +1269,14 @@ func parseGridArea(sty *ResolvedStyle, value string) {
 func applyGridLineEnd(style *ResolvedStyle, isRow bool, end string) {
 	target := gridTarget(style, isRow)
 
+	end = stripGridLineNames(end)
 	end = strings.TrimSpace(end)
+	if end == "" || isGridAutoToken(end) {
+		return
+	}
+	if strings.HasPrefix(end, "[") {
+		return
+	}
 	if strings.HasPrefix(end, "span ") {
 		node, err := strconv.Atoi(strings.TrimSpace(strings.TrimPrefix(end, "span ")))
 		if err != nil || node < 1 {
@@ -1287,18 +1288,38 @@ func applyGridLineEnd(style *ResolvedStyle, isRow bool, end string) {
 		return
 	}
 
-	val, err := strconv.Atoi(end)
-	if err != nil {
+	if end == "-1" {
+		if isRow {
+			style.GridRowEnd = -1
+		} else {
+			style.GridColumnEnd = -1
+		}
+		if *target.start != 0 {
+			*target.span = 1
+		}
 		return
 	}
 
-	if *target.start > 0 {
+	val, err := strconv.Atoi(end)
+	if err != nil || val == 0 {
+		return
+	}
+
+	if isRow {
+		style.GridRowEnd = val
+	} else {
+		style.GridColumnEnd = val
+	}
+
+	if *target.start != 0 && *target.start != -1 && val != -1 {
 		sp := val - *target.start
 		if sp < 1 {
 			sp = 1
 		}
 
 		*target.span = sp
+	} else if *target.start != 0 {
+		*target.span = 1
 	}
 }
 
@@ -1328,10 +1349,40 @@ func gridTarget(st *ResolvedStyle, isRow bool) gridLineTarget {
 	return colGridTarget(st)
 }
 
+// stripGridLineNames removes bracketed named lines "[name]" from a grid line value.
+func stripGridLineNames(value string) string {
+	var b strings.Builder
+	b.Grow(len(value))
+	inBracket := false
+	for _, ch := range value {
+		if ch == '[' {
+			inBracket = true
+			continue
+		}
+		if ch == ']' {
+			inBracket = false
+			continue
+		}
+		if inBracket {
+			continue
+		}
+		b.WriteRune(ch)
+	}
+	return b.String()
+}
+
+func isGridAutoToken(tok string) bool { return strings.EqualFold(strings.TrimSpace(tok), "auto") }
+
 // parseGridLineAt handles "N", "span N", "N / M" and "N / span M" for one
-// grid axis.
+// grid axis. Supports auto (keep 0), -1 (store -1), and named lines [name] stripped.
 func parseGridLineAt(target gridLineTarget, value string) {
+	value = stripGridLineNames(value)
 	value = strings.TrimSpace(value)
+	if value == "" || isGridAutoToken(value) {
+		*target.start = 0
+		*target.span = 1
+		return
+	}
 	if strings.HasPrefix(value, "span ") {
 		applyGridSpanToken(target, strings.TrimSpace(strings.TrimPrefix(value, "span ")))
 
@@ -1341,7 +1392,21 @@ func parseGridLineAt(target gridLineTarget, value string) {
 	// "1 / 3" or "1 / span 2"
 	parts := strings.Split(value, "/")
 	if len(parts) == 1 {
-		if v, err := strconv.Atoi(strings.TrimSpace(parts[0])); err == nil && v > 0 {
+		tok := strings.TrimSpace(parts[0])
+		if tok == "" || isGridAutoToken(tok) {
+			*target.start = 0
+			*target.span = 1
+			return
+		}
+		if tok == "-1" {
+			*target.start = -1
+			*target.span = 1
+			return
+		}
+		if strings.HasPrefix(tok, "[") {
+			return
+		}
+		if v, err := strconv.Atoi(tok); err == nil && v != 0 {
 			*target.start = v
 			*target.span = 1
 		}
@@ -1353,24 +1418,55 @@ func parseGridLineAt(target gridLineTarget, value string) {
 	applyGridEndToken(target, parts[1])
 }
 
-// setGridStartToken applies a positive start line index.
+// setGridStartToken applies a start line index: auto (0), -1, or positive.
 func setGridStartToken(target gridLineTarget, token string) {
-	if v, err := strconv.Atoi(strings.TrimSpace(token)); err == nil && v > 0 {
+	token = stripGridLineNames(token)
+	token = strings.TrimSpace(token)
+	if token == "" || isGridAutoToken(token) {
+		*target.start = 0
+		return
+	}
+	if token == "-1" {
+		*target.start = -1
+		return
+	}
+	if strings.HasPrefix(token, "[") {
+		return
+	}
+	if v, err := strconv.Atoi(token); err == nil && v != 0 {
 		*target.start = v
 	}
 }
 
 // applyGridEndToken applies a "span N" or absolute end line; absolute ends
-// become spans relative to the start line.
+// become spans relative to the start line. Supports auto and -1.
 func applyGridEndToken(target gridLineTarget, end string) {
+	end = stripGridLineNames(end)
 	end = strings.TrimSpace(end)
+	if end == "" || isGridAutoToken(end) {
+		return
+	}
 	if strings.HasPrefix(end, "span ") {
 		applyGridSpanToken(target, strings.TrimSpace(strings.TrimPrefix(end, "span ")))
 
 		return
 	}
-
-	if v, err := strconv.Atoi(end); err == nil && *target.start > 0 {
+	if strings.HasPrefix(end, "[") {
+		return
+	}
+	if end == "-1" {
+		// -1 means to end of grid; keep span at least 1, placement will handle.
+		if *target.start != 0 {
+			*target.span = 1
+		}
+		return
+	}
+	if v, err := strconv.Atoi(end); err == nil && *target.start != 0 && v != 0 {
+		// If either start or end is negative (-1), keep span 1; real placement handles -1.
+		if *target.start == -1 || v == -1 {
+			*target.span = 1
+			return
+		}
 		sp := v - *target.start
 		if sp < 1 {
 			sp = 1
@@ -1389,7 +1485,25 @@ func applyGridSpanToken(target gridLineTarget, token string) {
 
 func applyGridEndOnly(style *ResolvedStyle, isRow bool, value string) {
 	target := gridTarget(style, isRow)
+	value = stripGridLineNames(value)
 	trimmed := strings.TrimSpace(value)
+	if trimmed == "" || isGridAutoToken(trimmed) {
+		return
+	}
+	if strings.HasPrefix(trimmed, "[") {
+		return
+	}
+	if trimmed == "-1" {
+		if isRow {
+			style.GridRowEnd = -1
+		} else {
+			style.GridColumnEnd = -1
+		}
+		if *target.start != 0 {
+			*target.span = 1
+		}
+		return
+	}
 
 	if strings.HasPrefix(trimmed, "span ") {
 		applyGridSpanToken(target, strings.TrimSpace(strings.TrimPrefix(trimmed, "span ")))
@@ -1401,8 +1515,24 @@ func applyGridEndOnly(style *ResolvedStyle, isRow bool, value string) {
 }
 
 func applyGridEndNumeric(style *ResolvedStyle, target gridLineTarget, isRow bool, value string) {
+	value = stripGridLineNames(value)
+	value = strings.TrimSpace(value)
+	if value == "" || isGridAutoToken(value) || strings.HasPrefix(value, "[") {
+		return
+	}
+	if value == "-1" {
+		if isRow {
+			style.GridRowEnd = -1
+		} else {
+			style.GridColumnEnd = -1
+		}
+		if *target.start != 0 {
+			*target.span = 1
+		}
+		return
+	}
 	val, err := strconv.Atoi(value)
-	if err != nil || val <= 0 {
+	if err != nil || val == 0 {
 		return
 	}
 
@@ -1412,13 +1542,15 @@ func applyGridEndNumeric(style *ResolvedStyle, target gridLineTarget, isRow bool
 		style.GridColumnEnd = val
 	}
 
-	if *target.start > 0 {
+	if *target.start != 0 && *target.start != -1 && val != -1 {
 		sp := val - *target.start
 		if sp < 1 {
 			sp = 1
 		}
 
 		*target.span = sp
+	} else if *target.start != 0 {
+		*target.span = 1
 	}
 }
 

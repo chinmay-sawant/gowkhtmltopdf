@@ -21,7 +21,7 @@ func resolveGridRows(
 		rowDefs := parseGridTrackDefs(sty.GridTemplateRows)
 		// Pad/truncate defs to placed row count when template is shorter.
 		for len(rowDefs) < numRows {
-			rowDefs = append(rowDefs, flexibleTrack(1))
+			rowDefs = append(rowDefs, gridAutoTrackDef(sty.GridAutoRows))
 		}
 
 		rowIntrinsics := measureTrackIntrinsics(eng, kids, len(rowDefs), false)

@@ -152,6 +152,8 @@ type ResolvedStyle struct {
 	GridTemplateAreas   string  // raw grid-template-areas value
 	GridArea            string  // named area (custom-ident); empty = line-based placement
 	GridAutoFlow        string  // "row" | fxCol | "dense" | "row dense" | "column dense"
+	GridAutoColumns     string  // raw grid-auto-columns value (auto | length | minmax(...))
+	GridAutoRows        string  // raw grid-auto-rows value
 	GridColumnSpan      int     // from grid-column: span N (default 1)
 	GridColumnStart     int     // 1-based; 0 = auto
 	GridRowSpan         int     // from grid-row: span N (default 1)
@@ -168,6 +170,7 @@ type ResolvedStyle struct {
 	MinHeight           float64
 	MinHeightPercent    float64 // >=0 means % of CB height; indefinite → ignore
 	MaxHeight           float64
+	MaxHeightPercent    float64 // >=0 means % of CB height; -1 = none/auto (mirrors MaxWidthPercent)
 	Overflow            string // "visible" | "hidden" | "scroll" | "auto" | "clip" (non-visible = sticky scrollport)
 	OverflowX           string
 	OverflowY           string
@@ -267,10 +270,12 @@ type ResolvedStyle struct {
 	ContainerType string // "" | "normal" | "inline-size" | "size"
 	ContainerName string // space-separated lower-case names; empty = none
 	// Static 2D CSS transforms (paint-time CTM; sibling flow unchanged).
-	Transform       Matrix2D
-	HasTransform    bool
-	TransformOrigin transformOriginSpec
-	Opacity         float64 // 0..1; initial 1; also from filter:opacity()
+	Transform           Matrix2D
+	HasTransform        bool
+	TransformOrigin     transformOriginSpec
+	TranslateXPercent   float64 // -1 = none; else % of border-box width for `translate` longhand
+	TranslateYPercent   float64 // -1 = none; else % of border-box height
+	Opacity             float64 // 0..1; initial 1; also from filter:opacity()
 	Content         string
 	GridColumnEnd   int
 	GridRowEnd      int
@@ -412,6 +417,7 @@ func initialStyle() ResolvedStyle { //nolint:funlen // complete CSS initial-valu
 		MinHeight:        0,
 		MinHeightPercent: -1,
 		MaxHeight:        -1,
+		MaxHeightPercent: -1,
 		Overflow:         "visible",
 		OverflowX:        "visible",
 		OverflowY:        "visible",
@@ -442,9 +448,11 @@ func initialStyle() ResolvedStyle { //nolint:funlen // complete CSS initial-valu
 		Direction:          "ltr",
 		Orphans:            2,
 		Widows:             2,
-		Transform:          IdentityMatrix(),
-		TransformOrigin:    defaultTransformOrigin(),
-		Opacity:            1,
+		Transform:           IdentityMatrix(),
+		TransformOrigin:     defaultTransformOrigin(),
+		TranslateXPercent:   -1,
+		TranslateYPercent:   -1,
+		Opacity:             1,
 		FillOpacity:        1,
 		StrokeOpacity:      1,
 	}
@@ -769,12 +777,12 @@ type comparableResolvedStyle struct { //nolint:unused
 	ZIndexSet                                                                                      bool
 	WritingMode                                                                                    string
 	GridTemplateColumns, GridTemplateRows, GridTemplateAreas, GridArea                             string
-	GridAutoFlow                                                                                   string
+	GridAutoFlow, GridAutoColumns, GridAutoRows                                                  string
 	GridColumnSpan, GridColumnStart, GridRowSpan, GridRowStart                                     int
 	Width, WidthPercent, Height, HeightPercent                                                     float64
 	MinWidth, MinWidthPercent, MaxWidth, MaxWidthPercent                                           float64
 	MinWidthSet                                                                                    bool
-	MinHeight, MinHeightPercent, MaxHeight                                                         float64
+	MinHeight, MinHeightPercent, MaxHeight, MaxHeightPercent                                      float64
 	Overflow, OverflowX, OverflowY, Visibility                                                     string
 	MarginTop, MarginRight, MarginBottom, MarginLeft                                               float64
 	MarginTopAuto, MarginBottomAuto, MarginLeftAuto, MarginRightAuto                               bool
@@ -851,13 +859,13 @@ func comparableResolvedStyleFor(style ResolvedStyle) comparableResolvedStyle { /
 		FlexBasisPercent: style.FlexBasisPercent, FlexOrder: style.FlexOrder, ZIndex: style.ZIndex,
 		ZIndexSet: style.ZIndexSet, WritingMode: style.WritingMode, GridTemplateColumns: style.GridTemplateColumns,
 		GridTemplateRows: style.GridTemplateRows, GridTemplateAreas: style.GridTemplateAreas, GridArea: style.GridArea,
-		GridAutoFlow: style.GridAutoFlow, GridColumnSpan: style.GridColumnSpan, GridColumnStart: style.GridColumnStart,
+		GridAutoFlow: style.GridAutoFlow, GridAutoColumns: style.GridAutoColumns, GridAutoRows: style.GridAutoRows, GridColumnSpan: style.GridColumnSpan, GridColumnStart: style.GridColumnStart,
 		GridRowSpan: style.GridRowSpan, GridRowStart: style.GridRowStart, Width: style.Width,
 		WidthPercent: style.WidthPercent, Height: style.Height, HeightPercent: style.HeightPercent,
 		MinWidth: style.MinWidth, MinWidthPercent: style.MinWidthPercent, MaxWidth: style.MaxWidth,
 		MaxWidthPercent: style.MaxWidthPercent, MinHeight: style.MinHeight,
 		MinWidthSet:      style.MinWidthSet,
-		MinHeightPercent: style.MinHeightPercent, MaxHeight: style.MaxHeight, Overflow: style.Overflow,
+		MinHeightPercent: style.MinHeightPercent, MaxHeight: style.MaxHeight, MaxHeightPercent: style.MaxHeightPercent, Overflow: style.Overflow,
 		OverflowX: style.OverflowX, OverflowY: style.OverflowY,
 		Visibility: style.Visibility, MarginTop: style.MarginTop, MarginRight: style.MarginRight,
 		MarginBottom: style.MarginBottom, MarginLeft: style.MarginLeft, MarginTopAuto: style.MarginTopAuto,

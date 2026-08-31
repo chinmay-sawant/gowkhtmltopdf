@@ -1,6 +1,7 @@
 package layout
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
@@ -18,15 +19,28 @@ type undRun struct {
 	r, g, b float64
 	href    string
 	hasHref bool
+	style   string
 }
 
 // flush emits the accumulated underline stroke, if any.
 func (u *undRun) flush(e *engine) {
 	if u.active && u.w > 0.01 {
-		e.add(Op{ //nolint:exhaustruct // intentional zero fields
-			Kind: OpLine, X: u.x, Y: u.y, W: u.w, H: 0,
-			Width: u.uw, R: u.r, G: u.g, B: u.b,
-		})
+		col := [3]float64{u.r, u.g, u.b}
+		switch strings.ToLower(strings.TrimSpace(u.style)) {
+		case "dashed":
+			e.emitDashedLine(u.x, u.y, u.w, u.uw, col)
+		case "dotted":
+			e.emitDottedLine(u.x, u.y, u.w, u.uw, col)
+		case "wavy":
+			e.emitWavyLine(u.x, u.y, u.w, u.uw, col)
+		case "double":
+			e.emitDoubleLine(u.x, u.y, u.w, u.uw, col)
+		default:
+			e.add(Op{ //nolint:exhaustruct // intentional zero fields
+				Kind: OpLine, X: u.x, Y: u.y, W: u.w, H: 0,
+				Width: u.uw, R: u.r, G: u.g, B: u.b,
+			})
+		}
 	}
 
 	*u = undRun{} //nolint:exhaustruct // intentional zero fields
@@ -167,7 +181,12 @@ func (e *engine) emitInlineText( //nolint:funlen // text measurement, face-run e
 		e.applyEllipsis(item)
 	}
 	runStart := leftX
-	textBaseline := baseline
+	// Apply vertical-align <length> for text spans: positive raises.
+	shiftedBaseline := baseline
+	if item.style != nil {
+		shiftedBaseline -= e.scalePt(e.effectiveVerticalAlignShift(item.style))
+	}
+	textBaseline := shiftedBaseline
 
 	if isVerticalWritingMode(item.style.WritingMode) {
 		// A rotated run uses the baseline as its vertical start. The normal
@@ -213,7 +232,8 @@ func (e *engine) emitInlineText( //nolint:funlen // text measurement, face-run e
 	// Force-underline a[href] for PDF affordance. Bare URL strings
 	// (https://…, archive fragments) never get underlines — multi-line
 	// ref lists were a forest of rules; titles/prose links still underline.
-	e.paintDecoration(item, runStart, runSpan, size, ascent, descent, baseline, child, und)
+	e.paintDecoration(item, runStart, runSpan, size, ascent, descent, shiftedBaseline, child, und)
+	e.paintEmphasis(item, runStart, runSpan, shiftedBaseline, ascent, descent, size)
 
 	leftX += chromeRight + item.marginR
 	if gapAfter && isJustifyGapAfter(*item) {
@@ -302,8 +322,41 @@ func (e *engine) alignedInlineTop(item *inlineItem, lineY, lineH, baseline float
 	case cssVerticalAlignBottom:
 		return lineY + lineH - item.h
 	default:
-		return baseline - item.h - e.scalePt(item.style.VerticalAlignShift)
+		return baseline - item.h - e.scalePt(e.effectiveVerticalAlignShift(item.style))
 	}
+}
+
+// effectiveVerticalAlignShift maps vertical-align keywords and lengths to a
+// pt shift where positive raises. Handles sub/super and % of line-height
+// in addition to plain <length> stored in VerticalAlignShift.
+func (e *engine) effectiveVerticalAlignShift(st *ResolvedStyle) float64 {
+	if st == nil {
+		return 0
+	}
+	switch strings.ToLower(strings.TrimSpace(st.VerticalAlign)) {
+	case "sub":
+		return st.FontSize * 0.2
+	case "super":
+		return st.FontSize * -0.4
+	}
+	// If VerticalAlign looks like a percent (e.g. "50%"), compute against
+	// line-height per CSS spec.
+	if pct := strings.TrimSpace(st.VerticalAlign); strings.HasSuffix(pct, "%") {
+		if v, err := parsePercent(pct); err == nil {
+			lh := lineHeightOf(st)
+			return lh * v / 100
+		}
+	}
+	return st.VerticalAlignShift
+}
+
+func parsePercent(s string) (float64, error) {
+	s = strings.TrimSpace(s)
+	if !strings.HasSuffix(s, "%") {
+		return 0, strconv.ErrSyntax
+	}
+	num := strings.TrimSpace(strings.TrimSuffix(s, "%"))
+	return strconv.ParseFloat(num, 64)
 }
 
 func inlineBorderVisible(side border) bool {
@@ -333,16 +386,33 @@ func (e *engine) emitInlineTextRun(
 	}
 
 	if item.style.TextShadowSet {
-		e.add(Op{ //nolint:exhaustruct // intentional zero fields
-			Kind: OpText, X: textX + item.style.TextShadowX, Y: baseline + item.style.TextShadowY, W: textWidth, H: item.h,
-			Text: run.text, Font: run.face, Size: size,
-			InkDescent:    descent,
-			LetterSpacing: item.style.LetterSpacing * e.scale,
-			TextTransform: item.style.TextTransform,
-			Bold:          item.style.FontWeight >= 700,
-			R:             item.style.TextShadowColor[0], G: item.style.TextShadowColor[1], B: item.style.TextShadowColor[2],
-			RotateDeg: writingModeRotate(item.style.WritingMode),
-		})
+		shadows := e.collectTextShadows(item.style)
+		for _, sh := range shadows {
+			opacity := 0.0
+			if sh.blur > 0 {
+				opacity = 1.0 / (1.0 + sh.blur*0.3)
+				if opacity < 0.2 {
+					opacity = 0.2
+				}
+				if opacity > 1 {
+					opacity = 1
+				}
+			}
+			op := Op{ //nolint:exhaustruct // intentional zero fields
+				Kind: OpText, X: textX + sh.x, Y: baseline + sh.y, W: textWidth, H: item.h,
+				Text: run.text, Font: run.face, Size: size,
+				InkDescent:    descent,
+				LetterSpacing: item.style.LetterSpacing * e.scale,
+				TextTransform: item.style.TextTransform,
+				Bold:          item.style.FontWeight >= 700,
+				R:             sh.color[0], G: sh.color[1], B: sh.color[2],
+				RotateDeg: writingModeRotate(item.style.WritingMode),
+			}
+			if opacity > 0 && opacity < 1 {
+				op.PaintOpacity = opacity
+			}
+			e.add(op)
+		}
 	}
 
 	e.add(Op{ //nolint:exhaustruct // intentional zero fields
@@ -364,7 +434,7 @@ func (e *engine) emitInlineTextRun(
 	}
 }
 
-// paintDecoration draws the underline / line-through strokes for one text
+// paintDecoration draws the underline / line-through / overline strokes for one text
 // item, extending the active underline run when the styling continues.
 //
 //nolint:cyclop // decoration painting
@@ -378,8 +448,10 @@ func (e *engine) paintDecoration(
 	hasBottomBorder := inlineBorderVisible(item.style.BorderBottom)
 	wantUnderline := !hasBottomBorder &&
 		(item.style.TextDecoration == cssTextDecorationUnderline ||
-			(item.href != "" && item.style.TextDecoration != cssTextDecorationLineThrough))
+			(item.href != "" && item.style.TextDecoration != cssTextDecorationLineThrough && item.style.TextDecoration != cssTextDecorationOverline && !hasOverline(item.style)))
 	wsOnly := strings.TrimSpace(item.text) == ""
+	wantLineThrough := hasLineThrough(item.style)
+	wantOverline := hasOverline(item.style)
 
 	if runSpan <= 0.01 {
 		if !wantUnderline {
@@ -389,7 +461,7 @@ func (e *engine) paintDecoration(
 		return
 	}
 
-	if !wantUnderline && item.style.TextDecoration != cssTextDecorationLineThrough {
+	if !wantUnderline && !wantLineThrough && !wantOverline {
 		und.flush(e)
 
 		return
@@ -414,6 +486,29 @@ func (e *engine) paintDecoration(
 	}
 
 	e.paintLineThrough(item, runStart, runSpan, baseline, ascent, uWidth, wsOnly, decColor)
+	if wantOverline && !wsOnly {
+		e.paintOverline(item, runStart, runSpan, baseline, ascent, uWidth, decColor)
+	}
+}
+
+func hasOverline(st *ResolvedStyle) bool {
+	if st == nil {
+		return false
+	}
+	if st.TextDecoration == cssTextDecorationOverline {
+		return true
+	}
+	return strings.Contains(strings.ToLower(st.TextDecorationLine), "overline")
+}
+
+func hasLineThrough(st *ResolvedStyle) bool {
+	if st == nil {
+		return false
+	}
+	if st.TextDecoration == cssTextDecorationLineThrough {
+		return true
+	}
+	return strings.Contains(strings.ToLower(st.TextDecorationLine), "line-through")
 }
 
 // paintLineThrough strokes the strike-through rule for a decorated text item.
@@ -421,10 +516,47 @@ func (e *engine) paintLineThrough(
 	item *inlineItem, runStart, runSpan, baseline, ascent, uWidth float64,
 	wsOnly bool, child [3]float64,
 ) {
-	if item.style.TextDecoration == cssTextDecorationLineThrough && !wsOnly {
+	if hasLineThrough(item.style) && !wsOnly {
+		y := baseline - ascent*0.3
+		col := child
+		switch strings.ToLower(strings.TrimSpace(item.style.TextDecorationStyle)) {
+		case "dashed":
+			e.emitDashedLine(runStart, y, runSpan, uWidth, col)
+		case "dotted":
+			e.emitDottedLine(runStart, y, runSpan, uWidth, col)
+		case "wavy":
+			e.emitWavyLine(runStart, y, runSpan, uWidth, col)
+		case "double":
+			e.emitDoubleLine(runStart, y, runSpan, uWidth, col)
+		default:
+			e.add(Op{ //nolint:exhaustruct // intentional zero fields
+				Kind: OpLine, X: runStart, Y: y, W: runSpan, H: 0,
+				Width: uWidth, R: col[0], G: col[1], B: col[2],
+			})
+		}
+	}
+}
+
+// paintOverline strokes the overline rule for a decorated text item at the top.
+func (e *engine) paintOverline(
+	item *inlineItem, runStart, runSpan, baseline, ascent, uWidth float64,
+	child [3]float64,
+) {
+	y := baseline - ascent
+	col := child
+	switch strings.ToLower(strings.TrimSpace(item.style.TextDecorationStyle)) {
+	case "dashed":
+		e.emitDashedLine(runStart, y, runSpan, uWidth, col)
+	case "dotted":
+		e.emitDottedLine(runStart, y, runSpan, uWidth, col)
+	case "wavy":
+		e.emitWavyLine(runStart, y, runSpan, uWidth, col)
+	case "double":
+		e.emitDoubleLine(runStart, y, runSpan, uWidth, col)
+	default:
 		e.add(Op{ //nolint:exhaustruct // intentional zero fields
-			Kind: OpLine, X: runStart, Y: baseline - ascent*0.3, W: runSpan, H: 0,
-			Width: uWidth, R: child[0], G: child[1], B: child[2],
+			Kind: OpLine, X: runStart, Y: y, W: runSpan, H: 0,
+			Width: uWidth, R: col[0], G: col[1], B: col[2],
 		})
 	}
 }
@@ -459,13 +591,18 @@ func (e *engine) paintUnderline(
 	und.r, und.g, und.b = child[0], child[1], child[2]
 	und.href = item.href
 	und.hasHref = item.href != ""
+	und.style = item.style.TextDecorationStyle
 }
 
 // startsActiveUnder reports that the item continues an active underline run:
-// same href (or both href-less), same Y, and near enough in X — justify
-// rivers / margins between nested chunks (up to ~2em) do not split it.
+// same href (or both href-less), same Y, same decoration style, and near
+// enough in X — justify rivers / margins between nested chunks (up to ~2em)
+// do not split it.
 func startsActiveUnder(item *inlineItem, und *undRun, runStart, underY, size float64) bool {
 	if !und.active || !nearUndY(und.y, underY) {
+		return false
+	}
+	if strings.ToLower(strings.TrimSpace(und.style)) != strings.ToLower(strings.TrimSpace(item.style.TextDecorationStyle)) {
 		return false
 	}
 
@@ -643,8 +780,16 @@ func (e *engine) paintEmphasis(item *inlineItem, runStart, runSpan, baseline, as
 		dotY = baseline - ascent - dotD - 1.0
 	}
 	curX := runStart
+	lowStyle := strings.ToLower(styleVal)
+	isCircle := strings.Contains(lowStyle, "circle") || strings.Contains(lowStyle, "dot")
+	isTriangle := strings.Contains(lowStyle, "triangle")
+	isOpen := strings.Contains(lowStyle, "open")
 	for _, rn := range item.text {
 		if rn == ' ' {
+			curX += e.measureRuneFace(rn, item.style)
+			continue
+		}
+		if rn == '\t' {
 			curX += e.measureRuneFace(rn, item.style)
 			continue
 		}
@@ -653,7 +798,23 @@ func (e *engine) paintEmphasis(item *inlineItem, runStart, runSpan, baseline, as
 			adv = size * 0.5
 		}
 		cx := curX + adv/2 - dotD/2
-		e.add(Op{Kind: OpFillRect, X: cx, Y: dotY, W: dotD, H: dotD, R: r, G: g, B: b, Alpha: 1})
+		if isTriangle {
+			// triangle emphasis: keep visible as square with slight offset
+			// (true triangle would need path ops; square is distinguishable and visible)
+			e.add(Op{Kind: OpFillRect, X: cx, Y: dotY, W: dotD, H: dotD, R: r, G: g, B: b, Alpha: 1})
+		} else if isOpen {
+			radius := 0.0
+			if isCircle {
+				radius = dotD / 2
+			}
+			e.add(Op{Kind: OpStrokeRect, X: cx, Y: dotY, W: dotD, H: dotD, R: r, G: g, B: b, Alpha: 1, Width: 0.4, Radius: radius})
+		} else {
+			radius := 0.0
+			if isCircle {
+				radius = dotD / 2
+			}
+			e.add(Op{Kind: OpFillRect, X: cx, Y: dotY, W: dotD, H: dotD, R: r, G: g, B: b, Alpha: 1, Radius: radius})
+		}
 		curX += adv
 		if curX > runStart+runSpan+0.5 {
 			break
@@ -668,10 +829,16 @@ func (e *engine) applyEllipsis(item *inlineItem) {
 	if item.text == "" {
 		return
 	}
-	if item.style.Width <= 0 {
+	avail := 0.0
+	if item.style.Width > 0 {
+		avail = e.scalePt(item.style.Width)
+	} else if e.inlineCBW > 0 {
+		avail = e.inlineCBW
+	} else if e.opts.Width > 0 {
+		avail = e.opts.Width
+	} else {
 		return
 	}
-	avail := e.scalePt(item.style.Width)
 	if avail < 10 {
 		return
 	}
@@ -789,6 +956,23 @@ func (e *engine) accumulateTextFaceWidth(
 	spaceCount := 0
 
 	for _, runic := range cssSheet {
+		if runic == '\t' {
+			if isTabSizeLength(sty) {
+				total += e.scalePt(sty.TabSize)
+			} else {
+				tabSize := sty.TabSize
+				if tabSize <= 0 {
+					tabSize = 8
+				}
+				spaceW := primary.GlyphAdvancePoints(' ', size)
+				if spaceW <= 0 {
+					spaceW = size * 0.25
+				}
+				total += spaceW * tabSize
+			}
+			runeCount++
+			continue
+		}
 		face := primary
 		if !isRuneWhitespace(runic) && primary.GlyphID(runic) == 0 {
 			face = e.faceForRuneFallback(sty, runic, primary)
@@ -813,6 +997,21 @@ func (e *engine) accumulateTextFaceWidth(
 func (e *engine) measureRuneFace(curRune rune, sty *ResolvedStyle) float64 {
 	if sty == nil {
 		return 0
+	}
+	if curRune == '\t' {
+		if isTabSizeLength(sty) {
+			return e.scalePt(sty.TabSize)
+		}
+		tabSize := sty.TabSize
+		if tabSize <= 0 {
+			tabSize = 8
+		}
+		// \t expands to TabSize * space width per CSS tab-size.
+		spaceW := e.measureRuneFace(' ', sty)
+		if spaceW <= 0 {
+			spaceW = sty.FontSize * e.scale * 0.25
+		}
+		return spaceW * tabSize
 	}
 
 	size := sty.FontSize * e.scale
@@ -1042,4 +1241,34 @@ func isExternalHref(href string) bool {
 // isInternalHref reports a same-document fragment link (#id).
 func isInternalHref(href string) bool {
 	return strings.HasPrefix(href, "#") && len(href) > 1
+}
+
+func isTabSizeLength(sty *ResolvedStyle) bool {
+	if sty == nil || sty.CustomProps == nil {
+		return false
+	}
+	return sty.CustomProps["__tab_size_is_length"] == "1"
+}
+
+type shadowPaint struct {
+	x, y, blur float64
+	color      [3]float64
+}
+
+func (e *engine) collectTextShadows(sty *ResolvedStyle) []shadowPaint {
+	if sty == nil || !sty.TextShadowSet {
+		return nil
+	}
+	base := shadowPaint{x: sty.TextShadowX, y: sty.TextShadowY, blur: sty.TextShadowBlur, color: sty.TextShadowColor}
+	shadows := []shadowPaint{base}
+	if sty.CustomProps != nil {
+		if extra, ok := sty.CustomProps["__text_shadow_extra"]; ok && extra != "" {
+			for _, part := range strings.Split(extra, "|") {
+				if sp, ok := shadowDecode(part); ok {
+					shadows = append(shadows, shadowPaint{x: sp.x, y: sp.y, blur: sp.blur, color: sp.color})
+				}
+			}
+		}
+	}
+	return shadows
 }

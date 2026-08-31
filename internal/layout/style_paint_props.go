@@ -52,7 +52,11 @@ func applyOutlineProps(style *ResolvedStyle, prop, value string, fsize float64) 
 func applySVGPresentationProps(style *ResolvedStyle, prop, value string, fsize float64) bool {
 	switch prop {
 	case "fill":
-		if color, parsed := parseUsedColor(value, style.Color); parsed {
+		if strings.EqualFold(strings.TrimSpace(value), "none") {
+			style.Fill = [3]float64{}
+			style.FillSet = true
+			style.FillOpacity = 0
+		} else if color, parsed := parseUsedColor(value, style.Color); parsed {
 			style.Fill = color
 			style.FillSet = true
 		}

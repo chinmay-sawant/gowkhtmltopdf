@@ -169,27 +169,49 @@ func applyAdvancedProps(style *ResolvedStyle, prop, value string, fsize float64)
 		return true
 	case "overflow-clip-margin", "overflow-clip-margin-inline", "overflow-clip-margin-inline-start", "overflow-clip-margin-inline-end",
 		"overflow-clip-margin-block", "overflow-clip-margin-block-start", "overflow-clip-margin-block-end":
-		v := parseAdvancedLength(val, fsize)
+		vals := parseOverflowClipMarginLengths(val, fsize)
+		if len(vals) == 0 {
+			return true
+		}
 		// Shorthand and logical variants map to physical sides for horizontal-tb.
 		switch prop {
-		case "overflow-clip-margin", "overflow-clip-margin-inline":
-			style.OverflowClipMarginLeft = v
-			style.OverflowClipMarginRight = v
-			if prop == "overflow-clip-margin" {
-				style.OverflowClipMarginTop = v
-				style.OverflowClipMarginBottom = v
+		case "overflow-clip-margin":
+			switch len(vals) {
+			case 1:
+				style.OverflowClipMarginTop = vals[0]
+				style.OverflowClipMarginRight = vals[0]
+				style.OverflowClipMarginBottom = vals[0]
+				style.OverflowClipMarginLeft = vals[0]
+			case 2:
+				style.OverflowClipMarginTop = vals[0]
+				style.OverflowClipMarginBottom = vals[0]
+				style.OverflowClipMarginRight = vals[1]
+				style.OverflowClipMarginLeft = vals[1]
+			case 3:
+				style.OverflowClipMarginTop = vals[0]
+				style.OverflowClipMarginRight = vals[1]
+				style.OverflowClipMarginLeft = vals[1]
+				style.OverflowClipMarginBottom = vals[2]
+			default:
+				style.OverflowClipMarginTop = vals[0]
+				style.OverflowClipMarginRight = vals[1]
+				style.OverflowClipMarginBottom = vals[2]
+				style.OverflowClipMarginLeft = vals[3]
 			}
+		case "overflow-clip-margin-inline":
+			style.OverflowClipMarginLeft = vals[0]
+			style.OverflowClipMarginRight = vals[0]
 		case "overflow-clip-margin-inline-start":
-			style.OverflowClipMarginLeft = v
+			style.OverflowClipMarginLeft = vals[0]
 		case "overflow-clip-margin-inline-end":
-			style.OverflowClipMarginRight = v
+			style.OverflowClipMarginRight = vals[0]
 		case "overflow-clip-margin-block":
-			style.OverflowClipMarginTop = v
-			style.OverflowClipMarginBottom = v
+			style.OverflowClipMarginTop = vals[0]
+			style.OverflowClipMarginBottom = vals[0]
 		case "overflow-clip-margin-block-start":
-			style.OverflowClipMarginTop = v
+			style.OverflowClipMarginTop = vals[0]
 		case "overflow-clip-margin-block-end":
-			style.OverflowClipMarginBottom = v
+			style.OverflowClipMarginBottom = vals[0]
 		}
 		return true
 	}
@@ -198,25 +220,51 @@ func applyAdvancedProps(style *ResolvedStyle, prop, value string, fsize float64)
 }
 
 func parseAdvancedLength(val string, fsize float64) float64 {
+	if v, ok := parseAdvancedLengthOK(val, fsize); ok {
+		return v
+	}
+	return 0
+}
+
+func parseAdvancedLengthOK(val string, fsize float64) (float64, bool) {
 	if v, unit, ok := css.ParseLength(val); ok {
 		switch unit {
 		case "px":
-			return v * 0.75
+			return v * 0.75, true
 		case "pt":
-			return v
+			return v, true
 		case "em", "rem":
-			return v * fsize
+			return v * fsize, true
 		case "in":
-			return v * 72.0
+			return v * 72.0, true
 		case "mm":
-			return v * 72.0 / 25.4
+			return v * 72.0 / 25.4, true
 		case "cm":
-			return v * 72.0 / 2.54
+			return v * 72.0 / 2.54, true
 		default:
-			return v
+			return v, true
 		}
 	}
-	return 0
+	return 0, false
+}
+
+func parseOverflowClipMarginLengths(val string, fsize float64) []float64 {
+	toks := strings.Fields(val)
+	out := make([]float64, 0, 4)
+	for _, tok := range toks {
+		low := strings.ToLower(tok)
+		if low == "content-box" || low == "padding-box" || low == "border-box" ||
+			low == "fill-box" || low == "stroke-box" || low == "view-box" {
+			continue
+		}
+		if v, ok := parseAdvancedLengthOK(tok, fsize); ok {
+			out = append(out, v)
+			if len(out) >= 4 {
+				break
+			}
+		}
+	}
+	return out
 }
 
 //nolint:unused

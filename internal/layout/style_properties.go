@@ -573,6 +573,10 @@ func applyGridTemplateProps(style *ResolvedStyle, prop, value string) bool {
 		parseGridArea(style, value)
 	case "grid-auto-flow":
 		style.GridAutoFlow = parseGridAutoFlowValue(value)
+	case "grid-auto-columns":
+		style.GridAutoColumns = strings.TrimSpace(value)
+	case "grid-auto-rows":
+		style.GridAutoRows = strings.TrimSpace(value)
 	case "grid-template":
 		parseGridTemplateShorthand(style, value)
 	case "grid":
@@ -605,10 +609,41 @@ func applyGridPlacementProps(style *ResolvedStyle, prop, value string) bool {
 	return true
 }
 
-// setGridStartIndex parses a positive grid line index for one axis.
+// setGridStartIndex parses a grid line index: auto (0), -1, or positive. Ignores [name].
 func setGridStartIndex(style *ResolvedStyle, prop, value string) {
-	line, err := strconv.Atoi(strings.TrimSpace(value))
-	if err != nil || line <= 0 {
+	// Reuse stripGridLineNames logic inline to avoid cross-file helper import: remove bracketed names.
+	clean := value
+	// Strip [name] segments.
+	var b strings.Builder
+	inBracket := false
+	for _, ch := range clean {
+		if ch == '[' {
+			inBracket = true
+			continue
+		}
+		if ch == ']' {
+			inBracket = false
+			continue
+		}
+		if inBracket {
+			continue
+		}
+		b.WriteRune(ch)
+	}
+	clean = strings.TrimSpace(b.String())
+	if clean == "" || strings.EqualFold(clean, "auto") {
+		if prop == "grid-row-start" {
+			style.GridRowStart = 0
+		} else {
+			style.GridColumnStart = 0
+		}
+		return
+	}
+	if strings.HasPrefix(clean, "[") {
+		return
+	}
+	line, err := strconv.Atoi(strings.TrimSpace(clean))
+	if err != nil || line == 0 {
 		return
 	}
 
@@ -785,8 +820,15 @@ func setMaxWidthValue(style *ResolvedStyle, value string, fsize, viewportW float
 }
 
 func setMaxHeightValue(style *ResolvedStyle, value string, fsize, viewportH float64) bool {
-	if v, ok := lengthBox(value, fsize, viewportH, cssDisplayNone); ok {
+	if value == cssDisplayNone {
+		style.MaxHeight = -1
+		style.MaxHeightPercent = -1
+	} else if v, unit, ok := css.ParseLength(value); ok && unit == "%" {
+		style.MaxHeightPercent = v
+		style.MaxHeight = -1
+	} else if v, ok := lengthBox(value, fsize, viewportH, cssDisplayNone); ok {
 		style.MaxHeight = v
+		style.MaxHeightPercent = -1
 	}
 
 	return true
@@ -1600,11 +1642,31 @@ func setTextAlignValue(style *ResolvedStyle, value string) {
 }
 
 func setVerticalAlignValue(style *ResolvedStyle, value string) {
-	switch value {
+	trimmed := strings.TrimSpace(value)
+	low := strings.ToLower(trimmed)
+	switch low {
 	case "baseline", cssVerticalAlignTop, "middle", cssVerticalAlignBottom:
-		style.VerticalAlign = value
+		style.VerticalAlign = low
 		style.VerticalAlignShift = 0
+	case "sub":
+		style.VerticalAlign = "sub"
+		style.VerticalAlignShift = style.FontSize * 0.2
+	case "super":
+		style.VerticalAlign = "super"
+		style.VerticalAlignShift = style.FontSize * -0.4
 	default:
+		if strings.HasSuffix(low, "%") {
+			numStr := strings.TrimSpace(strings.TrimSuffix(trimmed, "%"))
+			if pct, err := strconv.ParseFloat(numStr, 64); err == nil {
+				lh := style.LineHeight
+				if lh <= 0 {
+					lh = 1.2 * style.FontSize
+				}
+				style.VerticalAlign = trimmed
+				style.VerticalAlignShift = lh * pct / 100
+				return
+			}
+		}
 		if shift, ok := plainLength(value, style.FontSize, 0); ok {
 			style.VerticalAlign = "baseline"
 			style.VerticalAlignShift = shift
@@ -1782,7 +1844,8 @@ func applyBorderSpacingValue(style *ResolvedStyle, value string, fsize, viewport
 func applyCaptionSideValue(style *ResolvedStyle, value string) {
 	value = strings.ToLower(strings.TrimSpace(value))
 	switch value {
-	case cssVerticalAlignTop, cssVerticalAlignBottom, floatLeft, floatRight:
+	case cssVerticalAlignTop, cssVerticalAlignBottom, floatLeft, floatRight,
+		"block-start", "block-end", "inline-start", "inline-end":
 		style.CaptionSide = value
 	}
 }

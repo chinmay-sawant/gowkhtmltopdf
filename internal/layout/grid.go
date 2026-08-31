@@ -58,6 +58,7 @@ func (e *engine) buildGrid(node *html.Node, sty ResolvedStyle, availW, posX, pos
 	colDefs := gridColumnDefs(sty.GridTemplateColumns, areas.cols)
 
 	kids := collectGridKids(e, node)
+	colDefs = expandGridColumnDefsForExplicitPlacement(colDefs, kids, areas, e, sty.GridAutoColumns)
 
 	// Handle repeat(auto-fit/auto-fill, minmax(..., 1fr)) which parseGridTrackDefs collapses to auto.
 	// Expand at layout time when contentW is known: n = floor((contentW+gap)/(min+gap)), min from minmax.
@@ -189,6 +190,91 @@ func gridColumnDefs(raw string, areaCols int) []gridTrackDef {
 	}
 
 	return colDefs
+}
+
+// expandGridColumnDefsForExplicitPlacement grows the explicit column defs when
+// an item is explicitly placed beyond the template (implicit tracks lite).
+// Implicit tracks use grid-auto-columns when specified (auto or 1fr lite),
+// otherwise flexibleTrack(1) (1fr).
+func expandGridColumnDefsForExplicitPlacement(
+	colDefs []gridTrackDef, kids []*html.Node, areas gridTemplateAreasMap, eng *engine, autoCols string,
+) []gridTrackDef {
+	need := len(colDefs)
+	if areas.cols > need {
+		need = areas.cols
+	}
+
+	for _, kid := range kids {
+		if kid.Type != html.ElementNode || eng == nil {
+			continue
+		}
+
+		st := eng.stylePtr(kid)
+		if st == nil {
+			continue
+		}
+
+		// Named area already covered by areas.cols; only check line-based placement.
+		if strings.TrimSpace(st.GridArea) != "" {
+			continue
+		}
+
+		// Handle grid-column: 1 / -1 where -1 means last line (nCols+1).
+		// For implicit track expansion, -1 resolves to max(len(colDefs), areas.cols, need)+1.
+		effEnd := st.GridColumnEnd
+		if effEnd == -1 {
+			base := len(colDefs)
+			if areas.cols > base {
+				base = areas.cols
+			}
+			if need > base {
+				base = need
+			}
+			effEnd = base + 1
+		}
+
+		if st.GridColumnStart > 0 {
+			end := st.GridColumnStart - 1 + st.GridColumnSpan
+			if effEnd > st.GridColumnStart {
+				end = effEnd - 1
+			}
+
+			if end < 1 {
+				end = 1
+			}
+
+			if end > need {
+				need = end
+			}
+		} else if effEnd > 0 {
+			// e.g. grid-column-end: 5 without start -> need at least end-1 columns.
+			if effEnd-1 > need {
+				need = effEnd - 1
+			}
+		} else if st.GridColumnSpan > 1 && st.GridColumnStart <= 0 {
+			// Bare span without start does not force extra explicit tracks; auto placement wraps.
+			continue
+		}
+	}
+
+	if need <= len(colDefs) {
+		return colDefs
+	}
+
+	// Cap implicit expansion to avoid unbounded allocations from bogus line numbers.
+	if need > 64 {
+		need = 64
+	}
+
+	padded := make([]gridTrackDef, need)
+	copy(padded, colDefs)
+
+	autoDef := gridAutoTrackDef(autoCols)
+	for i := len(colDefs); i < need; i++ {
+		padded[i] = autoDef
+	}
+
+	return padded
 }
 
 //nolint:cyclop,funlen,mnd // auto-fit calculation handles balanced track distribution

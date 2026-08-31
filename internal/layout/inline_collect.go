@@ -9,8 +9,48 @@ import (
 )
 
 func (e *engine) collectInline(nodes []*html.Node, out *[]inlineItem) {
+	start := len(*out)
 	for _, n := range nodes {
 		e.collectInlineNode(n, out)
+	}
+	// Lite RTL: mirror inline order when the containing block is dir:rtl.
+	// Full bidi (unicode bidi algorithm, embedding levels) is out of scope
+	// for print; this keeps e.g. <div dir="rtl">hello <b>world</b></div>
+	// from painting in strict LTR order while staying a single left-to-right
+	// layout pass.
+	if len(*out)-start > 1 && hasRTLRun(*out, start) {
+		reverseInlineRange(*out, start)
+	}
+}
+
+func hasRTLRun(items []inlineItem, start int) bool {
+	for i := start; i < len(items); i++ {
+		if items[i].style != nil && items[i].style.Direction == "rtl" {
+			return true
+		}
+		if items[i].forceBreak || items[i].blockBox != nil || items[i].img {
+			continue
+		}
+	}
+	return false
+}
+
+func reverseInlineRange(items []inlineItem, start int) {
+	// Reverse per hard-break segment so <br> stays as line terminator
+	// after mirroring. Segments between breaks are reversed independently.
+	segStart := start
+	for i := start; i <= len(items); i++ {
+		isEnd := i == len(items)
+		isBreak := !isEnd && items[i].forceBreak
+		if isEnd || isBreak {
+			// reverse [segStart, i) (exclusive of break)
+			for l, r := segStart, i-1; l < r; l, r = l+1, r-1 {
+				items[l], items[r] = items[r], items[l]
+			}
+			if isBreak {
+				segStart = i + 1
+			}
+		}
 	}
 }
 
@@ -454,7 +494,20 @@ func (e *engine) collectInlineSpan(node *html.Node, sty ResolvedStyle, out *[]in
 
 	before := len(*out)
 
-	if txt := e.pseudoContent(node, pseudoBefore); txt != "" {
+	if src := e.pseudoContentURL(node, pseudoBefore); src != "" {
+		if ref := e.resolveImage(src); ref != nil && ref.data != nil {
+			pstyle := e.pseudoStyle(node, pseudoBefore, sty)
+			imgW := e.scalePt(pxToPt(float64(ref.w)))
+			imgH := e.scalePt(pxToPt(float64(ref.h)))
+			if imgW <= 0 {
+				imgW = e.scalePt(pstyle.FontSize)
+			}
+			if imgH <= 0 {
+				imgH = e.scalePt(pstyle.FontSize)
+			}
+			*out = append(*out, inlineItem{img: true, imgRef: ref, w: imgW, h: imgH, style: pstyle}) //nolint:exhaustruct // pseudo url image
+		}
+	} else if txt := e.pseudoContent(node, pseudoBefore); txt != "" {
 		item := e.textItem(txt, e.pseudoStyle(node, pseudoBefore, sty))
 		e.enableInlineChrome(&item)
 		*out = append(*out, item)
@@ -464,7 +517,20 @@ func (e *engine) collectInlineSpan(node *html.Node, sty ResolvedStyle, out *[]in
 		e.collectInlineNode(c, out)
 	}
 
-	if txt := e.pseudoContent(node, pseudoAfter); txt != "" {
+	if src := e.pseudoContentURL(node, pseudoAfter); src != "" {
+		if ref := e.resolveImage(src); ref != nil && ref.data != nil {
+			pstyle := e.pseudoStyle(node, pseudoAfter, sty)
+			imgW := e.scalePt(pxToPt(float64(ref.w)))
+			imgH := e.scalePt(pxToPt(float64(ref.h)))
+			if imgW <= 0 {
+				imgW = e.scalePt(pstyle.FontSize)
+			}
+			if imgH <= 0 {
+				imgH = e.scalePt(pstyle.FontSize)
+			}
+			*out = append(*out, inlineItem{img: true, imgRef: ref, w: imgW, h: imgH, style: pstyle}) //nolint:exhaustruct // pseudo url image
+		}
+	} else if txt := e.pseudoContent(node, pseudoAfter); txt != "" {
 		item := e.textItem(txt, e.pseudoStyle(node, pseudoAfter, sty))
 		e.enableInlineChrome(&item)
 		*out = append(*out, item)

@@ -130,6 +130,22 @@ func gridItemSpans(sty ResolvedStyle, areas gridTemplateAreasMap, nCols int) (in
 
 	colStart, colSpan = resolveGridAxisSpan(colStart, sty.GridColumnEnd, colSpan)
 	rowStart, rowSpan = resolveGridAxisSpan(rowStart, sty.GridRowEnd, rowSpan)
+	// -1 means last grid line (nCols+1 for columns). Expand span to end.
+	if sty.GridColumnEnd == -1 {
+		if colStart >= 0 {
+			colSpan = nCols - colStart
+			if colSpan < 1 {
+				colSpan = 1
+			}
+		} else {
+			colStart = 0
+			colSpan = nCols
+		}
+	}
+	if sty.GridRowEnd == -1 && rowStart >= 0 {
+		// row -1 is best-effort: extend span if definite rows known elsewhere; handled via gridRowCount.
+		_ = rowStart
+	}
 
 	definite := false
 

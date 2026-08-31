@@ -1401,6 +1401,11 @@ func (e *engine) paintPositionedPseudo( //nolint:cyclop
 }
 
 func (e *engine) verticalWritingHeight(contentStart int, current float64, style ResolvedStyle) float64 {
+	// Lite vertical-rl/vertical-lr: glyphs are rotated -90deg (see
+	// inline_paint writingModeRotate) while block flow stays horizontal.
+	// This keeps the print pipeline intact and only reserves enough block
+	// height for the longest rotated run. Full vertical block progression
+	// (line stacking along the inline axis) is out of scope for print.
 	textWidth := 0.0
 	for _, op := range e.ops[contentStart:] {
 		if op.Kind == OpText && op.RotateDeg != 0 && op.W > textWidth {
@@ -1508,35 +1513,66 @@ func closedDetailsChildren(node *html.Node) []*html.Node {
 
 // applyHeightConstraints enforces the used/min/max-height constraints on the
 // current content height (extracted so buildBlock stays readable).
+// cbH is the containing-block height for % heights: <0 means indefinite (auto).
 func (e *engine) applyHeightConstraints(style ResolvedStyle, curY float64) float64 {
-	if h, ok := resolveUsedHeight(style, -1, e); ok {
+	return e.applyHeightConstraintsWithCB(style, curY, -1)
+}
+
+// applyHeightConstraintsWithCB is the definite-CB form for min/max percent.
+func (e *engine) applyHeightConstraintsWithCB(style ResolvedStyle, curY float64, cbH float64) float64 {
+	if h, ok := resolveUsedHeight(style, cbH, e); ok {
 		if curY < h {
 			curY = h
 		}
 	}
 
-	minHeight := e.scalePt(style.MinHeight)
+	vChrome := 0.0
 	if style.BoxSizing != borderBox {
-		minHeight += e.scalePt(style.PaddingTop) + e.scalePt(style.PaddingBottom) +
+		vChrome = e.scalePt(style.PaddingTop) + e.scalePt(style.PaddingBottom) +
 			e.scalePt(style.BorderTop.Width) + e.scalePt(style.BorderBottom.Width)
 	}
 
-	if minHeight < 0 {
-		minHeight = 0
+	// Min-height: percent when CB definite, else absolute.
+	if style.MinHeightPercent >= 0 && cbH >= 0 && cbH < 1e12 {
+		mn := cbH * style.MinHeightPercent / 100
+		if style.BoxSizing != borderBox {
+			mn += vChrome
+		}
+		if mn < 0 {
+			mn = 0
+		}
+		if curY < mn {
+			curY = mn
+		}
+	} else {
+		minHeight := e.scalePt(style.MinHeight)
+		if style.BoxSizing != borderBox {
+			minHeight += vChrome
+		}
+		if minHeight < 0 {
+			minHeight = 0
+		}
+		if minHeight > 0 && curY < minHeight {
+			curY = minHeight
+		}
 	}
 
-	if minHeight > 0 && curY < minHeight {
-		curY = minHeight
-	}
-
-	maxHeight := e.scalePt(style.MaxHeight)
-	if style.BoxSizing != borderBox {
-		maxHeight += e.scalePt(style.PaddingTop) + e.scalePt(style.PaddingBottom) +
-			e.scalePt(style.BorderTop.Width) + e.scalePt(style.BorderBottom.Width)
-	}
-
-	if style.MaxHeight >= 0 && curY > maxHeight {
-		curY = maxHeight
+	if style.MaxHeightPercent >= 0 && cbH >= 0 && cbH < 1e12 {
+		mx := cbH * style.MaxHeightPercent / 100
+		if style.BoxSizing != borderBox {
+			mx += vChrome
+		}
+		if curY > mx {
+			curY = mx
+		}
+	} else if style.MaxHeight >= 0 {
+		maxHeight := e.scalePt(style.MaxHeight)
+		if style.BoxSizing != borderBox {
+			maxHeight += vChrome
+		}
+		if curY > maxHeight {
+			curY = maxHeight
+		}
 	}
 
 	return curY
@@ -1619,8 +1655,16 @@ func clampBlockMinMax(eng *engine, style ResolvedStyle, availW, width float64) f
 }
 
 func clampBlockMinWidth(eng *engine, style ResolvedStyle, availW, width float64) float64 {
+	hChrome := 0.0
+	if style.BoxSizing != borderBox {
+		hChrome = eng.scalePt(style.PaddingLeft) + eng.scalePt(style.PaddingRight) +
+			eng.scalePt(style.BorderLeft.Width) + eng.scalePt(style.BorderRight.Width)
+	}
 	if style.MinWidthPercent >= 0 && availW > 0 && availW < 1e12 {
 		mn := availW * style.MinWidthPercent / 100
+		if style.BoxSizing != borderBox {
+			mn += hChrome
+		}
 		if width < mn {
 			return mn
 		}
@@ -1628,16 +1672,30 @@ func clampBlockMinWidth(eng *engine, style ResolvedStyle, availW, width float64)
 		return width
 	}
 
-	if style.MinWidth > 0 && width < eng.scalePt(style.MinWidth) {
-		return eng.scalePt(style.MinWidth)
+	if style.MinWidth > 0 {
+		mn := eng.scalePt(style.MinWidth)
+		if style.BoxSizing != borderBox {
+			mn += hChrome
+		}
+		if width < mn {
+			return mn
+		}
 	}
 
 	return width
 }
 
 func clampBlockMaxWidth(eng *engine, style ResolvedStyle, availW, width float64) float64 {
+	hChrome := 0.0
+	if style.BoxSizing != borderBox {
+		hChrome = eng.scalePt(style.PaddingLeft) + eng.scalePt(style.PaddingRight) +
+			eng.scalePt(style.BorderLeft.Width) + eng.scalePt(style.BorderRight.Width)
+	}
 	if style.MaxWidthPercent >= 0 && availW > 0 && availW < 1e12 {
 		mx := availW * style.MaxWidthPercent / 100
+		if style.BoxSizing != borderBox {
+			mx += hChrome
+		}
 		if width > mx {
 			return mx
 		}
@@ -1645,8 +1703,14 @@ func clampBlockMaxWidth(eng *engine, style ResolvedStyle, availW, width float64)
 		return width
 	}
 
-	if style.MaxWidth >= 0 && width > eng.scalePt(style.MaxWidth) {
-		return eng.scalePt(style.MaxWidth)
+	if style.MaxWidth >= 0 {
+		mx := eng.scalePt(style.MaxWidth)
+		if style.BoxSizing != borderBox {
+			mx += hChrome
+		}
+		if width > mx {
+			return mx
+		}
 	}
 
 	return width

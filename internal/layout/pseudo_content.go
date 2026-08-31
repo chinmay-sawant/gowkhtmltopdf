@@ -48,6 +48,21 @@ func (e *engine) pseudoContent(node *html.Node, pseudoEl string) string {
 	return evalContentValue(best.value, node, e.contentEnvAt(node, pseudoEl))
 }
 
+func (e *engine) pseudoContentURL(node *html.Node, pseudoEl string) string {
+	if e == nil || node == nil || (pseudoEl != pseudoBefore && pseudoEl != pseudoAfter) {
+		return ""
+	}
+	ctx := e.pseudoStyleContext()
+	best := selectContentDecl(ctx, node, pseudoEl)
+	if best == nil {
+		return ""
+	}
+	if url, ok := firstCSSUrl(best.value); ok {
+		return url
+	}
+	return ""
+}
+
 // pseudoStyleContext is the cascade context used to re-walk sheets for
 // generated content (media + @container gates). When e.styles came from a
 // container pass, non-matching container content is suppressed here the same
@@ -251,6 +266,9 @@ func scanContentFunction(
 		boxNode.WriteString(text)
 
 		return next, true
+	case "url":
+		// content:url() is an image replaced element (minimal: skip text, caller creates OpImage)
+		return skipCSSFunction(value, paren+1), true
 	default:
 		return skipCSSFunction(value, paren+1), true
 	}

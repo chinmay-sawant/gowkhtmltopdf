@@ -112,15 +112,27 @@ func (e *engine) attachCaption(tableBox *box, capNode *html.Node, tableW, posX, 
 }
 
 func captionSideValue(tableStyle ResolvedStyle, captionStyle *ResolvedStyle) string {
+	raw := ""
 	if tableStyle.CaptionSide != "" {
-		return tableStyle.CaptionSide
+		raw = tableStyle.CaptionSide
+	} else if captionStyle != nil {
+		raw = captionStyle.CaptionSide
 	}
-
-	if captionStyle != nil {
-		return captionStyle.CaptionSide
+	if raw == "" {
+		return ""
 	}
-
-	return ""
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "block-start":
+		return cssVerticalAlignTop
+	case "block-end":
+		return cssVerticalAlignBottom
+	case "inline-start":
+		return floatLeft
+	case "inline-end":
+		return floatRight
+	default:
+		return raw
+	}
 }
 
 func captionSideHorizontal(side string) bool {

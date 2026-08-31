@@ -280,9 +280,12 @@ func parseSingleAxisTranslate(name string, parts []string, fontSize float64) (Ma
 		return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
 	}
 
-	axisLen, isOK := parseTransformLength(parts[0], fontSize)
+	axisLen, _, isPct, isOK := parseTransformLength(parts[0], fontSize)
 	if !isOK {
 		return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
+	}
+	if isPct {
+		axisLen = 0
 	}
 
 	if name == transformFuncTranslatex {
@@ -298,17 +301,24 @@ func parseTwoArgTranslate(parts []string, fontSize float64) (Matrix2D, bool) {
 		return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
 	}
 
-	xLen, isOK := parseTransformLength(parts[0], fontSize)
+	xLen, _, xPct, isOK := parseTransformLength(parts[0], fontSize)
 	if !isOK {
 		return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
+	}
+	if xPct {
+		xLen = 0
 	}
 
 	yLen := 0.0
 	if len(parts) == 2 {
-		yLen, isOK = parseTransformLength(parts[1], fontSize)
-		if !isOK {
+		yLenTmp, _, yPct, ok2 := parseTransformLength(parts[1], fontSize)
+		if !ok2 {
 			return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
 		}
+		if yPct {
+			yLenTmp = 0
+		}
+		yLen = yLenTmp
 	}
 
 	return Translate(xLen, yLen), true
@@ -514,42 +524,39 @@ func parseAngleDeg(cssSheet string) (float64, bool) {
 	}
 }
 
-// parseTransformLength parses a translate length (px/pt/em/% of 0 → 0 for %).
-// Percentages in translate resolve against the reference box at used-value time;
-// at parse we store % as a fraction of a 0 base (treated as 0) unless we defer.
-// For static print we resolve % translate against 0 at parse (rare) — prefer
-// absolute lengths in reports. em uses font-size.
-func parseTransformLength(cssS string, fontSize float64) (float64, bool) {
+// parseTransformLength parses a translate length (px/pt/em/%).
+// For percentages it returns pct=value and isPct=true so callers can defer
+// resolution against the border box at layout time (spec: % of border-box).
+// Absolute lengths return pt and isPct=false. em uses font-size.
+func parseTransformLength(cssS string, fontSize float64) (float64, float64, bool, bool) {
 	cssS = strings.TrimSpace(cssS)
 	if cssS == "0" {
-		return 0, true
+		return 0, 0, false, true
 	}
 
 	val, unit, ok := css.ParseLength(cssS)
 	if !ok {
 		// bare number = px per CSS Transforms for matrix e/f; for translate too historically
 		if f, err := strconv.ParseFloat(cssS, 64); err == nil {
-			return pxToPt(f), true
+			return pxToPt(f), 0, false, true
 		}
 
-		return 0, false
+		return 0, 0, false, false
 	}
 
 	if unit == "%" {
-		// Without the border box at parse time, % translate is 0 (used value
-		// would need layout). Authors should use absolute lengths for print.
-		return 0, true
+		return 0, val, true, true
 	}
 
 	if unit == "rem" {
-		return pxToPt(16) * val, true //nolint:mnd // cssPxRoot 16 inlined
+		return pxToPt(16) * val, 0, false, true //nolint:mnd // cssPxRoot 16 inlined
 	}
 
 	if pt, ok := lengthToPt(val, unit, fontSize); ok {
-		return pt, true
+		return pt, 0, false, true
 	}
 
-	return 0, false
+	return 0, 0, false, false
 }
 
 // parseTransformOrigin parses CSS transform-origin (1–3 values; z ignored).
@@ -608,7 +615,7 @@ func parseTransformOriginToken(tok string, fontSize float64) (float64, bool, boo
 		return lv, true, true
 	}
 
-	if pt, lok := parseTransformLength(tok, fontSize); lok {
+	if pt, _, isPct, lok := parseTransformLength(tok, fontSize); lok && !isPct {
 		return pt, false, true
 	}
 
@@ -799,10 +806,10 @@ func ApplyScale(style *ResolvedStyle, value string) bool {
 }
 
 // ApplyTranslate implements the CSS `translate` longhand (CSS Transforms Level 2).
-// It parses one or two lengths (tx [ty]); percentages resolve to 0 at parse time
-// (like parseTransformLength) and bare numbers are treated as px. The resulting
-// translation is post-multiplied into style.Transform. fsize is the element's
-// used font-size for em units.
+// It parses one or two lengths (tx [ty]); percentages are deferred and resolved
+// against the border box at layout time, bare numbers are treated as px. The
+// absolute part is post-multiplied into style.Transform and the percent part
+// is stored in TranslateX/YPercent for resolution in stampBoxTransforms.
 func ApplyTranslate(style *ResolvedStyle, value string, fsize float64) bool {
 	if style == nil {
 		return false
@@ -816,21 +823,29 @@ func ApplyTranslate(style *ResolvedStyle, value string, fsize float64) bool {
 	if len(parts) == 0 || len(parts) > 3 {
 		return false
 	}
-	tx, ok := parseTransformLength(parts[0], fsize)
+	tx, txPct, txIsPct, ok := parseTransformLength(parts[0], fsize)
 	if !ok {
 		return false
 	}
-	ty := 0.0
+	ty, tyPct, tyIsPct, tyOk := 0.0, 0.0, false, true
 	if len(parts) >= 2 {
 		var ok2 bool
-		ty, ok2 = parseTransformLength(parts[1], fsize)
+		ty, tyPct, tyIsPct, ok2 = parseTransformLength(parts[1], fsize)
 		if !ok2 {
 			return false
 		}
+		tyOk = ok2
+		_ = tyOk
 	}
 	// Third value (z) ignored for 2D print.
 	tr := Translate(tx, ty)
 	style.Transform = style.Transform.Mul(tr)
+	if txIsPct {
+		style.TranslateXPercent = txPct
+	}
+	if tyIsPct {
+		style.TranslateYPercent = tyPct
+	}
 	style.HasTransform = true
 	return true
 }
@@ -882,8 +897,19 @@ func stampBoxTransformsRec(boxNode *box, parentAccum Matrix2D, ops []Op, covered
 	sty := boxNode.style
 
 	if sty != nil && sty.HasTransform {
+		tform := sty.Transform
+		if sty.TranslateXPercent >= 0 || sty.TranslateYPercent >= 0 {
+			tx, ty := 0.0, 0.0
+			if sty.TranslateXPercent >= 0 {
+				tx = sty.TranslateXPercent / 100 * boxNode.w
+			}
+			if sty.TranslateYPercent >= 0 {
+				ty = sty.TranslateYPercent / 100 * boxNode.height
+			}
+			tform = tform.Mul(Translate(tx, ty))
+		}
 		ox, oy := resolveTransformOrigin(sty.TransformOrigin, boxNode)
-		baked := BakeOrigin(sty.Transform, ox, oy)
+		baked := BakeOrigin(tform, ox, oy)
 		accum = parentAccum.Mul(baked)
 	}
 

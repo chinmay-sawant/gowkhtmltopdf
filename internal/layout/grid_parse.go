@@ -243,6 +243,25 @@ func parseOneTrackDef(tok string) gridTrackDef {
 	return gridTrackDef{min: size, max: size}
 }
 
+func gridAutoTrackDef(raw string) gridTrackDef {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return flexibleTrack(1)
+	}
+	lower := strings.ToLower(raw)
+	if lower == "auto" {
+		return gridTrackDef{min: gridTrackSize{kind: trackAuto}, max: gridTrackSize{kind: trackAuto}} //nolint:exhaustruct // auto
+	}
+	if size, ok := parseFrSize(lower); ok {
+		return gridTrackDef{min: gridTrackSize{kind: trackAuto}, max: size} //nolint:exhaustruct // 1fr lite
+	}
+	def := parseOneTrackDef(raw)
+	if def.min.kind == trackFixed || def.max.kind == trackFr || def.min.kind == trackAuto {
+		return def
+	}
+	return flexibleTrack(1)
+}
+
 // parseFrSize parses a "Nfr" track size; ok=false when tok is not fr.
 func parseFrSize(tok string) (gridTrackSize, bool) {
 	lower := strings.ToLower(tok)

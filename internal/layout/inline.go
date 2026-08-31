@@ -24,6 +24,7 @@ const (
 	cssVerticalAlignTop          = "top"
 	cssTextDecorationLineThrough = "line-through"
 	cssTextDecorationUnderline   = "underline"
+	cssTextDecorationOverline    = "overline"
 	writingModeVerticalRL        = "vertical-rl"
 	writingModeVerticalLR        = "vertical-lr"
 	nonASCIIStart                = 0x80
@@ -92,6 +93,23 @@ func (e *engine) injectBlockPseudos(boxNode *box, items []inlineItem) []inlineIt
 func (e *engine) makeInflowPseudoItem(
 	node *html.Node, pseudoEl string, host ResolvedStyle,
 ) (inlineItem, bool) {
+	if src := e.pseudoContentURL(node, pseudoEl); src != "" {
+		if ref := e.resolveImage(src); ref != nil && ref.data != nil {
+			pstyle := e.pseudoStyle(node, pseudoEl, host)
+			if pstyle.Position == positionAbsolute || pstyle.Position == positionFixed {
+				return inlineItem{}, false //nolint:exhaustruct
+			}
+			imgW := e.scalePt(pxToPt(float64(ref.w)))
+			imgH := e.scalePt(pxToPt(float64(ref.h)))
+			if imgW <= 0 {
+				imgW = e.scalePt(pstyle.FontSize)
+			}
+			if imgH <= 0 {
+				imgH = e.scalePt(pstyle.FontSize)
+			}
+			return inlineItem{img: true, imgRef: ref, w: imgW, h: imgH, style: pstyle}, true //nolint:exhaustruct
+		}
+	}
 	txt := e.pseudoContent(node, pseudoEl)
 	if txt == "" {
 		return inlineItem{}, false //nolint:exhaustruct

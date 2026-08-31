@@ -147,43 +147,79 @@ func (e *engine) appendBorderImage(
 	// Slice, outset, width and repeat still matter via geometry differences.
 
 	// Inset derived from slice fractions to prove slice affects crop.
+	// Per-side fractions give correct 1..4 value response without 9-op explosion.
 	var insetX, insetY, insetW, insetH float64
 
 	if hasSlice {
-		avgSlice := (sliceFracs[0] + sliceFracs[1] + sliceFracs[2] + sliceFracs[3]) / 4
-		// Clamp avgSlice to sensible range.
-		if avgSlice < 0 {
-			avgSlice = 0
+		// Scale each side: sliceFrac 0.1 -> 2% inset, 0.3 -> 6% inset, capped at 40%.
+		clamped := func(f float64) float64 {
+			if f < 0 {
+				f = 0
+			}
+
+			if f > 1 {
+				f = 1
+			}
+
+			v := f * 0.2
+			if v > 0.4 {
+				v = 0.4
+			}
+
+			return v
 		}
 
-		if avgSlice > 1 {
-			avgSlice = 1
-		}
-
-		// Slice 10 (~0.1) vs 30 (~0.3) yields ~2% vs 6% inset difference.
-		factor := avgSlice * 0.2
-		if factor > 0.4 {
-			factor = 0.4
-		}
-
-		insetW = ow * factor
-		insetH = oh * factor
-		insetX = insetW / 2
-		insetY = insetH / 2
+		topF := clamped(sliceFracs[0])
+		rightF := clamped(sliceFracs[1])
+		bottomF := clamped(sliceFracs[2])
+		leftF := clamped(sliceFracs[3])
+		insetTop := oh * topF
+		insetBottom := oh * bottomF
+		insetLeft := ow * leftF
+		insetRight := ow * rightF
+		insetX = insetLeft
+		insetY = insetTop
+		insetW = insetLeft + insetRight
+		insetH = insetTop + insetBottom
 	}
 
-	// Suppress unused thickness vars for single-image stretch but keep them
-	// for width/outset proof via bounds (ox/oy already include outset).
-	_ = tTop
-	_ = tRight
-	_ = tBottom
-	_ = tLeft
+	// border-image-width affects geometry: scale slice-derived inset by
+	// per-axis thickness vs default (6px). This makes width observable
+	// while keeping outset proof via ox/oy/ow/oh.
+	defThick := pxToPt(6)
+	if defThick <= 0 {
+		defThick = 4.5
+	}
+	if hasSlice && defThick > 0 {
+		avgThick := (tTop + tRight + tBottom + tLeft) / 4
+		if avgThick > 0 {
+			scale := avgThick / defThick
+			if scale < 0.25 {
+				scale = 0.25
+			}
+			if scale > 4 {
+				scale = 4
+			}
+			if scale != 1 {
+				insetX *= scale
+				insetY *= scale
+				insetW *= scale
+				insetH *= scale
+				if insetW > ow*0.85 {
+					insetW = ow * 0.85
+				}
+				if insetH > oh*0.85 {
+					insetH = oh * 0.85
+				}
+			}
+		}
+	}
 	_ = hasFill
 
 	if isRepeat {
 		// Repeat mode: emit two side-by-side tiles to prove repeat matters,
 		// while keeping count low (2 vs 1 for stretch).
-		half := (ow - 2*insetX) / 2
+		half := (ow - insetW) / 2
 
 		if half <= 0.01 {
 			half = ow / 2
@@ -199,7 +235,7 @@ func (e *engine) appendBorderImage(
 				X:            ox + insetX + float64(i)*half,
 				Y:            oy + insetY,
 				W:            half,
-				H:            oh - 2*insetY,
+				H:            oh - insetH,
 				Image:        ref.data,
 				ImgW:         ref.w,
 				ImgH:         ref.h,
@@ -216,8 +252,8 @@ func (e *engine) appendBorderImage(
 		Kind:         OpImage,
 		X:            ox + insetX,
 		Y:            oy + insetY,
-		W:            ow - 2*insetX,
-		H:            oh - 2*insetY,
+		W:            ow - insetW,
+		H:            oh - insetH,
 		Image:        ref.data,
 		ImgW:         ref.w,
 		ImgH:         ref.h,
