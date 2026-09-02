@@ -1323,9 +1323,27 @@ func applyGridLineEnd(style *ResolvedStyle, isRow bool, end string) {
 	}
 }
 
-func parseGridColumn(st *ResolvedStyle, value string) { parseGridLineAt(colGridTarget(st), value) }
+func parseGridColumn(st *ResolvedStyle, value string) {
+	parseGridLineAt(colGridTarget(st), value)
+	if isGridEndMinusOne(value) {
+		st.GridColumnEnd = -1
+	}
+}
 
-func parseGridRow(st *ResolvedStyle, value string) { parseGridLineAt(rowGridTarget(st), value) }
+func parseGridRow(st *ResolvedStyle, value string) {
+	parseGridLineAt(rowGridTarget(st), value)
+	if isGridEndMinusOne(value) {
+		st.GridRowEnd = -1
+	}
+}
+
+func isGridEndMinusOne(value string) bool {
+	parts := strings.Split(stripGridLineNames(value), "/")
+	if len(parts) != 2 {
+		return false
+	}
+	return strings.TrimSpace(parts[1]) == "-1"
+}
 
 // gridLineTarget points at the start/span fields of one grid axis.
 type gridLineTarget struct {

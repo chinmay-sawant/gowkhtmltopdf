@@ -199,6 +199,24 @@ func planGridItemPlacement(
 	minRows int,
 ) (int, int, int, int) {
 	rowStart, colStart, rowSpan, colSpan, definite := gridItemSpans(sty, areas, nCols)
+	if sty.GridRowEnd == -1 {
+		if rowStart >= 0 {
+			if rowStart < minRows {
+				rowSpan = minRows - rowStart
+				if rowSpan < 1 {
+					rowSpan = 1
+				}
+			} else {
+				rowSpan = 1
+			}
+		} else {
+			rowStart = 0
+			rowSpan = minRows
+			if rowSpan < 1 {
+				rowSpan = 1
+			}
+		}
+	}
 
 	var row, col int
 

@@ -67,12 +67,33 @@ func applyTextPropsWave3(
 	case "text-emphasis-skip":
 		ensureEmphasisMap(style)
 		style.CustomProps["__emph_skip"] = strings.ToLower(strings.TrimSpace(value))
+	case "text-decoration-inset":
+		setTextDecorationInset(style, value, fsize)
 
 	default:
 		return false
 	}
 
 	return true
+}
+
+func setTextDecorationInset(style *ResolvedStyle, value string, fsize float64) {
+	val := strings.TrimSpace(value)
+	if val == "" {
+		return
+	}
+	low := strings.ToLower(val)
+	switch low {
+	case "auto", "initial", "inherit", "unset", "revert", "revert-layer":
+		style.TextDecorationInset = low
+		return
+	}
+	for _, tok := range strings.Fields(val) {
+		if _, ok := plainLength(tok, fsize, 0); !ok {
+			return
+		}
+	}
+	style.TextDecorationInset = low
 }
 
 func ensureEmphasisMap(style *ResolvedStyle) {

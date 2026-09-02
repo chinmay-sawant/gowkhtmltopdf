@@ -127,18 +127,21 @@ func resolveTransformOrigin(spec transformOriginSpec, boxNode *box) (float64, fl
 // parseTransformList parses a CSS transform function list into a single matrix.
 // Returns ok=false for unrecognized input (caller keeps prior/initial).
 // "none" yields identity with ok=true and has=false.
-func parseTransformList(value string, fontSize float64) (Matrix2D, bool, bool) {
+// Percentage translates are deferred (NaN = none) and resolved at stamp time
+// against the border box, matching the `translate:` longhand path.
+func parseTransformList(value string, fontSize float64) (Matrix2D, float64, float64, bool, bool) {
 	value = strings.TrimSpace(value)
 	if value == "" {
-		return IdentityMatrix(), false, false
+		return IdentityMatrix(), math.NaN(), math.NaN(), false, false
 	}
 
 	if strings.EqualFold(value, cssDisplayNone) {
-		return IdentityMatrix(), false, true
+		return IdentityMatrix(), math.NaN(), math.NaN(), false, true
 	}
 
 	matrix := IdentityMatrix()
 	has := false
+	accXPct, accYPct := math.NaN(), math.NaN()
 	rest := value
 
 	for {
@@ -149,20 +152,34 @@ func parseTransformList(value string, fontSize float64) (Matrix2D, bool, bool) {
 
 		name, args, next, pok := splitTransformFunc(rest)
 		if !pok {
-			return IdentityMatrix(), false, false
+			return IdentityMatrix(), math.NaN(), math.NaN(), false, false
 		}
 
-		fm, fok := parseOneTransformFunc(name, args, fontSize)
+		fm, xp, yp, fok := parseOneTransformFunc(name, args, fontSize)
 		if !fok {
-			return IdentityMatrix(), false, false
+			return IdentityMatrix(), math.NaN(), math.NaN(), false, false
 		}
 		// Left-to-right post-multiply: M = M * Fi
 		matrix = matrix.Mul(fm)
+		if !math.IsNaN(xp) {
+			if math.IsNaN(accXPct) {
+				accXPct = xp
+			} else {
+				accXPct += xp
+			}
+		}
+		if !math.IsNaN(yp) {
+			if math.IsNaN(accYPct) {
+				accYPct = yp
+			} else {
+				accYPct += yp
+			}
+		}
 		has = true
 		rest = next
 	}
 
-	return matrix, has, true
+	return matrix, accXPct, accYPct, has, true
 }
 
 func splitTransformFunc(s string) (string, string, string, bool) {
@@ -218,23 +235,27 @@ func scanTransformParens(text string) (string, string, bool) {
 	return "", "", false
 }
 
-func parseOneTransformFunc(name, args string, fontSize float64) (Matrix2D, bool) {
+func parseOneTransformFunc(name, args string, fontSize float64) (Matrix2D, float64, float64, bool) {
 	parts := splitTransformArgs(args)
 
 	switch name {
 	case "matrix":
-		return parseMatrixFunc(parts)
+		m, ok := parseMatrixFunc(parts)
+		return m, math.NaN(), math.NaN(), ok
 	case "translate", transformFuncTranslatex, "translatey":
 		return parseTranslateFunc(name, parts, fontSize)
 	case "scale", transformFuncScalex, "scaley":
-		return parseScaleFunc(name, parts)
+		m, ok := parseScaleFunc(name, parts)
+		return m, math.NaN(), math.NaN(), ok
 	case "rotate":
-		return parseRotateFunc(parts)
+		m, ok := parseRotateFunc(parts)
+		return m, math.NaN(), math.NaN(), ok
 	case "skew", transformFuncSkewx, "skewy":
-		return parseSkewFunc(name, parts)
+		m, ok := parseSkewFunc(name, parts)
+		return m, math.NaN(), math.NaN(), ok
 	default:
 		// 3D / perspective / matrix3d: reject (non-goal)
-		return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
+		return Matrix2D{}, math.NaN(), math.NaN(), false //nolint:exhaustruct // intentional zero fields
 	}
 }
 
@@ -265,8 +286,8 @@ func parseMatrixFunc(parts []string) (Matrix2D, bool) {
 }
 
 // parseTranslateFunc parses translate(tx[, ty]) and its translatex/translatey
-// one-axis variants.
-func parseTranslateFunc(name string, parts []string, fontSize float64) (Matrix2D, bool) {
+// one-axis variants. Percentage components are deferred (NaN = none).
+func parseTranslateFunc(name string, parts []string, fontSize float64) (Matrix2D, float64, float64, bool) {
 	if name == transformFuncTranslatex || name == "translatey" {
 		return parseSingleAxisTranslate(name, parts, fontSize)
 	}
@@ -275,53 +296,62 @@ func parseTranslateFunc(name string, parts []string, fontSize float64) (Matrix2D
 }
 
 // parseSingleAxisTranslate parses translatex(tx) / translatey(ty).
-func parseSingleAxisTranslate(name string, parts []string, fontSize float64) (Matrix2D, bool) {
+func parseSingleAxisTranslate(name string, parts []string, fontSize float64) (Matrix2D, float64, float64, bool) {
 	if len(parts) != 1 {
-		return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
+		return Matrix2D{}, math.NaN(), math.NaN(), false //nolint:exhaustruct // intentional zero fields
 	}
 
-	axisLen, _, isPct, isOK := parseTransformLength(parts[0], fontSize)
+	axisLen, pctVal, isPct, isOK := parseTransformLength(parts[0], fontSize)
 	if !isOK {
-		return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
+		return Matrix2D{}, math.NaN(), math.NaN(), false //nolint:exhaustruct // intentional zero fields
 	}
+	xPct, yPct := math.NaN(), math.NaN()
 	if isPct {
 		axisLen = 0
+		if name == transformFuncTranslatex {
+			xPct = pctVal
+		} else {
+			yPct = pctVal
+		}
 	}
 
 	if name == transformFuncTranslatex {
-		return Translate(axisLen, 0), true
+		return Translate(axisLen, 0), xPct, yPct, true
 	}
 
-	return Translate(0, axisLen), true
+	return Translate(0, axisLen), xPct, yPct, true
 }
 
 // parseTwoArgTranslate parses translate(tx[, ty]).
-func parseTwoArgTranslate(parts []string, fontSize float64) (Matrix2D, bool) {
+func parseTwoArgTranslate(parts []string, fontSize float64) (Matrix2D, float64, float64, bool) {
 	if len(parts) < 1 || len(parts) > 2 {
-		return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
+		return Matrix2D{}, math.NaN(), math.NaN(), false //nolint:exhaustruct // intentional zero fields
 	}
 
-	xLen, _, xPct, isOK := parseTransformLength(parts[0], fontSize)
+	xLen, xPctVal, xIsPct, isOK := parseTransformLength(parts[0], fontSize)
 	if !isOK {
-		return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
+		return Matrix2D{}, math.NaN(), math.NaN(), false //nolint:exhaustruct // intentional zero fields
 	}
-	if xPct {
+	xPct, yPct := math.NaN(), math.NaN()
+	if xIsPct {
+		xPct = xPctVal
 		xLen = 0
 	}
 
 	yLen := 0.0
 	if len(parts) == 2 {
-		yLenTmp, _, yPct, ok2 := parseTransformLength(parts[1], fontSize)
+		yLenTmp, yPctVal, yIsPct, ok2 := parseTransformLength(parts[1], fontSize)
 		if !ok2 {
-			return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
+			return Matrix2D{}, math.NaN(), math.NaN(), false //nolint:exhaustruct // intentional zero fields
 		}
-		if yPct {
+		if yIsPct {
+			yPct = yPctVal
 			yLenTmp = 0
 		}
 		yLen = yLenTmp
 	}
 
-	return Translate(xLen, yLen), true
+	return Translate(xLen, yLen), xPct, yPct, true
 }
 
 // parseScaleFunc parses scale(sx[, sy]) and its scalex/scaley one-axis

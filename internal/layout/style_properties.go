@@ -1,6 +1,7 @@
 package layout
 
 import (
+	"math"
 	"strconv"
 	"strings"
 	"unicode"
@@ -1994,9 +1995,23 @@ func applyTransformGroup(
 	switch prop {
 	case "transform":
 		// Animations/transitions ignored: cascaded static value only.
-		if m, has, ok := parseTransformList(value, fsize); ok {
+		if m, xp, yp, has, ok := parseTransformList(value, fsize); ok {
 			style.Transform = m
 			style.HasTransform = has
+			if !math.IsNaN(xp) {
+				if style.TranslateXPercent == -1 {
+					style.TranslateXPercent = xp
+				} else {
+					style.TranslateXPercent += xp
+				}
+			}
+			if !math.IsNaN(yp) {
+				if style.TranslateYPercent == -1 {
+					style.TranslateYPercent = yp
+				} else {
+					style.TranslateYPercent += yp
+				}
+			}
 		}
 	case "transform-origin":
 		if spec, ok := parseTransformOrigin(value, fsize); ok {
