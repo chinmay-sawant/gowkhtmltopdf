@@ -13,19 +13,24 @@ import (
 // whitespace-only runs so dense reference lists (wrapped archive.org URLs) do
 // not paint a forest of short double-rules.
 type undRun struct {
-	active  bool
-	x, y, w float64
-	uw      float64
-	r, g, b float64
-	href    string
-	hasHref bool
-	style   string
+	active    bool
+	x, y, w   float64
+	uw        float64
+	r, g, b   float64
+	href      string
+	hasHref   bool
+	style     string
+	blendMode string
 }
 
 // flush emits the accumulated underline stroke, if any.
+//
+//nolint:varnamelen,wsl,goconst // underline variants share the existing engine helpers
 func (u *undRun) flush(e *engine) {
 	if u.active && u.w > 0.01 {
 		col := [3]float64{u.r, u.g, u.b}
+		prevBlend := e.blendMode
+		e.blendMode = u.blendMode
 		switch strings.ToLower(strings.TrimSpace(u.style)) {
 		case "dashed":
 			e.emitDashedLine(u.x, u.y, u.w, u.uw, col)
@@ -41,6 +46,7 @@ func (u *undRun) flush(e *engine) {
 				Width: u.uw, R: u.r, G: u.g, B: u.b,
 			})
 		}
+		e.blendMode = prevBlend
 	}
 
 	*u = undRun{} //nolint:exhaustruct // intentional zero fields
@@ -592,6 +598,7 @@ func (e *engine) paintUnderline(
 	und.href = item.href
 	und.hasHref = item.href != ""
 	und.style = item.style.TextDecorationStyle
+	und.blendMode = e.blendMode
 }
 
 // startsActiveUnder reports that the item continues an active underline run:

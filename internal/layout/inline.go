@@ -825,8 +825,15 @@ func (e *engine) emitLine(
 	e.trimTrailingSpace(line)
 
 	textAlign := floatLeft
-	if boxNode != nil && boxNode.style.TextAlign != "" {
-		textAlign = boxNode.style.TextAlign
+
+	if boxNode != nil && boxNode.style != nil {
+		if boxNode.style.Direction == cssDirectionRTL {
+			textAlign = "right"
+		}
+
+		if boxNode.style.TextAlign != "" {
+			textAlign = boxNode.style.TextAlign
+		}
 	}
 
 	if lastLine && boxNode != nil && boxNode.style != nil &&
@@ -862,6 +869,8 @@ func (e *engine) emitLine(
 
 // emitLineItems paints each item of a line at the given baseline, flushing
 // the accumulated underline run when the styling changes.
+//
+//nolint:wsl // blend scope restoration belongs immediately after item emission
 func (e *engine) emitLineItems(boxNode *box, line []inlineItem, leftX, baseline, lineH, lineY, justifyGap float64) {
 	var und undRun
 
@@ -885,6 +894,7 @@ func (e *engine) emitLineItems(boxNode *box, line []inlineItem, leftX, baseline,
 			continue
 		}
 
+		prevBlend := e.pushInlineBlend(item.style)
 		switch {
 		case item.blockBox != nil:
 			leftX = e.emitInlineBlock(
@@ -895,9 +905,31 @@ func (e *engine) emitLineItems(boxNode *box, line []inlineItem, leftX, baseline,
 		default:
 			leftX = e.emitInlineText(item, leftX, baseline, justifyGap, idx < len(line)-1, &und)
 		}
+		e.blendMode = prevBlend
 	}
 
 	und.flush(e)
+}
+
+// pushInlineBlend applies the compositing scope of one inline item. Inline
+// items do not get their own box-layout pushZ call, so isolation and mix-blend
+// mode must be scoped while their text and decorations are emitted.
+//
+//nolint:goconst,wsl // CSS isolation keyword and scope assignment are explicit
+func (e *engine) pushInlineBlend(style *ResolvedStyle) string {
+	prev := e.blendMode
+	if style == nil {
+		return prev
+	}
+
+	if style.Isolation == "isolate" {
+		e.blendMode = ""
+	}
+	if mode, ok := normalizeBlendMode(style.MixBlendMode); ok && mode != blendNormal {
+		e.blendMode = mode
+	}
+
+	return prev
 }
 
 // trimTrailingSpace drops trailing whitespace from the last run of a line.

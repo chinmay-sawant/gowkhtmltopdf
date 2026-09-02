@@ -64,6 +64,7 @@ const (
 	cssPropBorderBlockEndWidth    = "border-block-end-width"
 	cssPropBorderInlineStartWidth = "border-inline-start-width"
 	cssPropBorderInlineEndWidth   = "border-inline-end-width"
+	cssDirectionRTL               = "rtl"
 )
 
 // hashFontFamily fingerprints a CSS font-family list without allocating.
@@ -147,6 +148,9 @@ type ResolvedStyle struct {
 	// Direction is CSS direction ("ltr" | "rtl").
 	Direction           string
 	Filter              string
+	MixBlendMode        string // normal | multiply | screen | ...
+	BackgroundBlendMode string // comma-separated background layer modes
+	Isolation           string // auto | isolate
 	GridTemplateColumns string // raw grid-template-columns value
 	GridTemplateRows    string
 	GridTemplateAreas   string  // raw grid-template-areas value
@@ -171,7 +175,7 @@ type ResolvedStyle struct {
 	MinHeightPercent    float64 // >=0 means % of CB height; indefinite → ignore
 	MaxHeight           float64
 	MaxHeightPercent    float64 // >=0 means % of CB height; -1 = none/auto (mirrors MaxWidthPercent)
-	Overflow            string // "visible" | "hidden" | "scroll" | "auto" | "clip" (non-visible = sticky scrollport)
+	Overflow            string  // "visible" | "hidden" | "scroll" | "auto" | "clip" (non-visible = sticky scrollport)
 	OverflowX           string
 	OverflowY           string
 	// Visibility is CSS visibility: "visible" | "hidden" | "collapse".
@@ -271,15 +275,17 @@ type ResolvedStyle struct {
 	ContainerType string // "" | "normal" | "inline-size" | "size"
 	ContainerName string // space-separated lower-case names; empty = none
 	// Static 2D CSS transforms (paint-time CTM; sibling flow unchanged).
-	Transform           Matrix2D
-	HasTransform        bool
-	TransformOrigin     transformOriginSpec
-	TranslateXPercent   float64 // -1 = none; else % of border-box width for `translate` longhand
-	TranslateYPercent   float64 // -1 = none; else % of border-box height
-	Opacity             float64 // 0..1; initial 1; also from filter:opacity()
-	Content         string
-	GridColumnEnd   int
-	GridRowEnd      int
+	Transform            Matrix2D
+	HasTransform         bool
+	TransformOrigin      transformOriginSpec
+	TranslateXPercent    float64 // % of border-box width for `translate` longhand
+	TranslateXPercentSet bool
+	TranslateYPercent    float64 // % of border-box height
+	TranslateYPercentSet bool
+	Opacity              float64 // 0..1; initial 1; also from filter:opacity()
+	Content              string
+	GridColumnEnd        int
+	GridRowEnd           int
 	// Outline* is CSS outline. Empty OutlineStyle means none. Does not affect layout size.
 	OutlineWidth    float64
 	OutlineStyle    string
@@ -428,35 +434,36 @@ func initialStyle() ResolvedStyle { //nolint:funlen // complete CSS initial-valu
 		FontFamily:       nil,
 		// Empty family hashes to the FNV-1a offset, matching what
 		// resolveElementStyle records for elements without font-family.
-		famHash:            hashFontFamily(nil),
-		FontSize:           12, // 16px at 96dpi
-		FontWeight:         400,
-		TextTransform:      textTransformNone,
-		VerticalAlign:      "baseline",
-		WhiteSpace:         "normal",
-		TabSize:            defaultTabSize,
-		HyphenateCharacter: "-",
-		OverflowWrap:       "normal",
-		WordBreak:          "normal",
-		TextDecoration:     cssDisplayNone,
-		ListStyleType:      "disc",
-		BorderCollapse:     "separate",
-		BorderSpacing:      0,
-		TableLayout:        overflowAuto,
-		GridColumnSpan:     1,
-		GridRowSpan:        1,
-		WritingMode:        writingModeHorizontalTB,
-		Direction:          "ltr",
-		Orphans:            2,
-		Widows:             2,
+		famHash:             hashFontFamily(nil),
+		FontSize:            12, // 16px at 96dpi
+		FontWeight:          400,
+		TextTransform:       textTransformNone,
+		VerticalAlign:       "baseline",
+		WhiteSpace:          "normal",
+		TabSize:             defaultTabSize,
+		HyphenateCharacter:  "-",
+		OverflowWrap:        "normal",
+		WordBreak:           "normal",
+		TextDecoration:      cssDisplayNone,
+		ListStyleType:       "disc",
+		BorderCollapse:      "separate",
+		BorderSpacing:       0,
+		TableLayout:         overflowAuto,
+		GridColumnSpan:      1,
+		GridRowSpan:         1,
+		WritingMode:         writingModeHorizontalTB,
+		Direction:           "ltr",
+		MixBlendMode:        blendNormal,
+		BackgroundBlendMode: blendNormal,
+		Isolation:           "auto",
+		Orphans:             2,
+		Widows:              2,
 		EmptyCells:          "",
 		Transform:           IdentityMatrix(),
 		TransformOrigin:     defaultTransformOrigin(),
-		TranslateXPercent:   -1,
-		TranslateYPercent:   -1,
 		Opacity:             1,
-		FillOpacity:        1,
-		StrokeOpacity:      1,
+		FillOpacity:         1,
+		StrokeOpacity:       1,
 	}
 }
 
@@ -779,12 +786,12 @@ type comparableResolvedStyle struct { //nolint:unused
 	ZIndexSet                                                                                      bool
 	WritingMode                                                                                    string
 	GridTemplateColumns, GridTemplateRows, GridTemplateAreas, GridArea                             string
-	GridAutoFlow, GridAutoColumns, GridAutoRows                                                  string
+	GridAutoFlow, GridAutoColumns, GridAutoRows                                                    string
 	GridColumnSpan, GridColumnStart, GridRowSpan, GridRowStart                                     int
 	Width, WidthPercent, Height, HeightPercent                                                     float64
 	MinWidth, MinWidthPercent, MaxWidth, MaxWidthPercent                                           float64
 	MinWidthSet                                                                                    bool
-	MinHeight, MinHeightPercent, MaxHeight, MaxHeightPercent                                      float64
+	MinHeight, MinHeightPercent, MaxHeight, MaxHeightPercent                                       float64
 	Overflow, OverflowX, OverflowY, Visibility                                                     string
 	MarginTop, MarginRight, MarginBottom, MarginLeft                                               float64
 	MarginTopAuto, MarginBottomAuto, MarginLeftAuto, MarginRightAuto                               bool
@@ -819,6 +826,7 @@ type comparableResolvedStyle struct { //nolint:unused
 	TransformOrigin                                                                                transformOriginSpec
 	Opacity                                                                                        float64
 	Filter, Content                                                                                string
+	MixBlendMode, BackgroundBlendMode, Isolation                                                   string
 	GridColumnEnd, GridRowEnd                                                                      int
 	OutlineWidth                                                                                   float64
 	OutlineStyle                                                                                   string
@@ -898,6 +906,8 @@ func comparableResolvedStyleFor(style ResolvedStyle) comparableResolvedStyle { /
 		Widows:  style.Widows, ContainerType: style.ContainerType, ContainerName: style.ContainerName,
 		Transform: style.Transform, HasTransform: style.HasTransform, TransformOrigin: style.TransformOrigin,
 		Opacity: style.Opacity, Filter: style.Filter, Content: style.Content,
+		MixBlendMode: style.MixBlendMode, BackgroundBlendMode: style.BackgroundBlendMode,
+		Isolation:     style.Isolation,
 		GridColumnEnd: style.GridColumnEnd, GridRowEnd: style.GridRowEnd,
 		OutlineWidth: style.OutlineWidth, OutlineStyle: style.OutlineStyle,
 		OutlineColor: style.OutlineColor, OutlineColorSet: style.OutlineColorSet,

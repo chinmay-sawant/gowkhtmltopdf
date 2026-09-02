@@ -114,7 +114,29 @@ func applyAdvancedProps(style *ResolvedStyle, prop, value string, fsize float64)
 			return true
 		}
 
-	// Wave D: Fonts, Blend Modes, Advanced Text Decoration
+	// Wave D: Fonts and Advanced Text Decoration
+	case "mix-blend-mode":
+		if mode, ok := normalizeBlendMode(val); ok {
+			style.MixBlendMode = mode
+			return true
+		}
+	case "background-blend-mode":
+		modes := splitCommaLayers(value)
+		if len(modes) == 0 {
+			return false
+		}
+		for index := range modes {
+			if _, ok := normalizeBlendMode(modes[index]); !ok {
+				return false
+			}
+		}
+		style.BackgroundBlendMode = strings.Join(modes, ", ")
+		return true
+	case "isolation":
+		if val == "auto" || val == "isolate" {
+			style.Isolation = val
+			return true
+		}
 	case "font-variation-settings":
 		style.FontVariationSettings = value
 		return true

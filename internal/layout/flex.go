@@ -402,12 +402,23 @@ func reverseFlexMeas(line []flexMeas) {
 // applyAlignContentRow distributes free cross space between wrapped flex
 // lines when the container height is definite and wrapping produced multiple
 // lines. Height:auto → pack at start (no-op).
+// Single-line containers with a definite height and align-content:center/end
+// are also centered/end-aligned to match the audit fixture's expectation:
+// -webkit-align-content:center with height:56px and a single wrapped line
+// should appear vertically centered, not pinned to the top.
 func (e *engine) applyAlignContentRow(
 	parent *box, alignContent string, placed []flexLinePlace,
 	rowGap, contentH, curY float64,
 ) float64 {
-	if contentH < 0 || len(placed) <= 1 {
+	if contentH < 0 || len(placed) == 0 {
 		return curY
+	}
+	if len(placed) == 1 {
+		switch alignContent {
+		case fxCenter, fxFlexEnd, fxEnd, fxStart, flexStartKeyword:
+		default:
+			return curY
+		}
 	}
 
 	linesH := 0.0

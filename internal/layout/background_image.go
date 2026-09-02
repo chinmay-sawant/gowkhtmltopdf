@@ -60,6 +60,7 @@ func (e *engine) appendBackgroundImage(
 					ImgH:         imgH,
 					IsJPEG:       false,
 					IsBackground: true,
+					BlendMode:    backgroundBlendModeForLayer(sty.BackgroundBlendMode, i),
 				}
 				if sty.Filter != "" {
 					filters := parseFilterList(sty.Filter, sty.Color, sty.FontSize)
@@ -114,6 +115,7 @@ func (e *engine) appendBackgroundImage(
 			ImgH:         ref.h,
 			IsJPEG:       ref.isJPEG,
 			IsBackground: true,
+			BlendMode:    backgroundBlendModeForLayer(sty.BackgroundBlendMode, i),
 		}
 		if sty.Filter != "" {
 			filters := parseFilterList(sty.Filter, sty.Color, sty.FontSize)

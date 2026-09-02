@@ -67,6 +67,8 @@ Status legend (verified against `applyRestProps` in
 | `min-width`, `min-height`, `max-width`, `max-height` | Implemented | `style.go:324-339`; enforced `layout.go:181-186, 321-328`; `%` resolves against viewport approximation |
 | `box-sizing` (`content-box|border-box`) | Implemented | parsed `style.go`; default `content-box` (specified width is content width); `border-box` makes width include padding+border (`layout.go` `buildBlock`); test `TestBoxSizingBorderBox` |
 | `overflow` / `overflow-x` / `overflow-y` (`visible|hidden|auto|scroll|clip`) | Implemented | Sticky scrollport selection (`sticky.go`) plus paint clip of descendant fill/text/line/image to the padding box for `hidden|clip|auto|scroll` (`overflow_clip.go`). `visible` does not clip. Tests `TestOverflowClip`, `TestStickyOverflow*` |
+| `margin-trim` (`none|block|block-start|block-end|inline-start|inline-end`) | Implemented (lite) | Parsed, stored at `style.go:334` (`ResolvedStyle.MarginTrim`) via `style_advanced_props.go:44`; consumed in `layout_flow.go` (trims first/last child block margins at container edges). `inline` and logical sides parse but trim only block axis for horizontal-tb. Test `TestMarginTrim` (`style_advanced_props_test.go:15`). |
+| `box-decoration-break` (`slice|clone`) | Implemented (parsed, no visual effect) | Parsed, stored at `style.go:335` (`ResolvedStyle.BoxDecorationBreak`) via `style_advanced_props.go:52`; both values paint as `slice` for paginated PDF (borders/backgrounds do not clone across page breaks). `clone` is accepted then downgraded. Test `TestBoxDecorationBreak` (`style_advanced_props_test.go:35`). |
 
 ### 2.2 Display & flow
 
@@ -119,6 +121,10 @@ Status legend (verified against `applyRestProps` in
 | `box-shadow` / `-webkit-box-shadow` | Implemented | Multi-layer box-shadows with inset layers, offset fill, spread expansion, and blur approximation (`box_shadow.go`). Does not change layout size. Tests `TestBoxShadowParse`, `TestBoxShadowPaints`, `TestBoxShadowBlurPaints`, `phase79_test.go` |
 | `opacity` | Implemented | Parsed in `applyRestProps`; paint via PDF ExtGState (`SetOpacity`). Nested opacities multiply. Accepts `filter: opacity()`. |
 | `accent-color` | Implemented | Parsed `style_properties.go`; inherited. Fill color for form controls (`widgetValueColor` `layout.go`). Tests `widget_color_test.go`, `phase79_test.go` |
+| `background-attachment` (`scroll|fixed|local`) | Implemented (parsed, no visual effect) | Parsed, stored at `style.go:296` (`ResolvedStyle.BackgroundAttachment`) via `style_properties.go:1516`; paginated PDF has no viewport scroll so `fixed` paints as `scroll` (see `background_image.go:291`). `local` also paints as `scroll`. Test `TestBackgroundAttachment` (`style_backgrounds_borders_test.go:56`). |
+| `background-blend-mode` | Implemented (standard modes) | Parsed into `ResolvedStyle.BackgroundBlendMode` and applied per background-image layer. PDF uses ExtGState blend modes; PNG uses shared alpha compositing (`style_advanced_props.go`, `background_image.go`, `blend.go`, `pdf/content.go`). Tests `TestBlendModeParsing`, `TestBackgroundBlendModeForLayerRepeatsLastMode`, `TestContentBlendModeUsesPDFExtGState`. |
+| `isolation` (`auto|isolate`) | Partial | Parsed into `ResolvedStyle.Isolation`. `isolate` creates a stacking context and resets the operation-level blend scope for its subtree. Full isolated transparency groups are not available in the PDF writer. |
+| `mix-blend-mode` | Partial | Standard modes are parsed and applied to emitted display-list operations in PDF and PNG. Full element-group backdrop semantics remain deferred because the current display list is flat and the PDF writer has no transparency-group form objects. The newer `plus-lighter` value remains unsupported. Tests `TestMixBlendModeReachesDisplayList`, `TestPaintBlendedFillUsesMultiply`. |
 
 ### 2.5 Table subset
 
@@ -128,6 +134,7 @@ Status legend (verified against `applyRestProps` in
 | `border-spacing` | Implemented | `style.go`; used by `tableSpacing` (suppressed when collapse); test `TestBorderSpacing` |
 | `caption-side` | Implemented | `top` (default) above the grid; `bottom` below; `left`/`right` sit beside the grid (caption shrink-to-fit capped at 40% of table width, grid gets the rest). Tests `TestCaptionSideParse`, `TestCaptionSideBottom`, `TestCaptionSideLeft`, `TestCaptionSideRight` |
 | `table-layout` (`auto|fixed`) | Implemented | Consumed when `fixed` and table width is definite (`layout_tables.go:45`). Column used widths from hints, leftover split evenly; content max-content ignored (`sizeFixedTableColumns` `layout_measure.go:830`). `auto` remains the default path. Test `TestTableLayoutFixedIgnoresContentMax` |
+| `empty-cells` (`show|hide`) | Implemented (lite) | `show` (default) renders borders/background of empty cells (no visible content); `hide` suppresses `border`/`background` of empty cells. Parsed via `style_advanced_props.go`, consumed in `layout_tables.go` (grid paint skips empty-cell chrome when `hide`). Inherited. Test `TestEmptyCells` (table chrome). |
 
 ### 2.6 Print / paged media
 
@@ -232,6 +239,40 @@ Evidence: `internal/layout/multicol.go`, `style_cascade.go` (`applyRestProps`) a
 | `break-*: column \| avoid-column` | [~] Partial | `column` on before/after aliases to page `always` (`applyBreakBeforeProps` `style_properties.go:1486`). `avoid-column` is **ignored** (not page `avoid`). See §2.6 alias table. |
 | `column-rule` / `column-rule-width` / `column-rule-style` / `column-rule-color` | [x] Implemented | Border-style subset (`solid` / `dashed` / `dotted` / `none`); width `thin` / `medium` / `thick` plus lengths; color `currentColor`. Vertical rule centered in `column-gap`; gap 0 or `none` paints nothing. No column-axis (horizontal) rule. `TestColumnRuleParse`, `TestColumnRulePaints` |
 | L2 integer spans, overflow columns | [ ] Missing | Deferred (see `plans/0.2.0/phases/tier-2-pending-3/multicol.md` out of scope) |
+
+### 2.10 Parsed, stored, no visual effect for paginated PDF (intentionally no consumer)
+
+This subsection documents CSS properties that are **parsed and stored** in `ResolvedStyle` (`internal/layout/style.go`) but have **no layout or paint consumer** for the paginated print pipeline. They are intentionally left with no visual effect so that authored HTML does not error and print output stays deterministic. Declarations validate and cascade, then paint as if not set (or with the fixed-to-scroll / clone-to-slice downgrade noted). Compositing properties with an actual consumer are documented in §2.4. This is distinct from **Not implemented** (no field, declaration dropped).
+
+Status for this subsection:
+- **Implemented (parsed, no visual effect)** - declaration is recognized, `style_advanced_props.go` or `style_properties.go` writes a `ResolvedStyle` field, but no box, layout, or `Op` reads it for paginated PDF. Visual output is unchanged. Downgrades are noted.
+- **Not implemented** - no `ResolvedStyle` field and no consumer; the name is recognized but the declaration is dropped. Left in triage families `E_compositing`, `E_containment`, `E_paged_media`, etc.
+
+| Property | Status | Notes / file:line |
+|----------|--------|-------------------|
+| `background-attachment` | Implemented (parsed, no visual effect) | Stored at `style.go:296` via `style_properties.go:1516`. Paginated PDF has no scroll viewport, so `fixed` paints as `scroll` and `local` paints as `scroll` per `background_image.go:291`. No visual difference between `scroll`/`fixed`/`local` in print. |
+| `box-decoration-break` | Implemented (parsed, no visual effect) | Stored at `style.go:335` via `style_advanced_props.go:52`. Values `slice` (initial) and `clone` both paint as `slice` for paginated PDF - borders/backgrounds do not clone across page breaks. Accepted then downgraded; fragment boxes are always sliced. |
+| `contain` | Implemented (parsed, no visual effect) | Stored at `style.go:348` via `style_advanced_props.go:104`. Values `none|strict|content|size|layout|style|paint|inline-size` parse but have no layout effect - size/layout/style/paint containment is a browser performance hint with no print consumer. Paints as `none`. |
+| `contain-intrinsic-size` | Implemented (parsed, no visual effect) | Stored at `style.go:343` via `style_advanced_props.go:88`. Shorthand for intrinsic placeholder when `contain: size` is active; placeholder has no layout consumer in the print engine. |
+| `contain-intrinsic-width` | Implemented (parsed, no visual effect) | Stored at `style.go:344` via `style_advanced_props.go:91`. Placeholder inline size - no consumer. |
+| `contain-intrinsic-height` | Implemented (parsed, no visual effect) | Stored at `style.go:345` via `style_advanced_props.go:94`. Placeholder height - no consumer. |
+| `contain-intrinsic-inline-size` | Implemented (parsed, no visual effect) | Stored at `style.go:346` via `style_advanced_props.go:97`. Logical placeholder inline size - no consumer. |
+| `contain-intrinsic-block-size` | Implemented (parsed, no visual effect) | Stored at `style.go:347` via `style_advanced_props.go:100`. Logical placeholder block size - no consumer. |
+| `content-visibility` | Implemented (parsed, no visual effect) | Stored at `style.go:349` via `style_advanced_props.go:106`. Values `visible|auto|hidden` parse (initial `visible`); `auto`/`hidden` would skip offscreen rendering in a browser but print renders all content. Always paints as `visible`. |
+| `bookmark-label` | Implemented (parsed, no visual effect) | GCPM draft (`css-content-3`/`css-gcpm-3`). Parsed, stored via `style_advanced_props.go`, no PDF outline/bookmark consumer for print - paints as if not set. String content is not emitted as an outline. |
+| `bookmark-level` | Implemented (parsed, no visual effect) | GCPM draft. Parsed, stored, no outline hierarchy consumer - heading outline remains via `h1`-`h6` tags (§1) and `--outline`, not via `bookmark-level`. Paints as `none`. |
+| `bookmark-state` | Implemented (parsed, no visual effect) | GCPM draft. Parsed, stored, no outline open/closed consumer for print. Paints as `open`. |
+| `footnote-display` | Implemented (parsed, no visual effect) | GCPM draft. Parsed, stored, no footnote area consumer - footnotes render as normal flow. Paints as `block`. |
+| `footnote-policy` | Implemented (parsed, no visual effect) | GCPM draft. Parsed, stored, no footnote placement policy across page breaks. Paints as `auto`. |
+| `string-set` | Implemented (parsed, no visual effect) | GCPM draft for running headers/footers. Parsed, stored, no named-string consumer - use `@page` margin boxes or CLI `--header-*`/`--footer-*` (§2.6) instead. Paints as `none`. |
+| `margin-trim` | Implemented (lite) - see §2.1 | Lite impl trims block margins at container edges; listed here because inline/logical sides are parsed but only block axis is consumed in `layout_flow.go`. |
+| `empty-cells` | Implemented (lite) - see §2.5 | Lite impl hides empty-cell chrome when `hide`; listed here only for cross-reference. |
+
+Notes:
+- `background-attachment: fixed -> scroll` downgrade is unconditional for paginated PDF (no viewport). Background position still uses `BackgroundPosX/Y` and `BackgroundSize`/`Repeat` but the attachment axis is fixed to scroll.
+- `box-decoration-break: clone -> slice` downgrade is unconditional; fragmented rects are always sliced at page boundaries (`paint_pagination.go` / `paint_flow.go` split path), backgrounds and borders do not repeat per fragment.
+- `contain` / `contain-intrinsic-*` / `content-visibility` are containment and content-visibility hints for browser layout skipping; the print engine lays out all boxes eagerly and skips none, so these have no effect on `Op` output or pagination.
+- GCPM `bookmark-*` / `footnote-*` / `string-set` are paged-media running-string and footnote collection drafts that would feed a PDF outline or footnote area; the print engine builds its outline from heading tags and CLI TOC flags (§7), not from these properties.
 
 ## 3. Supported units
 

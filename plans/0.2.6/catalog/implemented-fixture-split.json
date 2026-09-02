@@ -1970,7 +1970,7 @@
           "group": "Compositing and Blending",
           "syntax": "<isolation-mode>",
           "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Implemented `isolation` (Compositing and Blending). Effect cell applies a representative value for visual checks."
+          "description": "Partial `isolation` (Compositing and Blending). The effect cell exercises the stacking-context boundary; full PDF transparency-group isolation is deferred."
         },
         {
           "property": "justify-content",
@@ -2291,7 +2291,7 @@
           "group": "Compositing and Blending",
           "syntax": "<blend-mode> | plus-lighter",
           "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Implemented `mix-blend-mode` (Compositing and Blending). Effect cell applies a representative value for visual checks."
+          "description": "Partial `mix-blend-mode` (Compositing and Blending). The effect cell exercises operation-level blending; full element-group backdrop semantics are deferred."
         },
         {
           "property": "object-view-box",

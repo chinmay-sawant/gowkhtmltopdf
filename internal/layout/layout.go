@@ -377,6 +377,9 @@ type Op struct {
 	// PaintOpacity is element opacity (CSS opacity / filter:opacity), 0..1.
 	// 0 or unset (≥1) means fully opaque. Nested opacities are multiplied.
 	PaintOpacity float64
+	// BlendMode is the CSS compositing mode for this display-list operation.
+	// Empty and normal both mean source-over.
+	BlendMode string
 	// Radius is the uniform border radius for rounded fill/stroke rectangles.
 	// RadiusY is the vertical radius when corners are elliptical; 0 means ry=rx.
 	Radius                                                                 float64
@@ -407,6 +410,7 @@ type engine struct {
 	zIndex         int
 	zIndexSet      bool
 	positioned     bool
+	blendMode      string
 	stickySeq      int // monotonically increasing sticky box IDs (for Op.StickyID)
 	// transformCBDepth counts ancestors with transform≠none; fixed→absolute CB.
 	transformCBDepth int
@@ -721,6 +725,9 @@ func (e *engine) add(paintOp Op) {
 		paintOp.ZIndex = e.zIndex
 		paintOp.ZIndexSet = e.zIndexSet
 		paintOp.Positioned = e.positioned
+		if paintOp.BlendMode == "" || paintOp.BlendMode == blendNormal {
+			paintOp.BlendMode = e.blendMode
+		}
 		e.ops = append(e.ops, paintOp)
 	}
 }
@@ -747,8 +754,9 @@ func (e *engine) checkContext() bool {
 	return false
 }
 
-func (e *engine) pushZ(style ResolvedStyle) (int, bool, bool) {
-	prevZ, prevSet, prevPositioned := e.zIndex, e.zIndexSet, e.positioned
+func (e *engine) pushZ(style ResolvedStyle) (int, bool, bool, string) {
+	prevZ, prevSet, prevPositioned, prevBlend := e.zIndex, e.zIndexSet, e.positioned, e.blendMode
+	createsBlendContext := style.MixBlendMode != blendNormal || style.Isolation == "isolate"
 
 	if style.Position == positionAbsolute || style.Position == positionFixed {
 		e.positioned = true
@@ -757,8 +765,8 @@ func (e *engine) pushZ(style ResolvedStyle) (int, bool, bool) {
 	if style.ZIndexSet {
 		e.zIndex = style.ZIndex
 		e.zIndexSet = true
-	} else if style.HasTransform || style.Opacity < 1 {
-		// CSS: transform/opacity create a stacking context (like z-index:0).
+	} else if style.HasTransform || style.Opacity < 1 || createsBlendContext {
+		// CSS: transform, opacity, blend, and isolation create a stacking context.
 		e.zIndex = 0
 		e.zIndexSet = true
 	}
@@ -766,12 +774,18 @@ func (e *engine) pushZ(style ResolvedStyle) (int, bool, bool) {
 	if style.HasTransform || style.Opacity < 1 {
 		e.needsXformStamp = true
 	}
+	if style.Isolation == "isolate" {
+		e.blendMode = ""
+	}
+	if style.MixBlendMode != blendNormal {
+		e.blendMode = style.MixBlendMode
+	}
 
-	return prevZ, prevSet, prevPositioned
+	return prevZ, prevSet, prevPositioned, prevBlend
 }
 
-func (e *engine) popZ(prevZ int, prevSet bool, prevPositioned bool) {
-	e.zIndex, e.zIndexSet, e.positioned = prevZ, prevSet, prevPositioned
+func (e *engine) popZ(prevZ int, prevSet bool, prevPositioned bool, prevBlend string) {
+	e.zIndex, e.zIndexSet, e.positioned, e.blendMode = prevZ, prevSet, prevPositioned, prevBlend
 }
 
 // Layout renders the document into a display list.
@@ -1139,8 +1153,8 @@ func (e *engine) build(node *html.Node, availW, posX, posY float64) *box {
 		return nil
 	}
 
-	prevZ, prevSet, prevPositioned := e.pushZ(sty)
-	defer e.popZ(prevZ, prevSet, prevPositioned)
+	prevZ, prevSet, prevPositioned, prevBlend := e.pushZ(sty)
+	defer e.popZ(prevZ, prevSet, prevPositioned, prevBlend)
 	// Ancestor transforms only (own transform does not change this box's CB).
 	underXformCB := e.transformCBDepth > 0
 	start := len(e.ops)
@@ -1389,7 +1403,7 @@ func (e *engine) paintPositionedPseudo( //nolint:cyclop
 		baseline = pseudoY
 	}
 
-	prevZ, prevSet, prevPositioned := e.pushZ(*style)
+	prevZ, prevSet, prevPositioned, prevBlend := e.pushZ(*style)
 	e.add(Op{ //nolint:exhaustruct // generated pseudo text has no DOM box
 		Kind: OpText, X: pseudoX, Y: baseline, W: e.measureTextFace(text, style),
 		H: style.LineHeight * e.scale, Text: text, Font: face, Size: size,
@@ -1397,7 +1411,7 @@ func (e *engine) paintPositionedPseudo( //nolint:cyclop
 		R:          style.Color[0], G: style.Color[1], B: style.Color[2],
 		Bold: style.FontWeight >= 700,
 	})
-	e.popZ(prevZ, prevSet, prevPositioned)
+	e.popZ(prevZ, prevSet, prevPositioned, prevBlend)
 }
 
 func (e *engine) verticalWritingHeight(contentStart int, current float64, style ResolvedStyle) float64 {
@@ -1518,6 +1532,69 @@ func (e *engine) applyHeightConstraints(style ResolvedStyle, curY float64) float
 	return e.applyHeightConstraintsWithCB(style, curY, -1)
 }
 
+func (e *engine) clampBlockMaxHeight(style ResolvedStyle, curY, cbH, vChrome float64) float64 {
+	if style.MaxHeightPercent >= 0 && cbH >= 0 && cbH < 1e12 {
+		maxH := cbH * style.MaxHeightPercent / oneHundred
+		if style.BoxSizing != borderBox {
+			maxH += vChrome
+		}
+
+		if curY > maxH {
+			return maxH
+		}
+
+		return curY
+	}
+
+	if style.MaxHeight >= 0 {
+		maxHeight := e.scalePt(style.MaxHeight)
+		if style.BoxSizing != borderBox {
+			maxHeight += vChrome
+		}
+
+		if curY > maxHeight {
+			return maxHeight
+		}
+	}
+
+	return curY
+}
+
+func (e *engine) calcMinHeight(style ResolvedStyle, cbH, vChrome float64) float64 {
+	if style.MinHeightPercent >= 0 && cbH >= 0 && cbH < 1e12 {
+		minH := cbH * style.MinHeightPercent / oneHundred
+		if style.BoxSizing != borderBox {
+			minH += vChrome
+		}
+
+		if minH < 0 {
+			return 0
+		}
+
+		return minH
+	}
+
+	minHeight := e.scalePt(style.MinHeight)
+	if style.BoxSizing != borderBox {
+		minHeight += vChrome
+	}
+
+	if minHeight < 0 {
+		return 0
+	}
+
+	return minHeight
+}
+
+func (e *engine) clampBlockMinHeight(style ResolvedStyle, curY, cbH, vChrome float64) float64 {
+	minH := e.calcMinHeight(style, cbH, vChrome)
+	if minH > 0 && curY < minH {
+		return minH
+	}
+
+	return curY
+}
+
 // applyHeightConstraintsWithCB is the definite-CB form for min/max percent.
 func (e *engine) applyHeightConstraintsWithCB(style ResolvedStyle, curY float64, cbH float64) float64 {
 	if h, ok := resolveUsedHeight(style, cbH, e); ok {
@@ -1532,50 +1609,9 @@ func (e *engine) applyHeightConstraintsWithCB(style ResolvedStyle, curY float64,
 			e.scalePt(style.BorderTop.Width) + e.scalePt(style.BorderBottom.Width)
 	}
 
-	// Min-height: percent when CB definite, else absolute.
-	if style.MinHeightPercent >= 0 && cbH >= 0 && cbH < 1e12 {
-		mn := cbH * style.MinHeightPercent / 100
-		if style.BoxSizing != borderBox {
-			mn += vChrome
-		}
-		if mn < 0 {
-			mn = 0
-		}
-		if curY < mn {
-			curY = mn
-		}
-	} else {
-		minHeight := e.scalePt(style.MinHeight)
-		if style.BoxSizing != borderBox {
-			minHeight += vChrome
-		}
-		if minHeight < 0 {
-			minHeight = 0
-		}
-		if minHeight > 0 && curY < minHeight {
-			curY = minHeight
-		}
-	}
+	curY = e.clampBlockMaxHeight(style, curY, cbH, vChrome)
 
-	if style.MaxHeightPercent >= 0 && cbH >= 0 && cbH < 1e12 {
-		mx := cbH * style.MaxHeightPercent / 100
-		if style.BoxSizing != borderBox {
-			mx += vChrome
-		}
-		if curY > mx {
-			curY = mx
-		}
-	} else if style.MaxHeight >= 0 {
-		maxHeight := e.scalePt(style.MaxHeight)
-		if style.BoxSizing != borderBox {
-			maxHeight += vChrome
-		}
-		if curY > maxHeight {
-			curY = maxHeight
-		}
-	}
-
-	return curY
+	return e.clampBlockMinHeight(style, curY, cbH, vChrome)
 }
 
 // resolveBlockWidth computes a block's used border-box width and the scaled
@@ -1649,9 +1685,9 @@ func resolveDefiniteWidth(eng *engine, style ResolvedStyle, availW float64, widt
 
 // clampBlockMinMax applies the min/max-width constraints to w.
 func clampBlockMinMax(eng *engine, style ResolvedStyle, availW, width float64) float64 {
-	width = clampBlockMinWidth(eng, style, availW, width)
+	width = clampBlockMaxWidth(eng, style, availW, width)
 
-	return clampBlockMaxWidth(eng, style, availW, width)
+	return clampBlockMinWidth(eng, style, availW, width)
 }
 
 func clampBlockMinWidth(eng *engine, style ResolvedStyle, availW, width float64) float64 {

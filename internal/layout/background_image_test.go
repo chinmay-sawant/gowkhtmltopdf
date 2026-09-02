@@ -181,6 +181,30 @@ func TestBackgroundImageMultiLayer(t *testing.T) {
 	}
 }
 
+func TestBackgroundBlendModeFollowsBackgroundLayerOrder(t *testing.T) {
+	t.Parallel()
+
+	eng := newBackgroundImageEngine(func(string) ([]byte, error) {
+		return tinyPNG(2, 2), nil
+	})
+	sty := ResolvedStyle{ //nolint:exhaustruct // background blend layer test
+		BackgroundImage:     `url("a.png"), url("b.png")`,
+		BackgroundBlendMode: "multiply, screen",
+	}
+	eng.prependChrome(0, &box{}, sty, 0, 0, 40, 20)
+
+	var modes []string
+	for _, op := range eng.deferredChrome[0].ops {
+		if op.Kind == OpImage {
+			modes = append(modes, op.BlendMode)
+		}
+	}
+
+	if len(modes) != 2 || modes[0] != blendScreen || modes[1] != blendMultiply {
+		t.Fatalf("background blend modes = %q, want [screen multiply]", modes)
+	}
+}
+
 func TestBackgroundImageNoBackgroundFlag(t *testing.T) {
 	t.Parallel()
 

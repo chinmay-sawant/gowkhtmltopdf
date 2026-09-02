@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"maps"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -28,8 +29,9 @@ type Content struct {
 	imageUses   map[string]string // resource name -> image object ref
 	imageRefs   map[string]*imageResource
 	imageDedup  map[imageDedupKey]*imageResource
-	opacity     float64 // 0 disables
-	markedDepth int     // tracks nesting of BDC/EMC blocks
+	opacity     float64           // 0 disables
+	blendUses   map[string]string // resource name -> PDF blend mode name
+	markedDepth int               // tracks nesting of BDC/EMC blocks
 	doc         *Document
 }
 
@@ -44,6 +46,24 @@ type imageDedupKey struct {
 	grayscale bool
 }
 
+var pdfBlendModes = map[string]string{ //nolint:gochecknoglobals // immutable CSS-to-PDF mode mapping
+	"multiply":    "Multiply",
+	"screen":      "Screen",
+	"overlay":     "Overlay",
+	"darken":      "Darken",
+	"lighten":     "Lighten",
+	"color-dodge": "ColorDodge",
+	"color-burn":  "ColorBurn",
+	"hard-light":  "HardLight",
+	"soft-light":  "SoftLight",
+	"difference":  "Difference",
+	"exclusion":   "Exclusion",
+	"hue":         "Hue",
+	"saturation":  "Saturation",
+	"color":       "Color",
+	"luminosity":  "Luminosity",
+}
+
 const fontRuneInitialCapacity = 32
 
 // NewContent creates an empty content stream builder.
@@ -54,6 +74,7 @@ func NewContent() *Content {
 		imageUses:  map[string]string{},
 		imageRefs:  map[string]*imageResource{},
 		imageDedup: map[imageDedupKey]*imageResource{},
+		blendUses:  map[string]string{},
 	}
 }
 
@@ -140,6 +161,7 @@ func cloneContent(cur *Content) *Content {
 		imageRefs:   imageRefs,
 		imageDedup:  cloneImageDedupMap(cur.imageDedup, imageRefs),
 		opacity:     cur.opacity,
+		blendUses:   cloneStringMap(cur.blendUses),
 		markedDepth: cur.markedDepth,
 		doc:         cur.doc,
 	}
@@ -256,6 +278,27 @@ func (c *Content) SetOpacity(opacity float64) {
 
 	c.opacity = opacity
 	c.buf.WriteString("/opacity gs\n")
+}
+
+// SetBlendMode selects a PDF transparency blend mode for subsequent painting.
+// The caller normally brackets this with Save and Restore so the mode applies
+// to one display-list operation.
+//
+//nolint:wsl // resource initialization and registration stay adjacent
+func (c *Content) SetBlendMode(mode string) {
+	pdfName, ok := pdfBlendModes[strings.ToLower(strings.TrimSpace(mode))]
+	if !ok || pdfName == "Normal" {
+		return
+	}
+
+	resourceName := "bm" + pdfName
+	if c.blendUses == nil {
+		c.blendUses = map[string]string{}
+	}
+	c.blendUses[resourceName] = pdfName
+	c.buf.WriteString("/")
+	c.buf.WriteString(resourceName)
+	c.buf.WriteString(" gs\n")
 }
 
 // paths
@@ -708,12 +751,27 @@ func (c *Content) imageResources() map[string]string {
 }
 
 // extGState returns the ExtGState dict for the page resources ("" when none).
+//
+//nolint:wsl // resource sorting and serialization stay together for deterministic output
 func (c *Content) extGState() string {
+	entries := make([]string, 0, len(c.blendUses)+1)
 	if c.opacity > 0 {
-		return fmt.Sprintf("/ExtGState << /opacity << /CA %s /ca %s >> >>", num(c.opacity), num(c.opacity))
+		entries = append(entries, fmt.Sprintf("/opacity << /CA %s /ca %s >>", num(c.opacity), num(c.opacity)))
 	}
 
-	return ""
+	resources := make([]string, 0, len(c.blendUses))
+	for resourceName := range c.blendUses {
+		resources = append(resources, resourceName)
+	}
+	sort.Strings(resources)
+	for _, resourceName := range resources {
+		entries = append(entries, fmt.Sprintf("/%s << /BM /%s >>", resourceName, c.blendUses[resourceName]))
+	}
+	if len(entries) == 0 {
+		return ""
+	}
+
+	return "/ExtGState << " + strings.Join(entries, " ") + " >>"
 }
 
 // BeginMarkedContent begins a marked-content sequence with a structure tag and MCID.

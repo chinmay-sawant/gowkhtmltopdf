@@ -28,14 +28,52 @@ func applyBorderImageProps(style *ResolvedStyle, prop, value string) bool {
 	return true
 }
 
+const (
+	maxBorderImageRepeatTokens = 2
+	borderRepeatRound          = "round"
+)
+
 func parseBorderImageShorthand(style *ResolvedStyle, value string) {
 	trimmed := strings.TrimSpace(value)
+	if trimmed == "" || strings.EqualFold(trimmed, "none") {
+		style.BorderImageSource = ""
+
+		return
+	}
+
 	if url, ok := firstCSSUrl(trimmed); ok {
 		style.BorderImageSource = url
 	} else if strings.HasPrefix(trimmed, "url(") {
 		style.BorderImageSource = urlFunctionTarget(trimmed)
-	} else {
-		style.BorderImageSource = trimmed
+	}
+
+	nonURL := trimmed
+
+	start := strings.Index(strings.ToLower(trimmed), "url(")
+	if start >= 0 {
+		end := strings.Index(trimmed[start:], ")")
+		if end >= 0 {
+			nonURL = trimmed[:start] + " " + trimmed[start+end+1:]
+		}
+	}
+
+	var repeatTokens []string
+
+	fields := strings.Fields(nonURL)
+	for _, tok := range fields {
+		tokLower := strings.ToLower(strings.Trim(tok, ",;/"))
+		switch tokLower {
+		case "stretch", "repeat", borderRepeatRound, "space":
+			repeatTokens = append(repeatTokens, tokLower)
+		}
+
+		if len(repeatTokens) == maxBorderImageRepeatTokens {
+			break
+		}
+	}
+
+	if len(repeatTokens) > 0 {
+		style.BorderImageRepeat = strings.Join(repeatTokens, " ")
 	}
 }
 
@@ -141,7 +179,9 @@ func (e *engine) appendBorderImage(
 		return append(dst, op)
 	}
 
-	isRepeat := strings.Contains(repeat, "repeat") || strings.Contains(repeat, "round") || strings.Contains(repeat, "space")
+	isRepeat := strings.Contains(repeat, "repeat") ||
+		strings.Contains(repeat, borderRepeatRound) ||
+		strings.Contains(repeat, "space")
 
 	// Single-image path keeps image count low for fixture60 spill test.
 	// Slice, outset, width and repeat still matter via geometry differences.

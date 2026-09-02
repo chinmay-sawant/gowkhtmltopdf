@@ -755,6 +755,11 @@ func paint(img *image.NRGBA, paintOp *layout.Op, pxPerPt float64, atlas *glyphAt
 	if paintOp == nil || paintOp.Kind == layout.OpLinkURI {
 		return
 	}
+	if paintOp.BlendMode != "" && paintOp.BlendMode != "normal" {
+		paintBlended(img, paintOp, pxPerPt, atlas, imageCache)
+
+		return
+	}
 
 	if paintOp.XformSet && !paintOp.Xform.IsIdentity() {
 		paintTransformedOp(img, paintOp, pxPerPt, atlas, imageCache)

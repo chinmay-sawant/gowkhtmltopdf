@@ -1999,15 +1999,17 @@ func applyTransformGroup(
 			style.Transform = m
 			style.HasTransform = has
 			if !math.IsNaN(xp) {
-				if style.TranslateXPercent == -1 {
+				if !style.TranslateXPercentSet {
 					style.TranslateXPercent = xp
+					style.TranslateXPercentSet = true
 				} else {
 					style.TranslateXPercent += xp
 				}
 			}
 			if !math.IsNaN(yp) {
-				if style.TranslateYPercent == -1 {
+				if !style.TranslateYPercentSet {
 					style.TranslateYPercent = yp
+					style.TranslateYPercentSet = true
 				} else {
 					style.TranslateYPercent += yp
 				}

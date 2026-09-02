@@ -416,7 +416,9 @@ func (p *pagePainter) paintOp(paintOp *Op) {
 		return
 	}
 
-	needGS := paintOp.XformSet || (paintOp.PaintOpacity > 0 && paintOp.PaintOpacity < 1)
+	needBlend := paintOp.BlendMode != "" && paintOp.BlendMode != blendNormal
+	opacity := pdfPaintOpacity(paintOp, needBlend)
+	needGS := paintOp.XformSet || opacity < 1 || needBlend
 	if needGS {
 		p.child.Save()
 	}
@@ -426,8 +428,11 @@ func (p *pagePainter) paintOp(paintOp *Op) {
 		p.child.Transform(a, b, cc, d, e, f)
 	}
 
-	if paintOp.PaintOpacity > 0 && paintOp.PaintOpacity < 1 {
-		p.child.SetOpacity(paintOp.PaintOpacity)
+	if opacity < 1 {
+		p.child.SetOpacity(opacity)
+	}
+	if needBlend {
+		p.child.SetBlendMode(paintOp.BlendMode)
 	}
 
 	switch {
@@ -508,7 +513,7 @@ func StyleOf(paintOp *Op) PaintStyle {
 		pstyle.StrokeWidth = 1
 	}
 	// Pre-composite translucent fills against white paper (PDF path).
-	if paintOp.Alpha > 0 && paintOp.Alpha < 1 {
+	if paintOp.Alpha > 0 && paintOp.Alpha < 1 && !hasBlendMode(paintOp) {
 		a := paintOp.Alpha
 		pstyle.FillR = paintOp.R*a + (1 - a)
 		pstyle.FillG = paintOp.G*a + (1 - a)
@@ -521,6 +526,25 @@ func StyleOf(paintOp *Op) PaintStyle {
 	pstyle.FakeBold = FakeBoldFor(paintOp)
 
 	return pstyle
+}
+
+func hasBlendMode(paintOp *Op) bool {
+	return paintOp != nil && paintOp.BlendMode != "" && paintOp.BlendMode != blendNormal
+}
+
+func pdfPaintOpacity(paintOp *Op, includeAlpha bool) float64 {
+	opacity := 1.0
+	if paintOp == nil {
+		return opacity
+	}
+	if paintOp.PaintOpacity > 0 && paintOp.PaintOpacity < 1 {
+		opacity = paintOp.PaintOpacity
+	}
+	if includeAlpha && paintOp.Alpha > 0 && paintOp.Alpha < 1 {
+		opacity *= paintOp.Alpha
+	}
+
+	return opacity
 }
 
 // FakeBoldFor reports whether CSS bold should be synthesized for op (Latin
@@ -658,7 +682,9 @@ func paintBandOp(
 	chld *pdf.Content, page *pdf.Page, paintOp *Op, contentH, pageH float64,
 	margins PaintOptions, resName func(*pdf.Font) string, nextImg *int, firstErr *error,
 ) {
-	needGS := paintOp.XformSet || (paintOp.PaintOpacity > 0 && paintOp.PaintOpacity < 1)
+	needBlend := paintOp.BlendMode != "" && paintOp.BlendMode != blendNormal
+	opacity := pdfPaintOpacity(paintOp, needBlend)
+	needGS := paintOp.XformSet || opacity < 1 || needBlend
 	if needGS {
 		chld.Save()
 	}
@@ -668,8 +694,11 @@ func paintBandOp(
 		chld.Transform(a, b, cc, d, e, f)
 	}
 
-	if paintOp.PaintOpacity > 0 && paintOp.PaintOpacity < 1 {
-		chld.SetOpacity(paintOp.PaintOpacity)
+	if opacity < 1 {
+		chld.SetOpacity(opacity)
+	}
+	if needBlend {
+		chld.SetBlendMode(paintOp.BlendMode)
 	}
 
 	isUA := page != nil && page.Doc() != nil && (page.Doc().Policy().IsPDFUA1() || page.Doc().Policy().IsPDFUA2())

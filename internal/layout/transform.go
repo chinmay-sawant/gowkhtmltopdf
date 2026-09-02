@@ -872,9 +872,11 @@ func ApplyTranslate(style *ResolvedStyle, value string, fsize float64) bool {
 	style.Transform = style.Transform.Mul(tr)
 	if txIsPct {
 		style.TranslateXPercent = txPct
+		style.TranslateXPercentSet = true
 	}
 	if tyIsPct {
 		style.TranslateYPercent = tyPct
+		style.TranslateYPercentSet = true
 	}
 	style.HasTransform = true
 	return true
@@ -928,14 +930,17 @@ func stampBoxTransformsRec(boxNode *box, parentAccum Matrix2D, ops []Op, covered
 
 	if sty != nil && sty.HasTransform {
 		tform := sty.Transform
-		if sty.TranslateXPercent >= 0 || sty.TranslateYPercent >= 0 {
+
+		if sty.TranslateXPercentSet || sty.TranslateYPercentSet {
 			tx, ty := 0.0, 0.0
-			if sty.TranslateXPercent >= 0 {
-				tx = sty.TranslateXPercent / 100 * boxNode.w
+			if sty.TranslateXPercentSet {
+				tx = sty.TranslateXPercent / oneHundred * boxNode.w
 			}
-			if sty.TranslateYPercent >= 0 {
-				ty = sty.TranslateYPercent / 100 * boxNode.height
+
+			if sty.TranslateYPercentSet {
+				ty = sty.TranslateYPercent / oneHundred * boxNode.height
 			}
+
 			tform = tform.Mul(Translate(tx, ty))
 		}
 		ox, oy := resolveTransformOrigin(sty.TransformOrigin, boxNode)
