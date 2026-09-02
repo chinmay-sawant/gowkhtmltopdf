@@ -80,9 +80,13 @@ func setDisplayKeyword(style *ResolvedStyle, value string) {
 		displayFlex, displayInlineFlex, displayGrid, displayInlineGrid, displaySubgrid, displayFlowRoot:
 		style.Display = value
 	case "-webkit-box":
-		style.Display = displayFlex
+		style.Display = displayBlock
+		style.IsWebkitBox = true
+		style.WhiteSpace = cssWhiteSpaceNowrap
 	case "-webkit-inline-box":
-		style.Display = displayInlineFlex
+		style.Display = cssDisplayInlineBlock
+		style.IsWebkitBox = true
+		style.WhiteSpace = cssWhiteSpaceNowrap
 	}
 }
 
@@ -1494,21 +1498,15 @@ func applyColorBackgroundProps(style *ResolvedStyle, prop, value string) bool {
 	case "background-size":
 		style.BackgroundSize = strings.TrimSpace(value)
 	case "background-repeat":
-		style.BackgroundRepeat = strings.TrimSpace(value)
-	case "background-repeat-x", "background-repeat-inline":
-		bgRepeatX := strings.TrimSpace(value)
-		if bgRepeatX == "repeat" {
-			bgRepeatX = "repeat-x"
-		}
-
-		style.BackgroundRepeat = bgRepeatX
-	case "background-repeat-y", "background-repeat-block":
-		bgRepeatY := strings.TrimSpace(value)
-		if bgRepeatY == "repeat" {
-			bgRepeatY = "repeat-y"
-		}
-
-		style.BackgroundRepeat = bgRepeatY
+		setBackgroundRepeatShorthand(style, value)
+	case "background-repeat-x":
+		style.BackgroundRepeatX = strings.TrimSpace(value)
+	case "background-repeat-y":
+		style.BackgroundRepeatY = strings.TrimSpace(value)
+	case "background-repeat-inline":
+		style.BackgroundRepeatInline = strings.TrimSpace(value)
+	case "background-repeat-block":
+		style.BackgroundRepeatBlock = strings.TrimSpace(value)
 	case "background-clip":
 		style.BackgroundClip = strings.ToLower(strings.TrimSpace(value))
 	case "background-origin":

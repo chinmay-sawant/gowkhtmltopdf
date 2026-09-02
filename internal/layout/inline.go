@@ -843,8 +843,9 @@ func (e *engine) emitLine(
 
 	// Coalesce adjacent same-style text runs into one op so PDF/image paint
 	// advances match layout (avoids word-by-word Tj gaps). Skip when
-	// justifying — gaps are distributed between word items.
-	if textAlign != cssTextAlignJustify {
+	// justifying — gaps are distributed between word items. Legacy
+	// -webkit-box keeps items separate so pack backgrounds stay distinct.
+	if textAlign != cssTextAlignJustify && (boxNode == nil || boxNode.style == nil || !boxNode.style.IsWebkitBox) {
 		line = e.coalesceTextItems(line)
 	}
 

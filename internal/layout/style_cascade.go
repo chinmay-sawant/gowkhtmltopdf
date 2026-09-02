@@ -936,7 +936,7 @@ func resolveFontWeight(current int, val string) int {
 // longhand (e.g. margin-bottom) always overrides its shorthand (margin).
 // Package-level to avoid per-node slice/array rebuilds.
 var restShorthandProps = [...]string{ //nolint:gochecknoglobals // static apply order
-	"margin", "padding", borderProperty, borderTopProperty, borderRightProperty, borderBottomProperty, borderLeftProperty,
+	"display", "margin", "padding", borderProperty, borderTopProperty, borderRightProperty, borderBottomProperty, borderLeftProperty,
 	borderWidthKeyword, borderStyleKeyword,
 	borderColorKeyword, gapKeyword, flexKeyword, containerKeyword,
 	cssPropMarginInline, cssPropMarginBlock, cssPropPaddingInline, cssPropPaddingBlock,
@@ -1099,6 +1099,18 @@ func applyStyleProp(
 	effectiveValue := value
 	if effectiveProp != prop {
 		effectiveValue = remapWebkitValue(prop, value)
+	}
+	if prop == "-webkit-box-pack" && style.Display == displayBlock {
+		switch effectiveValue {
+		case "center":
+			style.TextAlign = "center"
+		case flexStartKeyword:
+			style.TextAlign = "left"
+		case fxFlexEnd:
+			style.TextAlign = "right"
+		case fxBetween:
+			style.TextAlign = cssTextAlignJustify
+		}
 	}
 	for _, group := range styleGroups {
 		if group(style, effectiveProp, effectiveValue, fsize, ctx, parent, hasParent) {

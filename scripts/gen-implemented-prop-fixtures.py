@@ -22,7 +22,7 @@ OUT_DIR = ROOT / "testdata/golden"
 
 TINY_PNG = (
     "data:image/png;base64,"
-    "iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mNk+M9Qz0AEYBxVSF+FABJADveWkH26AAAAAElFTkSuQmCC"
+    "iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAIAAAACUFjqAAAAEklEQVR42mP4z8CABzGMSmNDALfKY53W1e90AAAAAElFTkSuQmCC"
 )
 
 
@@ -186,13 +186,13 @@ def effect_html(prop: str, kind: str, legacy_of: str | None) -> str:
             )
         if "ordinal" in p:
             return (
-                f'<div style="display:-webkit-box;-webkit-box-orient:horizontal;border:1px solid #336;padding:4px;">'
-                f'<span style="{p}:2;background:#fd8;padding:2px 6px;">2nd</span>'
-                f'<span style="{p}:1;background:#cde;padding:2px 6px;">1st</span></div>'
+                f'<div style="display:-webkit-box;-webkit-box-orient:horizontal;border:1px solid #336;padding:4px;gap:4px;">'
+                f'<span style="{p}:1;background:#fd8;padding:2px 6px;">2nd</span>'
+                f'<span style="{p}:2;background:#cde;padding:2px 6px;">1st</span></div>'
             )
         if p.endswith("orient"):
             return (
-                f'<div style="display:-webkit-box;{p}:vertical;border:1px solid #336;padding:4px;">'
+                f'<div style="display:-webkit-box;{p}:vertical;-webkit-box-align:start;border:1px solid #336;padding:4px;gap:4px;width:48px;">'
                 f'<span style="background:#cde;padding:2px 6px;">A</span>'
                 f'<span style="background:#9cf;padding:2px 6px;">B</span></div>'
             )
@@ -364,7 +364,7 @@ def render_fixture(key: str, meta: dict, font_family: str) -> str:
       display: inline-block;
       background: #1f4b99;
       color: #fff;
-      font-weight: bold;
+      font-weight: normal;
       padding: 2px 8px;
       border-radius: 3px;
       letter-spacing: 0.04em;
@@ -392,7 +392,7 @@ def render_fixture(key: str, meta: dict, font_family: str) -> str:
       font-family: "Liberation Mono", monospace;
       font-size: 8.5pt;
       color: #103a7a;
-      font-weight: bold;
+      font-weight: normal;
     }}
     td.prop .meta {{ font-size: 7.5pt; color: #667; margin-top: 2px; }}
     td.desc {{ width: 38%; font-size: 8.5pt; }}
