@@ -1218,7 +1218,9 @@ func (e *engine) emitCell(cell *box, skipBorders bool) {
 	sty := *cell.style
 	start := len(e.ops)
 
-	if e.opts.Background {
+	hideEmpty := isEmptyCellHidden(e, cell, sty)
+
+	if e.opts.Background && !hideEmpty {
 		if r, g, bl, a, ok := e.cellBG(cell); ok {
 			e.add(Op{ //nolint:exhaustruct // intentional zero fields
 				Kind: OpFillRect, X: cell.x, Y: cell.y, W: cell.w, H: cell.height,
@@ -1227,7 +1229,7 @@ func (e *engine) emitCell(cell *box, skipBorders bool) {
 		}
 	}
 
-	if !skipBorders {
+	if !skipBorders && !hideEmpty {
 		e.emitBorders(sty, cell.x, cell.y, cell.w, cell.height)
 	}
 
@@ -1285,4 +1287,47 @@ func cellVerticalAlignOffset(cell *box, curY float64) float64 {
 	default:
 		return curY
 	}
+}
+
+func isEmptyTableCell(cell *box) bool {
+	if cell == nil {
+		return false
+	}
+	if cell.hasInk {
+		return false
+	}
+	if cell.node != nil && len(cell.node.Children) == 0 {
+		return true
+	}
+	if cell.contentH < 0.5 {
+		return true
+	}
+	return !cell.hasInk
+}
+
+func isEmptyCellHidden(e *engine, cell *box, sty ResolvedStyle) bool {
+	if cell == nil || e == nil {
+		return false
+	}
+	isEmpty := isEmptyTableCell(cell)
+	if !isEmpty {
+		return false
+	}
+	if sty.EmptyCells == "hide" {
+		return true
+	}
+	if sty.EmptyCells == "show" {
+		return false
+	}
+	if cell.node != nil {
+		for n := cell.node.Parent; n != nil; n = n.Parent {
+			if n.Name == "table" {
+				if ts := e.stylePtr(n); ts != nil && ts.EmptyCells == "hide" {
+					return true
+				}
+				break
+			}
+		}
+	}
+	return false
 }

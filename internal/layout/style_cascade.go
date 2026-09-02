@@ -266,6 +266,7 @@ var inheritableProps = []inheritCopy{ //nolint:gochecknoglobals // static inheri
 	{[]string{"text-decoration-skip"}, func(dst, src *ResolvedStyle) {
 		dst.TextDecorationSkip = src.TextDecorationSkip
 	}},
+	{[]string{"empty-cells"}, func(dst, src *ResolvedStyle) { dst.EmptyCells = src.EmptyCells }},
 }
 
 // inheritProps copies inheritable properties from the parent, unless the

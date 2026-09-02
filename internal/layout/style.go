@@ -267,6 +267,7 @@ type ResolvedStyle struct {
 	PageName      string
 	Orphans       int    // CSS orphans; inherited; initial 2; integer ≥ 1
 	Widows        int    // CSS widows; inherited; initial 2; integer ≥ 1
+	EmptyCells    string // "show" | "hide"; inherited per CSS Tables 3; "" = show (initial)
 	ContainerType string // "" | "normal" | "inline-size" | "size"
 	ContainerName string // space-separated lower-case names; empty = none
 	// Static 2D CSS transforms (paint-time CTM; sibling flow unchanged).
@@ -448,6 +449,7 @@ func initialStyle() ResolvedStyle { //nolint:funlen // complete CSS initial-valu
 		Direction:          "ltr",
 		Orphans:            2,
 		Widows:             2,
+		EmptyCells:          "",
 		Transform:           IdentityMatrix(),
 		TransformOrigin:     defaultTransformOrigin(),
 		TranslateXPercent:   -1,

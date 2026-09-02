@@ -115,6 +115,13 @@ func onlyCollapsibleWS(nodes []*html.Node) bool {
 	return true
 }
 
+// margin-trim helpers for horizontal-tb (lite print).
+// block / block-start / block-end map to top/bottom; inline variants to left/right.
+func marginTrimTrimsBlockStart(trim string) bool { return trim == "block" || trim == "block-start" }
+func marginTrimTrimsBlockEnd(trim string) bool   { return trim == "block" || trim == "block-end" }
+func marginTrimTrimsInlineStart(trim string) bool { return trim == "inline" || trim == "inline-start" }
+func marginTrimTrimsInlineEnd(trim string) bool   { return trim == "inline" || trim == "inline-end" }
+
 // flowChildren lays out children in document order: runs of inlines, then
 // block boxes, alternating as they appear. Floated children are positioned
 // out of flow with a lite exclusion model; clear advances past them.
@@ -166,6 +173,34 @@ func (e *engine) flowChildren(
 		absCBW = contentW + e.scalePt(sty.PaddingLeft) + e.scalePt(sty.PaddingRight)
 	}
 
+	// margin-trim lite: find first/last in-flow block child for trimming.
+	parentTrim := sty.MarginTrim
+	firstBlockIdx, lastBlockIdx := -1, -1
+	if parentTrim != "" && parentTrim != "none" {
+		for i, child := range children {
+			cs := e.stylePtr(child)
+			if isSkippableFlowNode(child, cs) {
+				continue
+			}
+			if isOutOfFlowNode(child, cs) {
+				continue
+			}
+			if isFlowFloat(child, cs) {
+				continue
+			}
+			if e.isInlineChild(child) {
+				continue
+			}
+			if child.Type != html.ElementNode {
+				continue
+			}
+			if firstBlockIdx == -1 {
+				firstBlockIdx = i
+			}
+			lastBlockIdx = i
+		}
+	}
+
 	idx := 0
 	for idx < len(children) {
 		if e.checkContext() {
@@ -173,7 +208,7 @@ func (e *engine) flowChildren(
 		}
 
 		curY, prevBottom, idx, deferred = e.flowOneChild(parent, children, idx, sty,
-			contentW, contentX, posY, curY, prevBottom, floats, deferred)
+			contentW, contentX, posY, curY, prevBottom, floats, deferred, parentTrim, firstBlockIdx, lastBlockIdx)
 	}
 
 	parentHeight := e.applyHeightConstraints(sty, curY+e.scalePt(sty.PaddingBottom))
@@ -209,6 +244,7 @@ func (e *engine) flowChildren(
 func (e *engine) flowOneChild(
 	parent *box, children []*html.Node, idx int, sty ResolvedStyle,
 	contentW, contentX, posY, curY, prevBottom float64, floats *floatState, deferred []*html.Node,
+	parentTrim string, firstBlockIdx, lastBlockIdx int,
 ) (float64, float64, int, []*html.Node) {
 	node := children[idx]
 	// Fetch the child's resolved style once; all flow-child predicates and
@@ -240,7 +276,9 @@ func (e *engine) flowOneChild(
 		curY, prevBottom = e.layoutInlineRun(parent, sty, run, contentW, contentX, posY, curY, floats, prevBottom)
 	case node.Type == html.ElementNode:
 		var cblock *box
-		curY, prevBottom, cblock = e.layoutBlockChild(node, floats, contentW, contentX, posY, curY, prevBottom)
+		isFirst := idx == firstBlockIdx && firstBlockIdx != -1
+		isLast := idx == lastBlockIdx && lastBlockIdx != -1
+		curY, prevBottom, cblock = e.layoutBlockChild(node, floats, contentW, contentX, posY, curY, prevBottom, parentTrim, isFirst, isLast)
 		attachFlowBox(parent, cblock, e)
 
 		idx++
@@ -385,9 +423,44 @@ func attachFlowBox(parent *box, child *box, engine *engine) {
 // layoutBlockChild builds one block-level child: it clears floats, collapses
 // margins with the previous sibling, applies the BFC float exclusion, and
 // returns the advanced cy, the next margin accumulator, and the built box.
+// parentTrim/isFirst/isLast implement margin-trim lite for horizontal-tb:
+// block-start => top of first, block-end => bottom of last,
+// inline-start => left of first, inline-end => right of last.
 func (e *engine) layoutBlockChild(
 	node *html.Node, floats *floatState, contentW, contentX, posY, curY, prevBottom float64,
+	parentTrim string, isFirst, isLast bool,
 ) (float64, float64, *box) {
+	// margin-trim lite: override child margins at container edges.
+	needTrim := false
+	var trimmed *ResolvedStyle
+	if parentTrim != "" && parentTrim != "none" && (isFirst || isLast) {
+		orig := e.styleVal(node)
+		trimTop := isFirst && marginTrimTrimsBlockStart(parentTrim)
+		trimBottom := isLast && marginTrimTrimsBlockEnd(parentTrim)
+		trimLeft := isFirst && marginTrimTrimsInlineStart(parentTrim)
+		trimRight := isLast && marginTrimTrimsInlineEnd(parentTrim)
+		if trimTop || trimBottom || trimLeft || trimRight {
+			cpy := orig
+			if trimTop {
+				cpy.MarginTop = 0
+			}
+			if trimBottom {
+				cpy.MarginBottom = 0
+			}
+			if trimLeft {
+				cpy.MarginLeft = 0
+			}
+			if trimRight {
+				cpy.MarginRight = 0
+			}
+			trimmed = &cpy
+			needTrim = true
+		}
+	}
+	if needTrim {
+		e.styleOverrides = append(e.styleOverrides, styleOverride{node: node, style: trimmed})
+		defer e.popStyleOverride()
+	}
 	cstate := e.styleVal(node)
 	// In-flow tables always clear below preceding floats (deterministic
 	// report policy). Shrink-to-fit / squeeze-beside is unsupported.

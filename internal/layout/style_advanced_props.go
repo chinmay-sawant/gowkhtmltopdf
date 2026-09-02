@@ -47,6 +47,11 @@ func applyAdvancedProps(style *ResolvedStyle, prop, value string, fsize float64)
 			style.MarginTrim = val
 			return true
 		}
+	case "empty-cells":
+		if val == "show" || val == "hide" {
+			style.EmptyCells = val
+			return true
+		}
 
 	// Wave C: Fragmentation, Image/Color Metadata, Containment
 	case "box-decoration-break", "-webkit-box-decoration-break":
