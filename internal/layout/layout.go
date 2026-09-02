@@ -1277,7 +1277,7 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 	// bg → borders → children (otherwise fills cover text).
 	contentStart := len(e.ops)
 
-	curY := e.scalePt(style.PaddingTop) + e.scalePt(style.BorderTop.Width)
+	curY := e.scalePt(style.PaddingTop) + e.scalePt(borderLayoutWidth(style, style.BorderTop))
 	enclose := e.pushBFCFloats(style, contentX, contentW)
 	children := node.Children
 	widget := node.Name == htmlMeter || node.Name == "progress"
@@ -1310,6 +1310,9 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 	// padding-bottom is inside the border box (space above border-bottom /
 	// letterhead rules — fixture-07/16).
 	curY += e.scalePt(style.PaddingBottom)
+	if style.BorderImageSource != "" && style.Height < 0 && style.HeightPercent < 0 {
+		curY += e.scalePt(borderLayoutWidth(style, style.BorderBottom))
+	}
 	if isVerticalWritingMode(style.WritingMode) {
 		curY = e.verticalWritingHeight(contentStart, curY, style)
 	}

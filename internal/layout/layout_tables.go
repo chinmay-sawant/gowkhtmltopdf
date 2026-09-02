@@ -29,7 +29,8 @@ func (e *engine) buildTable(node *html.Node, style ResolvedStyle, availW, posX, 
 	// copies of their child pointers.
 	tableBox.children = make([]*box, 0, len(placed)+1)
 
-	colW, colMin, colPct, colAbs, cellData := e.measureTableColumns(placed, nCols)
+	fixedTable := style.TableLayout == positionFixed
+	colW, colMin, colPct, colAbs, cellData := e.measureTableColumns(placed, nCols, fixedTable)
 
 	// table width
 	// border-collapse: collapse suppresses the separate-border gap so colspan
@@ -54,7 +55,7 @@ func (e *engine) buildTable(node *html.Node, style ResolvedStyle, availW, posX, 
 	colW, gridW := sizeTableColumns(tableColumnEnv{
 		colMin: colMin, colW: colW, colPct: colPct, colAbs: colAbs,
 		chrome: chrome, availW: gridAvail, tableW: gridHint,
-		fixed: style.TableLayout == positionFixed && gridHint >= 0,
+		fixed: fixedTable && gridHint >= 0,
 	})
 	tableBox.w = gridW
 
@@ -520,7 +521,7 @@ func markRowspanCoverage(occupied [][]int, rowI, cidx, cstate, rowS, nRows int) 
 // cells contribute their content width evenly across the spanned columns
 // (min floor per col). Returns column hints and the per-row cell boxes.
 func (e *engine) measureTableColumns(
-	placed []tcell, nCols int,
+	placed []tcell, nCols int, fixedTable bool,
 ) ([]float64, []float64, []float64, []float64, [][]*box) {
 	colW := make([]float64, nCols)   // preferred = max-content
 	colMin := make([]float64, nCols) // shrink floor = min-content
@@ -554,10 +555,11 @@ func (e *engine) measureTableColumns(
 		cell.row, cell.rowSpan = page.row, page.rSpan
 		cellData[page.row] = append(cellData[page.row], cell)
 		cstate := e.styleVal(page.node)
+		allowHint := !fixedTable || page.row == 0
 
 		switch {
 		case page.cSpan == 1:
-			applySingleCellColumn(cell, cstate, colW, colMin, colPct, colAbs, page.col, e)
+			applySingleCellColumn(cell, cstate, colW, colMin, colPct, colAbs, page.col, e, allowHint)
 		case page.cSpan > 1:
 			distributeSpanColumns(cell, page, colW, colMin, nCols)
 		}
@@ -570,6 +572,7 @@ func (e *engine) measureTableColumns(
 // width hints into its column.
 func applySingleCellColumn(
 	cell *box, cstate ResolvedStyle, colW, colMin, colPct, colAbs []float64, col int, eng *engine,
+	allowHint bool,
 ) {
 	if cell.contentW > colW[col] {
 		colW[col] = cell.contentW
@@ -579,11 +582,11 @@ func applySingleCellColumn(
 		colMin[col] = cell.contentMin
 	}
 
-	if cstate.WidthPercent >= 0 && colPct[col] < 0 {
+	if allowHint && cstate.WidthPercent >= 0 && colPct[col] < 0 {
 		colPct[col] = cstate.WidthPercent
 	}
 
-	if cstate.Width >= 0 && colAbs[col] < 0 {
+	if allowHint && cstate.Width >= 0 && colAbs[col] < 0 {
 		colAbs[col] = eng.scalePt(cstate.Width)
 	}
 }

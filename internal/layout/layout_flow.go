@@ -9,13 +9,26 @@ import (
 )
 
 func (e *engine) contentBox(posX, boxW float64, style ResolvedStyle) (float64, float64) {
+	borderLeft := borderLayoutWidth(style, style.BorderLeft)
+	borderRight := borderLayoutWidth(style, style.BorderRight)
 	contentW := boxW - e.scalePt(style.PaddingLeft) - e.scalePt(style.PaddingRight) -
-		e.scalePt(style.BorderLeft.Width) - e.scalePt(style.BorderRight.Width)
+		e.scalePt(borderLeft) - e.scalePt(borderRight)
 	if contentW < 0 {
 		contentW = 0
 	}
 
-	return posX + e.scalePt(style.BorderLeft.Width) + e.scalePt(style.PaddingLeft), contentW
+	return posX + e.scalePt(borderLeft) + e.scalePt(style.PaddingLeft), contentW
+}
+
+// borderLayoutWidth uses the device width for border-image boxes. Border
+// image replaces the normal border paint, so its content area must use the
+// same converted width as the emitted image slices.
+func borderLayoutWidth(style ResolvedStyle, side border) float64 {
+	if style.BorderImageSource != "" && side.PaintWidth > 0 {
+		return side.PaintWidth
+	}
+
+	return side.Width
 }
 
 // imageRef is the resolved form of one <img src>: bytes + intrinsic size,
