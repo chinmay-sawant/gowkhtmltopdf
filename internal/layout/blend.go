@@ -61,11 +61,9 @@ func backgroundBlendModeForLayer(value string, layerIndex int) string {
 	if layerIndex < 0 {
 		layerIndex = 0
 	}
-	if layerIndex >= len(parts) {
-		layerIndex = len(parts) - 1
-	}
-
-	mode, ok := normalizeBlendMode(parts[layerIndex])
+	// CSS Backgrounds repeats the list to match layer count (cycling).
+	partsIndex := layerIndex % len(parts)
+	mode, ok := normalizeBlendMode(parts[partsIndex])
 	if !ok {
 		return blendNormal
 	}

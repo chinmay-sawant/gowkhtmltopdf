@@ -125,12 +125,15 @@ func applyAdvancedProps(style *ResolvedStyle, prop, value string, fsize float64)
 		if len(modes) == 0 {
 			return false
 		}
+		normalized := make([]string, 0, len(modes))
 		for index := range modes {
-			if _, ok := normalizeBlendMode(modes[index]); !ok {
+			mode, ok := normalizeBlendMode(modes[index])
+			if !ok {
 				return false
 			}
+			normalized = append(normalized, mode)
 		}
-		style.BackgroundBlendMode = strings.Join(modes, ", ")
+		style.BackgroundBlendMode = strings.Join(normalized, ", ")
 		return true
 	case "isolation":
 		if val == "auto" || val == "isolate" {

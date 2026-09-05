@@ -308,7 +308,7 @@
           "group": "CSS Backgrounds and Borders",
           "syntax": "<bg-layer>#? , <final-bg-layer>",
           "code_path": "internal/layout/background_image.go",
-          "description": "Background longhand/shorthand affecting color, image, repeat, position, size, clip, or origin."
+          "description": "Sets color and image together in one line; the box gets a tint with the logo on top."
         },
         {
           "property": "background-attachment",
@@ -317,7 +317,7 @@
           "group": "CSS Backgrounds and Borders",
           "syntax": "<attachment>#",
           "code_path": "internal/layout/style_properties.go",
-          "description": "Background longhand/shorthand affecting color, image, repeat, position, size, clip, or origin."
+          "description": "Chooses whether the image sticks to the box (scroll) or its content (local); fixed counts as scroll on paper, so print looks like scroll."
         },
         {
           "property": "background-blend-mode",
@@ -326,7 +326,7 @@
           "group": "Compositing and Blending",
           "syntax": "<'mix-blend-mode'>#",
           "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Background longhand/shorthand affecting color, image, repeat, position, size, clip, or origin."
+          "description": "Blends the image with the color under it; multiply darkens where the two overlap."
         },
         {
           "property": "background-clip",
@@ -335,7 +335,7 @@
           "group": "CSS Backgrounds and Borders",
           "syntax": "<bg-clip>#",
           "code_path": "internal/layout/style_properties.go",
-          "description": "Background longhand/shorthand affecting color, image, repeat, position, size, clip, or origin."
+          "description": "Draws the line the background may not cross; content-box keeps paint out of the padding and border."
         },
         {
           "property": "background-color",
@@ -344,7 +344,7 @@
           "group": "CSS Backgrounds and Borders",
           "syntax": "<color>",
           "code_path": "internal/layout/style_properties.go:951",
-          "description": "Paints the box background behind content."
+          "description": "Fills the whole border box with one flat color."
         },
         {
           "property": "background-image",
@@ -353,7 +353,7 @@
           "group": "CSS Backgrounds and Borders",
           "syntax": "<bg-image>#",
           "code_path": "internal/layout/background_image.go",
-          "description": "Layers an image (or gradient) behind the content."
+          "description": "Paints a generated gradient (or an image file) behind the content."
         },
         {
           "property": "background-origin",
@@ -362,7 +362,7 @@
           "group": "CSS Backgrounds and Borders",
           "syntax": "<visual-box>#",
           "code_path": "internal/layout/style_properties.go",
-          "description": "Background longhand/shorthand affecting color, image, repeat, position, size, clip, or origin."
+          "description": "Chooses the box the image is measured from; content-box starts it inside the padding."
         },
         {
           "property": "background-position",
@@ -371,7 +371,7 @@
           "group": "CSS Backgrounds and Borders",
           "syntax": "<bg-position>#",
           "code_path": "internal/layout/style_properties.go",
-          "description": "Background longhand/shorthand affecting color, image, repeat, position, size, clip, or origin."
+          "description": "Slides a one-shot image around its box; right bottom parks the image in the corner."
         },
         {
           "property": "background-position-block",
@@ -380,7 +380,7 @@
           "group": "(ungrouped)",
           "syntax": "[ center | [ [ start | end ]? <length-percentage>? ]! ]#",
           "code_path": "internal/layout/style_properties.go",
-          "description": "Background longhand/shorthand affecting color, image, repeat, position, size, clip, or origin."
+          "description": "Logical down-axis position; 100% drops the image to the block end (the bottom here)."
         },
         {
           "property": "background-position-inline",
@@ -389,7 +389,7 @@
           "group": "(ungrouped)",
           "syntax": "[ center | [ [ start | end ]? <length-percentage>? ]! ]#",
           "code_path": "internal/layout/style_properties.go",
-          "description": "Background longhand/shorthand affecting color, image, repeat, position, size, clip, or origin."
+          "description": "Logical across-axis position; 100% pushes the image to the inline end (the right here)."
         },
         {
           "property": "background-position-x",
@@ -398,7 +398,7 @@
           "group": "CSS Backgrounds and Borders",
           "syntax": "[ center | [ [ left | right | x-start | x-end ]? <length-percentage>? ]! ]#",
           "code_path": "internal/layout/style_properties.go",
-          "description": "Background longhand/shorthand affecting color, image, repeat, position, size, clip, or origin."
+          "description": "Across-axis position only; center puts the image mid-width."
         },
         {
           "property": "background-position-y",
@@ -407,7 +407,7 @@
           "group": "CSS Backgrounds and Borders",
           "syntax": "[ center | [ [ top | bottom | y-start | y-end ]? <length-percentage>? ]! ]#",
           "code_path": "internal/layout/style_properties.go",
-          "description": "Background longhand/shorthand affecting color, image, repeat, position, size, clip, or origin."
+          "description": "Down-axis position only; center floats the image mid-height."
         },
         {
           "property": "background-repeat",
@@ -416,7 +416,7 @@
           "group": "CSS Backgrounds and Borders",
           "syntax": "<repeat-style>#",
           "code_path": "internal/layout/style_properties.go",
-          "description": "Background longhand/shorthand affecting color, image, repeat, position, size, clip, or origin."
+          "description": "Tiles the small image on both axes so it fills the box with a grid."
         },
         {
           "property": "background-repeat-block",
@@ -425,7 +425,7 @@
           "group": "(ungrouped)",
           "syntax": "<repetition>#",
           "code_path": "internal/layout/style_properties.go",
-          "description": "Background longhand/shorthand affecting color, image, repeat, position, size, clip, or origin."
+          "description": "Logical down-axis tiling; no-repeat leaves one row tiling across."
         },
         {
           "property": "background-repeat-inline",
@@ -434,7 +434,7 @@
           "group": "(ungrouped)",
           "syntax": "<repetition>#",
           "code_path": "internal/layout/style_properties.go",
-          "description": "Background longhand/shorthand affecting color, image, repeat, position, size, clip, or origin."
+          "description": "Logical across-axis tiling; no-repeat leaves one column tiling down."
         },
         {
           "property": "background-repeat-x",
@@ -443,7 +443,7 @@
           "group": "(ungrouped)",
           "syntax": "<repetition>#",
           "code_path": "internal/layout/style_properties.go",
-          "description": "Background longhand/shorthand affecting color, image, repeat, position, size, clip, or origin."
+          "description": "Tiles along the x axis; the y axis keeps its default tiling, so the box fills."
         },
         {
           "property": "background-repeat-y",
@@ -452,7 +452,7 @@
           "group": "(ungrouped)",
           "syntax": "<repetition>#",
           "code_path": "internal/layout/style_properties.go",
-          "description": "Background longhand/shorthand affecting color, image, repeat, position, size, clip, or origin."
+          "description": "Tiles down the y axis; the x axis keeps its default tiling, so the box fills."
         },
         {
           "property": "background-size",
@@ -461,7 +461,7 @@
           "group": "CSS Backgrounds and Borders",
           "syntax": "<bg-size>#",
           "code_path": "internal/layout/style_properties.go",
-          "description": "Background longhand/shorthand affecting color, image, repeat, position, size, clip, or origin."
+          "description": "Sizes the image to cover the box (edges crop); contain would fit it whole instead."
         },
         {
           "property": "block-size",

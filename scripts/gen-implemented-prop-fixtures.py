@@ -48,17 +48,16 @@ def effect_html(prop: str, kind: str, legacy_of: str | None) -> str:
     if p == "color" or target in ("color", "-webkit-text-fill-color"):
         return f'<span style="{p}:#0b5;font-weight:bold;">colored text</span>'
     if p.startswith("background") or target.startswith("background"):
-        if "image" in p or p == "background":
+        if p == "background":
             return (
-                f'<div style="{p}:url(logo.png);background-size:contain;background-repeat:no-repeat;'
-                f'background-color:#eef;height:36px;border:1px solid #99a;"></div>'
+                '<div style="background:#eef url(logo.png) no-repeat;'
+                'height:36px;border:1px solid #99a;"></div>'
             )
-        if p == "background-color" or target == "background-color":
-            return f'<div style="{p}:#6af;height:28px;border:1px solid #336;"></div>'
-        if "attachment" in p:
+        if p == "background-attachment" or target == "background-attachment":
             return (
-                f'<div style="background-image:url(logo.png);background-repeat:no-repeat;{p}:local;'
-                f'background-color:#eef;height:36px;border:1px solid #99a;"></div>'
+                '<div style="background-image:url(logo.png);background-repeat:no-repeat;'
+                f'{p}:local;background-color:#eef;height:36px;border:1px solid #99a;overflow:auto;">'
+                '<div style="height:56px;font-size:8pt;">tall content scrolls over a local background</div></div>'
             )
         if "blend" in p:
             return (
@@ -67,32 +66,69 @@ def effect_html(prop: str, kind: str, legacy_of: str | None) -> str:
             )
         if "clip" in p:
             return (
-                f'<div style="background-color:#6af;{p}:content-box;padding:8px;border:4px dashed #246;'
-                f'height:36px;"></div>'
+                f'<div style="background-image:url(logo.png);background-repeat:no-repeat;{p}:content-box;'
+                f'padding:10px;background-color:#eef;height:44px;border:4px dashed #246;"></div>'
+            )
+        if p == "background-color" or target == "background-color":
+            return f'<div style="{p}:#6af;height:28px;border:1px solid #336;"></div>'
+        if "image" in p or p == "background":
+            return (
+                '<div style="background-image:linear-gradient(#6af,#f80);'
+                'height:36px;border:1px solid #99a;"></div>'
             )
         if "origin" in p:
             return (
                 f'<div style="background-image:url(logo.png);background-repeat:no-repeat;{p}:content-box;'
                 f'padding:10px;background-color:#eef;height:40px;border:1px solid #99a;"></div>'
             )
-        if "position" in p:
-            val = "right bottom" if p == "background-position" else ("100%" if p.endswith(("-x", "-inline")) else "100%")
+        if p == "background-position":
             return (
-                f'<div style="background-image:url(logo.png);background-repeat:no-repeat;{p}:{val};'
+                f'<div style="background-image:url(logo.png);background-repeat:no-repeat;{p}:right bottom;'
                 f'background-color:#eef;height:36px;border:1px solid #99a;"></div>'
             )
-        if "repeat" in p:
-            val = "repeat-x" if p in ("background-repeat", "background-repeat-x") else (
-                "repeat-y" if "y" in p or "block" in p else "no-repeat"
+        if p == "background-position-block":
+            return (
+                f'<div style="background-image:url(logo.png);background-repeat:no-repeat;{p}:100%;'
+                f'background-color:#eef;height:52px;border:1px solid #99a;"></div>'
             )
+        if p == "background-position-inline":
+            return (
+                f'<div style="background-image:url(logo.png);background-repeat:no-repeat;{p}:100%;'
+                f'background-color:#eef;height:36px;border:1px solid #99a;"></div>'
+            )
+        if p == "background-position-x":
+            return (
+                f'<div style="background-image:url(logo.png);background-repeat:no-repeat;{p}:center;'
+                f'background-color:#eef;height:36px;border:1px solid #99a;"></div>'
+            )
+        if p == "background-position-y":
+            return (
+                f'<div style="background-image:url(logo.png);background-repeat:no-repeat;{p}:center;'
+                f'background-color:#eef;height:52px;border:1px solid #99a;"></div>'
+            )
+        if p == "background-repeat":
+            return (
+                f'<div style="background-image:url(logo.png);{p}:repeat;background-size:16px 16px;'
+                f'background-color:#eef;height:48px;border:1px solid #99a;"></div>'
+            )
+        if p in ("background-repeat-block", "background-repeat-inline"):
+            height = "height:64px;" if p == "background-repeat-inline" else "height:36px;"
+            return (
+                f'<div style="background-image:url(logo.png);{p}:no-repeat;background-size:16px 16px;'
+                f'background-color:#eef;{height}border:1px solid #99a;"></div>'
+            )
+        if p in ("background-repeat-x", "background-repeat-y"):
+            val = "repeat-x" if p == "background-repeat-x" else "repeat-y"
+            tall = "" if p == "background-repeat-x" else "height:64px;"
+            base = "height:36px;" if not tall else tall
             return (
                 f'<div style="background-image:url(logo.png);{p}:{val};background-size:16px 16px;'
-                f'background-color:#eef;height:36px;border:1px solid #99a;"></div>'
+                f'background-color:#eef;{base}border:1px solid #99a;"></div>'
             )
         if "size" in p:
             return (
-                f'<div style="background-image:url(logo.png);background-repeat:no-repeat;{p}:contain;'
-                f'background-color:#eef;height:36px;border:1px solid #99a;"></div>'
+                f'<div style="background-image:url(logo.png);background-repeat:no-repeat;{p}:cover;'
+                f'background-color:#eef;height:40px;border:1px solid #99a;"></div>'
             )
         return f'<div style="{p}:#6af;background-color:#eef;height:28px;border:1px solid #336;"></div>'
     if "shadow" in p:
@@ -386,7 +422,7 @@ def render_fixture(key: str, meta: dict, font_family: str) -> str:
       text-align: left;
     }}
     table.audit tr:nth-child(even) td {{ background: #f7f9fc; }}
-    td.idx {{ width: 28px; text-align: right; color: #667; font-size: 8pt; }}
+    td.idx, th.idx {{ width: 20px; text-align: right; color: #667; font-size: 8pt; padding: 6px 4px; }}
     td.prop {{ width: 22%; }}
     td.prop code {{
       font-family: "Liberation Mono", monospace;
@@ -427,7 +463,7 @@ def render_fixture(key: str, meta: dict, font_family: str) -> str:
   <table class="audit">
     <thead>
       <tr>
-        <th>#</th>
+        <th class="idx">#</th>
         <th>Property</th>
         <th>What it should do</th>
         <th>Effect (live)</th>

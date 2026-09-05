@@ -1489,7 +1489,7 @@ func applyColorBackgroundProps(style *ResolvedStyle, prop, value string) bool {
 			style.BackgroundPosY = parts[1]
 		} else if len(parts) == 1 {
 			style.BackgroundPosX = parts[0]
-			style.BackgroundPosY = parts[0]
+			style.BackgroundPosY = "center"
 		}
 	case "background-position-x", "background-position-inline":
 		style.BackgroundPosX = strings.TrimSpace(value)

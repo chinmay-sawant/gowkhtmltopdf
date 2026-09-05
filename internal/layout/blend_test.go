@@ -39,8 +39,14 @@ func TestBackgroundBlendModeForLayerRepeatsLastMode(t *testing.T) {
 	if got := backgroundBlendModeForLayer("screen, multiply", 0); got != blendScreen {
 		t.Fatalf("layer 0 mode = %q, want %q", got, blendScreen)
 	}
-	if got := backgroundBlendModeForLayer("screen, multiply", 4); got != blendMultiply {
-		t.Fatalf("layer 4 mode = %q, want %q", got, blendMultiply)
+	if got := backgroundBlendModeForLayer("screen, multiply", 1); got != blendMultiply {
+		t.Fatalf("layer 1 mode = %q, want %q", got, blendMultiply)
+	}
+	if got := backgroundBlendModeForLayer("screen, multiply", 2); got != blendScreen {
+		t.Fatalf("layer 2 mode = %q, want %q (cycle)", got, blendScreen)
+	}
+	if got := backgroundBlendModeForLayer("screen, multiply", 4); got != blendScreen {
+		t.Fatalf("layer 4 mode = %q, want %q (cycle)", got, blendScreen)
 	}
 	if got := backgroundBlendModeForLayer("", 0); got != blendNormal {
 		t.Fatalf("empty mode = %q, want %q", got, blendNormal)
