@@ -1100,18 +1100,7 @@ func applyStyleProp(
 	if effectiveProp != prop {
 		effectiveValue = remapWebkitValue(prop, value)
 	}
-	if prop == "-webkit-box-pack" && style.Display == displayBlock {
-		switch effectiveValue {
-		case "center":
-			style.TextAlign = "center"
-		case flexStartKeyword:
-			style.TextAlign = "left"
-		case fxFlexEnd:
-			style.TextAlign = "right"
-		case fxBetween:
-			style.TextAlign = cssTextAlignJustify
-		}
-	}
+
 	for _, group := range styleGroups {
 		if group(style, effectiveProp, effectiveValue, fsize, ctx, parent, hasParent) {
 			return

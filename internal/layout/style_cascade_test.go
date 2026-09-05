@@ -325,12 +325,15 @@ func TestWebkitPrefixAliases(t *testing.T) {
 				t.Fatalf("-webkit-text-fill-color: got %v, want red", sty.Color)
 			}
 		case "webkit-box":
-			if sty.Display != displayBlock {
-				t.Fatalf("display: -webkit-box got %q, want %q", sty.Display, displayBlock)
+			if sty.Display != displayFlex {
+				t.Fatalf("display: -webkit-box got %q, want %q", sty.Display, displayFlex)
+			}
+			if !sty.IsWebkitBox {
+				t.Fatal("display: -webkit-box IsWebkitBox=false, want true")
 			}
 		case "webkit-inline-box":
-			if sty.Display != cssDisplayInlineBlock {
-				t.Fatalf("display: -webkit-inline-box got %q, want %q", sty.Display, cssDisplayInlineBlock)
+			if sty.Display != displayInlineFlex {
+				t.Fatalf("display: -webkit-inline-box got %q, want %q", sty.Display, displayInlineFlex)
 			}
 		}
 	}
@@ -362,12 +365,12 @@ func TestWebkitPrefixAliases(t *testing.T) {
 		}
 	}
 
-	// Display alias equivalence - legacy -webkit-box is now block for print compatibility (matches Chrome's current ignored flex).
-	if s1, s2 := styleForDecl(t, "display: -webkit-box"), styleForDecl(t, "display: block"); s1.Display != s2.Display {
-		t.Fatalf("display -webkit-box %q != block %q", s1.Display, s2.Display)
+	// Legacy -webkit-box maps to flex so box-* longhands can lay out.
+	if s1, s2 := styleForDecl(t, "display: -webkit-box"), styleForDecl(t, "display: flex"); s1.Display != s2.Display {
+		t.Fatalf("display -webkit-box %q != flex %q", s1.Display, s2.Display)
 	}
-	if s1, s2 := styleForDecl(t, "display: -webkit-inline-box"), styleForDecl(t, "display: inline-block"); s1.Display != s2.Display {
-		t.Fatalf("display -webkit-inline-box %q != inline-block %q", s1.Display, s2.Display)
+	if s1, s2 := styleForDecl(t, "display: -webkit-inline-box"), styleForDecl(t, "display: inline-flex"); s1.Display != s2.Display {
+		t.Fatalf("display -webkit-inline-box %q != inline-flex %q", s1.Display, s2.Display)
 	}
 }
 

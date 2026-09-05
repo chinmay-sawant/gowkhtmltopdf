@@ -80,11 +80,13 @@ func setDisplayKeyword(style *ResolvedStyle, value string) {
 		displayFlex, displayInlineFlex, displayGrid, displayInlineGrid, displaySubgrid, displayFlowRoot:
 		style.Display = value
 	case "-webkit-box":
-		style.Display = displayBlock
+		// Legacy 2009 flexible box. Map to modern flex so remapped
+		// -webkit-box-align/orient/pack/flex participate in layout.
+		style.Display = displayFlex
 		style.IsWebkitBox = true
 		style.WhiteSpace = cssWhiteSpaceNowrap
 	case "-webkit-inline-box":
-		style.Display = cssDisplayInlineBlock
+		style.Display = displayInlineFlex
 		style.IsWebkitBox = true
 		style.WhiteSpace = cssWhiteSpaceNowrap
 	}
