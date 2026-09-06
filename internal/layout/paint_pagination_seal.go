@@ -131,9 +131,9 @@ func sealPageBottomClusters(
 		page := int((child.y - 0.01) / contentH)
 		pageBot := float64(page+1) * contentH
 		// Seal last-row bottoms that sit in the lower band of the page.
-		// A tight 40pt window missed fixture-60 row 14 (room ≈ 40.9pt),
-		// leaving the table open when the next row moved to the next page.
-		const bottomSealBand = 56.0
+		// 56pt missed fixture-60 page-4 row 67 (room ≈ 69pt); keep a little
+		// headroom above that so taller trailing rows still close.
+		const bottomSealBand = 80.0
 		if child.y < pageBot-bottomSealBand || child.y > pageBot+eps {
 			continue
 		}
@@ -165,7 +165,11 @@ func verticalClusterStartsSoon(
 		if next.n < 3 || next.maxX-next.minX < 20 {
 			continue
 		}
-		if next.y <= endY+0.5 || next.y > endY+soonBand || next.y > pageBot+0.5 {
+		// Clusters at or past pageBot are the next page's thead/body, not a
+		// same-page continuation. Using pageBot+0.5 let a repeated thead that
+		// starts exactly on the boundary suppress the bottom seal (fixture-60
+		// page-2 after prop 33).
+		if next.y <= endY+0.5 || next.y > endY+soonBand || next.y >= pageBot {
 			continue
 		}
 		if next.maxX < minX-2 || next.minX > maxX+2 {

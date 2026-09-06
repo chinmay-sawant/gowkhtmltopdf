@@ -46,7 +46,7 @@ func TestFixture60TheadContinuationRowsHaveNoPaintGap(t *testing.T) {
 	contentH := pageH - 2*margin
 
 	res, err := Layout(doc, Options{ //nolint:exhaustruct
-		Width: contentW, Height: contentH, Background: true, Media: "print", Zoom: 0.995,
+		Width: contentW, Height: contentH, Background: true, Media: "print", Zoom: 1,
 		Sheets: []*css.Stylesheet{sheet},
 		Images: func(src string) ([]byte, error) {
 			src = strings.TrimPrefix(src, "file://")
@@ -140,5 +140,115 @@ func TestRowPaintBandPrefersVerticalRules(t *testing.T) {
 	}
 	if math.Abs(top-90) > 1e-9 || math.Abs(bot-130) > 1e-9 {
 		t.Fatalf("paint band = [%.2f,%.2f], want [90,130] from verticals", top, bot)
+	}
+}
+
+// Last body row on a page whose next row continues on the following page must
+// get a full-width bottom seal (fixture-60 pages ending at props 33 and 67).
+func TestFixture60PageBottomRowsAreSealed(t *testing.T) {
+	t.Parallel()
+
+	rootDir, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(rootDir, "testdata/golden/fixture-60-implemented-props-a.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	doc, err := html.Parse(string(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sheet, err := css.Parse(extractStyleContent(doc))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	base := filepath.Join(rootDir, "testdata/golden")
+	margin := 12 * 72 / 25.4
+	pageW, pageH := 595.28, 841.89
+	contentW := pageW - 2*margin
+	contentH := pageH - 2*margin
+
+	res, err := Layout(doc, Options{ //nolint:exhaustruct
+		Width: contentW, Height: contentH, Background: true, Media: "print", Zoom: 1,
+		Sheets: []*css.Stylesheet{sheet},
+		Images: func(src string) ([]byte, error) {
+			src = strings.TrimPrefix(src, "file://")
+			if strings.HasPrefix(src, "data:") {
+				return nil, os.ErrNotExist
+			}
+			if !filepath.IsAbs(src) {
+				src = filepath.Join(base, src)
+			}
+
+			return os.ReadFile(src)
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pdfDoc := pdf.NewDocument()
+	if err := Paint(pdfDoc, res, PaintOptions{ //nolint:exhaustruct
+		PageWidth: pageW, PageHeight: pageH,
+		MarginTop: margin, MarginBottom: margin, MarginLeft: margin, MarginRight: margin,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	var table *box
+	for _, b := range flowBoxList(res) {
+		if b.kind == displayTable && len(b.rows) > 100 {
+			table = b
+			break
+		}
+	}
+	if table == nil {
+		t.Fatal("fixture-60 table not found")
+	}
+
+	findIdx := func(want string) int {
+		for ri, row := range table.rows {
+			first, last, _, _, ok := rowPaintBand(row, res)
+			if !ok {
+				continue
+			}
+			for i := first; i <= last && i < len(res.Ops); i++ {
+				if res.Ops[i].Kind == OpText && res.Ops[i].Text == want {
+					return ri
+				}
+			}
+		}
+
+		return -1
+	}
+
+	for _, want := range []string{"33", "67"} {
+		ri := findIdx(want)
+		if ri < 0 {
+			t.Fatalf("idx %s not found", want)
+		}
+		_, _, _, bot, ok := rowPaintBand(table.rows[ri], res)
+		if !ok {
+			t.Fatalf("idx %s: no paint band", want)
+		}
+		hasFull := false
+		for _, op := range res.Ops {
+			if op.Kind != OpLine || op.H > 0.01 || op.W < 400 {
+				continue
+			}
+			if math.Abs(op.Y-bot) <= 1.0 {
+				hasFull = true
+				break
+			}
+		}
+		if !hasFull {
+			t.Fatalf("idx %s: missing full-width bottom seal at y=%.2f", want, bot)
+		}
 	}
 }
