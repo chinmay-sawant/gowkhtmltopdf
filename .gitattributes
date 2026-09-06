@@ -58,6 +58,13 @@ makefile text eol=lf
 *.txt linguist-vendored
 *.py linguist-vendored
 *.rs linguist-vendored
+*.c linguist-vendored
+*.h linguist-vendored
+*.cc linguist-vendored
+*.cpp linguist-vendored
+*.cxx linguist-vendored
+*.hh linguist-vendored
+*.hpp linguist-vendored
 *.sh linguist-vendored
 *.ps1 linguist-vendored
 Makefile linguist-vendored
