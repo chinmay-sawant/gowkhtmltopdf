@@ -618,7 +618,7 @@ func (e *engine) inlineBlockAvail(nodeN *html.Node, sty ResolvedStyle, cbW float
 	// padding/border widths and leaves misleading empty space on the right.
 	intr := e.measureCellContent(nodeN, sty) +
 		e.scalePt(sty.MarginLeft) + e.scalePt(sty.MarginRight) +
-		e.nestedBlockHMargins(nodeN)
+		e.nestedBlockHChrome(nodeN)
 
 	if intr < 1 {
 		intr = 1
@@ -627,10 +627,11 @@ func (e *engine) inlineBlockAvail(nodeN *html.Node, sty ResolvedStyle, cbW float
 	return intr
 }
 
-// nestedBlockHMargins sums horizontal margins of direct block-level children.
-// measureCellContent walks their text but omits those margins, which undersizes
-// inline-block wrappers around margin-inline demos.
-func (e *engine) nestedBlockHMargins(node *html.Node) float64 {
+// nestedBlockHChrome sums horizontal margin+padding+border of direct
+// block-level children. measureCellContent walks their text but omits that
+// chrome, which undersizes inline-block wrappers around margin demos
+// (fixture-61 margin / margin-block / margin-inline).
+func (e *engine) nestedBlockHChrome(node *html.Node) float64 {
 	if node == nil {
 		return 0
 	}
@@ -643,7 +644,9 @@ func (e *engine) nestedBlockHMargins(node *html.Node) float64 {
 		if st == nil || !isCellBlockish(st.Display) {
 			continue
 		}
-		sum += e.scalePt(st.MarginLeft) + e.scalePt(st.MarginRight)
+		sum += e.scalePt(st.MarginLeft) + e.scalePt(st.MarginRight) +
+			e.scalePt(st.PaddingLeft) + e.scalePt(st.PaddingRight) +
+			e.scalePt(st.BorderLeft.Width) + e.scalePt(st.BorderRight.Width)
 	}
 
 	return sum

@@ -624,6 +624,12 @@ func (e *engine) preferFloatClearForTail(
 	if floats == nil || idx >= len(items) {
 		return lineY, false
 	}
+	// First line of the IFC: keep short content beside the float (CSS2.1 /
+	// Chrome). Orphan-tail reclaim only applies after earlier lines already
+	// packed beside the float (wiki "big time."[71]).
+	if idx == 0 {
+		return lineY, false
+	}
 
 	next := floats.clearY(lineY)
 

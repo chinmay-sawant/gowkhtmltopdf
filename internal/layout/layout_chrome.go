@@ -271,8 +271,10 @@ func (e *engine) prependChrome(insertAt int, boxNode *box, sty ResolvedStyle, po
 	radii, radiiY := usedBorderRadiiXY(sty, width, height)
 	radius := uniformRadius(radii)
 	// Outset box-shadow paints behind the background so blur rings do not
-	// cover the border box.
-	chrome = e.appendBoxShadow(chrome, sty, posX, posY, width, height, radii, radiiY)
+	// cover the border box. Inset shadows must paint after the background
+	// (CSS Backgrounds §7.1 / fixture-61 box-shadow-position), or the fill
+	// hides them.
+	chrome = e.appendBoxShadow(chrome, sty, posX, posY, width, height, radii, radiiY, false)
 	if sty.BGColor[3] > 0 && e.opts.Background {
 		bgOp := Op{ //nolint:exhaustruct // intentional zero fields
 			Kind: OpFillRect, X: posX, Y: posY, W: width, H: height,
@@ -295,6 +297,7 @@ func (e *engine) prependChrome(insertAt int, boxNode *box, sty ResolvedStyle, po
 		}
 	}
 	chrome = e.appendBackgroundImage(chrome, sty, posX, posY, width, height)
+	chrome = e.appendBoxShadow(chrome, sty, posX, posY, width, height, radii, radiiY, true)
 
 	if sty.BorderImageSource != "" {
 		chrome = e.appendBorderImage(chrome, sty, posX, posY, width, height)

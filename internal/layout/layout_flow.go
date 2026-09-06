@@ -904,10 +904,10 @@ func (e *engine) floatIntrinsicAvail(node *html.Node, style ResolvedStyle, avail
 			e.scalePt(style.MarginLeft) + e.scalePt(style.MarginRight)
 	} else {
 		// measureCellContent is already the border-box max-content (content +
-		// padding + border). Only add outer margins (and nested block margins).
+		// padding + border). Only add outer margins (and nested block chrome).
 		intr = e.measureCellContent(node, style) +
 			e.scalePt(style.MarginLeft) + e.scalePt(style.MarginRight) +
-			e.nestedBlockHMargins(node)
+			e.nestedBlockHChrome(node)
 	}
 
 	if intr > 0 && intr < avail {

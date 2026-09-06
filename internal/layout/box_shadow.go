@@ -301,8 +301,11 @@ func ParseBoxShadowInset(value string) (bool, bool) {
 // box-shadow-position longhand (inset vs outset). See ParseBoxShadowInset.
 func ParseBoxShadowPosition(value string) (bool, bool) { return ParseBoxShadowInset(value) }
 
-// ApplyBoxShadowPosition parses box-shadow-position (inset/outset) and writes
-// style.BoxShadowInset.
+// ApplyBoxShadowPosition parses box-shadow-position (inset/outset) and stores
+// style.BoxShadowInset. When a box-shadow shorthand Raw string is already set,
+// paint keeps that layer list (including its own inset keyword) so we match
+// Chrome, which does not implement this Borders 4 longhand yet. Structured
+// fields are used only when Raw is empty (longhand-only / blur/offset setters).
 func ApplyBoxShadowPosition(style *ResolvedStyle, value string) bool {
 	if style == nil {
 		return false
@@ -320,10 +323,12 @@ func ApplyBoxShadowPosition(style *ResolvedStyle, value string) bool {
 	return true
 }
 
-// appendBoxShadow paints all box-shadow layers in reverse order so layer 0 is on top.
+// appendBoxShadow paints box-shadow layers in reverse order so layer 0 is on
+// top. insetOnly selects inset vs outset layers: callers paint outset behind
+// the background and inset after it so the fill does not hide inner rims.
 func (e *engine) appendBoxShadow(
 	dst []Op, sty ResolvedStyle, posX, posY, width, height float64,
-	radiusX, radiusY [4]float64,
+	radiusX, radiusY [4]float64, insetOnly bool,
 ) []Op {
 	if e == nil || !sty.BoxShadowSet || width <= 0 || height <= 0 {
 		return dst
@@ -339,6 +344,9 @@ func (e *engine) appendBoxShadow(
 
 	for i := len(shadows) - 1; i >= 0; i-- {
 		shadow := shadows[i]
+		if shadow.inset != insetOnly {
+			continue
+		}
 		if shadow.inset {
 			dst = e.appendInsetBoxShadow(dst, shadow, posX, posY, width, height, radiusX, radiusY)
 		} else {
@@ -397,12 +405,18 @@ func (e *engine) appendInsetBoxShadow(
 	offX := e.scalePt(shadow.x)
 	offY := e.scalePt(shadow.y)
 
-	insetDepth := math.Max(spread+blur, 1.0)
-	if insetDepth > width/2 {
-		insetDepth = width / 2
+	// Soft wash, not opaque slabs. Chrome inset on small chips (fixture-61
+	// #12) keeps the cream fill and label readable with a light top/left rim.
+	depth := spread + blur*0.5 + math.Max(math.Abs(offX), math.Abs(offY))*0.5
+	if depth < 1 {
+		depth = 1
 	}
-	if insetDepth > height/2 {
-		insetDepth = height / 2
+	maxDepth := math.Min(width, height) * 0.22
+	if maxDepth < 1.5 {
+		maxDepth = 1.5
+	}
+	if depth > maxDepth {
+		depth = maxDepth
 	}
 
 	baseAlpha := shadow.alpha
@@ -410,31 +424,62 @@ func (e *engine) appendInsetBoxShadow(
 		baseAlpha = 1.0
 	}
 
-	// Paint inner blur / shadow band inside padding box
-	steps := boxShadowBlurSteps
+	// Positive offset → shadow falls down/right → rim reads on top/left.
+	paintTop := offY >= -1e-6
+	paintLeft := offX >= -1e-6
+	paintBot := offY <= 1e-6
+	paintRight := offX <= 1e-6
+
+	steps := boxShadowBlurSteps * 2
 	if blur <= 0 {
-		steps = 1
+		steps = 3
 	}
 
 	for step := 1; step <= steps; step++ {
-		d := insetDepth * float64(step) / float64(steps)
-		alpha := baseAlpha * (1.0 - float64(step-1)/float64(steps))
-		if blur > 0 {
-			alpha *= 0.5
+		t := float64(step) / float64(steps)
+		d := depth * t
+		// Fall off inward; keep peak alpha low so cream stays visible.
+		alpha := baseAlpha * (1.0 - t) * 0.28
+		if blur <= 0 {
+			alpha = baseAlpha * (1.0 - t) * 0.4
+		}
+		if alpha < 0.025 {
+			continue
 		}
 
-		op := shadowFillOp(
-			posX+offX, posY+offY, width, d, shadow.color, radiusX, radiusY,
-		)
-		op.Alpha = alpha
-		dst = append(dst, op)
+		topH, botH, leftW, rightW := d, d*0.3, d, d*0.3
+		if offY > 0 {
+			topH = math.Min(d+offY*0.4, depth)
+		} else if offY < 0 {
+			botH = math.Min(d-offY*0.4, depth)
+			topH = d * 0.3
+		}
+		if offX > 0 {
+			leftW = math.Min(d+offX*0.4, depth)
+		} else if offX < 0 {
+			rightW = math.Min(d-offX*0.4, depth)
+			leftW = d * 0.3
+		}
 
-		if height > d {
-			opBot := shadowFillOp(
-				posX+offX, posY+height-d+offY, width, d, shadow.color, radiusX, radiusY,
-			)
-			opBot.Alpha = alpha
-			dst = append(dst, opBot)
+		if paintTop && topH > 0 && topH < height-0.5 {
+			op := shadowFillOp(posX, posY, width, topH, shadow.color, radiusX, radiusY)
+			op.Alpha = alpha
+			dst = append(dst, op)
+		}
+		if paintBot && botH > 0 && height > botH+0.5 {
+			op := shadowFillOp(posX, posY+height-botH, width, botH, shadow.color, radiusX, radiusY)
+			op.Alpha = alpha
+			dst = append(dst, op)
+		}
+		if paintLeft && leftW > 0 && leftW < width-0.5 {
+			op := shadowFillOp(posX, posY, leftW, height, shadow.color, radiusX, radiusY)
+			op.Alpha = alpha
+			dst = append(dst, op)
+		}
+		if paintRight && rightW > 0 && width > rightW+0.5 {
+			op := shadowFillOp(posX+width-rightW, posY, rightW, height, shadow.color, radiusX, radiusY)
+			op.Alpha = alpha
+			dst = append(dst, op)
 		}
 	}
 
