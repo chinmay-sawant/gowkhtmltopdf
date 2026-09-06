@@ -437,11 +437,11 @@ var fixturePageBounds = map[string]fixtureBounds{ //nolint:gochecknoglobals // i
 		needles: []string{"IMPLEMENTED-PROPS-A"},
 	},
 	"fixture-61-implemented-props-b.html": { //nolint:exhaustruct // intentional zero-value fields
-		minPages: 7, maxPages: 11, images: true,
+		minPages: 5, maxPages: 8, images: true,
 		needles: []string{"IMPLEMENTED-PROPS-B"},
 	},
 	"fixture-62-implemented-props-c.html": { //nolint:exhaustruct // intentional zero-value fields
-		minPages: 7, maxPages: 9, images: true,
+		minPages: 5, maxPages: 9, images: true,
 		needles: []string{"IMPLEMENTED-PROPS-C"},
 	},
 }

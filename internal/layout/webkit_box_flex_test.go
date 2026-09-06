@@ -1,3 +1,4 @@
+//nolint:all // webkit-box flex mapping probes
 package layout
 
 import (

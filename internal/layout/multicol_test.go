@@ -326,28 +326,106 @@ func TestMulticolAnonymousTextPaints(t *testing.T) {
   column-gap: 12pt;
   width: 200pt;
   font-size: 10pt;
-  column-fill: auto;
 }
 `)
 	res := layoutHTML(t, `<html><body>
 <div class="mc">Multi-column sample text repeated. Multi-column sample text repeated. Multi-column sample text repeated.</div>
 </body></html>`, cssSheet)
 
-	var hits int
+	var xs []float64
 	for _, op := range res.Ops {
 		if op.Kind != OpText {
 			continue
 		}
 		if len(op.Text) >= 12 && op.Text[:12] == "Multi-column" {
+			xs = append(xs, op.X)
+		}
+	}
+	if len(xs) == 0 {
+		t.Fatal("anonymous multicol text produced no OpText")
+	}
+	minX, maxX := xs[0], xs[0]
+	for _, x := range xs[1:] {
+		if x < minX {
+			minX = x
+		}
+		if x > maxX {
+			maxX = x
+		}
+	}
+	if maxX-minX < 40 {
+		t.Fatalf("expected two-column x spread for anonymous multicol text, got dx=%.1f xs=%v", maxX-minX, xs)
+	}
+}
+
+func TestMulticolDefiniteHeightCapsAnonymousStrip(t *testing.T) {
+	t.Parallel()
+
+	cssSheet := sheet(t, `
+.mc {
+  column-count: 2;
+  column-gap: 8pt;
+  width: 200pt;
+  height: 48pt;
+  font-size: 10pt;
+  border: 1pt solid #888;
+}
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="mc">Multi-column sample text repeated. Multi-column sample text repeated. Multi-column sample text repeated. Multi-column sample text repeated. Multi-column sample text repeated.</div>
+</body></html>`, cssSheet)
+
+	var mcBox *box
+	var walk func(*box)
+	walk = func(b *box) {
+		if b == nil {
+			return
+		}
+		if b.node != nil && b.node.Name == "div" {
+			st := res // find by class via style width
+			_ = st
+			if b.w > 150 && b.w < 220 {
+				mcBox = b
+			}
+		}
+		for _, c := range b.children {
+			walk(c)
+		}
+	}
+	walk(res.root)
+	if mcBox == nil {
+		// fallback: tallest short box
+		var best *box
+		var find func(*box)
+		find = func(b *box) {
+			if b == nil {
+				return
+			}
+			if b.node != nil && b.node.Name == "div" && (best == nil || b.w > best.w) {
+				best = b
+			}
+			for _, c := range b.children {
+				find(c)
+			}
+		}
+		find(res.root)
+		mcBox = best
+	}
+	if mcBox == nil {
+		t.Fatal("multicol box not found")
+	}
+	if mcBox.height > 80 {
+		t.Fatalf("definite-height multicol box height=%.1f, want ~48pt (blank-page regression)", mcBox.height)
+	}
+	var hits int
+	for _, op := range res.Ops {
+		if op.Kind == OpText && len(op.Text) >= 12 && op.Text[:12] == "Multi-column" {
 			hits++
 		}
 	}
 	if hits == 0 {
-		t.Fatal("anonymous multicol text produced no OpText")
+		t.Fatal("expected multicol text ops")
 	}
-	// Column fragmentation of a single anonymous block across columns is still
-	// lite (one column of colW-wrapped text). This test locks the prior empty
-	// paint regression; multi-column line packing is a follow-up.
 }
 
 // paint operation proof covers rule variants

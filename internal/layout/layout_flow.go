@@ -91,9 +91,9 @@ func (e *engine) isInlineChild(node *html.Node) bool {
 		cstate.Position == positionAbsolute || cstate.Position == positionFixed {
 		return false
 	}
-	// <img> is replaced and UA-default inline-block, but author CSS may set
+	// <img> / <svg> are replaced and UA-default inline, but author CSS may set
 	// display:block (wiki .mw-logo-wordmark / .mw-logo-tagline stack).
-	if node.Name == cssTagImg {
+	if node.Name == cssTagImg || node.Name == cssTagSVG {
 		return !blockishDisplay(cstate.Display)
 	}
 
@@ -130,8 +130,8 @@ func onlyCollapsibleWS(nodes []*html.Node) bool {
 
 // margin-trim helpers for horizontal-tb (lite print).
 // block / block-start / block-end map to top/bottom; inline variants to left/right.
-func marginTrimTrimsBlockStart(trim string) bool { return trim == "block" || trim == "block-start" }
-func marginTrimTrimsBlockEnd(trim string) bool   { return trim == "block" || trim == "block-end" }
+func marginTrimTrimsBlockStart(trim string) bool  { return trim == "block" || trim == "block-start" }
+func marginTrimTrimsBlockEnd(trim string) bool    { return trim == "block" || trim == "block-end" }
 func marginTrimTrimsInlineStart(trim string) bool { return trim == "inline" || trim == "inline-start" }
 func marginTrimTrimsInlineEnd(trim string) bool   { return trim == "inline" || trim == "inline-end" }
 
@@ -903,10 +903,11 @@ func (e *engine) floatIntrinsicAvail(node *html.Node, style ResolvedStyle, avail
 			e.scalePt(style.BorderLeft.Width) + e.scalePt(style.BorderRight.Width) +
 			e.scalePt(style.MarginLeft) + e.scalePt(style.MarginRight)
 	} else {
-		intr = e.measureCellContent(node, style)
-		intr += e.scalePt(style.PaddingLeft) + e.scalePt(style.PaddingRight) +
-			e.scalePt(style.BorderLeft.Width) + e.scalePt(style.BorderRight.Width) +
-			e.scalePt(style.MarginLeft) + e.scalePt(style.MarginRight)
+		// measureCellContent is already the border-box max-content (content +
+		// padding + border). Only add outer margins (and nested block margins).
+		intr = e.measureCellContent(node, style) +
+			e.scalePt(style.MarginLeft) + e.scalePt(style.MarginRight) +
+			e.nestedBlockHMargins(node)
 	}
 
 	if intr > 0 && intr < avail {

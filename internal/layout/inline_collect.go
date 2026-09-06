@@ -13,26 +13,45 @@ func (e *engine) collectInline(nodes []*html.Node, out *[]inlineItem) {
 	for _, n := range nodes {
 		e.collectInlineNode(n, out)
 	}
-	// Lite RTL: mirror inline order when the containing block is dir:rtl.
-	// Full bidi (unicode bidi algorithm, embedding levels) is out of scope
-	// for print; this keeps e.g. <div dir="rtl">hello <b>world</b></div>
-	// from painting in strict LTR order while staying a single left-to-right
-	// layout pass.
-	if len(*out)-start > 1 && hasRTLRun(*out, start) {
+
+	// Lite RTL: only mirror when a run contains strong RTL letters (Arabic /
+	// Hebrew). Latin/digit content under direction:rtl stays in logical order
+	// and is right-aligned via text-align in emitLine (Chrome match for
+	// direction:rtl with "ABC 123"). Full Unicode bidi is out of scope.
+	if len(*out)-start > 1 && hasStrongRTLText(*out, start) {
 		reverseInlineRange(*out, start)
 	}
 }
 
-func hasRTLRun(items []inlineItem, start int) bool {
-	for i := start; i < len(items); i++ {
-		if items[i].style != nil && items[i].style.Direction == "rtl" {
-			return true
-		}
-		if items[i].forceBreak || items[i].blockBox != nil || items[i].img {
+func hasStrongRTLText(items []inlineItem, start int) bool {
+	for idx := start; idx < len(items); idx++ {
+		if items[idx].forceBreak || items[idx].blockBox != nil || items[idx].img {
 			continue
 		}
+		for _, letter := range items[idx].text {
+			if isStrongRTLLetter(letter) {
+				return true
+			}
+		}
 	}
+
 	return false
+}
+
+func isStrongRTLLetter(letter rune) bool {
+	// Arabic, Arabic Supplement, Arabic Extended-A, Hebrew.
+	switch {
+	case letter >= 0x0590 && letter <= 0x05FF:
+		return true
+	case letter >= 0x0600 && letter <= 0x06FF:
+		return true
+	case letter >= 0x0750 && letter <= 0x077F:
+		return true
+	case letter >= 0x08A0 && letter <= 0x08FF:
+		return true
+	default:
+		return false
+	}
 }
 
 func reverseInlineRange(items []inlineItem, start int) {
@@ -419,6 +438,11 @@ func (e *engine) collectInlineElement(node *html.Node, sty ResolvedStyle, out *[
 
 		return
 	}
+	if node.Name == cssTagSVG {
+		e.collectInlineSVGItem(node, sty, out)
+
+		return
+	}
 
 	if sty.Display == cssDisplayInlineBlock || sty.Display == displayInlineFlex ||
 		sty.Display == displayInlineGrid {
@@ -593,13 +617,36 @@ func (e *engine) inlineBlockAvail(nodeN *html.Node, sty ResolvedStyle, cbW float
 	// adding the chrome again makes inline-block pills grow by a second set of
 	// padding/border widths and leaves misleading empty space on the right.
 	intr := e.measureCellContent(nodeN, sty) +
-		e.scalePt(sty.MarginLeft) + e.scalePt(sty.MarginRight)
+		e.scalePt(sty.MarginLeft) + e.scalePt(sty.MarginRight) +
+		e.nestedBlockHMargins(nodeN)
 
 	if intr < 1 {
 		intr = 1
 	}
 
 	return intr
+}
+
+// nestedBlockHMargins sums horizontal margins of direct block-level children.
+// measureCellContent walks their text but omits those margins, which undersizes
+// inline-block wrappers around margin-inline demos.
+func (e *engine) nestedBlockHMargins(node *html.Node) float64 {
+	if node == nil {
+		return 0
+	}
+	var sum float64
+	for _, child := range node.Children {
+		if child.Type != html.ElementNode {
+			continue
+		}
+		st := e.stylePtr(child)
+		if st == nil || !isCellBlockish(st.Display) {
+			continue
+		}
+		sum += e.scalePt(st.MarginLeft) + e.scalePt(st.MarginRight)
+	}
+
+	return sum
 }
 
 // availWForInline is a generous width for block-in-inline measurement.

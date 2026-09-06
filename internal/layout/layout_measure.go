@@ -289,6 +289,21 @@ func (m *cellMeasure) measureElement(nodeN *html.Node, childCS ResolvedStyle, no
 
 		return
 	}
+	if nodeN.Name == cssTagSVG {
+		innerW := parseSVGLengthPx(nodeN.Attribute("width"))
+		if childCS.Width >= 0 {
+			innerW = m.engine.scalePt(childCS.Width)
+		}
+		if innerW <= 0 {
+			innerW = m.engine.scalePt(pxToPt(64))
+		}
+		m.noteWord(innerW)
+		m.lineOnlyNowrap = false
+		m.lineHasInk = true
+		m.lineW += innerW
+
+		return
+	}
 
 	if m.measureSpecifiedInlineBlock(childCS) {
 		return

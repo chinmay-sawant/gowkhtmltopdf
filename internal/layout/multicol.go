@@ -157,6 +157,7 @@ func multicolKids(n *html.Node, e *engine) []*html.Node {
 
 		anonymous := &html.Node{ //nolint:exhaustruct // synthetic anonymous multicol item
 			Type: html.ElementNode, Name: "span", Parent: n, Children: textNodes,
+			Attrs: map[string]string{"data-gowk-anon": "multicol"},
 		}
 		anonStyle := anonymousMulticolItemStyle(parentStyle)
 		e.styles[anonymous] = &anonStyle
@@ -220,13 +221,13 @@ func (e *engine) flowMulticolSpanner(boxNode *box, nodes []*html.Node, contentW,
 }
 
 // clampMulticolHeight applies padding-bottom and min/max height constraints to
-// the accumulated content height of a multicol container.
+// the accumulated content height of a multicol container. A definite height
+// both floors and caps the used height so oversized column strips cannot blow
+// up table-row pagination into blank pages.
 func clampMulticolHeight(curY float64, style ResolvedStyle, eng *engine) float64 {
 	curY += eng.scalePt(style.PaddingBottom)
 	if h, ok := resolveUsedHeight(style, -1, eng); ok {
-		if curY < h {
-			curY = h
-		}
+		curY = h
 	}
 
 	if style.MinHeight > 0 && curY < eng.scalePt(style.MinHeight) {
@@ -347,6 +348,22 @@ func (e *engine) flowMulticolSegment(
 	definiteH := resolveContentHeight(style, e)
 	padTop := e.scalePt(style.PaddingTop) + e.scalePt(style.BorderTop.Width)
 
+	// Single anonymous text item: fragment its line strip across columns.
+	if nCols > 1 && len(items) == 1 && isAnonymousMulticolItem(items[0].n) {
+		maxColH, snappedCy, snap := e.multicolColumnHeight(items, 0, style, balance, definiteH, padTop, yPos, curY, pageH)
+		if snap {
+			curY = snappedCy
+			maxColH, _, _ = e.multicolColumnHeight(items, 0, style, balance, definiteH, padTop, yPos, curY, pageH)
+		}
+		lineTop := yPos + curY
+		lineH := e.placeMulticolAnonColumns(
+			parent, items[0], style, nCols, colW, gap, contentX, yPos, curY, maxColH, balance,
+		)
+		e.emitColumnRules(style, contentX, colW, gap, nCols, lineTop, lineH)
+
+		return curY + lineH
+	}
+
 	idx := 0
 	for idx < len(items) {
 		maxColH, snappedCy, snap := e.multicolColumnHeight(items, idx, style, balance, definiteH, padTop, yPos, curY, pageH)
@@ -372,6 +389,87 @@ func (e *engine) flowMulticolSegment(
 	}
 
 	return curY
+}
+
+func isAnonymousMulticolItem(n *html.Node) bool {
+	return n != nil && n.Type == html.ElementNode && n.Attribute("data-gowk-anon") == "multicol"
+}
+
+// placeMulticolAnonColumns lays out one anonymous text item as a single-column
+// strip at colW, then shifts line bands into subsequent columns (balance or
+// auto fill against maxColH). Returns the used multicol-line height.
+func (e *engine) placeMulticolAnonColumns(
+	parent *box, item multicolItem, style ResolvedStyle,
+	nCols int, colW, gap, contentX, yPos, curY, maxColH float64, balance bool,
+) float64 {
+	if nCols < 1 {
+		nCols = 1
+	}
+	cblock := e.build(item.n, colW, contentX, yPos+curY)
+	if cblock == nil {
+		return 0
+	}
+	if parent != nil {
+		parent.children = append(parent.children, cblock)
+	}
+
+	top := yPos + curY
+	totalH := cblock.height
+	if totalH <= 0 {
+		return 0
+	}
+
+	// Balanced auto-height: even split of the strip. When maxColH is finite
+	// (definite height or remaining page), never let the band exceed it —
+	// otherwise totalH/nCols from a tall single-column strip creates multi-
+	// page blank table rows.
+	bandH := totalH / float64(nCols)
+	if !balance && maxColH > 0 {
+		bandH = maxColH
+	}
+	if maxColH > 0 && bandH > maxColH {
+		bandH = maxColH
+	}
+	if bandH <= 0 {
+		bandH = totalH
+	}
+
+	// Use the box op range: prependChrome may insert before len-at-build-start.
+	opStart, opEnd := cblock.opStart, cblock.opEnd
+	for k := opStart; k <= opEnd && k < len(e.ops); k++ {
+		relY := e.ops[k].Y - top
+		if relY < 0 {
+			relY = 0
+		}
+		col := int(relY / bandH)
+		if col < 0 {
+			col = 0
+		}
+		if col >= nCols {
+			col = nCols - 1
+		}
+		if col == 0 {
+			continue
+		}
+		e.ops[k].X += float64(col) * (colW + gap)
+		e.ops[k].Y -= float64(col) * bandH
+	}
+
+	used := bandH
+	if balance && maxColH <= 0 {
+		// Auto-height balance: column height is the even split (or leftover).
+		if rem := totalH - bandH*float64(nCols-1); rem > used {
+			used = rem
+		}
+	}
+	if maxColH > 0 && used > maxColH {
+		used = maxColH
+	}
+	// Child box must not keep the unfragmented strip height; table/pagination
+	// walk children and would otherwise reserve blank pages.
+	cblock.height = used
+
+	return used
 }
 
 // measureMulticolItems measures each in-flow element child at the column width.
@@ -416,11 +514,16 @@ func (e *engine) multicolColumnHeight(
 
 	maxColH := remain
 
-	if !balance && definiteH >= 0 {
+	if definiteH >= 0 {
+		// Definite height caps column capacity for both balance and auto-fill.
 		maxColH = clampMulticolRemainder(maxColH, definiteH-(curY-padTop))
 	}
 
-	if items[idx].h > maxColH+1e-6 && absTop > pageTop+1e-6 {
+	// Oversized atomic items snap to the next page when mid-page. Anonymous
+	// multicol text fragments across columns, so a tall measured strip must
+	// not force a page snap.
+	if items[idx].h > maxColH+1e-6 && absTop > pageTop+1e-6 &&
+		!isAnonymousMulticolItem(items[idx].n) {
 		return 0, snapMulticolToPage(curY, absTop, boundary, pageH), true
 	}
 

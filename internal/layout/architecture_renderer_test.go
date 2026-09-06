@@ -543,6 +543,7 @@ body { margin: 0; font-size: 12pt; }
 	res, err := Layout(root, Options{ //nolint:exhaustruct
 		Width: 300, Height: 200, Sheets: []*css.Stylesheet{cssSheet}, Media: "print",
 	})
+
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -551,6 +552,7 @@ body { margin: 0; font-size: 12pt; }
 	pill := findElementByClass(root, "pill")
 	pageBox := fixture56BoxByNode(res.root, page)
 	pillBox := fixture56BoxByNode(res.root, pill)
+
 	if pageBox == nil || pillBox == nil {
 		t.Fatalf("missing boxes: page=%+v pill=%+v", pageBox, pillBox)
 	}
@@ -558,6 +560,7 @@ body { margin: 0; font-size: 12pt; }
 	if pillBox.w > pageBox.w*0.5 {
 		t.Fatalf("left-only abspos should shrink-to-fit, pill.w=%.1f page.w=%.1f", pillBox.w, pageBox.w)
 	}
+
 	if pillBox.x < pageBox.x+3 || pillBox.x > pageBox.x+6 {
 		t.Fatalf("pill.x=%.1f, want ~page.x+4 (page.x=%.1f)", pillBox.x, pageBox.x)
 	}
