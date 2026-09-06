@@ -546,6 +546,14 @@ func applyCascadeDeclaration(
 	ids, classes, types, order int,
 	important bool,
 ) {
+	if expanded, ok := expandListStyleDeclaration(prop, value); ok {
+		for _, item := range expanded {
+			applyCascadeWin(wins, item.prop, item.val, ids, classes, types, order, important)
+		}
+
+		return
+	}
+
 	if expanded, ok := expandLogicalBoxDeclaration(prop, value); ok {
 		for _, item := range expanded {
 			applyCascadeDeclaration(wins, item.prop, item.val, ids, classes, types, order, important)
@@ -569,6 +577,49 @@ func applyCascadeDeclaration(
 type logicalPropDecl struct {
 	prop string
 	val  string
+}
+
+// expandListStyleDeclaration expands the list-style shorthand into its
+// type, position, and image longhands so each part joins the cascade with
+// the shorthand's own origin and specificity. Without this, the shorthand
+// and a weaker-origin longhand (such as the UA disc on ul) coexist as
+// separate raw keys and the later-applied longhand wins regardless of
+// origin. Only components present in the value expand; the rest keep
+// whatever the cascade decided.
+func expandListStyleDeclaration(prop, value string) ([]logicalPropDecl, bool) {
+	if prop != "list-style" {
+		return nil, false
+	}
+
+	var out []logicalPropDecl
+
+	for _, tok := range strings.Fields(value) {
+		if typ := parseListStyleType(tok); typ != "" {
+			out = append(out, logicalPropDecl{prop: "list-style-type", val: typ})
+
+			break
+		}
+	}
+
+	for _, tok := range strings.Fields(value) {
+		if pos := parseListStylePosition(tok); pos != "" {
+			out = append(out, logicalPropDecl{prop: "list-style-position", val: pos})
+
+			break
+		}
+	}
+
+	if url, ok := firstCSSUrl(value); ok {
+		out = append(out, logicalPropDecl{prop: "list-style-image", val: `url("` + url + `")`})
+	} else if listStyleImageNone(value) {
+		out = append(out, logicalPropDecl{prop: "list-style-image", val: "none"})
+	}
+
+	if len(out) == 0 {
+		return nil, false
+	}
+
+	return out, true
 }
 
 // expandLogicalBoxDeclaration expands logical margin/padding/inset/border

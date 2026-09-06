@@ -42,6 +42,57 @@ func TestCascadeShorthandRespectsSourceOrder(t *testing.T) {
 // TestCascadeBorderShorthandOverridesEarlierBorderTop: a later border
 // shorthand must beat an earlier border-top longhand (fixture-56 domain-03
 // accent top vs .domains > section frame).
+// TestCascadeListStyleShorthandBeatsUADisc: an author list-style shorthand
+// must beat the UA `ul { list-style-type: disc }` longhand on the same
+// element (fixture-61 rows 108-111). The shorthand expands at cascade time
+// with its own origin and specificity; without that, both keys coexisted in
+// raw and the later-applied UA longhand won regardless of origin, so
+// `ul { list-style: none }` still painted discs.
+func TestCascadeListStyleShorthandBeatsUADisc(t *testing.T) {
+	t.Parallel()
+
+	root := mustParse(t, `<html><body><ul><li>a</li><li>b</li></ul></body></html>`)
+	styles := resolveStyles(root, []*css.Stylesheet{sheet(t, `ul { list-style: none }`)},
+		"print", testViewport, 800)
+	ul := findElementByName(root, "ul")
+	li := findElementByName(root, "li")
+
+	if got := styles[ul].ListStyleType; got != "none" {
+		t.Fatalf("ul list-style:none type = %q, want none", got)
+	}
+
+	if got := styles[li].ListStyleType; got != "none" {
+		t.Fatalf("li inherited type = %q, want none", got)
+	}
+
+	res := layoutHTML(t, `<html><body><ul><li>a</li><li>b</li></ul></body></html>`,
+		sheet(t, `ul { list-style: none }`))
+	if n := len(opsOfKind(res, OpBullet)); n != 0 {
+		t.Fatalf("list-style:none bullets = %d, want 0", n)
+	}
+
+	res = layoutHTML(t, `<html><body><ul style="list-style:none;"><li>a</li></ul></body></html>`)
+	if n := len(opsOfKind(res, OpBullet)); n != 0 {
+		t.Fatalf("inline list-style:none bullets = %d, want 0", n)
+	}
+
+	// Same-origin source order still holds between shorthand and longhand.
+	typeCase := layoutHTML(t, `<html><body><ul><li>a</li></ul></body></html>`,
+		sheet(t, `ul { list-style: square; list-style-type: decimal }`))
+	if bullets := opsOfKind(typeCase, OpBullet); len(bullets) != 1 || bullets[0].Text != "1." {
+		t.Fatalf("later longhand decimal lost to shorthand: %+v", bullets)
+	}
+
+	typeCase = layoutHTML(t, `<html><body><ul><li>a</li></ul></body></html>`,
+		sheet(t, `ul { list-style-type: decimal; list-style: square }`))
+	if bullets := opsOfKind(typeCase, OpBullet); len(bullets) != 1 || bullets[0].Text != "\u25AA" {
+		t.Fatalf("later shorthand square lost to longhand: %+v", bullets)
+	}
+}
+
+// TestCascadeBorderShorthandOverridesEarlierBorderTop: a later border
+// shorthand must beat an earlier border-top longhand (fixture-56 domain-03
+// accent top vs .domains > section frame).
 func TestCascadeBorderShorthandOverridesEarlierBorderTop(t *testing.T) {
 	t.Parallel()
 
