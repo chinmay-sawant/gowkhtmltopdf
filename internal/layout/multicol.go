@@ -436,6 +436,18 @@ func (e *engine) placeMulticolAnonColumns(
 
 	// Use the box op range: prependChrome may insert before len-at-build-start.
 	opStart, opEnd := cblock.opStart, cblock.opEnd
+	type colAssign struct {
+		idx int
+		col int
+	}
+	assigns := make([]colAssign, 0, opEnd-opStart+1)
+	// Track ink (text/bullet) tops only. Border/background ops sit at the
+	// box top and must not become the alignment anchor, or column 2+ gets
+	// pulled through the padding into the border.
+	colMinY := make([]float64, nCols)
+	for i := range colMinY {
+		colMinY[i] = math.Inf(1)
+	}
 	for k := opStart; k <= opEnd && k < len(e.ops); k++ {
 		relY := e.ops[k].Y - top
 		if relY < 0 {
@@ -446,13 +458,54 @@ func (e *engine) placeMulticolAnonColumns(
 			col = 0
 		}
 		if col >= nCols {
-			col = nCols - 1
-		}
-		if col == 0 {
+			// Past the last column band: mark for clip (no shift).
+			assigns = append(assigns, colAssign{idx: k, col: -1})
 			continue
 		}
-		e.ops[k].X += float64(col) * (colW + gap)
-		e.ops[k].Y -= float64(col) * bandH
+		if col > 0 {
+			e.ops[k].X += float64(col) * (colW + gap)
+			e.ops[k].Y -= float64(col) * bandH
+		}
+		if (e.ops[k].Kind == OpText || e.ops[k].Kind == OpBullet) && e.ops[k].Y < colMinY[col] {
+			colMinY[col] = e.ops[k].Y
+		}
+		assigns = append(assigns, colAssign{idx: k, col: col})
+	}
+	// Top-align column 2+ to column 0's first ink line. Band cuts often leave a
+	// mid-line orphan at the top of column 2+; anchoring that remnant to the
+	// box top (or keeping it) pulls real lines through the padding/border
+	// (fixture-61 #23/#24/#32). Drop orphans above column 0's first line, then
+	// shift the remaining column ink up to that anchor.
+	anchor := colMinY[0]
+	if math.IsInf(anchor, 1) {
+		anchor = top
+	}
+	for _, a := range assigns {
+		if a.col < 1 {
+			continue
+		}
+		op := &e.ops[a.idx]
+		if (op.Kind == OpText || op.Kind == OpBullet) && op.Y < anchor-0.01 {
+			DeactivateOp(op) // drop mid-band orphan
+		}
+	}
+	for i := 1; i < nCols; i++ {
+		colMinY[i] = math.Inf(1)
+	}
+	for _, a := range assigns {
+		if a.col < 1 {
+			continue
+		}
+		op := e.ops[a.idx]
+		if (op.Kind == OpText || op.Kind == OpBullet) && op.Y < colMinY[a.col] {
+			colMinY[a.col] = op.Y
+		}
+	}
+	for _, a := range assigns {
+		if a.col < 1 || math.IsInf(colMinY[a.col], 1) {
+			continue
+		}
+		e.ops[a.idx].Y -= colMinY[a.col] - anchor
 	}
 
 	used := bandH
@@ -464,6 +517,28 @@ func (e *engine) placeMulticolAnonColumns(
 	}
 	if maxColH > 0 && used > maxColH {
 		used = maxColH
+	}
+	// Drop ink that still sits below the used column height so definite-height
+	// demos (fixture-61 #23/#32) do not spill into the next table row.
+	// Never blank OpLine/OpStrokeRect here: zeroing with Op{} would turn them
+	// into OpFillRect (iota 0), and truncating vertical lines can eat chrome
+	// that shares the child op range.
+	limit := top + used
+	for _, a := range assigns {
+		op := &e.ops[a.idx]
+		if op.Kind == OpLine || op.Kind == OpStrokeRect {
+			continue
+		}
+		if a.col < 0 || op.Y >= limit-0.01 {
+			DeactivateOp(op)
+			continue
+		}
+		if (op.Kind == OpFillRect || op.Kind == OpImage) && op.Y+op.H > limit {
+			op.H = limit - op.Y
+			if op.H < 0 {
+				op.H = 0
+			}
+		}
 	}
 	// Child box must not keep the unfragmented strip height; table/pagination
 	// walk children and would otherwise reserve blank pages.
