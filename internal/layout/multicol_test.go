@@ -317,4 +317,37 @@ func TestColumnRuleParse(t *testing.T) {
 	}
 }
 
+func TestMulticolAnonymousTextPaints(t *testing.T) {
+	t.Parallel()
+
+	cssSheet := sheet(t, `
+.mc {
+  column-count: 2;
+  column-gap: 12pt;
+  width: 200pt;
+  font-size: 10pt;
+  column-fill: auto;
+}
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="mc">Multi-column sample text repeated. Multi-column sample text repeated. Multi-column sample text repeated.</div>
+</body></html>`, cssSheet)
+
+	var hits int
+	for _, op := range res.Ops {
+		if op.Kind != OpText {
+			continue
+		}
+		if len(op.Text) >= 12 && op.Text[:12] == "Multi-column" {
+			hits++
+		}
+	}
+	if hits == 0 {
+		t.Fatal("anonymous multicol text produced no OpText")
+	}
+	// Column fragmentation of a single anonymous block across columns is still
+	// lite (one column of colW-wrapped text). This test locks the prior empty
+	// paint regression; multi-column line packing is a follow-up.
+}
+
 // paint operation proof covers rule variants

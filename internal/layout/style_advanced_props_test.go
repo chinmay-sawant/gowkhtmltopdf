@@ -28,6 +28,32 @@ func TestWaveBTextTruncationAndClamping(t *testing.T) {
 	}
 }
 
+func TestLineClampClearsWebkitBoxNowrap(t *testing.T) {
+	t.Parallel()
+
+	var s ResolvedStyle
+	setDisplayKeyword(&s, "-webkit-box")
+	if s.WhiteSpace != cssWhiteSpaceNowrap {
+		t.Fatalf("webkit-box WhiteSpace=%q, want nowrap", s.WhiteSpace)
+	}
+	applyAdvancedProps(&s, "-webkit-line-clamp", "2", 12)
+	if s.LineClamp != 2 {
+		t.Fatalf("LineClamp=%d, want 2", s.LineClamp)
+	}
+	if s.WhiteSpace == cssWhiteSpaceNowrap {
+		t.Fatal("line-clamp should clear webkit-box nowrap so multiple lines can form")
+	}
+}
+
+func TestWordBreakOfLineBreakAnywhere(t *testing.T) {
+	t.Parallel()
+
+	st := ResolvedStyle{LineBreak: "anywhere", WhiteSpace: "normal"}
+	if got := wordBreakOf(st); got != breakAll {
+		t.Fatalf("wordBreakOf(line-break:anywhere)=%v, want breakAll", got)
+	}
+}
+
 func TestWaveCFragmentationAndImageMetadata(t *testing.T) {
 	t.Parallel()
 

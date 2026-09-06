@@ -120,22 +120,64 @@ func (e *engine) collectMulticolSegs(n *html.Node) []multicolSeg {
 }
 
 // multicolKids returns the non-hidden in-flow children of a multicol container.
+// Direct non-whitespace text is wrapped in anonymous block boxes (same idea as
+// flexChildren) because build() ignores TextNode and measureMulticolItems only
+// measures elements.
 func multicolKids(n *html.Node, e *engine) []*html.Node {
-	var kids []*html.Node
+	parentStyle := ResolvedStyle{}
+	if n != nil {
+		parentStyle = e.styleVal(n)
+	}
 
-	for _, child := range n.Children {
+	kids := make([]*html.Node, 0, len(n.Children))
+
+	for idx := 0; idx < len(n.Children); idx++ {
+		child := n.Children[idx]
 		if child.Type == html.ElementNode {
 			if e.stylePtr(child).Display == displayNone {
 				continue
 			}
 
 			kids = append(kids, child)
-		} else if child.Type == html.TextNode && strings.TrimSpace(child.Text) != "" {
-			kids = append(kids, child)
+
+			continue
 		}
+
+		if child.Type != html.TextNode || strings.TrimSpace(child.Text) == "" {
+			continue
+		}
+
+		textNodes := []*html.Node{child}
+		for idx+1 < len(n.Children) && n.Children[idx+1].Type == html.TextNode {
+			idx++
+			if strings.TrimSpace(n.Children[idx].Text) != "" {
+				textNodes = append(textNodes, n.Children[idx])
+			}
+		}
+
+		anonymous := &html.Node{ //nolint:exhaustruct // synthetic anonymous multicol item
+			Type: html.ElementNode, Name: "span", Parent: n, Children: textNodes,
+		}
+		anonStyle := anonymousMulticolItemStyle(parentStyle)
+		e.styles[anonymous] = &anonStyle
+		kids = append(kids, anonymous)
 	}
 
 	return kids
+}
+
+// anonymousMulticolItemStyle inherits text props from the multicol container
+// and resets the box/layout props so the anonymous item is a plain block.
+func anonymousMulticolItemStyle(parent ResolvedStyle) ResolvedStyle {
+	style := anonymousFlexItemStyle(parent)
+	style.ColumnCount = 0
+	style.ColumnWidth = -1
+	style.ColumnSpan = ""
+	style.ColumnFill = ""
+	style.ColumnGap = 0
+	style.ColumnGapNormal = false
+
+	return style
 }
 
 // flowMulticolSingleColumn lays out a one-column multicol container with the
@@ -332,8 +374,8 @@ func (e *engine) flowMulticolSegment(
 	return curY
 }
 
-// measureMulticolItems measures each in-flow element child at the column width,
-// skipping text nodes that never produce column content.
+// measureMulticolItems measures each in-flow element child at the column width.
+// Anonymous text wrappers from multicolKids are elements, so they are included.
 func (e *engine) measureMulticolItems(nodes []*html.Node, colW float64) []multicolItem {
 	items := make([]multicolItem, 0, len(nodes))
 

@@ -30,6 +30,11 @@ func applyAdvancedProps(style *ResolvedStyle, prop, value string, fsize float64)
 		}
 		if n, err := strconv.Atoi(val); err == nil && n > 0 {
 			style.LineClamp = n
+			// display:-webkit-box maps to flex and forces nowrap; line-clamp
+			// needs normal wrapping so the clamp can keep N lines.
+			if style.WhiteSpace == cssWhiteSpaceNowrap {
+				style.WhiteSpace = "normal"
+			}
 			return true
 		}
 	case "max-lines":

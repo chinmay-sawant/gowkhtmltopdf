@@ -1802,7 +1802,7 @@ func (e *engine) buildOutOfFlow(node *html.Node, sty ResolvedStyle, availW, x, y
 
 	start := len(e.ops)
 
-	buildW := e.absoluteBuildWidth(sty, cbW)
+	buildW := e.absoluteBuildWidth(node, sty, cbW)
 
 	boxNode := e.buildInFlowDisplay(node, sty, buildW, cbX, cbY)
 	if boxNode == nil {
@@ -1828,17 +1828,36 @@ func (e *engine) buildOutOfFlow(node *html.Node, sty ResolvedStyle, availW, x, y
 	return boxNode
 }
 
-func (e *engine) absoluteBuildWidth(sty ResolvedStyle, cbW float64) float64 {
-	if sty.Width >= 0 || sty.WidthPercent >= 0 || sty.LeftAuto || sty.RightAuto {
+// absoluteBuildWidth is the width available while building an abspos/fixed box.
+// Specified width uses the containing block as the build ceiling. When left and
+// right are both set, width fills the remaining space. Otherwise width is
+// shrink-to-fit capped by the remaining CB space (CSS 2.1 §10.3.7).
+func (e *engine) absoluteBuildWidth(node *html.Node, sty ResolvedStyle, cbW float64) float64 {
+	if sty.Width >= 0 || sty.WidthPercent >= 0 {
 		return cbW
 	}
 
-	buildW := cbW - e.scalePt(sty.Left+sty.Right)
-	if buildW < 0 {
-		return 0
+	if !sty.LeftAuto && !sty.RightAuto {
+		buildW := cbW - e.scalePt(sty.Left+sty.Right)
+		if buildW < 0 {
+			return 0
+		}
+
+		return buildW
 	}
 
-	return buildW
+	avail := cbW
+	if !sty.LeftAuto {
+		avail -= e.scalePt(sty.Left)
+	}
+	if !sty.RightAuto {
+		avail -= e.scalePt(sty.Right)
+	}
+	if avail < 0 {
+		avail = 0
+	}
+
+	return e.floatIntrinsicAvail(node, sty, avail)
 }
 
 // resolveAbsY places the out-of-flow box vertically: top wins, then bottom

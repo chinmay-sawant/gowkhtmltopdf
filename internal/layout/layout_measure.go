@@ -380,7 +380,10 @@ func wordBreakOf(sty ResolvedStyle) wordBreakPolicy {
 		return breakNever
 	}
 
-	if sty.WordBreak == "break-all" || sty.OverflowWrap == overflowWrapAnywhere {
+	// line-break:anywhere allows breaks between any typographic units, same
+	// practical effect as overflow-wrap:anywhere for our line breaker.
+	if sty.WordBreak == "break-all" || sty.OverflowWrap == overflowWrapAnywhere ||
+		sty.LineBreak == overflowWrapAnywhere {
 		return breakAll
 	}
 
