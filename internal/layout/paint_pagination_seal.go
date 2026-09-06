@@ -121,6 +121,8 @@ func sealPageBottomClusters(
 	seal func(gVal, minX, maxX, borderW, red, green, blue float64),
 	eps float64,
 ) {
+	starts := clusterVerticals(vertStarts, vertEnds, true)
+
 	for _, child := range clusterVerticals(vertStarts, vertEnds, false) {
 		if child.n < 3 || child.maxX-child.minX < 20 {
 			continue
@@ -140,10 +142,40 @@ func sealPageBottomClusters(
 			continue
 		}
 
+		// Same-page continuation: the next row's verticals start just below.
+		// Sealing here opened a false mid-page gap (fixture-60 rows 105-106).
+		if verticalClusterStartsSoon(starts, child.y, child.minX, child.maxX, pageBot) {
+			continue
+		}
+
 		if page >= 0 {
 			seal(child.y, child.minX, child.maxX, child.bw, child.r, child.g, child.b)
 		}
 	}
+}
+
+// verticalClusterStartsSoon reports a multi-column vertical cluster whose
+// top sits after endY on the same page and overlaps [minX, maxX].
+func verticalClusterStartsSoon(
+	starts map[int]borderCluster, endY, minX, maxX, pageBot float64,
+) bool {
+	const soonBand = 24.0
+
+	for _, next := range starts {
+		if next.n < 3 || next.maxX-next.minX < 20 {
+			continue
+		}
+		if next.y <= endY+0.5 || next.y > endY+soonBand || next.y > pageBot+0.5 {
+			continue
+		}
+		if next.maxX < minX-2 || next.minX > maxX+2 {
+			continue
+		}
+
+		return true
+	}
+
+	return false
 }
 
 // vseg is one vertical border segment.

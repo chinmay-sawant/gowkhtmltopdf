@@ -64,7 +64,7 @@
       text-align: left;
     }
     table.audit tr:nth-child(even) td { background: #f7f9fc; }
-    td.idx { width: 28px; text-align: right; color: #667; font-size: 8pt; }
+    td.idx, th.idx { width: 36px; text-align: right; color: #667; font-size: 8pt; padding: 6px 4px; }
     td.prop { width: 22%; }
     td.prop code {
       font-family: "Liberation Mono", monospace;
@@ -105,7 +105,7 @@
   <table class="audit">
     <thead>
       <tr>
-        <th>#</th>
+        <th class="idx">#</th>
         <th>Property</th>
         <th>What it should do</th>
         <th>Effect (live)</th>

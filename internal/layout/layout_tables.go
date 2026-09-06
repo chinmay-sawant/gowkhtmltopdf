@@ -1260,14 +1260,20 @@ func (e *engine) emitCell(cell *box, skipBorders bool) {
 	e.popBFCFloats(enclose)
 
 	e.imgMaxW = oldMax
-	// Clip only background-image layers to the cell padding box. Clipping all
+	// Clip background-image layers to the cell padding box. Clipping all
 	// content chopped box-shadow / borders that intentionally paint outside
-	// the padding edge (fixture-60 row 14 truncation).
+	// the padding edge (fixture-60 row 14 truncation). Transformed ink is
+	// clipped to the border box so rotate/translate cannot cross into the
+	// neighboring column (fixture-60 -webkit-transform effect cell).
 	pad := e.paddingBoxOf(cell)
+	cellClip := clipRect{x: cell.x, y: cell.y, w: cell.w, h: cell.height}
 
 	for i := contentStart; i < len(e.ops); i++ {
 		if e.ops[i].IsBackground {
 			clipPaintOp(&e.ops[i], pad)
+		}
+		if e.ops[i].XformSet {
+			clipPaintOp(&e.ops[i], cellClip)
 		}
 	}
 
