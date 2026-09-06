@@ -39,9 +39,6 @@ func TestCascadeShorthandRespectsSourceOrder(t *testing.T) {
 	}
 }
 
-// TestCascadeBorderShorthandOverridesEarlierBorderTop: a later border
-// shorthand must beat an earlier border-top longhand (fixture-56 domain-03
-// accent top vs .domains > section frame).
 // TestCascadeListStyleShorthandBeatsUADisc: an author list-style shorthand
 // must beat the UA `ul { list-style-type: disc }` longhand on the same
 // element (fixture-61 rows 108-111). The shorthand expands at cascade time
