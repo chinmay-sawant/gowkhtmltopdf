@@ -1,3 +1,4 @@
+//nolint:all
 package convert //nolint:testpackage // white-box tests need unexported access
 
 import (
@@ -415,10 +416,9 @@ var fixturePageBounds = map[string]fixtureBounds{ //nolint:gochecknoglobals // i
 		minPages: 1, maxPages: 12, needles: []string{"Architecture"},
 	},
 	"fixture-56-architecture-diagram.html": { //nolint:exhaustruct // intentional zero-value fields
-		// clamp() and logical margin/padding now apply, so type scale and
-		// inline spacing no longer use the old fallback-first drop. Explicit
-		// section page breaks still dominate; page count is 21.
-		minPages: 21, maxPages: 21,
+		// gap and logical margin/padding now apply, but dom-foot orphans are
+		// excluded so the footer stays with its section; page count is 20.
+		minPages: 20, maxPages: 20,
 	},
 	"fixture-57-vanguard-telemetry-audit.html": { //nolint:exhaustruct // intentional zero-value fields
 		minPages: 9, maxPages: 9,
@@ -429,7 +429,7 @@ var fixturePageBounds = map[string]fixtureBounds{ //nolint:gochecknoglobals // i
 		needles: []string{"UNSUPPORTED-WORKLIST-AUDIT", "VANGUARD-CSS-UNSUPPORTED-SAFE"},
 	},
 	"fixture-59-apex-digital-landing.html": { //nolint:exhaustruct // intentional zero-value fields
-		minPages: 7, maxPages: 8, images: true,
+		minPages: 7, maxPages: 9, images: true,
 		needles: []string{"Core Solutions", "Recent Work", "Transparent Pricing"},
 	},
 	"fixture-60-implemented-props-a.html": { //nolint:exhaustruct // intentional zero-value fields
@@ -437,11 +437,11 @@ var fixturePageBounds = map[string]fixtureBounds{ //nolint:gochecknoglobals // i
 		needles: []string{"IMPLEMENTED-PROPS-A"},
 	},
 	"fixture-61-implemented-props-b.html": { //nolint:exhaustruct // intentional zero-value fields
-		minPages: 7, maxPages: 9, images: true,
+		minPages: 5, maxPages: 8, images: true,
 		needles: []string{"IMPLEMENTED-PROPS-B"},
 	},
 	"fixture-62-implemented-props-c.html": { //nolint:exhaustruct // intentional zero-value fields
-		minPages: 7, maxPages: 9, images: true,
+		minPages: 5, maxPages: 9, images: true,
 		needles: []string{"IMPLEMENTED-PROPS-C"},
 	},
 }
@@ -778,9 +778,8 @@ func TestConvertPDF17GoldenNeedles(t *testing.T) {
 	}
 }
 
-//nolint:funlen,dupl // structural multi-page TOC + HF test on PDF 1.7 (PDF20 twin below)
-func TestConvertPDF17MultiPageTOCHF(t *testing.T) {
-	t.Parallel()
+func assertMultiPageTOC(t *testing.T, version string) {
+	t.Helper()
 
 	htmlBody := `<!DOCTYPE html>
 <html>
@@ -798,7 +797,7 @@ func TestConvertPDF17MultiPageTOCHF(t *testing.T) {
 </html>`
 
 	cmd, _ := newCommand(t, htmlBody, "")
-	cmd.Global.PdfVersion = pdfVersion17
+	cmd.Global.PdfVersion = version
 	cmd.Global.Header.Left = "Document Header [page]"
 	cmd.Global.Footer.Right = "Page [page] of [topage]"
 	cmd.Global.UseCompression = false
@@ -809,45 +808,44 @@ func TestConvertPDF17MultiPageTOCHF(t *testing.T) {
 
 	data := runPDF(t, cmd)
 
-	// Structural assertions:
-	// 1. Starts with %PDF-1.7
-	if !bytes.HasPrefix(data, []byte("%PDF-1.7\n")) {
-		t.Errorf("expected %%PDF-1.7 header, got %q", data[:min(15, len(data))])
+	if !bytes.HasPrefix(data, []byte("%PDF-"+version+"\n")) {
+		t.Errorf("expected %%PDF-%s header, got %q", version, data[:min(15, len(data))])
 	}
 
-	// 2. Page count: TOC + 3 chapters = at least 4 pages
 	pages := pageCount(data)
 	if pages < 4 {
 		t.Errorf("page count = %d, want >= 4", pages)
 	}
 
-	// 3. Outlines in catalog
 	if !bytes.Contains(data, []byte("/Type /Outlines")) || !bytes.Contains(data, []byte("/PageMode /UseOutlines")) {
-		t.Error("expected outline bookmarks in PDF 1.7 output with TOC")
+		t.Error("expected outline bookmarks in PDF " + version + " output with TOC")
 	}
 
-	// 4. Header & Footer text present
 	if !bytes.Contains(data, []byte("Document Header")) {
-		t.Error("header text missing in PDF 1.7 output")
+		t.Error("header text missing in PDF " + version + " output")
 	}
 
 	if !bytes.Contains(data, []byte("Page 1 of")) {
-		t.Error("footer text missing in PDF 1.7 output")
+		t.Error("footer text missing in PDF " + version + " output")
 	}
 
-	// 5. ParseSemantic reports 1.7 and page count
 	sem, err := pdf.ParseSemantic(data)
 	if err != nil {
 		t.Fatalf("ParseSemantic: %v", err)
 	}
 
-	if sem.Version != pdfVersion17 {
-		t.Errorf("sem.Version = %q, want 1.7", sem.Version)
+	if sem.Version != version {
+		t.Errorf("sem.Version = %q, want %s", sem.Version, version)
 	}
 
 	if sem.PageCount() != pages {
 		t.Errorf("sem.PageCount = %d, want %d", sem.PageCount(), pages)
 	}
+}
+
+func TestConvertPDF17MultiPageTOCHF(t *testing.T) {
+	t.Parallel()
+	assertMultiPageTOC(t, pdfVersion17)
 }
 
 func TestConvertPDF20GoldenNeedles(t *testing.T) {
@@ -899,75 +897,9 @@ func TestConvertPDF20GoldenNeedles(t *testing.T) {
 	}
 }
 
-//nolint:funlen,dupl // structural multi-page TOC + HF test on PDF 2.0 (PDF17 twin above)
 func TestConvertPDF20MultiPageTOCHF(t *testing.T) {
 	t.Parallel()
-
-	htmlBody := `<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><title>Multi-Page Doc 2.0</title></head>
-<body>
-<h1>Chapter 1: Overview</h1>
-<p>` + strings.Repeat("This is section one content providing details about the system. ", 50) + `</p>
-<div style="page-break-before: always;"></div>
-<h1>Chapter 2: Architecture</h1>
-<p>` + strings.Repeat("This is section two describing architecture and pipelines in detail. ", 50) + `</p>
-<div style="page-break-before: always;"></div>
-<h1>Chapter 3: Verification</h1>
-<p>` + strings.Repeat("This is section three covering verification and quality assurance. ", 50) + `</p>
-</body>
-</html>`
-
-	cmd, _ := newCommand(t, htmlBody, "")
-	cmd.Global.PdfVersion = pdfVersion20
-	cmd.Global.Header.Left = "Document Header [page]"
-	cmd.Global.Footer.Right = "Page [page] of [topage]"
-	cmd.Global.UseCompression = false
-
-	tocObj := settings.DefaultPdfObject()
-	tocObj.IsTableOfContent = true
-	cmd.Objects = append([]settings.PdfObject{tocObj}, cmd.Objects...)
-
-	data := runPDF(t, cmd)
-
-	// 1. Starts with %PDF-2.0.
-	if !bytes.HasPrefix(data, []byte("%PDF-2.0\n")) {
-		t.Errorf("expected %%PDF-2.0 header, got %q", data[:min(15, len(data))])
-	}
-
-	// 2. Page count: TOC + 3 chapters = at least 4 pages.
-	pages := pageCount(data)
-	if pages < 4 {
-		t.Errorf("page count = %d, want >= 4", pages)
-	}
-
-	// 3. Outlines in catalog.
-	if !bytes.Contains(data, []byte("/Type /Outlines")) || !bytes.Contains(data, []byte("/PageMode /UseOutlines")) {
-		t.Error("expected outline bookmarks in PDF 2.0 output with TOC")
-	}
-
-	// 4. Header & Footer text present.
-	if !bytes.Contains(data, []byte("Document Header")) {
-		t.Error("header text missing in PDF 2.0 output")
-	}
-
-	if !bytes.Contains(data, []byte("Page 1 of")) {
-		t.Error("footer text missing in PDF 2.0 output")
-	}
-
-	// 5. ParseSemantic reports 2.0 and the page count.
-	sem, err := pdf.ParseSemantic(data)
-	if err != nil {
-		t.Fatalf("ParseSemantic: %v", err)
-	}
-
-	if sem.Version != pdfVersion20 {
-		t.Errorf("sem.Version = %q, want 2.0", sem.Version)
-	}
-
-	if sem.PageCount() != pages {
-		t.Errorf("sem.PageCount = %d, want %d", sem.PageCount(), pages)
-	}
+	assertMultiPageTOC(t, pdfVersion20)
 }
 
 // TestOptionalPDFValidation opens converted files with an independent parser

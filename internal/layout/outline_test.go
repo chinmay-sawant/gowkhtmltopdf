@@ -26,7 +26,7 @@ func testOutlineOutsideBorder(t *testing.T) {
 	}
 
 	inflate := outlineInflate(width, 0)
-	assertOutlineOnInflatedRect(t, ops, -inflate, -inflate, boxW+two*inflate, boxH+two*inflate, width)
+	assertOutlineOnInflatedRect(t, ops, -inflate, -inflate, boxW+2*inflate, boxH+2*inflate, width)
 
 	for _, op := range ops {
 		if op.Kind != OpLine {
@@ -75,7 +75,7 @@ func testOutlineOffsetGap(t *testing.T) {
 		t.Fatalf("offset inflate %v should exceed zero-offset %v", inflate, zeroOff)
 	}
 
-	assertOutlineOnInflatedRect(t, ops, 10-inflate, 20-inflate, 100+two*inflate, 40+two*inflate, width)
+	assertOutlineOnInflatedRect(t, ops, 10-inflate, 20-inflate, 100+2*inflate, 40+2*inflate, width)
 }
 
 func testOutlineLayoutSizeUnchanged(t *testing.T) {
@@ -112,7 +112,7 @@ func testOutlinePrependChrome(t *testing.T) {
 
 	ops := eng.deferredChrome[0].ops
 	inflate := outlineInflate(10, 4)
-	assertOutlineOnInflatedRect(t, ops, -inflate, -inflate, 100+two*inflate, 50+two*inflate, 10)
+	assertOutlineOnInflatedRect(t, ops, -inflate, -inflate, 100+2*inflate, 50+2*inflate, 10)
 }
 
 func assertOutlineOnInflatedRect(t *testing.T, ops []Op, x, y, w, h, width float64) {

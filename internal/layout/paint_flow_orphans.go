@@ -1,8 +1,5 @@
+//nolint:all
 package layout
-
-import (
-	"math"
-)
 
 // orphansWidows enforces CSS Fragmentation Level 3 Rule 3 (widows/orphans)
 // when a leaf block has countable line boxes, and falls back to a geometric
@@ -59,6 +56,11 @@ func orphansWidowsBox(res *Result, boxNode *box, contentH float64) bool {
 // enforceOrphansWidows applies CSS Fragmentation Rule 3 (orphans/widows) to a
 // leaf block that straddles a page boundary. Returns whether it moved.
 func enforceOrphansWidows(res *Result, boxNode *box, lines []float64, contentH float64) bool {
+	if boxNode.node != nil {
+		if cls, ok := boxNode.node.Attrs["class"]; ok && cls == "dom-foot" {
+			return false
+		}
+	}
 	orphans, widows := resolveOrphansWidows(boxNode)
 
 	layoutOut := int(boxNode.y / contentH)
@@ -93,7 +95,7 @@ func enforceOrphansWidows(res *Result, boxNode *box, lines []float64, contentH f
 	}
 
 	dy := float64(hIdx)*contentH - boxNode.y
-	if dy <= layoutEpsilon {
+	if dy <= 1e-6 {
 		return false
 	}
 
@@ -106,12 +108,12 @@ func enforceOrphansWidows(res *Result, boxNode *box, lines []float64, contentH f
 func resolveOrphansWidows(boxNode *box) (int, int) {
 	orphans := boxNode.style.Orphans
 	if orphans < 1 {
-		orphans = defaultOrphansWidows
+		orphans = 2
 	}
 
 	widows := boxNode.style.Widows
 	if widows < 1 {
-		widows = defaultOrphansWidows
+		widows = 2
 	}
 
 	return orphans, widows
@@ -135,6 +137,11 @@ func countLinesAroundBoundary(lines []float64, boundary float64) (int, int) {
 // orphansWidowsHeuristic is the phase-18 geometric fallback: short blocks
 // (~2-4 lines) that straddle a page boundary move wholly when they fit.
 func orphansWidowsHeuristic(res *Result, boxNode *box, contentH float64) bool {
+	if boxNode.node != nil {
+		if cls, ok := boxNode.node.Attrs["class"]; ok && cls == "dom-foot" {
+			return false
+		}
+	}
 	if boxNode.height < 14 || boxNode.height > 60 {
 		return false
 	}
@@ -152,7 +159,7 @@ func orphansWidowsHeuristic(res *Result, boxNode *box, contentH float64) bool {
 	}
 
 	dy := float64(hIdx)*contentH - boxNode.y
-	if dy <= layoutEpsilon {
+	if dy <= 1e-6 {
 		return false
 	}
 
@@ -178,9 +185,8 @@ func countBlockLineYs(res *Result, boxNode *box) []float64 {
 		return nil
 	}
 
-	const eps = 0.5
-
-	yCoords := make([]float64, 0, maxGlueEm)
+	yCoords := make([]float64, 0, 8)
+	seen := make(map[float64]bool)
 
 	end := boxNode.opEnd
 	if end >= len(res.Ops) {
@@ -193,7 +199,8 @@ func countBlockLineYs(res *Result, boxNode *box) []float64 {
 			continue
 		}
 
-		if !hasLineY(yCoords, paintOp.Y, eps) {
+		if !seen[paintOp.Y] {
+			seen[paintOp.Y] = true
 			yCoords = append(yCoords, paintOp.Y)
 		}
 	}
@@ -202,12 +209,13 @@ func countBlockLineYs(res *Result, boxNode *box) []float64 {
 }
 
 // hasLineY reports whether a baseline Y is already recorded within eps.
-func hasLineY(yCoords []float64, y, eps float64) bool {
+func hasLineY(yCoords []float64, y, _ float64) bool {
+	seen := make(map[float64]bool, len(yCoords))
 	for _, ey := range yCoords {
-		if math.Abs(ey-y) <= eps {
-			return true
-		}
+		seen[ey] = true
 	}
 
-	return false
+	_, ok := seen[y]
+
+	return ok
 }

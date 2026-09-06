@@ -1,6 +1,6 @@
 {
-  "generated": "2026-08-30",
-  "scope": "Validate mapping engine_status=implemented (356) against non-test Go under internal/layout",
+  "generated": "2026-09-02",
+  "scope": "Validate mapping engine_status=implemented (355) against non-test Go under internal/layout",
   "method": [
     "switch prop { case \"name\": } in style_properties/paint/advanced/leftovers/cascade",
     "case ConstIdent where const ConstIdent = \"name\"",
@@ -13,9 +13,9 @@
     "_test.go"
   ],
   "counts": {
-    "VERIFIED": 356
+    "VERIFIED": 355
   },
-  "implemented_total": 356,
+  "implemented_total": 355,
   "properties": [
     {
       "property": "-webkit-align-content",
@@ -466,7 +466,7 @@
       "validation": "VERIFIED",
       "evidence_kind": "case-string",
       "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 162,
+      "primary_line": 123,
       "files": [
         "internal/layout/style_advanced_props.go"
       ],
@@ -2210,6 +2210,19 @@
       "claimed_code_path": "internal/layout/style_advanced_props.go"
     },
     {
+      "property": "empty-cells",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "case-string",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 50,
+      "files": [
+        "internal/layout/style_advanced_props.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
       "property": "fill",
       "kind": "longhand",
       "legacy_of": null,
@@ -2869,19 +2882,6 @@
       "claimed_code_path": "internal/layout/style_properties.go"
     },
     {
-      "property": "isolation",
-      "kind": "longhand",
-      "legacy_of": null,
-      "validation": "VERIFIED",
-      "evidence_kind": "case-string",
-      "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 165,
-      "files": [
-        "internal/layout/style_advanced_props.go"
-      ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
-    },
-    {
       "property": "justify-content",
       "kind": "longhand",
       "legacy_of": null,
@@ -3329,19 +3329,6 @@
         "internal/layout/style_properties.go"
       ],
       "claimed_code_path": "internal/layout/style_properties.go"
-    },
-    {
-      "property": "mix-blend-mode",
-      "kind": "longhand",
-      "legacy_of": null,
-      "validation": "VERIFIED",
-      "evidence_kind": "case-string",
-      "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 159,
-      "files": [
-        "internal/layout/style_advanced_props.go"
-      ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
     },
     {
       "property": "object-view-box",

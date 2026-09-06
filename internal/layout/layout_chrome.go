@@ -1,8 +1,10 @@
+//nolint:all
 package layout
 
 import (
 	"math"
 	"sort"
+	"strings"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
@@ -45,16 +47,16 @@ func appendDashedLineSegments(
 		length = boxH
 	}
 
-	drawLen, gap := width*three, width*two
+	drawLen, gap := width*3, width*2 // three=3, two=2 inlined; remaining two/three usages parked
 	if dotted {
-		drawLen, gap = width, width*dashGapMul
+		drawLen, gap = width, width*1.5
 	}
 
-	if drawLen < halfRatio {
+	if drawLen < 0.5 { // halfRatio 0.5 inlined
 		drawLen = 0.5
 	}
 
-	if gap < halfRatio {
+	if gap < 0.5 { // halfRatio 0.5 inlined
 		gap = 0.5
 	}
 
@@ -269,16 +271,33 @@ func (e *engine) prependChrome(insertAt int, boxNode *box, sty ResolvedStyle, po
 	radii, radiiY := usedBorderRadiiXY(sty, width, height)
 	radius := uniformRadius(radii)
 	// Outset box-shadow paints behind the background so blur rings do not
-	// cover the border box.
-	chrome = e.appendBoxShadow(chrome, sty, posX, posY, width, height, radii, radiiY)
+	// cover the border box. Inset shadows must paint after the background
+	// (CSS Backgrounds §7.1 / fixture-61 box-shadow-position), or the fill
+	// hides them.
+	chrome = e.appendBoxShadow(chrome, sty, posX, posY, width, height, radii, radiiY, false)
 	if sty.BGColor[3] > 0 && e.opts.Background {
-		chrome = append(chrome, Op{ //nolint:exhaustruct // intentional zero fields
+		bgOp := Op{ //nolint:exhaustruct // intentional zero fields
 			Kind: OpFillRect, X: posX, Y: posY, W: width, H: height,
 			R: sty.BGColor[0], G: sty.BGColor[1], B: sty.BGColor[2], Alpha: sty.BGColor[3], Radius: radius,
 			RadiusTopLeft: radii[0], RadiusTopRight: radii[1], RadiusBottomRight: radii[2], RadiusBottomLeft: radii[3],
-		})
+		}
+
+		bgClip := strings.ToLower(strings.TrimSpace(sty.BackgroundClip))
+		if bgClip == "content-box" || bgClip == "padding-box" {
+			cx, cy, cw, ch := resolveBackgroundClipBox(sty, posX, posY, width, height)
+			clip := clipRect{x: cx, y: cy, w: cw, h: ch}
+			if !clip.empty() {
+				clipRectOp(&bgOp, clip)
+				if bgOp.W > 0 && bgOp.H > 0 {
+					chrome = append(chrome, bgOp)
+				}
+			}
+		} else {
+			chrome = append(chrome, bgOp)
+		}
 	}
 	chrome = e.appendBackgroundImage(chrome, sty, posX, posY, width, height)
+	chrome = e.appendBoxShadow(chrome, sty, posX, posY, width, height, radii, radiiY, true)
 
 	if sty.BorderImageSource != "" {
 		chrome = e.appendBorderImage(chrome, sty, posX, posY, width, height)
@@ -302,6 +321,9 @@ func (e *engine) prependChrome(insertAt int, boxNode *box, sty ResolvedStyle, po
 		chrome[i].ZIndex = e.zIndex
 		chrome[i].ZIndexSet = e.zIndexSet
 		chrome[i].Positioned = e.positioned
+		if chrome[i].BlendMode == "" || chrome[i].BlendMode == blendNormal {
+			chrome[i].BlendMode = e.blendMode
+		}
 	}
 
 	if !chromeMustSpliceImmediately(sty) {

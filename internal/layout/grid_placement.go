@@ -131,15 +131,16 @@ func gridItemSpans(sty ResolvedStyle, areas gridTemplateAreasMap, nCols int) (in
 	colStart, colSpan = resolveGridAxisSpan(colStart, sty.GridColumnEnd, colSpan)
 	rowStart, rowSpan = resolveGridAxisSpan(rowStart, sty.GridRowEnd, rowSpan)
 
-	definite := false
+	colStart, colSpan = expandGridColumnEndSpan(colStart, colSpan, nCols, sty)
 
-	if name := strings.TrimSpace(sty.GridArea); name != "" {
-		if rect, ok := resolveNamedGridArea(areas, name); ok {
-			rowStart, colStart = rect.row, rect.col
-			rowSpan, colSpan = rect.rowSpan, rect.colSpan
-			definite = true
-		}
+	if sty.GridRowEnd == -1 && rowStart >= 0 {
+		// row -1 is best-effort: extend span if definite rows known elsewhere; handled via gridRowCount.
+		_ = rowStart
 	}
+
+	rowStart, colStart, rowSpan, colSpan, definite := applyGridAreaSpan(
+		rowStart, colStart, rowSpan, colSpan, sty, areas,
+	)
 
 	if colSpan > nCols {
 		colSpan = nCols
@@ -150,6 +151,44 @@ func gridItemSpans(sty ResolvedStyle, areas gridTemplateAreasMap, nCols int) (in
 	}
 
 	return rowStart, colStart, rowSpan, colSpan, definite
+}
+
+// expandGridColumnEndSpan expands a -1 column end (last grid line, nCols+1
+// for columns) into the column count it implies.
+func expandGridColumnEndSpan(colStart, colSpan, nCols int, sty ResolvedStyle) (int, int) {
+	// -1 means last grid line (nCols+1 for columns). Expand span to end.
+	if sty.GridColumnEnd != -1 {
+		return colStart, colSpan
+	}
+
+	if colStart >= 0 {
+		colSpan = nCols - colStart
+		if colSpan < 1 {
+			colSpan = 1
+		}
+
+		return colStart, colSpan
+	}
+
+	return 0, nCols
+}
+
+// applyGridAreaSpan overlays the named grid-area rect when the item names one
+// present in areas. It returns the possibly updated spans plus definite.
+func applyGridAreaSpan(
+	rowStart, colStart, rowSpan, colSpan int, sty ResolvedStyle, areas gridTemplateAreasMap,
+) (int, int, int, int, bool) {
+	name := strings.TrimSpace(sty.GridArea)
+	if name == "" {
+		return rowStart, colStart, rowSpan, colSpan, false
+	}
+
+	rect, ok := resolveNamedGridArea(areas, name)
+	if !ok {
+		return rowStart, colStart, rowSpan, colSpan, false
+	}
+
+	return rect.row, rect.col, rect.rowSpan, rect.colSpan, true
 }
 
 func resolveGridAxisSpan(start, end, span int) (int, int) {
@@ -184,6 +223,10 @@ func planGridItemPlacement(
 ) (int, int, int, int) {
 	rowStart, colStart, rowSpan, colSpan, definite := gridItemSpans(sty, areas, nCols)
 
+	if sty.GridRowEnd == -1 {
+		rowStart, rowSpan = resolveGridRowEndSpan(rowStart, minRows)
+	}
+
 	var row, col int
 
 	switch {
@@ -198,6 +241,29 @@ func planGridItemPlacement(
 	}
 
 	return row, col, rowSpan, colSpan
+}
+
+// resolveGridRowEndSpan expands a -1 row end (last grid line, best-effort)
+// against the known implicit row band.
+func resolveGridRowEndSpan(rowStart, minRows int) (int, int) {
+	if rowStart >= 0 {
+		if rowStart < minRows {
+			span := minRows - rowStart
+			if span < 1 {
+				span = 1
+			}
+
+			return rowStart, span
+		}
+
+		return rowStart, 1
+	}
+
+	if minRows < 1 {
+		return 0, 1
+	}
+
+	return 0, minRows
 }
 
 // placeGridItemDefinite drops an explicitly positioned item into its cell,

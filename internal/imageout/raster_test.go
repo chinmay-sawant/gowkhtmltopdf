@@ -6,6 +6,7 @@ import (
 	"errors"
 	"image"
 	"image/color"
+	"math"
 	"os"
 	"path/filepath"
 	"testing"
@@ -115,6 +116,65 @@ func TestRoundedTopStrokeLeavesOutsideCornerUnpainted(t *testing.T) {
 	corner := img.NRGBAAt(int(boxX*ptToPx)-2, int(boxY*ptToPx)-2)
 	if int(corner.G) > int(corner.R)+20 {
 		t.Fatalf("rounded top stroke painted the outside corner: pixel=%+v", corner)
+	}
+}
+
+// TestAxisAlignedBorderLinesFillOuterCorners guards the square-cap join for
+// solid CSS box borders: top+left OpLines meeting at (boxX,boxY) must paint
+// the outer corner pixel, not leave a butt-cap notch (fixture-61 props 3-5/14).
+func TestAxisAlignedBorderLinesFillOuterCorners(t *testing.T) {
+	t.Parallel()
+
+	const (
+		boxX  = 20.0
+		boxY  = 20.0
+		boxW  = 60.0
+		boxH  = 40.0
+		width = 4.0
+	)
+
+	res := &layout.Result{ //nolint:exhaustruct // synthetic four-side border
+		Width:  100,
+		Height: 80,
+		Ops: []layout.Op{
+			{ //nolint:exhaustruct // top
+				Kind: layout.OpLine, X: boxX, Y: boxY, W: boxW, H: 0,
+				Width: width, R: 0.1, G: 0.2, B: 0.4,
+			},
+			{ //nolint:exhaustruct // right
+				Kind: layout.OpLine, X: boxX + boxW, Y: boxY, W: 0, H: boxH,
+				Width: width, R: 0.1, G: 0.2, B: 0.4,
+			},
+			{ //nolint:exhaustruct // bottom
+				Kind: layout.OpLine, X: boxX, Y: boxY + boxH, W: boxW, H: 0,
+				Width: width, R: 0.1, G: 0.2, B: 0.4,
+			},
+			{ //nolint:exhaustruct // left
+				Kind: layout.OpLine, X: boxX, Y: boxY, W: 0, H: boxH,
+				Width: width, R: 0.1, G: 0.2, B: 0.4,
+			},
+		},
+	}
+
+	img, err := rasterizeContext(t.Context(), res, res.Height, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Outer corner sits half a stroke outside the centerline join.
+	halfPx := (width / 2) * ptToPx
+
+	checks := []image.Point{
+		{X: int(math.Round(boxX*ptToPx - halfPx + 1)), Y: int(math.Round(boxY*ptToPx - halfPx + 1))},               // TL
+		{X: int(math.Round((boxX+boxW)*ptToPx + halfPx - 2)), Y: int(math.Round(boxY*ptToPx - halfPx + 1))},        // TR
+		{X: int(math.Round(boxX*ptToPx - halfPx + 1)), Y: int(math.Round((boxY+boxH)*ptToPx + halfPx - 2))},        // BL
+		{X: int(math.Round((boxX+boxW)*ptToPx + halfPx - 2)), Y: int(math.Round((boxY+boxH)*ptToPx + halfPx - 2))}, // BR
+	}
+	for _, pt := range checks {
+		pixel := img.NRGBAAt(pt.X, pt.Y)
+		if pixel.B < 80 || pixel.R > 60 {
+			t.Fatalf("outer corner %v unpainted (butt-cap gap?): pixel=%+v", pt, pixel)
+		}
 	}
 }
 

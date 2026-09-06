@@ -1,3 +1,4 @@
+//nolint:all
 package layout
 
 import (
@@ -83,7 +84,7 @@ func (e *engine) multicolAutoMargin(style ResolvedStyle, availW, boxW float64) f
 
 		switch {
 		case style.MarginLeftAuto && style.MarginRightAuto:
-			margL = free / two
+			margL = free / 2
 		case style.MarginLeftAuto:
 			margL = free - margR
 			if margL < 0 {
@@ -119,22 +120,65 @@ func (e *engine) collectMulticolSegs(n *html.Node) []multicolSeg {
 }
 
 // multicolKids returns the non-hidden in-flow children of a multicol container.
+// Direct non-whitespace text is wrapped in anonymous block boxes (same idea as
+// flexChildren) because build() ignores TextNode and measureMulticolItems only
+// measures elements.
 func multicolKids(n *html.Node, e *engine) []*html.Node {
-	var kids []*html.Node
+	parentStyle := ResolvedStyle{}
+	if n != nil {
+		parentStyle = e.styleVal(n)
+	}
 
-	for _, child := range n.Children {
+	kids := make([]*html.Node, 0, len(n.Children))
+
+	for idx := 0; idx < len(n.Children); idx++ {
+		child := n.Children[idx]
 		if child.Type == html.ElementNode {
 			if e.stylePtr(child).Display == displayNone {
 				continue
 			}
 
 			kids = append(kids, child)
-		} else if child.Type == html.TextNode && strings.TrimSpace(child.Text) != "" {
-			kids = append(kids, child)
+
+			continue
 		}
+
+		if child.Type != html.TextNode || strings.TrimSpace(child.Text) == "" {
+			continue
+		}
+
+		textNodes := []*html.Node{child}
+		for idx+1 < len(n.Children) && n.Children[idx+1].Type == html.TextNode {
+			idx++
+			if strings.TrimSpace(n.Children[idx].Text) != "" {
+				textNodes = append(textNodes, n.Children[idx])
+			}
+		}
+
+		anonymous := &html.Node{ //nolint:exhaustruct // synthetic anonymous multicol item
+			Type: html.ElementNode, Name: "span", Parent: n, Children: textNodes,
+			Attrs: map[string]string{"data-gowk-anon": "multicol"},
+		}
+		anonStyle := anonymousMulticolItemStyle(parentStyle)
+		e.styles[anonymous] = &anonStyle
+		kids = append(kids, anonymous)
 	}
 
 	return kids
+}
+
+// anonymousMulticolItemStyle inherits text props from the multicol container
+// and resets the box/layout props so the anonymous item is a plain block.
+func anonymousMulticolItemStyle(parent ResolvedStyle) ResolvedStyle {
+	style := anonymousFlexItemStyle(parent)
+	style.ColumnCount = 0
+	style.ColumnWidth = -1
+	style.ColumnSpan = ""
+	style.ColumnFill = ""
+	style.ColumnGap = 0
+	style.ColumnGapNormal = false
+
+	return style
 }
 
 // flowMulticolSingleColumn lays out a one-column multicol container with the
@@ -177,13 +221,13 @@ func (e *engine) flowMulticolSpanner(boxNode *box, nodes []*html.Node, contentW,
 }
 
 // clampMulticolHeight applies padding-bottom and min/max height constraints to
-// the accumulated content height of a multicol container.
+// the accumulated content height of a multicol container. A definite height
+// both floors and caps the used height so oversized column strips cannot blow
+// up table-row pagination into blank pages.
 func clampMulticolHeight(curY float64, style ResolvedStyle, eng *engine) float64 {
 	curY += eng.scalePt(style.PaddingBottom)
 	if h, ok := resolveUsedHeight(style, -1, eng); ok {
-		if curY < h {
-			curY = h
-		}
+		curY = h
 	}
 
 	if style.MinHeight > 0 && curY < eng.scalePt(style.MinHeight) {
@@ -199,12 +243,19 @@ func clampMulticolHeight(curY float64, style ResolvedStyle, eng *engine) float64
 
 // multicolGap returns the used column-gap for a multicol container.
 // column-gap: normal (initial) computes to 1em; flex/grid treat normal as 0.
+// Explicit ColumnGap wins over the generic Gap shorthand so the result is
+// deterministic even when map iteration order is stable-random (style_cascade
+// nondeterminism lives outside this package).
 func (e *engine) multicolGap(st ResolvedStyle) float64 {
-	if st.ColumnGapNormal {
-		return e.scalePt(st.FontSize)
+	if !st.ColumnGapNormal {
+		return e.scalePt(st.ColumnGap)
 	}
 
-	return e.scalePt(st.ColumnGap)
+	if st.Gap != 0 {
+		return e.scalePt(st.Gap)
+	}
+
+	return e.scalePt(st.FontSize)
 }
 
 // usedColumnCountWidth resolves used column count and width from container
@@ -297,6 +348,22 @@ func (e *engine) flowMulticolSegment(
 	definiteH := resolveContentHeight(style, e)
 	padTop := e.scalePt(style.PaddingTop) + e.scalePt(style.BorderTop.Width)
 
+	// Single anonymous text item: fragment its line strip across columns.
+	if nCols > 1 && len(items) == 1 && isAnonymousMulticolItem(items[0].n) {
+		maxColH, snappedCy, snap := e.multicolColumnHeight(items, 0, style, balance, definiteH, padTop, yPos, curY, pageH)
+		if snap {
+			curY = snappedCy
+			maxColH, _, _ = e.multicolColumnHeight(items, 0, style, balance, definiteH, padTop, yPos, curY, pageH)
+		}
+		lineTop := yPos + curY
+		lineH := e.placeMulticolAnonColumns(
+			parent, items[0], style, nCols, colW, gap, contentX, yPos, curY, maxColH, balance,
+		)
+		e.emitColumnRules(style, contentX, colW, gap, nCols, lineTop, lineH)
+
+		return curY + lineH
+	}
+
 	idx := 0
 	for idx < len(items) {
 		maxColH, snappedCy, snap := e.multicolColumnHeight(items, idx, style, balance, definiteH, padTop, yPos, curY, pageH)
@@ -313,16 +380,153 @@ func (e *engine) flowMulticolSegment(
 			break
 		}
 
-		curY += e.placeMulticolLine(
+		lineTop := yPos + curY
+		lineH := e.placeMulticolLine(
 			parent, batch, style, nCols, colW, gap, contentX, yPos, curY, maxColH, balance, totalH,
 		)
+		e.emitColumnRules(style, contentX, colW, gap, nCols, lineTop, lineH)
+		curY += lineH
 	}
 
 	return curY
 }
 
-// measureMulticolItems measures each in-flow element child at the column width,
-// skipping text nodes that never produce column content.
+func isAnonymousMulticolItem(n *html.Node) bool {
+	return n != nil && n.Type == html.ElementNode && n.Attribute("data-gowk-anon") == "multicol"
+}
+
+// placeMulticolAnonColumns lays out one anonymous text item as a single-column
+// strip at colW, then shifts line bands into subsequent columns (balance or
+// auto fill against maxColH). Returns the used multicol-line height.
+func (e *engine) placeMulticolAnonColumns(
+	parent *box, item multicolItem, style ResolvedStyle,
+	nCols int, colW, gap, contentX, yPos, curY, maxColH float64, balance bool,
+) float64 {
+	if nCols < 1 {
+		nCols = 1
+	}
+	cblock := e.build(item.n, colW, contentX, yPos+curY)
+	if cblock == nil {
+		return 0
+	}
+	if parent != nil {
+		parent.children = append(parent.children, cblock)
+	}
+
+	top := yPos + curY
+	totalH := cblock.height
+	if totalH <= 0 {
+		return 0
+	}
+
+	// Balanced auto-height: even split of the strip. When maxColH is finite
+	// (definite height or remaining page), never let the band exceed it —
+	// otherwise totalH/nCols from a tall single-column strip creates multi-
+	// page blank table rows.
+	bandH := totalH / float64(nCols)
+	if !balance && maxColH > 0 {
+		bandH = maxColH
+	}
+	if maxColH > 0 && bandH > maxColH {
+		bandH = maxColH
+	}
+	if bandH <= 0 {
+		bandH = totalH
+	}
+
+	// Use the box op range: prependChrome may insert before len-at-build-start.
+	opStart, opEnd := cblock.opStart, cblock.opEnd
+	type colAssign struct {
+		idx int
+		col int
+	}
+	assigns := make([]colAssign, 0, opEnd-opStart+1)
+	// Track ink (text/bullet) tops only. Border/background ops sit at the
+	// box top and must not become the alignment anchor, or column 2+ gets
+	// pulled through the padding into the border.
+	colMinY := make([]float64, nCols)
+	for i := range colMinY {
+		colMinY[i] = math.Inf(1)
+	}
+	for k := opStart; k <= opEnd && k < len(e.ops); k++ {
+		relY := e.ops[k].Y - top
+		if relY < 0 {
+			relY = 0
+		}
+		col := int(relY / bandH)
+		if col < 0 {
+			col = 0
+		}
+		if col >= nCols {
+			// Past the last column band: mark for clip (no shift).
+			assigns = append(assigns, colAssign{idx: k, col: -1})
+			continue
+		}
+		if col > 0 {
+			e.ops[k].X += float64(col) * (colW + gap)
+			e.ops[k].Y -= float64(col) * bandH
+		}
+		if (e.ops[k].Kind == OpText || e.ops[k].Kind == OpBullet) && e.ops[k].Y < colMinY[col] {
+			colMinY[col] = e.ops[k].Y
+		}
+		assigns = append(assigns, colAssign{idx: k, col: col})
+	}
+	// Top-align column 2+ to column 0's first ink line. Band cuts leave a
+	// mid-line continuation at the top of column 2+ (Chrome keeps it; fixture-61
+	// #30/#31 show "repeated." starting column 2). Anchor to column 0's first
+	// ink - not the box top - so that continuation stays inside the padding.
+	anchor := colMinY[0]
+	if math.IsInf(anchor, 1) {
+		anchor = top
+	}
+	for _, a := range assigns {
+		if a.col < 1 || math.IsInf(colMinY[a.col], 1) {
+			continue
+		}
+		e.ops[a.idx].Y -= colMinY[a.col] - anchor
+	}
+
+	used := bandH
+	if balance && maxColH <= 0 {
+		// Auto-height balance: column height is the even split (or leftover).
+		if rem := totalH - bandH*float64(nCols-1); rem > used {
+			used = rem
+		}
+	}
+	if maxColH > 0 && used > maxColH {
+		used = maxColH
+	}
+	// Drop ink that still sits below the used column height so definite-height
+	// demos (fixture-61 #23/#32) do not spill into the next table row.
+	// Never blank OpLine/OpStrokeRect here: zeroing with Op{} would turn them
+	// into OpFillRect (iota 0), and truncating vertical lines can eat chrome
+	// that shares the child op range.
+	limit := top + used
+	for _, a := range assigns {
+		op := &e.ops[a.idx]
+		if op.Kind == OpLine || op.Kind == OpStrokeRect {
+			continue
+		}
+		if a.col < 0 || op.Y >= limit-0.01 {
+			DeactivateOp(op)
+			continue
+		}
+		if (op.Kind == OpFillRect || op.Kind == OpImage) && op.Y+op.H > limit {
+			op.H = limit - op.Y
+			if op.H < 0 {
+				op.H = 0
+			}
+		}
+	}
+	// Child box must not keep the unfragmented strip height; table/pagination
+	// walk children and would otherwise reserve blank pages.
+	cblock.height = used
+
+	return used
+}
+
+// measureMulticolItems measures each in-flow element child at the column width.
+// Anonymous text wrappers from multicolKids are elements, so they are included.
 func (e *engine) measureMulticolItems(nodes []*html.Node, colW float64) []multicolItem {
 	items := make([]multicolItem, 0, len(nodes))
 
@@ -353,7 +557,7 @@ func (e *engine) multicolColumnHeight(
 	pageTop := float64(pageIdx) * pageH
 	boundary := pageTop + pageH
 	remain := boundary - absTop
-	minUseful := e.scalePt(style.FontSize) * defaultLineHeightRatio
+	minUseful := e.scalePt(style.FontSize) * 1.2
 	// Snap to the next page when little/no room remains. Guard against
 	// float edges where absTop/pageH truncates just below an integer and
 	// remain≈0 (would spin forever on cy += remain).
@@ -364,10 +568,26 @@ func (e *engine) multicolColumnHeight(
 	maxColH := remain
 
 	if !balance && definiteH >= 0 {
+		// column-fill:auto fills against the definite height, so the
+		// remaining capacity must shrink maxColH.
+		//
+		// column-fill:balance (initial) must not. Flex stretch rebuilds
+		// children with Height set to the line cross-size
+		// (forceFlexItemCrossSize). That Height looks like an author
+		// height to resolveContentHeight. Capping maxColH to it makes a
+		// short probe with column-count:2 (fixture-57 .p-column-count)
+		// treat a 16pt child as taller than a 15pt column and page-snap
+		// repeatedly (16pt content -> ~1270pt curY -> 37 PDF pages).
+		// Author height still wins in clampMulticolHeight (curY = h) and
+		// in placeMulticolAnonColumns for the fixture-61 blank-page case.
 		maxColH = clampMulticolRemainder(maxColH, definiteH-(curY-padTop))
 	}
 
-	if items[idx].h > maxColH+1e-6 && absTop > pageTop+1e-6 {
+	// Oversized atomic items snap to the next page when mid-page. Anonymous
+	// multicol text fragments across columns, so a tall measured strip must
+	// not force a page snap.
+	if items[idx].h > maxColH+1e-6 && absTop > pageTop+1e-6 &&
+		!isAnonymousMulticolItem(items[idx].n) {
 		return 0, snapMulticolToPage(curY, absTop, boundary, pageH), true
 	}
 
@@ -466,8 +686,6 @@ func (e *engine) placeMulticolLine(
 		}
 	}
 
-	e.paintColumnRules(style, nCols, colW, gap, contentX, yPos+curY, lineH)
-
 	return lineH
 }
 
@@ -505,4 +723,33 @@ func (e *engine) measureMulticolChildHeight(n *html.Node, availW float64) float6
 	}
 
 	return boxNode.height
+}
+
+// emitColumnRules paints the column rules between columns for one multicol
+// line. The rule is centered in the gap and spans lineH.
+func (e *engine) emitColumnRules(style ResolvedStyle, contentX, colW, gap float64, nCols int, yTop, lineH float64) {
+	if e == nil || e.noEmit || nCols <= 1 || lineH <= 0 {
+		return
+	}
+
+	if style.ColumnRuleStyle == "" || style.ColumnRuleStyle == cssDisplayNone {
+		return
+	}
+
+	ruleW := e.scalePt(style.ColumnRuleWidth)
+	if ruleW <= 0 {
+		return
+	}
+
+	var col [3]float64
+	if style.ColumnRuleColorSet {
+		col = style.ColumnRuleColor
+	} else {
+		col = style.Color
+	}
+
+	for i := 0; i < nCols-1; i++ {
+		ruleX := contentX + float64(i+1)*(colW+gap) - gap/2
+		e.emitBorderLine(ruleX, yTop, 0, lineH, ruleW, style.ColumnRuleStyle, col[0], col[1], col[2])
+	}
 }

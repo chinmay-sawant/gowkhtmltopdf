@@ -1,5 +1,9 @@
 package layout
 
+// namedPageEdgeEpsilon nudges box edges onto their flow page so a box that
+// starts or ends exactly on a page boundary maps to the page it paints on.
+const namedPageEdgeEpsilon = 1e-6
+
 // applyNamedPageBreaks forces page-break-before:always on a box whose used
 // CSS page name differs from the previous sibling. Parent/child name changes
 // (body { page: chapter } wrapping the document) do not insert a blank first
@@ -74,12 +78,12 @@ func namedPageNames(res *Result, contentH float64) []string {
 			continue
 		}
 
-		start, startOK := checkedFlowPageOfY(boxNode.y+layoutEpsilon, contentH)
+		start, startOK := checkedFlowPageOfY(boxNode.y+namedPageEdgeEpsilon, contentH)
 		if !startOK {
 			continue
 		}
 
-		endY := boxNode.y + boxNode.height - layoutEpsilon
+		endY := boxNode.y + boxNode.height - namedPageEdgeEpsilon
 		if endY < boxNode.y {
 			endY = boxNode.y
 		}

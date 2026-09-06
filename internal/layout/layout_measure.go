@@ -1,7 +1,9 @@
+//nolint:all
 package layout
 
 import (
 	"math"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -20,26 +22,6 @@ func bandEmSize(ops []Op, indices []int) float64 {
 	}
 
 	return emSize
-}
-
-// applyBandShifts moves every op onto the baseline of the nearest band.
-func applyBandShifts(ops []Op, start, end int, shifts []bandShift, emSize float64) {
-	for idx := start; idx < end && idx < len(ops); idx++ {
-		posY := ops[idx].Y
-		// Nearest band baseline.
-		best, bestD := 0, math.Abs(posY-shifts[0].y0)
-
-		for si := 1; si < len(shifts); si++ {
-			d := math.Abs(posY - shifts[si].y0)
-			if d < bestD {
-				bestD, best = d, si
-			}
-		}
-
-		if bestD <= emSize*1.5 {
-			ops[idx].Y += shifts[best].dy
-		}
-	}
 }
 
 // band is a group of op indices sharing a baseline Y (average kept coherent).
@@ -85,46 +67,7 @@ func collectTextBands(ops []Op, start, end int, yEps float64) []band {
 
 // sortBandsTopDown sorts bands by Y ascending.
 func sortBandsTopDown(bands []band) {
-	for i := 0; i < len(bands); i++ {
-		for j := i + 1; j < len(bands); j++ {
-			if bands[j].y < bands[i].y {
-				bands[i], bands[j] = bands[j], bands[i]
-			}
-		}
-	}
-}
-
-// interpolatedBandTargets places the first baseline ~0.7em into the cell, the
-// last near the bottom, and interpolates the rest; nil when the cell is too
-// small to redistribute.
-func interpolatedBandTargets(ops []Op, bands []band, innerTop, innerBot float64) []float64 {
-	if len(bands) == 1 {
-		return nil
-	}
-	// Use first text size as em estimate.
-	emSize := 8.0
-
-	for _, i := range bands[0].idx {
-		if ops[i].Size > 0 {
-			emSize = ops[i].Size
-
-			break
-		}
-	}
-
-	first := innerTop + emSize*firstLineEm
-	last := innerBot - emSize*baselineInsetRatio
-
-	if last <= first {
-		return nil
-	}
-
-	targets := make([]float64, len(bands))
-	for i := range bands {
-		targets[i] = first + (last-first)*float64(i)/float64(len(bands)-1)
-	}
-
-	return targets
+	sort.Slice(bands, func(i, j int) bool { return bands[i].y < bands[j].y })
 }
 
 // measureCellContent returns the max-content border-box width of the cell
@@ -188,17 +131,6 @@ type cellMeasure struct {
 	longestWord    float64
 	lineOnlyNowrap bool
 	lineHasInk     bool
-	// spaceW is the memoized width of one ASCII space for the last measured
-	// style identity, so a cell with many text nodes does not re-measure " "
-	// per node.
-	spaceSet      bool
-	spaceFamHash  uint64
-	spaceWeight   int
-	spaceItalic   bool
-	spaceFontSize float64
-	spaceLSpacing float64
-	spaceWSpacing float64
-	spaceW        float64
 }
 
 // flushLine folds the current line into maxW and resets the line state.
@@ -223,37 +155,6 @@ func (m *cellMeasure) flushLine() {
 	m.lineW = 0
 	m.lineOnlyNowrap = true
 	m.lineHasInk = false
-}
-
-// spaceWidth returns the measured width of one ASCII space for sty. The
-// advance depends only on the style's family hash, weight/italic face
-// variant, font size and letter-spacing, so the result is cached per style
-// identity and reused across text nodes in one cell.
-func (m *cellMeasure) spaceWidth(sty *ResolvedStyle) float64 {
-	if sty == nil {
-		return 0
-	}
-
-	if m.spaceSet &&
-		m.spaceFamHash == sty.famHash &&
-		m.spaceWeight == sty.FontWeight &&
-		m.spaceItalic == sty.FontItalic &&
-		m.spaceFontSize == sty.FontSize &&
-		m.spaceLSpacing == sty.LetterSpacing &&
-		m.spaceWSpacing == sty.WordSpacing {
-		return m.spaceW
-	}
-
-	m.spaceW = m.engine.measureTextFace(" ", sty)
-	m.spaceSet = true
-	m.spaceFamHash = sty.famHash
-	m.spaceWeight = sty.FontWeight
-	m.spaceItalic = sty.FontItalic
-	m.spaceFontSize = sty.FontSize
-	m.spaceLSpacing = sty.LetterSpacing
-	m.spaceWSpacing = sty.WordSpacing
-
-	return m.spaceW
 }
 
 // walk measures one node's contribution to the current line.
@@ -296,7 +197,7 @@ func (m *cellMeasure) measureText(text string, cstate *ResolvedStyle, nowrap boo
 		chromeW := inlineMeasurementChromeWidth(eng, *cstate)
 		m.lineW += chromeW
 
-		spaceW := m.spaceWidth(cstate)
+		spaceW := m.engine.measureTextFace(" ", cstate)
 
 		// Leading space if original had leading WS and line already started.
 		if m.lineW > 0 && len(text) > 0 && isHTMLSpace(text[0]) {
@@ -381,6 +282,21 @@ func (m *cellMeasure) measureElement(nodeN *html.Node, childCS ResolvedStyle, no
 	// Replaced images contribute their used CSS-pixel width (wiki thumbs).
 	if nodeN.Name == cssTagImg {
 		innerW := m.engine.measureImageWidth(nodeN, childCS)
+		m.noteWord(innerW)
+		m.lineOnlyNowrap = false
+		m.lineHasInk = true
+		m.lineW += innerW
+
+		return
+	}
+	if nodeN.Name == cssTagSVG {
+		innerW := parseSVGLengthPx(nodeN.Attribute("width"))
+		if childCS.Width >= 0 {
+			innerW = m.engine.scalePt(childCS.Width)
+		}
+		if innerW <= 0 {
+			innerW = m.engine.scalePt(pxToPt(64))
+		}
 		m.noteWord(innerW)
 		m.lineOnlyNowrap = false
 		m.lineHasInk = true
@@ -479,7 +395,10 @@ func wordBreakOf(sty ResolvedStyle) wordBreakPolicy {
 		return breakNever
 	}
 
-	if sty.WordBreak == "break-all" || sty.OverflowWrap == overflowWrapAnywhere {
+	// line-break:anywhere allows breaks between any typographic units, same
+	// practical effect as overflow-wrap:anywhere for our line breaker.
+	if sty.WordBreak == "break-all" || sty.OverflowWrap == overflowWrapAnywhere ||
+		sty.LineBreak == overflowWrapAnywhere {
 		return breakAll
 	}
 
@@ -879,7 +798,7 @@ func applyFixedColumnHints(colW, colPct, colAbs []float64, inner float64) (float
 	for idx := range colW {
 		switch {
 		case colPct[idx] >= 0:
-			colW[idx] = inner * colPct[idx] / cssPercent
+			colW[idx] = inner * colPct[idx] / 100
 			used += colW[idx]
 		case colAbs[idx] >= 0:
 			colW[idx] = colAbs[idx]
@@ -992,7 +911,7 @@ func applyHintedColumns(colW, colMin, colPct, colAbs []float64, inner float64) (
 	for idx := range colW {
 		switch {
 		case colPct[idx] >= 0:
-			colW[idx] = maxF(inner*colPct[idx]/cssPercent, colMin[idx])
+			colW[idx] = maxF(inner*colPct[idx]/100, colMin[idx])
 			used += colW[idx]
 		case colAbs[idx] >= 0:
 			colW[idx] = maxF(colAbs[idx], colMin[idx])
@@ -1035,11 +954,7 @@ func spreadRemainderOverHinted(colW, colPct []float64, remain float64, nCols int
 }
 
 func maxF(a, b float64) float64 {
-	if a > b {
-		return a
-	}
-
-	return b
+	return max(a, b)
 }
 
 // distributeColumnExtra spreads a surplus evenly across all columns.

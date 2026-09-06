@@ -62,3 +62,4 @@ bindings/python/**/__pycache__/
 # local python package build trees
 bindings/python/build/
 bindings/python/dist/
+pen/

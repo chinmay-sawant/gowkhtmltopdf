@@ -2,10 +2,44 @@
 package layout
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
 )
+
+// Chrome ignores box-shadow-position when a box-shadow shorthand is present.
+// Paint must keep the shorthand layer (outer here), not force inset.
+func TestBoxShadowPositionLonghandDoesNotOverrideShorthandRaw(t *testing.T) {
+	t.Parallel()
+
+	root := mustParse(t, `<html><body>
+		<div class="pos">x</div>
+	</body></html>`)
+	styles := resolveStyles(root, []*css.Stylesheet{sheet(t, `
+		.pos { background: #ffe; box-shadow: 2pt 2pt 8pt #333; box-shadow-position: inset }
+	`)}, "print", testViewport, 800)
+	sty := styleByClass(t, styles, "pos")
+	if !sty.BoxShadowSet {
+		t.Fatal("BoxShadowSet false")
+	}
+	if sty.BoxShadowRaw == "" {
+		t.Fatal("BoxShadowRaw empty; shorthand raw must remain for Chrome-matched paint")
+	}
+	if !strings.Contains(sty.BoxShadowRaw, "2pt") {
+		t.Fatalf("BoxShadowRaw = %q, want shorthand lengths", sty.BoxShadowRaw)
+	}
+
+	eng := &engine{scale: 1, opts: Options{Background: true}} //nolint:exhaustruct // chrome probe
+	boxNode := &box{style: sty, w: 80, height: 36}            //nolint:exhaustruct // geometry probe
+	eng.prependChrome(0, boxNode, *sty, 10, 20, 80, 36)
+	ops := eng.deferredChrome[0].ops
+	// Outer shadow: dark fill before cream background, larger/offset from box.
+	bgIdx := findCreamBackgroundIndex(t, ops)
+	if !hasOuterShadowBeforeBackground(ops, bgIdx) {
+		t.Fatalf("expected outer shadow fills before background; bgIdx=%d", bgIdx)
+	}
+}
 
 func TestBoxShadowParse(t *testing.T) {
 	t.Parallel()
@@ -68,6 +102,65 @@ func TestBoxShadowPaints(t *testing.T) {
 	t.Run("spread-fill", testBoxShadowSpreadFill)
 	t.Run("layout-size-unchanged", testBoxShadowLayoutSizeUnchanged)
 	t.Run("rounded-fill", testBoxShadowRoundedFill)
+	t.Run("inset-after-background", testBoxShadowInsetAfterBackground)
+	t.Run("inset-top-left-rim", testBoxShadowInsetTopLeftRim)
+}
+
+// Inset shadows must splice after the background fill so the cream box does
+// not hide the inner rim (fixture-61 #12 / Chrome print).
+func testBoxShadowInsetAfterBackground(t *testing.T) {
+	t.Parallel()
+
+	eng := &engine{scale: 1, opts: Options{Background: true}} //nolint:exhaustruct // chrome probe
+	sty := ResolvedStyle{                                     //nolint:exhaustruct // shadow fields under test
+		BGColor:        [4]float64{1, 1, 0.933, 1},
+		BoxShadowX:     2,
+		BoxShadowY:     2,
+		BoxShadowBlur:  8,
+		BoxShadowColor: [3]float64{0.2, 0.2, 0.2},
+		BoxShadowInset: true,
+		BoxShadowSet:   true,
+		BoxShadowRaw:   "inset 2pt 2pt 8pt #333",
+	}
+	boxNode := &box{style: &sty, w: 80, height: 30} //nolint:exhaustruct // geometry probe
+	eng.prependChrome(0, boxNode, sty, 10, 20, 80, 30)
+
+	if len(eng.deferredChrome) != 1 {
+		t.Fatalf("deferred chrome entries = %d, want 1", len(eng.deferredChrome))
+	}
+	ops := eng.deferredChrome[0].ops
+	bgIdx, shadowAfter := findInsetShadowAfterBackground(ops)
+	if bgIdx < 0 {
+		t.Fatalf("missing cream background fill in %+v", ops)
+	}
+	if !shadowAfter {
+		t.Fatalf("inset shadow fills must follow background (bgIdx=%d) in %+v", bgIdx, ops)
+	}
+}
+
+// inset 2pt 2pt must darken the top and left inner edges, not only top/bottom.
+func testBoxShadowInsetTopLeftRim(t *testing.T) {
+	t.Parallel()
+
+	eng := &engine{scale: 1, opts: Options{Background: true}} //nolint:exhaustruct // chrome probe
+	sty := ResolvedStyle{                                     //nolint:exhaustruct // shadow fields under test
+		BGColor:        [4]float64{1, 1, 0.933, 1},
+		BoxShadowX:     2,
+		BoxShadowY:     2,
+		BoxShadowBlur:  8,
+		BoxShadowColor: [3]float64{0.2, 0.2, 0.2},
+		BoxShadowInset: true,
+		BoxShadowSet:   true,
+		BoxShadowRaw:   "inset 2pt 2pt 8pt #333",
+	}
+	boxNode := &box{style: &sty, w: 80, height: 30} //nolint:exhaustruct // geometry probe
+	eng.prependChrome(0, boxNode, sty, 10, 20, 80, 30)
+	ops := eng.deferredChrome[0].ops
+
+	hasTop, hasLeft := insetRimCoverage(ops)
+	if !hasTop || !hasLeft {
+		t.Fatalf("inset rim top=%v left=%v, want both; ops=%+v", hasTop, hasLeft, ops)
+	}
 }
 
 func testBoxShadowSpreadFill(t *testing.T) {
@@ -234,6 +327,89 @@ func testBoxShadowRoundedFill(t *testing.T) {
 	}
 
 	t.Fatal("rounded core shadow fill missing")
+}
+
+func findCreamBackgroundIndex(t *testing.T, ops []Op) int {
+	t.Helper()
+
+	for idx, op := range ops {
+		if op.Kind == OpFillRect && op.R > 0.9 && op.B > 0.9 {
+			return idx
+		}
+	}
+
+	t.Fatalf("missing background in %+v", ops)
+
+	return -1
+}
+
+func hasOuterShadowBeforeBackground(ops []Op, bgIdx int) bool {
+	for idx := range bgIdx {
+		op := ops[idx]
+
+		if op.Kind == OpFillRect && op.R < 0.5 {
+			return true
+		}
+	}
+
+	return false
+}
+
+func findInsetShadowAfterBackground(ops []Op) (int, bool) {
+	bgIdx := -1
+	shadowAfter := false
+
+	for idx, op := range ops {
+		if isCreamFill(op) {
+			bgIdx = idx
+		}
+
+		if bgIdx >= 0 && idx > bgIdx && isDarkFill(op) {
+			shadowAfter = true
+
+			break
+		}
+	}
+
+	return bgIdx, shadowAfter
+}
+
+func isCreamFill(op Op) bool {
+	return op.Kind == OpFillRect && op.R > 0.9 && op.G > 0.9 && op.B > 0.9
+}
+
+func isDarkFill(op Op) bool {
+	return op.Kind == OpFillRect && op.R < 0.5 && op.G < 0.5
+}
+
+func insetRimCoverage(ops []Op) (bool, bool) {
+	hasTop, hasLeft := false, false
+
+	for _, op := range ops {
+		if op.Kind != OpFillRect || op.R > 0.5 {
+			continue
+		}
+
+		// Top rim: near box top, spans most of width, short height.
+		if isInsetTopRim(op) {
+			hasTop = true
+		}
+
+		// Left rim: near box left, tall strip.
+		if isInsetLeftRim(op) {
+			hasLeft = true
+		}
+	}
+
+	return hasTop, hasLeft
+}
+
+func isInsetTopRim(op Op) bool {
+	return near(op.Y, 20) && op.H > 1 && op.H < 20 && op.W > 40
+}
+
+func isInsetLeftRim(op Op) bool {
+	return near(op.X, 10) && op.W > 1 && op.W < 25 && op.H > 15
 }
 
 func assertBoxShadow(t *testing.T, sty *ResolvedStyle, offsetX, offsetY, blur float64, color [3]float64, set bool) {

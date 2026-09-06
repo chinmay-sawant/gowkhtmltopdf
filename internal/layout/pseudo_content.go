@@ -7,7 +7,11 @@ import (
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
 
-const contentNormal = "normal"
+const (
+	contentNormal             = "normal"
+	singleQuotedContentMinLen = 2
+	listMarkerDisc            = "•"
+)
 
 // pseudoContent cascades the CSS content property for ::before/::after on n.
 // Supports string literals, attr(name), counter()/counters(), open-quote /
@@ -27,6 +31,9 @@ func contentNeedsEnv(value string) bool {
 }
 
 func (e *engine) pseudoContent(node *html.Node, pseudoEl string) string {
+	// content on regular elements (e.g. div with content:none or counter-increment)
+	// intentionally has no effect – only ::before/::after generate content.
+	// List markers for display:list-item are handled via OpBullet (see inline_paint.go).
 	if e == nil || node == nil || (pseudoEl != pseudoBefore && pseudoEl != pseudoAfter) {
 		return ""
 	}
@@ -43,6 +50,25 @@ func (e *engine) pseudoContent(node *html.Node, pseudoEl string) string {
 	}
 
 	return evalContentValue(best.value, node, e.contentEnvAt(node, pseudoEl))
+}
+
+func (e *engine) pseudoContentURL(node *html.Node, pseudoEl string) string {
+	if e == nil || node == nil || (pseudoEl != pseudoBefore && pseudoEl != pseudoAfter) {
+		return ""
+	}
+
+	ctx := e.pseudoStyleContext()
+
+	best := selectContentDecl(ctx, node, pseudoEl)
+	if best == nil {
+		return ""
+	}
+
+	if url, ok := firstCSSUrl(best.value); ok {
+		return url
+	}
+
+	return ""
 }
 
 // pseudoStyleContext is the cascade context used to re-walk sheets for
@@ -248,6 +274,9 @@ func scanContentFunction(
 		boxNode.WriteString(text)
 
 		return next, true
+	case "url":
+		// content:url() is an image replaced element (minimal: skip text, caller creates OpImage)
+		return skipCSSFunction(value, paren+1), true
 	default:
 		return skipCSSFunction(value, paren+1), true
 	}
@@ -274,7 +303,7 @@ func scanContentIdent(value string, idx int, env *contentEnv, boxNode *strings.B
 // singleQuotedContent returns the inner text when value is exactly one quoted
 // string with no inner unescaped quote.
 func singleQuotedContent(value string) (string, bool) {
-	if len(value) < two {
+	if len(value) < singleQuotedContentMinLen {
 		return "", false
 	}
 
@@ -467,4 +496,60 @@ func decodeHexEscape(value string, start int) (rune, int) {
 
 func isHex(c byte) bool {
 	return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
+}
+
+// listItemMarkerText returns the marker for a display:list-item element
+// based on its ListStyleType. Used by inline_paint when parent is display:list-item.
+func listItemMarkerText(style ResolvedStyle, node *html.Node) string { //nolint:unused // used by inline_paint.go.
+	typ := style.ListStyleType
+	if typ == "" {
+		typ = listStyleDisc
+	}
+	// Reuse layout's markerText logic for disc/circle/square/decimal etc.
+	// When node is available, counter-based types could use its position.
+	// For inline-paint fallback, use simple glyphs.
+	switch typ {
+	case listStyleDisc:
+		return listMarkerDisc
+	case listStyleCircle:
+		return "○"
+	case listStyleSquare:
+		return "■"
+	case listStyleDecimal, listStyleDecimalZero:
+		// Inline fallback without counter context – markerText in layout_flow would compute index.
+		// Use generic "1."; real <ol> path uses emitListMarker with correct counter.
+		if node != nil {
+			return markerText(node, typ)
+		}
+
+		return "1."
+	case listStyleLowerAlpha, listStyleLowerLatin, listStyleUpperAlpha,
+		listStyleUpperLatin, listStyleLowerRoman, listStyleUpperRoman:
+		return listMarkerAlphaRoman(typ)
+	default:
+		if node != nil {
+			return markerText(node, typ)
+		}
+
+		return listMarkerDisc
+	}
+}
+
+//nolint:unused // helper for listItemMarkerText above.
+func listMarkerAlphaRoman(typ string) string {
+	switch typ {
+	case listStyleLowerAlpha, listStyleLowerLatin:
+		return "a."
+	case listStyleUpperAlpha, listStyleUpperLatin:
+		return "A."
+	case listStyleLowerRoman:
+		return "i."
+	default:
+		return "I."
+	}
+}
+
+// isDisplayListItem reports whether the style is a list-item display.
+func isDisplayListItem(style *ResolvedStyle) bool { //nolint:unused // used by inline_paint.go.
+	return style != nil && style.Display == "list-item"
 }

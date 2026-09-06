@@ -1,3 +1,4 @@
+//nolint:all
 //nolint:testpackage,wsl,nlreturn,varnamelen,lll // fixture assertions inspect layout internals
 package layout
 
@@ -162,7 +163,7 @@ func fixture56PageLead(y, contentH float64) float64 {
 		offset += contentH
 	}
 
-	if contentH-offset <= layoutSlack {
+	if contentH-offset <= 0.01 {
 		return 0
 	}
 
@@ -238,6 +239,23 @@ func fixture56PaintOptions() PaintOptions {
 		MarginTop: margin, MarginBottom: margin,
 		MarginLeft: margin, MarginRight: margin,
 	}
+}
+
+func fixture56Result(t *testing.T, zoom float64) (*html.Node, *Result) {
+	t.Helper()
+	root, sheet := loadFixture56(t)
+	const contentHeight = 841.89 - 2*28.35
+	res, err := Layout(root, Options{ //nolint:exhaustruct // fixture uses the standard print layout path
+		Width: 595.28 - 2*28.35, Height: contentHeight,
+		Background: true, Sheets: []*css.Stylesheet{sheet}, Media: "print", Zoom: zoom,
+	})
+	if err != nil {
+		t.Fatalf("fixture56 layout: %v", err)
+	}
+	if err := Paint(pdf.NewDocument(), res, fixture56PaintOptions()); err != nil {
+		t.Fatalf("fixture56 paint: %v", err)
+	}
+	return root, res
 }
 
 //nolint:gocognit,gocyclo,cyclop,funlen // fixture seam assertions intentionally remain together
@@ -563,18 +581,7 @@ func TestFixture56PageBackgroundDoesNotUseHeroFill(t *testing.T) { //nolint:para
 }
 
 func TestFixture56D02PageStartHasWhiteSectionBackground(t *testing.T) { //nolint:paralleltest,cyclop // renderer fixture uses shared font state
-	root, sheet := loadFixture56(t)
-	contentHeight := 841.89 - 2*28.35
-	res, err := Layout(root, Options{ //nolint:exhaustruct // fixture uses the standard print layout path
-		Width: 595.28 - 2*28.35, Height: contentHeight,
-		Background: true, Sheets: []*css.Stylesheet{sheet}, Media: "print", Zoom: 0.98,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := Paint(pdf.NewDocument(), res, fixture56PaintOptions()); err != nil {
-		t.Fatal(err)
-	}
+	root, res := fixture56Result(t, 0.98)
 
 	d02 := fixture56Node(root, func(node *html.Node) bool { return node.Attribute("id") == "domain-02" })
 	d02Box := fixture56BoxByNode(res.root, d02)
@@ -593,18 +600,7 @@ func TestFixture56D02PageStartHasWhiteSectionBackground(t *testing.T) { //nolint
 
 //nolint:cyclop,paralleltest // renderer fixture assertions intentionally stay together
 func TestFixture56D02VerticalTabBaselineMatchesBoxTop(t *testing.T) {
-	root, sheet := loadFixture56(t)
-	contentHeight := 841.89 - 2*28.35
-	res, err := Layout(root, Options{ //nolint:exhaustruct // fixture uses the standard print layout path
-		Width: 595.28 - 2*28.35, Height: contentHeight,
-		Background: true, Sheets: []*css.Stylesheet{sheet}, Media: "print", Zoom: 0.98,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := Paint(pdf.NewDocument(), res, fixture56PaintOptions()); err != nil {
-		t.Fatal(err)
-	}
+	root, res := fixture56Result(t, 0.98)
 
 	tab := fixture56Node(root, func(node *html.Node) bool { return fixture56Class(node) == "d02-tab" })
 	tabBox := fixture56BoxByNode(res.root, tab)
@@ -695,18 +691,7 @@ func TestFixture56DoesNotRepeatAncestorSideRails(t *testing.T) { //nolint:parall
 }
 
 func TestFixture56SectionRailsFlushWithFrame(t *testing.T) { //nolint:cyclop,paralleltest // fixture seam assertions intentionally remain together
-	root, sheet := loadFixture56(t)
-	contentHeight := 841.89 - 2*28.35
-	res, err := Layout(root, Options{ //nolint:exhaustruct // fixture uses the standard print layout path
-		Width: 595.28 - 2*28.35, Height: contentHeight,
-		Background: true, Sheets: []*css.Stylesheet{sheet}, Media: "print", Zoom: 0.98,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := Paint(pdf.NewDocument(), res, fixture56PaintOptions()); err != nil {
-		t.Fatal(err)
-	}
+	root, res := fixture56Result(t, 0.98)
 
 	for _, id := range []string{"dependency-dag", "divergence", "security"} {
 		node := fixture56Node(root, func(node *html.Node) bool { return node.Attribute("id") == id })
@@ -835,12 +820,12 @@ func countSplitNotes(t *testing.T, res *Result, notes []*html.Node, contentHeigh
 
 	for _, node := range notes {
 		box := fixture56BoxByNode(res.root, node)
-		if box == nil || box.height <= layoutSlack || box.height > contentHeight {
+		if box == nil || box.height <= 0.01 || box.height > contentHeight {
 			continue
 		}
 
-		start := int((box.y + layoutSlack) / contentHeight)
-		end := int((box.y + box.height - layoutSlack) / contentHeight)
+		start := int((box.y + 0.01) / contentHeight)
+		end := int((box.y + box.height - 0.01) / contentHeight)
 		section := findAncestorSectionID(node)
 		t.Logf("notes %s y=%.2f h=%.2f pages=%d-%d", section, box.y, box.height, start+1, end+1)
 
@@ -854,7 +839,7 @@ func countSplitNotes(t *testing.T, res *Result, notes []*html.Node, contentHeigh
 		// later snap can still leave the box Y straddling; that is not a
 		// mid-page keep miss.
 		if remaining > 0 && remaining < box.height &&
-			remaining <= contentHeight*keepTogetherMaxBlankRatio {
+			remaining <= contentHeight*0.2 {
 			t.Logf("notes %s overflow remaining=%.2f in keep-together band", section, remaining)
 
 			continue
@@ -1197,7 +1182,7 @@ func TestFixture56PaginationChromeAndWidgetGeometry(t *testing.T) { //nolint:par
 
 	for _, child := range gaugeBox.children {
 		const authoredGaugeWidthPercent = 46.0
-		wantWidth := gaugeBox.w * authoredGaugeWidthPercent / cssPercent
+		wantWidth := gaugeBox.w * authoredGaugeWidthPercent / 100
 		if math.Abs(child.w-wantWidth) > 0.01 {
 			t.Fatalf("D03 gauge width = %.2f, want authored %.2f%% of row %.2f", child.w, authoredGaugeWidthPercent, gaugeBox.w)
 		}

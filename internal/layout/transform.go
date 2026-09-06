@@ -14,6 +14,17 @@ const (
 	transformFuncSkewx      = "skewx"
 )
 
+const (
+	degreesInHalfCircle   = 180
+	transformOriginMiddle = 50
+	matrixFuncArgCount    = 6
+	matrixTranslateStart  = 4
+	gradToDegFactor       = 0.9
+	fullTurnDegrees       = 360
+	maxTwoValueArgs       = 2
+	maxThreeValueArgs     = 3
+)
+
 // Matrix2D is a CSS/SVG-style 2D affine transform:
 //
 //	x' = A*x + C*y + E
@@ -60,7 +71,7 @@ func Scale(sx, sy float64) Matrix2D {
 
 // RotateDeg returns a rotation by deg degrees about the origin (CSS y-down).
 func RotateDeg(deg float64) Matrix2D {
-	rad := deg * math.Pi / degHalfCircle
+	rad := deg * math.Pi / degreesInHalfCircle
 	c, s := math.Cos(rad), math.Sin(rad)
 
 	return Matrix2D{A: c, B: s, C: -s, D: c} //nolint:exhaustruct // intentional zero fields
@@ -68,14 +79,14 @@ func RotateDeg(deg float64) Matrix2D {
 
 // SkewXDeg returns a skewX matrix (CSS degrees).
 func SkewXDeg(deg float64) Matrix2D {
-	t := math.Tan(deg * math.Pi / degHalfCircle)
+	t := math.Tan(deg * math.Pi / degreesInHalfCircle)
 
 	return Matrix2D{A: 1, D: 1, C: t} //nolint:exhaustruct // intentional zero fields
 }
 
 // SkewYDeg returns a skewY matrix (CSS degrees).
 func SkewYDeg(deg float64) Matrix2D {
-	t := math.Tan(deg * math.Pi / degHalfCircle)
+	t := math.Tan(deg * math.Pi / degreesInHalfCircle)
 
 	return Matrix2D{A: 1, D: 1, B: t} //nolint:exhaustruct // intentional zero fields
 }
@@ -99,7 +110,7 @@ type transformOriginSpec struct {
 }
 
 func defaultTransformOrigin() transformOriginSpec {
-	return transformOriginSpec{X: cssCenterPercent, Y: cssCenterPercent, XPercent: true, YPercent: true}
+	return transformOriginSpec{X: transformOriginMiddle, Y: transformOriginMiddle, XPercent: true, YPercent: true}
 }
 
 func resolveTransformOrigin(spec transformOriginSpec, boxNode *box) (float64, float64) {
@@ -110,13 +121,13 @@ func resolveTransformOrigin(spec transformOriginSpec, boxNode *box) (float64, fl
 	var originX, originY float64
 
 	if spec.XPercent {
-		originX = boxNode.x + boxNode.w*spec.X/cssPercent
+		originX = boxNode.x + boxNode.w*spec.X/oneHundred
 	} else {
 		originX = boxNode.x + spec.X
 	}
 
 	if spec.YPercent {
-		originY = boxNode.y + boxNode.height*spec.Y/cssPercent
+		originY = boxNode.y + boxNode.height*spec.Y/oneHundred
 	} else {
 		originY = boxNode.y + spec.Y
 	}
@@ -127,18 +138,36 @@ func resolveTransformOrigin(spec transformOriginSpec, boxNode *box) (float64, fl
 // parseTransformList parses a CSS transform function list into a single matrix.
 // Returns ok=false for unrecognized input (caller keeps prior/initial).
 // "none" yields identity with ok=true and has=false.
-func parseTransformList(value string, fontSize float64) (Matrix2D, bool, bool) {
+// Percentage translates are deferred (NaN = none) and resolved at stamp time
+// against the border box, matching the `translate:` longhand path.
+// mergePercentAccum folds one deferred translate percent into its accumulator.
+// NaN means "none", so a NaN delta leaves the accumulator unchanged and a NaN
+// accumulator adopts the first real delta.
+func mergePercentAccum(accum, delta float64) float64 {
+	if math.IsNaN(delta) {
+		return accum
+	}
+
+	if math.IsNaN(accum) {
+		return delta
+	}
+
+	return accum + delta
+}
+
+func parseTransformList(value string, fontSize float64) (Matrix2D, float64, float64, bool, bool) {
 	value = strings.TrimSpace(value)
 	if value == "" {
-		return IdentityMatrix(), false, false
+		return IdentityMatrix(), math.NaN(), math.NaN(), false, false
 	}
 
 	if strings.EqualFold(value, cssDisplayNone) {
-		return IdentityMatrix(), false, true
+		return IdentityMatrix(), math.NaN(), math.NaN(), false, true
 	}
 
 	matrix := IdentityMatrix()
 	has := false
+	accXPct, accYPct := math.NaN(), math.NaN()
 	rest := value
 
 	for {
@@ -149,20 +178,23 @@ func parseTransformList(value string, fontSize float64) (Matrix2D, bool, bool) {
 
 		name, args, next, pok := splitTransformFunc(rest)
 		if !pok {
-			return IdentityMatrix(), false, false
+			return IdentityMatrix(), math.NaN(), math.NaN(), false, false
 		}
 
-		fm, fok := parseOneTransformFunc(name, args, fontSize)
-		if !fok {
-			return IdentityMatrix(), false, false
+		funcMatrix, xPctVal, yPctVal, funcOK := parseOneTransformFunc(name, args, fontSize)
+		if !funcOK {
+			return IdentityMatrix(), math.NaN(), math.NaN(), false, false
 		}
+
 		// Left-to-right post-multiply: M = M * Fi
-		matrix = matrix.Mul(fm)
+		matrix = matrix.Mul(funcMatrix)
+		accXPct = mergePercentAccum(accXPct, xPctVal)
+		accYPct = mergePercentAccum(accYPct, yPctVal)
 		has = true
 		rest = next
 	}
 
-	return matrix, has, true
+	return matrix, accXPct, accYPct, has, true
 }
 
 func splitTransformFunc(s string) (string, string, string, bool) {
@@ -218,33 +250,41 @@ func scanTransformParens(text string) (string, string, bool) {
 	return "", "", false
 }
 
-func parseOneTransformFunc(name, args string, fontSize float64) (Matrix2D, bool) {
+func parseOneTransformFunc(name, args string, fontSize float64) (Matrix2D, float64, float64, bool) {
 	parts := splitTransformArgs(args)
 
 	switch name {
 	case "matrix":
-		return parseMatrixFunc(parts)
+		m, ok := parseMatrixFunc(parts)
+
+		return m, math.NaN(), math.NaN(), ok
 	case "translate", transformFuncTranslatex, "translatey":
 		return parseTranslateFunc(name, parts, fontSize)
 	case "scale", transformFuncScalex, "scaley":
-		return parseScaleFunc(name, parts)
+		m, ok := parseScaleFunc(name, parts)
+
+		return m, math.NaN(), math.NaN(), ok
 	case "rotate":
-		return parseRotateFunc(parts)
+		m, ok := parseRotateFunc(parts)
+
+		return m, math.NaN(), math.NaN(), ok
 	case "skew", transformFuncSkewx, "skewy":
-		return parseSkewFunc(name, parts)
+		m, ok := parseSkewFunc(name, parts)
+
+		return m, math.NaN(), math.NaN(), ok
 	default:
 		// 3D / perspective / matrix3d: reject (non-goal)
-		return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
+		return Matrix2D{}, math.NaN(), math.NaN(), false //nolint:exhaustruct // intentional zero fields
 	}
 }
 
 // parseMatrixFunc parses matrix(a,b,c,d,e,f) coefficients.
 func parseMatrixFunc(parts []string) (Matrix2D, bool) {
-	if len(parts) != matrixCoeffCount {
+	if len(parts) != matrixFuncArgCount {
 		return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
 	}
 
-	vals := make([]float64, matrixCoeffCount)
+	vals := make([]float64, matrixFuncArgCount)
 
 	for idx, p := range parts {
 		// CSS matrix() takes six <number>s (user units ≈ px at 96dpi).
@@ -253,7 +293,7 @@ func parseMatrixFunc(parts []string) (Matrix2D, bool) {
 			return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
 		}
 
-		if idx >= minBoxPt {
+		if idx >= matrixTranslateStart {
 			// e,f: translate in px → pt for our canvas.
 			vals[idx] = pxToPt(val)
 		} else {
@@ -265,8 +305,8 @@ func parseMatrixFunc(parts []string) (Matrix2D, bool) {
 }
 
 // parseTranslateFunc parses translate(tx[, ty]) and its translatex/translatey
-// one-axis variants.
-func parseTranslateFunc(name string, parts []string, fontSize float64) (Matrix2D, bool) {
+// one-axis variants. Percentage components are deferred (NaN = none).
+func parseTranslateFunc(name string, parts []string, fontSize float64) (Matrix2D, float64, float64, bool) {
 	if name == transformFuncTranslatex || name == "translatey" {
 		return parseSingleAxisTranslate(name, parts, fontSize)
 	}
@@ -275,43 +315,70 @@ func parseTranslateFunc(name string, parts []string, fontSize float64) (Matrix2D
 }
 
 // parseSingleAxisTranslate parses translatex(tx) / translatey(ty).
-func parseSingleAxisTranslate(name string, parts []string, fontSize float64) (Matrix2D, bool) {
+func parseSingleAxisTranslate(name string, parts []string, fontSize float64) (Matrix2D, float64, float64, bool) {
 	if len(parts) != 1 {
-		return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
+		return Matrix2D{}, math.NaN(), math.NaN(), false //nolint:exhaustruct // intentional zero fields
 	}
 
-	axisLen, isOK := parseTransformLength(parts[0], fontSize)
+	axisLen, pctVal, isPct, isOK := parseTransformLength(parts[0], fontSize)
 	if !isOK {
-		return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
+		return Matrix2D{}, math.NaN(), math.NaN(), false //nolint:exhaustruct // intentional zero fields
 	}
 
-	if name == transformFuncTranslatex {
-		return Translate(axisLen, 0), true
-	}
+	xPct, yPct := math.NaN(), math.NaN()
 
-	return Translate(0, axisLen), true
-}
+	if isPct {
+		axisLen = 0
 
-// parseTwoArgTranslate parses translate(tx[, ty]).
-func parseTwoArgTranslate(parts []string, fontSize float64) (Matrix2D, bool) {
-	if len(parts) < 1 || len(parts) > 2 {
-		return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
-	}
-
-	xLen, isOK := parseTransformLength(parts[0], fontSize)
-	if !isOK {
-		return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
-	}
-
-	yLen := 0.0
-	if len(parts) == two {
-		yLen, isOK = parseTransformLength(parts[1], fontSize)
-		if !isOK {
-			return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
+		if name == transformFuncTranslatex {
+			xPct = pctVal
+		} else {
+			yPct = pctVal
 		}
 	}
 
-	return Translate(xLen, yLen), true
+	if name == transformFuncTranslatex {
+		return Translate(axisLen, 0), xPct, yPct, true
+	}
+
+	return Translate(0, axisLen), xPct, yPct, true
+}
+
+// parseTwoArgTranslate parses translate(tx[, ty]).
+func parseTwoArgTranslate(parts []string, fontSize float64) (Matrix2D, float64, float64, bool) {
+	if len(parts) < 1 || len(parts) > maxTwoValueArgs {
+		return Matrix2D{}, math.NaN(), math.NaN(), false //nolint:exhaustruct // intentional zero fields
+	}
+
+	xLen, xPctVal, xIsPct, isOK := parseTransformLength(parts[0], fontSize)
+	if !isOK {
+		return Matrix2D{}, math.NaN(), math.NaN(), false //nolint:exhaustruct // intentional zero fields
+	}
+
+	xPct, yPct := math.NaN(), math.NaN()
+
+	if xIsPct {
+		xPct = xPctVal
+		xLen = 0
+	}
+
+	yLen := 0.0
+
+	if len(parts) == maxTwoValueArgs {
+		yLenTmp, yPctVal, yIsPct, ok2 := parseTransformLength(parts[1], fontSize)
+		if !ok2 {
+			return Matrix2D{}, math.NaN(), math.NaN(), false //nolint:exhaustruct // intentional zero fields
+		}
+
+		if yIsPct {
+			yPct = yPctVal
+			yLenTmp = 0
+		}
+
+		yLen = yLenTmp
+	}
+
+	return Translate(xLen, yLen), xPct, yPct, true
 }
 
 // parseScaleFunc parses scale(sx[, sy]) and its scalex/scaley one-axis
@@ -344,7 +411,7 @@ func parseSingleAxisScale(name string, parts []string) (Matrix2D, bool) {
 
 // parseTwoArgScale parses scale(sx[, sy]).
 func parseTwoArgScale(parts []string) (Matrix2D, bool) {
-	if len(parts) < 1 || len(parts) > 2 {
+	if len(parts) < 1 || len(parts) > maxTwoValueArgs {
 		return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
 	}
 
@@ -354,7 +421,7 @@ func parseTwoArgScale(parts []string) (Matrix2D, bool) {
 	}
 
 	yScale := xScale
-	if len(parts) == two {
+	if len(parts) == maxTwoValueArgs {
 		yScale, isOK = parseUnitless(parts[1])
 		if !isOK {
 			return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
@@ -407,7 +474,7 @@ func parseSingleAxisSkew(name string, parts []string) (Matrix2D, bool) {
 
 // parseTwoArgSkew parses skew(ax[, ay]).
 func parseTwoArgSkew(parts []string) (Matrix2D, bool) {
-	if len(parts) < 1 || len(parts) > 2 {
+	if len(parts) < 1 || len(parts) > maxTwoValueArgs {
 		return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
 	}
 
@@ -417,7 +484,7 @@ func parseTwoArgSkew(parts []string) (Matrix2D, bool) {
 	}
 
 	yDeg := 0.0
-	if len(parts) == two {
+	if len(parts) == maxTwoValueArgs {
 		yDeg, isOK = parseAngleDeg(parts[1])
 		if !isOK {
 			return Matrix2D{}, false //nolint:exhaustruct // intentional zero fields
@@ -490,21 +557,21 @@ func parseAngleDeg(cssSheet string) (float64, bool) {
 			return 0, false
 		}
 
-		return v * 180 / math.Pi, true
+		return v * degreesInHalfCircle / math.Pi, true
 	case strings.HasSuffix(cssSheet, "grad"):
 		v, err := strconv.ParseFloat(strings.TrimSpace(cssSheet[:len(cssSheet)-4]), 64)
 		if err != nil {
 			return 0, false
 		}
 
-		return v * turnScale, true
+		return v * gradToDegFactor, true
 	case strings.HasSuffix(cssSheet, "turn"):
 		v, err := strconv.ParseFloat(strings.TrimSpace(cssSheet[:len(cssSheet)-4]), 64)
 		if err != nil {
 			return 0, false
 		}
 
-		return v * degFullCircle, true
+		return v * fullTurnDegrees, true
 	default:
 		// Unitless angles are invalid in modern CSS; accept bare numbers as deg
 		// for authoring convenience in fixtures.
@@ -514,42 +581,39 @@ func parseAngleDeg(cssSheet string) (float64, bool) {
 	}
 }
 
-// parseTransformLength parses a translate length (px/pt/em/% of 0 → 0 for %).
-// Percentages in translate resolve against the reference box at used-value time;
-// at parse we store % as a fraction of a 0 base (treated as 0) unless we defer.
-// For static print we resolve % translate against 0 at parse (rare) — prefer
-// absolute lengths in reports. em uses font-size.
-func parseTransformLength(cssS string, fontSize float64) (float64, bool) {
+// parseTransformLength parses a translate length (px/pt/em/%).
+// For percentages it returns pct=value and isPct=true so callers can defer
+// resolution against the border box at layout time (spec: % of border-box).
+// Absolute lengths return pt and isPct=false. em uses font-size.
+func parseTransformLength(cssS string, fontSize float64) (float64, float64, bool, bool) {
 	cssS = strings.TrimSpace(cssS)
 	if cssS == "0" {
-		return 0, true
+		return 0, 0, false, true
 	}
 
 	val, unit, ok := css.ParseLength(cssS)
 	if !ok {
 		// bare number = px per CSS Transforms for matrix e/f; for translate too historically
 		if f, err := strconv.ParseFloat(cssS, 64); err == nil {
-			return pxToPt(f), true
+			return pxToPt(f), 0, false, true
 		}
 
-		return 0, false
+		return 0, 0, false, false
 	}
 
 	if unit == "%" {
-		// Without the border box at parse time, % translate is 0 (used value
-		// would need layout). Authors should use absolute lengths for print.
-		return 0, true
+		return 0, val, true, true
 	}
 
 	if unit == "rem" {
-		return pxToPt(cssPxRoot) * val, true
+		return pxToPt(16) * val, 0, false, true //nolint:mnd // cssPxRoot 16 inlined
 	}
 
 	if pt, ok := lengthToPt(val, unit, fontSize); ok {
-		return pt, true
+		return pt, 0, false, true
 	}
 
-	return 0, false
+	return 0, 0, false, false
 }
 
 // parseTransformOrigin parses CSS transform-origin (1–3 values; z ignored).
@@ -560,7 +624,7 @@ func parseTransformOrigin(value string, fontSize float64) (transformOriginSpec, 
 	}
 
 	parts := strings.Fields(value)
-	if len(parts) == 0 || len(parts) > 3 {
+	if len(parts) == 0 || len(parts) > maxThreeValueArgs {
 		return transformOriginSpec{}, false //nolint:exhaustruct // intentional zero fields
 	}
 
@@ -576,12 +640,12 @@ func parseTransformOrigin(value string, fontSize float64) (transformOriginSpec, 
 		tok := strings.ToLower(parts[0])
 		if tok == cssVerticalAlignTop || tok == cssVerticalAlignBottom {
 			spec.Y, spec.YPercent = val, pct
-			spec.X, spec.XPercent = 50, true
+			spec.X, spec.XPercent = transformOriginMiddle, true
 		} else {
 			spec.X, spec.XPercent = val, pct
-			spec.Y, spec.YPercent = 50, true
+			spec.Y, spec.YPercent = transformOriginMiddle, true
 		}
-	case two, three:
+	case maxTwoValueArgs, maxThreeValueArgs:
 		// Optional third value (z) ignored for 2D print.
 		if !applyTransformOriginPair(&spec, parts[0], parts[1], fontSize) {
 			return transformOriginSpec{}, false //nolint:exhaustruct // intentional zero fields
@@ -599,16 +663,16 @@ func parseTransformOriginToken(tok string, fontSize float64) (float64, bool, boo
 	case floatLeft, cssVerticalAlignTop:
 		return 0, true, true
 	case fxCenter:
-		return cssCenterPercent, true, true
+		return transformOriginMiddle, true, true
 	case floatRight, cssVerticalAlignBottom:
-		return cssPercent, true, true
+		return oneHundred, true, true
 	}
 
 	if lv, unit, lok := css.ParseLength(tok); lok && unit == "%" {
 		return lv, true, true
 	}
 
-	if pt, lok := parseTransformLength(tok, fontSize); lok {
+	if pt, _, isPct, lok := parseTransformLength(tok, fontSize); lok && !isPct {
 		return pt, false, true
 	}
 
@@ -655,7 +719,7 @@ func parseOpacityValue(value string) (float64, bool) {
 			return 1, false
 		}
 
-		return clamp01(v / cssPercent), true
+		return clamp01(v / oneHundred), true
 	}
 
 	v, err := strconv.ParseFloat(value, 64)
@@ -714,6 +778,197 @@ func clamp01(val float64) float64 {
 	return val
 }
 
+// isRotateAxisToken reports whether tok is a bare rotate axis name.
+func isRotateAxisToken(tok string) bool {
+	axis := strings.ToLower(tok)
+
+	return axis == "x" || axis == "y" || axis == "z"
+}
+
+// rotateAngleToken extracts the 2D angle token from a CSS rotate value.
+// CSS rotate may be "<angle>" or "z <angle>" or "<axis> <angle>" (3d ignored);
+// for 2D print the last angle token wins unless it is a bare axis name.
+func rotateAngleToken(value string) (string, bool) {
+	trimmed := strings.TrimSpace(value)
+
+	if trimmed == "" || strings.EqualFold(trimmed, cssDisplayNone) || strings.EqualFold(trimmed, "initial") {
+		return "", false
+	}
+
+	fields := strings.Fields(trimmed)
+
+	if len(fields) == 0 {
+		return "", false
+	}
+
+	angleTok := fields[len(fields)-1]
+
+	if len(fields) > 1 && isRotateAxisToken(angleTok) {
+		// e.g. "rotate: z 12deg" weird order – fall back to first angle
+		angleTok = fields[0]
+	}
+
+	return angleTok, true
+}
+
+// parseRotateAngle parses one CSS rotate angle into degrees.
+func parseRotateAngle(value string) (float64, bool) {
+	angleTok, ok := rotateAngleToken(value)
+	if !ok {
+		return 0, false
+	}
+
+	if deg, degOK := parseAngleDeg(angleTok); degOK {
+		return deg, true
+	}
+
+	// Try legacy bare numbers that parseAngleDeg already handles; second
+	// fallback via ParseFloat (treat as deg) for author convenience.
+	if deg, err := strconv.ParseFloat(strings.TrimSpace(angleTok), 64); err == nil {
+		return deg, true
+	}
+
+	return 0, false
+}
+
+// ApplyRotate implements the CSS `rotate` longhand (CSS Transforms Level 2).
+// It parses a single angle (deg/rad/grad/turn or bare number as deg) and
+// composes it into style.Transform / style.HasTransform. On invalid input the
+// style is unchanged and false is returned. The composition uses post-multiply
+// (style.Transform = style.Transform * RotateDeg) to match parseTransformList
+// ordering and to allow successive individual properties to accumulate.
+func ApplyRotate(style *ResolvedStyle, value string) bool {
+	if style == nil {
+		return false
+	}
+
+	deg, angleOK := parseRotateAngle(value)
+	if !angleOK {
+		return false
+	}
+
+	rot := RotateDeg(deg)
+	style.Transform = style.Transform.Mul(rot)
+	style.HasTransform = true
+
+	return true
+}
+
+// ApplyScale implements the CSS `scale` longhand. It parses one or two
+// unitless numbers (sx [sy]); a single number yields uniform scale.
+// Invalid input leaves style unchanged. Composition is post-multiply like
+// parseTransformList.
+func ApplyScale(style *ResolvedStyle, value string) bool {
+	if style == nil {
+		return false
+	}
+
+	trimmed := strings.TrimSpace(value)
+
+	if trimmed == "" || strings.EqualFold(trimmed, cssDisplayNone) || strings.EqualFold(trimmed, "initial") {
+		return false
+	}
+
+	// scale may be comma-separated in some authoring; normalize to spaces.
+	normalized := strings.ReplaceAll(trimmed, ",", " ")
+	parts := strings.Fields(normalized)
+
+	if len(parts) == 0 || len(parts) > maxThreeValueArgs {
+		return false
+	}
+
+	scaleX, scaleOK := parseUnitless(parts[0])
+	if !scaleOK {
+		return false
+	}
+
+	scaleY := scaleX
+
+	if len(parts) >= maxTwoValueArgs {
+		second, secondOK := parseUnitless(parts[1])
+
+		if !secondOK {
+			return false
+		}
+
+		scaleY = second
+	}
+
+	// Third value (z) ignored for 2D print.
+	scaled := Scale(scaleX, scaleY)
+	style.Transform = style.Transform.Mul(scaled)
+	style.HasTransform = true
+
+	return true
+}
+
+// parseTranslateValues parses one or two translate lengths from already-split
+// fields. The third (z) value is ignored by the caller for 2D print.
+func parseTranslateValues(parts []string, fsize float64) (float64, float64, float64, float64, bool, bool, bool) {
+	xLen, xPctVal, xPctSet, xOK := parseTransformLength(parts[0], fsize)
+	if !xOK {
+		return 0, 0, 0, 0, false, false, false
+	}
+
+	if len(parts) < maxTwoValueArgs {
+		return xLen, 0, xPctVal, math.NaN(), xPctSet, false, true
+	}
+
+	yLen, yPctVal, yPctSet, yOK := parseTransformLength(parts[1], fsize)
+	if !yOK {
+		return 0, 0, 0, 0, false, false, false
+	}
+
+	return xLen, yLen, xPctVal, yPctVal, xPctSet, yPctSet, true
+}
+
+// ApplyTranslate implements the CSS `translate` longhand (CSS Transforms Level 2).
+// It parses one or two lengths (tx [ty]); percentages are deferred and resolved
+// against the border box at layout time, bare numbers are treated as px. The
+// absolute part is post-multiplied into style.Transform and the percent part
+// is stored in TranslateX/YPercent for resolution in stampBoxTransforms.
+func ApplyTranslate(style *ResolvedStyle, value string, fsize float64) bool {
+	if style == nil {
+		return false
+	}
+
+	trimmed := strings.TrimSpace(value)
+
+	if trimmed == "" || strings.EqualFold(trimmed, cssDisplayNone) || strings.EqualFold(trimmed, "initial") {
+		return false
+	}
+
+	normalized := strings.ReplaceAll(trimmed, ",", " ")
+	parts := strings.Fields(normalized)
+
+	if len(parts) == 0 || len(parts) > maxThreeValueArgs {
+		return false
+	}
+
+	transX, transY, xPct, yPct, xIsPct, yIsPct, parseOK := parseTranslateValues(parts, fsize)
+	if !parseOK {
+		return false
+	}
+
+	// Third value (z) ignored for 2D print.
+	formed := Translate(transX, transY)
+	style.Transform = style.Transform.Mul(formed)
+
+	if xIsPct {
+		style.TranslateXPercent = xPct
+		style.TranslateXPercentSet = true
+	}
+
+	if yIsPct {
+		style.TranslateYPercent = yPct
+		style.TranslateYPercentSet = true
+	}
+
+	style.HasTransform = true
+
+	return true
+}
+
 // stampBoxTransforms walks the laid-out tree and stamps composed 2D
 // transform matrices (origin baked) onto display-list ops. Parent transforms
 // compose around children; sibling flow geometry is unchanged.
@@ -752,19 +1007,48 @@ func restampBoxTransforms(boxNode *box, ops []Op) {
 	}
 }
 
+// withPercentTranslate folds deferred translate percents into the box transform.
+func withPercentTranslate(sty *ResolvedStyle, boxNode *box) Matrix2D {
+	tform := sty.Transform
+
+	if !sty.TranslateXPercentSet && !sty.TranslateYPercentSet {
+		return tform
+	}
+
+	var transX, transY float64
+
+	if sty.TranslateXPercentSet {
+		transX = sty.TranslateXPercent / oneHundred * boxNode.w
+	}
+
+	if sty.TranslateYPercentSet {
+		transY = sty.TranslateYPercent / oneHundred * boxNode.height
+	}
+
+	return tform.Mul(Translate(transX, transY))
+}
+
+// boxTransformAccum composes one box's baked transform onto its parent.
+func boxTransformAccum(boxNode *box, parentAccum Matrix2D) Matrix2D {
+	sty := boxNode.style
+
+	if sty == nil || !sty.HasTransform {
+		return parentAccum
+	}
+
+	tform := withPercentTranslate(sty, boxNode)
+	originX, originY := resolveTransformOrigin(sty.TransformOrigin, boxNode)
+	baked := BakeOrigin(tform, originX, originY)
+
+	return parentAccum.Mul(baked)
+}
+
 func stampBoxTransformsRec(boxNode *box, parentAccum Matrix2D, ops []Op, covered []bool) {
 	if boxNode == nil {
 		return
 	}
 
-	accum := parentAccum
-	sty := boxNode.style
-
-	if sty != nil && sty.HasTransform {
-		ox, oy := resolveTransformOrigin(sty.TransformOrigin, boxNode)
-		baked := BakeOrigin(sty.Transform, ox, oy)
-		accum = parentAccum.Mul(baked)
-	}
+	accum := boxTransformAccum(boxNode, parentAccum)
 
 	for _, c := range boxNode.children {
 		stampBoxTransformsRec(c, accum, ops, covered)

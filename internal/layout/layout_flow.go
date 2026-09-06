@@ -8,14 +8,54 @@ import (
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/svg"
 )
 
+// Repeated CSS keywords and layout magnitudes (goconst/mnd).
+const (
+	marginTrimBlock       = "block"
+	marginTrimBlockStart  = "block-start"
+	marginTrimBlockEnd    = "block-end"
+	marginTrimInlineStart = "inline-start"
+	marginTrimInlineEnd   = "inline-end"
+	listStyleCircle       = "circle"
+	listStyleDecimalZero  = "decimal-leading-zero"
+	listStyleLowerAlpha   = "lower-alpha"
+	listStyleLowerLatin   = "lower-latin"
+	listStyleUpperAlpha   = "upper-alpha"
+	listStyleUpperLatin   = "upper-latin"
+	listStyleLowerRoman   = "lower-roman"
+	listStyleUpperRoman   = "upper-roman"
+	// svgRasterMaxDim caps SVG rasterization resolution in resolveImage.
+	svgRasterMaxDim = 1024
+	// markerHalfWidth is the fallback list-marker width factor of font size.
+	markerHalfWidth = 0.5
+	// floatPackRatio is the available-width fraction required to pack a
+	// float beside existing floats instead of stacking below them.
+	floatPackRatio = 0.5
+	// alphaBase is the radix of alphabetic list markers (a..z).
+	alphaBase = 26
+)
+
 func (e *engine) contentBox(posX, boxW float64, style ResolvedStyle) (float64, float64) {
+	borderLeft := borderLayoutWidth(style, style.BorderLeft)
+	borderRight := borderLayoutWidth(style, style.BorderRight)
 	contentW := boxW - e.scalePt(style.PaddingLeft) - e.scalePt(style.PaddingRight) -
-		e.scalePt(style.BorderLeft.Width) - e.scalePt(style.BorderRight.Width)
+		e.scalePt(borderLeft) - e.scalePt(borderRight)
+
 	if contentW < 0 {
 		contentW = 0
 	}
 
-	return posX + e.scalePt(style.BorderLeft.Width) + e.scalePt(style.PaddingLeft), contentW
+	return posX + e.scalePt(borderLeft) + e.scalePt(style.PaddingLeft), contentW
+}
+
+// borderLayoutWidth uses the device width for border-image boxes. Border
+// image replaces the normal border paint, so its content area must use the
+// same converted width as the emitted image slices.
+func borderLayoutWidth(style ResolvedStyle, side border) float64 {
+	if style.BorderImageSource != "" && side.PaintWidth > 0 {
+		return side.PaintWidth
+	}
+
+	return side.Width
 }
 
 // imageRef is the resolved form of one <img src>: bytes + intrinsic size,
@@ -50,7 +90,7 @@ func (e *engine) resolveImage(src string) *imageRef {
 	}
 
 	ref := &imageRef{src: src, data: data} //nolint:exhaustruct // intentional zero fields
-	if png, pw, ph, err := svg.Rasterize(data, svgRasterMax); err == nil {
+	if png, pw, ph, err := svg.Rasterize(data, svgRasterMaxDim); err == nil {
 		ref.data, ref.w, ref.h = png, pw, ph
 	} else if w, h, jpeg, ok := imageDims(data); ok {
 		ref.w, ref.h, ref.isJPEG = w, h, jpeg
@@ -78,9 +118,9 @@ func (e *engine) isInlineChild(node *html.Node) bool {
 		cstate.Position == positionAbsolute || cstate.Position == positionFixed {
 		return false
 	}
-	// <img> is replaced and UA-default inline-block, but author CSS may set
+	// <img> / <svg> are replaced and UA-default inline, but author CSS may set
 	// display:block (wiki .mw-logo-wordmark / .mw-logo-tagline stack).
-	if node.Name == cssTagImg {
+	if node.Name == cssTagImg || node.Name == cssTagSVG {
 		return !blockishDisplay(cstate.Display)
 	}
 
@@ -115,14 +155,27 @@ func onlyCollapsibleWS(nodes []*html.Node) bool {
 	return true
 }
 
+// margin-trim helpers for horizontal-tb (lite print).
+// block / block-start / block-end map to top/bottom; inline variants to left/right.
+func marginTrimTrimsBlockStart(trim string) bool {
+	return trim == marginTrimBlock || trim == marginTrimBlockStart
+}
+func marginTrimTrimsBlockEnd(trim string) bool {
+	return trim == marginTrimBlock || trim == marginTrimBlockEnd
+}
+func marginTrimTrimsInlineStart(trim string) bool {
+	return trim == cssDisplayInline || trim == marginTrimInlineStart
+}
+func marginTrimTrimsInlineEnd(trim string) bool {
+	return trim == cssDisplayInline || trim == marginTrimInlineEnd
+}
+
 // flowChildren lays out children in document order: runs of inlines, then
 // block boxes, alternating as they appear. Floated children are positioned
 // out of flow with a lite exclusion model; clear advances past them.
 // Returns the advanced content height (cy end − cy start contribution is
 // encoded as the final cy relative to start; callers pass starting cy).
 // Float enclosure (extentCy) is the caller's job when it owns a BFC.
-//
-//nolint:cyclop,wsl,varnamelen,funlen // document-order flow keeps its state machine explicit
 func (e *engine) flowChildren(
 	parent *box, children []*html.Node, sty ResolvedStyle,
 	contentW, contentX, posY, curY float64,
@@ -143,9 +196,51 @@ func (e *engine) flowChildren(
 	// Absolute/fixed containing-block origin is the content edge at entry.
 	// Do not use the post-flow cy or deferred boxes sit below in-flow siblings.
 	absOriginY := posY + curY
+	absCBX, absCBW, absOriginY := e.flowAbsCB(sty, children, contentX, contentW, absOriginY)
 
+	// margin-trim lite: find first/last in-flow block child for trimming.
+	parentTrim := sty.MarginTrim
+	firstBlockIdx, lastBlockIdx := e.flowTrimBounds(children, parentTrim)
+
+	idx := 0
+	for idx < len(children) {
+		if e.checkContext() {
+			return curY
+		}
+
+		curY, prevBottom, idx, deferred = e.flowOneChild(parent, children, idx, sty,
+			contentW, contentX, posY, curY, prevBottom, floats, deferred, parentTrim, firstBlockIdx, lastBlockIdx)
+	}
+
+	parentHeight := e.applyHeightConstraints(sty, curY+e.scalePt(sty.PaddingBottom))
+	cbHeight := parentHeight - (absOriginY - posY)
+
+	if cbHeight < 0 {
+		cbHeight = 0
+	}
+
+	e.flushDeferredFlowChildren(parent, deferred, cbHeight, absCBW, absCBX, absOriginY)
+
+	// A final child margin is inside a parent that has bottom padding or a
+	// bottom border. Without this, the margin disappears from the parent's
+	// used height, making padded cards and diagram boxes shorter than HTML.
+	if sty.PaddingBottom > 0 || sty.BorderBottom.Width > 0 {
+		curY += prevBottom
+	}
+
+	return curY
+}
+
+// flowAbsCB resolves the containing block for absolute/fixed descendants:
+// the padding box when the parent is positioned or transformed, else the
+// content box. absOriginY is the content edge at flow entry.
+func (e *engine) flowAbsCB(
+	sty ResolvedStyle, children []*html.Node, contentX, contentW, absOriginY float64,
+) (float64, float64, float64) {
 	absCBX, absCBW := contentX, contentW
+
 	paddingBoxCB := sty.HasTransform
+
 	if sty.Position == positionRelative {
 		for _, child := range children {
 			childStyle := e.stylePtr(child)
@@ -166,41 +261,64 @@ func (e *engine) flowChildren(
 		absCBW = contentW + e.scalePt(sty.PaddingLeft) + e.scalePt(sty.PaddingRight)
 	}
 
-	idx := 0
-	for idx < len(children) {
-		if e.checkContext() {
-			return curY
+	return absCBX, absCBW, absOriginY
+}
+
+// flowTrimBounds finds the first/last in-flow block child indexes for
+// margin-trim lite. -1 means no trimmable block child.
+func (e *engine) flowTrimBounds(children []*html.Node, parentTrim string) (int, int) {
+	firstBlockIdx, lastBlockIdx := -1, -1
+
+	if parentTrim == "" || parentTrim == cssDisplayNone {
+		return firstBlockIdx, lastBlockIdx
+	}
+
+	for pos, child := range children {
+		if e.isTrimmableBlock(child) {
+			if firstBlockIdx == -1 {
+				firstBlockIdx = pos
+			}
+
+			lastBlockIdx = pos
 		}
-
-		curY, prevBottom, idx, deferred = e.flowOneChild(parent, children, idx, sty,
-			contentW, contentX, posY, curY, prevBottom, floats, deferred)
 	}
 
-	parentHeight := e.applyHeightConstraints(sty, curY+e.scalePt(sty.PaddingBottom))
-	cbHeight := parentHeight - (absOriginY - posY)
-	if cbHeight < 0 {
-		cbHeight = 0
+	return firstBlockIdx, lastBlockIdx
+}
+
+// isTrimmableBlock reports in-flow block children eligible for margin-trim.
+func (e *engine) isTrimmableBlock(child *html.Node) bool {
+	cs := e.stylePtr(child)
+
+	if isSkippableFlowNode(child, cs) || isOutOfFlowNode(child, cs) || isFlowFloat(child, cs) {
+		return false
 	}
 
-	for _, n := range deferred {
+	if e.isInlineChild(child) || child.Type != html.ElementNode {
+		return false
+	}
+
+	return true
+}
+
+// flushDeferredFlowChildren builds deferred out-of-flow children against the
+// resolved containing block and attaches them to the parent.
+func (e *engine) flushDeferredFlowChildren(
+	parent *box, deferred []*html.Node, cbHeight, absCBW, absCBX, absOriginY float64,
+) {
+	for _, target := range deferred {
 		if e.absCBHeights == nil {
 			e.absCBHeights = make(map[*html.Node]float64, len(deferred))
 		}
-		e.absCBHeights[n] = cbHeight
-		ab := e.build(n, absCBW, absCBX, absOriginY)
-		delete(e.absCBHeights, n)
+
+		e.absCBHeights[target] = cbHeight
+		ab := e.build(target, absCBW, absCBX, absOriginY)
+		delete(e.absCBHeights, target)
+
 		if ab != nil && parent != nil {
 			parent.children = append(parent.children, ab)
 		}
 	}
-	// A final child margin is inside a parent that has bottom padding or a
-	// bottom border. Without this, the margin disappears from the parent's
-	// used height, making padded cards and diagram boxes shorter than HTML.
-	if sty.PaddingBottom > 0 || sty.BorderBottom.Width > 0 {
-		curY += prevBottom
-	}
-
-	return curY
 }
 
 // flowOneChild advances one flow child (inline run, block, float or
@@ -209,6 +327,7 @@ func (e *engine) flowChildren(
 func (e *engine) flowOneChild(
 	parent *box, children []*html.Node, idx int, sty ResolvedStyle,
 	contentW, contentX, posY, curY, prevBottom float64, floats *floatState, deferred []*html.Node,
+	parentTrim string, firstBlockIdx, lastBlockIdx int,
 ) (float64, float64, int, []*html.Node) {
 	node := children[idx]
 	// Fetch the child's resolved style once; all flow-child predicates and
@@ -240,7 +359,14 @@ func (e *engine) flowOneChild(
 		curY, prevBottom = e.layoutInlineRun(parent, sty, run, contentW, contentX, posY, curY, floats, prevBottom)
 	case node.Type == html.ElementNode:
 		var cblock *box
-		curY, prevBottom, cblock = e.layoutBlockChild(node, floats, contentW, contentX, posY, curY, prevBottom)
+
+		isFirst := idx == firstBlockIdx && firstBlockIdx != -1
+		isLast := idx == lastBlockIdx && lastBlockIdx != -1
+
+		curY, prevBottom, cblock = e.layoutBlockChild(
+			node, floats, contentW, contentX, posY, curY, prevBottom,
+			parentTrim, isFirst, isLast,
+		)
 		attachFlowBox(parent, cblock, e)
 
 		idx++
@@ -385,9 +511,19 @@ func attachFlowBox(parent *box, child *box, engine *engine) {
 // layoutBlockChild builds one block-level child: it clears floats, collapses
 // margins with the previous sibling, applies the BFC float exclusion, and
 // returns the advanced cy, the next margin accumulator, and the built box.
+// parentTrim/isFirst/isLast implement margin-trim lite for horizontal-tb:
+// block-start => top of first, block-end => bottom of last,
+// inline-start => left of first, inline-end => right of last.
 func (e *engine) layoutBlockChild(
 	node *html.Node, floats *floatState, contentW, contentX, posY, curY, prevBottom float64,
+	parentTrim string, isFirst, isLast bool,
 ) (float64, float64, *box) {
+	// margin-trim lite: override child margins at container edges.
+	if trim := e.marginTrimOverride(node, parentTrim, isFirst, isLast); trim != nil {
+		e.styleOverrides = append(e.styleOverrides, styleOverride{node: node, style: trim})
+		defer e.popStyleOverride()
+	}
+
 	cstate := e.styleVal(node)
 	// In-flow tables always clear below preceding floats (deterministic
 	// report policy). Shrink-to-fit / squeeze-beside is unsupported.
@@ -420,12 +556,115 @@ func (e *engine) layoutBlockChild(
 		}
 	}
 
+	// CSS Align: non-stretch justify-self on a width:auto block treats the
+	// size as fit-content and aligns that margin box in the containing block
+	// (Chrome 130+; fixture-61 #102 justify-self:center in a table cell).
+	boxX, boxW = e.applyJustifySelfFitContent(node, cstate, boxX, boxW)
+
 	cblock := e.build(node, boxW, boxX, posY+curY)
 	if cblock == nil {
 		return curY, 0, nil
 	}
 
 	return curY + cblock.height, e.scalePt(cstate.MarginBottom), cblock
+}
+
+// marginTrimOverride returns the margin-trimmed style override for a block
+// child at a container edge, or nil when no trim applies.
+func (e *engine) marginTrimOverride(
+	node *html.Node, parentTrim string, isFirst, isLast bool,
+) *ResolvedStyle {
+	if !marginTrimApplies(parentTrim, isFirst, isLast) {
+		return nil
+	}
+
+	orig := e.styleVal(node)
+
+	cpy := orig
+	if !applyMarginTrimSides(&cpy, parentTrim, isFirst, isLast) {
+		return nil
+	}
+
+	return &cpy
+}
+
+// marginTrimApplies reports whether margin-trim lite can affect a block
+// child at a container edge.
+func marginTrimApplies(parentTrim string, isFirst, isLast bool) bool {
+	return parentTrim != "" && parentTrim != cssDisplayNone && (isFirst || isLast)
+}
+
+// applyMarginTrimSides zeroes the trimmed margins on cpy. It reports whether
+// any side was trimmed.
+func applyMarginTrimSides(cpy *ResolvedStyle, parentTrim string, isFirst, isLast bool) bool {
+	trimmed := false
+
+	if isFirst && marginTrimTrimsBlockStart(parentTrim) {
+		cpy.MarginTop = 0
+		trimmed = true
+	}
+
+	if isLast && marginTrimTrimsBlockEnd(parentTrim) {
+		cpy.MarginBottom = 0
+		trimmed = true
+	}
+
+	if isFirst && marginTrimTrimsInlineStart(parentTrim) {
+		cpy.MarginLeft = 0
+		trimmed = true
+	}
+
+	if isLast && marginTrimTrimsInlineEnd(parentTrim) {
+		cpy.MarginRight = 0
+		trimmed = true
+	}
+
+	return trimmed
+}
+
+// applyJustifySelfFitContent shrinks and offsets an auto-width in-flow box
+// when justify-self is start/end/center (not auto/stretch). Returns the
+// containing-block slot (x, w) to pass into build.
+func (e *engine) applyJustifySelfFitContent(
+	node *html.Node, style ResolvedStyle, boxX, boxW float64,
+) (float64, float64) {
+	if !justifySelfUsesFitContent(style) || boxW <= 0 {
+		return boxX, boxW
+	}
+
+	fit := e.blockFitContentMarginBox(node, style)
+	if fit <= 0 || fit >= boxW {
+		return boxX, boxW
+	}
+
+	return boxX + gridAlignOffset(style.JustifySelf, boxW, fit), fit
+}
+
+// justifySelfUsesFitContent reports CSS Align "auto width becomes fit-content"
+// for block-level justify-self keywords other than stretch/auto/normal.
+func justifySelfUsesFitContent(style ResolvedStyle) bool {
+	if style.Width >= 0 || style.WidthPercent >= 0 {
+		return false
+	}
+
+	return isPlaceAlignmentKeyword(style.JustifySelf)
+}
+
+// blockFitContentMarginBox is the shrink-to-fit margin-box width used when
+// justify-self opts out of stretch. Flex containers use the flex-aware
+// intrinsic measure so row gaps are included.
+func (e *engine) blockFitContentMarginBox(node *html.Node, style ResolvedStyle) float64 {
+	var borderBox float64
+
+	switch style.Display {
+	case displayFlex, displayInlineFlex:
+		borderBox = e.measureFlexItemMaxContent(node, style)
+	default:
+		_, maxW := e.measureCellMinMax(node, style)
+		borderBox = maxW
+	}
+
+	return borderBox + e.scalePt(style.MarginLeft) + e.scalePt(style.MarginRight)
 }
 
 // pushBFCFloats installs a floatState for the current box. When the box
@@ -511,7 +750,7 @@ func (e *engine) emitListMarker(node *html.Node, style ResolvedStyle, contentX, 
 	}
 
 	if minW <= 0 {
-		minW = size * float64(len([]rune(text))) * halfRatio
+		minW = size * float64(len([]rune(text))) * markerHalfWidth
 	}
 
 	posX := listMarkerX(style.ListStylePosition, contentX, size, minW)
@@ -577,7 +816,7 @@ func listMarkerX(position string, contentX, emSize, markerW float64) float64 {
 		return contentX
 	}
 
-	posX := contentX - emSize*bulletGapRatio - markerW
+	posX := contentX - emSize*0.35 - markerW
 	if posX < 0 {
 		return 0
 	}
@@ -590,19 +829,19 @@ func markerText(node *html.Node, typ string) string {
 	switch typ {
 	case listStyleDisc:
 		return bulletDisc
-	case "circle":
+	case listStyleCircle:
 		return "\u25E6"
 	case listStyleSquare:
 		return "\u25AA"
-	case listStyleDecimal, "decimal-leading-zero":
+	case listStyleDecimal, listStyleDecimalZero:
 		return strconv.Itoa(listItemIndex(node)) + "."
-	case "lower-alpha", "lower-latin":
+	case listStyleLowerAlpha, listStyleLowerLatin:
 		return alphaMarker(listItemIndex(node), false) + "."
-	case "upper-alpha", "upper-latin":
+	case listStyleUpperAlpha, listStyleUpperLatin:
 		return alphaMarker(listItemIndex(node), true) + "."
-	case "lower-roman":
+	case listStyleLowerRoman:
 		return romanMarker(listItemIndex(node), false) + "."
-	case "upper-roman":
+	case listStyleUpperRoman:
 		return romanMarker(listItemIndex(node), true) + "."
 	default:
 		return bulletDisc
@@ -645,13 +884,13 @@ func alphaMarker(node int, upper bool) string {
 	for node > 0 {
 		node--
 
-		ch := byte('a' + (node % alphabetLen))
+		ch := byte('a' + (node % alphaBase))
 		if upper {
-			ch = byte('A' + (node % alphabetLen))
+			ch = byte('A' + (node % alphaBase))
 		}
 
 		chars = append(chars, ch)
-		node /= 26
+		node /= alphaBase
 	}
 
 	for i, j := 0, len(chars)-1; i < j; i, j = i+1, j-1 {
@@ -747,7 +986,7 @@ func (e *engine) setFloatImgMaxW(cs ResolvedStyle, contentW, avail float64) {
 	case cs.Width >= 0:
 		e.imgMaxW = e.scalePt(cs.Width)
 	case cs.WidthPercent >= 0 && contentW > 0:
-		e.imgMaxW = contentW * cs.WidthPercent / cssPercent
+		e.imgMaxW = contentW * cs.WidthPercent / oneHundred
 	case avail > 0 && avail < contentW:
 		e.imgMaxW = avail
 	}
@@ -768,7 +1007,7 @@ func packFloatPosition(
 		}
 
 		room := floatsPackRoom(floats, contentX, contentW, true)
-		if room >= avail*halfRatio { // enough room to attempt side-by-side
+		if room >= avail*floatPackRatio { // enough room to attempt side-by-side
 			fixX = floats.leftEdge
 			fromY = maxY(floats.leftTop, flowY)
 			packedAvail = minY(avail, room)
@@ -786,7 +1025,7 @@ func packFloatPosition(
 	}
 
 	room := floatsPackRoom(floats, contentX, contentW, false)
-	if room >= avail*halfRatio {
+	if room >= avail*floatPackRatio {
 		fromY = maxY(floats.rightTop, flowY)
 		packedAvail = minY(avail, room)
 
@@ -817,10 +1056,11 @@ func (e *engine) floatIntrinsicAvail(node *html.Node, style ResolvedStyle, avail
 			e.scalePt(style.BorderLeft.Width) + e.scalePt(style.BorderRight.Width) +
 			e.scalePt(style.MarginLeft) + e.scalePt(style.MarginRight)
 	} else {
-		intr = e.measureCellContent(node, style)
-		intr += e.scalePt(style.PaddingLeft) + e.scalePt(style.PaddingRight) +
-			e.scalePt(style.BorderLeft.Width) + e.scalePt(style.BorderRight.Width) +
-			e.scalePt(style.MarginLeft) + e.scalePt(style.MarginRight)
+		// measureCellContent is already the border-box max-content (content +
+		// padding + border). Only add outer margins (and nested block chrome).
+		intr = e.measureCellContent(node, style) +
+			e.scalePt(style.MarginLeft) + e.scalePt(style.MarginRight) +
+			e.nestedBlockHChrome(node)
 	}
 
 	if intr > 0 && intr < avail {
@@ -846,19 +1086,11 @@ func floatsPackRoom(floats *floatState, contentX, contentW float64, isLeft bool)
 }
 
 func maxY(a, b float64) float64 {
-	if a > b {
-		return a
-	}
-
-	return b
+	return max(a, b)
 }
 
 func minY(a, b float64) float64 {
-	if a < b {
-		return a
-	}
-
-	return b
+	return min(a, b)
 }
 
 // shiftBoxOps translates every op in b's op range by (dx, dy).

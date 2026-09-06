@@ -255,6 +255,52 @@ body { margin:0 }
 	t.Fatal("absolute child background was not painted")
 }
 
+// TestFlexJustifySelfCenterShrinkWrapsInCell matches Chrome CSS Align on a
+// width:auto flex box: justify-self:center → fit-content width, then center
+// the margin box in the table cell (fixture-61 #102).
+func TestFlexJustifySelfCenterShrinkWrapsInCell(t *testing.T) {
+	t.Parallel()
+
+	cssSheet := sheet(t, `
+table { width: 300pt; table-layout: fixed; border-collapse: collapse; }
+td { width: 300pt; padding: 0; border: 0; }
+.box { display: flex; justify-self: center; border: 1px solid #336; padding: 4px; gap: 4px; }
+.box > span { background: #cde; padding: 2px 6px; }
+.stretch { display: flex; border: 1px solid #336; padding: 4px; gap: 4px; }
+`)
+	centered := layoutHTML(t, `<html><body><table><tr><td>
+<div class="box"><span>1</span><span>2</span><span>3</span></div>
+</td></tr></table></body></html>`, cssSheet)
+	stretched := layoutHTML(t, `<html><body><table><tr><td>
+<div class="stretch"><span>1</span><span>2</span><span>3</span></div>
+</td></tr></table></body></html>`, cssSheet)
+
+	box := classBoxes(centered.root, "box")
+	cell := findNamedBox(centered.root, "td")
+	full := classBoxes(stretched.root, "stretch")
+
+	if len(box) != 1 || cell == nil || len(full) != 1 {
+		t.Fatalf("boxes: justify-self=%d cell=%v stretch=%d", len(box), cell != nil, len(full))
+	}
+
+	flexBox, stretchBox := box[0], full[0]
+
+	if flexBox.w >= cell.w*0.6 {
+		t.Fatalf("justify-self:center flex.w=%.1f, want shrink-wrap << cell.w=%.1f", flexBox.w, cell.w)
+	}
+
+	if stretchBox.w < cell.w*0.9 {
+		t.Fatalf("default flex.w=%.1f, want stretch near cell.w=%.1f", stretchBox.w, cell.w)
+	}
+
+	cellMid := cell.x + cell.w/2
+	boxMid := flexBox.x + flexBox.w/2
+
+	if math.Abs(boxMid-cellMid) > 2 {
+		t.Fatalf("justify-self box center=%.1f, cell center=%.1f (not centered)", boxMid, cellMid)
+	}
+}
+
 //nolint:wsl // fixture-oriented paint test keeps setup and assertions together
 func TestBorderRadiusReachesRoundedPaintOps(t *testing.T) {
 	t.Parallel()

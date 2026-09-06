@@ -1,4 +1,4 @@
-//nolint:varnamelen,cyclop,wsl,intrange,nlreturn,funlen,mnd,goconst,gocognit // background layers
+//nolint:varnamelen,cyclop,wsl,nlreturn,funlen,mnd,goconst,gocognit // background layers
 package layout
 
 import (
@@ -28,6 +28,7 @@ func (e *engine) appendBackgroundImage(
 	if len(layers) == 0 {
 		return dst
 	}
+	repeatX, repeatY := backgroundRepeatAxes(sty)
 
 	originX, originY, originW, originH := resolveBackgroundOriginBox(sty, posX, posY, width, height)
 	if originW <= 0 || originH <= 0 {
@@ -48,24 +49,35 @@ func (e *engine) appendBackgroundImage(
 		}
 
 		if isGradientFunc(layer) {
-			if pngData, imgW, imgH, ok := renderGradientPNG(layer, originW, originH, sty.Color); ok {
-				op := Op{ //nolint:exhaustruct // intentional zero fields
+			sizeSpec := backgroundSizeForLayer(sty.BackgroundSize, i)
+			destW, destH := resolveBackgroundSize(sizeSpec, originW, originH, originW, originH)
+			if sizeSpec == "" || strings.EqualFold(sizeSpec, "auto") {
+				destW, destH = originW, originH
+			}
+			destX, destY := resolveBackgroundPosition(
+				sty.BackgroundPosX, sty.BackgroundPosY, originX, originY, originW, originH, destW, destH,
+			)
+			if pngData, imgW, imgH, ok := renderGradientPNG(layer, destW, destH, sty.Color); ok {
+				baseOp := Op{ //nolint:exhaustruct // intentional zero fields
 					Kind:         OpImage,
-					X:            originX,
-					Y:            originY,
-					W:            originW,
-					H:            originH,
+					X:            destX,
+					Y:            destY,
+					W:            destW,
+					H:            destH,
 					Image:        pngData,
 					ImgW:         imgW,
 					ImgH:         imgH,
 					IsJPEG:       false,
 					IsBackground: true,
+					BlendMode:    backgroundBlendModeForLayer(sty.BackgroundBlendMode, i),
 				}
 				if sty.Filter != "" {
 					filters := parseFilterList(sty.Filter, sty.Color, sty.FontSize)
-					op.Image = applyImageFilterToImage(op.Image, filters)
+					baseOp.Image = applyImageFilterToImage(baseOp.Image, filters)
 				}
-				dst = append(dst, op)
+				dst = tileBackgroundRepeat(
+					dst, baseOp, repeatX, repeatY, clip, destX, destY, destW, destH,
+				)
 			}
 			continue
 		}
@@ -80,8 +92,9 @@ func (e *engine) appendBackgroundImage(
 			continue
 		}
 
-		imgW := float64(ref.w)
-		imgH := float64(ref.h)
+		// Bitmap pixels are CSS px; match <img> / inline image sizing (pxToPt).
+		imgW := e.scalePt(pxToPt(float64(ref.w)))
+		imgH := e.scalePt(pxToPt(float64(ref.h)))
 		if imgW <= 0 {
 			imgW = originW
 		}
@@ -89,12 +102,11 @@ func (e *engine) appendBackgroundImage(
 			imgH = originH
 		}
 
-		sizeSpec := backgroundSizeForLayer(sty.BackgroundSize, len(layers)-1-i)
+		sizeSpec := backgroundSizeForLayer(sty.BackgroundSize, i)
 		destW, destH := resolveBackgroundSize(sizeSpec, originW, originH, imgW, imgH)
 		if (sizeSpec == "" || strings.EqualFold(sizeSpec, "auto")) &&
-			(strings.EqualFold(sty.BackgroundRepeat, "repeat") ||
-				strings.EqualFold(sty.BackgroundRepeat, "repeat-x") ||
-				strings.EqualFold(sty.BackgroundRepeat, "repeat-y")) {
+			(strings.EqualFold(repeatX, backgroundRepeatRepeat) ||
+				strings.EqualFold(repeatY, backgroundRepeatRepeat)) {
 			if imgW > 0 && imgH > 0 {
 				destW, destH = imgW, imgH
 			}
@@ -114,6 +126,7 @@ func (e *engine) appendBackgroundImage(
 			ImgH:         ref.h,
 			IsJPEG:       ref.isJPEG,
 			IsBackground: true,
+			BlendMode:    backgroundBlendModeForLayer(sty.BackgroundBlendMode, i),
 		}
 		if sty.Filter != "" {
 			filters := parseFilterList(sty.Filter, sty.Color, sty.FontSize)
@@ -121,7 +134,7 @@ func (e *engine) appendBackgroundImage(
 		}
 
 		dst = tileBackgroundRepeat(
-			dst, baseOp, sty.BackgroundRepeat, originX, originY, originW, originH, destX, destY, destW, destH,
+			dst, baseOp, repeatX, repeatY, clip, destX, destY, destW, destH,
 		)
 	}
 	// Clip every layer (including no-repeat / cover overflow) to background-clip.
@@ -131,23 +144,28 @@ func (e *engine) appendBackgroundImage(
 }
 
 // backgroundSizeForLayer picks the comma-separated background-size token for
-// layer index (0 = furthest back, matching paint order of split layers).
+// layer index (0 = first declared layer, topmost, per CSS Backgrounds).
 func backgroundSizeForLayer(sizeSpec string, layerIndex int) string {
 	parts := splitCommaLayers(sizeSpec)
 	if len(parts) == 0 {
 		return sizeSpec
 	}
-	if layerIndex >= 0 && layerIndex < len(parts) {
-		return strings.TrimSpace(parts[layerIndex])
+	if len(parts) == 1 {
+		return strings.TrimSpace(parts[0])
 	}
-
-	return strings.TrimSpace(parts[len(parts)-1])
+	if layerIndex < 0 {
+		layerIndex = 0
+	}
+	return strings.TrimSpace(parts[layerIndex%len(parts)])
 }
 
 func resolveBackgroundClipBox(
 	sty ResolvedStyle, posX, posY, width, height float64,
 ) (float64, float64, float64, float64) {
 	keyword := strings.ToLower(strings.TrimSpace(sty.BackgroundClip))
+	if keyword == "" || keyword == "border-box" {
+		return posX, posY, width, height
+	}
 
 	return backgroundBoxForKeyword(keyword, sty, posX, posY, width, height)
 }
@@ -173,7 +191,17 @@ func backgroundBoxForKeyword(
 		return x, y, math.Max(0, w), math.Max(0, h)
 	case "border-box":
 		return posX, posY, width, height
-	default: // padding-box
+	case "text":
+		// background-clip:text clips to glyph bounds; PDF path requires vector
+		// text clip which we approximate as content-box (conservative) since
+		// no glyph vector clipping is implemented. Treat as content-box.
+		x := posX + sty.BorderLeft.Width + sty.PaddingLeft
+		y := posY + sty.BorderTop.Width + sty.PaddingTop
+		w := width - sty.BorderLeft.Width - sty.BorderRight.Width - sty.PaddingLeft - sty.PaddingRight
+		h := height - sty.BorderTop.Width - sty.BorderBottom.Width - sty.PaddingTop - sty.PaddingBottom
+
+		return x, y, math.Max(0, w), math.Max(0, h)
+	default: // padding-box (also the background-origin initial value)
 		x := posX + sty.BorderLeft.Width
 		y := posY + sty.BorderTop.Width
 		w := width - sty.BorderLeft.Width - sty.BorderRight.Width
@@ -193,7 +221,7 @@ func resolveBackgroundSize(sizeSpec string, originW, originH, imgW, imgH float64
 		scale := math.Min(originW/imgW, originH/imgH)
 		return imgW * scale, imgH * scale
 	case "", "auto":
-		return originW, originH
+		return imgW, imgH
 	}
 
 	parts := strings.Fields(spec)
@@ -222,7 +250,7 @@ func parseBgDim(token string, containerDim, fallback float64) float64 {
 		}
 	}
 	if val, unit, ok := css.ParseLength(token); ok {
-		if pt, converted := lengthToPt(val, unit, defaultFontSizePt); converted {
+		if pt, converted := lengthToPt(val, unit, 12); converted {
 			return pt
 		}
 		return val
@@ -248,7 +276,7 @@ func resolveBackgroundPosition(
 				offX = (originW - destW) * val / 100.0
 			}
 		} else if val, unit, ok := css.ParseLength(specX); ok {
-			if pt, converted := lengthToPt(val, unit, defaultFontSizePt); converted {
+			if pt, converted := lengthToPt(val, unit, 12); converted {
 				offX = pt
 			}
 		}
@@ -269,7 +297,7 @@ func resolveBackgroundPosition(
 				offY = (originH - destH) * val / 100.0
 			}
 		} else if val, unit, ok := css.ParseLength(specY); ok {
-			if pt, converted := lengthToPt(val, unit, defaultFontSizePt); converted {
+			if pt, converted := lengthToPt(val, unit, 12); converted {
 				offY = pt
 			}
 		}
@@ -278,20 +306,27 @@ func resolveBackgroundPosition(
 	return originX + offX, originY + offY
 }
 
+// background-attachment:fixed is intentionally a no-op in paginated PDF
+// output (no viewport scroll); it paints as scroll. No paint change needed
+// beyond documentation here; tileBackgroundRepeat branches remain correct.
+//
+// Tiling is anchored on the positioned tile (destX/destY, resolved against
+// the background-origin positioning area) and covers the background-clip
+// painting area. The origin box is never a clip bound: a no-repeat image may
+// overflow the positioning area and paint out to the clip edge.
 func tileBackgroundRepeat(
-	dst []Op, baseOp Op, repeatSpec string,
-	originX, originY, originW, originH, destX, destY, destW, destH float64,
+	dst []Op, baseOp Op, repeatX, repeatY string,
+	clip clipRect, destX, destY, destW, destH float64,
 ) []Op {
-	spec := strings.ToLower(strings.TrimSpace(repeatSpec))
-	switch spec {
-	case "no-repeat", "":
-		return appendBackgroundTileNoRepeat(dst, baseOp, originX, originY, originW, originH)
-	case "repeat-x":
-		return appendBackgroundTileRepeatX(dst, baseOp, originX, originY, originW, originH, destY, destW)
-	case "repeat-y":
-		return appendBackgroundTileRepeatY(dst, baseOp, originX, originY, originW, originH, destX, destH)
-	case "repeat":
-		return appendBackgroundTileRepeat(dst, baseOp, originX, originY, originW, originH, destW, destH)
+	switch {
+	case repeatX == backgroundRepeatNoRepeat && repeatY == backgroundRepeatNoRepeat:
+		return appendBackgroundTileNoRepeat(dst, baseOp, clip)
+	case repeatX == backgroundRepeatRepeat && repeatY == backgroundRepeatNoRepeat:
+		return appendBackgroundTileRepeatX(dst, baseOp, clip, destX, destY, destW)
+	case repeatX == backgroundRepeatNoRepeat && repeatY == backgroundRepeatRepeat:
+		return appendBackgroundTileRepeatY(dst, baseOp, clip, destX, destY, destH)
+	case repeatX == backgroundRepeatRepeat && repeatY == backgroundRepeatRepeat:
+		return appendBackgroundTileRepeat(dst, baseOp, clip, destX, destY, destW, destH)
 	default:
 		dst = append(dst, baseOp)
 
@@ -299,25 +334,9 @@ func tileBackgroundRepeat(
 	}
 }
 
-func appendBackgroundTileNoRepeat(dst []Op, baseOp Op, originX, originY, originW, originH float64) []Op {
+func appendBackgroundTileNoRepeat(dst []Op, baseOp Op, clip clipRect) []Op {
 	op := baseOp
-	if op.X < originX {
-		op.W -= originX - op.X
-		op.X = originX
-	}
-
-	if op.Y < originY {
-		op.H -= originY - op.Y
-		op.Y = originY
-	}
-
-	if op.X+op.W > originX+originW {
-		op.W = originX + originW - op.X
-	}
-
-	if op.Y+op.H > originY+originH {
-		op.H = originY + originH - op.Y
-	}
+	clipOpToPaintArea(&op, clip)
 
 	if op.W > 0 && op.H > 0 {
 		dst = append(dst, op)
@@ -326,23 +345,20 @@ func appendBackgroundTileNoRepeat(dst []Op, baseOp Op, originX, originY, originW
 	return dst
 }
 
-func appendBackgroundTileRepeatX(dst []Op, baseOp Op, originX, originY, originW, originH, destY, destW float64) []Op {
+func appendBackgroundTileRepeatX(dst []Op, baseOp Op, clip clipRect, destX, destY, destW float64) []Op {
 	if destW <= 0 {
 		dst = append(dst, baseOp)
 
 		return dst
 	}
 
-	count := int(math.Ceil(originW / destW))
-	if count > maxBackgroundTiles {
-		count = maxBackgroundTiles
-	}
+	end := clip.x + clip.w
 
-	for k := 0; k < count; k++ {
+	for x, n := tileCoverStart(destX, clip.x, destW), 0; x < end && n < maxBackgroundTiles; x, n = x+destW, n+1 {
 		op := baseOp
-		op.X = originX + float64(k)*destW
+		op.X = x
 		op.Y = destY
-		clipBackgroundTileTrailing(&op, originX, originY, originW, originH)
+		clipOpToPaintArea(&op, clip)
 
 		if op.W > 0 && op.H > 0 {
 			dst = append(dst, op)
@@ -352,23 +368,20 @@ func appendBackgroundTileRepeatX(dst []Op, baseOp Op, originX, originY, originW,
 	return dst
 }
 
-func appendBackgroundTileRepeatY(dst []Op, baseOp Op, originX, originY, originW, originH, destX, destH float64) []Op {
+func appendBackgroundTileRepeatY(dst []Op, baseOp Op, clip clipRect, destX, destY, destH float64) []Op {
 	if destH <= 0 {
 		dst = append(dst, baseOp)
 
 		return dst
 	}
 
-	count := int(math.Ceil(originH / destH))
-	if count > maxBackgroundTiles {
-		count = maxBackgroundTiles
-	}
+	end := clip.y + clip.h
 
-	for k := 0; k < count; k++ {
+	for y, n := tileCoverStart(destY, clip.y, destH), 0; y < end && n < maxBackgroundTiles; y, n = y+destH, n+1 {
 		op := baseOp
 		op.X = destX
-		op.Y = originY + float64(k)*destH
-		clipBackgroundTileTrailing(&op, originX, originY, originW, originH)
+		op.Y = y
+		clipOpToPaintArea(&op, clip)
 
 		if op.W > 0 && op.H > 0 {
 			dst = append(dst, op)
@@ -378,29 +391,29 @@ func appendBackgroundTileRepeatY(dst []Op, baseOp Op, originX, originY, originW,
 	return dst
 }
 
-func appendBackgroundTileRepeat(dst []Op, baseOp Op, originX, originY, originW, originH, destW, destH float64) []Op {
-	if (destW >= originW && destH >= originH) || destW <= 0 || destH <= 0 {
+func appendBackgroundTileRepeat(dst []Op, baseOp Op, clip clipRect, destX, destY, destW, destH float64) []Op {
+	if destW <= 0 || destH <= 0 {
 		dst = append(dst, baseOp)
 
 		return dst
 	}
 
-	countX := int(math.Ceil(originW / destW))
-	countY := int(math.Ceil(originH / destH))
-	if countX*countY > maxBackgroundTiles {
-		countX = int(math.Sqrt(maxBackgroundTiles))
-		countY = countX
-	}
+	endX := clip.x + clip.w
+	endY := clip.y + clip.h
+	startX := tileCoverStart(destX, clip.x, destW)
+	startY := tileCoverStart(destY, clip.y, destH)
+	emitted := 0
 
-	for yk := 0; yk < countY; yk++ {
-		for xk := 0; xk < countX; xk++ {
+	for y := startY; y < endY && emitted < maxBackgroundTiles; y += destH {
+		for x := startX; x < endX && emitted < maxBackgroundTiles; x += destW {
 			op := baseOp
-			op.X = originX + float64(xk)*destW
-			op.Y = originY + float64(yk)*destH
-			clipBackgroundTileTrailing(&op, originX, originY, originW, originH)
+			op.X = x
+			op.Y = y
+			clipOpToPaintArea(&op, clip)
 
 			if op.W > 0 && op.H > 0 {
 				dst = append(dst, op)
+				emitted++
 			}
 		}
 	}
@@ -408,13 +421,30 @@ func appendBackgroundTileRepeat(dst []Op, baseOp Op, originX, originY, originW, 
 	return dst
 }
 
-func clipBackgroundTileTrailing(op *Op, originX, originY, originW, originH float64) {
-	if op.X+op.W > originX+originW {
-		op.W = originX + originW - op.X
+// tileCoverStart returns the first tile position at or before coverStart on
+// the grid fixed by the positioned tile at pos, so repeat runs fill the
+// painting area on both sides of the positioned tile.
+func tileCoverStart(pos, coverStart, tile float64) float64 {
+	return pos - math.Ceil((pos-coverStart)/tile)*tile
+}
+
+func clipOpToPaintArea(op *Op, clip clipRect) {
+	if op.X < clip.x {
+		op.W -= clip.x - op.X
+		op.X = clip.x
 	}
 
-	if op.Y+op.H > originY+originH {
-		op.H = originY + originH - op.Y
+	if op.Y < clip.y {
+		op.H -= clip.y - op.Y
+		op.Y = clip.y
+	}
+
+	if op.X+op.W > clip.x+clip.w {
+		op.W = clip.x + clip.w - op.X
+	}
+
+	if op.Y+op.H > clip.y+clip.h {
+		op.H = clip.y + clip.h - op.Y
 	}
 }
 
@@ -448,47 +478,9 @@ func backgroundImageSrc(layer string) string {
 }
 
 // splitCommaLayers splits raw by top-level commas, not splitting commas inside
-// quotes or parentheses.
+// quotes or parentheses. Delegates to splitParenArgs helper.
 func splitCommaLayers(raw string) []string {
-	var layers []string
-	depth := 0
-	inQuote := byte(0)
-	start := 0
-
-	for idx := 0; idx < len(raw); idx++ {
-		char := raw[idx]
-		if inQuote != 0 {
-			if char == inQuote {
-				inQuote = 0
-			}
-			continue
-		}
-
-		switch char {
-		case '"', '\'':
-			inQuote = char
-		case '(':
-			depth++
-		case ')':
-			if depth > 0 {
-				depth--
-			}
-		case ',':
-			if depth == 0 {
-				layers = append(layers, strings.TrimSpace(raw[start:idx]))
-				start = idx + 1
-			}
-		}
-	}
-
-	if start < len(raw) {
-		trimmed := strings.TrimSpace(raw[start:])
-		if trimmed != "" {
-			layers = append(layers, trimmed)
-		}
-	}
-
-	return layers
+	return splitParenArgs(raw, ',')
 }
 
 func urlFunctionTarget(layer string) string {

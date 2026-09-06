@@ -52,7 +52,11 @@ func applyOutlineProps(style *ResolvedStyle, prop, value string, fsize float64) 
 func applySVGPresentationProps(style *ResolvedStyle, prop, value string, fsize float64) bool {
 	switch prop {
 	case "fill":
-		if color, parsed := parseUsedColor(value, style.Color); parsed {
+		if strings.EqualFold(strings.TrimSpace(value), "none") {
+			style.Fill = [3]float64{}
+			style.FillSet = true
+			style.FillOpacity = 0
+		} else if color, parsed := parseUsedColor(value, style.Color); parsed {
 			style.Fill = color
 			style.FillSet = true
 		}
@@ -115,46 +119,20 @@ func applyOutlineLonghands(style *ResolvedStyle, prop, value string, fsize float
 	return true
 }
 
-//nolint:cyclop,mnd,wsl // box shadow longhand dispatch
 func applyBoxShadowProp(style *ResolvedStyle, prop, value string, fsize float64) bool {
 	switch prop {
 	case boxShadowProp:
 		applyBoxShadowValue(style, value, fsize)
-	case "box-shadow-color":
-		if c, ok := parseUsedColor(value, style.Color); ok {
-			style.BoxShadowColor = c
-			style.BoxShadowSet = true
-		}
-	case "box-shadow-offset":
-		parts := strings.Fields(strings.TrimSpace(value))
-		if len(parts) >= 2 {
-			if x, ok := plainLength(parts[0], fsize, 0); ok {
-				style.BoxShadowX = x
-			}
-			if y, ok := plainLength(parts[1], fsize, 0); ok {
-				style.BoxShadowY = y
-			}
-			style.BoxShadowSet = true
-		}
 	case "box-shadow-blur":
-		if b, ok := plainLength(value, fsize, 0); ok && b >= 0 {
-			style.BoxShadowBlur = b
-			style.BoxShadowSet = true
-		}
+		ApplyBoxShadowBlur(style, value, fsize)
 	case "box-shadow-spread":
-		if s, ok := plainLength(value, fsize, 0); ok {
-			style.BoxShadowSpread = s
-			style.BoxShadowSet = true
-		}
-	case "box-shadow-position":
-		val := strings.ToLower(strings.TrimSpace(value))
-		if val == "inset" {
-			style.BoxShadowInset = true
-			style.BoxShadowSet = true
-		} else if val == "outset" {
-			style.BoxShadowInset = false
-			style.BoxShadowSet = true
-		}
+		ApplyBoxShadowSpread(style, value, fsize)
+	case "box-shadow-color":
+		ApplyBoxShadowColor(style, value)
+	case "box-shadow-offset":
+		ApplyBoxShadowOffset(style, value, fsize)
+	case "box-shadow-position", "box-shadow-inset":
+		ApplyBoxShadowPosition(style, value)
 	default:
 		return false
 	}

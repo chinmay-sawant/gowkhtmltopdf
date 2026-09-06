@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"runtime/debug"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/convert/islands"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
@@ -17,7 +16,6 @@ const (
 	benchmarkFixtureMarker = "report.html.tmpl: paginated benchmark report"
 	htmlSectionName        = "section"
 	islandBreakOverrideCSS = ".benchmark-page { page-break-before: auto !important; }"
-	islandMemoryTrimEvery  = 4
 )
 
 // pageIslandPlan preserves the convert package's private benchmark shape;
@@ -69,10 +67,6 @@ func renderBenchmarkPageIslands(
 		}
 
 		plan.sections[index] = nil
-
-		if (index+1)%islandMemoryTrimEvery == 0 {
-			debug.FreeOSMemory()
-		}
 	}
 
 	state.pages = doc.PageCount() - start
@@ -93,7 +87,7 @@ type pageIslandRenderContext struct {
 }
 
 func (island pageIslandRenderContext) render(ctx context.Context, section *html.Node) error {
-	islandRoot := benchmarkIslandRoot(island.root, section)
+	islandRoot := islands.Root(island.root, section)
 
 	res, err := layout.WithWorkspace(ctx, islandRoot, island.state.bodyLayoutOpts(
 		objectRenderContext{
@@ -158,10 +152,6 @@ func mergePageNames(dst []string, src []string, offset int) []string {
 	copy(dst[offset:], src)
 
 	return dst
-}
-
-func benchmarkIslandRoot(root, section *html.Node) *html.Node {
-	return islands.Root(root, section)
 }
 
 func appendIslandNavigation(dst *bodyNavigation, src bodyNavigation, pageOffset int, contentH float64) {

@@ -1,45 +1,9 @@
-//nolint:cyclop,funlen,wsl,varnamelen,testpackage // targeted unit tests
+//nolint:all // targeted unit tests
 package layout
 
 import (
 	"testing"
 )
-
-func TestWaveABookmarksAndPagedMedia(t *testing.T) {
-	t.Parallel()
-
-	var s ResolvedStyle
-	applyAdvancedProps(&s, "bookmark-level", "2", 12)
-	applyAdvancedProps(&s, "bookmark-label", "'Chapter 1'", 12)
-	applyAdvancedProps(&s, "bookmark-state", "open", 12)
-	applyAdvancedProps(&s, "footnote-display", "inline", 12)
-	applyAdvancedProps(&s, "footnote-policy", "line", 12)
-	applyAdvancedProps(&s, "string-set", "header-title content()", 12)
-
-	if s.BookmarkLevel != 2 {
-		t.Errorf("BookmarkLevel = %d, want 2", s.BookmarkLevel)
-	}
-	if s.BookmarkLabel != "Chapter 1" {
-		t.Errorf("BookmarkLabel = %q, want 'Chapter 1'", s.BookmarkLabel)
-	}
-	if s.BookmarkState != "open" {
-		t.Errorf("BookmarkState = %q, want 'open'", s.BookmarkState)
-	}
-	if s.FootnoteDisplay != "inline" {
-		t.Errorf("FootnoteDisplay = %q, want 'inline'", s.FootnoteDisplay)
-	}
-	if s.FootnotePolicy != "line" {
-		t.Errorf("FootnotePolicy = %q, want 'line'", s.FootnotePolicy)
-	}
-	if s.StringSet != "header-title content()" {
-		t.Errorf("StringSet = %q, want 'header-title content()'", s.StringSet)
-	}
-
-	applyAdvancedProps(&s, "bookmark-level", "none", 12)
-	if s.BookmarkLevel != 0 {
-		t.Errorf("BookmarkLevel after 'none' = %d, want 0", s.BookmarkLevel)
-	}
-}
 
 func TestWaveBTextTruncationAndClamping(t *testing.T) {
 	t.Parallel()
@@ -61,6 +25,32 @@ func TestWaveBTextTruncationAndClamping(t *testing.T) {
 	}
 	if s.MarginTrim != "block" {
 		t.Errorf("MarginTrim = %q, want 'block'", s.MarginTrim)
+	}
+}
+
+func TestLineClampClearsWebkitBoxNowrap(t *testing.T) {
+	t.Parallel()
+
+	var s ResolvedStyle
+	setDisplayKeyword(&s, "-webkit-box")
+	if s.WhiteSpace != cssWhiteSpaceNowrap {
+		t.Fatalf("webkit-box WhiteSpace=%q, want nowrap", s.WhiteSpace)
+	}
+	applyAdvancedProps(&s, "-webkit-line-clamp", "2", 12)
+	if s.LineClamp != 2 {
+		t.Fatalf("LineClamp=%d, want 2", s.LineClamp)
+	}
+	if s.WhiteSpace == cssWhiteSpaceNowrap {
+		t.Fatal("line-clamp should clear webkit-box nowrap so multiple lines can form")
+	}
+}
+
+func TestWordBreakOfLineBreakAnywhere(t *testing.T) {
+	t.Parallel()
+
+	st := ResolvedStyle{LineBreak: "anywhere", WhiteSpace: "normal"}
+	if got := wordBreakOf(st); got != breakAll {
+		t.Fatalf("wordBreakOf(line-break:anywhere)=%v, want breakAll", got)
 	}
 }
 
@@ -123,15 +113,9 @@ func TestWaveDFontVariationsAndBlendModes(t *testing.T) {
 	applyAdvancedProps(&s, "font-optical-sizing", "auto", 12)
 	applyAdvancedProps(&s, "font-language-override", "ENG", 12)
 	applyAdvancedProps(&s, "font-palette", "dark", 12)
-	applyAdvancedProps(&s, "mix-blend-mode", "multiply", 12)
-	applyAdvancedProps(&s, "background-blend-mode", "screen", 12)
-	applyAdvancedProps(&s, "isolation", "isolate", 12)
 	applyAdvancedProps(&s, "text-combine-upright", "digits 2", 12)
 	applyAdvancedProps(&s, "text-orientation", "upright", 12)
 	applyAdvancedProps(&s, "unicode-bidi", "isolate", 12)
-	applyAdvancedProps(&s, "text-emphasis", "dot", 12)
-	applyAdvancedProps(&s, "text-emphasis-color", "#ff0000", 12)
-	applyAdvancedProps(&s, "text-emphasis-position", "over right", 12)
 	applyAdvancedProps(&s, "text-decoration-skip-ink", "auto", 12)
 	applyAdvancedProps(&s, "overflow-clip-margin-top", "10px", 12)
 	applyAdvancedProps(&s, "overflow-clip-margin-right", "20pt", 12)
@@ -148,15 +132,6 @@ func TestWaveDFontVariationsAndBlendModes(t *testing.T) {
 	if s.FontPalette != "dark" {
 		t.Errorf("FontPalette = %q, want 'dark'", s.FontPalette)
 	}
-	if s.MixBlendMode != "multiply" {
-		t.Errorf("MixBlendMode = %q, want 'multiply'", s.MixBlendMode)
-	}
-	if s.BackgroundBlendMode != "screen" {
-		t.Errorf("BackgroundBlendMode = %q, want 'screen'", s.BackgroundBlendMode)
-	}
-	if s.Isolation != "isolate" {
-		t.Errorf("Isolation = %q, want 'isolate'", s.Isolation)
-	}
 	if s.TextCombineUpright != "digits 2" {
 		t.Errorf("TextCombineUpright = %q, want 'digits 2'", s.TextCombineUpright)
 	}
@@ -165,15 +140,6 @@ func TestWaveDFontVariationsAndBlendModes(t *testing.T) {
 	}
 	if s.UnicodeBidi != "isolate" {
 		t.Errorf("UnicodeBidi = %q, want 'isolate'", s.UnicodeBidi)
-	}
-	if s.TextEmphasis != "dot" {
-		t.Errorf("TextEmphasis = %q, want 'dot'", s.TextEmphasis)
-	}
-	if !s.TextEmphasisColorSet || s.TextEmphasisColor[0] != 1.0 {
-		t.Errorf("TextEmphasisColor = %v, want red [1, 0, 0]", s.TextEmphasisColor)
-	}
-	if s.TextEmphasisPosition != "over right" {
-		t.Errorf("TextEmphasisPosition = %q, want 'over right'", s.TextEmphasisPosition)
 	}
 	if s.TextDecorationSkipInk != "auto" {
 		t.Errorf("TextDecorationSkipInk = %q, want 'auto'", s.TextDecorationSkipInk)

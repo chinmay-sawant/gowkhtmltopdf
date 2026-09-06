@@ -454,27 +454,7 @@ func matchAny(sels []css.Selector, n *html.Node) bool {
 // to a single space and trims leading/trailing spaces. Shared by outline
 // title collection; convert may reuse for document titles and similar.
 func CollapseWS(text string) string {
-	var buf strings.Builder
-
-	prevSpace := true
-
-	for _, runeVal := range text {
-		if runeVal == ' ' || runeVal == '\t' || runeVal == '\n' || runeVal == '\r' || runeVal == '\f' {
-			if !prevSpace {
-				buf.WriteByte(' ')
-
-				prevSpace = true
-			}
-
-			continue
-		}
-
-		buf.WriteRune(runeVal)
-
-		prevSpace = false
-	}
-
-	return strings.TrimRight(buf.String(), " ")
+	return strings.Join(strings.Fields(text), " ")
 }
 
 // xmlEscape escapes the five XML special characters.

@@ -285,23 +285,7 @@ func buildFlowOpIndex(ops []Op, pageSize float64) ([][]int, []int, []int, bool) 
 		}
 	}
 
-	// Count-then-fill: page buckets get exact capacity instead of growing
-	// geometrically from zero.
-	counts := make([]int, maxPage+1)
-
-	for idx := range ops {
-		if ops[idx].Fixed {
-			continue
-		}
-
-		counts[pageOf[idx]]++
-	}
-
 	pages := make([][]int, maxPage+1)
-	for p := range counts {
-		pages[p] = make([]int, 0, counts[p])
-	}
-
 	pos := make([]int, len(ops))
 
 	for idx := range ops {

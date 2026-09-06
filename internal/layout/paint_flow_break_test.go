@@ -19,7 +19,7 @@ func TestForcedBreakTargetYLandsAtNextPageTop(t *testing.T) {
 			t.Fatal("bottom sliver must not count as a fresh page")
 		}
 
-		if math.Abs(target-contentH) > layoutSlack {
+		if math.Abs(target-contentH) > 0.01 {
 			t.Fatalf("target = %.4f, want %.4f", target, contentH)
 		}
 	})
@@ -43,7 +43,7 @@ func TestForcedBreakTargetYLandsAtNextPageTop(t *testing.T) {
 			t.Fatal("landing band should snap to that page top")
 		}
 
-		if math.Abs(target-2*contentH) > layoutSlack {
+		if math.Abs(target-2*contentH) > 0.01 {
 			t.Fatalf("target = %.4f, want %.4f", target, 2*contentH)
 		}
 	})
@@ -56,7 +56,7 @@ func TestForcedBreakTargetYLandsAtNextPageTop(t *testing.T) {
 			t.Fatal("sliver after ink on the same page must move")
 		}
 
-		if math.Abs(target-2*contentH) > layoutSlack {
+		if math.Abs(target-2*contentH) > 0.01 {
 			t.Fatalf("target = %.4f, want %.4f", target, 2*contentH)
 		}
 	})
@@ -83,15 +83,15 @@ func TestShiftSamePageFromYLeavesLaterPages(t *testing.T) {
 
 	shiftSamePageFromY(res, 10, 0, contentH, -10)
 
-	if got := res.Ops[0].Y; math.Abs(got-2) > layoutSlack {
+	if got := res.Ops[0].Y; math.Abs(got-2) > 0.01 {
 		t.Fatalf("same-page op Y = %.2f, want 2", got)
 	}
 
-	if got := res.Ops[1].Y; math.Abs(got-110) > layoutSlack {
+	if got := res.Ops[1].Y; math.Abs(got-110) > 0.01 {
 		t.Fatalf("later-page op Y = %.2f, want 110", got)
 	}
 
-	if got := res.root.children[1].y; math.Abs(got-110) > layoutSlack {
+	if got := res.root.children[1].y; math.Abs(got-110) > 0.01 {
 		t.Fatalf("later-page box Y = %.2f, want 110", got)
 	}
 }

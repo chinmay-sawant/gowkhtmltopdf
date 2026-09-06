@@ -1,77 +1,13 @@
-// Code-generated-ish package constants for mnd-named magic numbers.
-// Values preserve prior behavior; names document common layout ratios.
 package layout
 
 const (
-	alphabetLen               = 26
-	ascentRatio               = 0.8
-	baselineInsetRatio        = 0.25
-	borderWidthMediumPx       = 5
-	borderWidthThinPx         = 3
-	bulletGapRatio            = 0.35
-	byteMax                   = 0xFF
-	byteShift                 = 8
-	captionSideMaxFrac        = 0.4
-	cssCenterPercent          = 50
-	cssPercent                = 100
-	cssPxRoot                 = 16
-	dashDrawMul               = 3
-	dashGapMul                = 1.5
-	defaultFontSizePt         = 12
-	defaultLineHeightRatio    = 1.2
-	defaultOrphansWidows      = 2
-	degFullCircle             = 360
-	degHalfCircle             = 180
-	descentPadRatio           = 0.35
-	descentRatio              = 0.2
-	firstLineEm               = 0.85
-	fontSizeLargePx           = 18
-	fontSizeMediumPx          = 13
-	fontSizeSmallPx           = 10
-	fontSizeXSmallPx          = 9
-	fontSizeXXLargePx         = 24
-	fontSizeXXXLargePx        = 32
-	fontWeightBold            = 700
-	fontWeightNormal          = 400
-	glueEmHard                = 3.5
-	glueEmSoft                = 2.5
-	halfDivisor               = 2
-	halfPtBins                = 2
-	halfRatio                 = 0.5
-	infiniteMeasure           = 1e9
-	jpegSegHeaderLen          = 2
-	keepTogetherMaxBlankRatio = 0.2
-	layoutEpsilon             = 1e-6
-	layoutSlack               = 0.01
-	layoutSlackFine           = 0.001
-	matrixCoeffCount          = 6
-	matrixTranslateIdx        = 4
-	maxGlueEm                 = 8
-	maxIntShift               = 30
-	minBorderWidthPt          = 0.3
-	minBoxPt                  = 4
-	minDashPt                 = 0.5
-	minLeadPt                 = 8
-	minOpsCapacity            = 64
-	opsPerNodeHint            = 3 // estimateOpCapacity divides this by two
-	outlineStrokeRatio        = 0.06
-	paginationGuardMax        = 10000
-	pairLen                   = 2
-	marginProperty            = "margin"
-	paddingProperty           = "padding"
-	pxToPtFactor              = 0.75
-	smallSliceCap             = 8
-	smallerFontRatio          = 0.833
-	styleEpsilon              = 1e-9
-	svgRasterMax              = 1024
-	textLeadRatio             = 0.75
-	textRenderFillStroke      = 2
-	three                     = 3
-	turnScale                 = 0.9
-	two                       = 2
-	twoLineRoomPt             = 24
-	underlineOffsetRatio      = 0.22
-	underlineWidthEm          = 0.05
-	underlineWidthMax         = 0.45
-	underlineWidthMin         = 0.25
+	two        = 2
+	three      = 3
+	oneHundred = 100
+
+	layoutEpsilon         = 1e-6
+	indefiniteContentCap  = 1e9
+	textLineHeightFactor  = 1.2
+	maxImplicitGridTracks = 64
+	trackDefaultFontPt    = 12
 )

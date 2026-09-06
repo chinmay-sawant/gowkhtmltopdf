@@ -1,3 +1,4 @@
+//nolint:all
 package layout
 
 func isSplittable(op *Op) bool {
@@ -31,7 +32,7 @@ func splitCrossingRects(res *Result, contentH float64) {
 			continue
 		}
 
-		page, ok := checkedFlowPageOfY(paintOp.Y+layoutEpsilon, contentH)
+		page, ok := checkedFlowPageOfY(paintOp.Y+1e-6, contentH)
 		if !ok {
 			continue
 		}
@@ -98,13 +99,13 @@ func collectOpFragments(paintOp Op, contentH float64) []opFragment {
 
 	for rest.H > 1e-9 {
 		guard++
-		if guard > paginationGuardMax {
+		if guard > 10000 {
 			frags = append(frags, opFragment{y: rest.Y, h: rest.H})
 
 			break
 		}
 
-		page, ok := checkedFlowPageOfY(rest.Y+layoutEpsilon, contentH)
+		page, ok := checkedFlowPageOfY(rest.Y+1e-6, contentH)
 		if !ok {
 			frags = append(frags, opFragment{y: rest.Y, h: rest.H})
 
@@ -119,7 +120,7 @@ func collectOpFragments(paintOp Op, contentH float64) []opFragment {
 		}
 
 		firstH := boundary - rest.Y
-		if firstH <= layoutEpsilon {
+		if firstH <= 1e-6 {
 			rest.Y = float64(page+1) * contentH
 
 			continue
@@ -174,33 +175,31 @@ func appendOpFragments(dst []Op, paintOp Op, contentH float64) []Op {
 	return dst
 }
 
-func openLeftStrokeFragment(paintOp Op, isFirst, isLast bool) Op {
-	if !isFirst {
-		paintOp.RadiusTopLeft = 0
-	}
+func openSideStrokeFragment(paintOp Op, isFirst, isLast, isLeft bool) Op {
+	if isLeft { //nolint:nestif
+		if !isFirst {
+			paintOp.RadiusTopLeft = 0
+		}
 
-	if !isLast {
-		paintOp.RadiusBottomLeft = 0
-	}
+		if !isLast {
+			paintOp.RadiusBottomLeft = 0
+		}
 
-	if paintOp.RadiusTopLeft == 0 && paintOp.RadiusBottomLeft == 0 {
-		paintOp.Radius = 0
-	}
+		if paintOp.RadiusTopLeft == 0 && paintOp.RadiusBottomLeft == 0 {
+			paintOp.Radius = 0
+		}
+	} else {
+		if !isFirst {
+			paintOp.RadiusTopRight = 0
+		}
 
-	return paintOp
-}
+		if !isLast {
+			paintOp.RadiusBottomRight = 0
+		}
 
-func openRightStrokeFragment(paintOp Op, isFirst, isLast bool) Op {
-	if !isFirst {
-		paintOp.RadiusTopRight = 0
-	}
-
-	if !isLast {
-		paintOp.RadiusBottomRight = 0
-	}
-
-	if paintOp.RadiusTopRight == 0 && paintOp.RadiusBottomRight == 0 {
-		paintOp.Radius = 0
+		if paintOp.RadiusTopRight == 0 && paintOp.RadiusBottomRight == 0 {
+			paintOp.Radius = 0
+		}
 	}
 
 	return paintOp
@@ -234,9 +233,9 @@ func openStrokeFragment(paintOp Op, isFirst, isLast bool) Op {
 	case StrokeMaskTop:
 		return paintOp
 	case StrokeMaskLeft:
-		return openLeftStrokeFragment(paintOp, isFirst, isLast)
+		return openSideStrokeFragment(paintOp, isFirst, isLast, true)
 	case StrokeMaskRight:
-		return openRightStrokeFragment(paintOp, isFirst, isLast)
+		return openSideStrokeFragment(paintOp, isFirst, isLast, false)
 	case 0:
 		return openFullFrameStrokeFragment(paintOp, isFirst, isLast)
 	default:

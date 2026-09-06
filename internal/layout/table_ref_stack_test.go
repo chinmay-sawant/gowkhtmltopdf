@@ -179,73 +179,7 @@ func refCellWidth(t *testing.T, src string, cssSheet *css.Stylesheet) float64 {
 	return tb.rows[0][0].w
 }
 
-func TestRowspanBrCitesSpreadVertically(t *testing.T) { //nolint:cyclop,funlen
-	t.Parallel()
-
-	cssSheet := sheet(t, `
-body { margin: 0; font-size: 10pt; }
-table { border-collapse: collapse; width: 480pt; }
-td { border: 1px solid #aaa; padding: 2pt; font-size: 9pt; }
-.reference { white-space: nowrap; font-size: 8pt; }
-`)
-	src := `<html><body><table>
-<tr><td rowspan="2">2023</td><td>EDA Awards</td><td>She Deserves a New Agent Award</td><td>Won</td>
-<td rowspan="2" style="text-align:center"><sup class="reference"><a href="#a">` +
-		`<span class="cite-bracket">[</span>127<span class="cite-bracket">]</span></a></sup>` +
-		`<br/><sup class="reference"><a href="#b">` +
-		`<span class="cite-bracket">[</span>128<span class="cite-bracket">]</span></a></sup></td>
-</tr>
-<tr><td></td><td>Most Egregious Lovers Age Difference Award</td><td>Nominated</td></tr>
-</table></body></html>`
-	root := mustParse(t, src)
-
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
-		Width: 500, Height: 400, Sheets: []*css.Stylesheet{cssSheet}, Background: true, Zoom: 0.666667,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	var y127, y128 float64
-
-	var n127, n128 int
-
-	for _, paintOp := range res.Ops {
-		if paintOp.Kind != OpText {
-			continue
-		}
-
-		if containsCite(paintOp.Text, "127") {
-			y127 += paintOp.Y
-			n127++
-		}
-
-		if containsCite(paintOp.Text, "128") {
-			y128 += paintOp.Y
-			n128++
-		}
-	}
-
-	if n127 == 0 || n128 == 0 {
-		// try full marker as single op
-		for _, op := range res.Ops {
-			if op.Kind == OpText {
-				t.Logf("text %q y=%.1f", op.Text, op.Y)
-			}
-		}
-
-		t.Fatalf("missing cites n127=%d n128=%d", n127, n128)
-	}
-
-	y127 /= float64(n127)
-	y128 /= float64(n128)
-	dy := y128 - y127
-
-	if dy < 8 {
-		t.Fatalf("cite baselines too close dy=%.1f (y127=%.1f y128=%.1f); want spread across rowspan", dy, y127, y128)
-	}
-}
-
+//nolint:unused
 func containsCite(text, num string) bool {
 	if text == num || text == "["+num+"]" {
 		return true

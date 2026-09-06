@@ -17,38 +17,6 @@ func applyAdvancedProps(style *ResolvedStyle, prop, value string, fsize float64)
 	}
 
 	switch prop {
-	// Wave A: Paged Media & Bookmarks
-	case "bookmark-level":
-		if val == "none" {
-			style.BookmarkLevel = 0
-			return true
-		}
-		if n, err := strconv.Atoi(val); err == nil && n >= 0 {
-			style.BookmarkLevel = n
-			return true
-		}
-	case "bookmark-label":
-		style.BookmarkLabel = strings.Trim(value, "'\"")
-		return true
-	case "bookmark-state":
-		if val == "open" || val == "closed" {
-			style.BookmarkState = val
-			return true
-		}
-	case "footnote-display":
-		if val == "block" || val == "inline" || val == "compact" {
-			style.FootnoteDisplay = val
-			return true
-		}
-	case "footnote-policy":
-		if val == "auto" || val == "line" || val == "block" {
-			style.FootnotePolicy = val
-			return true
-		}
-	case "string-set":
-		style.StringSet = value
-		return true
-
 	// Wave B: Text Truncation, Clamping, Margins
 	case "text-overflow":
 		if val == "clip" || val == "ellipsis" {
@@ -62,6 +30,11 @@ func applyAdvancedProps(style *ResolvedStyle, prop, value string, fsize float64)
 		}
 		if n, err := strconv.Atoi(val); err == nil && n > 0 {
 			style.LineClamp = n
+			// display:-webkit-box maps to flex and forces nowrap; line-clamp
+			// needs normal wrapping so the clamp can keep N lines.
+			if style.WhiteSpace == cssWhiteSpaceNowrap {
+				style.WhiteSpace = "normal"
+			}
 			return true
 		}
 	case "max-lines":
@@ -77,6 +50,11 @@ func applyAdvancedProps(style *ResolvedStyle, prop, value string, fsize float64)
 		if val == "none" || val == "block" || val == "inline" ||
 			val == "block-start" || val == "block-end" || val == "inline-start" || val == "inline-end" {
 			style.MarginTrim = val
+			return true
+		}
+	case "empty-cells":
+		if val == "show" || val == "hide" {
+			style.EmptyCells = val
 			return true
 		}
 
@@ -141,7 +119,32 @@ func applyAdvancedProps(style *ResolvedStyle, prop, value string, fsize float64)
 			return true
 		}
 
-	// Wave D: Fonts, Blend Modes, Advanced Text Decoration
+	// Wave D: Fonts and Advanced Text Decoration
+	case "mix-blend-mode":
+		if mode, ok := normalizeBlendMode(val); ok {
+			style.MixBlendMode = mode
+			return true
+		}
+	case "background-blend-mode":
+		modes := splitCommaLayers(value)
+		if len(modes) == 0 {
+			return false
+		}
+		normalized := make([]string, 0, len(modes))
+		for index := range modes {
+			mode, ok := normalizeBlendMode(modes[index])
+			if !ok {
+				return false
+			}
+			normalized = append(normalized, mode)
+		}
+		style.BackgroundBlendMode = strings.Join(normalized, ", ")
+		return true
+	case "isolation":
+		if val == "auto" || val == "isolate" {
+			style.Isolation = val
+			return true
+		}
 	case "font-variation-settings":
 		style.FontVariationSettings = value
 		return true
@@ -156,17 +159,6 @@ func applyAdvancedProps(style *ResolvedStyle, prop, value string, fsize float64)
 	case "font-palette":
 		style.FontPalette = val
 		return true
-	case "mix-blend-mode":
-		style.MixBlendMode = val
-		return true
-	case "background-blend-mode":
-		style.BackgroundBlendMode = val
-		return true
-	case "isolation":
-		if val == "auto" || val == "isolate" {
-			style.Isolation = val
-			return true
-		}
 	case "text-combine-upright", "-webkit-text-combine":
 		style.TextCombineUpright = val
 		return true
@@ -177,24 +169,6 @@ func applyAdvancedProps(style *ResolvedStyle, prop, value string, fsize float64)
 		}
 	case "unicode-bidi":
 		style.UnicodeBidi = val
-		return true
-	case "text-emphasis":
-		style.TextEmphasis = value
-		return true
-	case "text-emphasis-color":
-		if col, ok := parseAdvancedColor(val); ok {
-			style.TextEmphasisColor = col
-			style.TextEmphasisColorSet = true
-			return true
-		}
-	case "text-emphasis-position":
-		style.TextEmphasisPosition = val
-		return true
-	case "text-emphasis-style":
-		style.TextEmphasisStyle = value
-		return true
-	case "text-emphasis-skip":
-		style.TextEmphasisSkip = val
 		return true
 	case "text-decoration-skip":
 		style.TextDecorationSkip = val
@@ -228,11 +202,54 @@ func applyAdvancedProps(style *ResolvedStyle, prop, value string, fsize float64)
 	case "overflow-clip-margin-left":
 		style.OverflowClipMarginLeft = parseAdvancedLength(val, fsize)
 		return true
-	case "overflow-clip-margin-inline", "overflow-clip-margin-inline-start", "overflow-clip-margin-inline-end":
-		style.OverflowClipMargin = parseAdvancedLength(val, fsize)
-		return true
-	case "overflow-clip-margin-block", "overflow-clip-margin-block-start", "overflow-clip-margin-block-end":
-		style.OverflowClipMargin = parseAdvancedLength(val, fsize)
+	case "overflow-clip-margin", "overflow-clip-margin-inline",
+		"overflow-clip-margin-inline-start", "overflow-clip-margin-inline-end",
+		"overflow-clip-margin-block", "overflow-clip-margin-block-start",
+		"overflow-clip-margin-block-end":
+		vals := parseOverflowClipMarginLengths(val, fsize)
+		if len(vals) == 0 {
+			return true
+		}
+		// Shorthand and logical variants map to physical sides for horizontal-tb.
+		switch prop {
+		case "overflow-clip-margin":
+			switch len(vals) {
+			case 1:
+				style.OverflowClipMarginTop = vals[0]
+				style.OverflowClipMarginRight = vals[0]
+				style.OverflowClipMarginBottom = vals[0]
+				style.OverflowClipMarginLeft = vals[0]
+			case 2:
+				style.OverflowClipMarginTop = vals[0]
+				style.OverflowClipMarginBottom = vals[0]
+				style.OverflowClipMarginRight = vals[1]
+				style.OverflowClipMarginLeft = vals[1]
+			case 3:
+				style.OverflowClipMarginTop = vals[0]
+				style.OverflowClipMarginRight = vals[1]
+				style.OverflowClipMarginLeft = vals[1]
+				style.OverflowClipMarginBottom = vals[2]
+			default:
+				style.OverflowClipMarginTop = vals[0]
+				style.OverflowClipMarginRight = vals[1]
+				style.OverflowClipMarginBottom = vals[2]
+				style.OverflowClipMarginLeft = vals[3]
+			}
+		case "overflow-clip-margin-inline":
+			style.OverflowClipMarginLeft = vals[0]
+			style.OverflowClipMarginRight = vals[0]
+		case "overflow-clip-margin-inline-start":
+			style.OverflowClipMarginLeft = vals[0]
+		case "overflow-clip-margin-inline-end":
+			style.OverflowClipMarginRight = vals[0]
+		case "overflow-clip-margin-block":
+			style.OverflowClipMarginTop = vals[0]
+			style.OverflowClipMarginBottom = vals[0]
+		case "overflow-clip-margin-block-start":
+			style.OverflowClipMarginTop = vals[0]
+		case "overflow-clip-margin-block-end":
+			style.OverflowClipMarginBottom = vals[0]
+		}
 		return true
 	}
 
@@ -240,27 +257,54 @@ func applyAdvancedProps(style *ResolvedStyle, prop, value string, fsize float64)
 }
 
 func parseAdvancedLength(val string, fsize float64) float64 {
-	if v, unit, ok := css.ParseLength(val); ok {
-		switch unit {
-		case "px":
-			return v * 0.75
-		case "pt":
-			return v
-		case "em", "rem":
-			return v * fsize
-		case "in":
-			return v * 72.0
-		case "mm":
-			return v * 72.0 / 25.4
-		case "cm":
-			return v * 72.0 / 2.54
-		default:
-			return v
-		}
+	if v, ok := parseAdvancedLengthOK(val, fsize); ok {
+		return v
 	}
 	return 0
 }
 
+func parseAdvancedLengthOK(val string, fsize float64) (float64, bool) {
+	if v, unit, ok := css.ParseLength(val); ok {
+		switch unit {
+		case "px":
+			return v * 0.75, true
+		case "pt":
+			return v, true
+		case "em", "rem":
+			return v * fsize, true
+		case "in":
+			return v * 72.0, true
+		case "mm":
+			return v * 72.0 / 25.4, true
+		case "cm":
+			return v * 72.0 / 2.54, true
+		default:
+			return v, true
+		}
+	}
+	return 0, false
+}
+
+func parseOverflowClipMarginLengths(val string, fsize float64) []float64 {
+	toks := strings.Fields(val)
+	out := make([]float64, 0, 4)
+	for _, tok := range toks {
+		low := strings.ToLower(tok)
+		if low == "content-box" || low == "padding-box" || low == "border-box" ||
+			low == "fill-box" || low == "stroke-box" || low == "view-box" {
+			continue
+		}
+		if v, ok := parseAdvancedLengthOK(tok, fsize); ok {
+			out = append(out, v)
+			if len(out) >= 4 {
+				break
+			}
+		}
+	}
+	return out
+}
+
+//nolint:unused
 func parseAdvancedColor(val string) ([3]float64, bool) {
 	r, g, b, _, ok := css.ParseColor(val)
 	if !ok {

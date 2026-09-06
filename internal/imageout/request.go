@@ -6,7 +6,6 @@ import (
 	"io"
 	"time"
 
-	"github.com/chinmay-sawant/gowkhtmltopdf/internal/errs"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
@@ -16,7 +15,8 @@ import (
 var ErrMultipleInputs = errors.New("imageout: exactly one input object is required")
 
 // ErrMissingOutput reports an image request with a nil output writer.
-var ErrMissingOutput = errs.ErrMissingImageOutput
+// Primary definition (migrated from internal/errs, PT-GO-28).
+var ErrMissingOutput = errors.New("imageout: nil Output writer")
 
 // Request is the image-mode job. It does not share convert.Request so the
 // PDF union never carries image settings.

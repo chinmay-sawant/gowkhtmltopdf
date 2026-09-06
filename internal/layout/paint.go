@@ -32,6 +32,20 @@ const rowChromeBandTolerance = 42
 // fragments; a crossing rect yields at least two fragments.
 const splitSlackPerCrossing = 2
 
+// layoutCoordEpsilon is the coordinate tolerance for pagination shifts and
+// same-band tests, matching nearLayout.
+const layoutCoordEpsilon = 0.01
+
+// maxLatin1Rune gates fake-bold synthesis to Latin text; stroking CJK/Type0
+// outlines creates horizontal streak artifacts.
+const maxLatin1Rune = 0xFF
+
+// fakeBoldStrokeRatio scales the synthesized bold stroke from the font size.
+const fakeBoldStrokeRatio = 0.06
+
+// pdfTextRenderFillStroke is the PDF text rendering mode for fill plus stroke.
+const pdfTextRenderFillStroke = 2
+
 // PaintOptions describes the destination page geometry, in points.
 type PaintOptions struct {
 	PageWidth    float64
@@ -68,13 +82,6 @@ type PageMargins struct {
 //
 // After pagination Paint fills res.Pages (page → op indices) and res.Locations
 // (element boxes in document order with their page and canvas rect).
-// beginPaintContext is the single context-normalization boundary owned by
-// this painting slice. Both legacy and cancellation-aware entrypoints use it,
-// so nil-context compatibility does not leak into the paint implementation.
-func beginPaintContext(ctx context.Context) (context.Context, context.CancelFunc) {
-	return context.WithCancel(ctx)
-}
-
 func Paint(doc *pdf.Document, res *Result, opts PaintOptions) error {
 	return PaintContext(context.Background(), doc, res, opts)
 }
@@ -89,7 +96,7 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 		return errNilContext
 	}
 
-	ctx, cancel := beginPaintContext(ctx)
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	if doc == nil || res == nil {
@@ -423,7 +430,10 @@ func (p *pagePainter) paintOp(paintOp *Op) {
 		return
 	}
 
-	needGS := paintOp.XformSet || (paintOp.PaintOpacity > 0 && paintOp.PaintOpacity < 1)
+	needBlend := paintOp.BlendMode != "" && paintOp.BlendMode != blendNormal
+	opacity := pdfPaintOpacity(paintOp, needBlend)
+	needGS := paintOp.XformSet || opacity < 1 || needBlend
+
 	if needGS {
 		p.child.Save()
 	}
@@ -433,9 +443,27 @@ func (p *pagePainter) paintOp(paintOp *Op) {
 		p.child.Transform(a, b, cc, d, e, f)
 	}
 
-	if paintOp.PaintOpacity > 0 && paintOp.PaintOpacity < 1 {
-		p.child.SetOpacity(paintOp.PaintOpacity)
+	if opacity < 1 {
+		p.child.SetOpacity(opacity)
 	}
+
+	if needBlend {
+		p.child.SetBlendMode(paintOp.BlendMode)
+	}
+
+	p.paintWrappedOp(paintOp)
+
+	if needGS {
+		p.child.Restore()
+	}
+}
+
+// paintWrappedOp dispatches one op through the UA marked-content wrappers,
+// or directly when tagging is off.
+//
+//nolint:cyclop // UA marked-content dispatch over op kinds, moved out of paintOp
+func (p *pagePainter) paintWrappedOp(paintOp *Op) {
+	elem := paintOp.StructElem
 
 	switch {
 	case p.isUA && elem != nil && paintOp.Kind != OpFillRect && paintOp.Kind != OpStrokeRect && paintOp.Kind != OpLine:
@@ -457,10 +485,6 @@ func (p *pagePainter) paintOp(paintOp *Op) {
 		p.child.EndArtifact()
 	default:
 		p.drawPageOp(paintOp)
-	}
-
-	if needGS {
-		p.child.Restore()
 	}
 }
 
@@ -515,7 +539,7 @@ func StyleOf(paintOp *Op) PaintStyle {
 		pstyle.StrokeWidth = 1
 	}
 	// Pre-composite translucent fills against white paper (PDF path).
-	if paintOp.Alpha > 0 && paintOp.Alpha < 1 {
+	if paintOp.Alpha > 0 && paintOp.Alpha < 1 && !hasBlendMode(paintOp) {
 		a := paintOp.Alpha
 		pstyle.FillR = paintOp.R*a + (1 - a)
 		pstyle.FillG = paintOp.G*a + (1 - a)
@@ -530,6 +554,27 @@ func StyleOf(paintOp *Op) PaintStyle {
 	return pstyle
 }
 
+func hasBlendMode(paintOp *Op) bool {
+	return paintOp != nil && paintOp.BlendMode != "" && paintOp.BlendMode != blendNormal
+}
+
+func pdfPaintOpacity(paintOp *Op, includeAlpha bool) float64 {
+	opacity := 1.0
+	if paintOp == nil {
+		return opacity
+	}
+
+	if paintOp.PaintOpacity > 0 && paintOp.PaintOpacity < 1 {
+		opacity = paintOp.PaintOpacity
+	}
+
+	if includeAlpha && paintOp.Alpha > 0 && paintOp.Alpha < 1 {
+		opacity *= paintOp.Alpha
+	}
+
+	return opacity
+}
+
 // FakeBoldFor reports whether CSS bold should be synthesized for op (Latin
 // only; CJK stroking produces streak artifacts).
 func FakeBoldFor(op *Op) bool {
@@ -538,7 +583,7 @@ func FakeBoldFor(op *Op) bool {
 	}
 
 	for _, r := range op.Text {
-		if r > byteMax {
+		if r > maxLatin1Rune {
 			return false
 		}
 	}
@@ -574,7 +619,7 @@ func PaintBandContext(ctx context.Context, page *pdf.Page, chld *pdf.Content, op
 		return errNilContext
 	}
 
-	ctx, cancel := beginPaintContext(ctx)
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	if page == nil || chld == nil {
@@ -665,7 +710,9 @@ func paintBandOp(
 	chld *pdf.Content, page *pdf.Page, paintOp *Op, contentH, pageH float64,
 	margins PaintOptions, resName func(*pdf.Font) string, nextImg *int, firstErr *error,
 ) {
-	needGS := paintOp.XformSet || (paintOp.PaintOpacity > 0 && paintOp.PaintOpacity < 1)
+	needBlend := paintOp.BlendMode != "" && paintOp.BlendMode != blendNormal
+	opacity := pdfPaintOpacity(paintOp, needBlend)
+	needGS := paintOp.XformSet || opacity < 1 || needBlend
 	if needGS {
 		chld.Save()
 	}
@@ -675,8 +722,11 @@ func paintBandOp(
 		chld.Transform(a, b, cc, d, e, f)
 	}
 
-	if paintOp.PaintOpacity > 0 && paintOp.PaintOpacity < 1 {
-		chld.SetOpacity(paintOp.PaintOpacity)
+	if opacity < 1 {
+		chld.SetOpacity(opacity)
+	}
+	if needBlend {
+		chld.SetBlendMode(paintOp.BlendMode)
 	}
 
 	isUA := page != nil && page.Doc() != nil && (page.Doc().Policy().IsPDFUA1() || page.Doc().Policy().IsPDFUA2())
@@ -714,15 +764,10 @@ func drawBandOp(
 		name := "I" + strconv.Itoa(*nextImg)
 		*nextImg++
 
-		recordBandError(firstErr, drawImage(page, chld, paintOp, 0, contentH, margins, pageH, name))
+		if err := drawImage(page, chld, paintOp, 0, contentH, margins, pageH, name); err != nil && *firstErr == nil {
+			*firstErr = err
+		}
 	case OpLinkURI, opKindNoop:
-	}
-}
-
-// recordBandError keeps the first image-embed error.
-func recordBandError(firstErr *error, err error) {
-	if err != nil && *firstErr == nil {
-		*firstErr = err
 	}
 }
 
@@ -1128,9 +1173,15 @@ func drawLine(chld *pdf.Content, paintOp *Op, pageIdx int, contentH float64, opt
 
 	chld.SetStrokeColor(paintOp.R, paintOp.G, paintOp.B)
 	chld.SetLineWidth(width)
+	// Square caps project half the stroke past each endpoint so axis-aligned
+	// border sides meet at outer corners (butt caps leave a width/2 notch).
+	const pdfLineCapSquare = 2
+
+	chld.SetLineCap(pdfLineCapSquare)
 	chld.MoveTo(xEnd, yEnd)
 	chld.LineTo(xTwo, yTwo)
 	chld.Stroke()
+	chld.SetLineCap(0) // restore PDF default butt for later strokes
 }
 
 func drawText(
@@ -1164,8 +1215,9 @@ func drawText(
 	// Stroking CJK/Type0 outlines creates horizontal streak artifacts.
 	fakeBold := FakeBoldFor(paintOp)
 	if fakeBold {
-		chld.SetLineWidth(paintOp.Size * outlineStrokeRatio)
-		chld.TextRenderMode(two) // fill + stroke
+		chld.SetStrokeColor(paintOp.R, paintOp.G, paintOp.B)
+		chld.SetLineWidth(paintOp.Size * fakeBoldStrokeRatio)
+		chld.TextRenderMode(pdfTextRenderFillStroke) // fill + stroke
 	}
 
 	chld.TextShow(transformInlineText(paintOp.Text, paintOp.TextTransform))

@@ -1,4 +1,4 @@
-Liberation fonts (Sans Regular/Bold/Italic, Serif Regular, Mono Regular)
+Liberation fonts (Sans Regular/Bold/Italic, Serif Regular/Bold/Italic/BoldItalic, Mono Regular)
 License: SIL Open Font License 1.1 (OFL-1.1)
 Upstream: https://github.com/liberationfonts/liberation-fonts
 Compatible with MIT for bundling and redistribution in this repo (same faces

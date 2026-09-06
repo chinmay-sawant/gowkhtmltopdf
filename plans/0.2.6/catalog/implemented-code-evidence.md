@@ -1,6 +1,6 @@
-# Implemented property code evidence (2026-08-30)
+# Implemented property code evidence (2026-09-02)
 
-Cross-check of all **356** `engine_status: implemented` rows in `mapping.json` against **non-test** Go under `internal/layout`.
+Cross-check of all **355** `engine_status: implemented` rows in `mapping.json` against **non-test** Go under `internal/layout`.
 
 Tests (`*_test.go`) were excluded.
 
@@ -8,9 +8,9 @@ Tests (`*_test.go`) were excluded.
 
 | Validation | Count | Meaning |
 |------------|------:|----------|
-| VERIFIED | 356 | apply arm: `case`, `raw["prop"]`, vendor alias, const case, or `prop ==` |
+| VERIFIED | 355 | apply arm: `case`, `raw["prop"]`, vendor alias, const case, or `prop ==` |
 | UNVERIFIED | 0 | no non-test layout evidence |
-| **Total** | **356** | |
+| **Total** | **355** | |
 
 Machine-readable list (every property + file + line): [`implemented-code-evidence.json`](implemented-code-evidence.json).
 
@@ -20,7 +20,7 @@ Machine-readable list (every property + file + line): [`implemented-code-evidenc
 |------|----------:|
 | `internal/layout/style_properties.go` | 166 |
 | `internal/layout/style_cascade.go` | 90 |
-| `internal/layout/style_advanced_props.go` | 57 |
+| `internal/layout/style_advanced_props.go` | 56 |
 | `internal/layout/style_paint_props.go` | 37 |
 | `internal/layout/style_leftovers.go` | 6 |
 
@@ -296,7 +296,7 @@ Machine-readable list (every property + file + line): [`implemented-code-evidenc
 
 | Property | Evidence | Line |
 |----------|----------|-----:|
-| `background-blend-mode` | case-string | 162 |
+| `background-blend-mode` | case-string | 123 |
 | `bookmark-label` | case-string | 30 |
 | `bookmark-level` | case-string | 21 |
 | `bookmark-state` | case-string | 33 |
@@ -311,6 +311,7 @@ Machine-readable list (every property + file + line): [`implemented-code-evidenc
 | `contain-intrinsic-width` | case-string | 123 |
 | `content-visibility` | case-string | 138 |
 | `dynamic-range-limit` | case-string | 115 |
+| `empty-cells` | case-string | 50 |
 | `font-language-override` | case-string | 153 |
 | `font-optical-sizing` | case-string | 148 |
 | `font-palette` | case-string | 156 |
@@ -320,11 +321,9 @@ Machine-readable list (every property + file + line): [`implemented-code-evidenc
 | `forced-color-adjust` | case-string | 107 |
 | `image-orientation` | case-string | 89 |
 | `image-resolution` | case-string | 94 |
-| `isolation` | case-string | 165 |
 | `line-clamp` | case-string | 58 |
 | `margin-trim` | case-string | 76 |
 | `max-lines` | case-string | 67 |
-| `mix-blend-mode` | case-string | 159 |
 | `object-view-box` | case-string | 99 |
 | `overflow-clip-margin-block` | case-string | 234 |
 | `overflow-clip-margin-block-end` | case-string | 234 |
@@ -406,4 +405,3 @@ Machine-readable list (every property + file + line): [`implemented-code-evidenc
 | `scale` | case-string | 83 |
 | `transform-box` | case-string | 69 |
 | `translate` | case-string | 85 |
-

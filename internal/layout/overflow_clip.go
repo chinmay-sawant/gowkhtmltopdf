@@ -52,7 +52,27 @@ func (e *engine) paddingBoxRect(posX, posY, width, height float64, sty ResolvedS
 		h = 0
 	}
 
-	return clipRect{x: posX + left, y: posY + top, w: w, h: h}
+	rect := clipRect{x: posX + left, y: posY + top, w: w, h: h}
+
+	// Inflate for overflow-clip-margin (used by fixture-62 rows 27-37).
+	// Values are in points already via parseAdvancedLength.
+	if sty.OverflowClipMarginTop != 0 || sty.OverflowClipMarginRight != 0 ||
+		sty.OverflowClipMarginBottom != 0 || sty.OverflowClipMarginLeft != 0 {
+		rect.x -= sty.OverflowClipMarginLeft
+		rect.y -= sty.OverflowClipMarginTop
+		rect.w += sty.OverflowClipMarginLeft + sty.OverflowClipMarginRight
+		rect.h += sty.OverflowClipMarginTop + sty.OverflowClipMarginBottom
+
+		if rect.w < 0 {
+			rect.w = 0
+		}
+
+		if rect.h < 0 {
+			rect.h = 0
+		}
+	}
+
+	return rect
 }
 
 func (e *engine) paddingBoxOf(boxNode *box) clipRect {
@@ -77,6 +97,8 @@ func (e *engine) applyOverflowClips(root *box) {
 const (
 	unconstrainedClipOffset = -1e9
 	unconstrainedClipSpan   = 2e9
+	clipPointTolerance      = 0.01
+	clipZeroLineEpsilon     = 1e-6
 )
 
 func (e *engine) computeBoxOverflowClip(boxNode *box, current *clipRect) *clipRect {
@@ -234,7 +256,7 @@ func (e *engine) isOwnOutlineLine(op *Op, boxNode *box) bool {
 	return lineOnRectEdges(
 		op,
 		boxNode.x-inflate, boxNode.y-inflate,
-		boxNode.w+two*inflate, boxNode.height+two*inflate,
+		boxNode.w+2*inflate, boxNode.height+2*inflate,
 	)
 }
 
@@ -243,10 +265,10 @@ func nearRectOp(op *Op, x, y, w, h float64) bool {
 		return false
 	}
 
-	return math.Abs(op.X-x) <= layoutSlack &&
-		math.Abs(op.Y-y) <= layoutSlack &&
-		math.Abs(op.W-w) <= layoutSlack &&
-		math.Abs(op.H-h) <= layoutSlack
+	return math.Abs(op.X-x) <= clipPointTolerance &&
+		math.Abs(op.Y-y) <= clipPointTolerance &&
+		math.Abs(op.W-w) <= clipPointTolerance &&
+		math.Abs(op.H-h) <= clipPointTolerance
 }
 
 func lineOnRectEdges(op *Op, x, y, w, h float64) bool {
@@ -254,11 +276,11 @@ func lineOnRectEdges(op *Op, x, y, w, h float64) bool {
 		return false
 	}
 
-	if math.Abs(op.H) <= layoutSlack && op.W > 0 {
+	if math.Abs(op.H) <= clipPointTolerance && op.W > 0 {
 		return horizontalOnRectEdges(op, x, y, w, h)
 	}
 
-	if math.Abs(op.W) <= layoutSlack && op.H > 0 {
+	if math.Abs(op.W) <= clipPointTolerance && op.H > 0 {
 		return verticalOnRectEdges(op, x, y, w, h)
 	}
 
@@ -270,14 +292,14 @@ func horizontalOnRectEdges(op *Op, x, y, w, h float64) bool {
 		return false
 	}
 
-	onTop := math.Abs(op.Y-y) <= layoutSlack
-	onBot := math.Abs(op.Y-(y+h)) <= layoutSlack
+	onTop := math.Abs(op.Y-y) <= clipPointTolerance
+	onBot := math.Abs(op.Y-(y+h)) <= clipPointTolerance
 
 	if !onTop && !onBot {
 		return false
 	}
 
-	return op.X+op.W >= x-layoutSlack && op.X <= x+w+layoutSlack
+	return op.X+op.W >= x-clipPointTolerance && op.X <= x+w+clipPointTolerance
 }
 
 func verticalOnRectEdges(op *Op, x, y, w, h float64) bool {
@@ -285,14 +307,14 @@ func verticalOnRectEdges(op *Op, x, y, w, h float64) bool {
 		return false
 	}
 
-	onLeft := math.Abs(op.X-x) <= layoutSlack
-	onRight := math.Abs(op.X-(x+w)) <= layoutSlack
+	onLeft := math.Abs(op.X-x) <= clipPointTolerance
+	onRight := math.Abs(op.X-(x+w)) <= clipPointTolerance
 
 	if !onLeft && !onRight {
 		return false
 	}
 
-	return op.Y+op.H >= y-layoutSlack && op.Y <= y+h+layoutSlack
+	return op.Y+op.H >= y-clipPointTolerance && op.Y <= y+h+clipPointTolerance
 }
 
 func clipPaintOp(op *Op, clip clipRect) {
@@ -317,7 +339,7 @@ func clipRectOp(op *Op, clip clipRect) {
 	x2 := math.Min(op.X+op.W, clip.x+clip.w)
 	y2 := math.Min(op.Y+op.H, clip.y+clip.h)
 
-	if x2-x1 <= layoutSlack || y2-y1 <= layoutSlack {
+	if x2-x1 <= clipPointTolerance || y2-y1 <= clipPointTolerance {
 		DeactivateOp(op)
 
 		return
@@ -330,13 +352,13 @@ func clipLineOp(op *Op, clip clipRect) {
 	x0, y0 := op.X, op.Y
 	x1, y1 := op.X+op.W, op.Y+op.H
 
-	if math.Abs(op.H) <= layoutEpsilon {
+	if math.Abs(op.H) <= clipZeroLineEpsilon {
 		clipHorizontalLine(op, clip, x0, x1, y0)
 
 		return
 	}
 
-	if math.Abs(op.W) <= layoutEpsilon {
+	if math.Abs(op.W) <= clipZeroLineEpsilon {
 		clipVerticalLine(op, clip, y0, y1, x0)
 
 		return
@@ -348,7 +370,7 @@ func clipLineOp(op *Op, clip clipRect) {
 }
 
 func clipHorizontalLine(op *Op, clip clipRect, x0, x1, y0 float64) {
-	if y0 < clip.y-layoutSlack || y0 > clip.y+clip.h+layoutSlack {
+	if y0 < clip.y-clipPointTolerance || y0 > clip.y+clip.h+clipPointTolerance {
 		DeactivateOp(op)
 
 		return
@@ -369,7 +391,7 @@ func clipHorizontalLine(op *Op, clip clipRect, x0, x1, y0 float64) {
 }
 
 func clipVerticalLine(op *Op, clip clipRect, y0, y1, x0 float64) {
-	if x0 < clip.x-layoutSlack || x0 > clip.x+clip.w+layoutSlack {
+	if x0 < clip.x-clipPointTolerance || x0 > clip.x+clip.w+clipPointTolerance {
 		DeactivateOp(op)
 
 		return

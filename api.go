@@ -54,7 +54,7 @@ var (
 	ErrMissingPDFOutput         = convert.ErrMissingOutput
 	ErrInvalidPDFCopies         = convert.ErrInvalidCopies
 	ErrMissingPDFOutlineOutput  = convert.ErrMissingOutlineOutput
-	ErrMissingImageOutput       = errs.ErrMissingImageOutput
+	ErrMissingImageOutput       = imageout.ErrMissingOutput
 	ErrNilContext               = errs.ErrNilContext
 	ErrInvalidPDFVersion        = settings.ErrInvalidPDFVersion
 	ErrInvalidPDFProfile        = settings.ErrInvalidPDFProfile
@@ -63,7 +63,6 @@ var (
 	ErrConformanceRequiresPDF17 = pdf.ErrConformanceRequiresPDF17
 	ErrProfileRequiresPDF17     = pdf.ErrConformanceRequiresPDF17
 	ErrConformanceRequiresPDF20 = pdf.ErrConformanceRequiresPDF20
-	ErrProfileRequiresPDF20     = pdf.ErrConformanceRequiresPDF20
 	ErrTitleRequired            = pdf.ErrTitleRequired
 	ErrPDFUAMissingAlt          = pdf.ErrPDFUAMissingAlt
 	errNilLogWriter             = errors.New("gowkhtmltopdf: nil log writer")

@@ -29,14 +29,10 @@ type gridTrackDef struct {
 	min, max gridTrackSize
 }
 
-func flexibleTrack(frac float64) gridTrackDef {
-	if frac <= 0 {
-		frac = 1
-	}
-
+func flexibleTrack() gridTrackDef {
 	return gridTrackDef{
 		min: gridTrackSize{kind: trackAuto}, //nolint:exhaustruct // intentional zero fields
-		max: gridTrackSize{kind: trackFr, val: frac},
+		max: gridTrackSize{kind: trackFr, val: 1},
 	}
 }
 
@@ -162,28 +158,7 @@ func findMatchingParen(s string, openIdx int) int {
 }
 
 func splitTopLevelComma(cssSheet string) []string {
-	var parts []string
-
-	depth := 0
-	start := 0
-
-	for idx := range len(cssSheet) {
-		switch cssSheet[idx] {
-		case '(':
-			depth++
-		case ')':
-			depth--
-		case ',':
-			if depth == 0 {
-				parts = append(parts, cssSheet[start:idx])
-				start = idx + 1
-			}
-		}
-	}
-
-	parts = append(parts, cssSheet[start:])
-
-	return parts
+	return splitParenArgs(cssSheet, ',')
 }
 
 // isTrackWhitespace reports CSS whitespace between grid track tokens.
@@ -264,6 +239,32 @@ func parseOneTrackDef(tok string) gridTrackDef {
 	return gridTrackDef{min: size, max: size}
 }
 
+func gridAutoTrackDef(raw string) gridTrackDef {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return flexibleTrack()
+	}
+
+	lower := strings.ToLower(raw)
+	if lower == "auto" {
+		return gridTrackDef{
+			min: gridTrackSize{kind: trackAuto}, //nolint:exhaustruct // auto min
+			max: gridTrackSize{kind: trackAuto}, //nolint:exhaustruct // auto max
+		}
+	}
+
+	if size, ok := parseFrSize(lower); ok {
+		return gridTrackDef{min: gridTrackSize{kind: trackAuto}, max: size} //nolint:exhaustruct // 1fr lite
+	}
+
+	def := parseOneTrackDef(raw)
+	if def.min.kind == trackFixed || def.max.kind == trackFr || def.min.kind == trackAuto {
+		return def
+	}
+
+	return flexibleTrack()
+}
+
 // parseFrSize parses a "Nfr" track size; ok=false when tok is not fr.
 func parseFrSize(tok string) (gridTrackSize, bool) {
 	lower := strings.ToLower(tok)
@@ -311,7 +312,7 @@ func parseTrackSize(tok string) gridTrackSize {
 		return size
 	}
 
-	if val, ok := lengthBox(tok, defaultFontSizePt, 0, overflowAuto); ok && val >= 0 {
+	if val, ok := lengthBox(tok, trackDefaultFontPt, 0, overflowAuto); ok && val >= 0 {
 		// Percentages are re-resolved in resolveGridTrackSizes against the
 		// definite container; store raw % as a sentinel via kind+val.
 		if pctSize, ok := parseTrackPct(tok); ok {

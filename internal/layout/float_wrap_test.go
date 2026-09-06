@@ -134,3 +134,70 @@ img { display: block; width: 100pt; height: 120pt; }
 		t.Fatalf("orphan tail x=%.1f, want full-width under float (~0), not beside float", tail.X)
 	}
 }
+
+// Short first-line content beside a small float must stay beside it (Chrome /
+// CSS2.1), not drop under via the orphan-tail heuristic. Matches fixture-61
+// float demo: float:left "F" + following span.
+func TestFloatShortFirstLineStaysBeside(t *testing.T) {
+	t.Parallel()
+
+	cssSheet := sheet(t, `
+body { margin: 0; font-size: 10pt; }
+.box { border: 1px dashed #888; overflow: auto; width: 220pt; }
+.f { float: left; background: #9cf; padding: 4px; margin-right: 6px; }
+`)
+
+	root, err := html.Parse(`<html><body>
+<div class="box"><div class="f">F</div><span>following text wraps beside the float.</span></div>
+</body></html>`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+		Width: 360, Height: 200, Sheets: []*css.Stylesheet{cssSheet}, Background: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	floatOp, followOp := findFloatFirstLineOps(res.Ops)
+
+	if floatOp == nil || followOp == nil {
+		t.Fatalf("missing F or following text ops (F=%v follow=%v)", floatOp != nil, followOp != nil)
+	}
+
+	// Same line band: following must sit to the right of F, not a full line below.
+	if followOp.Y > floatOp.Y+floatOp.H*0.75 {
+		t.Fatalf("following y=%.1f below F y=%.1f h=%.1f; want wrap beside float",
+			followOp.Y, floatOp.Y, floatOp.H)
+	}
+
+	if followOp.X < floatOp.X+floatOp.W-1 {
+		t.Fatalf("following x=%.1f, want right of F (x=%.1f w=%.1f)", followOp.X, floatOp.X, floatOp.W)
+	}
+}
+
+// findFloatFirstLineOps locates the float marker and its following text in a
+// paint list, keeping TestFloatShortFirstLineStaysBeside under the cyclop cap.
+func findFloatFirstLineOps(ops []Op) (*Op, *Op) {
+	var floatOp, followOp *Op
+
+	for i := range ops {
+		operation := &ops[i]
+
+		if operation.Kind != OpText {
+			continue
+		}
+
+		if operation.Text == "F" {
+			floatOp = operation
+		}
+
+		if strings.Contains(operation.Text, "following") {
+			followOp = operation
+		}
+	}
+
+	return floatOp, followOp
+}

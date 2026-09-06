@@ -839,6 +839,36 @@ func TestTableLayoutFixedIgnoresContentMax(t *testing.T) {
 	}
 }
 
+// Fixed tables use column widths from the first row. Body-cell width hints do
+// not change the columns when the header row has no width hints.
+func TestTableLayoutFixedIgnoresBodyWidthHints(t *testing.T) {
+	t.Parallel()
+
+	styles := sheet(t, `
+table.audit { table-layout:fixed; width:200pt; border-collapse:collapse; border-spacing:0 }
+td.a { width:10% }
+td.b { width:20% }
+td.c { width:30% }
+td.d { width:40% }
+`)
+	res := layoutHTML(t, `<html><body>
+<table class="audit">
+<thead><tr><th>A</th><th>B</th></tr></thead>
+<tbody><tr><td class="a">A</td><td class="b">B</td><td class="c">C</td><td class="d">D</td></tr></tbody>
+</table></body></html>`, styles)
+
+	texts := opsOfKind(res, OpText)
+	if len(texts) < 6 {
+		t.Fatalf("expected header and body text, got %d ops", len(texts))
+	}
+
+	gap := texts[1].X - texts[0].X
+
+	if gap < 45 || gap > 55 {
+		t.Fatalf("fixed body-hint gap=%.2f, want ~50pt equal share", gap)
+	}
+}
+
 func TestBorderSpacing(t *testing.T) {
 	t.Parallel()
 

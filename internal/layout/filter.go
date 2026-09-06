@@ -147,7 +147,7 @@ func buildGaussianKernel(radius float64) []float64 {
 
 // applyGaussianBlur performs a 2D separable Gaussian blur on an RGBA image.
 func applyGaussianBlur(src *image.NRGBA, radius float64) *image.NRGBA {
-	if radius <= 0 || src == nil {
+	if radius <= 0 || radius > 20 || src == nil {
 		return src
 	}
 

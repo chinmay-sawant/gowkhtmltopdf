@@ -1,6 +1,7 @@
 package layout
 
 import (
+	"math"
 	"strconv"
 	"strings"
 	"unicode"
@@ -27,6 +28,17 @@ const (
 	propMaxInlineSize       = "max-inline-size"
 	propMinBlockSize        = "min-block-size"
 	propMaxBlockSize        = "max-block-size"
+
+	gridRowStartProp    = "grid-row-start"
+	gridColumnStartProp = "grid-column-start"
+
+	insetTwoSideCount   = 2
+	insetThreeSideCount = 3
+
+	verticalAlignSubFactor        = 0.2
+	verticalAlignSuperFactor      = 0.4
+	verticalAlignLineHeightFactor = 1.2
+	percentDivisor                = 100.0
 )
 
 func applyDisplayGroup(
@@ -79,9 +91,15 @@ func setDisplayKeyword(style *ResolvedStyle, value string) {
 		displayFlex, displayInlineFlex, displayGrid, displayInlineGrid, displaySubgrid, displayFlowRoot:
 		style.Display = value
 	case "-webkit-box":
+		// Legacy 2009 flexible box. Map to modern flex so remapped
+		// -webkit-box-align/orient/pack/flex participate in layout.
 		style.Display = displayFlex
+		style.IsWebkitBox = true
+		style.WhiteSpace = cssWhiteSpaceNowrap
 	case "-webkit-inline-box":
 		style.Display = displayInlineFlex
+		style.IsWebkitBox = true
+		style.WhiteSpace = cssWhiteSpaceNowrap
 	}
 }
 
@@ -562,6 +580,14 @@ func applyGridGroup(
 }
 
 func applyGridTemplateProps(style *ResolvedStyle, prop, value string) bool {
+	if applyGridTemplateCoreProps(style, prop, value) {
+		return true
+	}
+
+	return applyGridTemplateAutoProps(style, prop, value)
+}
+
+func applyGridTemplateCoreProps(style *ResolvedStyle, prop, value string) bool {
 	switch prop {
 	case "grid-template-columns":
 		style.GridTemplateColumns = value
@@ -571,8 +597,21 @@ func applyGridTemplateProps(style *ResolvedStyle, prop, value string) bool {
 		style.GridTemplateAreas = value
 	case "grid-area":
 		parseGridArea(style, value)
+	default:
+		return false
+	}
+
+	return true
+}
+
+func applyGridTemplateAutoProps(style *ResolvedStyle, prop, value string) bool {
+	switch prop {
 	case "grid-auto-flow":
 		style.GridAutoFlow = parseGridAutoFlowValue(value)
+	case "grid-auto-columns":
+		style.GridAutoColumns = strings.TrimSpace(value)
+	case "grid-auto-rows":
+		style.GridAutoRows = strings.TrimSpace(value)
 	case "grid-template":
 		parseGridTemplateShorthand(style, value)
 	case "grid":
@@ -588,14 +627,14 @@ func applyGridPlacementProps(style *ResolvedStyle, prop, value string) bool {
 	switch prop {
 	case "grid-column":
 		parseGridColumn(style, value)
-	case "grid-column-start":
-		setGridStartIndex(style, "grid-column-start", value)
+	case gridColumnStartProp:
+		setGridStartIndex(style, gridColumnStartProp, value)
 	case "grid-column-end":
 		applyGridEndOnly(style, false, value)
 	case "grid-row":
 		parseGridRow(style, value)
-	case "grid-row-start":
-		setGridStartIndex(style, "grid-row-start", value)
+	case gridRowStartProp:
+		setGridStartIndex(style, gridRowStartProp, value)
 	case "grid-row-end":
 		applyGridEndOnly(style, true, value)
 	default:
@@ -605,18 +644,34 @@ func applyGridPlacementProps(style *ResolvedStyle, prop, value string) bool {
 	return true
 }
 
-// setGridStartIndex parses a positive grid line index for one axis.
-func setGridStartIndex(style *ResolvedStyle, prop, value string) {
-	line, err := strconv.Atoi(strings.TrimSpace(value))
-	if err != nil || line <= 0 {
-		return
-	}
-
-	if prop == "grid-row-start" {
+func setGridStartValue(style *ResolvedStyle, prop string, line int) {
+	if prop == gridRowStartProp {
 		style.GridRowStart = line
 	} else {
 		style.GridColumnStart = line
 	}
+}
+
+// setGridStartIndex parses a grid line index: auto (0), -1, or positive. Ignores [name].
+func setGridStartIndex(style *ResolvedStyle, prop, value string) {
+	clean := strings.TrimSpace(stripGridLineNames(value))
+
+	if clean == "" || strings.EqualFold(clean, "auto") {
+		setGridStartValue(style, prop, 0)
+
+		return
+	}
+
+	if strings.HasPrefix(clean, "[") {
+		return
+	}
+
+	line, err := strconv.Atoi(clean)
+	if err != nil || line == 0 {
+		return
+	}
+
+	setGridStartValue(style, prop, line)
 }
 
 // applyBoxGroup handles the sizing and box props (width/height/margins/padding).
@@ -655,7 +710,7 @@ func applyBoxSpacingProps(style *ResolvedStyle, prop, value string, fsize, viewp
 		return applyMarginVerticalProps(style, prop, value, fsize, viewportW)
 	case "margin-right", "margin-left":
 		return applyMarginHorizontalProps(style, prop, value, fsize, viewportW)
-	case paddingProperty:
+	case "padding":
 		return applyPaddingShorthandProps(style, value, fsize, viewportW)
 	case "padding-top", "padding-right", "padding-bottom", "padding-left":
 		return applyPaddingSideProps(style, prop, value, fsize, viewportW)
@@ -785,8 +840,15 @@ func setMaxWidthValue(style *ResolvedStyle, value string, fsize, viewportW float
 }
 
 func setMaxHeightValue(style *ResolvedStyle, value string, fsize, viewportH float64) bool {
-	if v, ok := lengthBox(value, fsize, viewportH, cssDisplayNone); ok {
+	if value == cssDisplayNone {
+		style.MaxHeight = -1
+		style.MaxHeightPercent = -1
+	} else if v, unit, ok := css.ParseLength(value); ok && unit == "%" {
+		style.MaxHeightPercent = v
+		style.MaxHeight = -1
+	} else if v, ok := lengthBox(value, fsize, viewportH, cssDisplayNone); ok {
 		style.MaxHeight = v
+		style.MaxHeightPercent = -1
 	}
 
 	return true
@@ -1183,11 +1245,11 @@ func applyInsetShorthand(style *ResolvedStyle, value string, fsize, viewportW, v
 	top, right, bottom, left := val[0], val[0], val[0], val[0]
 
 	switch {
-	case count > three:
+	case count > insetThreeSideCount:
 		top, right, bottom, left = val[0], val[1], val[2], val[3]
-	case count == three:
+	case count == insetThreeSideCount:
 		top, right, bottom, left = val[0], val[1], val[2], val[1]
-	case count == two:
+	case count == insetTwoSideCount:
 		top, right, bottom, left = val[0], val[1], val[0], val[1]
 	}
 
@@ -1245,7 +1307,7 @@ func applyBorderGroup(
 		"border-inline-width", "border-inline-start-width", "border-inline-end-width",
 		"border-inline-style", "border-inline-start-style", "border-inline-end-style",
 		"border-inline-color", "border-inline-start-color", "border-inline-end-color":
-		return applyLogicalBorder(style, prop, value, fsize)
+		return false // logical border expanded in cascade (style_cascade.go:expandLogicalBorder)
 	case "border-image", "border-image-source", "border-image-slice",
 		"border-image-width", "border-image-outset", "border-image-repeat":
 		return applyBorderImageProps(style, prop, value)
@@ -1442,7 +1504,7 @@ func applyColorBackgroundProps(style *ResolvedStyle, prop, value string) bool {
 			style.BackgroundPosY = parts[1]
 		} else if len(parts) == 1 {
 			style.BackgroundPosX = parts[0]
-			style.BackgroundPosY = parts[0]
+			style.BackgroundPosY = "center"
 		}
 	case "background-position-x", "background-position-inline":
 		style.BackgroundPosX = strings.TrimSpace(value)
@@ -1451,11 +1513,15 @@ func applyColorBackgroundProps(style *ResolvedStyle, prop, value string) bool {
 	case "background-size":
 		style.BackgroundSize = strings.TrimSpace(value)
 	case "background-repeat":
-		style.BackgroundRepeat = strings.TrimSpace(value)
-	case "background-repeat-x", "background-repeat-inline":
-		style.BackgroundRepeat = "repeat-x"
-	case "background-repeat-y", "background-repeat-block":
-		style.BackgroundRepeat = "repeat-y"
+		setBackgroundRepeatShorthand(style, value)
+	case "background-repeat-x":
+		style.BackgroundRepeatX = strings.TrimSpace(value)
+	case "background-repeat-y":
+		style.BackgroundRepeatY = strings.TrimSpace(value)
+	case "background-repeat-inline":
+		style.BackgroundRepeatInline = strings.TrimSpace(value)
+	case "background-repeat-block":
+		style.BackgroundRepeatBlock = strings.TrimSpace(value)
 	case "background-clip":
 		style.BackgroundClip = strings.ToLower(strings.TrimSpace(value))
 	case "background-origin":
@@ -1590,11 +1656,35 @@ func setTextAlignValue(style *ResolvedStyle, value string) {
 }
 
 func setVerticalAlignValue(style *ResolvedStyle, value string) {
-	switch value {
+	trimmed := strings.TrimSpace(value)
+	low := strings.ToLower(trimmed)
+
+	switch low {
 	case "baseline", cssVerticalAlignTop, "middle", cssVerticalAlignBottom:
-		style.VerticalAlign = value
+		style.VerticalAlign = low
 		style.VerticalAlignShift = 0
+	case "sub":
+		style.VerticalAlign = "sub"
+		style.VerticalAlignShift = style.FontSize * verticalAlignSubFactor
+	case "super":
+		style.VerticalAlign = "super"
+		style.VerticalAlignShift = style.FontSize * -verticalAlignSuperFactor
 	default:
+		if strings.HasSuffix(low, "%") {
+			numStr := strings.TrimSpace(strings.TrimSuffix(trimmed, "%"))
+			if pct, err := strconv.ParseFloat(numStr, 64); err == nil {
+				lineHeight := style.LineHeight
+				if lineHeight <= 0 {
+					lineHeight = verticalAlignLineHeightFactor * style.FontSize
+				}
+
+				style.VerticalAlign = trimmed
+				style.VerticalAlignShift = lineHeight * pct / percentDivisor
+
+				return
+			}
+		}
+
 		if shift, ok := plainLength(value, style.FontSize, 0); ok {
 			style.VerticalAlign = "baseline"
 			style.VerticalAlignShift = shift
@@ -1772,7 +1862,8 @@ func applyBorderSpacingValue(style *ResolvedStyle, value string, fsize, viewport
 func applyCaptionSideValue(style *ResolvedStyle, value string) {
 	value = strings.ToLower(strings.TrimSpace(value))
 	switch value {
-	case cssVerticalAlignTop, cssVerticalAlignBottom, floatLeft, floatRight:
+	case cssVerticalAlignTop, cssVerticalAlignBottom, floatLeft, floatRight,
+		"block-start", "block-end", "inline-start", "inline-end":
 		style.CaptionSide = value
 	}
 }
@@ -1870,7 +1961,6 @@ func applyPageNameProp(style *ResolvedStyle, value string, parent *ResolvedStyle
 	}
 
 	style.PageName = low
-	style.Page = low
 
 	return true
 }
@@ -1921,17 +2011,25 @@ func applyTransformGroup(
 ) bool {
 	switch prop {
 	case "transform":
-		// Animations/transitions ignored: cascaded static value only.
-		if m, has, ok := parseTransformList(value, fsize); ok {
-			style.Transform = m
-			style.HasTransform = has
-		}
+		applyTransformListValue(style, value, fsize)
 	case "transform-origin":
 		if spec, ok := parseTransformOrigin(value, fsize); ok {
 			style.TransformOrigin = spec
 		}
+	case "rotate":
+		ApplyRotate(style, value)
+
+		return true
+	case "scale":
+		ApplyScale(style, value)
+
+		return true
+	case "translate":
+		ApplyTranslate(style, value, fsize)
+
+		return true
 	case "transform-box", "transform-style", "perspective", "perspective-origin",
-		"backface-visibility", "rotate", "scale", "translate":
+		"backface-visibility":
 		return applyLeftoversProps(style, prop, value, fsize)
 	default:
 		if applyAdvancedProps(style, prop, value, fsize) {
@@ -1942,6 +2040,51 @@ func applyTransformGroup(
 	}
 
 	return true
+}
+
+// applyTransformListValue stores a parsed transform list and its translate
+// percents. Animations/transitions are ignored: cascaded static value only.
+func applyTransformListValue(style *ResolvedStyle, value string, fsize float64) {
+	matrix, xPercent, yPercent, has, ok := parseTransformList(value, fsize)
+	if !ok {
+		return
+	}
+
+	style.Transform = matrix
+	style.HasTransform = has
+
+	accumulateTranslateXPercent(style, xPercent)
+	accumulateTranslateYPercent(style, yPercent)
+}
+
+func accumulateTranslateXPercent(style *ResolvedStyle, xPercent float64) {
+	if math.IsNaN(xPercent) {
+		return
+	}
+
+	if !style.TranslateXPercentSet {
+		style.TranslateXPercent = xPercent
+		style.TranslateXPercentSet = true
+
+		return
+	}
+
+	style.TranslateXPercent += xPercent
+}
+
+func accumulateTranslateYPercent(style *ResolvedStyle, yPercent float64) {
+	if math.IsNaN(yPercent) {
+		return
+	}
+
+	if !style.TranslateYPercentSet {
+		style.TranslateYPercent = yPercent
+		style.TranslateYPercentSet = true
+
+		return
+	}
+
+	style.TranslateYPercent += yPercent
 }
 
 // applyIgnoredGroup parses but ignores the animation/transition family.

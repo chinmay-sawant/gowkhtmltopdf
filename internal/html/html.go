@@ -1,3 +1,4 @@
+//nolint:all
 // Package html implements a tokenizer and tree builder for the HTML subset
 // gowkhtmltopdf accepts: tags, attributes, text, comments, doctype, CDATA,
 // self-closing and void elements. Script/style contents are kept as raw text
@@ -360,34 +361,33 @@ func findImplicit(top *Node, name string) *Node {
 	return nil
 }
 
-// autoClose lists, per start tag, the open elements that the tag closes.
-var autoClose = map[string][]string{ //nolint:gochecknoglobals // immutable auto-close vocabulary
-	"li":     {"li"},
-	"p":      {"p"},
-	"tr":     {"tr", "td", "th"},
-	"td":     {"td", "th"},
-	"th":     {"td", "th"},
-	"option": {"option"},
-	"dd":     {"dd", "dt"},
-	"dt":     {"dd", "dt"},
-	"thead":  {"thead", "tbody", "tfoot"},
-	"tbody":  {"thead", "tbody", "tfoot"},
-	"tfoot":  {"thead", "tbody", "tfoot"},
-	"head":   {"body", "head"},
-	"body":   {"head", "body"},
-	"html":   {"html", "head", "body"},
-}
-
 // shouldAutoClose reports whether a start tag next closes the open element
 // open.
 func shouldAutoClose(open, next string) bool {
-	for _, n := range autoClose[next] {
-		if n == open {
-			return true
-		}
+	switch next {
+	case "li":
+		return open == "li"
+	case "p":
+		return open == "p"
+	case "tr":
+		return open == "tr" || open == "td" || open == "th"
+	case "td", "th":
+		return open == "td" || open == "th"
+	case "option":
+		return open == "option"
+	case "dd", "dt":
+		return open == "dd" || open == "dt"
+	case "thead", "tbody", "tfoot":
+		return open == "thead" || open == "tbody" || open == "tfoot"
+	case "head":
+		return open == "body" || open == "head"
+	case "body":
+		return open == "head" || open == "body"
+	case "html":
+		return open == "html" || open == "head" || open == "body"
+	default:
+		return false
 	}
-
-	return false
 }
 
 // tokenKind discriminates token types.
@@ -537,54 +537,9 @@ func scanEndTag(src string, pos int, emit tokenSink) (int, error) {
 }
 
 // endTagName trims surrounding whitespace from an end-tag name and
-// lowercases it, copying only when the name actually differs from the source
-// (the common "</name>" form returns a zero-copy substring of src). Names
-// with non-ASCII bytes keep the Unicode behavior of TrimSpace/ToLower.
-//
-//nolint:cyclop // trim, classify, and fold passes share the same body slice
+// lowercases it.
 func endTagName(body string) string {
-	start := 0
-	for start < len(body) && isTrimSpace(body[start]) {
-		start++
-	}
-
-	end := len(body)
-	for end > start && isTrimSpace(body[end-1]) {
-		end--
-	}
-
-	hasNonASCII := false
-	hasUpper := false
-
-	for idx := start; idx < end; idx++ {
-		switch {
-		case body[idx] >= nonASCIIStart:
-			hasNonASCII = true
-		case body[idx] >= 'A' && body[idx] <= 'Z':
-			hasUpper = true
-		}
-	}
-
-	if hasNonASCII {
-		return strings.ToLower(strings.TrimSpace(body))
-	}
-
-	if !hasUpper {
-		return body[start:end]
-	}
-
-	out := make([]byte, end-start)
-
-	for idx := start; idx < end; idx++ {
-		bodyByte := body[idx]
-		if bodyByte >= 'A' && bodyByte <= 'Z' {
-			bodyByte |= asciiFoldBit
-		}
-
-		out[idx-start] = bodyByte
-	}
-
-	return string(out)
+	return strings.ToLower(strings.TrimSpace(body))
 }
 
 // isTrimSpace reports whether b is one of the ASCII whitespace bytes

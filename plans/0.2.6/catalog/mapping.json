@@ -4,17 +4,17 @@
     "all_properties": "https://www.w3.org/Style/CSS/all-properties.en.json",
     "mdn_units": "mdn/data css/units.json",
     "mdn_properties": "mdn/data css/properties.json (overlay for mdn_url/groups)",
-    "engine": "honesty pass over 166 Implemented (4 subagents); 14 demoted to partial",
-    "generated": "2026-08-28"
+    "engine": "honesty pass plus standard compositing support; 2 compositing properties remain partial",
+    "generated": "2026-09-02"
   },
   "summary": {
     "webref_properties": 818,
     "mapped_properties": 818,
     "properties_by_engine_status": {
-      "implemented": 356,
-      "unsupported": 462,
+      "implemented": 355,
+      "unsupported": 461,
       "ignored": 0,
-      "partial": 0
+      "partial": 2
     },
     "properties_print_relevant": 818,
     "properties_goal_implement": 818,
@@ -2366,7 +2366,7 @@
       ],
       "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "notes": "Parsed, stored at style.go:296 (ResolvedStyle.BackgroundAttachment), no layout/paint consumer for paginated PDF - fixed paints as scroll per background_image.go:291. Implemented (parsed, no visual effect for print)."
     },
     {
       "property": "background-blend-mode",
@@ -2388,8 +2388,8 @@
         "Compositing and Blending"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_advanced_props.go",
-      "notes": ""
+      "code_path": "internal/layout/style_advanced_props.go; internal/layout/background_image.go; internal/layout/blend.go; internal/layout/paint.go; internal/imageout/blend.go; internal/pdf/content.go",
+      "notes": "Standard CSS blend modes are parsed into ResolvedStyle and applied per background-image layer. PDF uses ExtGState blend modes; PNG uses shared alpha compositing. Verified by TestBlendModeParsing, TestBackgroundBlendModeForLayerRepeatsLastMode, and TestContentBlendModeUsesPDFExtGState."
     },
     {
       "property": "background-clip",
@@ -2967,7 +2967,7 @@
       "groups": [],
       "engine_status": "implemented",
       "code_path": "internal/layout/style_advanced_props.go",
-      "notes": ""
+      "notes": "Parsed, stored, no PDF outline consumer for print - paints as if not set. Implemented (parsed, no visual effect for print) - GCPM paged media draft."
     },
     {
       "property": "bookmark-level",
@@ -2988,7 +2988,7 @@
       "groups": [],
       "engine_status": "implemented",
       "code_path": "internal/layout/style_advanced_props.go",
-      "notes": ""
+      "notes": "Parsed, stored, no PDF outline consumer for print - paints as if not set. Implemented (parsed, no visual effect for print) - GCPM paged media draft."
     },
     {
       "property": "bookmark-state",
@@ -3009,7 +3009,7 @@
       "groups": [],
       "engine_status": "implemented",
       "code_path": "internal/layout/style_advanced_props.go",
-      "notes": ""
+      "notes": "Parsed, stored, no PDF outline consumer for print - paints as if not set. Implemented (parsed, no visual effect for print) - GCPM paged media draft."
     },
     {
       "property": "border",
@@ -5044,7 +5044,7 @@
       ],
       "engine_status": "implemented",
       "code_path": "internal/layout/style_advanced_props.go",
-      "notes": ""
+      "notes": "Parsed, stored at style.go:335 (ResolvedStyle.BoxDecorationBreak), clone paints as slice for paginated PDF - no fragmentation difference (always slice). Implemented (parsed, no visual effect for print) per style_advanced_props.go:52."
     },
     {
       "property": "box-shadow",
@@ -6174,7 +6174,7 @@
       ],
       "engine_status": "implemented",
       "code_path": "internal/layout/style_advanced_props.go",
-      "notes": ""
+      "notes": "Parsed, stored at style.go:348 (ResolvedStyle.Contain), parsed but no layout effect for print - performance hint only (layout/paint/style containment has no consumer). Implemented (parsed, no visual effect for print)."
     },
     {
       "property": "contain-intrinsic-block-size",
@@ -6197,7 +6197,7 @@
       ],
       "engine_status": "implemented",
       "code_path": "internal/layout/style_advanced_props.go",
-      "notes": ""
+      "notes": "Parsed, stored at style.go:347 (ResolvedStyle.ContainIntrinsicBlockSize), placeholder block size for size containment - no layout consumer. Implemented (parsed, no visual effect)."
     },
     {
       "property": "contain-intrinsic-height",
@@ -6220,7 +6220,7 @@
       ],
       "engine_status": "implemented",
       "code_path": "internal/layout/style_advanced_props.go",
-      "notes": ""
+      "notes": "Parsed, stored at style.go:345 (ResolvedStyle.ContainIntrinsicHeight), placeholder height for size containment - no layout consumer. Implemented (parsed, no visual effect)."
     },
     {
       "property": "contain-intrinsic-inline-size",
@@ -6243,7 +6243,7 @@
       ],
       "engine_status": "implemented",
       "code_path": "internal/layout/style_advanced_props.go",
-      "notes": ""
+      "notes": "Parsed, stored at style.go:346 (ResolvedStyle.ContainIntrinsicInlineSize), placeholder inline size for size containment - no layout consumer. Implemented (parsed, no visual effect)."
     },
     {
       "property": "contain-intrinsic-size",
@@ -6269,7 +6269,7 @@
       ],
       "engine_status": "implemented",
       "code_path": "internal/layout/style_advanced_props.go",
-      "notes": ""
+      "notes": "Parsed, stored at style.go:343 (ResolvedStyle.ContainIntrinsicSize), placeholder size for size containment - no layout consumer for print, paints as if not set. Implemented (parsed, no visual effect)."
     },
     {
       "property": "contain-intrinsic-width",
@@ -6292,7 +6292,7 @@
       ],
       "engine_status": "implemented",
       "code_path": "internal/layout/style_advanced_props.go",
-      "notes": ""
+      "notes": "Parsed, stored at style.go:344 (ResolvedStyle.ContainIntrinsicWidth), placeholder width for size containment - no layout consumer. Implemented (parsed, no visual effect)."
     },
     {
       "property": "container",
@@ -6410,7 +6410,7 @@
       ],
       "engine_status": "implemented",
       "code_path": "internal/layout/style_advanced_props.go",
-      "notes": ""
+      "notes": "Parsed, stored at style.go:349 (ResolvedStyle.ContentVisibility), performance hint (auto/visible/hidden) - no layout effect for print, paints as if visible. Implemented (parsed, no visual effect)."
     },
     {
       "property": "continue",
@@ -7621,9 +7621,9 @@
       "groups": [
         "CSS Table"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/layout/layout_tables.go",
+      "notes": "Implemented (lite) - show (default) renders empty cells with borders/background, hide suppresses borders/background of empty cells with no visible content. Stored at style.go (future) and consumed in layout_tables.go. Parsed per style_advanced_props.go; paints per table grid."
     },
     {
       "property": "event-trigger",
@@ -8996,7 +8996,7 @@
       "groups": [],
       "engine_status": "implemented",
       "code_path": "internal/layout/style_advanced_props.go",
-      "notes": ""
+      "notes": "Parsed, stored, no PDF outline consumer for print - paints as if not set. Implemented (parsed, no visual effect for print) - GCPM paged media draft."
     },
     {
       "property": "footnote-policy",
@@ -9017,7 +9017,7 @@
       "groups": [],
       "engine_status": "implemented",
       "code_path": "internal/layout/style_advanced_props.go",
-      "notes": ""
+      "notes": "Parsed, stored, no PDF outline consumer for print - paints as if not set. Implemented (parsed, no visual effect for print) - GCPM paged media draft."
     },
     {
       "property": "forced-color-adjust",
@@ -10267,9 +10267,9 @@
       "groups": [
         "Compositing and Blending"
       ],
-      "engine_status": "implemented",
-      "code_path": "internal/layout/style_advanced_props.go",
-      "notes": ""
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_advanced_props.go; internal/layout/layout.go",
+      "notes": "Parsed into ResolvedStyle. isolate creates a stacking context and clears an inherited operation blend mode for its subtree; full isolated transparency groups are not available in the PDF writer."
     },
     {
       "property": "justify-content",
@@ -11019,8 +11019,8 @@
         "CSS Box Model"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_advanced_props.go",
-      "notes": ""
+      "code_path": "internal/layout/style_advanced_props.go + internal/layout/layout_flow.go",
+      "notes": "Implemented (lite) - trims block-start/block-end margins at container edges (none/block). Parsed, stored at style.go:334 (ResolvedStyle.MarginTrim) via style_advanced_props.go:44, consumed in layout_flow.go (flowChildren margin collapse trim)."
     },
     {
       "property": "marker",
@@ -11862,9 +11862,9 @@
       "groups": [
         "Compositing and Blending"
       ],
-      "engine_status": "implemented",
-      "code_path": "internal/layout/style_advanced_props.go",
-      "notes": ""
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_advanced_props.go; internal/layout/layout.go; internal/layout/paint.go; internal/imageout/blend.go; internal/pdf/content.go",
+      "notes": "Standard CSS blend modes are parsed and applied to emitted display-list operations in PDF and PNG. This is operation-level compositing; full element-group backdrop semantics are not available in the current flat display list and PDF writer. The newer plus-lighter value remains unsupported. Verified by TestMixBlendModeReachesDisplayList and TestPaintBlendedFillUsesMultiply."
     },
     {
       "property": "nav-down",
@@ -15997,7 +15997,7 @@
       "groups": [],
       "engine_status": "implemented",
       "code_path": "internal/layout/style_advanced_props.go",
-      "notes": ""
+      "notes": "Parsed, stored, no PDF outline consumer for print - paints as if not set. Implemented (parsed, no visual effect for print) - GCPM running string draft."
     },
     {
       "property": "stroke",

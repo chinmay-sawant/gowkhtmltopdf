@@ -13,7 +13,7 @@ import (
 func TestParseTransformTranslateRotateScale(t *testing.T) {
 	t.Parallel()
 
-	m, has, ok := parseTransformList("translate(10pt, 20pt) rotate(90deg) scale(2)", 12)
+	m, _, _, has, ok := parseTransformList("translate(10pt, 20pt) rotate(90deg) scale(2)", 12)
 	if !ok || !has {
 		t.Fatalf("parse ok=%v has=%v", ok, has)
 	}
@@ -106,7 +106,7 @@ func transformedBox(root *box) *box {
 func TestParseTransformMatrixAndSkew(t *testing.T) {
 	t.Parallel()
 
-	m, has, isOK := parseTransformList("matrix(1, 0, 0, 1, 30, 0)", 12)
+	m, _, _, has, isOK := parseTransformList("matrix(1, 0, 0, 1, 30, 0)", 12)
 	if !isOK || !has {
 		t.Fatal("matrix parse failed")
 	}
@@ -118,7 +118,7 @@ func TestParseTransformMatrixAndSkew(t *testing.T) {
 		t.Fatalf("matrix translate got (%v,%v), want (%v,0)", x, y, want)
 	}
 
-	sk, has, isOK := parseTransformList("skewX(45deg)", 12)
+	sk, _, _, has, isOK := parseTransformList("skewX(45deg)", 12)
 	if !isOK || !has {
 		t.Fatal("skewX parse failed")
 	}
@@ -132,13 +132,22 @@ func TestParseTransformMatrixAndSkew(t *testing.T) {
 func TestParseTransformNoneAnd3DRejected(t *testing.T) {
 	t.Parallel()
 
-	_, has, isOK := parseTransformList("none", 12)
+	matNone, xNone, yNone, has, isOK := parseTransformList("none", 12)
+	_ = matNone
+	_ = xNone
+	_ = yNone
+
 	if !isOK || has {
 		t.Fatalf("none: ok=%v has=%v", isOK, has)
 	}
 
-	_, _, isOK = parseTransformList("translate3d(1px,2px,3px)", 12)
-	if isOK {
+	matBad, xBad, yBad, hasBad, isBadOK := parseTransformList("translate3d(1px,2px,3px)", 12)
+	_ = matBad
+	_ = xBad
+	_ = yBad
+	_ = hasBad
+
+	if isBadOK {
 		t.Fatal("3d transform should be rejected")
 	}
 }

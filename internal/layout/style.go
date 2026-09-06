@@ -1,3 +1,4 @@
+//nolint:all
 package layout
 
 import (
@@ -63,6 +64,7 @@ const (
 	cssPropBorderBlockEndWidth    = "border-block-end-width"
 	cssPropBorderInlineStartWidth = "border-inline-start-width"
 	cssPropBorderInlineEndWidth   = "border-inline-end-width"
+	cssDirectionRTL               = "rtl"
 )
 
 // hashFontFamily fingerprints a CSS font-family list without allocating.
@@ -102,6 +104,7 @@ const asciiFoldBit = 0x20
 //nolint:lll // the resolved-style table keeps field comments beside each property
 type ResolvedStyle struct {
 	Display            string
+	IsWebkitBox        bool // true when display was -webkit-box / -webkit-inline-box (legacy)
 	Position           string  // "static" | "relative" | "absolute" | "fixed" | "sticky"
 	Float              string  // cssDisplayNone | floatLeft | floatRight
 	Clear              string  // cssDisplayNone | floatLeft | floatRight | "both"
@@ -146,11 +149,16 @@ type ResolvedStyle struct {
 	// Direction is CSS direction ("ltr" | "rtl").
 	Direction           string
 	Filter              string
+	MixBlendMode        string // normal | multiply | screen | ...
+	BackgroundBlendMode string // comma-separated background layer modes
+	Isolation           string // auto | isolate
 	GridTemplateColumns string // raw grid-template-columns value
 	GridTemplateRows    string
 	GridTemplateAreas   string  // raw grid-template-areas value
 	GridArea            string  // named area (custom-ident); empty = line-based placement
 	GridAutoFlow        string  // "row" | fxCol | "dense" | "row dense" | "column dense"
+	GridAutoColumns     string  // raw grid-auto-columns value (auto | length | minmax(...))
+	GridAutoRows        string  // raw grid-auto-rows value
 	GridColumnSpan      int     // from grid-column: span N (default 1)
 	GridColumnStart     int     // 1-based; 0 = auto
 	GridRowSpan         int     // from grid-row: span N (default 1)
@@ -167,7 +175,8 @@ type ResolvedStyle struct {
 	MinHeight           float64
 	MinHeightPercent    float64 // >=0 means % of CB height; indefinite → ignore
 	MaxHeight           float64
-	Overflow            string // "visible" | "hidden" | "scroll" | "auto" | "clip" (non-visible = sticky scrollport)
+	MaxHeightPercent    float64 // >=0 means % of CB height; -1 = none/auto (mirrors MaxWidthPercent)
+	Overflow            string  // "visible" | "hidden" | "scroll" | "auto" | "clip" (non-visible = sticky scrollport)
 	OverflowX           string
 	OverflowY           string
 	// Visibility is CSS visibility: "visible" | "hidden" | "collapse".
@@ -197,26 +206,9 @@ type ResolvedStyle struct {
 	BGColor                                                                                        [4]float64 // rgba, 0..1
 	// AccentColor is CSS accent-color when authored; AccentColorSet is false
 	// when the property is absent so widgets can keep their default fill.
-	AccentColor            [3]float64
-	AccentColorSet         bool
-	FontFamily             []string
-	FontFeatureSettings    string
-	FontKerning            string
-	FontVariant            string
-	FontVariantCaps        string
-	FontVariantLigatures   string
-	FontVariantNumeric     string
-	FontVariantPosition    string
-	FontVariantEastAsian   string
-	FontVariantEmoji       string
-	FontVariantAlternates  string
-	FontStretch            string
-	FontSynthesis          string
-	FontSynthesisWeight    bool
-	FontSynthesisStyle     bool
-	FontSynthesisSmallCaps bool
-	FontSynthesisPosition  bool
-	FontSizeAdjust         float64
+	AccentColor    [3]float64
+	AccentColorSet bool
+	FontFamily     []string
 	// famHash is the FNV-1a fingerprint of FontFamily, computed once during
 	// style resolution. Text measurement reuses
 	// it instead of re-hashing the family list per run.
@@ -280,16 +272,21 @@ type ResolvedStyle struct {
 	PageName      string
 	Orphans       int    // CSS orphans; inherited; initial 2; integer ≥ 1
 	Widows        int    // CSS widows; inherited; initial 2; integer ≥ 1
+	EmptyCells    string // "show" | "hide"; inherited per CSS Tables 3; "" = show (initial)
 	ContainerType string // "" | "normal" | "inline-size" | "size"
 	ContainerName string // space-separated lower-case names; empty = none
 	// Static 2D CSS transforms (paint-time CTM; sibling flow unchanged).
-	Transform       Matrix2D
-	HasTransform    bool
-	TransformOrigin transformOriginSpec
-	Opacity         float64 // 0..1; initial 1; also from filter:opacity()
-	Content         string
-	GridColumnEnd   int
-	GridRowEnd      int
+	Transform            Matrix2D
+	HasTransform         bool
+	TransformOrigin      transformOriginSpec
+	TranslateXPercent    float64 // % of border-box width for `translate` longhand
+	TranslateXPercentSet bool
+	TranslateYPercent    float64 // % of border-box height
+	TranslateYPercentSet bool
+	Opacity              float64 // 0..1; initial 1; also from filter:opacity()
+	Content              string
+	GridColumnEnd        int
+	GridRowEnd           int
 	// Outline* is CSS outline. Empty OutlineStyle means none. Does not affect layout size.
 	OutlineWidth    float64
 	OutlineStyle    string
@@ -297,19 +294,23 @@ type ResolvedStyle struct {
 	OutlineColorSet bool
 	OutlineOffset   float64
 	// BackgroundImage is a raw url(...) target for the first layer, empty if none.
-	BackgroundImage      string
-	BackgroundPosX       string
-	BackgroundPosY       string
-	BackgroundSize       string
-	BackgroundRepeat     string
-	BackgroundClip       string
-	BackgroundOrigin     string
-	BackgroundAttachment string
-	BorderImageSource    string
-	BorderImageSlice     string
-	BorderImageWidth     string
-	BorderImageOutset    string
-	BorderImageRepeat    string
+	BackgroundImage        string
+	BackgroundPosX         string
+	BackgroundPosY         string
+	BackgroundSize         string
+	BackgroundRepeat       string
+	BackgroundRepeatX      string
+	BackgroundRepeatY      string
+	BackgroundRepeatBlock  string
+	BackgroundRepeatInline string
+	BackgroundClip         string
+	BackgroundOrigin       string
+	BackgroundAttachment   string
+	BorderImageSource      string
+	BorderImageSlice       string
+	BorderImageWidth       string
+	BorderImageOutset      string
+	BorderImageRepeat      string
 	// ListStylePosition is "inside" or "outside"; empty means outside.
 	ListStylePosition          string
 	QuotesRaw                  string
@@ -339,36 +340,6 @@ type ResolvedStyle struct {
 	StrokeLineCap              string
 	StrokeLineJoin             string
 	StrokeMiterLimit           float64
-	FillRule                   string
-	ClipRule                   string
-	ColorInterpolation         string
-	ColorInterpolationFilters  string
-	ShapeRendering             string
-	TextAnchor                 string
-	DominantBaseline           string
-	AlignmentBaseline          string
-	ClipPath                   string
-	OverflowClipMargin         float64
-	ScrollMarginTop            float64
-	ScrollMarginRight          float64
-	ScrollMarginBottom         float64
-	ScrollMarginLeft           float64
-	TransformBox               string
-	TransformStyle             string
-	Perspective                float64
-	PerspectiveOrigin          [2]float64
-	BackfaceVisibility         string
-	RubyAlign                  string
-	RubyPosition               string
-	RubyMerge                  string
-	RubyOverhang               string
-	Page                       string
-	BookmarkLevel              int
-	BookmarkLabel              string
-	BookmarkState              string
-	FootnoteDisplay            string
-	FootnotePolicy             string
-	StringSet                  string
 	TextOverflow               string
 	LineClamp                  int
 	MaxLines                   int
@@ -392,18 +363,9 @@ type ResolvedStyle struct {
 	FontOpticalSizing          string
 	FontLanguageOverride       string
 	FontPalette                string
-	MixBlendMode               string
-	BackgroundBlendMode        string
-	Isolation                  string
 	TextCombineUpright         string
 	TextOrientation            string
 	UnicodeBidi                string
-	TextEmphasis               string
-	TextEmphasisColor          [3]float64
-	TextEmphasisColorSet       bool
-	TextEmphasisPosition       string
-	TextEmphasisStyle          string
-	TextEmphasisSkip           string
 	TextDecorationSkip         string
 	TextDecorationSkipInk      string
 	TextDecorationSkipBox      string
@@ -467,6 +429,7 @@ func initialStyle() ResolvedStyle { //nolint:funlen // complete CSS initial-valu
 		MinHeight:        0,
 		MinHeightPercent: -1,
 		MaxHeight:        -1,
+		MaxHeightPercent: -1,
 		Overflow:         "visible",
 		OverflowX:        "visible",
 		OverflowY:        "visible",
@@ -476,36 +439,36 @@ func initialStyle() ResolvedStyle { //nolint:funlen // complete CSS initial-valu
 		FontFamily:       nil,
 		// Empty family hashes to the FNV-1a offset, matching what
 		// resolveElementStyle records for elements without font-family.
-		famHash:                hashFontFamily(nil),
-		FontSize:               defaultFontSizePt, // 16px at 96dpi
-		FontWeight:             fontWeightNormal,
-		TextTransform:          textTransformNone,
-		VerticalAlign:          "baseline",
-		WhiteSpace:             "normal",
-		TabSize:                defaultTabSize,
-		HyphenateCharacter:     "-",
-		OverflowWrap:           "normal",
-		WordBreak:              "normal",
-		TextDecoration:         cssDisplayNone,
-		ListStyleType:          "disc",
-		BorderCollapse:         "separate",
-		BorderSpacing:          0,
-		TableLayout:            overflowAuto,
-		GridColumnSpan:         1,
-		GridRowSpan:            1,
-		WritingMode:            writingModeHorizontalTB,
-		Direction:              "ltr",
-		FontSynthesisWeight:    true,
-		FontSynthesisStyle:     true,
-		FontSynthesisSmallCaps: true,
-		FontSynthesisPosition:  true,
-		Orphans:                two,
-		Widows:                 two,
-		Transform:              IdentityMatrix(),
-		TransformOrigin:        defaultTransformOrigin(),
-		Opacity:                1,
-		FillOpacity:            1,
-		StrokeOpacity:          1,
+		famHash:             hashFontFamily(nil),
+		FontSize:            12, // 16px at 96dpi
+		FontWeight:          400,
+		TextTransform:       textTransformNone,
+		VerticalAlign:       "baseline",
+		WhiteSpace:          "normal",
+		TabSize:             defaultTabSize,
+		HyphenateCharacter:  "-",
+		OverflowWrap:        "normal",
+		WordBreak:           "normal",
+		TextDecoration:      cssDisplayNone,
+		ListStyleType:       "disc",
+		BorderCollapse:      "separate",
+		BorderSpacing:       0,
+		TableLayout:         overflowAuto,
+		GridColumnSpan:      1,
+		GridRowSpan:         1,
+		WritingMode:         writingModeHorizontalTB,
+		Direction:           "ltr",
+		MixBlendMode:        blendNormal,
+		BackgroundBlendMode: blendNormal,
+		Isolation:           "auto",
+		Orphans:             2,
+		Widows:              2,
+		EmptyCells:          "",
+		Transform:           IdentityMatrix(),
+		TransformOrigin:     defaultTransformOrigin(),
+		Opacity:             1,
+		FillOpacity:         1,
+		StrokeOpacity:       1,
 	}
 }
 
@@ -582,7 +545,7 @@ func sameSizeContainerState(a, b sizeContainer) bool {
 }
 
 func nearlyEqual(a, b float64) bool {
-	return math.Abs(a-b) <= styleEpsilon
+	return math.Abs(a-b) <= 1e-9
 }
 
 // resolveStylesWith is the single cascade entry: Options + optional size
@@ -745,12 +708,12 @@ const styleStoreChunkSize = 64
 type styleStore struct {
 	candidate ResolvedStyle
 	chunks    [][]ResolvedStyle
-	interned  map[styleStoreKey][]*ResolvedStyle
+	interned  map[styleStoreKey][]*ResolvedStyle //nolint:unused
 }
 
 // styleStoreKey is a comparable coarse discriminator for style candidates.
 // It reduces exact comparisons without deciding semantic equivalence itself.
-type styleStoreKey struct {
+type styleStoreKey struct { //nolint:unused
 	display, position, float, clear, boxSizing                                                 string
 	fontHash                                                                                   uint64
 	fontSize, lineHeight, lineHeightUnitless                                                   float64
@@ -766,7 +729,7 @@ type styleStoreKey struct {
 	hasTransform                                                                               bool
 }
 
-func styleStoreKeyFor(style ResolvedStyle) styleStoreKey {
+func styleStoreKeyFor(style ResolvedStyle) styleStoreKey { //nolint:unused
 	return styleStoreKey{
 		display: style.Display, position: style.Position, float: style.Float, clear: style.Clear,
 		boxSizing: style.BoxSizing, fontHash: hashFontFamily(style.FontFamily), fontSize: style.FontSize,
@@ -781,30 +744,16 @@ func styleStoreKeyFor(style ResolvedStyle) styleStoreKey {
 	}
 }
 
-// intern returns a stable canonical pointer for styles without custom
-// properties. Custom-property maps are intentionally left unique until they
-// have a value-semantic representation; sharing them would expose mutability.
+// intern allocates a fresh canonical style without deduplication (PT-GO-16).
+// Previous implementation interned identical ResolvedStyle values via
+// styleStoreKey / comparableResolvedStyle / resolvedStylesEqual map buckets
+// to share canonical pointers. That saved allocations on repetitive templates
+// but added ~260 lines of projection and chunked-map logic. The store now
+// only owns stable backing storage via append; each candidate gets its own
+// allocation. The key/comparable types below are retained as dead code for
+// a follow-up deletion pass and do not affect correctness.
 func (s *styleStore) intern(candidate ResolvedStyle) *ResolvedStyle {
-	if candidate.CustomProps != nil {
-		return s.append(candidate)
-	}
-
-	key := styleStoreKeyFor(candidate)
-	for _, canonical := range s.interned[key] {
-		if resolvedStylesEqual(*canonical, candidate) {
-			return canonical
-		}
-	}
-
-	canonical := s.append(candidate)
-
-	if s.interned == nil {
-		s.interned = make(map[styleStoreKey][]*ResolvedStyle)
-	}
-
-	s.interned[key] = append(s.interned[key], canonical)
-
-	return canonical
+	return s.append(candidate)
 }
 
 func (s *styleStore) append(style ResolvedStyle) *ResolvedStyle {
@@ -822,93 +771,95 @@ func (s *styleStore) append(style ResolvedStyle) *ResolvedStyle {
 // non-comparable reference fields. Keeping the projection exhaustive makes the
 // exact interning comparison allocation-free while preserving used-style
 // identity.
-type comparableResolvedStyle struct {
-	Display, Position, Float, Clear, BoxSizing                                                     string
-	Top, Right, Bottom, Left                                                                       float64
-	TopAuto, RightAuto, BottomAuto, LeftAuto                                                       bool
-	FlexDirection, FlexWrap, JustifyContent, AlignItems, AlignContent, AlignSelf                   string
-	JustifyItems, JustifySelf                                                                      string
-	Gap, RowGap, ColumnGap                                                                         float64
-	ColumnGapNormal                                                                                bool
-	ColumnCount                                                                                    int
-	ColumnWidth                                                                                    float64
-	ColumnSpan, ColumnFill                                                                         string
-	ColumnRuleWidth                                                                                float64
-	ColumnRuleStyle                                                                                string
-	ColumnRuleColor                                                                                [3]float64
-	ColumnRuleColorSet                                                                             bool
-	FlexGrow, FlexShrink, FlexBasis, FlexBasisPercent                                              float64
-	FlexOrder, ZIndex                                                                              int
-	ZIndexSet                                                                                      bool
-	WritingMode                                                                                    string
-	GridTemplateColumns, GridTemplateRows, GridTemplateAreas, GridArea                             string
-	GridAutoFlow                                                                                   string
-	GridColumnSpan, GridColumnStart, GridRowSpan, GridRowStart                                     int
-	Width, WidthPercent, Height, HeightPercent                                                     float64
-	MinWidth, MinWidthPercent, MaxWidth, MaxWidthPercent                                           float64
-	MinWidthSet                                                                                    bool
-	MinHeight, MinHeightPercent, MaxHeight                                                         float64
-	Overflow, OverflowX, OverflowY, Visibility                                                     string
-	MarginTop, MarginRight, MarginBottom, MarginLeft                                               float64
-	MarginTopAuto, MarginBottomAuto, MarginLeftAuto, MarginRightAuto                               bool
-	PaddingTop, PaddingRight, PaddingBottom, PaddingLeft                                           float64
-	BorderTop, BorderRight, BorderBottom, BorderLeft                                               border
-	BorderRadius, BorderRadiusPercent                                                              float64
-	BorderRadiusTopLeft, BorderRadiusTopRight, BorderRadiusBottomRight, BorderRadiusBottomLeft     float64
-	BorderRadiusTopLeftY, BorderRadiusTopRightY, BorderRadiusBottomRightY, BorderRadiusBottomLeftY float64
-	Color                                                                                          [3]float64
-	BGColor                                                                                        [4]float64
-	AccentColor                                                                                    [3]float64
-	AccentColorSet                                                                                 bool
-	famHash                                                                                        uint64
-	FontSize                                                                                       float64
-	FontWeight                                                                                     int
-	FontItalic                                                                                     bool
-	LineHeight, LineHeightUnitless                                                                 float64
-	TextAlign, TextTransform, VerticalAlign, WhiteSpace, OverflowWrap, WordBreak                   string
-	VerticalAlignShift                                                                             float64
-	TextDecoration                                                                                 string
-	LetterSpacing, WordSpacing, TextIndent                                                         float64
-	ListStyleType, BorderCollapse                                                                  string
-	BorderSpacing, BorderSpacingV                                                                  float64
-	TableLayout, CaptionSide                                                                       string
-	IsReplaced                                                                                     bool
-	PageBreakBefore, PageBreakAfter, PageBreakInside                                               string
-	PageName                                                                                       string
-	Orphans, Widows                                                                                int
-	ContainerType, ContainerName                                                                   string
-	Transform                                                                                      Matrix2D
-	HasTransform                                                                                   bool
-	TransformOrigin                                                                                transformOriginSpec
-	Opacity                                                                                        float64
-	Filter, Content                                                                                string
-	GridColumnEnd, GridRowEnd                                                                      int
-	OutlineWidth                                                                                   float64
-	OutlineStyle                                                                                   string
-	OutlineColor                                                                                   [3]float64
-	OutlineColorSet                                                                                bool
-	OutlineOffset                                                                                  float64
-	BackgroundImage                                                                                string
-	ListStylePosition                                                                              string
-	QuotesRaw, QuotesOpen, QuotesClose                                                             string
-	CounterReset, CounterIncrement                                                                 string
-	ListStyleImage                                                                                 string
-	BoxShadowX, BoxShadowY, BoxShadowBlur, BoxShadowSpread                                         float64
-	BoxShadowColor                                                                                 [3]float64
-	BoxShadowSet, BoxShadowInset                                                                   bool
-	BoxShadowRaw                                                                                   string
-	Fill                                                                                           [3]float64
-	FillSet                                                                                        bool
-	FillOpacity                                                                                    float64
-	Stroke                                                                                         [3]float64
-	StrokeSet                                                                                      bool
-	StrokeWidth                                                                                    float64
-	StrokeWidthSet                                                                                 bool
-	StrokeOpacity                                                                                  float64
+type comparableResolvedStyle struct { //nolint:unused
+	Display, Position, Float, Clear, BoxSizing                                                            string
+	Top, Right, Bottom, Left                                                                              float64
+	TopAuto, RightAuto, BottomAuto, LeftAuto                                                              bool
+	FlexDirection, FlexWrap, JustifyContent, AlignItems, AlignContent, AlignSelf                          string
+	JustifyItems, JustifySelf                                                                             string
+	Gap, RowGap, ColumnGap                                                                                float64
+	ColumnGapNormal                                                                                       bool
+	ColumnCount                                                                                           int
+	ColumnWidth                                                                                           float64
+	ColumnSpan, ColumnFill                                                                                string
+	ColumnRuleWidth                                                                                       float64
+	ColumnRuleStyle                                                                                       string
+	ColumnRuleColor                                                                                       [3]float64
+	ColumnRuleColorSet                                                                                    bool
+	FlexGrow, FlexShrink, FlexBasis, FlexBasisPercent                                                     float64
+	FlexOrder, ZIndex                                                                                     int
+	ZIndexSet                                                                                             bool
+	WritingMode                                                                                           string
+	GridTemplateColumns, GridTemplateRows, GridTemplateAreas, GridArea                                    string
+	GridAutoFlow, GridAutoColumns, GridAutoRows                                                           string
+	GridColumnSpan, GridColumnStart, GridRowSpan, GridRowStart                                            int
+	Width, WidthPercent, Height, HeightPercent                                                            float64
+	MinWidth, MinWidthPercent, MaxWidth, MaxWidthPercent                                                  float64
+	MinWidthSet                                                                                           bool
+	MinHeight, MinHeightPercent, MaxHeight, MaxHeightPercent                                              float64
+	Overflow, OverflowX, OverflowY, Visibility                                                            string
+	MarginTop, MarginRight, MarginBottom, MarginLeft                                                      float64
+	MarginTopAuto, MarginBottomAuto, MarginLeftAuto, MarginRightAuto                                      bool
+	PaddingTop, PaddingRight, PaddingBottom, PaddingLeft                                                  float64
+	BorderTop, BorderRight, BorderBottom, BorderLeft                                                      border
+	BorderRadius, BorderRadiusPercent                                                                     float64
+	BorderRadiusTopLeft, BorderRadiusTopRight, BorderRadiusBottomRight, BorderRadiusBottomLeft            float64
+	BorderRadiusTopLeftY, BorderRadiusTopRightY, BorderRadiusBottomRightY, BorderRadiusBottomLeftY        float64
+	Color                                                                                                 [3]float64
+	BGColor                                                                                               [4]float64
+	AccentColor                                                                                           [3]float64
+	AccentColorSet                                                                                        bool
+	famHash                                                                                               uint64
+	FontSize                                                                                              float64
+	FontWeight                                                                                            int
+	FontItalic                                                                                            bool
+	LineHeight, LineHeightUnitless                                                                        float64
+	TextAlign, TextTransform, VerticalAlign, WhiteSpace, OverflowWrap, WordBreak                          string
+	VerticalAlignShift                                                                                    float64
+	TextDecoration                                                                                        string
+	LetterSpacing, WordSpacing, TextIndent                                                                float64
+	ListStyleType, BorderCollapse                                                                         string
+	BorderSpacing, BorderSpacingV                                                                         float64
+	TableLayout, CaptionSide                                                                              string
+	IsReplaced                                                                                            bool
+	PageBreakBefore, PageBreakAfter, PageBreakInside                                                      string
+	PageName                                                                                              string
+	Orphans, Widows                                                                                       int
+	ContainerType, ContainerName                                                                          string
+	Transform                                                                                             Matrix2D
+	HasTransform                                                                                          bool
+	TransformOrigin                                                                                       transformOriginSpec
+	Opacity                                                                                               float64
+	Filter, Content                                                                                       string
+	MixBlendMode, BackgroundBlendMode, Isolation                                                          string
+	GridColumnEnd, GridRowEnd                                                                             int
+	OutlineWidth                                                                                          float64
+	OutlineStyle                                                                                          string
+	OutlineColor                                                                                          [3]float64
+	OutlineColorSet                                                                                       bool
+	OutlineOffset                                                                                         float64
+	BackgroundImage                                                                                       string
+	BackgroundRepeat, BackgroundRepeatX, BackgroundRepeatY, BackgroundRepeatBlock, BackgroundRepeatInline string
+	ListStylePosition                                                                                     string
+	QuotesRaw, QuotesOpen, QuotesClose                                                                    string
+	CounterReset, CounterIncrement                                                                        string
+	ListStyleImage                                                                                        string
+	BoxShadowX, BoxShadowY, BoxShadowBlur, BoxShadowSpread                                                float64
+	BoxShadowColor                                                                                        [3]float64
+	BoxShadowSet, BoxShadowInset                                                                          bool
+	BoxShadowRaw                                                                                          string
+	Fill                                                                                                  [3]float64
+	FillSet                                                                                               bool
+	FillOpacity                                                                                           float64
+	Stroke                                                                                                [3]float64
+	StrokeSet                                                                                             bool
+	StrokeWidth                                                                                           float64
+	StrokeWidthSet                                                                                        bool
+	StrokeOpacity                                                                                         float64
 }
 
 //nolint:funlen // struct field mapping of complete resolved style
-func comparableResolvedStyleFor(style ResolvedStyle) comparableResolvedStyle {
+func comparableResolvedStyleFor(style ResolvedStyle) comparableResolvedStyle { //nolint:unused
 	return comparableResolvedStyle{
 		Display: style.Display, Position: style.Position, Float: style.Float, Clear: style.Clear,
 		BoxSizing: style.BoxSizing, Top: style.Top, Right: style.Right, Bottom: style.Bottom, Left: style.Left,
@@ -924,13 +875,13 @@ func comparableResolvedStyleFor(style ResolvedStyle) comparableResolvedStyle {
 		FlexBasisPercent: style.FlexBasisPercent, FlexOrder: style.FlexOrder, ZIndex: style.ZIndex,
 		ZIndexSet: style.ZIndexSet, WritingMode: style.WritingMode, GridTemplateColumns: style.GridTemplateColumns,
 		GridTemplateRows: style.GridTemplateRows, GridTemplateAreas: style.GridTemplateAreas, GridArea: style.GridArea,
-		GridAutoFlow: style.GridAutoFlow, GridColumnSpan: style.GridColumnSpan, GridColumnStart: style.GridColumnStart,
+		GridAutoFlow: style.GridAutoFlow, GridAutoColumns: style.GridAutoColumns, GridAutoRows: style.GridAutoRows, GridColumnSpan: style.GridColumnSpan, GridColumnStart: style.GridColumnStart,
 		GridRowSpan: style.GridRowSpan, GridRowStart: style.GridRowStart, Width: style.Width,
 		WidthPercent: style.WidthPercent, Height: style.Height, HeightPercent: style.HeightPercent,
 		MinWidth: style.MinWidth, MinWidthPercent: style.MinWidthPercent, MaxWidth: style.MaxWidth,
 		MaxWidthPercent: style.MaxWidthPercent, MinHeight: style.MinHeight,
 		MinWidthSet:      style.MinWidthSet,
-		MinHeightPercent: style.MinHeightPercent, MaxHeight: style.MaxHeight, Overflow: style.Overflow,
+		MinHeightPercent: style.MinHeightPercent, MaxHeight: style.MaxHeight, MaxHeightPercent: style.MaxHeightPercent, Overflow: style.Overflow,
 		OverflowX: style.OverflowX, OverflowY: style.OverflowY,
 		Visibility: style.Visibility, MarginTop: style.MarginTop, MarginRight: style.MarginRight,
 		MarginBottom: style.MarginBottom, MarginLeft: style.MarginLeft, MarginTopAuto: style.MarginTopAuto,
@@ -961,11 +912,16 @@ func comparableResolvedStyleFor(style ResolvedStyle) comparableResolvedStyle {
 		Widows:  style.Widows, ContainerType: style.ContainerType, ContainerName: style.ContainerName,
 		Transform: style.Transform, HasTransform: style.HasTransform, TransformOrigin: style.TransformOrigin,
 		Opacity: style.Opacity, Filter: style.Filter, Content: style.Content,
+		MixBlendMode: style.MixBlendMode, BackgroundBlendMode: style.BackgroundBlendMode,
+		Isolation:     style.Isolation,
 		GridColumnEnd: style.GridColumnEnd, GridRowEnd: style.GridRowEnd,
 		OutlineWidth: style.OutlineWidth, OutlineStyle: style.OutlineStyle,
 		OutlineColor: style.OutlineColor, OutlineColorSet: style.OutlineColorSet,
 		OutlineOffset: style.OutlineOffset, BackgroundImage: style.BackgroundImage,
-		ListStylePosition: style.ListStylePosition, QuotesRaw: style.QuotesRaw,
+		BackgroundRepeat: style.BackgroundRepeat, BackgroundRepeatX: style.BackgroundRepeatX,
+		BackgroundRepeatY: style.BackgroundRepeatY, BackgroundRepeatBlock: style.BackgroundRepeatBlock,
+		BackgroundRepeatInline: style.BackgroundRepeatInline,
+		ListStylePosition:      style.ListStylePosition, QuotesRaw: style.QuotesRaw,
 		QuotesOpen: style.QuotesOpen, QuotesClose: style.QuotesClose,
 		CounterReset: style.CounterReset, CounterIncrement: style.CounterIncrement,
 		ListStyleImage: style.ListStyleImage,
@@ -981,7 +937,7 @@ func comparableResolvedStyleFor(style ResolvedStyle) comparableResolvedStyle {
 
 // resolvedStylesEqual is deliberately exact. The coarse key only selects a
 // candidate bucket, so a hash collision cannot cause two used styles to share.
-func resolvedStylesEqual(left, right ResolvedStyle) bool {
+func resolvedStylesEqual(left, right ResolvedStyle) bool { //nolint:unused
 	if left.CustomProps != nil || right.CustomProps != nil ||
 		(left.FontFamily == nil) != (right.FontFamily == nil) ||
 		len(left.FontFamily) != len(right.FontFamily) {

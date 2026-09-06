@@ -184,37 +184,52 @@ func clearCornerRadiiY(style *ResolvedStyle) {
 	style.BorderRadiusBottomLeftY = 0
 }
 
-const (
-	borderRadiusPercentBasis = 100.0
-	borderRadiusHalf         = 2.0
-)
+const borderRadiusPercentBasis = 100.0
 
 // usedBorderRadiiXY resolves both axes of a box's corner ellipses together.
-// Percent radii resolve against width on the X axis and height on the Y axis
-// per CSS Backgrounds and Borders Module Level 3.
+// Percent radii resolve against width on X and height on Y. Absolute circular
+// shorthand (Y left 0) copies X onto Y before a unified CSS overlap scale so
+// border-radius:999px on a wide short pill becomes half-height circles, not
+// half-width ellipses.
 func usedBorderRadiiXY(sty ResolvedStyle, width, height float64) ([4]float64, [4]float64) {
-	radiusX := borderRadiusValues(sty, width, height)
-	clampBorderRadii(radiusX[:], width, height)
-	scaleBorderRadii(radiusX[:], width, height)
-
-	var radiusY [4]float64
+	var radiusX, radiusY [4]float64
 
 	if sty.BorderRadiusPercent >= 0 {
+		pctX := width * sty.BorderRadiusPercent / borderRadiusPercentBasis
 		pctY := height * sty.BorderRadiusPercent / borderRadiusPercentBasis
-		for i := range radiusY {
+
+		for i := range radiusX {
+			radiusX[i] = pctX
 			radiusY[i] = pctY
 		}
 
-		clampBorderRadiiY(radiusY[:], height)
-		scaleBorderRadiiY(radiusY[:], height)
-	} else {
-		radiusY = [4]float64{
-			sty.BorderRadiusTopLeftY, sty.BorderRadiusTopRightY,
-			sty.BorderRadiusBottomRightY, sty.BorderRadiusBottomLeftY,
-		}
-		clampBorderRadiiY(radiusY[:], height)
-		scaleBorderRadiiY(radiusY[:], height)
+		scaleRadiiXY(radiusX[:], radiusY[:], width, height)
+
+		return radiusX, radiusY
 	}
+
+	radiusX = borderRadiusValues(sty, width, height)
+	radiusY = [4]float64{
+		sty.BorderRadiusTopLeftY, sty.BorderRadiusTopRightY,
+		sty.BorderRadiusBottomRightY, sty.BorderRadiusBottomLeftY,
+	}
+
+	for idx := range radiusX {
+		if radiusX[idx] < 0 {
+			radiusX[idx] = 0
+		}
+
+		if radiusY[idx] < 0 {
+			radiusY[idx] = 0
+		}
+
+		// Circular corner: omitted Y means the same absolute radius as X.
+		if radiusY[idx] <= 0 && radiusX[idx] > 0 {
+			radiusY[idx] = radiusX[idx]
+		}
+	}
+
+	scaleRadiiXY(radiusX[:], radiusY[:], width, height)
 
 	return radiusX, radiusY
 }
@@ -253,74 +268,39 @@ func borderRadiusValues(sty ResolvedStyle, width, _ float64) [4]float64 {
 	return radii
 }
 
-//nolint:wsl // CSS radius clamping is a compact geometry loop
-func clampBorderRadii(radii []float64, width, _ float64) {
-	for i := range radii {
-		if radii[i] < 0 {
-			radii[i] = 0
-		}
-		if radii[i] > width/borderRadiusHalf {
-			radii[i] = width / borderRadiusHalf
-		}
-	}
-}
-
-//nolint:wsl,mnd // CSS adjacent-radius scaling is expressed as two horizontal edge sums
-func scaleBorderRadii(radii []float64, width, _ float64) {
-	if len(radii) < 4 {
+// scaleRadiiXY applies the CSS Backgrounds Level 3 overlap reduction: when
+// adjacent corner radii on any edge exceed that edge's length, every radius
+// (both axes) is scaled by the same factor.
+//
+// CSS adjacent-radius scaling is four edge sums on two axes.
+func scaleRadiiXY(radiusX, radiusY []float64, width, height float64) {
+	if len(radiusX) < borderRadiusValueCount || len(radiusY) < borderRadiusValueCount {
 		return
 	}
 
 	scale := 1.0
+
 	for _, edge := range []struct {
 		sum   float64
 		limit float64
 	}{
-		{sum: radii[0] + radii[1], limit: width},
-		{sum: radii[3] + radii[2], limit: width},
+		{sum: radiusX[0] + radiusX[1], limit: width},
+		{sum: radiusX[3] + radiusX[2], limit: width},
+		{sum: radiusY[0] + radiusY[3], limit: height},
+		{sum: radiusY[1] + radiusY[2], limit: height},
 	} {
 		if edge.sum > edge.limit && edge.sum > 0 && edge.limit/edge.sum < scale {
 			scale = edge.limit / edge.sum
 		}
 	}
-	if scale < 1 {
-		for i := range radii {
-			radii[i] *= scale
-		}
-	}
-}
 
-func clampBorderRadiiY(radii []float64, height float64) {
-	limit := height / borderRadiusHalf
-
-	for idx := range radii {
-		if radii[idx] < 0 {
-			radii[idx] = 0
-		}
-
-		if radii[idx] > limit {
-			radii[idx] = limit
-		}
-	}
-}
-
-func scaleBorderRadiiY(radii []float64, height float64) {
-	if len(radii) < borderRadiusValueCount {
+	if scale >= 1 {
 		return
 	}
 
-	scale := 1.0
-
-	for _, sum := range []float64{radii[0] + radii[3], radii[1] + radii[2]} {
-		if sum > height && sum > 0 && height/sum < scale {
-			scale = height / sum
-		}
-	}
-
-	if scale < 1 {
-		for idx := range radii {
-			radii[idx] *= scale
-		}
+	for i := range borderRadiusValueCount {
+		radiusX[i] *= scale
+		radiusY[i] *= scale
 	}
 }
 

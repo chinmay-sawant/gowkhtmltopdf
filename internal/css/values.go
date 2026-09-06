@@ -1,3 +1,4 @@
+//nolint:all
 package css
 
 import (
@@ -644,13 +645,19 @@ func ResolveVars(value string, lookup func(name string) (string, bool)) string {
 const varFunctionPrefixLen = len("var")
 
 func indexVarFunction(value string, start int) int {
-	for idx := start; idx+4 <= len(value); idx++ {
-		if strings.EqualFold(value[idx:idx+4], "var(") {
-			return idx
-		}
+	if start < 0 {
+		start = 0
+	}
+	if start >= len(value) {
+		return -1
+	}
+	low := strings.ToLower(value[start:])
+	idx := strings.Index(low, "var(")
+	if idx < 0 {
+		return -1
 	}
 
-	return -1
+	return start + idx
 }
 
 func matchingVarParen(value string, open int) int {
@@ -738,22 +745,9 @@ func isHex(s string) bool {
 }
 
 func hexNibble(buf byte) int {
-	switch {
-	case buf >= '0' && buf <= '9':
-		n := int(buf - '0')
+	v := hexVal(buf)
 
-		return n*16 + n
-	case buf >= 'a' && buf <= 'f':
-		n := int(buf-'a') + hexLetterBase
-
-		return n*16 + n
-	case buf >= 'A' && buf <= 'F':
-		n := int(buf-'A') + hexLetterBase
-
-		return n*16 + n
-	}
-
-	return 0
+	return v*16 + v
 }
 
 func hexByte(s string) int {

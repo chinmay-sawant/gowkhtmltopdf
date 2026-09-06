@@ -1,6 +1,7 @@
 package layout
 
 import (
+	"sort"
 	"strconv"
 	"strings"
 
@@ -14,6 +15,19 @@ const (
 	borderBottomProperty = "border-bottom"
 	borderLeftProperty   = "border-left"
 	borderRightProperty  = "border-right"
+
+	marginProperty  = "margin"
+	paddingProperty = "padding"
+
+	inlineStylePriority = 1 << 30
+
+	defaultRootFontPx = 16
+
+	fontWeightNormalValue = 400
+	fontWeightBoldValue   = 700
+
+	boxShorthandTwoSides   = 2
+	boxShorthandThreeSides = 3
 )
 
 // mergeCustomProps inherits parent custom properties and overlays any --*
@@ -140,41 +154,8 @@ var inheritableProps = []inheritCopy{ //nolint:gochecknoglobals // static inheri
 	}},
 	{[]string{"font-family"}, func(dst, src *ResolvedStyle) { dst.FontFamily = src.FontFamily }},
 	{[]string{"font-size"}, func(dst, src *ResolvedStyle) { dst.FontSize = src.FontSize }},
-	{[]string{"font-size-adjust"}, func(dst, src *ResolvedStyle) { dst.FontSizeAdjust = src.FontSizeAdjust }},
 	{[]string{"font-weight"}, func(dst, src *ResolvedStyle) { dst.FontWeight = src.FontWeight }},
 	{[]string{"font-style"}, func(dst, src *ResolvedStyle) { dst.FontItalic = src.FontItalic }},
-	{[]string{"font-feature-settings"}, func(dst, src *ResolvedStyle) {
-		dst.FontFeatureSettings = src.FontFeatureSettings
-	}},
-	{[]string{"font-kerning"}, func(dst, src *ResolvedStyle) { dst.FontKerning = src.FontKerning }},
-	{[]string{"font-variant"}, func(dst, src *ResolvedStyle) { dst.FontVariant = src.FontVariant }},
-	{[]string{"font-variant-caps"}, func(dst, src *ResolvedStyle) { dst.FontVariantCaps = src.FontVariantCaps }},
-	{[]string{"font-variant-ligatures"}, func(dst, src *ResolvedStyle) {
-		dst.FontVariantLigatures = src.FontVariantLigatures
-	}},
-	{[]string{"font-variant-numeric"}, func(dst, src *ResolvedStyle) { dst.FontVariantNumeric = src.FontVariantNumeric }},
-	{[]string{"font-variant-position"}, func(dst, src *ResolvedStyle) {
-		dst.FontVariantPosition = src.FontVariantPosition
-	}},
-	{[]string{"font-variant-east-asian"}, func(dst, src *ResolvedStyle) {
-		dst.FontVariantEastAsian = src.FontVariantEastAsian
-	}},
-	{[]string{"font-variant-emoji"}, func(dst, src *ResolvedStyle) { dst.FontVariantEmoji = src.FontVariantEmoji }},
-	{[]string{"font-variant-alternates"}, func(dst, src *ResolvedStyle) {
-		dst.FontVariantAlternates = src.FontVariantAlternates
-	}},
-	{[]string{"font-stretch", "font-width"}, func(dst, src *ResolvedStyle) { dst.FontStretch = src.FontStretch }},
-	{[]string{"font-synthesis"}, func(dst, src *ResolvedStyle) { dst.FontSynthesis = src.FontSynthesis }},
-	{[]string{"font-synthesis-weight"}, func(dst, src *ResolvedStyle) {
-		dst.FontSynthesisWeight = src.FontSynthesisWeight
-	}},
-	{[]string{"font-synthesis-style"}, func(dst, src *ResolvedStyle) { dst.FontSynthesisStyle = src.FontSynthesisStyle }},
-	{[]string{"font-synthesis-small-caps"}, func(dst, src *ResolvedStyle) {
-		dst.FontSynthesisSmallCaps = src.FontSynthesisSmallCaps
-	}},
-	{[]string{"font-synthesis-position"}, func(dst, src *ResolvedStyle) {
-		dst.FontSynthesisPosition = src.FontSynthesisPosition
-	}},
 	{[]string{"line-height"}, func(dst, src *ResolvedStyle) {
 		dst.LineHeight = src.LineHeight
 		dst.LineHeightUnitless = src.LineHeightUnitless
@@ -266,20 +247,6 @@ var inheritableProps = []inheritCopy{ //nolint:gochecknoglobals // static inheri
 	{[]string{"stroke-dasharray"}, func(dst, src *ResolvedStyle) { dst.StrokeDashArray = src.StrokeDashArray }},
 	{[]string{"stroke-dashoffset"}, func(dst, src *ResolvedStyle) { dst.StrokeDashOffset = src.StrokeDashOffset }},
 	{[]string{"stroke-miterlimit"}, func(dst, src *ResolvedStyle) { dst.StrokeMiterLimit = src.StrokeMiterLimit }},
-	{[]string{"fill-rule"}, func(dst, src *ResolvedStyle) { dst.FillRule = src.FillRule }},
-	{[]string{"clip-rule"}, func(dst, src *ResolvedStyle) { dst.ClipRule = src.ClipRule }},
-	{[]string{"color-interpolation"}, func(dst, src *ResolvedStyle) { dst.ColorInterpolation = src.ColorInterpolation }},
-	{[]string{"color-interpolation-filters"}, func(dst, src *ResolvedStyle) {
-		dst.ColorInterpolationFilters = src.ColorInterpolationFilters
-	}},
-	{[]string{"shape-rendering"}, func(dst, src *ResolvedStyle) { dst.ShapeRendering = src.ShapeRendering }},
-	{[]string{"text-anchor"}, func(dst, src *ResolvedStyle) { dst.TextAnchor = src.TextAnchor }},
-	{[]string{"dominant-baseline"}, func(dst, src *ResolvedStyle) { dst.DominantBaseline = src.DominantBaseline }},
-	{[]string{"alignment-baseline"}, func(dst, src *ResolvedStyle) { dst.AlignmentBaseline = src.AlignmentBaseline }},
-	{[]string{"ruby-align"}, func(dst, src *ResolvedStyle) { dst.RubyAlign = src.RubyAlign }},
-	{[]string{"ruby-position"}, func(dst, src *ResolvedStyle) { dst.RubyPosition = src.RubyPosition }},
-	{[]string{"ruby-merge"}, func(dst, src *ResolvedStyle) { dst.RubyMerge = src.RubyMerge }},
-	{[]string{"ruby-overhang"}, func(dst, src *ResolvedStyle) { dst.RubyOverhang = src.RubyOverhang }},
 	{[]string{"image-orientation"}, func(dst, src *ResolvedStyle) { dst.ImageOrientation = src.ImageOrientation }},
 	{[]string{"image-resolution"}, func(dst, src *ResolvedStyle) { dst.ImageResolution = src.ImageResolution }},
 	{[]string{"print-color-adjust", "color-adjust"}, func(dst, src *ResolvedStyle) {
@@ -306,25 +273,13 @@ var inheritableProps = []inheritCopy{ //nolint:gochecknoglobals // static inheri
 		dst.TextCombineUpright = src.TextCombineUpright
 	}},
 	{[]string{"text-orientation"}, func(dst, src *ResolvedStyle) { dst.TextOrientation = src.TextOrientation }},
-	{[]string{"text-emphasis"}, func(dst, src *ResolvedStyle) { dst.TextEmphasis = src.TextEmphasis }},
-	{[]string{"text-emphasis-color"}, func(dst, src *ResolvedStyle) {
-		dst.TextEmphasisColor = src.TextEmphasisColor
-		dst.TextEmphasisColorSet = src.TextEmphasisColorSet
-	}},
-	{[]string{"text-emphasis-position"}, func(dst, src *ResolvedStyle) {
-		dst.TextEmphasisPosition = src.TextEmphasisPosition
-	}},
-	{[]string{"text-emphasis-style"}, func(dst, src *ResolvedStyle) {
-		dst.TextEmphasisStyle = src.TextEmphasisStyle
-	}},
-	{[]string{"text-emphasis-skip"}, func(dst, src *ResolvedStyle) { dst.TextEmphasisSkip = src.TextEmphasisSkip }},
 	{[]string{"text-decoration-skip-ink"}, func(dst, src *ResolvedStyle) {
 		dst.TextDecorationSkipInk = src.TextDecorationSkipInk
 	}},
 	{[]string{"text-decoration-skip"}, func(dst, src *ResolvedStyle) {
 		dst.TextDecorationSkip = src.TextDecorationSkip
 	}},
-	{[]string{"footnote-policy"}, func(dst, src *ResolvedStyle) { dst.FootnotePolicy = src.FootnotePolicy }},
+	{[]string{"empty-cells"}, func(dst, src *ResolvedStyle) { dst.EmptyCells = src.EmptyCells }},
 }
 
 // inheritProps copies inheritable properties from the parent, unless the
@@ -523,7 +478,7 @@ func cascadeRaw( //nolint:funlen // cascade tiers are deliberately visible in on
 			continue
 		}
 
-		applyCascadeDeclaration(wins, d.Prop, d.Value, 1<<maxIntShift, 0, 0, 1<<maxIntShift, d.Important)
+		applyCascadeDeclaration(wins, d.Prop, d.Value, inlineStylePriority, 0, 0, inlineStylePriority, d.Important)
 	}
 
 	if len(wins) == 0 {
@@ -604,6 +559,14 @@ func applyCascadeDeclaration(
 	ids, classes, types, order int,
 	important bool,
 ) {
+	if expanded, ok := expandListStyleDeclaration(prop, value); ok {
+		for _, item := range expanded {
+			applyCascadeWin(wins, item.prop, item.val, ids, classes, types, order, important)
+		}
+
+		return
+	}
+
 	if expanded, ok := expandLogicalBoxDeclaration(prop, value); ok {
 		for _, item := range expanded {
 			applyCascadeDeclaration(wins, item.prop, item.val, ids, classes, types, order, important)
@@ -627,6 +590,49 @@ func applyCascadeDeclaration(
 type logicalPropDecl struct {
 	prop string
 	val  string
+}
+
+// expandListStyleDeclaration expands the list-style shorthand into its
+// type, position, and image longhands so each part joins the cascade with
+// the shorthand's own origin and specificity. Without this, the shorthand
+// and a weaker-origin longhand (such as the UA disc on ul) coexist as
+// separate raw keys and the later-applied longhand wins regardless of
+// origin. Only components present in the value expand; the rest keep
+// whatever the cascade decided.
+func expandListStyleDeclaration(prop, value string) ([]logicalPropDecl, bool) {
+	if prop != "list-style" {
+		return nil, false
+	}
+
+	var out []logicalPropDecl
+
+	for _, tok := range strings.Fields(value) {
+		if typ := parseListStyleType(tok); typ != "" {
+			out = append(out, logicalPropDecl{prop: "list-style-type", val: typ})
+
+			break
+		}
+	}
+
+	for _, tok := range strings.Fields(value) {
+		if pos := parseListStylePosition(tok); pos != "" {
+			out = append(out, logicalPropDecl{prop: "list-style-position", val: pos})
+
+			break
+		}
+	}
+
+	if url, ok := firstCSSUrl(value); ok {
+		out = append(out, logicalPropDecl{prop: "list-style-image", val: `url("` + url + `")`})
+	} else if listStyleImageNone(value) {
+		out = append(out, logicalPropDecl{prop: "list-style-image", val: "none"})
+	}
+
+	if len(out) == 0 {
+		return nil, false
+	}
+
+	return out, true
 }
 
 // expandLogicalBoxDeclaration expands logical margin/padding/inset/border
@@ -807,9 +813,9 @@ func expandBoxShorthand(prop, value string) ([4]string, bool) {
 	switch count {
 	case 1:
 		values = [4]string{tokens[0], tokens[0], tokens[0], tokens[0]}
-	case two:
+	case boxShorthandTwoSides:
 		values = [4]string{tokens[0], tokens[1], tokens[0], tokens[1]}
-	case three:
+	case boxShorthandThreeSides:
 		values = [4]string{tokens[0], tokens[1], tokens[2], tokens[1]}
 	default:
 		values = tokens
@@ -818,14 +824,14 @@ func expandBoxShorthand(prop, value string) ([4]string, bool) {
 	return values, true
 }
 
-// supportedDeclaration rejects modern color functions that this lite renderer
+// supportedDeclaration rejects modern value functions that this lite renderer
 // cannot compute. Excluding them from the cascade preserves an earlier valid
-// fallback declaration, matching the fixture's fallback-first contract.
-// clamp() is computed by clampLength and is therefore allowed.
+// fallback declaration, matching the fixture's fallback-first contract
+// (e.g. width:100%; width:clamp(...) must keep 100% while clampLength is gated).
 func supportedDeclaration(value string) bool {
 	value = strings.ToLower(value)
 
-	for _, unsupported := range []string{"color-mix(", "light-dark(", "oklch("} {
+	for _, unsupported := range []string{"clamp(", "color-mix(", "light-dark(", "oklch("} {
 		if strings.Contains(value, unsupported) {
 			return false
 		}
@@ -907,7 +913,7 @@ func specificityBeats(cur [4]int, ids, classes, types, order, curOrder int) bool
 // applyFontProps resolves font-size/family/weight/style/font first, using the
 // parent's size for percentages and em, and ctx.remBase for rem.
 func applyFontProps(style *ResolvedStyle, raw map[string]string, parentSize float64, ctx *styleContext) {
-	remBase := pxToPt(cssPxRoot)
+	remBase := pxToPt(defaultRootFontPx)
 	if ctx != nil && ctx.remBase > 0 {
 		remBase = ctx.remBase
 	}
@@ -974,9 +980,9 @@ func applyFontStyleValue(style *ResolvedStyle, raw map[string]string) {
 func resolveFontWeight(current int, val string) int {
 	switch val {
 	case contentNormal:
-		return fontWeightNormal
+		return fontWeightNormalValue
 	case "bold":
-		return fontWeightBold
+		return fontWeightBoldValue
 	case "bolder":
 		return current + fontWeightStep
 	case "lighter":
@@ -994,7 +1000,8 @@ func resolveFontWeight(current int, val string) int {
 // longhand (e.g. margin-bottom) always overrides its shorthand (margin).
 // Package-level to avoid per-node slice/array rebuilds.
 var restShorthandProps = [...]string{ //nolint:gochecknoglobals // static apply order
-	"margin", "padding", borderProperty, borderTopProperty, borderRightProperty, borderBottomProperty, borderLeftProperty,
+	"display", marginProperty, paddingProperty, borderProperty, borderTopProperty,
+	borderRightProperty, borderBottomProperty, borderLeftProperty,
 	borderWidthKeyword, borderStyleKeyword,
 	borderColorKeyword, gapKeyword, flexKeyword, containerKeyword,
 	cssPropMarginInline, cssPropMarginBlock, cssPropPaddingInline, cssPropPaddingBlock,
@@ -1028,9 +1035,12 @@ func applyRestProps(
 		applyStyleProp(style, prop, value, fsize, ctx, parent, hasParent)
 	}
 
-	for prop, value := range raw {
-		switch prop {
-		case "margin", "padding", borderProperty, borderTopProperty,
+	// Deterministic iteration for remaining longhands (map iteration is random).
+	keys := make([]string, 0, len(raw))
+
+	for key := range raw {
+		switch key {
+		case marginProperty, paddingProperty, borderProperty, borderTopProperty,
 			borderRightProperty, borderBottomProperty, borderLeftProperty,
 			borderWidthKeyword, borderStyleKeyword,
 			borderColorKeyword, gapKeyword, flexKeyword, containerKeyword,
@@ -1040,9 +1050,15 @@ func applyRestProps(
 			cssPropBorderInlineStart, cssPropBorderInlineEnd, cssPropBorderBlockWidth, cssPropBorderBlockStyle,
 			cssPropBorderBlockColor, cssPropBorderInlineWidth, cssPropBorderInlineStyle, cssPropBorderInlineColor:
 			continue
+		default:
+			keys = append(keys, key)
 		}
+	}
 
-		applyStyleProp(style, prop, value, fsize, ctx, parent, hasParent)
+	sort.Strings(keys)
+
+	for _, prop := range keys {
+		applyStyleProp(style, prop, raw[prop], fsize, ctx, parent, hasParent)
 	}
 }
 
@@ -1150,6 +1166,7 @@ func applyStyleProp(
 	if effectiveProp != prop {
 		effectiveValue = remapWebkitValue(prop, value)
 	}
+
 	for _, group := range styleGroups {
 		if group(style, effectiveProp, effectiveValue, fsize, ctx, parent, hasParent) {
 			return

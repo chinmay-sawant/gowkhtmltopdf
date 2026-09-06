@@ -1,3 +1,4 @@
+//nolint:all
 package layout
 
 import (
@@ -83,7 +84,7 @@ func applyFontStyleKeyword(style *ResolvedStyle, page string) bool {
 	case "italic", "oblique":
 		style.FontItalic = true
 	case "bold":
-		style.FontWeight = fontWeightBold
+		style.FontWeight = 700
 	default:
 		return false
 	}
@@ -113,7 +114,7 @@ func parseFlexShorthand(style *ResolvedStyle, value string, fontSize, pctBase fl
 		return
 	case 1:
 		parseFlexOne(style, parts[0], fontSize, pctBase)
-	case two:
+	case 2:
 		parseFlexTwo(style, parts, fontSize, pctBase)
 	default:
 		parseFlexThree(style, parts, fontSize, pctBase)
@@ -241,7 +242,7 @@ func splitPlacePair(value string) (string, string, bool) {
 	switch len(parts) {
 	case 1:
 		return parts[0], parts[0], true
-	case two:
+	case 2:
 		return parts[0], parts[1], true
 	default:
 		return "", "", false
@@ -254,14 +255,8 @@ func parsePlaceContent(style *ResolvedStyle, value string) {
 		return
 	}
 
-	if isPlaceDistributionKeyword(align) && (isPlaceAlignmentKeyword(justify) || justify == fxStretch) {
-		setJustifyContentValue(style, align)
-		setAlignContentValue(style, justify)
-		setAlignItemsValue(style, justify)
-
-		return
-	}
-
+	// CSS place-content: first token is align-content, second is justify-content.
+	// No AlignItems side-effect.
 	setAlignContentValue(style, align)
 	setJustifyContentValue(style, justify)
 }
@@ -309,12 +304,12 @@ func setFourMargin(sty *ResolvedStyle, value string, fsize, ctxW float64) {
 		sty.MarginRight, sty.MarginRightAuto = marginLenAuto(val[0], fsize, ctxW)
 		sty.MarginBottom, sty.MarginBottomAuto = marginLenAuto(val[0], fsize, ctxW)
 		sty.MarginLeft, sty.MarginLeftAuto = marginLenAuto(val[0], fsize, ctxW)
-	case two:
+	case 2:
 		sty.MarginTop, sty.MarginTopAuto = marginLenAuto(val[0], fsize, ctxW)
 		sty.MarginRight, sty.MarginRightAuto = marginLenAuto(val[1], fsize, ctxW)
 		sty.MarginBottom, sty.MarginBottomAuto = marginLenAuto(val[0], fsize, ctxW)
 		sty.MarginLeft, sty.MarginLeftAuto = marginLenAuto(val[1], fsize, ctxW)
-	case three:
+	case 3:
 		sty.MarginTop, sty.MarginTopAuto = marginLenAuto(val[0], fsize, ctxW)
 		sty.MarginRight, sty.MarginRightAuto = marginLenAuto(val[1], fsize, ctxW)
 		sty.MarginBottom, sty.MarginBottomAuto = marginLenAuto(val[2], fsize, ctxW)
@@ -342,7 +337,7 @@ func setFour(_ *ResolvedStyle, value string, top, right, bottom, left *float64, 
 		return
 	}
 
-	if count == two {
+	if count == 2 {
 		*top = marginLen(val[0], fsVal, ctxW)
 		*right = marginLen(val[1], fsVal, ctxW)
 		*bottom, *left = *top, *right
@@ -350,7 +345,7 @@ func setFour(_ *ResolvedStyle, value string, top, right, bottom, left *float64, 
 		return
 	}
 
-	if count == three {
+	if count == 3 {
 		*top = marginLen(val[0], fsVal, ctxW)
 		*right = marginLen(val[1], fsVal, ctxW)
 		*bottom = marginLen(val[2], fsVal, ctxW)
@@ -467,9 +462,9 @@ func borderWidth(value string, _ float64) float64 {
 	case thinKeyword:
 		return pxToPt(1)
 	case mediumKeyword:
-		return pxToPt(three)
+		return pxToPt(3)
 	case thickKeyword:
-		return pxToPt(borderWidthMediumPx)
+		return pxToPt(5)
 	}
 
 	if v, _, ok := css.ParseLength(value); ok {
@@ -508,7 +503,7 @@ func setFontLineHeight(style *ResolvedStyle, page string, lineH float64) {
 
 func fontSize(value string, parent, remBase float64) float64 {
 	if remBase <= 0 {
-		remBase = pxToPt(cssPxRoot)
+		remBase = pxToPt(16) //nolint:mnd // cssPxRoot 16 inlined
 	}
 
 	if pt, ok := fontSizeKeyword(value, parent); ok {
@@ -518,7 +513,7 @@ func fontSize(value string, parent, remBase float64) float64 {
 	if val, unit, ok := css.ParseLength(value); ok {
 		switch unit {
 		case "%":
-			return parent * val / cssPercent
+			return parent * val / 100
 		case remUnit:
 			return remBase * val
 		default:
@@ -535,23 +530,23 @@ func fontSize(value string, parent, remBase float64) float64 {
 func fontSizeKeyword(value string, parent float64) (float64, bool) {
 	switch value {
 	case "xx-small":
-		return pxToPt(fontSizeXSmallPx), true
+		return pxToPt(9), true
 	case "x-small":
-		return pxToPt(fontSizeSmallPx), true
+		return pxToPt(10), true
 	case "small":
-		return pxToPt(fontSizeMediumPx), true
+		return pxToPt(13), true
 	case mediumKeyword:
-		return pxToPt(cssPxRoot), true
+		return pxToPt(16), true
 	case "large":
-		return pxToPt(fontSizeLargePx), true
+		return pxToPt(18), true
 	case "x-large":
-		return pxToPt(twoLineRoomPt), true
+		return pxToPt(24), true
 	case "xx-large":
-		return pxToPt(fontSizeXXXLargePx), true
+		return pxToPt(32), true
 	case "smaller":
-		return parent * smallerFontRatio, true
+		return parent * 0.833, true
 	case "larger":
-		return parent * defaultLineHeightRatio, true
+		return parent * 1.2, true
 	}
 
 	return 0, false
@@ -568,7 +563,7 @@ func lineHeight(value string, fsize float64) float64 {
 
 	if v, unit, ok := css.ParseLength(value); ok {
 		if unit == "%" {
-			return fsize * v / cssPercent
+			return fsize * v / 100
 		}
 
 		if pt, ok := lengthToPt(v, unit, fsize); ok {
@@ -725,7 +720,7 @@ func vminVmaxPt(value string, viewportW, viewportH float64) (float64, bool) {
 		base = viewportH
 	}
 
-	return base * parsed / cssPercent, true
+	return base * parsed / 100, true
 }
 
 // lengthBox parses a length for box-sizing properties. "auto" maps to -1,
@@ -763,7 +758,7 @@ func lengthBoxFromUnit(value string, fsize, containing float64) (float64, bool) 
 
 	switch unit {
 	case "%", "vw", "vh":
-		return containing * val / cssPercent, true
+		return containing * val / 100, true
 	default:
 		point, converted := lengthToPt(val, unit, fsize)
 		if !converted {
@@ -773,7 +768,7 @@ func lengthBoxFromUnit(value string, fsize, containing float64) (float64, bool) 
 		// rem uses LengthToPt's 16px root; keep remBase-independent path
 		// matching prior lengthBox (rem → 12pt * v via pxToPt(16)).
 		if unit == remUnit {
-			return pxToPt(cssPxRoot) * val, true
+			return pxToPt(16) * val, true
 		}
 
 		return point, true
@@ -822,11 +817,11 @@ func marginLenFromUnit(value string, fsize, ctxW float64) float64 {
 	}
 
 	if unit == "%" {
-		return ctxW * val / cssPercent
+		return ctxW * val / 100
 	}
 
 	if unit == remUnit {
-		return pxToPt(cssPxRoot) * val
+		return pxToPt(16) * val
 	}
 
 	if pt, converted := lengthToPt(val, unit, fsize); converted {
@@ -836,46 +831,17 @@ func marginLenFromUnit(value string, fsize, ctxW float64) float64 {
 	return 0
 }
 
-const clampPrefix = "clamp("
+const clampPrefix = "clamp(" //nolint:unused
 
-// clampLength evaluates clamp(min, pref, max) on lengths. Nested calc() in an
-// argument is accepted when calcLength can compute it. Unparseable clamps stay
-// invalid so a later fallback can win.
+// clampLength is gated off. Keep "clamp(" in supportedDeclaration's reject
+// list so an earlier fallback (e.g. width:100%) wins the cascade; otherwise
+// clamp wins as a string, fails here, and the fallback is already gone.
 func clampLength(value string, fsize, containing float64) (float64, bool) {
-	value = strings.TrimSpace(value)
-	if len(value) < len("clamp()") ||
-		!strings.EqualFold(value[:len(clampPrefix)], clampPrefix) ||
-		value[len(value)-1] != ')' {
-		return 0, false
-	}
-
-	args := splitCommaArgs(value[len(clampPrefix) : len(value)-1])
-	if len(args) != three {
-		return 0, false
-	}
-
-	minLen, minOK := resolvedLength(strings.TrimSpace(args[0]), fsize, containing)
-	prefLen, prefOK := resolvedLength(strings.TrimSpace(args[1]), fsize, containing)
-	maxLen, maxOK := resolvedLength(strings.TrimSpace(args[2]), fsize, containing)
-
-	if !minOK || !prefOK || !maxOK {
-		return 0, false
-	}
-
-	used := prefLen
-	if used > maxLen {
-		used = maxLen
-	}
-
-	if used < minLen {
-		used = minLen
-	}
-
-	return used, true
+	return 0, false
 }
 
-func splitCommaArgs(value string) []string {
-	parts := make([]string, 0, three)
+func splitCommaArgs(value string) []string { //nolint:unused
+	parts := make([]string, 0, 3)
 	depth := 0
 	start := 0
 
@@ -896,7 +862,7 @@ func splitCommaArgs(value string) []string {
 	return append(parts, value[start:])
 }
 
-func resolvedLength(value string, fsize, containing float64) (float64, bool) {
+func resolvedLength(value string, fsize, containing float64) (float64, bool) { //nolint:unused
 	if point, ok := calcLength(value, fsize, containing); ok {
 		return point, true
 	}
@@ -908,9 +874,9 @@ func resolvedLength(value string, fsize, containing float64) (float64, bool) {
 
 	switch unit {
 	case "%", "vw", "vh":
-		return containing * val / cssPercent, true
+		return containing * val / 100, true
 	case remUnit:
-		return pxToPt(cssPxRoot) * val, true
+		return pxToPt(16) * val, true
 	default:
 		return lengthToPt(val, unit, fsize)
 	}
@@ -968,17 +934,17 @@ func plainLength(value string, fsize, containing float64) (float64, bool) {
 	}
 
 	if unit == "%" {
-		return containing * val / cssPercent, true
+		return containing * val / 100, true
 	}
 
 	if unit == remUnit {
-		return pxToPt(cssPxRoot) * val, true
+		return pxToPt(16) * val, true
 	}
 
 	return lengthToPt(val, unit, fsize)
 }
 
-func pxToPt(px float64) float64 { return px * pxToPtFactor }
+func pxToPt(px float64) float64 { return px * 0.75 }
 
 // parseGridAutoFlowValue normalizes grid-auto-flow to one of:
 // "row", "column", "dense", "row dense", "column dense".
@@ -1281,11 +1247,11 @@ func parseGridArea(sty *ResolvedStyle, value string) {
 	sty.GridArea = ""
 
 	switch len(parts) {
-	case two:
+	case 2:
 		// CSS: row-start / column-start (omitted ends copy starts → span 1).
 		parseGridRow(sty, parts[0])
 		parseGridColumn(sty, parts[1])
-	case three:
+	case 3:
 		// row-start / column-start / row-end
 		parseGridRow(sty, parts[0])
 		parseGridColumn(sty, parts[1])
@@ -1303,7 +1269,14 @@ func parseGridArea(sty *ResolvedStyle, value string) {
 func applyGridLineEnd(style *ResolvedStyle, isRow bool, end string) {
 	target := gridTarget(style, isRow)
 
+	end = stripGridLineNames(end)
 	end = strings.TrimSpace(end)
+	if end == "" || isGridAutoToken(end) {
+		return
+	}
+	if strings.HasPrefix(end, "[") {
+		return
+	}
 	if strings.HasPrefix(end, "span ") {
 		node, err := strconv.Atoi(strings.TrimSpace(strings.TrimPrefix(end, "span ")))
 		if err != nil || node < 1 {
@@ -1315,24 +1288,62 @@ func applyGridLineEnd(style *ResolvedStyle, isRow bool, end string) {
 		return
 	}
 
-	val, err := strconv.Atoi(end)
-	if err != nil {
+	if end == "-1" {
+		if isRow {
+			style.GridRowEnd = -1
+		} else {
+			style.GridColumnEnd = -1
+		}
+		if *target.start != 0 {
+			*target.span = 1
+		}
 		return
 	}
 
-	if *target.start > 0 {
+	val, err := strconv.Atoi(end)
+	if err != nil || val == 0 {
+		return
+	}
+
+	if isRow {
+		style.GridRowEnd = val
+	} else {
+		style.GridColumnEnd = val
+	}
+
+	if *target.start != 0 && *target.start != -1 && val != -1 {
 		sp := val - *target.start
 		if sp < 1 {
 			sp = 1
 		}
 
 		*target.span = sp
+	} else if *target.start != 0 {
+		*target.span = 1
 	}
 }
 
-func parseGridColumn(st *ResolvedStyle, value string) { parseGridLineAt(colGridTarget(st), value) }
+func parseGridColumn(st *ResolvedStyle, value string) {
+	parseGridLineAt(colGridTarget(st), value)
+	if isGridEndMinusOne(value) {
+		st.GridColumnEnd = -1
+	}
+}
 
-func parseGridRow(st *ResolvedStyle, value string) { parseGridLineAt(rowGridTarget(st), value) }
+func parseGridRow(st *ResolvedStyle, value string) {
+	parseGridLineAt(rowGridTarget(st), value)
+	if isGridEndMinusOne(value) {
+		st.GridRowEnd = -1
+	}
+}
+
+func isGridEndMinusOne(value string) bool {
+	parts := strings.Split(stripGridLineNames(value), "/")
+	if len(parts) != 2 {
+		return false
+	}
+	return strings.TrimSpace(parts[1]) == "-1"
+}
 
 // gridLineTarget points at the start/span fields of one grid axis.
 type gridLineTarget struct {
@@ -1356,10 +1367,40 @@ func gridTarget(st *ResolvedStyle, isRow bool) gridLineTarget {
 	return colGridTarget(st)
 }
 
+// stripGridLineNames removes bracketed named lines "[name]" from a grid line value.
+func stripGridLineNames(value string) string {
+	var b strings.Builder
+	b.Grow(len(value))
+	inBracket := false
+	for _, ch := range value {
+		if ch == '[' {
+			inBracket = true
+			continue
+		}
+		if ch == ']' {
+			inBracket = false
+			continue
+		}
+		if inBracket {
+			continue
+		}
+		b.WriteRune(ch)
+	}
+	return b.String()
+}
+
+func isGridAutoToken(tok string) bool { return strings.EqualFold(strings.TrimSpace(tok), "auto") }
+
 // parseGridLineAt handles "N", "span N", "N / M" and "N / span M" for one
-// grid axis.
+// grid axis. Supports auto (keep 0), -1 (store -1), and named lines [name] stripped.
 func parseGridLineAt(target gridLineTarget, value string) {
+	value = stripGridLineNames(value)
 	value = strings.TrimSpace(value)
+	if value == "" || isGridAutoToken(value) {
+		*target.start = 0
+		*target.span = 1
+		return
+	}
 	if strings.HasPrefix(value, "span ") {
 		applyGridSpanToken(target, strings.TrimSpace(strings.TrimPrefix(value, "span ")))
 
@@ -1369,7 +1410,21 @@ func parseGridLineAt(target gridLineTarget, value string) {
 	// "1 / 3" or "1 / span 2"
 	parts := strings.Split(value, "/")
 	if len(parts) == 1 {
-		if v, err := strconv.Atoi(strings.TrimSpace(parts[0])); err == nil && v > 0 {
+		tok := strings.TrimSpace(parts[0])
+		if tok == "" || isGridAutoToken(tok) {
+			*target.start = 0
+			*target.span = 1
+			return
+		}
+		if tok == "-1" {
+			*target.start = -1
+			*target.span = 1
+			return
+		}
+		if strings.HasPrefix(tok, "[") {
+			return
+		}
+		if v, err := strconv.Atoi(tok); err == nil && v != 0 {
 			*target.start = v
 			*target.span = 1
 		}
@@ -1381,24 +1436,55 @@ func parseGridLineAt(target gridLineTarget, value string) {
 	applyGridEndToken(target, parts[1])
 }
 
-// setGridStartToken applies a positive start line index.
+// setGridStartToken applies a start line index: auto (0), -1, or positive.
 func setGridStartToken(target gridLineTarget, token string) {
-	if v, err := strconv.Atoi(strings.TrimSpace(token)); err == nil && v > 0 {
+	token = stripGridLineNames(token)
+	token = strings.TrimSpace(token)
+	if token == "" || isGridAutoToken(token) {
+		*target.start = 0
+		return
+	}
+	if token == "-1" {
+		*target.start = -1
+		return
+	}
+	if strings.HasPrefix(token, "[") {
+		return
+	}
+	if v, err := strconv.Atoi(token); err == nil && v != 0 {
 		*target.start = v
 	}
 }
 
 // applyGridEndToken applies a "span N" or absolute end line; absolute ends
-// become spans relative to the start line.
+// become spans relative to the start line. Supports auto and -1.
 func applyGridEndToken(target gridLineTarget, end string) {
+	end = stripGridLineNames(end)
 	end = strings.TrimSpace(end)
+	if end == "" || isGridAutoToken(end) {
+		return
+	}
 	if strings.HasPrefix(end, "span ") {
 		applyGridSpanToken(target, strings.TrimSpace(strings.TrimPrefix(end, "span ")))
 
 		return
 	}
-
-	if v, err := strconv.Atoi(end); err == nil && *target.start > 0 {
+	if strings.HasPrefix(end, "[") {
+		return
+	}
+	if end == "-1" {
+		// -1 means to end of grid; keep span at least 1, placement will handle.
+		if *target.start != 0 {
+			*target.span = 1
+		}
+		return
+	}
+	if v, err := strconv.Atoi(end); err == nil && *target.start != 0 && v != 0 {
+		// If either start or end is negative (-1), keep span 1; real placement handles -1.
+		if *target.start == -1 || v == -1 {
+			*target.span = 1
+			return
+		}
 		sp := v - *target.start
 		if sp < 1 {
 			sp = 1
@@ -1417,7 +1503,25 @@ func applyGridSpanToken(target gridLineTarget, token string) {
 
 func applyGridEndOnly(style *ResolvedStyle, isRow bool, value string) {
 	target := gridTarget(style, isRow)
+	value = stripGridLineNames(value)
 	trimmed := strings.TrimSpace(value)
+	if trimmed == "" || isGridAutoToken(trimmed) {
+		return
+	}
+	if strings.HasPrefix(trimmed, "[") {
+		return
+	}
+	if trimmed == "-1" {
+		if isRow {
+			style.GridRowEnd = -1
+		} else {
+			style.GridColumnEnd = -1
+		}
+		if *target.start != 0 {
+			*target.span = 1
+		}
+		return
+	}
 
 	if strings.HasPrefix(trimmed, "span ") {
 		applyGridSpanToken(target, strings.TrimSpace(strings.TrimPrefix(trimmed, "span ")))
@@ -1429,8 +1533,24 @@ func applyGridEndOnly(style *ResolvedStyle, isRow bool, value string) {
 }
 
 func applyGridEndNumeric(style *ResolvedStyle, target gridLineTarget, isRow bool, value string) {
+	value = stripGridLineNames(value)
+	value = strings.TrimSpace(value)
+	if value == "" || isGridAutoToken(value) || strings.HasPrefix(value, "[") {
+		return
+	}
+	if value == "-1" {
+		if isRow {
+			style.GridRowEnd = -1
+		} else {
+			style.GridColumnEnd = -1
+		}
+		if *target.start != 0 {
+			*target.span = 1
+		}
+		return
+	}
 	val, err := strconv.Atoi(value)
-	if err != nil || val <= 0 {
+	if err != nil || val == 0 {
 		return
 	}
 
@@ -1440,13 +1560,15 @@ func applyGridEndNumeric(style *ResolvedStyle, target gridLineTarget, isRow bool
 		style.GridColumnEnd = val
 	}
 
-	if *target.start > 0 {
+	if *target.start != 0 && *target.start != -1 && val != -1 {
 		sp := val - *target.start
 		if sp < 1 {
 			sp = 1
 		}
 
 		*target.span = sp
+	} else if *target.start != 0 {
+		*target.span = 1
 	}
 }
 

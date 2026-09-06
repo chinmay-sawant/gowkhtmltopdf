@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"maps"
+	"slices"
 	"time"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/convert"
@@ -615,25 +617,9 @@ func cloneHeaderFooter(header *HeaderFooter) *HeaderFooter {
 }
 
 func documentCloneStrings(src []string) []string {
-	if src == nil {
-		return nil
-	}
-
-	dst := make([]string, len(src))
-	copy(dst, src)
-
-	return dst
+	return slices.Clone(src)
 }
 
 func documentCloneStringMap(src map[string]string) map[string]string {
-	if src == nil {
-		return nil
-	}
-
-	dst := make(map[string]string, len(src))
-	for key, value := range src {
-		dst[key] = value
-	}
-
-	return dst
+	return maps.Clone(src)
 }

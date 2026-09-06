@@ -150,8 +150,8 @@ samples:
 	rm -f output/fixture-*.pdf output/fixture-*.png output/showcase-*.pdf output/architecture-diagram.pdf
 	# Opt-in CJK/system faces when present (fixture-27 and font-family lists).
 	FONT_FLAGS=""; \
-	if [ -d /usr/share/fonts/truetype/droid ]; then FONT_FLAGS="$$FONT_FLAGS --font-path /usr/share/fonts/truetype/droid"; fi; \
-	if [ -d testdata/fonts ]; then FONT_FLAGS="$$FONT_FLAGS --font-path testdata/fonts"; fi; \
+	if [ -e /usr/share/fonts/truetype/droid ]; then FONT_FLAGS="$$FONT_FLAGS --font-path /usr/share/fonts/truetype/droid"; fi; \
+	if [ -e testdata/fonts ]; then FONT_FLAGS="$$FONT_FLAGS --font-path testdata/fonts"; fi; \
 	for f in testdata/golden/fixture-*.html; do \
 		case "$$f" in *-header.html|*-footer.html) continue;; esac; \
 		name=$$(basename "$$f" .html); \

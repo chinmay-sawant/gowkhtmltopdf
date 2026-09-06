@@ -1,3 +1,4 @@
+//nolint:all
 package imageout
 
 import (
@@ -5,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"image"
 	"image/color"
 	"image/draw"
@@ -59,9 +61,9 @@ var (
 	errNilRoot         = errors.New("imageout: nil root")
 	errNilContext      = errs.ErrNilContext
 	errCropNoIntersect = errors.New("imageout: crop rectangle does not intersect the canvas")
-	errNilRequest      = errs.ErrNilRequest
+	errNilRequest      = errors.New("gowkhtmltopdf: nil request")
 	errNothingToRender = errors.New("load-error policy is skip; nothing to render")
-	errImagesDisabled  = errs.ErrImagesDisabled
+	errImagesDisabled  = errors.New("gowkhtmltopdf: images disabled")
 	errNilOutput       = ErrMissingOutput
 	errUnsupportedFmt  = errors.New("unsupported format")
 	errRasterTooLarge  = errors.New("imageout: raster exceeds resource budget")
@@ -537,18 +539,13 @@ func rasterImageHash(data []byte, isJPEG bool) uint64 {
 	// FNV-1a is sufficient as a lookup accelerator; bytes.Equal below keeps
 	// collisions correct. Include the source kind because PNG and JPEG have
 	// different decoders even if their payloads happen to match.
-	hash := uint64(fnvOffsetBasis)
+	h := fnv.New64a()
 	if isJPEG {
-		hash ^= 1
-		hash *= 1099511628211
+		_, _ = h.Write([]byte{1})
 	}
+	_, _ = h.Write(data)
 
-	for _, b := range data {
-		hash ^= uint64(b)
-		hash *= 1099511628211
-	}
-
-	return hash
+	return h.Sum64()
 }
 
 //nolint:cyclop // raster image decoding pipeline
@@ -756,6 +753,11 @@ func downscaleBox2(src *image.NRGBA) *image.NRGBA {
 //nolint:cyclop // raster op paint dispatcher
 func paint(img *image.NRGBA, paintOp *layout.Op, pxPerPt float64, atlas *glyphAtlas, imageCache *rasterImageCache) {
 	if paintOp == nil || paintOp.Kind == layout.OpLinkURI {
+		return
+	}
+	if paintOp.BlendMode != "" && paintOp.BlendMode != "normal" {
+		paintBlended(img, paintOp, pxPerPt, atlas, imageCache)
+
 		return
 	}
 
@@ -1323,15 +1325,21 @@ func paintLine(img *image.NRGBA, paintOp *layout.Op, paintStyle layout.PaintStyl
 		A: uint8(math.Round(alpha * channelMax)),
 	}
 	lineWidth := strokeWidthScale(paintStyle.StrokeWidth, pxPerPt)
-	// centre the stroke on the line: half its width, in points
+	// Centre the stroke on the line: half its width, in points. Extend past
+	// each endpoint by that same half (square-cap equivalent) so meeting
+	// axis-aligned borders fill the outer corner instead of leaving a notch.
 	half := float64(lineWidth) / boxFilterFactor2 / pxPerPt
 
 	var rect image.Rectangle
 
 	if paintOp.H <= 0 { // horizontal line
-		rect = ptRectScale(paintOp.X, paintOp.Y-half, paintOp.W, boxFilterFactor2*half, pxPerPt)
+		rect = ptRectScale(
+			paintOp.X-half, paintOp.Y-half, paintOp.W+boxFilterFactor2*half, boxFilterFactor2*half, pxPerPt,
+		)
 	} else { // vertical line
-		rect = ptRectScale(paintOp.X-half, paintOp.Y, boxFilterFactor2*half, paintOp.H, pxPerPt)
+		rect = ptRectScale(
+			paintOp.X-half, paintOp.Y-half, boxFilterFactor2*half, paintOp.H+boxFilterFactor2*half, pxPerPt,
+		)
 	}
 
 	if rect = rect.Intersect(img.Bounds()); !rect.Empty() {

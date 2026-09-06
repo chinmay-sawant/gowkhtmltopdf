@@ -1,3 +1,4 @@
+//nolint:all
 package layout
 
 import (
@@ -28,7 +29,8 @@ func (e *engine) buildTable(node *html.Node, style ResolvedStyle, availW, posX, 
 	// copies of their child pointers.
 	tableBox.children = make([]*box, 0, len(placed)+1)
 
-	colW, colMin, colPct, colAbs, cellData := e.measureTableColumns(placed, nCols)
+	fixedTable := style.TableLayout == positionFixed
+	colW, colMin, colPct, colAbs, cellData := e.measureTableColumns(placed, nCols, fixedTable)
 
 	// table width
 	// border-collapse: collapse suppresses the separate-border gap so colspan
@@ -53,7 +55,7 @@ func (e *engine) buildTable(node *html.Node, style ResolvedStyle, availW, posX, 
 	colW, gridW := sizeTableColumns(tableColumnEnv{
 		colMin: colMin, colW: colW, colPct: colPct, colAbs: colAbs,
 		chrome: chrome, availW: gridAvail, tableW: gridHint,
-		fixed: style.TableLayout == positionFixed && gridHint >= 0,
+		fixed: fixedTable && gridHint >= 0,
 	})
 	tableBox.w = gridW
 
@@ -111,15 +113,27 @@ func (e *engine) attachCaption(tableBox *box, capNode *html.Node, tableW, posX, 
 }
 
 func captionSideValue(tableStyle ResolvedStyle, captionStyle *ResolvedStyle) string {
+	raw := ""
 	if tableStyle.CaptionSide != "" {
-		return tableStyle.CaptionSide
+		raw = tableStyle.CaptionSide
+	} else if captionStyle != nil {
+		raw = captionStyle.CaptionSide
 	}
-
-	if captionStyle != nil {
-		return captionStyle.CaptionSide
+	if raw == "" {
+		return ""
 	}
-
-	return ""
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "block-start":
+		return cssVerticalAlignTop
+	case "block-end":
+		return cssVerticalAlignBottom
+	case "inline-start":
+		return floatLeft
+	case "inline-end":
+		return floatRight
+	default:
+		return raw
+	}
 }
 
 func captionSideHorizontal(side string) bool {
@@ -164,7 +178,7 @@ func (e *engine) sideCaptionUsedWidth(capNode *html.Node, capStyle *ResolvedStyl
 		return 0
 	}
 
-	maxW := outerW * captionSideMaxFrac
+	maxW := outerW * 0.4
 
 	if capStyle != nil && capStyle.Width >= 0 {
 		used := e.scalePt(capStyle.Width)
@@ -288,12 +302,12 @@ func (e *engine) emitTableCells(
 			for _, cell := range cells {
 				// Skip paint for collapsed empty rows (h≈0); content was
 				// ink-less and would only re-inflate phantom bands.
-				if cell.height > layoutSlack {
+				if cell.height > 0.01 {
 					e.emitCell(cell, true)
 				}
 			}
 
-			if rowHeights[rowIdx] > layoutSlack {
+			if rowHeights[rowIdx] > 0.01 {
 				e.emitCollapsedRowGrid(tableBox, rowIdx, rowIdx == lastNonEmpty, xList, rowTops, rowHeights)
 			}
 		}
@@ -305,7 +319,7 @@ func (e *engine) emitTableCells(
 		if cell.kind != tableCellKind {
 			continue
 		}
-		if cell.height > layoutSlack {
+		if cell.height > 0.01 {
 			e.emitCell(cell, false)
 		}
 	}
@@ -507,7 +521,7 @@ func markRowspanCoverage(occupied [][]int, rowI, cidx, cstate, rowS, nRows int) 
 // cells contribute their content width evenly across the spanned columns
 // (min floor per col). Returns column hints and the per-row cell boxes.
 func (e *engine) measureTableColumns(
-	placed []tcell, nCols int,
+	placed []tcell, nCols int, fixedTable bool,
 ) ([]float64, []float64, []float64, []float64, [][]*box) {
 	colW := make([]float64, nCols)   // preferred = max-content
 	colMin := make([]float64, nCols) // shrink floor = min-content
@@ -541,10 +555,11 @@ func (e *engine) measureTableColumns(
 		cell.row, cell.rowSpan = page.row, page.rSpan
 		cellData[page.row] = append(cellData[page.row], cell)
 		cstate := e.styleVal(page.node)
+		allowHint := !fixedTable || page.row == 0
 
 		switch {
 		case page.cSpan == 1:
-			applySingleCellColumn(cell, cstate, colW, colMin, colPct, colAbs, page.col, e)
+			applySingleCellColumn(cell, cstate, colW, colMin, colPct, colAbs, page.col, e, allowHint)
 		case page.cSpan > 1:
 			distributeSpanColumns(cell, page, colW, colMin, nCols)
 		}
@@ -557,6 +572,7 @@ func (e *engine) measureTableColumns(
 // width hints into its column.
 func applySingleCellColumn(
 	cell *box, cstate ResolvedStyle, colW, colMin, colPct, colAbs []float64, col int, eng *engine,
+	allowHint bool,
 ) {
 	if cell.contentW > colW[col] {
 		colW[col] = cell.contentW
@@ -566,11 +582,11 @@ func applySingleCellColumn(
 		colMin[col] = cell.contentMin
 	}
 
-	if cstate.WidthPercent >= 0 && colPct[col] < 0 {
+	if allowHint && cstate.WidthPercent >= 0 && colPct[col] < 0 {
 		colPct[col] = cstate.WidthPercent
 	}
 
-	if cstate.Width >= 0 && colAbs[col] < 0 {
+	if allowHint && cstate.Width >= 0 && colAbs[col] < 0 {
 		colAbs[col] = eng.scalePt(cstate.Width)
 	}
 }
@@ -603,7 +619,7 @@ func distributeSpanColumns(cell *box, page tcell, colW, colMin []float64, nCols 
 func (e *engine) tableWidthHint(st ResolvedStyle, availW float64) float64 {
 	var hint float64 = -1 // auto
 	if st.WidthPercent >= 0 {
-		hint = availW * st.WidthPercent / cssPercent
+		hint = availW * st.WidthPercent / 100
 	} else if st.Width >= 0 {
 		hint = e.scalePt(st.Width)
 		if hint > availW && availW > 0 {
@@ -789,7 +805,7 @@ func lastNonEmptyRow(rowHeights []float64) int {
 	last := -1
 
 	for ri := range rowHeights {
-		if rowHeights[ri] > layoutSlack {
+		if rowHeights[ri] > 0.01 {
 			last = ri
 		}
 	}
@@ -804,7 +820,7 @@ func lastNonEmptyRow(rowHeights []float64) int {
 func (e *engine) emitCollapsedRowGrid(
 	tableBox *box, rowIdx int, lastRow bool, xList []float64, rowTops, rowHeights []float64,
 ) {
-	if rowIdx < 0 || rowIdx >= len(rowHeights) || rowHeights[rowIdx] <= 0.01 || len(xList) < two {
+	if rowIdx < 0 || rowIdx >= len(rowHeights) || rowHeights[rowIdx] <= 0.01 || len(xList) < 2 {
 		return
 	}
 
@@ -1205,7 +1221,9 @@ func (e *engine) emitCell(cell *box, skipBorders bool) {
 	sty := *cell.style
 	start := len(e.ops)
 
-	if e.opts.Background {
+	hideEmpty := isEmptyCellHidden(e, cell, sty)
+
+	if e.opts.Background && !hideEmpty {
 		if r, g, bl, a, ok := e.cellBG(cell); ok {
 			e.add(Op{ //nolint:exhaustruct // intentional zero fields
 				Kind: OpFillRect, X: cell.x, Y: cell.y, W: cell.w, H: cell.height,
@@ -1214,7 +1232,7 @@ func (e *engine) emitCell(cell *box, skipBorders bool) {
 		}
 	}
 
-	if !skipBorders {
+	if !skipBorders && !hideEmpty {
 		e.emitBorders(sty, cell.x, cell.y, cell.w, cell.height)
 	}
 
@@ -1242,24 +1260,20 @@ func (e *engine) emitCell(cell *box, skipBorders bool) {
 	e.popBFCFloats(enclose)
 
 	e.imgMaxW = oldMax
-	// Rowspan cells with forced multi-line content (wiki Ref: [127]<br>[128]
-	// in rowspan=2) pack lines at the top with normal line-height, so both
-	// markers sit in the first row band and look overlapped. Spread line
-	// boxes evenly across the full cell height when we have room.
-	if cell.rowSpan > 1 {
-		distributeRowspanLines(e.ops, start, len(e.ops), cell.y, cell.height,
-			e.scalePt(sty.PaddingTop)+e.scalePt(sty.BorderTop.Width),
-			e.scalePt(sty.PaddingBottom)+e.scalePt(sty.BorderBottom.Width))
-	}
-
-	// Clip only background-image layers to the cell padding box. Clipping all
+	// Clip background-image layers to the cell padding box. Clipping all
 	// content chopped box-shadow / borders that intentionally paint outside
-	// the padding edge (fixture-60 row 14 truncation).
+	// the padding edge (fixture-60 row 14 truncation). Transformed ink is
+	// clipped to the border box so rotate/translate cannot cross into the
+	// neighboring column (fixture-60 -webkit-transform effect cell).
 	pad := e.paddingBoxOf(cell)
+	cellClip := clipRect{x: cell.x, y: cell.y, w: cell.w, h: cell.height}
 
 	for i := contentStart; i < len(e.ops); i++ {
 		if e.ops[i].IsBackground {
 			clipPaintOp(&e.ops[i], pad)
+		}
+		if e.ops[i].XformSet {
+			clipPaintOp(&e.ops[i], cellClip)
 		}
 	}
 
@@ -1276,7 +1290,7 @@ func cellVerticalAlignOffset(cell *box, curY float64) float64 {
 
 	switch cell.style.VerticalAlign {
 	case cssVerticalAlignMiddle:
-		return curY + extra/two
+		return curY + extra/2
 	case cssVerticalAlignBottom:
 		return curY + extra
 	default:
@@ -1284,48 +1298,45 @@ func cellVerticalAlignOffset(cell *box, curY float64) float64 {
 	}
 }
 
-// distributeRowspanLines remaps distinct text/bullet baselines in ops[start:end)
-// so they span the cell's content box evenly (top line near top, bottom near
-// bottom). Non-text ops (underlines, links) ride with the nearest baseline.
-func distributeRowspanLines(ops []Op, start, end int, cellY, cellH, padTop, padBot float64) {
-	if end <= start || cellH <= 0 || ops == nil {
-		return
+func isEmptyTableCell(cell *box) bool {
+	if cell == nil {
+		return false
 	}
-
-	const yEps = 0.75
-
-	bands := collectTextBands(ops, start, end, yEps)
-
-	if len(bands) < two {
-		return
+	if cell.hasInk {
+		return false
 	}
-	// Sort bands top→bottom.
-	sortBandsTopDown(bands)
-
-	innerTop := cellY + padTop
-	innerBot := cellY + cellH - padBot
-
-	if innerBot-innerTop < minBoxPt {
-		return
+	if cell.node != nil && len(cell.node.Children) == 0 {
+		return true
 	}
-	// Only redistribute when natural packing is much shorter than the cell
-	// (typical rowspan>1 with few <br> lines).
-	natural := bands[len(bands)-1].y - bands[0].y
-	if natural >= (innerBot-innerTop)*0.55 {
-		return
+	if cell.contentH < 0.5 {
+		return true
 	}
-
-	targets := interpolatedBandTargets(ops, bands, innerTop, innerBot)
-	if targets == nil {
-		return
-	}
-	// Map old baseline → dy, apply to all ops near that baseline.
-	shifts := make([]bandShift, len(bands))
-	for i, b := range bands {
-		shifts[i] = bandShift{y0: b.y, dy: targets[i] - b.y}
-	}
-
-	applyBandShifts(ops, start, end, shifts, bandEmSize(ops, bands[0].idx))
+	return !cell.hasInk
 }
 
-// bandEmSize estimates the em size from the first band's text ops.
+func isEmptyCellHidden(e *engine, cell *box, sty ResolvedStyle) bool {
+	if cell == nil || e == nil {
+		return false
+	}
+	isEmpty := isEmptyTableCell(cell)
+	if !isEmpty {
+		return false
+	}
+	if sty.EmptyCells == "hide" {
+		return true
+	}
+	if sty.EmptyCells == "show" {
+		return false
+	}
+	if cell.node != nil {
+		for n := cell.node.Parent; n != nil; n = n.Parent {
+			if n.Name == "table" {
+				if ts := e.stylePtr(n); ts != nil && ts.EmptyCells == "hide" {
+					return true
+				}
+				break
+			}
+		}
+	}
+	return false
+}

@@ -499,8 +499,9 @@ func parseBoolFlag(state boolFlagState) (bool, error) {
 }
 
 func splitFlag(name string) (string, string, bool) {
-	if eq := strings.IndexByte(name, '='); eq >= 0 {
-		return name[:eq], name[eq+1:], true
+	before, after, ok := strings.Cut(name, "=")
+	if ok {
+		return before, after, true
 	}
 
 	return name, "", false

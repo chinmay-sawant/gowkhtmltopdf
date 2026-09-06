@@ -24,9 +24,19 @@ const (
 	cssVerticalAlignTop          = "top"
 	cssTextDecorationLineThrough = "line-through"
 	cssTextDecorationUnderline   = "underline"
+	cssTextDecorationOverline    = "overline"
 	writingModeVerticalRL        = "vertical-rl"
 	writingModeVerticalLR        = "vertical-lr"
 	nonASCIIStart                = 0x80
+
+	minInlinePairLen    = 2
+	glueBaseEmFactor    = 2.5
+	glueNowrapEmFactor  = 8
+	inlineFitEpsilon    = 0.01
+	floatClearEpsilon   = 0.5
+	tailGapBaseFactor   = 2.5
+	tailGapNarrowFactor = 3.5
+	inlineHalfDivisor   = 2
 )
 
 // inlineItem is one atomic piece of inline content.
@@ -66,12 +76,8 @@ func (e *engine) collectAndPrepareInlineItems(nodes []*html.Node, contentW float
 	e.imgMaxW = oldMax
 	e.inlineCBW = oldCB
 
-	if len(items) >= two {
+	if len(items) >= minInlinePairLen {
 		items = squeezeInlineSpaces(items)
-	}
-
-	if len(items) >= two {
-		items = separateAdjacentCites(items, e)
 	}
 
 	return items
@@ -96,7 +102,14 @@ func (e *engine) injectBlockPseudos(boxNode *box, items []inlineItem) []inlineIt
 func (e *engine) makeInflowPseudoItem(
 	node *html.Node, pseudoEl string, host ResolvedStyle,
 ) (inlineItem, bool) {
+	if src := e.pseudoContentURL(node, pseudoEl); src != "" {
+		if ref := e.resolveImage(src); ref != nil && ref.data != nil {
+			return e.inflowPseudoImage(node, pseudoEl, host, ref)
+		}
+	}
+
 	txt := e.pseudoContent(node, pseudoEl)
+
 	if txt == "" {
 		return inlineItem{}, false //nolint:exhaustruct
 	}
@@ -110,6 +123,28 @@ func (e *engine) makeInflowPseudoItem(
 	e.enableInlineChrome(&item)
 
 	return item, true
+}
+
+func (e *engine) inflowPseudoImage(
+	node *html.Node, pseudoEl string, host ResolvedStyle, ref *imageRef,
+) (inlineItem, bool) {
+	pstyle := e.pseudoStyle(node, pseudoEl, host)
+	if pstyle.Position == positionAbsolute || pstyle.Position == positionFixed {
+		return inlineItem{}, false //nolint:exhaustruct
+	}
+
+	imgW := e.scalePt(pxToPt(float64(ref.w)))
+	imgH := e.scalePt(pxToPt(float64(ref.h)))
+
+	if imgW <= 0 {
+		imgW = e.scalePt(pstyle.FontSize)
+	}
+
+	if imgH <= 0 {
+		imgH = e.scalePt(pstyle.FontSize)
+	}
+
+	return inlineItem{img: true, imgRef: ref, w: imgW, h: imgH, style: pstyle}, true //nolint:exhaustruct
 }
 
 // layoutInlineFloats lays out inline content into line boxes and emits
@@ -279,7 +314,7 @@ func (e *engine) packInlineLine(
 		// that already has content and overflow into a float (wiki .IPA).
 		// Exception: never break before attaching punctuation / mid-cite
 		// (")[37]" → ")\n[" or "[\n37]" or "saying.[\n7]").
-		if lineAdv > 0 && lineAdv+adv > lineW+layoutEpsilon {
+		if lineAdv > 0 && lineAdv+adv > lineW+1e-6 {
 			idx, _ = e.glueStickyTail(*items, idx, start, adv)
 
 			break
@@ -390,10 +425,10 @@ func (e *engine) glueStickyTail(items []inlineItem, idx, start int, adv float64)
 // glueLimit returns the max advance that may stick to the current line for
 // the item pair: nowrap clusters (multi-cite / IPA fragments) may glue more.
 func glueLimit(prev, cur inlineItem, emSize float64) float64 {
-	limit := emSize * glueEmSoft
+	limit := emSize * glueBaseEmFactor
 
 	if isNowrapCluster(prev, cur) {
-		limit = emSize * maxGlueEm // multi-cite / IPA fragments
+		limit = emSize * glueNowrapEmFactor // multi-cite / IPA fragments
 	}
 
 	return limit
@@ -475,11 +510,11 @@ func (e *engine) breakOverflowItem(
 
 	adv := item.marginL + item.w + item.marginR
 	// Nothing to do when the whole item fits on this line.
-	if adv <= remainW+0.01 {
+	if adv <= remainW+inlineFitEpsilon {
 		return nil
 	}
 
-	if !allowMidTokenBreak(pol, adv, fullLineW+layoutSlack, aloneOnLine) {
+	if !allowMidTokenBreak(pol, adv, fullLineW+inlineFitEpsilon, aloneOnLine) {
 		return nil
 	}
 
@@ -610,10 +645,16 @@ func (e *engine) preferFloatClearForTail(
 	if floats == nil || idx >= len(items) {
 		return lineY, false
 	}
+	// First line of the IFC: keep short content beside the float (CSS2.1 /
+	// Chrome). Orphan-tail reclaim only applies after earlier lines already
+	// packed beside the float (wiki "big time."[71]).
+	if idx == 0 {
+		return lineY, false
+	}
 
 	next := floats.clearY(lineY)
 
-	if next-lineY <= halfRatio {
+	if next-lineY <= floatClearEpsilon {
 		return lineY, false
 	}
 
@@ -635,9 +676,9 @@ func (e *engine) preferFloatClearForTail(
 	// float so we do not leave "…destined for the" beside + orphan
 	// "big time."[71] under. Allow a slightly larger jump when the tail would
 	// need multiple narrow lines but only one full-width line.
-	maxGap := estLH * glueEmSoft
-	if rem > lineW+0.01 {
-		maxGap = estLH * glueEmHard
+	maxGap := estLH * tailGapBaseFactor
+	if rem > lineW+inlineFitEpsilon {
+		maxGap = estLH * tailGapNarrowFactor
 	}
 
 	if next-lineY <= maxGap {
@@ -668,52 +709,6 @@ func tailRemaining(items []inlineItem, i int) (float64, float64) {
 	}
 
 	return rem, estLH
-}
-
-// separateAdjacentCites inserts a thin space between consecutive citation
-// markers ("][") so [90][91][92] are not painted as a cramped cluster. Does
-// not touch spaces inside a single marker ([111]). Items are mutated in
-// place (only the current item's text/w change), so no copy slice is needed.
-func separateAdjacentCites(items []inlineItem, eng *engine) []inlineItem {
-	if len(items) < two {
-		return items
-	}
-
-	for i := 1; i < len(items); i++ {
-		cur := &items[i]
-		prev := &items[i-1]
-
-		if isCiteBoundary(*prev, *cur) {
-			// Prefer a hair space so markers stay visually tight but not
-			// colliding; fall back to a normal space if measure fails.
-			gap := "\u200a" // hair space
-
-			cur.text = gap + cur.text
-			if eng != nil {
-				cur.w = eng.inlineTextWidth(cur.text, cur.style, cur.chrome)
-			}
-		}
-	}
-
-	return items
-}
-
-// isCiteBoundary reports that prev followed by cur are two adjacent citation
-// markers ("][") that would paint as a cramped cluster.
-func isCiteBoundary(prev, cur inlineItem) bool {
-	if prev.img || cur.img || prev.forceBreak || cur.forceBreak {
-		return false
-	}
-
-	if prev.blockBox != nil || cur.blockBox != nil {
-		return false
-	}
-
-	pt := strings.TrimRight(prev.text, " ")
-	ct := strings.TrimLeft(cur.text, " ")
-
-	return strings.HasSuffix(pt, "]") && strings.HasPrefix(ct, "[") &&
-		!strings.HasSuffix(prev.text, " ") && !strings.HasPrefix(cur.text, " ")
 }
 
 // softBreakMode selects where splitTextToWidth may insert breaks inside a token.
@@ -857,8 +852,15 @@ func (e *engine) emitLine(
 	e.trimTrailingSpace(line)
 
 	textAlign := floatLeft
-	if boxNode != nil && boxNode.style.TextAlign != "" {
-		textAlign = boxNode.style.TextAlign
+
+	if boxNode != nil && boxNode.style != nil {
+		if boxNode.style.Direction == cssDirectionRTL {
+			textAlign = "right"
+		}
+
+		if boxNode.style.TextAlign != "" {
+			textAlign = boxNode.style.TextAlign
+		}
 	}
 
 	if lastLine && boxNode != nil && boxNode.style != nil &&
@@ -868,8 +870,9 @@ func (e *engine) emitLine(
 
 	// Coalesce adjacent same-style text runs into one op so PDF/image paint
 	// advances match layout (avoids word-by-word Tj gaps). Skip when
-	// justifying — gaps are distributed between word items.
-	if textAlign != cssTextAlignJustify {
+	// justifying — gaps are distributed between word items. Legacy
+	// -webkit-box keeps items separate so pack backgrounds stay distinct.
+	if textAlign != cssTextAlignJustify && (boxNode == nil || boxNode.style == nil || !boxNode.style.IsWebkitBox) {
 		line = e.coalesceTextItems(line)
 	}
 
@@ -894,6 +897,8 @@ func (e *engine) emitLine(
 
 // emitLineItems paints each item of a line at the given baseline, flushing
 // the accumulated underline run when the styling changes.
+//
+//nolint:wsl // blend scope restoration belongs immediately after item emission
 func (e *engine) emitLineItems(boxNode *box, line []inlineItem, leftX, baseline, lineH, lineY, justifyGap float64) {
 	var und undRun
 
@@ -917,6 +922,7 @@ func (e *engine) emitLineItems(boxNode *box, line []inlineItem, leftX, baseline,
 			continue
 		}
 
+		prevBlend := e.pushInlineBlend(item.style)
 		switch {
 		case item.blockBox != nil:
 			leftX = e.emitInlineBlock(
@@ -927,9 +933,31 @@ func (e *engine) emitLineItems(boxNode *box, line []inlineItem, leftX, baseline,
 		default:
 			leftX = e.emitInlineText(item, leftX, baseline, justifyGap, idx < len(line)-1, &und)
 		}
+		e.blendMode = prevBlend
 	}
 
 	und.flush(e)
+}
+
+// pushInlineBlend applies the compositing scope of one inline item. Inline
+// items do not get their own box-layout pushZ call, so isolation and mix-blend
+// mode must be scoped while their text and decorations are emitted.
+//
+//nolint:goconst,wsl // CSS isolation keyword and scope assignment are explicit
+func (e *engine) pushInlineBlend(style *ResolvedStyle) string {
+	prev := e.blendMode
+	if style == nil {
+		return prev
+	}
+
+	if style.Isolation == "isolate" {
+		e.blendMode = ""
+	}
+	if mode, ok := normalizeBlendMode(style.MixBlendMode); ok && mode != blendNormal {
+		e.blendMode = mode
+	}
+
+	return prev
 }
 
 // trimTrailingSpace drops trailing whitespace from the last run of a line.
@@ -979,7 +1007,7 @@ func (e *engine) lineMetrics(line []inlineItem, lineY float64) (float64, float64
 		ascent, descent := e.inlineFontMetrics(item.text, item.style)
 		lh := lineHeightOf(item.style) * e.scale
 
-		extra := (lh - ascent - descent) / two
+		extra := (lh - ascent - descent) / inlineHalfDivisor
 		itemAscent := ascent + extra
 		itemDescent := descent + extra
 
@@ -1047,7 +1075,7 @@ func (e *engine) lineOriginAndGap(
 	case floatRight:
 		return originX + availW - totalW, 0
 	case fxCenter:
-		return originX + (availW-totalW)/two, 0
+		return originX + (availW-totalW)/2, 0
 	case cssTextAlignJustify:
 		return originX, e.justifyGapOf(line, availW, totalW, lastLine)
 	default:

@@ -97,6 +97,37 @@ body { margin: 0 }
 	}
 }
 
+// TestRadiusPillClampsCircularShorthand: border-radius:999px on a wide short
+// box must become half-height circular ends (fixture-56 .hero-badge), not
+// half-width ellipses from width-only X clamping with Y copied later.
+func TestRadiusPillClampsCircularShorthand(t *testing.T) {
+	t.Parallel()
+
+	res := layoutHTML(t, `<html><body><div class="pill">badge</div></body></html>`, sheet(t, `
+body { margin: 0 }
+.pill {
+  display: inline-block;
+  width: 220pt;
+  height: 15pt;
+  background: #f00;
+  border-radius: 999px;
+}
+`))
+	fill := redFillOp(t, res.Ops)
+	want := 7.5 // height/2
+
+	if !near(fill.RadiusTopLeft, want) || !near(fill.RadiusTopLeftY, want) {
+		t.Fatalf("pill radii X=%.3f Y=%.3f, want %.3f / %.3f (circular half-height)",
+			fill.RadiusTopLeft, fill.RadiusTopLeftY, want, want)
+	}
+
+	if !near(fill.RadiusTopRight, want) || !near(fill.RadiusBottomRight, want) ||
+		!near(fill.RadiusBottomLeft, want) {
+		t.Fatalf("pill corner X radii = TL %.3f TR %.3f BR %.3f BL %.3f, want all %.3f",
+			fill.RadiusTopLeft, fill.RadiusTopRight, fill.RadiusBottomRight, fill.RadiusBottomLeft, want)
+	}
+}
+
 func assertCornerRadiusXY(t *testing.T, radiusX, radiusY, wantX, wantY float64, label string) {
 	t.Helper()
 

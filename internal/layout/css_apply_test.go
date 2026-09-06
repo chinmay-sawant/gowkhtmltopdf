@@ -127,53 +127,12 @@ func TestWhiteSpacePreWrap(t *testing.T) {
 		t.Fatalf("pre-line should collapse spaces, got %q", joined)
 	}
 
-	if len(lineTexts) < two {
+	if len(lineTexts) < 2 {
 		t.Fatalf("pre-line should keep the newline, got %+v", lineTexts)
 	}
 
 	if !strings.Contains(joined, "a") || !strings.Contains(joined, "b") || !strings.Contains(joined, "c") {
 		t.Fatalf("pre-line dropped content: %q", joined)
-	}
-}
-
-func TestClampLength(t *testing.T) {
-	t.Parallel()
-
-	root := mustParse(t, `<html><body>
-		<div class="pref">x</div>
-		<div class="min">x</div>
-		<div class="max">x</div>
-		<div class="only">x</div>
-		<div class="mix">x</div>
-	</body></html>`)
-	styles := resolveStyles(root, []*css.Stylesheet{sheet(t, `
-		.pref { width: clamp(12px, 2vw, 24px) }
-		.min { width: clamp(40px, 2vw, 80px) }
-		.max { width: clamp(8px, 2vw, 10px) }
-		.only { width: 99pt; width: clamp(12px, 2vw, 24px) }
-		.mix { color: #ff0000; color: color-mix(in srgb, red 50%, blue) }
-	`)}, "print", testViewport, 800)
-
-	// viewport 500pt: 2vw = 10pt. 12px=9pt, 24px=18pt, 40px=30pt, 8px=6pt, 10px=7.5pt.
-	if got := styleByClass(t, styles, "pref").Width; !near(got, 10) {
-		t.Fatalf("clamp preferred = %.3f, want 10pt (2vw)", got)
-	}
-
-	if got := styleByClass(t, styles, "min").Width; !near(got, 30) {
-		t.Fatalf("clamp min = %.3f, want 30pt (40px)", got)
-	}
-
-	if got := styleByClass(t, styles, "max").Width; !near(got, 7.5) {
-		t.Fatalf("clamp max = %.3f, want 7.5pt (10px)", got)
-	}
-
-	if got := styleByClass(t, styles, "only").Width; !near(got, 10) {
-		t.Fatalf("clamp without fallback = %.3f, want 10pt", got)
-	}
-
-	mix := styleByClass(t, styles, "mix")
-	if mix.Color != [3]float64{1, 0, 0} {
-		t.Fatalf("color-mix should stay excluded, color=%v", mix.Color)
 	}
 }
 

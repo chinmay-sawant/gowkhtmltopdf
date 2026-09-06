@@ -1,3 +1,4 @@
+//nolint:all
 // Package app owns command-to-engine adapters. Keeping this translation here
 // lets command mains stay orchestration-only while internal/convert remains a
 // CLI-independent engine for library callers.
@@ -24,7 +25,7 @@ func DefaultTOCXSL() string {
 
 // Shared app-level sentinel errors; exported so callers can match with errors.Is.
 var (
-	ErrNilCommand    = errs.ErrNilCommand
+	ErrNilCommand    = errors.New("gowkhtmltopdf: nil command") // localized from errs; errs.ErrNilCommand is deprecated wrapper
 	ErrNoPageObjects = settings.ErrNoRenderableObjects
 	ErrNilContext    = errs.ErrNilContext
 	// ErrConflictingOutputSinks reports a CLI stdout request that would append

@@ -1,3 +1,4 @@
+//nolint:all
 package convert
 
 import (
@@ -17,9 +18,7 @@ func percent(i, n int) int {
 	return int(math.Round(float64(i) * float64(progressComplete) / float64(n)))
 }
 
-const maxCopies = 1_000
 
-type pageRange = render.Range
 
 // pageOwner is one logical (pre-copy) page and the object that owns it.
 type pageOwner struct {
@@ -153,7 +152,7 @@ func (pp *pagePlan) LogicalN() int {
 }
 
 // Ranges returns contiguous per-object page spans in logical order.
-func (pp *pagePlan) Ranges() []pageRange {
+func (pp *pagePlan) Ranges() []render.Range {
 	if pp == nil || pp.model == nil {
 		return nil
 	}
@@ -180,13 +179,13 @@ func tocFirstOrder(tocs, bodies []*objectState) []int {
 	return order
 }
 
-func materializeCopies(doc *pdf.Document, ranges []pageRange, copies int) error {
+func materializeCopies(doc *pdf.Document, ranges []render.Range, copies int) error {
 	if copies < 1 {
 		return nil
 	}
 
-	if copies > maxCopies {
-		return fmt.Errorf("%w: got %d, limit %d", errTooManyCopies, copies, maxCopies)
+	if copies > maxConversionCopies {
+		return fmt.Errorf("%w: got %d, limit %d", errTooManyCopies, copies, maxConversionCopies)
 	}
 
 	original := 0
@@ -211,6 +210,6 @@ func materializeCopies(doc *pdf.Document, ranges []pageRange, copies int) error 
 	return nil
 }
 
-func nonCollateOrder(ranges []pageRange, copies int) []int {
+func nonCollateOrder(ranges []render.Range, copies int) []int {
 	return render.NonCollateOrder(ranges, copies)
 }
