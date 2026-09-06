@@ -428,4 +428,64 @@ func TestMulticolDefiniteHeightCapsAnonymousStrip(t *testing.T) {
 	}
 }
 
+// Flex stretch rebuilds items with Height forced to the line cross-size.
+// Under column-fill:balance that forced Height must not shrink maxColH, or a
+// short column-count:2 probe page-snaps when content-box height is a hair
+// under the child measure (fixture-57: itemH 16.25 > definiteH 15.75 ->
+// repeated snaps to ~1270pt and 37 PDF pages). clampMulticolHeight then
+// hides the blow-up in box.height, so assert on paint extent instead.
+func TestMulticolFlexStretchBalanceNoPageSnap(t *testing.T) {
+	t.Parallel()
+
+	cssSheet := sheet(t, `
+.row {
+  display: flex;
+  flex-flow: row nowrap;
+  align-items: stretch;
+  gap: 4pt;
+  width: 200pt;
+}
+.sib {
+  flex: 0 0 auto;
+  width: 88pt;
+  height: 22.75pt;
+  box-sizing: border-box;
+  padding: 3pt 4pt;
+  border: 0.5pt solid #888;
+  font-size: 6.5pt;
+}
+.probe {
+  flex: 0 0 auto;
+  width: 88pt;
+  box-sizing: border-box;
+  padding: 3pt 4pt;
+  border: 0.5pt solid #888;
+  font-size: 6.5pt;
+  line-height: 1.25;
+  column-count: 2;
+}
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="row">
+  <div class="sib">sib</div>
+  <div class="probe" data-prop="column-count"><code>column-count</code><span>implemented</span></div>
+</div>
+</body></html>`, cssSheet)
+
+	const pageH = 800.0
+	maxY := 0.0
+	for _, op := range res.Ops {
+		if op.Kind != OpText || op.Text == "" {
+			continue
+		}
+		bottom := op.Y + op.H
+		if bottom > maxY {
+			maxY = bottom
+		}
+	}
+	if pages := int(maxY/pageH) + 1; pages > 2 {
+		t.Fatalf("flex-stretched column-count probe spanned %d pages (maxY=%.1f); page-snap loop regresses fixture-57", pages, maxY)
+	}
+}
+
 // paint operation proof covers rule variants

@@ -567,8 +567,19 @@ func (e *engine) multicolColumnHeight(
 
 	maxColH := remain
 
-	if definiteH >= 0 {
-		// Definite height caps column capacity for both balance and auto-fill.
+	if !balance && definiteH >= 0 {
+		// column-fill:auto fills against the definite height, so the
+		// remaining capacity must shrink maxColH.
+		//
+		// column-fill:balance (initial) must not. Flex stretch rebuilds
+		// children with Height set to the line cross-size
+		// (forceFlexItemCrossSize). That Height looks like an author
+		// height to resolveContentHeight. Capping maxColH to it makes a
+		// short probe with column-count:2 (fixture-57 .p-column-count)
+		// treat a 16pt child as taller than a 15pt column and page-snap
+		// repeatedly (16pt content -> ~1270pt curY -> 37 PDF pages).
+		// Author height still wins in clampMulticolHeight (curY = h) and
+		// in placeMulticolAnonColumns for the fixture-61 blank-page case.
 		maxColH = clampMulticolRemainder(maxColH, definiteH-(curY-padTop))
 	}
 

@@ -264,6 +264,9 @@ PR bodies live in `plans/PR/`. Phase checklist format comes from
 - `skills/release-note/` - cut a release: VERSION + CHANGELOG + notes + stamp
 - `skills/debug-html-template/` - diagnose a wrapping/misaligned template,
   propose fixes, wait for the pick
+- `skills/diagnose-golden-fixture/` - golden corpus failure loop: tight red
+  test, bisect, falsifiable probes, fix the interaction without undoing
+  intentional prior work
 - `skills/golang-anti-patterns/` - top 50 Go anti-patterns catalog, detection
   heuristics, and idiomatic Go pattern replacements
 - `skills/ponytail*` - laziness protocol family (YAGNI reviews, debt ledger)
