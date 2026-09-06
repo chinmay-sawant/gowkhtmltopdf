@@ -34,6 +34,11 @@ func rowsIntact(res *Result, contentH float64) bool {
 // moves a row to the next page and a later fixpoint pulls the table back.
 // Collapsed table rows should remain adjacent when both rows fit on one page.
 //
+// Gap size comes from painted ops (vertical rules when present), not cell.y.
+// Thead-repeat used to call shiftFlowY and then shiftTableRowBoxes, so cell.y
+// drifted ahead of the display list; cell-based gaps looked closed while the
+// PDF still showed a white seam (fixture-60 props 51/52, 104/105).
+//
 //nolint:cyclop,wsl,gocognit // table-row geometry checks intentionally stay together; complexity from table geometry
 func normalizeTableRowGaps(res *Result, contentH float64) {
 	if res == nil || res.root == nil || contentH <= 0 {
@@ -46,12 +51,9 @@ func normalizeTableRowGaps(res *Result, contentH float64) {
 		}
 
 		for rowIndex := 1; rowIndex < len(table.rows); rowIndex++ {
-			if !rowWasPaginationShifted(table.rows[rowIndex]) {
-				continue
-			}
-			_, _, previousTop, previousBottom, previousOK := rowOpGeometry(table.rows[rowIndex-1])
+			_, _, previousTop, previousBottom, previousOK := rowPaintBand(table.rows[rowIndex-1], res)
 
-			first, last, currentTop, currentBottom, currentOK := rowOpGeometry(table.rows[rowIndex])
+			first, last, currentTop, currentBottom, currentOK := rowPaintBand(table.rows[rowIndex], res)
 
 			if !previousOK || !currentOK || first < 0 || last < first {
 				continue
@@ -102,7 +104,7 @@ func shiftTableRowsUp(res *Result, rows [][]*box, page int, contentH, gap float6
 	}
 
 	for _, row := range rows {
-		first, last, top, _, ok := rowOpGeometry(row)
+		first, last, top, _, ok := rowPaintBand(row, res)
 		if !ok || first < 0 || last < first {
 			return
 		}
@@ -116,9 +118,74 @@ func shiftTableRowsUp(res *Result, rows [][]*box, page int, contentH, gap float6
 	}
 }
 
+// rowPaintBand returns the op range and painted Y band for a table row.
+// Prefer vertical grid rules when present so inter-row seams match what the
+// PDF shows; fall back to the full op ink bounds.
+func rowPaintBand(row []*box, res *Result) (int, int, float64, float64, bool) {
+	first, last := rowOpRange(row)
+	if res == nil || first < 0 || last < first || first >= len(res.Ops) {
+		return -1, -1, 0, 0, false
+	}
+
+	if last >= len(res.Ops) {
+		last = len(res.Ops) - 1
+	}
+
+	minY, maxY := 0.0, 0.0
+	vertTop, vertBot := 0.0, 0.0
+	have, haveVert := false, false
+
+	for i := first; i <= last; i++ {
+		op := res.Ops[i]
+		y0 := op.Y
+		y1 := op.Y
+		if op.H > 0 {
+			y1 = op.Y + op.H
+		}
+
+		if !have || y0 < minY {
+			minY = y0
+		}
+
+		if !have || y1 > maxY {
+			maxY = y1
+		}
+
+		have = true
+
+		if op.Kind == OpLine && math.Abs(op.W) < 0.01 && op.H > 0.5 {
+			if !haveVert || y0 < vertTop {
+				vertTop = y0
+			}
+
+			if !haveVert || y1 > vertBot {
+				vertBot = y1
+			}
+
+			haveVert = true
+		}
+	}
+
+	if !have {
+		return first, last, 0, 0, false
+	}
+
+	if haveVert {
+		return first, last, vertTop, vertBot, true
+	}
+
+	return first, last, minY, maxY, true
+}
+
 func shiftTableRowBoxes(row []*box, deltaY float64) {
 	for _, cell := range row {
+		if cell == nil {
+			continue
+		}
 		shiftTableBox(cell, deltaY)
+		if deltaY != 0 {
+			cell.paginationShifted = true
+		}
 	}
 }
 
@@ -321,8 +388,10 @@ func repeatTableHeaderOnPages(res *Result, tblBox *box, contentH float64) {
 			dy := pageTop + hdrH - bodyTop
 			if dy > 0 {
 				shiftFlowY(res, shiftFrom, shiftTo, bodyTop-0.01, dy)
-				// Table cells are not always in the flow-box index, so
-				// shiftFlowY alone can leave cell.y behind the ops.
+				// Table cells are not always moved with the op range (skipBoxShift
+				// edge cases), so keep cell.y in step with the body shift.
+				// normalizeTableRowGaps measures paint gaps, so a cell.y drift
+				// no longer hides white seams between continuation rows.
 				shiftTableBodyBoxesFrom(tblBox, page, contentH, dy)
 			}
 		}
