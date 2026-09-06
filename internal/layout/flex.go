@@ -503,7 +503,7 @@ func (e *engine) flexLineNaturalCross(
 	}
 
 	startX, justifyGap := justifyRowStart(
-		style.JustifyContent, contentX, contentW, sumW, gaps, gap, len(items),
+		flexMainJustify(style), contentX, contentW, sumW, gaps, gap, len(items),
 	)
 
 	return e.measureFlexCrossMax(items, widths, startX, topY, curY, justifyGap)
@@ -843,7 +843,7 @@ func (e *engine) placeFlexLineMeasured(
 		sumW += w
 	}
 
-	startX, justifyGap := justifyRowStart(style.JustifyContent, contentX, contentW, sumW, gaps, gap, len(items))
+	startX, justifyGap := justifyRowStart(flexMainJustify(style), contentX, contentW, sumW, gaps, gap, len(items))
 
 	targetCross := lineCross
 	if targetCross < 0 {
@@ -931,6 +931,26 @@ func (e *engine) flexShrinkWidths(items []flexMeas, widths []float64, deficit, s
 		if widths[idx] < floor {
 			widths[idx] = floor
 		}
+	}
+}
+
+// flexMainJustify picks the main-axis packing keyword for a flex container.
+// Fixture-61 #102 sets justify-self:center on a flex container (not an item).
+// Chrome print packs the flex line as if justify-content were center; honor
+// that when justify-content is still the initial flex-start value.
+func flexMainJustify(style ResolvedStyle) string {
+	jc := style.JustifyContent
+	if jc != "" && jc != fxFlexStart && jc != fxStart {
+		return jc
+	}
+	switch style.JustifySelf {
+	case fxCenter, fxFlexEnd, fxEnd, fxBetween, fxAround, fxEvenly:
+		return style.JustifySelf
+	default:
+		if jc == "" {
+			return fxFlexStart
+		}
+		return jc
 	}
 }
 
@@ -1294,7 +1314,7 @@ func (e *engine) flowFlexColumn(
 		sumH += h
 	}
 
-	startY, justifyGap := justifyColumnStart(style.JustifyContent, contentH, curY, sumH+gaps, sumH, gap, len(items))
+	startY, justifyGap := justifyColumnStart(flexMainJustify(style), contentH, curY, sumH+gaps, sumH, gap, len(items))
 
 	endY := e.buildColumnItems(parent, style, items, heights, contentW, contentX, topY, curY, startY, justifyGap, contentH)
 

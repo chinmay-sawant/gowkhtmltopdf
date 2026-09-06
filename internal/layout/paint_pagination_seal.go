@@ -113,8 +113,11 @@ func sealPageTopClusters(
 	}
 }
 
-// sealPageBottomClusters closes vertical clusters that end near a page bottom
-// with no full horizontal rule (next row's top moved to the following page).
+// sealPageBottomClusters closes vertical clusters that are the last body strip
+// on a page with no full horizontal rule (next row's top moved to the following
+// page, often under a repeated thead). A fixed "near pageBot" band is not
+// enough: fixture-61 props 31/82 leave ~95pt of empty page below the last row
+// when the next row+thead cannot fit, which sat outside the old 80pt band.
 func sealPageBottomClusters(
 	vertStarts, vertEnds map[int][]vseg, contentH float64,
 	coverage func(y, minX, maxX float64) bool,
@@ -129,12 +132,12 @@ func sealPageBottomClusters(
 		}
 
 		page := int((child.y - 0.01) / contentH)
+		if page < 0 {
+			continue
+		}
+		pageTop := float64(page) * contentH
 		pageBot := float64(page+1) * contentH
-		// Seal last-row bottoms that sit in the lower band of the page.
-		// 56pt missed fixture-60 page-4 row 67 (room ≈ 69pt); keep a little
-		// headroom above that so taller trailing rows still close.
-		const bottomSealBand = 80.0
-		if child.y < pageBot-bottomSealBand || child.y > pageBot+eps {
+		if child.y < pageTop || child.y > pageBot+eps {
 			continue
 		}
 
@@ -142,24 +145,44 @@ func sealPageBottomClusters(
 			continue
 		}
 
-		// Same-page continuation: the next row's verticals start just below.
-		// Sealing here opened a false mid-page gap (fixture-60 rows 105-106).
-		if verticalClusterStartsSoon(starts, child.y, child.minX, child.maxX, pageBot) {
+		// Same-page continuation below: do not seal (false mid-page gap,
+		// fixture-60 rows 105-106). Next-page thead at pageBot must not count.
+		if verticalClusterStartsBefore(starts, child.y, child.minX, child.maxX, pageBot) {
 			continue
 		}
 
-		if page >= 0 {
-			seal(child.y, child.minX, child.maxX, child.bw, child.r, child.g, child.b)
-		}
+		seal(child.y, child.minX, child.maxX, child.bw, child.r, child.g, child.b)
 	}
 }
 
 // verticalClusterStartsSoon reports a multi-column vertical cluster whose
-// top sits after endY on the same page and overlaps [minX, maxX].
+// top sits shortly after endY on the same page and overlaps [minX, maxX].
 func verticalClusterStartsSoon(
 	starts map[int]borderCluster, endY, minX, maxX, pageBot float64,
 ) bool {
 	const soonBand = 24.0
+
+	return verticalClusterStartsInBand(starts, endY, minX, maxX, pageBot, soonBand)
+}
+
+// verticalClusterStartsBefore reports any overlapping multi-column vertical
+// cluster that starts after endY and before pageBot (last-on-page detection).
+func verticalClusterStartsBefore(
+	starts map[int]borderCluster, endY, minX, maxX, pageBot float64,
+) bool {
+	return verticalClusterStartsInBand(starts, endY, minX, maxX, pageBot, pageBot-endY)
+}
+
+func verticalClusterStartsInBand(
+	starts map[int]borderCluster, endY, minX, maxX, pageBot, band float64,
+) bool {
+	if band < 0 {
+		return false
+	}
+	limit := endY + band
+	if limit > pageBot {
+		limit = pageBot
+	}
 
 	for _, next := range starts {
 		if next.n < 3 || next.maxX-next.minX < 20 {
@@ -169,7 +192,7 @@ func verticalClusterStartsSoon(
 		// same-page continuation. Using pageBot+0.5 let a repeated thead that
 		// starts exactly on the boundary suppress the bottom seal (fixture-60
 		// page-2 after prop 33).
-		if next.y <= endY+0.5 || next.y > endY+soonBand || next.y >= pageBot {
+		if next.y <= endY+0.5 || next.y > limit || next.y >= pageBot {
 			continue
 		}
 		if next.maxX < minX-2 || next.minX > maxX+2 {

@@ -471,35 +471,13 @@ func (e *engine) placeMulticolAnonColumns(
 		}
 		assigns = append(assigns, colAssign{idx: k, col: col})
 	}
-	// Top-align column 2+ to column 0's first ink line. Band cuts often leave a
-	// mid-line orphan at the top of column 2+; anchoring that remnant to the
-	// box top (or keeping it) pulls real lines through the padding/border
-	// (fixture-61 #23/#24/#32). Drop orphans above column 0's first line, then
-	// shift the remaining column ink up to that anchor.
+	// Top-align column 2+ to column 0's first ink line. Band cuts leave a
+	// mid-line continuation at the top of column 2+ (Chrome keeps it; fixture-61
+	// #30/#31 show "repeated." starting column 2). Anchor to column 0's first
+	// ink - not the box top - so that continuation stays inside the padding.
 	anchor := colMinY[0]
 	if math.IsInf(anchor, 1) {
 		anchor = top
-	}
-	for _, a := range assigns {
-		if a.col < 1 {
-			continue
-		}
-		op := &e.ops[a.idx]
-		if (op.Kind == OpText || op.Kind == OpBullet) && op.Y < anchor-0.01 {
-			DeactivateOp(op) // drop mid-band orphan
-		}
-	}
-	for i := 1; i < nCols; i++ {
-		colMinY[i] = math.Inf(1)
-	}
-	for _, a := range assigns {
-		if a.col < 1 {
-			continue
-		}
-		op := e.ops[a.idx]
-		if (op.Kind == OpText || op.Kind == OpBullet) && op.Y < colMinY[a.col] {
-			colMinY[a.col] = op.Y
-		}
 	}
 	for _, a := range assigns {
 		if a.col < 1 || math.IsInf(colMinY[a.col], 1) {

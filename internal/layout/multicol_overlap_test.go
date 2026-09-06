@@ -14,7 +14,11 @@ func isMulticolSample(s string) bool {
 	case "Multi-column", "sample", "text", "repeated.", "repeated", "Multi", "column":
 		return true
 	default:
-		return strings.HasPrefix(s, "Multi-column")
+		// Band cuts leave mid-line continuations such as "sample text repeated."
+		// at the top of column 2 (Chrome keeps them; see fixture-61 #30/#31).
+		return strings.HasPrefix(s, "Multi-column") ||
+			strings.Contains(s, "sample") ||
+			strings.Contains(s, "repeated")
 	}
 }
 

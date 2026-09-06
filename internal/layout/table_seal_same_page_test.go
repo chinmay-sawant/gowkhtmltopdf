@@ -27,3 +27,22 @@ func TestVerticalClusterStartsSoon(t *testing.T) {
 		t.Fatal("cluster at pageBot (next-page thead) must not count as same-page continuation")
 	}
 }
+
+func TestVerticalClusterStartsBefore(t *testing.T) {
+	t.Parallel()
+
+	// Last-on-page detection: a continuation 90pt below still counts (the old
+	// 80pt bottomSealBand missed fixture-61 props 31/82).
+	starts := map[int]borderCluster{
+		845: {y: 845, minX: 34, maxX: 561, bw: 1, n: 5},
+	}
+	if !verticalClusterStartsBefore(starts, 755, 34, 561, 900) {
+		t.Fatal("expected same-page continuation within pageBot band")
+	}
+	if verticalClusterStartsBefore(starts, 755, 34, 561, 840) {
+		t.Fatal("cluster at/past pageBot must not count")
+	}
+	if verticalClusterStartsBefore(starts, 850, 34, 561, 900) {
+		t.Fatal("cluster above endY must not count")
+	}
+}
