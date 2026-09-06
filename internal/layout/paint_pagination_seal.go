@@ -4,6 +4,27 @@ import (
 	"math"
 )
 
+// Table-seal geometry: border-width floors, cluster sizes, and page bands.
+const (
+	sealMinBorderWidth = 0.3
+	sealFallbackWidth  = 0.5
+	sealStubMinCount   = 2
+	yBucketScale       = 2
+	trailingBandSlack  = 8.0
+	minInkHeight       = 4
+
+	// bandClusterMinColumns is the smallest vertical-segment count that seals
+	// a table edge; narrower clusters are text rules, not grid borders.
+	bandClusterMinColumns = 3
+	// bandClusterMinSpan is the narrowest horizontal span that seals an edge.
+	bandClusterMinSpan = 20.0
+	// bandEdgeTolerance keeps a repeated thead starting exactly on the page
+	// boundary from suppressing the previous page bottom seal.
+	bandEdgeTolerance = 0.5
+	// bandOverlapSlack is the horizontal overlap slack for cluster spans.
+	bandOverlapSlack = 2.0
+)
+
 // capTablePageBreaks draws a horizontal top edge on pages where a table
 // continuation begins mid-grid (split vertical rules at the page top with no
 // matching full-width horizontal). Without this, border-collapse rowspan
@@ -50,12 +71,12 @@ func capTablePageBreaks(res *Result, contentH float64) {
 func sealBorderGap(
 	res *Result, horiz *[]hseg, horizByY map[int][]hseg, eps, gVal, minX, maxX, borderW, red, green, blue float64,
 ) {
-	if maxX-minX < 20 || borderW < 0 {
+	if maxX-minX < bandClusterMinSpan || borderW < 0 {
 		return
 	}
 
-	if borderW < 0.3 {
-		borderW = 0.5
+	if borderW < sealMinBorderWidth {
+		borderW = sealFallbackWidth
 	}
 	// Avoid exact duplicates.
 	for _, h := range *horiz {
@@ -86,7 +107,7 @@ func sealPageTopClusters(
 	seal func(gVal, minX, maxX, borderW, red, green, blue float64),
 ) {
 	for _, child := range clusterVerticals(vertStarts, vertEnds, true) {
-		if child.n < 3 || child.maxX-child.minX < 20 {
+		if !isBandCluster(child) {
 			continue
 		}
 
@@ -127,16 +148,18 @@ func sealPageBottomClusters(
 	starts := clusterVerticals(vertStarts, vertEnds, true)
 
 	for _, child := range clusterVerticals(vertStarts, vertEnds, false) {
-		if child.n < 3 || child.maxX-child.minX < 20 {
+		if !isBandCluster(child) {
 			continue
 		}
 
-		page := int((child.y - 0.01) / contentH)
+		page := int((child.y - layoutCoordEpsilon) / contentH)
 		if page < 0 {
 			continue
 		}
+
 		pageTop := float64(page) * contentH
 		pageBot := float64(page+1) * contentH
+
 		if child.y < pageTop || child.y > pageBot+eps {
 			continue
 		}
@@ -179,23 +202,23 @@ func verticalClusterStartsInBand(
 	if band < 0 {
 		return false
 	}
+
 	limit := endY + band
+
 	if limit > pageBot {
 		limit = pageBot
 	}
 
 	for _, next := range starts {
-		if next.n < 3 || next.maxX-next.minX < 20 {
+		if !isBandCluster(next) {
 			continue
 		}
-		// Clusters at or past pageBot are the next page's thead/body, not a
-		// same-page continuation. Using pageBot+0.5 let a repeated thead that
-		// starts exactly on the boundary suppress the bottom seal (fixture-60
-		// page-2 after prop 33).
-		if next.y <= endY+0.5 || next.y > limit || next.y >= pageBot {
+
+		if clusterOutsideBand(next.y, endY, limit, pageBot) {
 			continue
 		}
-		if next.maxX < minX-2 || next.minX > maxX+2 {
+
+		if !clusterOverlapsSpan(next, minX, maxX) {
 			continue
 		}
 
@@ -203,6 +226,27 @@ func verticalClusterStartsInBand(
 	}
 
 	return false
+}
+
+// isBandCluster reports whether a vertical cluster is wide enough to seal a
+// table edge rather than a text rule.
+func isBandCluster(cluster borderCluster) bool {
+	return cluster.n >= bandClusterMinColumns && cluster.maxX-cluster.minX >= bandClusterMinSpan
+}
+
+// clusterOutsideBand reports whether a cluster top sits outside the seal band:
+// at or before the strip end (within tolerance), past the band limit, or on
+// the next page. Clusters at or past pageBot are the next page's thead/body,
+// not a same-page continuation. Using pageBot+0.5 let a repeated thead that
+// starts exactly on the boundary suppress the bottom seal (fixture-60 page-2
+// after prop 33).
+func clusterOutsideBand(clusterY, endY, limit, pageBot float64) bool {
+	return clusterY <= endY+bandEdgeTolerance || clusterY > limit || clusterY >= pageBot
+}
+
+// clusterOverlapsSpan reports whether a cluster span overlaps [minX, maxX].
+func clusterOverlapsSpan(cluster borderCluster, minX, maxX float64) bool {
+	return cluster.maxX >= minX-bandOverlapSlack && cluster.minX <= maxX+bandOverlapSlack
 }
 
 // vseg is one vertical border segment.
@@ -298,7 +342,7 @@ func collectBorderSegmentOps(ops []Op) ([]vseg, []hseg) {
 }
 
 // roundY bins a canvas Y into 0.5pt buckets.
-func roundY(y float64) int { return int(math.Round(y * 2)) }
+func roundY(y float64) int { return int(math.Round(y * yBucketScale)) }
 
 // clusterVerticals merges vertical segments sharing a start (byStart) or end
 // Y into clusters with the min/max x and dominant stroke.
@@ -352,7 +396,7 @@ func hCoverage(horizByY map[int][]hseg, posY, minX, maxX float64) (bool, float64
 	has := false
 
 	key := roundY(posY)
-	for k := key - int(eps*2) - 1; k <= key+int(eps*2)+1; k++ {
+	for k := key - int(eps*yBucketScale) - 1; k <= key+int(eps*yBucketScale)+1; k++ {
 		for _, height := range horizByY[k] {
 			covMin, covMax, has = mergeCoverageSeg(height, posY, minX, maxX, eps, covMin, covMax, has)
 		}
@@ -408,7 +452,7 @@ func sealPageTopStubs(
 
 		minX, maxX, borderW, redN, green, blueN, node := pageTopStubBounds(vertStarts, pageTop, eps)
 
-		if node < 2 {
+		if node < sealStubMinCount {
 			continue
 		}
 
@@ -430,7 +474,7 @@ func pageTopStubBounds(
 	node := 0
 
 	key := roundY(pageTop)
-	for k := key - int(eps*2) - 1; k <= key+int(eps*2)+1; k++ {
+	for k := key - int(eps*yBucketScale) - 1; k <= key+int(eps*yBucketScale)+1; k++ {
 		for _, val := range vertStarts[k] {
 			if val.y0 < pageTop-eps || val.y0 > pageTop+eps {
 				continue
@@ -486,7 +530,7 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 		// (TestBoundaryFillSplit) are left to the normal page-split remnant.
 		contentBot := sectionContentBottom(res, pageOps[page], pageTop, pageBot, lastInkBot)
 
-		if pageBot-contentBot < 8 {
+		if pageBot-contentBot < trailingBandSlack {
 			continue
 		}
 
@@ -606,8 +650,8 @@ func lastInkBottom(res *Result, idxs []int, pageTop, pageBot float64) (float64, 
 		case OpText, OpBullet:
 			height := opInkHeight(*paintOp)
 
-			if height < 4 {
-				height = 4
+			if height < minInkHeight {
+				height = minInkHeight
 			}
 
 			bot = paintOp.Y + height
@@ -1141,7 +1185,8 @@ func stickyTargetFor(parent *box) stickySectionChromeTarget {
 // same frame geometry.
 func hasDuplicateTarget(targets []stickySectionChromeTarget, target stickySectionChromeTarget) bool {
 	for _, prior := range targets {
-		if math.Abs(prior.x-target.x) < 0.01 && math.Abs(prior.y-target.y) < 0.01 && math.Abs(prior.w-target.w) < 0.01 {
+		if math.Abs(prior.x-target.x) < layoutCoordEpsilon && math.Abs(prior.y-target.y) < layoutCoordEpsilon &&
+			math.Abs(prior.w-target.w) < layoutCoordEpsilon {
 			return true
 		}
 	}

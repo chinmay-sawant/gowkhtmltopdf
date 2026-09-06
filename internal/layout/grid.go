@@ -172,7 +172,7 @@ func gridColumnDefs(raw string, areaCols int) []gridTrackDef {
 
 		colDefs = make([]gridTrackDef, n)
 		for i := range colDefs {
-			colDefs[i] = flexibleTrack(1)
+			colDefs[i] = flexibleTrack()
 		}
 
 		return colDefs
@@ -183,7 +183,7 @@ func gridColumnDefs(raw string, areaCols int) []gridTrackDef {
 		copy(padded, colDefs)
 
 		for i := len(colDefs); i < areaCols; i++ {
-			padded[i] = flexibleTrack(1)
+			padded[i] = flexibleTrack()
 		}
 
 		return padded
@@ -195,7 +195,7 @@ func gridColumnDefs(raw string, areaCols int) []gridTrackDef {
 // expandGridColumnDefsForExplicitPlacement grows the explicit column defs when
 // an item is explicitly placed beyond the template (implicit tracks lite).
 // Implicit tracks use grid-auto-columns when specified (auto or 1fr lite),
-// otherwise flexibleTrack(1) (1fr).
+// otherwise flexibleTrack() (1fr).
 func expandGridColumnDefsForExplicitPlacement(
 	colDefs []gridTrackDef, kids []*html.Node, areas gridTemplateAreasMap, eng *engine, autoCols string,
 ) []gridTrackDef {
@@ -205,56 +205,7 @@ func expandGridColumnDefsForExplicitPlacement(
 	}
 
 	for _, kid := range kids {
-		if kid.Type != html.ElementNode || eng == nil {
-			continue
-		}
-
-		st := eng.stylePtr(kid)
-		if st == nil {
-			continue
-		}
-
-		// Named area already covered by areas.cols; only check line-based placement.
-		if strings.TrimSpace(st.GridArea) != "" {
-			continue
-		}
-
-		// Handle grid-column: 1 / -1 where -1 means last line (nCols+1).
-		// For implicit track expansion, -1 resolves to max(len(colDefs), areas.cols, need)+1.
-		effEnd := st.GridColumnEnd
-		if effEnd == -1 {
-			base := len(colDefs)
-			if areas.cols > base {
-				base = areas.cols
-			}
-			if need > base {
-				base = need
-			}
-			effEnd = base + 1
-		}
-
-		if st.GridColumnStart > 0 {
-			end := st.GridColumnStart - 1 + st.GridColumnSpan
-			if effEnd > st.GridColumnStart {
-				end = effEnd - 1
-			}
-
-			if end < 1 {
-				end = 1
-			}
-
-			if end > need {
-				need = end
-			}
-		} else if effEnd > 0 {
-			// e.g. grid-column-end: 5 without start -> need at least end-1 columns.
-			if effEnd-1 > need {
-				need = effEnd - 1
-			}
-		} else if st.GridColumnSpan > 1 && st.GridColumnStart <= 0 {
-			// Bare span without start does not force extra explicit tracks; auto placement wraps.
-			continue
-		}
+		need = gridExplicitNeedForKid(need, kid, areas, eng, colDefs)
 	}
 
 	if need <= len(colDefs) {
@@ -262,8 +213,8 @@ func expandGridColumnDefsForExplicitPlacement(
 	}
 
 	// Cap implicit expansion to avoid unbounded allocations from bogus line numbers.
-	if need > 64 {
-		need = 64
+	if need > maxImplicitGridTracks {
+		need = maxImplicitGridTracks
 	}
 
 	padded := make([]gridTrackDef, need)
@@ -275,6 +226,84 @@ func expandGridColumnDefsForExplicitPlacement(
 	}
 
 	return padded
+}
+
+// gridExplicitNeedForKid grows the needed column count for one child's
+// line-based placement. Named-area items are covered by areas.cols.
+func gridExplicitNeedForKid(
+	need int, kid *html.Node, areas gridTemplateAreasMap, eng *engine, colDefs []gridTrackDef,
+) int {
+	if kid.Type != html.ElementNode || eng == nil {
+		return need
+	}
+
+	itemStyle := eng.stylePtr(kid)
+	if itemStyle == nil {
+		return need
+	}
+
+	// Named area already covered by areas.cols; only check line-based placement.
+	if strings.TrimSpace(itemStyle.GridArea) != "" {
+		return need
+	}
+
+	// Handle grid-column: 1 / -1 where -1 means last line (nCols+1).
+	// For implicit track expansion, -1 resolves to max(len(colDefs), areas.cols, need)+1.
+	effEnd := resolveExplicitColumnEnd(itemStyle, colDefs, areas, need)
+
+	return explicitNeedForLinePlacement(itemStyle, effEnd, need)
+}
+
+// resolveExplicitColumnEnd resolves a -1 column end to the current last line.
+func resolveExplicitColumnEnd(
+	itemStyle *ResolvedStyle, colDefs []gridTrackDef, areas gridTemplateAreasMap, need int,
+) int {
+	if itemStyle.GridColumnEnd != -1 {
+		return itemStyle.GridColumnEnd
+	}
+
+	base := len(colDefs)
+	if areas.cols > base {
+		base = areas.cols
+	}
+
+	if need > base {
+		base = need
+	}
+
+	return base + 1
+}
+
+// explicitNeedForLinePlacement returns the column count needed by one item's
+// line-based start/end/span placement.
+func explicitNeedForLinePlacement(itemStyle *ResolvedStyle, effEnd, need int) int {
+	switch {
+	case itemStyle.GridColumnStart > 0:
+		end := itemStyle.GridColumnStart - 1 + itemStyle.GridColumnSpan
+		if effEnd > itemStyle.GridColumnStart {
+			end = effEnd - 1
+		}
+
+		if end < 1 {
+			end = 1
+		}
+
+		if end > need {
+			return end
+		}
+
+		return need
+	case effEnd > 0:
+		// e.g. grid-column-end: 5 without start -> need at least end-1 columns.
+		if effEnd-1 > need {
+			return effEnd - 1
+		}
+
+		return need
+	default:
+		// Bare span without start does not force extra explicit tracks; auto placement wraps.
+		return need
+	}
 }
 
 //nolint:cyclop,funlen,mnd // auto-fit calculation handles balanced track distribution
@@ -659,7 +688,7 @@ func resolveUsedWidth(sty ResolvedStyle, availW float64, engN *engine) float64 {
 	if sty.WidthPercent >= 0 {
 		// Cyclic % -> auto (keep fill-remaining width).
 		if availW > 0 && !math.IsInf(availW, 0) && availW < 1e12 {
-			width = availW * sty.WidthPercent / 100
+			width = availW * sty.WidthPercent / oneHundred
 		}
 	} else if sty.Width >= 0 {
 		width = engN.scalePt(sty.Width)

@@ -28,6 +28,15 @@ const (
 	writingModeVerticalRL        = "vertical-rl"
 	writingModeVerticalLR        = "vertical-lr"
 	nonASCIIStart                = 0x80
+
+	minInlinePairLen    = 2
+	glueBaseEmFactor    = 2.5
+	glueNowrapEmFactor  = 8
+	inlineFitEpsilon    = 0.01
+	floatClearEpsilon   = 0.5
+	tailGapBaseFactor   = 2.5
+	tailGapNarrowFactor = 3.5
+	inlineHalfDivisor   = 2
 )
 
 // inlineItem is one atomic piece of inline content.
@@ -67,7 +76,7 @@ func (e *engine) collectAndPrepareInlineItems(nodes []*html.Node, contentW float
 	e.imgMaxW = oldMax
 	e.inlineCBW = oldCB
 
-	if len(items) >= 2 {
+	if len(items) >= minInlinePairLen {
 		items = squeezeInlineSpaces(items)
 	}
 
@@ -95,22 +104,12 @@ func (e *engine) makeInflowPseudoItem(
 ) (inlineItem, bool) {
 	if src := e.pseudoContentURL(node, pseudoEl); src != "" {
 		if ref := e.resolveImage(src); ref != nil && ref.data != nil {
-			pstyle := e.pseudoStyle(node, pseudoEl, host)
-			if pstyle.Position == positionAbsolute || pstyle.Position == positionFixed {
-				return inlineItem{}, false //nolint:exhaustruct
-			}
-			imgW := e.scalePt(pxToPt(float64(ref.w)))
-			imgH := e.scalePt(pxToPt(float64(ref.h)))
-			if imgW <= 0 {
-				imgW = e.scalePt(pstyle.FontSize)
-			}
-			if imgH <= 0 {
-				imgH = e.scalePt(pstyle.FontSize)
-			}
-			return inlineItem{img: true, imgRef: ref, w: imgW, h: imgH, style: pstyle}, true //nolint:exhaustruct
+			return e.inflowPseudoImage(node, pseudoEl, host, ref)
 		}
 	}
+
 	txt := e.pseudoContent(node, pseudoEl)
+
 	if txt == "" {
 		return inlineItem{}, false //nolint:exhaustruct
 	}
@@ -124,6 +123,28 @@ func (e *engine) makeInflowPseudoItem(
 	e.enableInlineChrome(&item)
 
 	return item, true
+}
+
+func (e *engine) inflowPseudoImage(
+	node *html.Node, pseudoEl string, host ResolvedStyle, ref *imageRef,
+) (inlineItem, bool) {
+	pstyle := e.pseudoStyle(node, pseudoEl, host)
+	if pstyle.Position == positionAbsolute || pstyle.Position == positionFixed {
+		return inlineItem{}, false //nolint:exhaustruct
+	}
+
+	imgW := e.scalePt(pxToPt(float64(ref.w)))
+	imgH := e.scalePt(pxToPt(float64(ref.h)))
+
+	if imgW <= 0 {
+		imgW = e.scalePt(pstyle.FontSize)
+	}
+
+	if imgH <= 0 {
+		imgH = e.scalePt(pstyle.FontSize)
+	}
+
+	return inlineItem{img: true, imgRef: ref, w: imgW, h: imgH, style: pstyle}, true //nolint:exhaustruct
 }
 
 // layoutInlineFloats lays out inline content into line boxes and emits
@@ -404,10 +425,10 @@ func (e *engine) glueStickyTail(items []inlineItem, idx, start int, adv float64)
 // glueLimit returns the max advance that may stick to the current line for
 // the item pair: nowrap clusters (multi-cite / IPA fragments) may glue more.
 func glueLimit(prev, cur inlineItem, emSize float64) float64 {
-	limit := emSize * 2.5
+	limit := emSize * glueBaseEmFactor
 
 	if isNowrapCluster(prev, cur) {
-		limit = emSize * 8 // multi-cite / IPA fragments
+		limit = emSize * glueNowrapEmFactor // multi-cite / IPA fragments
 	}
 
 	return limit
@@ -489,11 +510,11 @@ func (e *engine) breakOverflowItem(
 
 	adv := item.marginL + item.w + item.marginR
 	// Nothing to do when the whole item fits on this line.
-	if adv <= remainW+0.01 {
+	if adv <= remainW+inlineFitEpsilon {
 		return nil
 	}
 
-	if !allowMidTokenBreak(pol, adv, fullLineW+0.01, aloneOnLine) {
+	if !allowMidTokenBreak(pol, adv, fullLineW+inlineFitEpsilon, aloneOnLine) {
 		return nil
 	}
 
@@ -633,7 +654,7 @@ func (e *engine) preferFloatClearForTail(
 
 	next := floats.clearY(lineY)
 
-	if next-lineY <= 0.5 {
+	if next-lineY <= floatClearEpsilon {
 		return lineY, false
 	}
 
@@ -655,9 +676,9 @@ func (e *engine) preferFloatClearForTail(
 	// float so we do not leave "…destined for the" beside + orphan
 	// "big time."[71] under. Allow a slightly larger jump when the tail would
 	// need multiple narrow lines but only one full-width line.
-	maxGap := estLH * 2.5
-	if rem > lineW+0.01 {
-		maxGap = estLH * 3.5
+	maxGap := estLH * tailGapBaseFactor
+	if rem > lineW+inlineFitEpsilon {
+		maxGap = estLH * tailGapNarrowFactor
 	}
 
 	if next-lineY <= maxGap {
@@ -986,7 +1007,7 @@ func (e *engine) lineMetrics(line []inlineItem, lineY float64) (float64, float64
 		ascent, descent := e.inlineFontMetrics(item.text, item.style)
 		lh := lineHeightOf(item.style) * e.scale
 
-		extra := (lh - ascent - descent) / 2
+		extra := (lh - ascent - descent) / inlineHalfDivisor
 		itemAscent := ascent + extra
 		itemDescent := descent + extra
 

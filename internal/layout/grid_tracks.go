@@ -83,7 +83,7 @@ func measureTrackIntrinsics(eng *engine, kids []*html.Node, nTracks int, axisCol
 			val = eng.measureCellContent(kid, *cstate)
 		} else {
 			// Height intrinsic: single-line text approximation via font size.
-			val = eng.scalePt(cstate.FontSize) * 1.2
+			val = eng.scalePt(cstate.FontSize) * textLineHeightFactor
 			val += eng.scalePt(cstate.PaddingTop) + eng.scalePt(cstate.PaddingBottom) +
 				eng.scalePt(cstate.BorderTop.Width) + eng.scalePt(cstate.BorderBottom.Width)
 		}
@@ -356,7 +356,7 @@ func resolveTrackFixedSide(size gridTrackSize, contentSize float64, definite boo
 
 		pct := -size.val
 
-		return contentSize * pct / 100
+		return contentSize * pct / oneHundred
 	}
 
 	if eng != nil {

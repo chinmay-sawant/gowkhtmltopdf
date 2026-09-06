@@ -278,20 +278,24 @@ td { width: 300pt; padding: 0; border: 0; }
 	box := classBoxes(centered.root, "box")
 	cell := findNamedBox(centered.root, "td")
 	full := classBoxes(stretched.root, "stretch")
+
 	if len(box) != 1 || cell == nil || len(full) != 1 {
 		t.Fatalf("boxes: justify-self=%d cell=%v stretch=%d", len(box), cell != nil, len(full))
 	}
 
 	flexBox, stretchBox := box[0], full[0]
+
 	if flexBox.w >= cell.w*0.6 {
 		t.Fatalf("justify-self:center flex.w=%.1f, want shrink-wrap << cell.w=%.1f", flexBox.w, cell.w)
 	}
+
 	if stretchBox.w < cell.w*0.9 {
 		t.Fatalf("default flex.w=%.1f, want stretch near cell.w=%.1f", stretchBox.w, cell.w)
 	}
 
 	cellMid := cell.x + cell.w/2
 	boxMid := flexBox.x + flexBox.w/2
+
 	if math.Abs(boxMid-cellMid) > 2 {
 		t.Fatalf("justify-self box center=%.1f, cell center=%.1f (not centered)", boxMid, cellMid)
 	}

@@ -687,7 +687,7 @@ func (e *engine) facesWithGlyph(style *ResolvedStyle, runeValue rune) *pdf.Font 
 		return f
 	}
 
-	if style.FontWeight >= 700 && e.faces.UnicodeFallbackBold != nil && e.faces.UnicodeFallbackBold.GlyphID(runeValue) != 0 {
+	if style.FontWeight >= fontWeightBoldValue && e.faces.UnicodeFallbackBold != nil && e.faces.UnicodeFallbackBold.GlyphID(runeValue) != 0 {
 		return e.faces.UnicodeFallbackBold
 	}
 
@@ -725,9 +725,11 @@ func (e *engine) add(paintOp Op) {
 		paintOp.ZIndex = e.zIndex
 		paintOp.ZIndexSet = e.zIndexSet
 		paintOp.Positioned = e.positioned
+
 		if paintOp.BlendMode == "" || paintOp.BlendMode == blendNormal {
 			paintOp.BlendMode = e.blendMode
 		}
+
 		e.ops = append(e.ops, paintOp)
 	}
 }
@@ -762,6 +764,16 @@ func (e *engine) pushZ(style ResolvedStyle) (int, bool, bool, string) {
 		e.positioned = true
 	}
 
+	e.enterStackingContext(style, createsBlendContext)
+	e.enterBlendIsolation(style)
+
+	return prevZ, prevSet, prevPositioned, prevBlend
+}
+
+// enterStackingContext applies CSS stacking-context creation: an explicit
+// z-index wins, otherwise transform, opacity, blend, or isolation reset the
+// level to zero.
+func (e *engine) enterStackingContext(style ResolvedStyle, createsBlendContext bool) {
 	if style.ZIndexSet {
 		e.zIndex = style.ZIndex
 		e.zIndexSet = true
@@ -770,18 +782,22 @@ func (e *engine) pushZ(style ResolvedStyle) (int, bool, bool, string) {
 		e.zIndex = 0
 		e.zIndexSet = true
 	}
+}
 
+// enterBlendIsolation applies the transform stamp, the isolation reset, and
+// the blend-mode override for the current stacking context.
+func (e *engine) enterBlendIsolation(style ResolvedStyle) {
 	if style.HasTransform || style.Opacity < 1 {
 		e.needsXformStamp = true
 	}
+
 	if style.Isolation == "isolate" {
 		e.blendMode = ""
 	}
+
 	if style.MixBlendMode != blendNormal {
 		e.blendMode = style.MixBlendMode
 	}
-
-	return prevZ, prevSet, prevPositioned, prevBlend
 }
 
 func (e *engine) popZ(prevZ int, prevSet bool, prevPositioned bool, prevBlend string) {
@@ -1060,6 +1076,9 @@ func flattenBoxes(boxNode *box, out *[]*box) {
 	}
 }
 
+// minOpCapacity floors the preallocated op display list.
+const minOpCapacity = 64
+
 func estimateOpCapacity(root *html.Node) int {
 	if root == nil {
 		return 0
@@ -1069,9 +1088,9 @@ func estimateOpCapacity(root *html.Node) int {
 
 	root.Walk(func(*html.Node) { nodes++ })
 
-	capacity := nodes * 3 / 2
-	if capacity < 64 {
-		capacity = 64
+	capacity := nodes * three / two
+	if capacity < minOpCapacity {
+		capacity = minOpCapacity
 	}
 
 	const maxCapacity = 1 << 20
@@ -1159,6 +1178,23 @@ func (e *engine) build(node *html.Node, availW, posX, posY float64) *box {
 	underXformCB := e.transformCBDepth > 0
 	start := len(e.ops)
 
+	boxNode := e.buildDisplayBox(node, sty, availW, posX, posY, underXformCB)
+
+	if boxNode != nil {
+		boxNode.opStart, boxNode.opEnd = start, len(e.ops)-1
+		e.finishBuiltBox(boxNode, sty, underXformCB)
+	}
+
+	return boxNode
+}
+
+// buildDisplayBox runs the display dispatch for build: replaced elements,
+// out-of-flow positioning, then the in-flow formatting context. The
+// transform containing-block depth is owned here so descendants built by the
+// in-flow branch see this box exactly as build did before the extraction.
+func (e *engine) buildDisplayBox(
+	node *html.Node, sty ResolvedStyle, availW, posX, posY float64, underXformCB bool,
+) *box {
 	var boxNode *box
 
 	switch node.Name {
@@ -1183,11 +1219,6 @@ func (e *engine) build(node *html.Node, availW, posX, posY float64) *box {
 
 	if boxNode == nil {
 		boxNode = e.buildInFlowDisplay(node, sty, availW, posX, posY)
-	}
-
-	if boxNode != nil {
-		boxNode.opStart, boxNode.opEnd = start, len(e.ops)-1
-		e.finishBuiltBox(boxNode, sty, underXformCB)
 	}
 
 	return boxNode
@@ -1315,6 +1346,7 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 	if style.BorderImageSource != "" && style.Height < 0 && style.HeightPercent < 0 {
 		curY += e.scalePt(borderLayoutWidth(style, style.BorderBottom))
 	}
+
 	if isVerticalWritingMode(style.WritingMode) {
 		curY = e.verticalWritingHeight(contentStart, curY, style)
 	}
@@ -1414,7 +1446,7 @@ func (e *engine) paintPositionedPseudo( //nolint:cyclop
 		H: style.LineHeight * e.scale, Text: text, Font: face, Size: size,
 		InkDescent: e.fontDescentFace(face, size),
 		R:          style.Color[0], G: style.Color[1], B: style.Color[2],
-		Bold: style.FontWeight >= 700,
+		Bold: style.FontWeight >= fontWeightBoldValue,
 	})
 	e.popZ(prevZ, prevSet, prevPositioned, prevBlend)
 }
@@ -1489,7 +1521,7 @@ func (e *engine) paintValueWidget(node *html.Node, style ResolvedStyle, leftX, t
 		indicatorH = contentH
 	}
 
-	indicatorY := contentY + (contentH-indicatorH)/2
+	indicatorY := contentY + (contentH-indicatorH)/two
 
 	e.add(Op{ //nolint:exhaustruct // intentional zero fields
 		Kind: OpFillRect, X: contentX, Y: indicatorY, W: contentW * ratio, H: indicatorH,
@@ -1656,7 +1688,7 @@ func resolveAutoMargins(style ResolvedStyle, definiteW bool, width, availW, marg
 
 		switch {
 		case style.MarginLeftAuto && style.MarginRightAuto:
-			margL = free / 2
+			margL = free / two
 		case style.MarginLeftAuto:
 			margL = free - margR
 			if margL < 0 {
@@ -1677,7 +1709,7 @@ func resolveDefiniteWidth(eng *engine, style ResolvedStyle, availW float64, widt
 	case style.WidthPercent >= 0:
 		// Cyclic % honesty: indefinite containing block → treat as auto.
 		if availW > 0 && availW < 1e12 {
-			*width = availW * style.WidthPercent / 100
+			*width = availW * style.WidthPercent / oneHundred
 		} else {
 			definiteW = false
 		}
@@ -1701,25 +1733,29 @@ func clampBlockMinWidth(eng *engine, style ResolvedStyle, availW, width float64)
 		hChrome = eng.scalePt(style.PaddingLeft) + eng.scalePt(style.PaddingRight) +
 			eng.scalePt(style.BorderLeft.Width) + eng.scalePt(style.BorderRight.Width)
 	}
+
 	if style.MinWidthPercent >= 0 && availW > 0 && availW < 1e12 {
-		mn := availW * style.MinWidthPercent / 100
+		minW := availW * style.MinWidthPercent / oneHundred
+
 		if style.BoxSizing != borderBox {
-			mn += hChrome
+			minW += hChrome
 		}
-		if width < mn {
-			return mn
+
+		if width < minW {
+			return minW
 		}
 
 		return width
 	}
 
 	if style.MinWidth > 0 {
-		mn := eng.scalePt(style.MinWidth)
+		minW := eng.scalePt(style.MinWidth)
 		if style.BoxSizing != borderBox {
-			mn += hChrome
+			minW += hChrome
 		}
-		if width < mn {
-			return mn
+
+		if width < minW {
+			return minW
 		}
 	}
 
@@ -1732,25 +1768,29 @@ func clampBlockMaxWidth(eng *engine, style ResolvedStyle, availW, width float64)
 		hChrome = eng.scalePt(style.PaddingLeft) + eng.scalePt(style.PaddingRight) +
 			eng.scalePt(style.BorderLeft.Width) + eng.scalePt(style.BorderRight.Width)
 	}
+
 	if style.MaxWidthPercent >= 0 && availW > 0 && availW < 1e12 {
-		mx := availW * style.MaxWidthPercent / 100
+		maxW := availW * style.MaxWidthPercent / oneHundred
+
 		if style.BoxSizing != borderBox {
-			mx += hChrome
+			maxW += hChrome
 		}
-		if width > mx {
-			return mx
+
+		if width > maxW {
+			return maxW
 		}
 
 		return width
 	}
 
 	if style.MaxWidth >= 0 {
-		mx := eng.scalePt(style.MaxWidth)
+		maxW := eng.scalePt(style.MaxWidth)
 		if style.BoxSizing != borderBox {
-			mx += hChrome
+			maxW += hChrome
 		}
-		if width > mx {
-			return mx
+
+		if width > maxW {
+			return maxW
 		}
 	}
 
@@ -1766,7 +1806,7 @@ func resolveUsedHeight(sty ResolvedStyle, cbH float64, engN *engine) (float64, b
 			return 0, false
 		}
 
-		height := cbH * sty.HeightPercent / 100
+		height := cbH * sty.HeightPercent / oneHundred
 		if sty.BoxSizing != borderBox {
 			height += engN.scalePt(sty.PaddingTop) + engN.scalePt(sty.PaddingBottom) +
 				engN.scalePt(sty.BorderTop.Width) + engN.scalePt(sty.BorderBottom.Width)
@@ -1852,9 +1892,11 @@ func (e *engine) absoluteBuildWidth(node *html.Node, sty ResolvedStyle, cbW floa
 	if !sty.LeftAuto {
 		avail -= e.scalePt(sty.Left)
 	}
+
 	if !sty.RightAuto {
 		avail -= e.scalePt(sty.Right)
 	}
+
 	if avail < 0 {
 		avail = 0
 	}

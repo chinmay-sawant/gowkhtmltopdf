@@ -146,6 +146,7 @@ body { margin: 0; font-size: 10pt; }
 .box { border: 1px dashed #888; overflow: auto; width: 220pt; }
 .f { float: left; background: #9cf; padding: 4px; margin-right: 6px; }
 `)
+
 	root, err := html.Parse(`<html><body>
 <div class="box"><div class="f">F</div><span>following text wraps beside the float.</span></div>
 </body></html>`)
@@ -160,27 +161,43 @@ body { margin: 0; font-size: 10pt; }
 		t.Fatal(err)
 	}
 
-	var fOp, follow *Op
-	for i := range res.Ops {
-		op := &res.Ops[i]
-		if op.Kind != OpText {
+	floatOp, followOp := findFloatFirstLineOps(res.Ops)
+
+	if floatOp == nil || followOp == nil {
+		t.Fatalf("missing F or following text ops (F=%v follow=%v)", floatOp != nil, followOp != nil)
+	}
+
+	// Same line band: following must sit to the right of F, not a full line below.
+	if followOp.Y > floatOp.Y+floatOp.H*0.75 {
+		t.Fatalf("following y=%.1f below F y=%.1f h=%.1f; want wrap beside float",
+			followOp.Y, floatOp.Y, floatOp.H)
+	}
+
+	if followOp.X < floatOp.X+floatOp.W-1 {
+		t.Fatalf("following x=%.1f, want right of F (x=%.1f w=%.1f)", followOp.X, floatOp.X, floatOp.W)
+	}
+}
+
+// findFloatFirstLineOps locates the float marker and its following text in a
+// paint list, keeping TestFloatShortFirstLineStaysBeside under the cyclop cap.
+func findFloatFirstLineOps(ops []Op) (*Op, *Op) {
+	var floatOp, followOp *Op
+
+	for i := range ops {
+		operation := &ops[i]
+
+		if operation.Kind != OpText {
 			continue
 		}
-		if op.Text == "F" {
-			fOp = op
+
+		if operation.Text == "F" {
+			floatOp = operation
 		}
-		if strings.Contains(op.Text, "following") {
-			follow = op
+
+		if strings.Contains(operation.Text, "following") {
+			followOp = operation
 		}
 	}
-	if fOp == nil || follow == nil {
-		t.Fatalf("missing F or following text ops (F=%v follow=%v)", fOp != nil, follow != nil)
-	}
-	// Same line band: following must sit to the right of F, not a full line below.
-	if follow.Y > fOp.Y+fOp.H*0.75 {
-		t.Fatalf("following y=%.1f below F y=%.1f h=%.1f; want wrap beside float", follow.Y, fOp.Y, fOp.H)
-	}
-	if follow.X < fOp.X+fOp.W-1 {
-		t.Fatalf("following x=%.1f, want right of F (x=%.1f w=%.1f)", follow.X, fOp.X, fOp.W)
-	}
+
+	return floatOp, followOp
 }

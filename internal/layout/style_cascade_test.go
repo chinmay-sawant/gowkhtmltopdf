@@ -52,13 +52,13 @@ func TestCascadeListStyleShorthandBeatsUADisc(t *testing.T) {
 	styles := resolveStyles(root, []*css.Stylesheet{sheet(t, `ul { list-style: none }`)},
 		"print", testViewport, 800)
 	ul := findElementByName(root, "ul")
-	li := findElementByName(root, "li")
+	listItem := findElementByName(root, "li")
 
 	if got := styles[ul].ListStyleType; got != "none" {
 		t.Fatalf("ul list-style:none type = %q, want none", got)
 	}
 
-	if got := styles[li].ListStyleType; got != "none" {
+	if got := styles[listItem].ListStyleType; got != "none" {
 		t.Fatalf("li inherited type = %q, want none", got)
 	}
 

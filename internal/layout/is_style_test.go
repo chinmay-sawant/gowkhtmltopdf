@@ -26,7 +26,7 @@ func TestIsPseudoStyle(t *testing.T) {
 	walk = func(node *html.Node) {
 		if node.Type == html.ElementNode {
 			switch node.Name {
-			case "div":
+			case divElementName:
 				divN = node
 			case "p":
 				pN = node

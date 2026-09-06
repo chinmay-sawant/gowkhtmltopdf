@@ -13,8 +13,10 @@ import "errors"
 //   - ErrNilRequest       -> convert.errNilRequest / imageout.errNilRequest (private, same string)
 //   - ErrImagesDisabled   -> convert.errImagesDisabled / imageout.errImagesDisabled (private, same string)
 //   - ErrMissingImageOutput -> imageout.ErrMissingOutput (public, api re-exports imageout)
+//
 // Parked (still in hub, need coordinated migration):
-//   - ErrNilContext (10+ consumers across app/convert/prepare/render/imageout/layout/load/api; distinct instances would break errors.Is)
+//   - ErrNilContext (10+ consumers across app/convert/prepare/render and
+//     other packages; distinct instances would break errors.Is)
 //   - ErrNilCommand (primary in app; imageout/compat_test cannot import app due to app -> imageout cycle)
 var (
 	// ErrNilContext is returned when a cancellation-aware operation receives a nil context.

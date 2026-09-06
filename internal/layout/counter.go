@@ -221,11 +221,11 @@ func parseQuotes(value string) quoteStyle {
 	}
 
 	parts := collectQuotedStrings(value)
-	if len(parts) < 2 {
+	if len(parts) < two {
 		return defaultQuotes()
 	}
 
-	count := len(parts) / 2
+	count := len(parts) / two
 	style := quoteStyle{
 		opens:  make([]string, 0, count),
 		closes: make([]string, 0, count),
@@ -241,7 +241,7 @@ func parseQuotes(value string) quoteStyle {
 }
 
 func collectQuotedStrings(value string) []string {
-	parts := make([]string, 0, 2)
+	parts := make([]string, 0, two)
 	idx := 0
 
 	for {
@@ -419,10 +419,10 @@ func winningInlinePropHit(best *contentHit, node *html.Node, prop string) *conte
 
 		hit := contentHit{
 			value:     decl.Value,
-			a:         1 << 30,
+			a:         inlineStylePriority,
 			b:         0,
 			c:         0,
-			order:     1 << 30,
+			order:     inlineStylePriority,
 			important: decl.Important,
 		}
 		if betterContentHit(hit, best) {
@@ -520,7 +520,7 @@ func evalCountersFn(value string, idx int, env *contentEnv) (string, int) {
 	}
 
 	sep := ""
-	if len(args) >= 2 {
+	if len(args) >= two {
 		sep = unquoteCSSArg(args[1])
 	}
 
@@ -560,7 +560,7 @@ func splitCSSArgs(inner string) []string {
 		return nil
 	}
 
-	args := make([]string, 0, 2)
+	args := make([]string, 0, two)
 	start, depth := 0, 0
 	inQuote := byte(0)
 
@@ -616,7 +616,7 @@ func consumeQuotedCSSArg(
 
 func unquoteCSSArg(arg string) string {
 	arg = strings.TrimSpace(arg)
-	if len(arg) < 2 {
+	if len(arg) < two {
 		return arg
 	}
 

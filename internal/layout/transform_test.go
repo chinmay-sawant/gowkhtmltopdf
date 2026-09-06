@@ -132,13 +132,22 @@ func TestParseTransformMatrixAndSkew(t *testing.T) {
 func TestParseTransformNoneAnd3DRejected(t *testing.T) {
 	t.Parallel()
 
-	_, _, _, has, isOK := parseTransformList("none", 12)
+	matNone, xNone, yNone, has, isOK := parseTransformList("none", 12)
+	_ = matNone
+	_ = xNone
+	_ = yNone
+
 	if !isOK || has {
 		t.Fatalf("none: ok=%v has=%v", isOK, has)
 	}
 
-	_, _, _, _, isOK = parseTransformList("translate3d(1px,2px,3px)", 12)
-	if isOK {
+	matBad, xBad, yBad, hasBad, isBadOK := parseTransformList("translate3d(1px,2px,3px)", 12)
+	_ = matBad
+	_ = xBad
+	_ = yBad
+	_ = hasBad
+
+	if isBadOK {
 		t.Fatal("3d transform should be rejected")
 	}
 }

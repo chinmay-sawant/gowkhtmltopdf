@@ -1,10 +1,11 @@
-package layout
+package layout_test
 
 import (
 	"testing"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/layout"
 )
 
 func TestTableCellClipsTransformedContent(t *testing.T) {
@@ -20,6 +21,7 @@ td.right { width: 150pt; background: #eef; }
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	root, err := html.Parse(`<html><body><table><tr>
 <td class="left">desc</td>
 <td class="right"><div class="rot">T</div></td>
@@ -27,38 +29,64 @@ td.right { width: 150pt; background: #eef; }
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := Layout(root, Options{ //nolint:exhaustruct
+
+	res, err := layout.Layout(root, layout.Options{ //nolint:exhaustruct
 		Width: 400, Height: 200, Background: true, Sheets: []*css.Stylesheet{sheet},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	var rightCellLeft float64
-	var sawRight bool
-	for _, op := range res.Ops {
-		// right cell background (#eef ≈ high B)
-		if op.Kind == OpFillRect && op.B > 0.9 && op.W > 80 && op.X > 50 {
-			if !sawRight || op.X > rightCellLeft {
-				rightCellLeft = op.X
-				sawRight = true
-			}
-		}
-	}
-	if !sawRight {
+	rightCellLeft, ok := findRightCellLeft(res)
+	if !ok {
 		t.Fatal("right cell background fill not found")
 	}
 
-	sawXform := false
-	for _, op := range res.Ops {
-		if !op.XformSet {
+	assertTransformedOpsClipped(t, res, rightCellLeft)
+}
+
+func findRightCellLeft(res *layout.Result) (float64, bool) {
+	var (
+		rightCellLeft float64
+		sawRight      bool
+	)
+
+	for _, paintOp := range res.Ops {
+		// right cell background (#eef ≈ high B)
+		if !isRightCellFill(paintOp) {
 			continue
 		}
-		sawXform = true
-		if op.X+0.05 < rightCellLeft {
-			t.Fatalf("transformed op X=%.2f spills left of cell X=%.2f", op.X, rightCellLeft)
+
+		if !sawRight || paintOp.X > rightCellLeft {
+			rightCellLeft = paintOp.X
+			sawRight = true
 		}
 	}
+
+	return rightCellLeft, sawRight
+}
+
+func isRightCellFill(paintOp layout.Op) bool {
+	return paintOp.Kind == layout.OpFillRect && paintOp.B > 0.9 && paintOp.W > 80 && paintOp.X > 50
+}
+
+func assertTransformedOpsClipped(t *testing.T, res *layout.Result, rightCellLeft float64) {
+	t.Helper()
+
+	sawXform := false
+
+	for _, paintOp := range res.Ops {
+		if !paintOp.XformSet {
+			continue
+		}
+
+		sawXform = true
+
+		if paintOp.X+0.05 < rightCellLeft {
+			t.Fatalf("transformed op X=%.2f spills left of cell X=%.2f", paintOp.X, rightCellLeft)
+		}
+	}
+
 	if !sawXform {
 		t.Fatal("expected transformed ops")
 	}

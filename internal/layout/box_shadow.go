@@ -139,7 +139,7 @@ func boxShadowFromLengths(
 // invalid value returns ok==false so the caller keeps the prior style.
 func ParseBoxShadowBlur(value string, fsize float64) (float64, bool) {
 	value = strings.TrimSpace(value)
-	if value == "" || strings.EqualFold(value, cssDisplayNone) || strings.EqualFold(value, "initial") {
+	if value == "" || strings.EqualFold(value, cssDisplayNone) || strings.EqualFold(value, cssKeywordInitial) {
 		return 0, false
 	}
 	v, ok := plainLength(value, fsize, 0)
@@ -174,7 +174,7 @@ func ApplyBoxShadowBlur(style *ResolvedStyle, value string, fsize float64) bool 
 // shadow. Returns ok==false for missing/invalid.
 func ParseBoxShadowSpread(value string, fsize float64) (float64, bool) {
 	value = strings.TrimSpace(value)
-	if value == "" || strings.EqualFold(value, cssDisplayNone) || strings.EqualFold(value, "initial") {
+	if value == "" || strings.EqualFold(value, cssDisplayNone) || strings.EqualFold(value, cssKeywordInitial) {
 		return 0, false
 	}
 	v, ok := plainLength(value, fsize, 0)
@@ -212,7 +212,7 @@ func ParseBoxShadowColor(value string, current [3]float64) ([3]float64, float64,
 	if strings.EqualFold(value, "currentcolor") {
 		return current, 1.0, true
 	}
-	if strings.EqualFold(value, "initial") || strings.EqualFold(value, cssDisplayNone) {
+	if strings.EqualFold(value, cssKeywordInitial) || strings.EqualFold(value, cssDisplayNone) {
 		return [3]float64{}, 0, false
 	}
 	r, g, b, a, ok := css.ParseColor(value)
@@ -241,7 +241,7 @@ func ApplyBoxShadowColor(style *ResolvedStyle, value string) bool {
 // for symmetric offset). Returns x, y in points.
 func ParseBoxShadowOffset(value string, fsize float64) (float64, float64, bool) {
 	value = strings.TrimSpace(value)
-	if value == "" || strings.EqualFold(value, cssDisplayNone) || strings.EqualFold(value, "initial") {
+	if value == "" || strings.EqualFold(value, cssDisplayNone) || strings.EqualFold(value, cssKeywordInitial) {
 		return 0, 0, false
 	}
 	var toks [2]string
@@ -288,7 +288,7 @@ func ParseBoxShadowInset(value string) (bool, bool) {
 	switch v {
 	case insetKeyword:
 		return true, true
-	case "outset", "initial", "":
+	case "outset", cssKeywordInitial, "":
 		return false, true
 	case cssDisplayNone:
 		return false, true
@@ -407,17 +407,7 @@ func (e *engine) appendInsetBoxShadow(
 
 	// Soft wash, not opaque slabs. Chrome inset on small chips (fixture-61
 	// #12) keeps the cream fill and label readable with a light top/left rim.
-	depth := spread + blur*0.5 + math.Max(math.Abs(offX), math.Abs(offY))*0.5
-	if depth < 1 {
-		depth = 1
-	}
-	maxDepth := math.Min(width, height) * 0.22
-	if maxDepth < 1.5 {
-		maxDepth = 1.5
-	}
-	if depth > maxDepth {
-		depth = maxDepth
-	}
+	depth := insetShadowDepth(spread, blur, width, height, offX, offY)
 
 	baseAlpha := shadow.alpha
 	if baseAlpha <= 0 {
@@ -430,59 +420,122 @@ func (e *engine) appendInsetBoxShadow(
 	paintBot := offY <= 1e-6
 	paintRight := offX <= 1e-6
 
-	steps := boxShadowBlurSteps * 2
-	if blur <= 0 {
-		steps = 3
-	}
+	steps := insetShadowStepCount(blur)
 
 	for step := 1; step <= steps; step++ {
 		t := float64(step) / float64(steps)
 		d := depth * t
-		// Fall off inward; keep peak alpha low so cream stays visible.
-		alpha := baseAlpha * (1.0 - t) * 0.28
-		if blur <= 0 {
-			alpha = baseAlpha * (1.0 - t) * 0.4
-		}
-		if alpha < 0.025 {
+		alpha, ok := insetShadowStepAlpha(baseAlpha, blur, t)
+		if !ok {
 			continue
 		}
-
-		topH, botH, leftW, rightW := d, d*0.3, d, d*0.3
-		if offY > 0 {
-			topH = math.Min(d+offY*0.4, depth)
-		} else if offY < 0 {
-			botH = math.Min(d-offY*0.4, depth)
-			topH = d * 0.3
+		topH, botH, leftW, rightW := insetShadowRimSizes(offX, offY, d, depth)
+		rims := insetShadowRims{
+			paintTop: paintTop, paintBot: paintBot, paintLeft: paintLeft, paintRight: paintRight,
+			topH: topH, botH: botH, leftW: leftW, rightW: rightW, alpha: alpha,
 		}
-		if offX > 0 {
-			leftW = math.Min(d+offX*0.4, depth)
-		} else if offX < 0 {
-			rightW = math.Min(d-offX*0.4, depth)
-			leftW = d * 0.3
-		}
-
-		if paintTop && topH > 0 && topH < height-0.5 {
-			op := shadowFillOp(posX, posY, width, topH, shadow.color, radiusX, radiusY)
-			op.Alpha = alpha
-			dst = append(dst, op)
-		}
-		if paintBot && botH > 0 && height > botH+0.5 {
-			op := shadowFillOp(posX, posY+height-botH, width, botH, shadow.color, radiusX, radiusY)
-			op.Alpha = alpha
-			dst = append(dst, op)
-		}
-		if paintLeft && leftW > 0 && leftW < width-0.5 {
-			op := shadowFillOp(posX, posY, leftW, height, shadow.color, radiusX, radiusY)
-			op.Alpha = alpha
-			dst = append(dst, op)
-		}
-		if paintRight && rightW > 0 && width > rightW+0.5 {
-			op := shadowFillOp(posX+width-rightW, posY, rightW, height, shadow.color, radiusX, radiusY)
-			op.Alpha = alpha
-			dst = append(dst, op)
-		}
+		dst = appendInsetShadowTopBottom(dst, shadow, posX, posY, width, height, radiusX, radiusY, rims)
+		dst = appendInsetShadowLeftRight(dst, shadow, posX, posY, width, height, radiusX, radiusY, rims)
 	}
 
+	return dst
+}
+
+// insetShadowDepth caps the inner wash so small chips keep their fill readable.
+func insetShadowDepth(spread, blur, width, height, offX, offY float64) float64 {
+	depth := spread + blur*0.5 + math.Max(math.Abs(offX), math.Abs(offY))*0.5
+	if depth < 1 {
+		depth = 1
+	}
+	maxDepth := math.Min(width, height) * 0.22
+	if maxDepth < 1.5 {
+		maxDepth = 1.5
+	}
+	if depth > maxDepth {
+		depth = maxDepth
+	}
+	return depth
+}
+
+// insetShadowStepCount spreads blurred shadows over more bands than sharp ones.
+func insetShadowStepCount(blur float64) int {
+	steps := boxShadowBlurSteps * 2
+	if blur <= 0 {
+		steps = 3
+	}
+	return steps
+}
+
+// insetShadowStepAlpha fades each band inward, keeping the peak alpha low so
+// the fill stays visible. ok is false when the band is too faint to paint.
+func insetShadowStepAlpha(baseAlpha, blur, t float64) (float64, bool) {
+	alpha := baseAlpha * (1.0 - t) * 0.28
+	if blur <= 0 {
+		alpha = baseAlpha * (1.0 - t) * 0.4
+	}
+	if alpha < 0.025 {
+		return 0, false
+	}
+	return alpha, true
+}
+
+// insetShadowRimSizes biases rim thickness toward the light side: a positive
+// offset throws the shadow down/right, so the top/left rim reads stronger.
+func insetShadowRimSizes(offX, offY, d, depth float64) (float64, float64, float64, float64) {
+	topH, botH, leftW, rightW := d, d*0.3, d, d*0.3
+	if offY > 0 {
+		topH = math.Min(d+offY*0.4, depth)
+	} else if offY < 0 {
+		botH = math.Min(d-offY*0.4, depth)
+		topH = d * 0.3
+	}
+	if offX > 0 {
+		leftW = math.Min(d+offX*0.4, depth)
+	} else if offX < 0 {
+		rightW = math.Min(d-offX*0.4, depth)
+		leftW = d * 0.3
+	}
+	return topH, botH, leftW, rightW
+}
+
+// insetShadowRims is one band of the inset wash: which edges paint and how thick.
+type insetShadowRims struct {
+	paintTop, paintBot, paintLeft, paintRight bool
+	topH, botH, leftW, rightW                 float64
+	alpha                                     float64
+}
+
+func appendInsetShadowTopBottom(
+	dst []Op, shadow parsedBoxShadow, posX, posY, width, height float64,
+	radiusX, radiusY [4]float64, rims insetShadowRims,
+) []Op {
+	if rims.paintTop && rims.topH > 0 && rims.topH < height-0.5 {
+		op := shadowFillOp(posX, posY, width, rims.topH, shadow.color, radiusX, radiusY)
+		op.Alpha = rims.alpha
+		dst = append(dst, op)
+	}
+	if rims.paintBot && rims.botH > 0 && height > rims.botH+0.5 {
+		op := shadowFillOp(posX, posY+height-rims.botH, width, rims.botH, shadow.color, radiusX, radiusY)
+		op.Alpha = rims.alpha
+		dst = append(dst, op)
+	}
+	return dst
+}
+
+func appendInsetShadowLeftRight(
+	dst []Op, shadow parsedBoxShadow, posX, posY, width, height float64,
+	radiusX, radiusY [4]float64, rims insetShadowRims,
+) []Op {
+	if rims.paintLeft && rims.leftW > 0 && rims.leftW < width-0.5 {
+		op := shadowFillOp(posX, posY, rims.leftW, height, shadow.color, radiusX, radiusY)
+		op.Alpha = rims.alpha
+		dst = append(dst, op)
+	}
+	if rims.paintRight && rims.rightW > 0 && width > rims.rightW+0.5 {
+		op := shadowFillOp(posX+width-rims.rightW, posY, rims.rightW, height, shadow.color, radiusX, radiusY)
+		op.Alpha = rims.alpha
+		dst = append(dst, op)
+	}
 	return dst
 }
 

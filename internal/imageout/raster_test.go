@@ -137,10 +137,22 @@ func TestAxisAlignedBorderLinesFillOuterCorners(t *testing.T) {
 		Width:  100,
 		Height: 80,
 		Ops: []layout.Op{
-			{Kind: layout.OpLine, X: boxX, Y: boxY, W: boxW, H: 0, Width: width, R: 0.1, G: 0.2, B: 0.4},       //nolint:exhaustruct // top
-			{Kind: layout.OpLine, X: boxX + boxW, Y: boxY, W: 0, H: boxH, Width: width, R: 0.1, G: 0.2, B: 0.4}, //nolint:exhaustruct // right
-			{Kind: layout.OpLine, X: boxX, Y: boxY + boxH, W: boxW, H: 0, Width: width, R: 0.1, G: 0.2, B: 0.4}, //nolint:exhaustruct // bottom
-			{Kind: layout.OpLine, X: boxX, Y: boxY, W: 0, H: boxH, Width: width, R: 0.1, G: 0.2, B: 0.4},       //nolint:exhaustruct // left
+			{ //nolint:exhaustruct // top
+				Kind: layout.OpLine, X: boxX, Y: boxY, W: boxW, H: 0,
+				Width: width, R: 0.1, G: 0.2, B: 0.4,
+			},
+			{ //nolint:exhaustruct // right
+				Kind: layout.OpLine, X: boxX + boxW, Y: boxY, W: 0, H: boxH,
+				Width: width, R: 0.1, G: 0.2, B: 0.4,
+			},
+			{ //nolint:exhaustruct // bottom
+				Kind: layout.OpLine, X: boxX, Y: boxY + boxH, W: boxW, H: 0,
+				Width: width, R: 0.1, G: 0.2, B: 0.4,
+			},
+			{ //nolint:exhaustruct // left
+				Kind: layout.OpLine, X: boxX, Y: boxY, W: 0, H: boxH,
+				Width: width, R: 0.1, G: 0.2, B: 0.4,
+			},
 		},
 	}
 
@@ -151,10 +163,11 @@ func TestAxisAlignedBorderLinesFillOuterCorners(t *testing.T) {
 
 	// Outer corner sits half a stroke outside the centerline join.
 	halfPx := (width / 2) * ptToPx
+
 	checks := []image.Point{
-		{X: int(math.Round(boxX*ptToPx - halfPx + 1)), Y: int(math.Round(boxY*ptToPx - halfPx + 1))},             // TL
-		{X: int(math.Round((boxX+boxW)*ptToPx + halfPx - 2)), Y: int(math.Round(boxY*ptToPx - halfPx + 1))},       // TR
-		{X: int(math.Round(boxX*ptToPx - halfPx + 1)), Y: int(math.Round((boxY+boxH)*ptToPx + halfPx - 2))},       // BL
+		{X: int(math.Round(boxX*ptToPx - halfPx + 1)), Y: int(math.Round(boxY*ptToPx - halfPx + 1))},               // TL
+		{X: int(math.Round((boxX+boxW)*ptToPx + halfPx - 2)), Y: int(math.Round(boxY*ptToPx - halfPx + 1))},        // TR
+		{X: int(math.Round(boxX*ptToPx - halfPx + 1)), Y: int(math.Round((boxY+boxH)*ptToPx + halfPx - 2))},        // BL
 		{X: int(math.Round((boxX+boxW)*ptToPx + halfPx - 2)), Y: int(math.Round((boxY+boxH)*ptToPx + halfPx - 2))}, // BR
 	}
 	for _, pt := range checks {

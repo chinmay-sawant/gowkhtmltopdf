@@ -21,6 +21,7 @@ func backgroundRepeatAxes(sty ResolvedStyle) (string, string) {
 
 func backgroundRepeatBase(sty ResolvedStyle) (string, string) {
 	repeatX, repeatY := parseBackgroundRepeatShorthand(sty.BackgroundRepeat)
+
 	if sty.BackgroundRepeat == "" && hasBackgroundRepeatAxisLonghand(sty) {
 		return backgroundRepeatRepeat, backgroundRepeatRepeat
 	}
@@ -44,6 +45,7 @@ func overrideBackgroundRepeat(current, value string) string {
 func applyLogicalBackgroundRepeat(sty ResolvedStyle, repeatX, repeatY string) (string, string) {
 	block := normalizeBackgroundRepeatValue(sty.BackgroundRepeatBlock)
 	inline := normalizeBackgroundRepeatValue(sty.BackgroundRepeatInline)
+
 	if backgroundRepeatIsVerticalWritingMode(sty.WritingMode) {
 		return overrideBackgroundRepeat(repeatX, block), overrideBackgroundRepeat(repeatY, inline)
 	}
@@ -60,6 +62,7 @@ func parseBackgroundRepeatShorthand(value string) (string, string) {
 	if len(parts) == 0 {
 		return backgroundRepeatRepeat, backgroundRepeatRepeat
 	}
+
 	if len(parts) >= backgroundRepeatShorthandTwoValues {
 		return normalizedRepeatOrDefault(parts[0]), normalizedRepeatOrDefault(parts[1])
 	}

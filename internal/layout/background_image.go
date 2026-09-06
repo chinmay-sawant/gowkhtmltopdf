@@ -1,4 +1,4 @@
-//nolint:varnamelen,cyclop,wsl,intrange,nlreturn,funlen,mnd,goconst,gocognit // background layers
+//nolint:varnamelen,cyclop,wsl,nlreturn,funlen,mnd,goconst,gocognit // background layers
 package layout
 
 import (

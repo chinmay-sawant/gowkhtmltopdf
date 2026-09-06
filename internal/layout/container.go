@@ -160,7 +160,7 @@ func contentBaseInlineSize(sty ResolvedStyle, availW float64) (float64, bool) {
 	switch {
 	case sty.WidthPercent >= 0:
 		if availW > 0 && availW < 1e12 {
-			return availW * sty.WidthPercent / 100, true
+			return availW * sty.WidthPercent / oneHundred, true
 		}
 	case sty.Width >= 0:
 		return sty.Width, true

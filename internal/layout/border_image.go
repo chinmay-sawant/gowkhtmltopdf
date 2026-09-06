@@ -3,10 +3,11 @@ package layout
 
 import (
 	"bytes"
+	"fmt"
 	"image"
 	"image/draw"
-	_ "image/gif"
-	_ "image/jpeg"
+	_ "image/gif"  // Register GIF decoder for cropBorderImage via image.Decode.
+	_ "image/jpeg" // Register JPEG decoder for cropBorderImage via image.Decode.
 	"image/png"
 	"math"
 	"strconv"
@@ -38,6 +39,22 @@ func applyBorderImageProps(style *ResolvedStyle, prop, value string) bool {
 const (
 	maxBorderImageRepeatTokens = 2
 	borderRepeatRound          = "round"
+	borderRepeatRepeat         = "repeat"
+	borderRepeatSpace          = "space"
+
+	borderImageFullCount   = 4
+	borderImagePairCount   = 2
+	borderImageTripleCount = 3
+
+	borderImageSliceSection  = 0
+	borderImageWidthSection  = 1
+	borderImageOutsetSection = 2
+
+	borderImageTopEdge    = 0
+	borderImageBottomEdge = 2
+
+	borderImagePercentDivisor      = 100
+	fallbackBorderImageThicknessPx = 6
 )
 
 func parseBorderImageShorthand(style *ResolvedStyle, value string) {
@@ -49,58 +66,113 @@ func parseBorderImageShorthand(style *ResolvedStyle, value string) {
 	style.BorderImageRepeat = ""
 
 	if trimmed == "" || strings.EqualFold(trimmed, "none") {
-
 		return
 	}
 
+	source, nonURL := borderImageSourceAndRemainder(trimmed)
+	style.BorderImageSource = source
+
+	normalized := strings.ReplaceAll(nonURL, "/", " / ")
+	cleanedSections, repeatTokens := splitBorderImageSections(normalized)
+
+	if len(cleanedSections) > borderImageSliceSection {
+		style.BorderImageSlice = strings.TrimSpace(cleanedSections[borderImageSliceSection])
+	}
+
+	if len(cleanedSections) > borderImageWidthSection {
+		style.BorderImageWidth = strings.TrimSpace(cleanedSections[borderImageWidthSection])
+	}
+
+	if len(cleanedSections) > borderImageOutsetSection {
+		style.BorderImageOutset = strings.TrimSpace(cleanedSections[borderImageOutsetSection])
+	}
+
+	if len(repeatTokens) > 0 {
+		style.BorderImageRepeat = strings.Join(repeatTokens, " ")
+	}
+}
+
+// borderImageSourceAndRemainder extracts the border-image-source URL and the
+// remaining shorthand text without the url(...) token.
+func borderImageSourceAndRemainder(trimmed string) (string, string) {
+	source := ""
+
 	if url, ok := firstCSSUrl(trimmed); ok {
-		style.BorderImageSource = url
+		source = url
 	} else if strings.HasPrefix(trimmed, "url(") {
-		style.BorderImageSource = urlFunctionTarget(trimmed)
+		source = urlFunctionTarget(trimmed)
 	}
 
 	nonURL := trimmed
-
 	start := strings.Index(strings.ToLower(trimmed), "url(")
+
 	if start >= 0 {
 		end := strings.Index(trimmed[start:], ")")
+
 		if end >= 0 {
 			nonURL = trimmed[:start] + " " + trimmed[start+end+1:]
 		}
 	}
 
-	normalized := strings.ReplaceAll(nonURL, "/", " / ")
+	return source, nonURL
+}
+
+// splitBorderImageSections splits slash-separated slice/width/outset sections
+// and pulls repeat keywords into repeatTokens.
+func splitBorderImageSections(normalized string) ([]string, []string) {
 	sections := strings.Split(normalized, "/")
-	var cleanedSections []string
+	cleanedSections := make([]string, 0, len(sections))
 	repeatTokens := make([]string, 0, maxBorderImageRepeatTokens)
+
 	for _, section := range sections {
-		var kept []string
-		for _, tok := range strings.Fields(section) {
-			tok = strings.Trim(tok, ",")
-			tokLower := strings.ToLower(tok)
-			switch tokLower {
-			case "stretch", "repeat", borderRepeatRound, "space":
-				if len(repeatTokens) < maxBorderImageRepeatTokens {
-					repeatTokens = append(repeatTokens, tokLower)
-				}
-			default:
-				kept = append(kept, tok)
-			}
-		}
-		cleanedSections = append(cleanedSections, strings.Join(kept, " "))
+		cleaned, updated := extractBorderImageRepeats(section, repeatTokens)
+		repeatTokens = updated
+
+		cleanedSections = append(cleanedSections, cleaned)
 	}
 
-	if len(cleanedSections) > 0 {
-		style.BorderImageSlice = strings.TrimSpace(cleanedSections[0])
+	return cleanedSections, repeatTokens
+}
+
+// extractBorderImageRepeats separates one section into its kept content and
+// the repeat keywords it contains.
+func extractBorderImageRepeats(section string, repeatTokens []string) (string, []string) {
+	fields := strings.Fields(section)
+	kept := make([]string, 0, len(fields))
+
+	for _, tok := range fields {
+		cleaned := strings.Trim(tok, ",")
+		lowered := strings.ToLower(cleaned)
+
+		if isBorderImageRepeatToken(lowered) {
+			repeatTokens = appendBorderImageRepeat(repeatTokens, lowered)
+
+			continue
+		}
+
+		kept = append(kept, cleaned)
 	}
-	if len(cleanedSections) > 1 {
-		style.BorderImageWidth = strings.TrimSpace(cleanedSections[1])
+
+	return strings.Join(kept, " "), repeatTokens
+}
+
+// appendBorderImageRepeat records one repeat keyword up to the two-token cap.
+func appendBorderImageRepeat(repeatTokens []string, token string) []string {
+	if len(repeatTokens) >= maxBorderImageRepeatTokens {
+		return repeatTokens
 	}
-	if len(cleanedSections) > 2 {
-		style.BorderImageOutset = strings.TrimSpace(cleanedSections[2])
-	}
-	if len(repeatTokens) > 0 {
-		style.BorderImageRepeat = strings.Join(repeatTokens, " ")
+
+	return append(repeatTokens, token)
+}
+
+// isBorderImageRepeatToken reports whether a lowercased token is a
+// border-image repeat keyword rather than slice/width/outset content.
+func isBorderImageRepeatToken(token string) bool {
+	switch token {
+	case fxStretch, borderRepeatRepeat, borderRepeatRound, borderRepeatSpace:
+		return true
+	default:
+		return false
 	}
 }
 
@@ -122,113 +194,156 @@ func (e *engine) appendBorderImage(
 	}
 
 	src := backgroundImageSrc(sty.BorderImageSource)
+
 	if src == "" {
 		src = sty.BorderImageSource
 	}
 
 	ref := e.resolveImage(src)
+
 	if ref == nil || ref.data == nil {
 		return dst
 	}
 
-	// Parse outset/width/slice/repeat.
 	outsetSpec := parseBorderImageDimensionFour(sty.BorderImageOutset, sty.FontSize)
 	widthSpec := parseBorderImageDimensionFour(sty.BorderImageWidth, sty.FontSize)
 	sliceFracs, hasSlice, hasFill := parseBorderImageSliceFracs(sty.BorderImageSlice, ref.w, ref.h)
 	repeat := strings.ToLower(strings.TrimSpace(sty.BorderImageRepeat))
 
-	borderWidths := [4]float64{
-		borderPaint(sty.BorderTop), borderPaint(sty.BorderRight),
-		borderPaint(sty.BorderBottom), borderPaint(sty.BorderLeft),
-	}
-	var thick [4]float64
-	for i, spec := range widthSpec {
-		switch {
-		case !spec.set || spec.auto:
-			thick[i] = borderWidths[i]
-		case spec.multiplier:
-			thick[i] = borderWidths[i] * spec.value
-		default:
-			thick[i] = spec.value
-		}
-	}
-
-	// If no usable border widths are available, retain the historical 6px fallback.
-	if thick[0] <= 0 && thick[1] <= 0 && thick[2] <= 0 && thick[3] <= 0 {
-		def := pxToPt(6)
-		thick = [4]float64{def, def, def, def}
-	}
-
-	var outset [4]float64
-	for i, spec := range outsetSpec {
-		if !spec.set {
-			continue
-		}
-		if spec.multiplier {
-			outset[i] = spec.value * thick[i]
-		} else {
-			outset[i] = spec.value
-		}
-	}
-
-	// Apply outset to expand bounds.
-	ox := posX - e.scalePt(outset[3])
-	oy := posY - e.scalePt(outset[0])
-	ow := width + e.scalePt(outset[1]+outset[3])
-	oh := height + e.scalePt(outset[0]+outset[2])
+	thick := borderImageThickness(widthSpec, borderWidthsOf(sty))
+	outset := borderImageOutset(outsetSpec, thick)
+	ox, oy, ow, oh := borderImageOuterBounds(e, posX, posY, width, height, outset)
 
 	if ow <= 0 || oh <= 0 {
 		return dst
 	}
 
-	// Scale thickness.
-	tTop := e.scalePt(thick[0])
-	tRight := e.scalePt(thick[1])
-	tBottom := e.scalePt(thick[2])
-	tLeft := e.scalePt(thick[3])
-
-	if tTop < 0 {
-		tTop = 0
-	}
-
-	if tRight < 0 {
-		tRight = 0
-	}
-
-	if tBottom < 0 {
-		tBottom = 0
-	}
-
-	if tLeft < 0 {
-		tLeft = 0
-	}
-
-	// Clamp thickness to half box to avoid overlap.
-	if tLeft+tRight > ow && ow > 0 {
-		scale := ow / (tLeft + tRight)
-		tLeft *= scale
-		tRight *= scale
-	}
-
-	if tTop+tBottom > oh && oh > 0 {
-		scale := oh / (tTop + tBottom)
-		tTop *= scale
-		tBottom *= scale
-	}
+	scaled := scaleBorderImageThickness(e, thick, ow, oh)
 
 	if !hasSlice {
 		return append(dst, newBorderImageOp(ox, oy, ow, oh, ref.data, ref.w, ref.h, ref.isJPEG))
 	}
 
-	// Border-image repeat modes need different edge placement. Stretch is the
-	// supported mode used by fixture 60 and maps each source slice to one
-	// destination corner or edge while leaving the center transparent unless
-	// `fill` was requested.
-	if strings.Contains(repeat, "repeat") || strings.Contains(repeat, borderRepeatRound) || strings.Contains(repeat, "space") {
-		return appendBorderImageRepeated(dst, ref, ox, oy, ow, oh, [4]float64{tTop, tRight, tBottom, tLeft}, sliceFracs, hasFill)
+	return appendBorderImageByRepeat(dst, ref, ox, oy, ow, oh, scaled, sliceFracs, repeat, hasFill)
+}
+
+// borderWidthsOf reads the painted widths of the four borders in top, right,
+// bottom, left order.
+func borderWidthsOf(sty ResolvedStyle) [4]float64 {
+	return [4]float64{
+		borderPaint(sty.BorderTop), borderPaint(sty.BorderRight),
+		borderPaint(sty.BorderBottom), borderPaint(sty.BorderLeft),
+	}
+}
+
+// borderImageThickness resolves the border-image-width spec against the painted
+// border widths, keeping the historical 6px fallback when all are unusable.
+func borderImageThickness(widthSpec [4]borderImageDimension, borderWidths [4]float64) [4]float64 {
+	var thick [4]float64
+
+	for idx, spec := range widthSpec {
+		switch {
+		case !spec.set || spec.auto:
+			thick[idx] = borderWidths[idx]
+		case spec.multiplier:
+			thick[idx] = borderWidths[idx] * spec.value
+		default:
+			thick[idx] = spec.value
+		}
 	}
 
-	return appendBorderImageStretched(dst, ref, ox, oy, ow, oh, [4]float64{tTop, tRight, tBottom, tLeft}, sliceFracs, hasFill)
+	if thick[0] <= 0 && thick[1] <= 0 && thick[2] <= 0 && thick[3] <= 0 {
+		def := pxToPt(fallbackBorderImageThicknessPx)
+		thick = [4]float64{def, def, def, def}
+	}
+
+	return thick
+}
+
+// borderImageOutset resolves the border-image-outset spec against thickness.
+func borderImageOutset(outsetSpec [4]borderImageDimension, thick [4]float64) [4]float64 {
+	var outset [4]float64
+
+	for idx, spec := range outsetSpec {
+		if !spec.set {
+			continue
+		}
+
+		if spec.multiplier {
+			outset[idx] = spec.value * thick[idx]
+		} else {
+			outset[idx] = spec.value
+		}
+	}
+
+	return outset
+}
+
+// borderImageOuterBounds expands the border box by the outset on each side.
+func borderImageOuterBounds(
+	e *engine, posX, posY, width, height float64, outset [4]float64,
+) (float64, float64, float64, float64) {
+	ox := posX - e.scalePt(outset[3])
+	oy := posY - e.scalePt(outset[0])
+	ow := width + e.scalePt(outset[1]+outset[3])
+	oh := height + e.scalePt(outset[0]+outset[2])
+
+	return ox, oy, ow, oh
+}
+
+// scaleBorderImageThickness converts thickness to device units and clamps it
+// to non-negative values within half the outer box to avoid overlap.
+func scaleBorderImageThickness(e *engine, thick [4]float64, ow, oh float64) [4]float64 {
+	scaled := [4]float64{
+		e.scalePt(thick[0]), e.scalePt(thick[1]),
+		e.scalePt(thick[2]), e.scalePt(thick[3]),
+	}
+
+	for idx := range scaled {
+		if scaled[idx] < 0 {
+			scaled[idx] = 0
+		}
+	}
+
+	if scaled[3]+scaled[1] > ow && ow > 0 {
+		scale := ow / (scaled[3] + scaled[1])
+		scaled[3] *= scale
+		scaled[1] *= scale
+	}
+
+	if scaled[0]+scaled[2] > oh && oh > 0 {
+		scale := oh / (scaled[0] + scaled[2])
+		scaled[0] *= scale
+		scaled[2] *= scale
+	}
+
+	return scaled
+}
+
+// appendBorderImageByRepeat dispatches tiled repeat modes to the repeated
+// painter and everything else to the stretched painter.
+func appendBorderImageByRepeat(
+	dst []Op,
+	ref *imageRef,
+	ox, oy, ow, oh float64,
+	thick [4]float64,
+	sliceFracs [4]float64,
+	repeat string,
+	hasFill bool,
+) []Op {
+	if isTiledBorderImageRepeat(repeat) {
+		return appendBorderImageRepeated(dst, ref, ox, oy, ow, oh, thick, sliceFracs, hasFill)
+	}
+
+	return appendBorderImageStretched(dst, ref, ox, oy, ow, oh, thick, sliceFracs, hasFill)
+}
+
+// isTiledBorderImageRepeat reports whether the repeat value asks for tiled
+// edges instead of stretched ones.
+func isTiledBorderImageRepeat(repeat string) bool {
+	return strings.Contains(repeat, borderRepeatRepeat) ||
+		strings.Contains(repeat, borderRepeatRound) ||
+		strings.Contains(repeat, borderRepeatSpace)
 }
 
 func newBorderImageOp(x, y, w, h float64, data []byte, imgW, imgH int, isJPEG bool) Op {
@@ -246,6 +361,9 @@ func newBorderImageOp(x, y, w, h float64, data []byte, imgW, imgH int, isJPEG bo
 	}
 }
 
+// appendBorderImageStretched paints the 3x3 slice grid with each source slice
+// mapped to one destination corner or edge, leaving the center transparent
+// unless fill was requested. This is the supported mode used by fixture 60.
 func appendBorderImageStretched(
 	dst []Op,
 	ref *imageRef,
@@ -255,40 +373,82 @@ func appendBorderImageStretched(
 	hasFill bool,
 ) []Op {
 	slice := borderImageSlicePixels(sliceFracs, ref.w, ref.h)
-	srcTop, srcRight, srcBottom, srcLeft := slice[0], slice[1], slice[2], slice[3]
+	innerW, innerH := clampBorderImageInner(ow, oh, thick)
+	srcX, srcY, srcW, srcH := borderImageSourceGrid(ref, slice)
+	dstX, dstY, dstW, dstH := borderImageDestGrid(ox, oy, ow, oh, thick, innerW, innerH)
+
+	for row := range 3 {
+		for col := range 3 {
+			dst = appendBorderImageCell(
+				dst, ref, srcX, srcY, srcW, srcH, dstX, dstY, dstW, dstH, row, col, hasFill,
+			)
+		}
+	}
+
+	return dst
+}
+
+// clampBorderImageInner derives the center-cell size, floored at zero.
+func clampBorderImageInner(ow, oh float64, thick [4]float64) (float64, float64) {
 	innerW := ow - thick[3] - thick[1]
 	innerH := oh - thick[0] - thick[2]
+
 	if innerW < 0 {
 		innerW = 0
 	}
+
 	if innerH < 0 {
 		innerH = 0
 	}
+
+	return innerW, innerH
+}
+
+// borderImageSourceGrid maps slice pixels to source column/row origins and sizes.
+func borderImageSourceGrid(ref *imageRef, slice [4]int) ([3]int, [3]int, [3]int, [3]int) {
+	srcTop, srcRight, srcBottom, srcLeft := slice[0], slice[1], slice[2], slice[3]
 
 	srcX := [3]int{0, srcLeft, ref.w - srcRight}
 	srcY := [3]int{0, srcTop, ref.h - srcBottom}
 	srcW := [3]int{srcLeft, ref.w - srcLeft - srcRight, srcRight}
 	srcH := [3]int{srcTop, ref.h - srcTop - srcBottom, srcBottom}
+
+	return srcX, srcY, srcW, srcH
+}
+
+// borderImageDestGrid maps thickness and inner size to destination origins and sizes.
+func borderImageDestGrid(
+	ox, oy, ow, oh float64, thick [4]float64, innerW, innerH float64,
+) ([3]float64, [3]float64, [3]float64, [3]float64) {
 	dstX := [3]float64{ox, ox + thick[3], ox + ow - thick[1]}
 	dstY := [3]float64{oy, oy + thick[0], oy + oh - thick[2]}
 	dstW := [3]float64{thick[3], innerW, thick[1]}
 	dstH := [3]float64{thick[0], innerH, thick[2]}
 
-	for row := range 3 {
-		for col := range 3 {
-			if row == 1 && col == 1 && !hasFill {
-				continue
-			}
-			if srcW[col] <= 0 || srcH[row] <= 0 || dstW[col] <= 0 || dstH[row] <= 0 {
-				continue
-			}
+	return dstX, dstY, dstW, dstH
+}
 
-			srcRect := image.Rect(srcX[col], srcY[row], srcX[col]+srcW[col], srcY[row]+srcH[row])
-			dst = appendBorderImagePart(dst, ref, srcRect, dstX[col], dstY[row], dstW[col], dstH[row])
-		}
+// appendBorderImageCell paints one of the nine stretched grid cells, skipping
+// the transparent center unless fill was requested and any empty slice.
+func appendBorderImageCell(
+	dst []Op,
+	ref *imageRef,
+	srcX, srcY, srcW, srcH [3]int,
+	dstX, dstY, dstW, dstH [3]float64,
+	row, col int,
+	hasFill bool,
+) []Op {
+	if row == 1 && col == 1 && !hasFill {
+		return dst
 	}
 
-	return dst
+	if srcW[col] <= 0 || srcH[row] <= 0 || dstW[col] <= 0 || dstH[row] <= 0 {
+		return dst
+	}
+
+	srcRect := image.Rect(srcX[col], srcY[row], srcX[col]+srcW[col], srcY[row]+srcH[row])
+
+	return appendBorderImagePart(dst, ref, srcRect, dstX[col], dstY[row], dstW[col], dstH[row])
 }
 
 func appendBorderImageRepeated(
@@ -322,10 +482,11 @@ func appendBorderImagePart(
 func cropBorderImage(data []byte, src image.Rectangle) ([]byte, error) {
 	img, _, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("decode border image: %w", err)
 	}
 
 	src = src.Intersect(img.Bounds())
+
 	if src.Empty() {
 		return nil, image.ErrFormat
 	}
@@ -335,7 +496,7 @@ func cropBorderImage(data []byte, src image.Rectangle) ([]byte, error) {
 
 	var out bytes.Buffer
 	if err := png.Encode(&out, cropped); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("encode border image slice: %w", err)
 	}
 
 	return out.Bytes(), nil
@@ -353,6 +514,7 @@ func borderImageSlicePixels(fracs [4]float64, imgW, imgH int) [4]int {
 		pixels[0] = int(math.Round(float64(pixels[0]) * scale))
 		pixels[2] = imgH - pixels[0]
 	}
+
 	if pixels[1]+pixels[3] > imgW {
 		scale := float64(imgW) / float64(pixels[1]+pixels[3])
 		pixels[1] = int(math.Round(float64(pixels[1]) * scale))
@@ -362,12 +524,13 @@ func borderImageSlicePixels(fracs [4]float64, imgW, imgH int) [4]int {
 	return pixels
 }
 
-func clampBorderImagePixel(value, max int) int {
+func clampBorderImagePixel(value, limit int) int {
 	if value < 0 {
 		return 0
 	}
-	if value > max {
-		return max
+
+	if value > limit {
+		return limit
 	}
 
 	return value
@@ -375,66 +538,105 @@ func clampBorderImagePixel(value, max int) int {
 
 func parseBorderImageSliceFracs(s string, imgW, imgH int) ([4]float64, bool, bool) {
 	trimmed := strings.TrimSpace(s)
+
 	if trimmed == "" {
 		return [4]float64{}, false, false
 	}
 
-	hasFill := strings.Contains(strings.ToLower(trimmed), "fill")
-	// Strip fill keyword for tokenisation.
-	trimmed = strings.ReplaceAll(trimmed, "fill", " ")
-	trimmed = strings.ReplaceAll(trimmed, "Fill", " ")
-	trimmed = strings.ReplaceAll(trimmed, "FILL", " ")
-	// Remove slash separators.
-	trimmed = strings.ReplaceAll(trimmed, "/", " ")
+	withoutFill, hasFill := stripBorderImageFill(trimmed)
+	toks := strings.Fields(withoutFill)
 
-	toks := strings.Fields(trimmed)
 	if len(toks) == 0 {
 		return [4]float64{}, false, hasFill
 	}
 
-	// Up to 4 numeric tokens.
-	vals := make([]float64, 0, 4)
-	isPct := make([]bool, 0, 4)
+	vals, isPct := parseBorderImageSliceValues(toks)
+
+	if len(vals) == 0 {
+		return [4]float64{}, false, hasFill
+	}
+
+	exp, expPct := expandBorderImageSliceValues(vals, isPct)
+
+	return sliceFracsFromExpanded(exp, expPct, imgW, imgH), true, hasFill
+}
+
+// stripBorderImageFill removes fill keywords and slash separators, reporting
+// whether the fill keyword was present.
+func stripBorderImageFill(trimmed string) (string, bool) {
+	hasFill := strings.Contains(strings.ToLower(trimmed), "fill")
+	withoutFill := strings.ReplaceAll(trimmed, "fill", " ")
+	withoutFill = strings.ReplaceAll(withoutFill, "Fill", " ")
+	withoutFill = strings.ReplaceAll(withoutFill, "FILL", " ")
+	// Remove slash separators.
+	withoutFill = strings.ReplaceAll(withoutFill, "/", " ")
+
+	return withoutFill, hasFill
+}
+
+// parseBorderImageSliceValues reads up to four numeric slice tokens,
+// tracking which were percentages.
+func parseBorderImageSliceValues(toks []string) ([]float64, []bool) {
+	vals := make([]float64, 0, borderImageFullCount)
+	isPct := make([]bool, 0, borderImageFullCount)
 
 	for _, tok := range toks {
 		if tok == "" {
 			continue
 		}
 
-		if strings.HasSuffix(tok, "%") {
-			numStr := strings.TrimSuffix(tok, "%")
-			if v, err := strconv.ParseFloat(numStr, 64); err == nil {
-				vals = append(vals, v)
-				isPct = append(isPct, true)
-			}
-		} else {
-			if v, err := strconv.ParseFloat(tok, 64); err == nil {
-				vals = append(vals, v)
-				isPct = append(isPct, false)
-			}
-		}
+		vals, isPct = appendBorderImageSliceValue(vals, isPct, tok)
 
-		if len(vals) >= 4 {
+		if len(vals) >= borderImageFullCount {
 			break
 		}
 	}
 
-	if len(vals) == 0 {
-		return [4]float64{}, false, hasFill
+	return vals, isPct
+}
+
+// appendBorderImageSliceValue parses one slice token as a percent or a bare
+// number, appending it to vals when valid.
+func appendBorderImageSliceValue(
+	vals []float64, isPct []bool, tok string,
+) ([]float64, []bool) {
+	if strings.HasSuffix(tok, "%") {
+		numStr := strings.TrimSuffix(tok, "%")
+		value, err := strconv.ParseFloat(numStr, 64)
+
+		if err == nil {
+			vals = append(vals, value)
+			isPct = append(isPct, true)
+		}
+
+		return vals, isPct
 	}
 
-	// Expand to 4 per CSS clockwise.
-	var exp [4]float64
-	var expPct [4]bool
+	value, err := strconv.ParseFloat(tok, 64)
+
+	if err == nil {
+		vals = append(vals, value)
+		isPct = append(isPct, false)
+	}
+
+	return vals, isPct
+}
+
+// expandBorderImageSliceValues expands one to four values to clockwise order.
+func expandBorderImageSliceValues(vals []float64, isPct []bool) ([4]float64, [4]bool) {
+	var (
+		exp    [4]float64
+		expPct [4]bool
+	)
 
 	switch len(vals) {
 	case 1:
 		exp = [4]float64{vals[0], vals[0], vals[0], vals[0]}
 		expPct = [4]bool{isPct[0], isPct[0], isPct[0], isPct[0]}
-	case 2:
+	case borderImagePairCount:
 		exp = [4]float64{vals[0], vals[1], vals[0], vals[1]}
 		expPct = [4]bool{isPct[0], isPct[1], isPct[0], isPct[1]}
-	case 3:
+	case borderImageTripleCount:
 		exp = [4]float64{vals[0], vals[1], vals[2], vals[1]}
 		expPct = [4]bool{isPct[0], isPct[1], isPct[2], isPct[1]}
 	default:
@@ -442,49 +644,66 @@ func parseBorderImageSliceFracs(s string, imgW, imgH int) ([4]float64, bool, boo
 		expPct = [4]bool{isPct[0], isPct[1], isPct[2], isPct[3]}
 	}
 
-	// Convert to fractions 0..1.
+	return exp, expPct
+}
+
+// sliceFracsFromExpanded converts expanded slice values to fractions,
+// resolving bare numbers against the image dimensions.
+func sliceFracsFromExpanded(
+	exp [4]float64, expPct [4]bool, imgW, imgH int,
+) [4]float64 {
 	var frac [4]float64
-	for i := 0; i < 4; i++ {
-		if expPct[i] {
-			frac[i] = exp[i] / 100
+
+	for idx := range borderImageFullCount {
+		if expPct[idx] {
+			frac[idx] = exp[idx] / borderImagePercentDivisor
 		} else {
-			// Numeric: slice pixels relative to image dimension.
-			dim := imgW
-			if i == 0 || i == 2 {
-				dim = imgH
-			}
-
-			if dim > 0 {
-				frac[i] = exp[i] / float64(dim)
-			} else {
-				frac[i] = exp[i] / 100
-			}
+			frac[idx] = numericBorderImageFrac(exp[idx], idx, imgW, imgH)
 		}
 
-		if frac[i] < 0 {
-			frac[i] = 0
+		if frac[idx] < 0 {
+			frac[idx] = 0
 		}
 
-		if frac[i] > 1 {
-			frac[i] = 1
+		if frac[idx] > 1 {
+			frac[idx] = 1
 		}
 	}
 
-	return frac, true, hasFill
+	return frac
+}
+
+// numericBorderImageFrac resolves a bare slice number against the relevant
+// image dimension, falling back to percent semantics when unknown.
+func numericBorderImageFrac(value float64, idx, imgW, imgH int) float64 {
+	dim := imgW
+
+	if idx == borderImageTopEdge || idx == borderImageBottomEdge {
+		dim = imgH
+	}
+
+	if dim > 0 {
+		return value / float64(dim)
+	}
+
+	return value / borderImagePercentDivisor
 }
 
 func parseBorderImageDimensionFour(s string, fsize float64) [4]borderImageDimension {
 	toks := strings.Fields(strings.ReplaceAll(s, "/", " "))
+
 	if len(toks) == 0 {
 		return [4]borderImageDimension{}
 	}
 
-	values := make([]borderImageDimension, 0, 4)
+	values := make([]borderImageDimension, 0, borderImageFullCount)
+
 	for _, tok := range toks {
 		if value, ok := parseBorderImageDimension(tok, fsize); ok {
 			values = append(values, value)
 		}
-		if len(values) >= 4 {
+
+		if len(values) >= borderImageFullCount {
 			break
 		}
 	}
@@ -494,33 +713,40 @@ func parseBorderImageDimensionFour(s string, fsize float64) [4]borderImageDimens
 
 func parseBorderImageDimension(tok string, fsize float64) (borderImageDimension, bool) {
 	tok = strings.TrimSpace(tok)
+
 	if tok == "" {
-		return borderImageDimension{}, false
-	}
-	if strings.EqualFold(tok, "auto") {
-		return borderImageDimension{set: true, auto: true}, true
-	}
-	if value, err := strconv.ParseFloat(tok, 64); err == nil {
-		return borderImageDimension{value: value, set: true, multiplier: true}, true
-	}
-	if v, ok := plainLength(tok, fsize, 0); ok {
-		return borderImageDimension{value: v, set: true}, true
+		return borderImageDimension{value: 0, set: false, multiplier: false, auto: false}, false
 	}
 
-	return borderImageDimension{}, false
+	if strings.EqualFold(tok, "auto") {
+		return borderImageDimension{value: 0, set: true, multiplier: false, auto: true}, true
+	}
+
+	if value, err := strconv.ParseFloat(tok, 64); err == nil {
+		return borderImageDimension{value: value, set: true, multiplier: true, auto: false}, true
+	}
+
+	if v, ok := plainLength(tok, fsize, 0); ok {
+		return borderImageDimension{value: v, set: true, multiplier: false, auto: false}, true
+	}
+
+	return borderImageDimension{value: 0, set: false, multiplier: false, auto: false}, false
 }
 
 func expandBorderImageDimensions(values []borderImageDimension) [4]borderImageDimension {
 	if len(values) == 0 {
 		return [4]borderImageDimension{}
 	}
+
 	if len(values) == 1 {
 		return [4]borderImageDimension{values[0], values[0], values[0], values[0]}
 	}
-	if len(values) == 2 {
+
+	if len(values) == borderImagePairCount {
 		return [4]borderImageDimension{values[0], values[1], values[0], values[1]}
 	}
-	if len(values) == 3 {
+
+	if len(values) == borderImageTripleCount {
 		return [4]borderImageDimension{values[0], values[1], values[2], values[1]}
 	}
 

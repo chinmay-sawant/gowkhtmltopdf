@@ -1,6 +1,10 @@
 package layout
 
-const outlineSideHint = 4 // four sides of a rectangular outline
+const (
+	outlineSideHint        = 4 // four sides of a rectangular outline
+	outlineBothSidesFactor = 2 // outline inflates both sides of the box
+	mediumOutlineWidthPt   = 3 // fallback when medium width resolves to 0
+)
 
 // effectiveOutline returns the effective outline width/style after applying
 // CSS initial values for isolated longhands: width defaults to medium (3px)
@@ -12,23 +16,46 @@ func effectiveOutline(sty *ResolvedStyle) (float64, string) {
 		return 0, ""
 	}
 
-	w := sty.OutlineWidth
-	s := sty.OutlineStyle
+	outlineStyle := defaultedOutlineStyle(sty)
 
-	if s == "" || s == "none" {
-		if w > 0 || sty.OutlineColorSet {
-			s = solidKeyword
-		}
+	return defaultedOutlineWidth(sty, outlineStyle), outlineStyle
+}
+
+// defaultedOutlineStyle applies the CSS initial-value rule for isolated
+// style longhands: an empty/none style becomes solid when width>0 or a
+// color is set.
+func defaultedOutlineStyle(sty *ResolvedStyle) string {
+	style := sty.OutlineStyle
+	if (style == "" || style == textTransformNone) && (sty.OutlineWidth > 0 || sty.OutlineColorSet) {
+		return solidKeyword
 	}
 
-	if w <= 0 && (s == solidKeyword || s == borderStyleDashed || s == borderStyleDotted) {
-		w = borderWidth("medium", sty.FontSize)
-		if w <= 0 {
-			w = 3
-		}
+	return style
+}
+
+// defaultedOutlineWidth applies the CSS initial-value rule for isolated
+// width longhands: a zero width with a visible style becomes medium.
+func defaultedOutlineWidth(sty *ResolvedStyle, style string) float64 {
+	if sty.OutlineWidth > 0 || !outlineNeedsMediumWidth(style) {
+		return sty.OutlineWidth
 	}
 
-	return w, s
+	if medium := borderWidth("medium", sty.FontSize); medium > 0 {
+		return medium
+	}
+
+	return mediumOutlineWidthPt
+}
+
+// outlineNeedsMediumWidth reports visible outline styles that force a
+// medium width when no explicit width is set.
+func outlineNeedsMediumWidth(style string) bool {
+	switch style {
+	case solidKeyword, borderStyleDashed, borderStyleDotted:
+		return true
+	}
+
+	return false
 }
 
 // outlinePaints reports a CSS outline that should stroke. Empty or "none"
@@ -88,8 +115,8 @@ func appendOutlineOps(
 	inflate := outlineInflate(width, offset)
 	outX := posX - inflate
 	outY := posY - inflate
-	outW := boxW + 2*inflate
-	outH := boxH + 2*inflate
+	outW := boxW + outlineBothSidesFactor*inflate
+	outH := boxH + outlineBothSidesFactor*inflate
 
 	if outW <= 0 || outH <= 0 {
 		return dst
@@ -122,8 +149,8 @@ func (e *engine) roundedOutlineOp(
 	inflate := outlineInflate(outlineWidth, outlineOff)
 	outX := posX - inflate
 	outY := posY - inflate
-	outW := width + 2*inflate
-	outH := height + 2*inflate
+	outW := width + outlineBothSidesFactor*inflate
+	outH := height + outlineBothSidesFactor*inflate
 
 	if outW <= 0 || outH <= 0 {
 		return Op{}, false //nolint:exhaustruct

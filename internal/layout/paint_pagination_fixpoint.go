@@ -152,10 +152,17 @@ func opInPaintRange(index int, ranges []paintRange) bool {
 	return false
 }
 
+// snapAscenderRatio reserves ascender room above snapped text so snapped
+// lines do not paint into the top margin.
+const snapAscenderRatio = 0.75
+
+// minSnapLead is the smallest ascender lead when snapping text forward.
+const minSnapLead = 8
+
 // snapOpToBoundary shifts one crossing op (and the row chrome under it) onto
 // the next page, leaving ascender room above the boundary.
 func snapOpToBoundary(res *Result, idx int, paintOp *Op, boundary float64) {
-	if boundary-paintOp.Y > 1e-6 {
+	if boundary-paintOp.Y > layoutEpsilon {
 		snapOpForward(res, idx, paintOp, boundary)
 
 		return
@@ -180,19 +187,19 @@ func snapOpForward(res *Result, idx int, paintOp *Op, boundary float64) {
 	// lines do not paint into the top margin (page-4/5 bleed).
 	lead := 0.0
 	if paintOp.Kind == OpText || paintOp.Kind == OpBullet {
-		lead = paintOp.Size * 0.75
-		if lead < 8 {
-			lead = 8
+		lead = paintOp.Size * snapAscenderRatio
+		if lead < minSnapLead {
+			lead = minSnapLead
 		}
 	}
 
 	deltaY := boundary + lead - minY
-	shiftFlowY(res, idx, idx, oldY-0.01, deltaY)
+	shiftFlowY(res, idx, idx, oldY-layoutCoordEpsilon, deltaY)
 	shiftNearestOwnedChrome(res, idx, oldY, deltaY)
 
 	for _, j := range chrome {
 		o := &res.Ops[j]
-		if o.Y < oldY-0.01 {
+		if o.Y < oldY-layoutCoordEpsilon {
 			o.Y += deltaY
 		}
 	}
@@ -220,7 +227,7 @@ func shiftNearestOwnedChrome(res *Result, opIndex int, oldY, deltaY float64) {
 		for idx := boxNode.opStart; idx <= boxNode.opEnd && idx < len(res.Ops); idx++ {
 			chromeOp := &res.Ops[idx]
 			if idx == opIndex || !isOwnBoxChrome(*chromeOp, boxNode, boxNode.y+boxNode.height) ||
-				chromeOp.Y >= oldY-0.01 ||
+				chromeOp.Y >= oldY-layoutCoordEpsilon ||
 				(oldY-chromeOp.Y > rowChromeBandTolerance && chromeOp.Kind != OpLine) {
 				continue
 			}

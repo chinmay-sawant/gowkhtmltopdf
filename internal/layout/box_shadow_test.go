@@ -35,25 +35,8 @@ func TestBoxShadowPositionLonghandDoesNotOverrideShorthandRaw(t *testing.T) {
 	eng.prependChrome(0, boxNode, *sty, 10, 20, 80, 36)
 	ops := eng.deferredChrome[0].ops
 	// Outer shadow: dark fill before cream background, larger/offset from box.
-	bgIdx := -1
-	outerBefore := false
-	for i, op := range ops {
-		if op.Kind == OpFillRect && op.R > 0.9 && op.B > 0.9 {
-			bgIdx = i
-			break
-		}
-	}
-	if bgIdx < 0 {
-		t.Fatalf("missing background in %+v", ops)
-	}
-	for i := 0; i < bgIdx; i++ {
-		op := ops[i]
-		if op.Kind == OpFillRect && op.R < 0.5 {
-			outerBefore = true
-			break
-		}
-	}
-	if !outerBefore {
+	bgIdx := findCreamBackgroundIndex(t, ops)
+	if !hasOuterShadowBeforeBackground(ops, bgIdx) {
 		t.Fatalf("expected outer shadow fills before background; bgIdx=%d", bgIdx)
 	}
 }
@@ -146,16 +129,7 @@ func testBoxShadowInsetAfterBackground(t *testing.T) {
 		t.Fatalf("deferred chrome entries = %d, want 1", len(eng.deferredChrome))
 	}
 	ops := eng.deferredChrome[0].ops
-	bgIdx, shadowAfter := -1, false
-	for i, op := range ops {
-		if op.Kind == OpFillRect && op.R > 0.9 && op.G > 0.9 && op.B > 0.9 {
-			bgIdx = i
-		}
-		if bgIdx >= 0 && i > bgIdx && op.Kind == OpFillRect && op.R < 0.5 && op.G < 0.5 {
-			shadowAfter = true
-			break
-		}
-	}
+	bgIdx, shadowAfter := findInsetShadowAfterBackground(ops)
 	if bgIdx < 0 {
 		t.Fatalf("missing cream background fill in %+v", ops)
 	}
@@ -183,20 +157,7 @@ func testBoxShadowInsetTopLeftRim(t *testing.T) {
 	eng.prependChrome(0, boxNode, sty, 10, 20, 80, 30)
 	ops := eng.deferredChrome[0].ops
 
-	hasTop, hasLeft := false, false
-	for _, op := range ops {
-		if op.Kind != OpFillRect || op.R > 0.5 {
-			continue
-		}
-		// Top rim: near box top, spans most of width, short height.
-		if near(op.Y, 20) && op.H > 1 && op.H < 20 && op.W > 40 {
-			hasTop = true
-		}
-		// Left rim: near box left, tall strip.
-		if near(op.X, 10) && op.W > 1 && op.W < 25 && op.H > 15 {
-			hasLeft = true
-		}
-	}
+	hasTop, hasLeft := insetRimCoverage(ops)
 	if !hasTop || !hasLeft {
 		t.Fatalf("inset rim top=%v left=%v, want both; ops=%+v", hasTop, hasLeft, ops)
 	}
@@ -366,6 +327,89 @@ func testBoxShadowRoundedFill(t *testing.T) {
 	}
 
 	t.Fatal("rounded core shadow fill missing")
+}
+
+func findCreamBackgroundIndex(t *testing.T, ops []Op) int {
+	t.Helper()
+
+	for idx, op := range ops {
+		if op.Kind == OpFillRect && op.R > 0.9 && op.B > 0.9 {
+			return idx
+		}
+	}
+
+	t.Fatalf("missing background in %+v", ops)
+
+	return -1
+}
+
+func hasOuterShadowBeforeBackground(ops []Op, bgIdx int) bool {
+	for idx := range bgIdx {
+		op := ops[idx]
+
+		if op.Kind == OpFillRect && op.R < 0.5 {
+			return true
+		}
+	}
+
+	return false
+}
+
+func findInsetShadowAfterBackground(ops []Op) (int, bool) {
+	bgIdx := -1
+	shadowAfter := false
+
+	for idx, op := range ops {
+		if isCreamFill(op) {
+			bgIdx = idx
+		}
+
+		if bgIdx >= 0 && idx > bgIdx && isDarkFill(op) {
+			shadowAfter = true
+
+			break
+		}
+	}
+
+	return bgIdx, shadowAfter
+}
+
+func isCreamFill(op Op) bool {
+	return op.Kind == OpFillRect && op.R > 0.9 && op.G > 0.9 && op.B > 0.9
+}
+
+func isDarkFill(op Op) bool {
+	return op.Kind == OpFillRect && op.R < 0.5 && op.G < 0.5
+}
+
+func insetRimCoverage(ops []Op) (bool, bool) {
+	hasTop, hasLeft := false, false
+
+	for _, op := range ops {
+		if op.Kind != OpFillRect || op.R > 0.5 {
+			continue
+		}
+
+		// Top rim: near box top, spans most of width, short height.
+		if isInsetTopRim(op) {
+			hasTop = true
+		}
+
+		// Left rim: near box left, tall strip.
+		if isInsetLeftRim(op) {
+			hasLeft = true
+		}
+	}
+
+	return hasTop, hasLeft
+}
+
+func isInsetTopRim(op Op) bool {
+	return near(op.Y, 20) && op.H > 1 && op.H < 20 && op.W > 40
+}
+
+func isInsetLeftRim(op Op) bool {
+	return near(op.X, 10) && op.W > 1 && op.W < 25 && op.H > 15
 }
 
 func assertBoxShadow(t *testing.T, sty *ResolvedStyle, offsetX, offsetY, blur float64, color [3]float64, set bool) {

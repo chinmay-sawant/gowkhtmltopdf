@@ -8,8 +8,14 @@ import (
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
 
+const (
+	inlineMeasureWidth     = 1 << 30
+	defaultLineHeightRatio = 1.2
+)
+
 func (e *engine) collectInline(nodes []*html.Node, out *[]inlineItem) {
 	start := len(*out)
+
 	for _, n := range nodes {
 		e.collectInlineNode(n, out)
 	}
@@ -28,6 +34,7 @@ func hasStrongRTLText(items []inlineItem, start int) bool {
 		if items[idx].forceBreak || items[idx].blockBox != nil || items[idx].img {
 			continue
 		}
+
 		for _, letter := range items[idx].text {
 			if isStrongRTLLetter(letter) {
 				return true
@@ -58,16 +65,19 @@ func reverseInlineRange(items []inlineItem, start int) {
 	// Reverse per hard-break segment so <br> stays as line terminator
 	// after mirroring. Segments between breaks are reversed independently.
 	segStart := start
-	for i := start; i <= len(items); i++ {
-		isEnd := i == len(items)
-		isBreak := !isEnd && items[i].forceBreak
+
+	for idx := start; idx <= len(items); idx++ {
+		isEnd := idx == len(items)
+		isBreak := !isEnd && items[idx].forceBreak
+
 		if isEnd || isBreak {
-			// reverse [segStart, i) (exclusive of break)
-			for l, r := segStart, i-1; l < r; l, r = l+1, r-1 {
+			// reverse [segStart, idx) (exclusive of break)
+			for l, r := segStart, idx-1; l < r; l, r = l+1, r-1 {
 				items[l], items[r] = items[r], items[l]
 			}
+
 			if isBreak {
-				segStart = i + 1
+				segStart = idx + 1
 			}
 		}
 	}
@@ -438,6 +448,7 @@ func (e *engine) collectInlineElement(node *html.Node, sty ResolvedStyle, out *[
 
 		return
 	}
+
 	if node.Name == cssTagSVG {
 		e.collectInlineSVGItem(node, sty, out)
 
@@ -518,47 +529,14 @@ func (e *engine) collectInlineSpan(node *html.Node, sty ResolvedStyle, out *[]in
 
 	before := len(*out)
 
-	if src := e.pseudoContentURL(node, pseudoBefore); src != "" {
-		if ref := e.resolveImage(src); ref != nil && ref.data != nil {
-			pstyle := e.pseudoStyle(node, pseudoBefore, sty)
-			imgW := e.scalePt(pxToPt(float64(ref.w)))
-			imgH := e.scalePt(pxToPt(float64(ref.h)))
-			if imgW <= 0 {
-				imgW = e.scalePt(pstyle.FontSize)
-			}
-			if imgH <= 0 {
-				imgH = e.scalePt(pstyle.FontSize)
-			}
-			*out = append(*out, inlineItem{img: true, imgRef: ref, w: imgW, h: imgH, style: pstyle}) //nolint:exhaustruct // pseudo url image
-		}
-	} else if txt := e.pseudoContent(node, pseudoBefore); txt != "" {
-		item := e.textItem(txt, e.pseudoStyle(node, pseudoBefore, sty))
-		e.enableInlineChrome(&item)
-		*out = append(*out, item)
-	}
+	e.appendPseudoItem(node, sty, pseudoBefore, out)
 
 	for _, c := range node.Children {
 		e.collectInlineNode(c, out)
 	}
 
-	if src := e.pseudoContentURL(node, pseudoAfter); src != "" {
-		if ref := e.resolveImage(src); ref != nil && ref.data != nil {
-			pstyle := e.pseudoStyle(node, pseudoAfter, sty)
-			imgW := e.scalePt(pxToPt(float64(ref.w)))
-			imgH := e.scalePt(pxToPt(float64(ref.h)))
-			if imgW <= 0 {
-				imgW = e.scalePt(pstyle.FontSize)
-			}
-			if imgH <= 0 {
-				imgH = e.scalePt(pstyle.FontSize)
-			}
-			*out = append(*out, inlineItem{img: true, imgRef: ref, w: imgW, h: imgH, style: pstyle}) //nolint:exhaustruct // pseudo url image
-		}
-	} else if txt := e.pseudoContent(node, pseudoAfter); txt != "" {
-		item := e.textItem(txt, e.pseudoStyle(node, pseudoAfter, sty))
-		e.enableInlineChrome(&item)
-		*out = append(*out, item)
-	}
+	e.appendPseudoItem(node, sty, pseudoAfter, out)
+
 	// Horizontal margins on inline elements (e.g. .co { margin-left: 10px }
 	// after a logo) apply to the first/last generated items.
 	if before < len(*out) {
@@ -573,6 +551,44 @@ func (e *engine) collectInlineSpan(node *html.Node, sty ResolvedStyle, out *[]in
 	}
 }
 
+// appendPseudoItem appends the ::before/::after pseudo content of node: an
+// image item for url() content, otherwise a decorated text item.
+func (e *engine) appendPseudoItem(node *html.Node, sty ResolvedStyle, pseudo string, out *[]inlineItem) {
+	if src := e.pseudoContentURL(node, pseudo); src != "" {
+		if ref := e.resolveImage(src); ref != nil && ref.data != nil {
+			e.appendPseudoImage(node, sty, pseudo, ref, out)
+
+			return
+		}
+	} else if txt := e.pseudoContent(node, pseudo); txt != "" {
+		item := e.textItem(txt, e.pseudoStyle(node, pseudo, sty))
+		e.enableInlineChrome(&item)
+		*out = append(*out, item)
+	}
+}
+
+// appendPseudoImage appends one url() pseudo-element image at its font-sized
+// fallback dimensions when the image reports no size of its own.
+func (e *engine) appendPseudoImage(
+	node *html.Node, sty ResolvedStyle, pseudo string, ref *imageRef, out *[]inlineItem,
+) {
+	pstyle := e.pseudoStyle(node, pseudo, sty)
+	imgW := e.scalePt(pxToPt(float64(ref.w)))
+	imgH := e.scalePt(pxToPt(float64(ref.h)))
+
+	if imgW <= 0 {
+		imgW = e.scalePt(pstyle.FontSize)
+	}
+
+	if imgH <= 0 {
+		imgH = e.scalePt(pstyle.FontSize)
+	}
+
+	*out = append(*out, inlineItem{ //nolint:exhaustruct // pseudo url image
+		img: true, imgRef: ref, w: imgW, h: imgH, style: pstyle,
+	})
+}
+
 // inlineBlockAvail returns the containing-block width used to lay out an
 // inline-block: specified width when present, otherwise shrink-to-fit capped
 // at a generous max so auto-width badges size to their content.
@@ -580,11 +596,11 @@ func (e *engine) inlineBlockAvail(nodeN *html.Node, sty ResolvedStyle, cbW float
 	if sty.WidthPercent >= 0 {
 		// Prefer the inline formatting-context width; fall back to viewport.
 		if cbW > 0 {
-			return cbW * sty.WidthPercent / 100
+			return cbW * sty.WidthPercent / percentDivisor
 		}
 
 		if e.opts.Width > 0 {
-			return e.opts.Width * sty.WidthPercent / 100
+			return e.opts.Width * sty.WidthPercent / percentDivisor
 		}
 	}
 
@@ -635,25 +651,29 @@ func (e *engine) nestedBlockHChrome(node *html.Node) float64 {
 	if node == nil {
 		return 0
 	}
+
 	var sum float64
+
 	for _, child := range node.Children {
 		if child.Type != html.ElementNode {
 			continue
 		}
-		st := e.stylePtr(child)
-		if st == nil || !isCellBlockish(st.Display) {
+
+		childStyle := e.stylePtr(child)
+		if childStyle == nil || !isCellBlockish(childStyle.Display) {
 			continue
 		}
-		sum += e.scalePt(st.MarginLeft) + e.scalePt(st.MarginRight) +
-			e.scalePt(st.PaddingLeft) + e.scalePt(st.PaddingRight) +
-			e.scalePt(st.BorderLeft.Width) + e.scalePt(st.BorderRight.Width)
+
+		sum += e.scalePt(childStyle.MarginLeft) + e.scalePt(childStyle.MarginRight) +
+			e.scalePt(childStyle.PaddingLeft) + e.scalePt(childStyle.PaddingRight) +
+			e.scalePt(childStyle.BorderLeft.Width) + e.scalePt(childStyle.BorderRight.Width)
 	}
 
 	return sum
 }
 
-// availWForInline is a generous width for block-in-inline measurement.
-func availWForInline() float64 { return 1 << 30 }
+// inlineMeasureWidth is a generous width for block-in-inline measurement.
+func availWForInline() float64 { return inlineMeasureWidth }
 
 func (e *engine) textItem(text string, style *ResolvedStyle) inlineItem {
 	textWidth := e.measureTextFace(transformInlineText(text, style.TextTransform), style)
@@ -755,7 +775,7 @@ func capitalizeInlineText(text string) string {
 // redundant after a trailing space already on the previous item. Survivors
 // are compacted in place; the surviving prefix is returned.
 func squeezeInlineSpaces(items []inlineItem) []inlineItem {
-	if len(items) < 2 {
+	if len(items) < minInlinePairLen {
 		return items
 	}
 
@@ -937,7 +957,7 @@ func isAllWhitespace(s string) bool {
 //
 //nolint:cyclop // per-item merge decision: image/break/href/style compare plus in-place compaction
 func (e *engine) coalesceTextItems(line []inlineItem) []inlineItem {
-	if len(line) < 2 {
+	if len(line) < minInlinePairLen {
 		return line
 	}
 
@@ -1025,7 +1045,7 @@ func lineHeightOf(st *ResolvedStyle) float64 {
 		return st.LineHeight
 	}
 
-	return 1.2 * st.FontSize
+	return defaultLineHeightRatio * st.FontSize
 }
 
 func borderPaint(side border) float64 {

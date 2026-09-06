@@ -25,6 +25,13 @@ type imageUsedSize struct {
 	w, h float64
 }
 
+// JPEG parsing constants for imageDims/jpegDims: the SOI/marker prefix
+// byte and the segment-length byte shift.
+const (
+	jpegMarkerPrefix = 0xFF
+	jpegLengthShift  = 8
+)
+
 // imageContainingWidth is the width used by percentage/max-width image
 // constraints. imgMaxW is set by inline, float, and table-cell layout; the
 // viewport is the fallback for ordinary block images.
@@ -65,7 +72,7 @@ func (e *engine) usedImageSize(
 
 	if style.WidthPercent >= 0 {
 		if cb := e.imageContainingWidth(); cb > 0 {
-			size.w = cb * style.WidthPercent / 100
+			size.w = cb * style.WidthPercent / oneHundred
 			cssW = true
 		}
 	} else if cssW {
@@ -179,7 +186,7 @@ func (e *engine) imageMaxWidth(style ResolvedStyle, cssW bool) float64 {
 
 	if style.MaxWidthPercent >= 0 {
 		if cb := e.imageContainingWidth(); cb > 0 {
-			pct := cb * style.MaxWidthPercent / 100
+			pct := cb * style.MaxWidthPercent / oneHundred
 			if maxW < 0 || pct < maxW {
 				maxW = pct
 			}
@@ -368,7 +375,7 @@ func imageDims(data []byte) (int, int, bool, bool) {
 func jpegDims(data []byte) (int, int, bool, bool) {
 	pos := 2
 	for pos+4 <= len(data) {
-		if data[pos] != 0xFF {
+		if data[pos] != jpegMarkerPrefix {
 			pos++
 
 			continue
@@ -396,12 +403,12 @@ func jpegDims(data []byte) (int, int, bool, bool) {
 			return width, height, true, true
 		}
 
-		segLen := int(data[pos+2])<<8 | int(data[pos+3])
-		if segLen < 2 {
+		segLen := int(data[pos+2])<<jpegLengthShift | int(data[pos+3])
+		if segLen < two {
 			return 0, 0, false, false
 		}
 
-		pos += 2 + segLen
+		pos += two + segLen
 	}
 
 	return 0, 0, false, false

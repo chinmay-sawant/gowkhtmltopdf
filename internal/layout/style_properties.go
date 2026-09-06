@@ -28,6 +28,17 @@ const (
 	propMaxInlineSize       = "max-inline-size"
 	propMinBlockSize        = "min-block-size"
 	propMaxBlockSize        = "max-block-size"
+
+	gridRowStartProp    = "grid-row-start"
+	gridColumnStartProp = "grid-column-start"
+
+	insetTwoSideCount   = 2
+	insetThreeSideCount = 3
+
+	verticalAlignSubFactor        = 0.2
+	verticalAlignSuperFactor      = 0.4
+	verticalAlignLineHeightFactor = 1.2
+	percentDivisor                = 100.0
 )
 
 func applyDisplayGroup(
@@ -569,6 +580,14 @@ func applyGridGroup(
 }
 
 func applyGridTemplateProps(style *ResolvedStyle, prop, value string) bool {
+	if applyGridTemplateCoreProps(style, prop, value) {
+		return true
+	}
+
+	return applyGridTemplateAutoProps(style, prop, value)
+}
+
+func applyGridTemplateCoreProps(style *ResolvedStyle, prop, value string) bool {
 	switch prop {
 	case "grid-template-columns":
 		style.GridTemplateColumns = value
@@ -578,6 +597,15 @@ func applyGridTemplateProps(style *ResolvedStyle, prop, value string) bool {
 		style.GridTemplateAreas = value
 	case "grid-area":
 		parseGridArea(style, value)
+	default:
+		return false
+	}
+
+	return true
+}
+
+func applyGridTemplateAutoProps(style *ResolvedStyle, prop, value string) bool {
+	switch prop {
 	case "grid-auto-flow":
 		style.GridAutoFlow = parseGridAutoFlowValue(value)
 	case "grid-auto-columns":
@@ -599,14 +627,14 @@ func applyGridPlacementProps(style *ResolvedStyle, prop, value string) bool {
 	switch prop {
 	case "grid-column":
 		parseGridColumn(style, value)
-	case "grid-column-start":
-		setGridStartIndex(style, "grid-column-start", value)
+	case gridColumnStartProp:
+		setGridStartIndex(style, gridColumnStartProp, value)
 	case "grid-column-end":
 		applyGridEndOnly(style, false, value)
 	case "grid-row":
 		parseGridRow(style, value)
-	case "grid-row-start":
-		setGridStartIndex(style, "grid-row-start", value)
+	case gridRowStartProp:
+		setGridStartIndex(style, gridRowStartProp, value)
 	case "grid-row-end":
 		applyGridEndOnly(style, true, value)
 	default:
@@ -616,49 +644,34 @@ func applyGridPlacementProps(style *ResolvedStyle, prop, value string) bool {
 	return true
 }
 
-// setGridStartIndex parses a grid line index: auto (0), -1, or positive. Ignores [name].
-func setGridStartIndex(style *ResolvedStyle, prop, value string) {
-	// Reuse stripGridLineNames logic inline to avoid cross-file helper import: remove bracketed names.
-	clean := value
-	// Strip [name] segments.
-	var b strings.Builder
-	inBracket := false
-	for _, ch := range clean {
-		if ch == '[' {
-			inBracket = true
-			continue
-		}
-		if ch == ']' {
-			inBracket = false
-			continue
-		}
-		if inBracket {
-			continue
-		}
-		b.WriteRune(ch)
-	}
-	clean = strings.TrimSpace(b.String())
-	if clean == "" || strings.EqualFold(clean, "auto") {
-		if prop == "grid-row-start" {
-			style.GridRowStart = 0
-		} else {
-			style.GridColumnStart = 0
-		}
-		return
-	}
-	if strings.HasPrefix(clean, "[") {
-		return
-	}
-	line, err := strconv.Atoi(strings.TrimSpace(clean))
-	if err != nil || line == 0 {
-		return
-	}
-
-	if prop == "grid-row-start" {
+func setGridStartValue(style *ResolvedStyle, prop string, line int) {
+	if prop == gridRowStartProp {
 		style.GridRowStart = line
 	} else {
 		style.GridColumnStart = line
 	}
+}
+
+// setGridStartIndex parses a grid line index: auto (0), -1, or positive. Ignores [name].
+func setGridStartIndex(style *ResolvedStyle, prop, value string) {
+	clean := strings.TrimSpace(stripGridLineNames(value))
+
+	if clean == "" || strings.EqualFold(clean, "auto") {
+		setGridStartValue(style, prop, 0)
+
+		return
+	}
+
+	if strings.HasPrefix(clean, "[") {
+		return
+	}
+
+	line, err := strconv.Atoi(clean)
+	if err != nil || line == 0 {
+		return
+	}
+
+	setGridStartValue(style, prop, line)
 }
 
 // applyBoxGroup handles the sizing and box props (width/height/margins/padding).
@@ -1232,11 +1245,11 @@ func applyInsetShorthand(style *ResolvedStyle, value string, fsize, viewportW, v
 	top, right, bottom, left := val[0], val[0], val[0], val[0]
 
 	switch {
-	case count > 3:
+	case count > insetThreeSideCount:
 		top, right, bottom, left = val[0], val[1], val[2], val[3]
-	case count == 3:
+	case count == insetThreeSideCount:
 		top, right, bottom, left = val[0], val[1], val[2], val[1]
-	case count == 2:
+	case count == insetTwoSideCount:
 		top, right, bottom, left = val[0], val[1], val[0], val[1]
 	}
 
@@ -1645,29 +1658,33 @@ func setTextAlignValue(style *ResolvedStyle, value string) {
 func setVerticalAlignValue(style *ResolvedStyle, value string) {
 	trimmed := strings.TrimSpace(value)
 	low := strings.ToLower(trimmed)
+
 	switch low {
 	case "baseline", cssVerticalAlignTop, "middle", cssVerticalAlignBottom:
 		style.VerticalAlign = low
 		style.VerticalAlignShift = 0
 	case "sub":
 		style.VerticalAlign = "sub"
-		style.VerticalAlignShift = style.FontSize * 0.2
+		style.VerticalAlignShift = style.FontSize * verticalAlignSubFactor
 	case "super":
 		style.VerticalAlign = "super"
-		style.VerticalAlignShift = style.FontSize * -0.4
+		style.VerticalAlignShift = style.FontSize * -verticalAlignSuperFactor
 	default:
 		if strings.HasSuffix(low, "%") {
 			numStr := strings.TrimSpace(strings.TrimSuffix(trimmed, "%"))
 			if pct, err := strconv.ParseFloat(numStr, 64); err == nil {
-				lh := style.LineHeight
-				if lh <= 0 {
-					lh = 1.2 * style.FontSize
+				lineHeight := style.LineHeight
+				if lineHeight <= 0 {
+					lineHeight = verticalAlignLineHeightFactor * style.FontSize
 				}
+
 				style.VerticalAlign = trimmed
-				style.VerticalAlignShift = lh * pct / 100
+				style.VerticalAlignShift = lineHeight * pct / percentDivisor
+
 				return
 			}
 		}
+
 		if shift, ok := plainLength(value, style.FontSize, 0); ok {
 			style.VerticalAlign = "baseline"
 			style.VerticalAlignShift = shift
@@ -1994,39 +2011,22 @@ func applyTransformGroup(
 ) bool {
 	switch prop {
 	case "transform":
-		// Animations/transitions ignored: cascaded static value only.
-		if m, xp, yp, has, ok := parseTransformList(value, fsize); ok {
-			style.Transform = m
-			style.HasTransform = has
-			if !math.IsNaN(xp) {
-				if !style.TranslateXPercentSet {
-					style.TranslateXPercent = xp
-					style.TranslateXPercentSet = true
-				} else {
-					style.TranslateXPercent += xp
-				}
-			}
-			if !math.IsNaN(yp) {
-				if !style.TranslateYPercentSet {
-					style.TranslateYPercent = yp
-					style.TranslateYPercentSet = true
-				} else {
-					style.TranslateYPercent += yp
-				}
-			}
-		}
+		applyTransformListValue(style, value, fsize)
 	case "transform-origin":
 		if spec, ok := parseTransformOrigin(value, fsize); ok {
 			style.TransformOrigin = spec
 		}
 	case "rotate":
 		ApplyRotate(style, value)
+
 		return true
 	case "scale":
 		ApplyScale(style, value)
+
 		return true
 	case "translate":
 		ApplyTranslate(style, value, fsize)
+
 		return true
 	case "transform-box", "transform-style", "perspective", "perspective-origin",
 		"backface-visibility":
@@ -2040,6 +2040,51 @@ func applyTransformGroup(
 	}
 
 	return true
+}
+
+// applyTransformListValue stores a parsed transform list and its translate
+// percents. Animations/transitions are ignored: cascaded static value only.
+func applyTransformListValue(style *ResolvedStyle, value string, fsize float64) {
+	matrix, xPercent, yPercent, has, ok := parseTransformList(value, fsize)
+	if !ok {
+		return
+	}
+
+	style.Transform = matrix
+	style.HasTransform = has
+
+	accumulateTranslateXPercent(style, xPercent)
+	accumulateTranslateYPercent(style, yPercent)
+}
+
+func accumulateTranslateXPercent(style *ResolvedStyle, xPercent float64) {
+	if math.IsNaN(xPercent) {
+		return
+	}
+
+	if !style.TranslateXPercentSet {
+		style.TranslateXPercent = xPercent
+		style.TranslateXPercentSet = true
+
+		return
+	}
+
+	style.TranslateXPercent += xPercent
+}
+
+func accumulateTranslateYPercent(style *ResolvedStyle, yPercent float64) {
+	if math.IsNaN(yPercent) {
+		return
+	}
+
+	if !style.TranslateYPercentSet {
+		style.TranslateYPercent = yPercent
+		style.TranslateYPercentSet = true
+
+		return
+	}
+
+	style.TranslateYPercent += yPercent
 }
 
 // applyIgnoredGroup parses but ignores the animation/transition family.

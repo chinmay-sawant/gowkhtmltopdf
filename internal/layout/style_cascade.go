@@ -15,6 +15,19 @@ const (
 	borderBottomProperty = "border-bottom"
 	borderLeftProperty   = "border-left"
 	borderRightProperty  = "border-right"
+
+	marginProperty  = "margin"
+	paddingProperty = "padding"
+
+	inlineStylePriority = 1 << 30
+
+	defaultRootFontPx = 16
+
+	fontWeightNormalValue = 400
+	fontWeightBoldValue   = 700
+
+	boxShorthandTwoSides   = 2
+	boxShorthandThreeSides = 3
 )
 
 // mergeCustomProps inherits parent custom properties and overlays any --*
@@ -465,7 +478,7 @@ func cascadeRaw( //nolint:funlen // cascade tiers are deliberately visible in on
 			continue
 		}
 
-		applyCascadeDeclaration(wins, d.Prop, d.Value, 1<<30, 0, 0, 1<<30, d.Important)
+		applyCascadeDeclaration(wins, d.Prop, d.Value, inlineStylePriority, 0, 0, inlineStylePriority, d.Important)
 	}
 
 	if len(wins) == 0 {
@@ -777,7 +790,7 @@ func expandBoxShorthand(prop, value string) ([4]string, bool) {
 	var values [4]string
 
 	switch prop {
-	case "margin", "padding":
+	case marginProperty, paddingProperty:
 		// 1–4 space-separated sides (CSS box shorthand).
 	case borderProperty:
 		// border: <width> <style> <color> applies the same value to every side.
@@ -800,9 +813,9 @@ func expandBoxShorthand(prop, value string) ([4]string, bool) {
 	switch count {
 	case 1:
 		values = [4]string{tokens[0], tokens[0], tokens[0], tokens[0]}
-	case 2:
+	case boxShorthandTwoSides:
 		values = [4]string{tokens[0], tokens[1], tokens[0], tokens[1]}
-	case 3:
+	case boxShorthandThreeSides:
 		values = [4]string{tokens[0], tokens[1], tokens[2], tokens[1]}
 	default:
 		values = tokens
@@ -900,7 +913,7 @@ func specificityBeats(cur [4]int, ids, classes, types, order, curOrder int) bool
 // applyFontProps resolves font-size/family/weight/style/font first, using the
 // parent's size for percentages and em, and ctx.remBase for rem.
 func applyFontProps(style *ResolvedStyle, raw map[string]string, parentSize float64, ctx *styleContext) {
-	remBase := pxToPt(16)
+	remBase := pxToPt(defaultRootFontPx)
 	if ctx != nil && ctx.remBase > 0 {
 		remBase = ctx.remBase
 	}
@@ -967,9 +980,9 @@ func applyFontStyleValue(style *ResolvedStyle, raw map[string]string) {
 func resolveFontWeight(current int, val string) int {
 	switch val {
 	case contentNormal:
-		return 400
+		return fontWeightNormalValue
 	case "bold":
-		return 700
+		return fontWeightBoldValue
 	case "bolder":
 		return current + fontWeightStep
 	case "lighter":
@@ -987,7 +1000,8 @@ func resolveFontWeight(current int, val string) int {
 // longhand (e.g. margin-bottom) always overrides its shorthand (margin).
 // Package-level to avoid per-node slice/array rebuilds.
 var restShorthandProps = [...]string{ //nolint:gochecknoglobals // static apply order
-	"display", "margin", "padding", borderProperty, borderTopProperty, borderRightProperty, borderBottomProperty, borderLeftProperty,
+	"display", marginProperty, paddingProperty, borderProperty, borderTopProperty,
+	borderRightProperty, borderBottomProperty, borderLeftProperty,
 	borderWidthKeyword, borderStyleKeyword,
 	borderColorKeyword, gapKeyword, flexKeyword, containerKeyword,
 	cssPropMarginInline, cssPropMarginBlock, cssPropPaddingInline, cssPropPaddingBlock,
@@ -1023,9 +1037,10 @@ func applyRestProps(
 
 	// Deterministic iteration for remaining longhands (map iteration is random).
 	keys := make([]string, 0, len(raw))
+
 	for key := range raw {
 		switch key {
-		case "margin", "padding", borderProperty, borderTopProperty,
+		case marginProperty, paddingProperty, borderProperty, borderTopProperty,
 			borderRightProperty, borderBottomProperty, borderLeftProperty,
 			borderWidthKeyword, borderStyleKeyword,
 			borderColorKeyword, gapKeyword, flexKeyword, containerKeyword,

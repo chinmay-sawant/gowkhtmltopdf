@@ -7,7 +7,11 @@ import (
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
 
-const contentNormal = "normal"
+const (
+	contentNormal             = "normal"
+	singleQuotedContentMinLen = 2
+	listMarkerDisc            = "•"
+)
 
 // pseudoContent cascades the CSS content property for ::before/::after on n.
 // Supports string literals, attr(name), counter()/counters(), open-quote /
@@ -52,14 +56,18 @@ func (e *engine) pseudoContentURL(node *html.Node, pseudoEl string) string {
 	if e == nil || node == nil || (pseudoEl != pseudoBefore && pseudoEl != pseudoAfter) {
 		return ""
 	}
+
 	ctx := e.pseudoStyleContext()
+
 	best := selectContentDecl(ctx, node, pseudoEl)
 	if best == nil {
 		return ""
 	}
+
 	if url, ok := firstCSSUrl(best.value); ok {
 		return url
 	}
+
 	return ""
 }
 
@@ -295,7 +303,7 @@ func scanContentIdent(value string, idx int, env *contentEnv, boxNode *strings.B
 // singleQuotedContent returns the inner text when value is exactly one quoted
 // string with no inner unescaped quote.
 func singleQuotedContent(value string) (string, bool) {
-	if len(value) < 2 {
+	if len(value) < singleQuotedContentMinLen {
 		return "", false
 	}
 
@@ -492,45 +500,56 @@ func isHex(c byte) bool {
 
 // listItemMarkerText returns the marker for a display:list-item element
 // based on its ListStyleType. Used by inline_paint when parent is display:list-item.
-//
-func listItemMarkerText(style ResolvedStyle, node *html.Node) string {
+func listItemMarkerText(style ResolvedStyle, node *html.Node) string { //nolint:unused // used by inline_paint.go.
 	typ := style.ListStyleType
 	if typ == "" {
-		typ = "disc"
+		typ = listStyleDisc
 	}
 	// Reuse layout's markerText logic for disc/circle/square/decimal etc.
 	// When node is available, counter-based types could use its position.
 	// For inline-paint fallback, use simple glyphs.
 	switch typ {
-	case "disc":
-		return "•"
-	case "circle":
+	case listStyleDisc:
+		return listMarkerDisc
+	case listStyleCircle:
 		return "○"
-	case "square":
+	case listStyleSquare:
 		return "■"
-	case "decimal", "decimal-leading-zero":
+	case listStyleDecimal, listStyleDecimalZero:
 		// Inline fallback without counter context – markerText in layout_flow would compute index.
 		// Use generic "1."; real <ol> path uses emitListMarker with correct counter.
 		if node != nil {
 			return markerText(node, typ)
 		}
+
 		return "1."
-	case "lower-alpha", "lower-latin":
-		return "a."
-	case "upper-alpha", "upper-latin":
-		return "A."
-	case "lower-roman":
-		return "i."
-	case "upper-roman":
-		return "I."
+	case listStyleLowerAlpha, listStyleLowerLatin, listStyleUpperAlpha,
+		listStyleUpperLatin, listStyleLowerRoman, listStyleUpperRoman:
+		return listMarkerAlphaRoman(typ)
 	default:
 		if node != nil {
 			return markerText(node, typ)
 		}
-		return "•"
+
+		return listMarkerDisc
 	}
 }
 
-func isDisplayListItem(style *ResolvedStyle) bool {
+//nolint:unused // helper for listItemMarkerText above.
+func listMarkerAlphaRoman(typ string) string {
+	switch typ {
+	case listStyleLowerAlpha, listStyleLowerLatin:
+		return "a."
+	case listStyleUpperAlpha, listStyleUpperLatin:
+		return "A."
+	case listStyleLowerRoman:
+		return "i."
+	default:
+		return "I."
+	}
+}
+
+// isDisplayListItem reports whether the style is a list-item display.
+func isDisplayListItem(style *ResolvedStyle) bool { //nolint:unused // used by inline_paint.go.
 	return style != nil && style.Display == "list-item"
 }

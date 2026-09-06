@@ -861,7 +861,9 @@ td.d { width:40% }
 	if len(texts) < 6 {
 		t.Fatalf("expected header and body text, got %d ops", len(texts))
 	}
+
 	gap := texts[1].X - texts[0].X
+
 	if gap < 45 || gap > 55 {
 		t.Fatalf("fixed body-hint gap=%.2f, want ~50pt equal share", gap)
 	}

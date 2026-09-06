@@ -1,4 +1,4 @@
-//nolint:testpackage,wsl,varnamelen,exhaustruct,cyclop,err113,usetesting,goconst // image chrome probes
+//nolint:testpackage,wsl,varnamelen,exhaustruct,err113,usetesting,goconst // image chrome probes
 package layout
 
 import (
@@ -56,7 +56,10 @@ func TestBackgroundImagePaints(t *testing.T) {
 
 		return png, nil
 	})
-	sty := ResolvedStyle{BackgroundImage: `url("x.png")`, BackgroundRepeat: "no-repeat"} //nolint:exhaustruct // paint field under test
+	sty := ResolvedStyle{ //nolint:exhaustruct // paint field under test
+		BackgroundImage:  `url("x.png")`,
+		BackgroundRepeat: "no-repeat",
+	}
 	eng.prependChrome(0, &box{}, sty, 10, 20, 100, 50)
 
 	imageOp := wantSingleDeferredImage(t, eng)
@@ -235,7 +238,7 @@ func TestBackgroundImageLayoutPaints(t *testing.T) {
 	t.Parallel()
 
 	png := tinyPNG(10, 20)
-	cssSheet := sheet(t, `div.bg { background-image: url("x.png"); background-repeat: no-repeat; width: 100pt; height: 50pt }`)
+	cssSheet := sheet(t, backgroundImageLayoutCSS)
 	root := mustParse(t, `<html><body><div class="bg">hi</div></body></html>`)
 	opts := Options{ //nolint:exhaustruct // layoutHTML viewport plus image fetch
 		Width: testViewport, Height: 800, Sheets: []*css.Stylesheet{cssSheet}, Background: true,
@@ -247,6 +250,38 @@ func TestBackgroundImageLayoutPaints(t *testing.T) {
 			return png, nil
 		},
 	}
+
+	res := layoutBackgroundImageDoc(t, root, opts)
+
+	imgs := opsOfKind(res, OpImage)
+	if len(imgs) != 1 {
+		t.Fatalf("image ops = %d, want 1 in %+v", len(imgs), res.Ops)
+	}
+
+	wantW, wantH := pxToPt(10), pxToPt(20)
+	if imgs[0].W != wantW || imgs[0].H != wantH {
+		t.Errorf("image size = %vx%v, want %vx%v", imgs[0].W, imgs[0].H, wantW, wantH)
+	}
+
+	if imgs[0].ImgW != 10 || imgs[0].ImgH != 20 {
+		t.Errorf("intrinsic = %dx%d, want 10x20", imgs[0].ImgW, imgs[0].ImgH)
+	}
+
+	if !bytes.Equal(imgs[0].Image, png) {
+		t.Error("image bytes do not match provided PNG")
+	}
+}
+
+// backgroundImageLayoutCSS paints one 100x50pt div with a no-repeat image.
+const backgroundImageLayoutCSS = `div.bg {
+	background-image: url("x.png");
+	background-repeat: no-repeat;
+	width: 100pt;
+	height: 50pt;
+}`
+
+func layoutBackgroundImageDoc(t *testing.T, root *html.Node, opts Options) *Result {
+	t.Helper()
 
 	styles, containers, err := resolveStylesForLayoutContext(context.Background(), root, opts)
 	if err != nil {
@@ -277,23 +312,7 @@ func TestBackgroundImageLayoutPaints(t *testing.T) {
 		t.Fatalf("layout: %v", err)
 	}
 
-	imgs := opsOfKind(res, OpImage)
-	if len(imgs) != 1 {
-		t.Fatalf("image ops = %d, want 1 in %+v", len(imgs), res.Ops)
-	}
-
-	wantW, wantH := pxToPt(10), pxToPt(20)
-	if imgs[0].W != wantW || imgs[0].H != wantH {
-		t.Errorf("image size = %vx%v, want %vx%v", imgs[0].W, imgs[0].H, wantW, wantH)
-	}
-
-	if imgs[0].ImgW != 10 || imgs[0].ImgH != 20 {
-		t.Errorf("intrinsic = %dx%d, want 10x20", imgs[0].ImgW, imgs[0].ImgH)
-	}
-
-	if !bytes.Equal(imgs[0].Image, png) {
-		t.Error("image bytes do not match provided PNG")
-	}
+	return res
 }
 
 func TestBackgroundImageBarePath(t *testing.T) {
@@ -306,7 +325,10 @@ func TestBackgroundImageBarePath(t *testing.T) {
 
 		return png, nil
 	})
-	sty := ResolvedStyle{BackgroundImage: "logo.png", BackgroundRepeat: "no-repeat"} //nolint:exhaustruct // sibling may store a bare path
+	sty := ResolvedStyle{ //nolint:exhaustruct // sibling may store a bare path
+		BackgroundImage:  "logo.png",
+		BackgroundRepeat: "no-repeat",
+	}
 	eng.prependChrome(0, &box{}, sty, 0, 0, 30, 30)
 	imageOp := wantSingleDeferredImage(t, eng)
 

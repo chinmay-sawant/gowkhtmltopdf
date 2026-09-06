@@ -214,18 +214,18 @@ func usedBorderRadiiXY(sty ResolvedStyle, width, height float64) ([4]float64, [4
 		sty.BorderRadiusBottomRightY, sty.BorderRadiusBottomLeftY,
 	}
 
-	for i := range radiusX {
-		if radiusX[i] < 0 {
-			radiusX[i] = 0
+	for idx := range radiusX {
+		if radiusX[idx] < 0 {
+			radiusX[idx] = 0
 		}
 
-		if radiusY[i] < 0 {
-			radiusY[i] = 0
+		if radiusY[idx] < 0 {
+			radiusY[idx] = 0
 		}
 
 		// Circular corner: omitted Y means the same absolute radius as X.
-		if radiusY[i] <= 0 && radiusX[i] > 0 {
-			radiusY[i] = radiusX[i]
+		if radiusY[idx] <= 0 && radiusX[idx] > 0 {
+			radiusY[idx] = radiusX[idx]
 		}
 	}
 
@@ -272,7 +272,7 @@ func borderRadiusValues(sty ResolvedStyle, width, _ float64) [4]float64 {
 // adjacent corner radii on any edge exceed that edge's length, every radius
 // (both axes) is scaled by the same factor.
 //
-//nolint:wsl,mnd // CSS adjacent-radius scaling is four edge sums on two axes
+// CSS adjacent-radius scaling is four edge sums on two axes.
 func scaleRadiiXY(radiusX, radiusY []float64, width, height float64) {
 	if len(radiusX) < borderRadiusValueCount || len(radiusY) < borderRadiusValueCount {
 		return

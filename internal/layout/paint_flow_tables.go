@@ -66,7 +66,7 @@ func normalizeTableRowGaps(res *Result, contentH float64) {
 			}
 
 			gap := currentTop - previousBottom
-			if gap <= 1e-6 {
+			if gap <= layoutEpsilon {
 				continue
 			}
 
@@ -81,7 +81,7 @@ func normalizeTableRowGaps(res *Result, contentH float64) {
 				minTop := pageTop + hdrH
 				if currentTop-gap < minTop {
 					gap = currentTop - minTop
-					if gap <= 1e-6 {
+					if gap <= layoutEpsilon {
 						continue
 					}
 				}
@@ -99,7 +99,7 @@ func normalizeTableRowGaps(res *Result, contentH float64) {
 // shiftTableRowsUp moves consecutive same-page table rows up by gap, stopping
 // at the first row that sits on another page or has no geometry.
 func shiftTableRowsUp(res *Result, rows [][]*box, page int, contentH, gap float64) {
-	if gap <= 1e-6 {
+	if gap <= layoutEpsilon {
 		return
 	}
 
@@ -131,50 +131,93 @@ func rowPaintBand(row []*box, res *Result) (int, int, float64, float64, bool) {
 		last = len(res.Ops) - 1
 	}
 
-	minY, maxY := 0.0, 0.0
-	vertTop, vertBot := 0.0, 0.0
-	have, haveVert := false, false
+	inkTop, inkBottom, hasInk := rowInkBand(res.Ops[first : last+1])
 
-	for i := first; i <= last; i++ {
-		op := res.Ops[i]
-		y0 := op.Y
-		y1 := op.Y
-		if op.H > 0 {
-			y1 = op.Y + op.H
-		}
+	vertTop, vertBottom, hasVert := rowVerticalBand(res.Ops[first : last+1])
 
-		if !have || y0 < minY {
-			minY = y0
-		}
-
-		if !have || y1 > maxY {
-			maxY = y1
-		}
-
-		have = true
-
-		if op.Kind == OpLine && math.Abs(op.W) < 0.01 && op.H > 0.5 {
-			if !haveVert || y0 < vertTop {
-				vertTop = y0
-			}
-
-			if !haveVert || y1 > vertBot {
-				vertBot = y1
-			}
-
-			haveVert = true
-		}
-	}
-
-	if !have {
+	if !hasInk {
 		return first, last, 0, 0, false
 	}
 
-	if haveVert {
-		return first, last, vertTop, vertBot, true
+	if hasVert {
+		return first, last, vertTop, vertBottom, true
 	}
 
-	return first, last, minY, maxY, true
+	return first, last, inkTop, inkBottom, true
+}
+
+// rowOpBand returns the painted top and bottom Y of one op.
+func rowOpBand(paintOp Op) (float64, float64) {
+	opBottom := paintOp.Y
+
+	if paintOp.H > 0 {
+		opBottom = paintOp.Y + paintOp.H
+	}
+
+	return paintOp.Y, opBottom
+}
+
+// rowInkBand returns the painted Y band over ops (false when empty).
+func rowInkBand(ops []Op) (float64, float64, bool) {
+	var bandTop, bandBottom float64
+
+	banded := false
+
+	for _, paintOp := range ops {
+		opTop, opBottom := rowOpBand(paintOp)
+
+		if !banded || opTop < bandTop {
+			bandTop = opTop
+		}
+
+		if !banded || opBottom > bandBottom {
+			bandBottom = opBottom
+		}
+
+		banded = true
+	}
+
+	return bandTop, bandBottom, banded
+}
+
+// rowRuleMinHeight is the shortest line op that counts as a table vertical
+// grid rule; shorter marks are text decorations, not grid borders.
+const rowRuleMinHeight = 0.5
+
+// isVerticalRule reports whether paintOp is a table vertical grid rule: a
+// tall line op with near-zero width.
+func isVerticalRule(paintOp Op) bool {
+	return paintOp.Kind == OpLine &&
+		math.Abs(paintOp.W) < layoutCoordEpsilon &&
+		paintOp.H > rowRuleMinHeight
+}
+
+// rowVerticalBand returns the Y band of the vertical grid rules in ops
+// (false when none are present).
+func rowVerticalBand(ops []Op) (float64, float64, bool) {
+	var vertTop, vertBottom float64
+
+	haveVert := false
+
+	for _, paintOp := range ops {
+		if !isVerticalRule(paintOp) {
+			continue
+		}
+
+		opTop, opBottom := rowOpBand(paintOp)
+
+		if !haveVert || opTop < vertTop {
+			vertTop = opTop
+		}
+
+		if !haveVert || opBottom > vertBottom {
+			vertBottom = opBottom
+		}
+
+		haveVert = true
+	}
+
+	return vertTop, vertBottom, haveVert
 }
 
 func shiftTableRowBoxes(row []*box, deltaY float64) {
@@ -182,21 +225,13 @@ func shiftTableRowBoxes(row []*box, deltaY float64) {
 		if cell == nil {
 			continue
 		}
+
 		shiftTableBox(cell, deltaY)
+
 		if deltaY != 0 {
 			cell.paginationShifted = true
 		}
 	}
-}
-
-func rowWasPaginationShifted(row []*box) bool {
-	for _, cell := range row {
-		if cell != nil && cell.paginationShifted {
-			return true
-		}
-	}
-
-	return false
 }
 
 func shiftTableBox(boxNode *box, deltaY float64) {
@@ -233,7 +268,7 @@ func shiftRowToPage(res *Result, row []*box, contentH float64) bool {
 	// paint height leaking into rowBoxH) skipped blank pages
 	// between filmography and awards on long wiki tables.
 	deltaY := float64(layoutOut+1)*contentH - rowTop
-	if deltaY <= 0.01 {
+	if deltaY <= layoutCoordEpsilon {
 		return false
 	}
 	// fromY slightly above rowTop so border-collapse grid
@@ -245,7 +280,7 @@ func shiftRowToPage(res *Result, row []*box, contentH float64) bool {
 	// shiftFlowBoxes; do not shiftTableRowBoxes again or
 	// cell.y advances twice while ops advance once (fixture-56
 	// Surface/Contract ImageConverter desync / crush).
-	shiftFlowY(res, first, last, rowTop-0.01, deltaY)
+	shiftFlowY(res, first, last, rowTop-layoutCoordEpsilon, deltaY)
 	for _, cell := range row {
 		if cell != nil {
 			cell.paginationShifted = true
@@ -385,14 +420,14 @@ func repeatTableHeaderOnPages(res *Result, tblBox *box, contentH float64) {
 		shiftFrom, shiftTo, bodyTop := tableBodyRange(tblBox, page, res, contentH)
 
 		if shiftFrom >= 0 && bodyTop >= 0 && bodyTop < pageTop+hdrH-0.5 {
-			dy := pageTop + hdrH - bodyTop
-			if dy > 0 {
-				shiftFlowY(res, shiftFrom, shiftTo, bodyTop-0.01, dy)
+			deltaY := pageTop + hdrH - bodyTop
+			if deltaY > 0 {
+				shiftFlowY(res, shiftFrom, shiftTo, bodyTop-layoutCoordEpsilon, deltaY)
 				// Table cells are not always moved with the op range (skipBoxShift
 				// edge cases), so keep cell.y in step with the body shift.
 				// normalizeTableRowGaps measures paint gaps, so a cell.y drift
 				// no longer hides white seams between continuation rows.
-				shiftTableBodyBoxesFrom(tblBox, page, contentH, dy)
+				shiftTableBodyBoxesFrom(tblBox, page, contentH, deltaY)
 			}
 		}
 
@@ -453,13 +488,13 @@ func ensureBodyBelowRepeatedHeader(
 		return
 	}
 
-	if bodyTop >= minTop-1e-6 {
+	if bodyTop >= minTop-layoutEpsilon {
 		return
 	}
 
 	deltaY := minTop - bodyTop
 	if deltaY > 0 {
-		shiftFlowY(res, shiftFrom, shiftTo, bodyTop-0.01, deltaY)
+		shiftFlowY(res, shiftFrom, shiftTo, bodyTop-layoutCoordEpsilon, deltaY)
 		shiftTableBodyBoxesFrom(tblBox, page, contentH, deltaY)
 	}
 }
@@ -510,11 +545,11 @@ func placeSliverBodyBelowHeader(res *Result, tblBox *box, pageTop, hdrH float64)
 		}
 
 		deltaY := target - rowTop
-		if deltaY <= 0.01 {
+		if deltaY <= layoutCoordEpsilon {
 			continue
 		}
 
-		shiftFlowY(res, first, last, rowTop-0.01, deltaY)
+		shiftFlowY(res, first, last, rowTop-layoutCoordEpsilon, deltaY)
 		shiftTableRowBoxes(row, deltaY)
 	}
 }

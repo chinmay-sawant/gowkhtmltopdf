@@ -13,14 +13,18 @@ import (
 
 func TestD02SurfaceTableRowHeights(t *testing.T) {
 	t.Parallel()
+
 	htmlSrc := `<!DOCTYPE html><html><body>
 <section class="d02">
 <table class="d02-table">
 <thead><tr><th>Surface</th><th>Contract</th></tr></thead>
 <tbody>
-<tr><td><code>Converter</code></td><td>PDF, multi-object, <code>OnPhase</code>/<code>OnProgress</code> (final 100); no <code>Now</code> hook</td></tr>
-<tr><td><code>ImageConverter</code></td><td>PNG/JPEG, single most-recent page, lazy zero-value init, no phase callbacks</td></tr>
-<tr><td><code>RunPDF</code> / <code>RunImage</code></td><td>typed path - <code>Now</code> injectable for reproducible metadata</td></tr>
+<tr><td><code>Converter</code></td>
+<td>PDF, multi-object, <code>OnPhase</code>/<code>OnProgress</code> (final 100); no <code>Now</code> hook</td></tr>
+<tr><td><code>ImageConverter</code></td>
+<td>PNG/JPEG, single most-recent page, lazy zero-value init, no phase callbacks</td></tr>
+<tr><td><code>RunPDF</code> / <code>RunImage</code></td>
+<td>typed path - <code>Now</code> injectable for reproducible metadata</td></tr>
 </tbody>
 </table>
 </section>
@@ -45,79 +49,107 @@ func TestD02SurfaceTableRowHeightsFullFixture(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	htmlBytes, err := os.ReadFile(filepath.Join(root, "fixture-56-architecture-diagram.html"))
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	cssBytes, err := os.ReadFile(filepath.Join(root, "fixture-56-architecture-diagram.css"))
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	doc, err := html.Parse(string(htmlBytes))
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	cssSheet, err := css.Parse(string(cssBytes))
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := Layout(doc, Options{
+
+	res, err := Layout(doc, Options{ //nolint:exhaustruct // fixture print geometry only
 		Width: 527.2, Height: 20000, Sheets: []*css.Stylesheet{cssSheet},
 		Background: true, Media: "print",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	assertSurfaceContractGaps(t, res, "full-fixture-tall")
 }
 
 func assertSurfaceContractGaps(t *testing.T, res *Result, label string) {
 	t.Helper()
 
-	// Anchor on the Surface/Contract header pair, then take the next Converter /
-	// ImageConverter / RunPDF labels within a short vertical window.
-	var surfaceY float64
-	for _, op := range res.Ops {
-		if op.Kind == OpText && op.Text == "Surface" {
-			surfaceY = op.Y
-			break
-		}
-	}
-	if surfaceY == 0 {
-		t.Fatalf("%s: Surface header not found", label)
-	}
+	surfaceY := findSurfaceHeaderY(t, res, label)
+	convY, imgY, runY := findSurfaceLabelRows(res, surfaceY)
 
-	var convY, imgY, runY float64
-	for _, op := range res.Ops {
-		if op.Kind != OpText {
-			continue
-		}
-		if op.Y < surfaceY-1 || op.Y > surfaceY+120 {
-			continue
-		}
-		switch {
-		case op.Text == "Converter":
-			convY = op.Y
-		case op.Text == "ImageConverter" || strings.HasPrefix(op.Text, "ImageConverter"):
-			imgY = op.Y
-		case op.Text == "RunPDF" || strings.HasPrefix(op.Text, "RunPDF"):
-			runY = op.Y
-		}
-	}
 	if convY == 0 || imgY == 0 || runY == 0 {
 		t.Fatalf("%s: missing labels near Surface(y=%.2f) conv=%v img=%v run=%v",
 			label, surfaceY, convY, imgY, runY)
 	}
+
 	gap1 := imgY - convY
 	gap2 := runY - imgY
+
 	t.Logf("%s gaps Converter->Image=%.2f Image->RunPDF=%.2f (surface=%.2f conv=%.2f img=%.2f run=%.2f)",
 		label, gap1, gap2, surfaceY, convY, imgY, runY)
+
 	if gap2 > gap1*1.6 {
 		t.Fatalf("%s: ImageConverter row inflated: gap1=%.2f gap2=%.2f", label, gap1, gap2)
 	}
+
 	if gap1 < 14 {
 		t.Fatalf("%s: Converter/ImageConverter crush: gap1=%.2f", label, gap1)
 	}
+}
+
+func findSurfaceHeaderY(t *testing.T, res *Result, label string) float64 {
+	t.Helper()
+
+	var surfaceY float64
+
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind == OpText && paintOp.Text == "Surface" {
+			surfaceY = paintOp.Y
+
+			break
+		}
+	}
+
+	if surfaceY == 0 {
+		t.Fatalf("%s: Surface header not found", label)
+	}
+
+	return surfaceY
+}
+
+func findSurfaceLabelRows(res *Result, surfaceY float64) (float64, float64, float64) {
+	var convY, imgY, runY float64
+
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpText {
+			continue
+		}
+
+		if paintOp.Y < surfaceY-1 || paintOp.Y > surfaceY+120 {
+			continue
+		}
+
+		switch {
+		case paintOp.Text == "Converter":
+			convY = paintOp.Y
+		case paintOp.Text == "ImageConverter" || strings.HasPrefix(paintOp.Text, "ImageConverter"):
+			imgY = paintOp.Y
+		case paintOp.Text == "RunPDF" || strings.HasPrefix(paintOp.Text, "RunPDF"):
+			runY = paintOp.Y
+		}
+	}
+
+	return convY, imgY, runY
 }
 
 func TestD02SurfaceTableRowHeightsAfterPagination(t *testing.T) {
@@ -127,18 +159,22 @@ func TestD02SurfaceTableRowHeightsAfterPagination(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	htmlBytes, err := os.ReadFile(filepath.Join(root, "fixture-56-architecture-diagram.html"))
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	cssBytes, err := os.ReadFile(filepath.Join(root, "fixture-56-architecture-diagram.css"))
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	doc, err := html.Parse(string(htmlBytes))
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	cssSheet, err := css.Parse(string(cssBytes))
 	if err != nil {
 		t.Fatal(err)
@@ -149,11 +185,12 @@ func TestD02SurfaceTableRowHeightsAfterPagination(t *testing.T) {
 		pageH    = 841.89
 		marginMM = 12.0
 	)
+
 	margin := marginMM * 72 / 25.4
 	contentW := pageW - 2*margin
 	contentH := pageH - 2*margin
 
-	res, err := Layout(doc, Options{
+	res, err := Layout(doc, Options{ //nolint:exhaustruct // fixture print geometry only
 		Width: contentW, Height: contentH, Sheets: []*css.Stylesheet{cssSheet},
 		Background: true, Media: "print",
 	})

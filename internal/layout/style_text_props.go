@@ -118,9 +118,7 @@ func setTextEmphasis(style *ResolvedStyle, value string) {
 			continue
 		}
 		tl := strings.ToLower(tok)
-		if tl == "filled" || tl == "open" || tl == "dot" || tl == "circle" || tl == "double-circle" || tl == "triangle" || tl == "sesame" || tl == "wavy" || tl == "none" {
-			style.CustomProps["__emph_style"] = tl
-		} else if tl != "" {
+		if tl != "" {
 			style.CustomProps["__emph_style"] = tl
 		}
 	}
@@ -307,11 +305,9 @@ func applyTextShadow(style *ResolvedStyle, value string, fsize float64) {
 		}
 		style.CustomProps["__text_shadow_extra"] = strings.Join(extra, "|")
 		style.CustomProps["__text_shadow_raw"] = val
-	} else {
-		if style.CustomProps != nil {
-			delete(style.CustomProps, "__text_shadow_extra")
-			delete(style.CustomProps, "__text_shadow_raw")
-		}
+	} else if style.CustomProps != nil {
+		delete(style.CustomProps, "__text_shadow_extra")
+		delete(style.CustomProps, "__text_shadow_raw")
 	}
 }
 
@@ -320,82 +316,93 @@ type shadowSpec struct {
 	color      [3]float64
 }
 
-func parseSingleShadow(s string, fsize float64, fallback [3]float64) shadowSpec {
-	var sp shadowSpec
-	sp.color = fallback
-	parts := strings.Fields(s)
+func parseSingleShadow(input string, fsize float64, fallback [3]float64) shadowSpec {
+	var shadow shadowSpec
+	shadow.color = fallback
+	parts := strings.Fields(input)
 	if len(parts) >= 1 {
 		if x, ok := plainLength(parts[0], fsize, 0); ok {
-			sp.x = x
+			shadow.x = x
 		}
 	}
 	if len(parts) >= 2 {
 		if y, ok := plainLength(parts[1], fsize, 0); ok {
-			sp.y = y
+			shadow.y = y
 		}
 	}
 	if len(parts) >= 3 {
-		if b, ok := plainLength(parts[2], fsize, 0); ok && b >= 0 {
-			sp.blur = b
-			if len(parts) >= 4 {
-				if c, ok := parseUsedColor(strings.Join(parts[3:], " "), fallback); ok {
-					sp.color = c
-				}
-			}
-		} else {
-			// third token is actually color when blur absent
-			if c, ok := parseUsedColor(strings.Join(parts[2:], " "), fallback); ok {
-				sp.color = c
-			}
-		}
+		applyShadowBlurColor(&shadow, parts, fsize, fallback)
 	}
-	return sp
+	return shadow
 }
 
-func shadowEncode(s shadowSpec) string {
+func applyShadowBlurColor(shadow *shadowSpec, parts []string, fsize float64, fallback [3]float64) {
+	blur, ok := plainLength(parts[2], fsize, 0)
+	if !ok || blur < 0 {
+		// Third token is actually color when blur absent.
+		if c, ok := parseUsedColor(strings.Join(parts[2:], " "), fallback); ok {
+			shadow.color = c
+		}
+
+		return
+	}
+
+	shadow.blur = blur
+
+	if len(parts) < 4 {
+		return
+	}
+
+	if c, ok := parseUsedColor(strings.Join(parts[3:], " "), fallback); ok {
+		shadow.color = c
+	}
+}
+
+func shadowEncode(shadow shadowSpec) string {
 	return strings.Join([]string{
-		strconv.FormatFloat(s.x, 'f', -1, 64),
-		strconv.FormatFloat(s.y, 'f', -1, 64),
-		strconv.FormatFloat(s.blur, 'f', -1, 64),
-		strconv.FormatFloat(s.color[0], 'f', -1, 64),
-		strconv.FormatFloat(s.color[1], 'f', -1, 64),
-		strconv.FormatFloat(s.color[2], 'f', -1, 64),
+		strconv.FormatFloat(shadow.x, 'f', -1, 64),
+		strconv.FormatFloat(shadow.y, 'f', -1, 64),
+		strconv.FormatFloat(shadow.blur, 'f', -1, 64),
+		strconv.FormatFloat(shadow.color[0], 'f', -1, 64),
+		strconv.FormatFloat(shadow.color[1], 'f', -1, 64),
+		strconv.FormatFloat(shadow.color[2], 'f', -1, 64),
 	}, ",")
 }
 
-func shadowDecode(s string) (shadowSpec, bool) {
-	parts := strings.Split(s, ",")
+func shadowDecode(input string) (shadowSpec, bool) {
+	empty := shadowSpec{x: 0, y: 0, blur: 0, color: [3]float64{}}
+	parts := strings.Split(input, ",")
 	if len(parts) != 6 {
-		return shadowSpec{}, false
+		return empty, false
 	}
-	var sp shadowSpec
+	var shadow shadowSpec
 	var err error
-	if sp.x, err = strconv.ParseFloat(parts[0], 64); err != nil {
-		return shadowSpec{}, false
+	if shadow.x, err = strconv.ParseFloat(parts[0], 64); err != nil {
+		return empty, false
 	}
-	if sp.y, err = strconv.ParseFloat(parts[1], 64); err != nil {
-		return shadowSpec{}, false
+	if shadow.y, err = strconv.ParseFloat(parts[1], 64); err != nil {
+		return empty, false
 	}
-	if sp.blur, err = strconv.ParseFloat(parts[2], 64); err != nil {
-		return shadowSpec{}, false
+	if shadow.blur, err = strconv.ParseFloat(parts[2], 64); err != nil {
+		return empty, false
 	}
-	if sp.color[0], err = strconv.ParseFloat(parts[3], 64); err != nil {
-		return shadowSpec{}, false
+	if shadow.color[0], err = strconv.ParseFloat(parts[3], 64); err != nil {
+		return empty, false
 	}
-	if sp.color[1], err = strconv.ParseFloat(parts[4], 64); err != nil {
-		return shadowSpec{}, false
+	if shadow.color[1], err = strconv.ParseFloat(parts[4], 64); err != nil {
+		return empty, false
 	}
-	if sp.color[2], err = strconv.ParseFloat(parts[5], 64); err != nil {
-		return shadowSpec{}, false
+	if shadow.color[2], err = strconv.ParseFloat(parts[5], 64); err != nil {
+		return empty, false
 	}
-	return sp, true
+	return shadow, true
 }
 
-func splitCommaRespectParens(s string) []string {
+func splitCommaRespectParens(input string) []string {
 	var out []string
 	depth := 0
 	start := 0
-	for i, r := range s {
+	for idx, r := range input {
 		switch r {
 		case '(':
 			depth++
@@ -405,15 +412,15 @@ func splitCommaRespectParens(s string) []string {
 			}
 		case ',':
 			if depth == 0 {
-				part := strings.TrimSpace(s[start:i])
+				part := strings.TrimSpace(input[start:idx])
 				if part != "" {
 					out = append(out, part)
 				}
-				start = i + 1
+				start = idx + 1
 			}
 		}
 	}
-	part := strings.TrimSpace(s[start:])
+	part := strings.TrimSpace(input[start:])
 	if part != "" {
 		out = append(out, part)
 	}
