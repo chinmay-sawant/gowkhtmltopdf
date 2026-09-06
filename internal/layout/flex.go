@@ -935,23 +935,16 @@ func (e *engine) flexShrinkWidths(items []flexMeas, widths []float64, deficit, s
 }
 
 // flexMainJustify picks the main-axis packing keyword for a flex container.
-// Fixture-61 #102 sets justify-self:center on a flex container (not an item).
-// Chrome print packs the flex line as if justify-content were center; honor
-// that when justify-content is still the initial flex-start value.
+// Only justify-content applies here. Non-stretch justify-self on the container
+// itself shrinks and aligns the flex box in layoutBlockChild (CSS Align), it
+// does not remap to justify-content.
 func flexMainJustify(style ResolvedStyle) string {
 	jc := style.JustifyContent
-	if jc != "" && jc != fxFlexStart && jc != fxStart {
-		return jc
+	if jc == "" {
+		return fxFlexStart
 	}
-	switch style.JustifySelf {
-	case fxCenter, fxFlexEnd, fxEnd, fxBetween, fxAround, fxEvenly:
-		return style.JustifySelf
-	default:
-		if jc == "" {
-			return fxFlexStart
-		}
-		return jc
-	}
+
+	return jc
 }
 
 // justifyRowStart resolves the main-axis start offset and gap for a row line

@@ -506,12 +506,61 @@ func (e *engine) layoutBlockChild(
 		}
 	}
 
+	// CSS Align: non-stretch justify-self on a width:auto block treats the
+	// size as fit-content and aligns that margin box in the containing block
+	// (Chrome 130+; fixture-61 #102 justify-self:center in a table cell).
+	boxX, boxW = e.applyJustifySelfFitContent(node, cstate, boxX, boxW)
+
 	cblock := e.build(node, boxW, boxX, posY+curY)
 	if cblock == nil {
 		return curY, 0, nil
 	}
 
 	return curY + cblock.height, e.scalePt(cstate.MarginBottom), cblock
+}
+
+// applyJustifySelfFitContent shrinks and offsets an auto-width in-flow box
+// when justify-self is start/end/center (not auto/stretch). Returns the
+// containing-block slot (x, w) to pass into build.
+func (e *engine) applyJustifySelfFitContent(
+	node *html.Node, style ResolvedStyle, boxX, boxW float64,
+) (float64, float64) {
+	if !justifySelfUsesFitContent(style) || boxW <= 0 {
+		return boxX, boxW
+	}
+
+	fit := e.blockFitContentMarginBox(node, style)
+	if fit <= 0 || fit >= boxW {
+		return boxX, boxW
+	}
+
+	return boxX + gridAlignOffset(style.JustifySelf, boxW, fit), fit
+}
+
+// justifySelfUsesFitContent reports CSS Align "auto width becomes fit-content"
+// for block-level justify-self keywords other than stretch/auto/normal.
+func justifySelfUsesFitContent(style ResolvedStyle) bool {
+	if style.Width >= 0 || style.WidthPercent >= 0 {
+		return false
+	}
+
+	return isPlaceAlignmentKeyword(style.JustifySelf)
+}
+
+// blockFitContentMarginBox is the shrink-to-fit margin-box width used when
+// justify-self opts out of stretch. Flex containers use the flex-aware
+// intrinsic measure so row gaps are included.
+func (e *engine) blockFitContentMarginBox(node *html.Node, style ResolvedStyle) float64 {
+	borderBox := 0.0
+	switch style.Display {
+	case displayFlex, displayInlineFlex:
+		borderBox = e.measureFlexItemMaxContent(node, style)
+	default:
+		_, maxW := e.measureCellMinMax(node, style)
+		borderBox = maxW
+	}
+
+	return borderBox + e.scalePt(style.MarginLeft) + e.scalePt(style.MarginRight)
 }
 
 // pushBFCFloats installs a floatState for the current box. When the box
