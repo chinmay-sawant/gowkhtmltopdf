@@ -1325,15 +1325,21 @@ func paintLine(img *image.NRGBA, paintOp *layout.Op, paintStyle layout.PaintStyl
 		A: uint8(math.Round(alpha * channelMax)),
 	}
 	lineWidth := strokeWidthScale(paintStyle.StrokeWidth, pxPerPt)
-	// centre the stroke on the line: half its width, in points
+	// Centre the stroke on the line: half its width, in points. Extend past
+	// each endpoint by that same half (square-cap equivalent) so meeting
+	// axis-aligned borders fill the outer corner instead of leaving a notch.
 	half := float64(lineWidth) / boxFilterFactor2 / pxPerPt
 
 	var rect image.Rectangle
 
 	if paintOp.H <= 0 { // horizontal line
-		rect = ptRectScale(paintOp.X, paintOp.Y-half, paintOp.W, boxFilterFactor2*half, pxPerPt)
+		rect = ptRectScale(
+			paintOp.X-half, paintOp.Y-half, paintOp.W+boxFilterFactor2*half, boxFilterFactor2*half, pxPerPt,
+		)
 	} else { // vertical line
-		rect = ptRectScale(paintOp.X-half, paintOp.Y, boxFilterFactor2*half, paintOp.H, pxPerPt)
+		rect = ptRectScale(
+			paintOp.X-half, paintOp.Y-half, boxFilterFactor2*half, paintOp.H+boxFilterFactor2*half, pxPerPt,
+		)
 	}
 
 	if rect = rect.Intersect(img.Bounds()); !rect.Empty() {

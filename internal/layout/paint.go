@@ -1145,9 +1145,15 @@ func drawLine(chld *pdf.Content, paintOp *Op, pageIdx int, contentH float64, opt
 
 	chld.SetStrokeColor(paintOp.R, paintOp.G, paintOp.B)
 	chld.SetLineWidth(width)
+	// Square caps project half the stroke past each endpoint so axis-aligned
+	// border sides meet at outer corners (butt caps leave a width/2 notch).
+	const pdfLineCapSquare = 2
+
+	chld.SetLineCap(pdfLineCapSquare)
 	chld.MoveTo(xEnd, yEnd)
 	chld.LineTo(xTwo, yTwo)
 	chld.Stroke()
+	chld.SetLineCap(0) // restore PDF default butt for later strokes
 }
 
 func drawText(
