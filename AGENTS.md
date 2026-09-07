@@ -267,6 +267,8 @@ PR bodies live in `plans/PR/`. Phase checklist format comes from
 - `skills/diagnose-golden-fixture/` - golden corpus failure loop: tight red
   test, bisect, falsifiable probes, fix the interaction without undoing
   intentional prior work
+- `skills/diagnose-fixture-picture/` - Effect-cell screenshots, authorship vs
+  engine classification, 3-agent analysis council, 4-agent picture verify
 - `skills/golang-anti-patterns/` - top 50 Go anti-patterns catalog, detection
   heuristics, and idiomatic Go pattern replacements
 - `skills/ponytail*` - laziness protocol family (YAGNI reviews, debt ledger)
