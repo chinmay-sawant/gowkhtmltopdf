@@ -185,6 +185,24 @@ func (m *cellMeasure) measureText(text string, cstate *ResolvedStyle, nowrap boo
 
 	eng := m.engine
 
+	// vertical-rl/lr: physical width is one glyph column (line-height), not the
+	// horizontal string advance. Matching Chrome shrink-to-fit for fixture-62
+	// #119 (narrow yellow column, not a wide rotated run box).
+	if isVerticalWritingMode(cstate.WritingMode) {
+		if !hasNonHTMLSpace(text) {
+			return
+		}
+
+		col := verticalWritingColumnWidth(eng, cstate)
+		chromeW := inlineMeasurementChromeWidth(eng, *cstate)
+		m.lineW += col + chromeW
+		m.noteWord(col + chromeW)
+		m.lineHasInk = true
+		m.lineOnlyNowrap = nowrap
+
+		return
+	}
+
 	if !nowrap {
 		// Walk words without strings.Fields: no []string or word copies.
 		// Matching white-space:normal - runs of HTML space collapse to one gap.
@@ -246,6 +264,21 @@ func (m *cellMeasure) measureText(text string, cstate *ResolvedStyle, nowrap boo
 	if hasNonHTMLSpace(text) {
 		m.lineHasInk = true
 	}
+}
+
+// verticalWritingColumnWidth is the physical horizontal measure of one glyph
+// column under writing-mode: vertical-rl / vertical-lr (Chrome fit-content).
+func verticalWritingColumnWidth(eng *engine, style *ResolvedStyle) float64 {
+	if eng == nil || style == nil {
+		return 0
+	}
+
+	col := lineHeightOf(style) * eng.scale
+	if font := eng.scalePt(style.FontSize); font > col {
+		col = font
+	}
+
+	return col
 }
 
 // inlineMeasurementChromeWidth keeps intrinsic flex/grid measurements in
