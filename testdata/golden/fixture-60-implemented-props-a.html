@@ -53,6 +53,7 @@
       border-collapse: collapse;
       table-layout: fixed;
     }
+    table.audit-continuation { page-break-before: always; }
     table.audit th, table.audit td {
       border: 1px solid #b8c0cc;
       vertical-align: top;
@@ -227,11 +228,16 @@
 <tr><td class="idx">113</td><td class="prop"><code>border-start-end-radius</code><div class="meta">longhand · CSS Logical Properties and Values</div></td><td class="desc">With `border-start-end-radius: 14px` the logical start-end (top-right) corner is curved.</td><td class="effect"><div style="border:2px solid #2563eb;border-start-end-radius:14px;background:#eff6ff;width:70px;height:26px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:bold;">SE (TR)</div></td></tr>
 <tr><td class="idx">114</td><td class="prop"><code>border-start-start-radius</code><div class="meta">longhand · CSS Logical Properties and Values</div></td><td class="desc">With `border-start-start-radius: 14px` the logical start-start (top-left) corner is curved.</td><td class="effect"><div style="border:2px solid #2563eb;border-start-start-radius:14px;background:#eff6ff;width:70px;height:26px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:bold;">SS (TL)</div></td></tr>
 <tr><td class="idx">115</td><td class="prop"><code>border-style</code><div class="meta">shorthand · CSS Backgrounds and Borders</div></td><td class="desc">With `border-style: solid dashed dotted double` top solid, right dashed, bottom dotted, left double.</td><td class="effect"><div style="border-width:3px;border-style:solid dashed dotted double;border-color:#2563eb;padding:3px 8px;background:#eff6ff;display:inline-block;font-size:10px;">4 styles</div></td></tr>
+</tbody>
+</table>
+
+<table class="audit audit-continuation">
+  <tbody>
 <tr><td class="idx">116</td><td class="prop"><code>border-top</code><div class="meta">shorthand · CSS Backgrounds and Borders</div></td><td class="desc">With `border-top: 3px solid #2563eb` only the top edge has a 3px blue border.</td><td class="effect"><div style="border:1px solid #e2e8f0;border-top:3px solid #2563eb;padding:3px 8px;background:#eff6ff;display:inline-block;font-size:11px;">top border</div></td></tr>
 <tr><td class="idx">117</td><td class="prop"><code>border-top-color</code><div class="meta">longhand · CSS Backgrounds and Borders</div></td><td class="desc">With `border-top-color: #dc2626` only the top edge turns red while others remain slate.</td><td class="effect"><div style="border:2px solid #94a3b8;border-top-color:#dc2626;padding:3px 8px;background:#fef2f2;display:inline-block;font-size:11px;">red top</div></td></tr>
 <tr><td class="idx">118</td><td class="prop"><code>border-top-left-radius</code><div class="meta">longhand · CSS Backgrounds and Borders</div></td><td class="desc">With `border-top-left-radius: 14px` only the top-left corner is rounded.</td><td class="effect"><div style="border:2px solid #2563eb;border-top-left-radius:14px;background:#eff6ff;width:70px;height:26px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:bold;">TL</div></td></tr>
-    </tbody>
-  </table>
+  </tbody>
+</table>
 
   <footer class="note">
     IMPLEMENTED-PROPS-A · Liberation fonts OFL-1.1 under testdata/fonts/implemented-audit ·
