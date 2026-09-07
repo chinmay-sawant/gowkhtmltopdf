@@ -1,51 +1,43 @@
 ## Summary
 
-Fixes visual Effect-cell demos on fixtures 61 and 62, and a few layout bugs those demos exposed: column-rule px width, transform restamp after pagination, and vertical-rl shrink-to-fit width. Sample PDFs and the diagnose-fixture-picture skill are updated with the same work.
+Fix fixture rendering regressions in borders, tables, transforms, opacity, and native form controls. The change also refreshes the affected fixture source files and sample PDFs so the generated output matches the corrected layout behavior.
 
 ## Motivation / context
 
-- Branch: `chore/fix-fixtures`
-- Goal: make Implemented CSS audit fixtures checkable by eye against Chrome-style expectations, without placeholder Effect cells
-- Related issues: none opened for this batch
+- Fixtures 56 and 60 exposed layout and paint differences that were visible in the generated PDFs.
+- The fixes keep logical layout coordinates separate from paint geometry where a thick border needs to be inset.
+- No public API or CLI behavior changes are intended.
 
 ## Changes
 
-### Layout engine
+### Layout and paint engine
 
-- `column-rule` / outline px lengths go through `borderPaintWidth` instead of treating `1px` as `1pt`
-- After pagination, `restampBoxTransforms` rebakes transform origins so scale/rotate chips stay with their boxes on later pages
-- `writing-mode: vertical-rl` / `vertical-lr` intrinsic width uses one glyph column (line-height / font-size), matching Chrome shrink-to-fit for narrow vertical columns
+- Expand border shorthands with one to four values and keep unequal-width border corners inside their boxes.
+- Paint mixed-width straight borders inward so thick strokes do not extend beyond the border box.
+- Preserve signed line geometry for checkbox tick segments while applying border-only paint insets.
+- Add native checkbox and radio widget painting, including accent-color support and aligned checked ticks.
+- Correct table border-spacing offsets and repeat table headers on normal continuation pages.
+- Keep fixture 60's explicitly requested final continuation page without a table header.
+- Prevent compounded opacity and restamp transforms after pagination.
 
-### Fixture 61 (implemented props B)
+### Fixtures and generated output
 
-- Multicol rows 23-32: taller cells and distinct longhand demos
-- Live `content` / counter demos via `::before`
-- Grid props 73-85: item placement, auto-flow, named areas, explicit tracks instead of identical A/B stubs
-
-### Fixture 62 (implemented props C)
-
-- Overflow-clip-margin rows: directional protrusion demos
-- Padding sides: fixed-width blue shell + orange chip so each side band is visible
-- Opacity, place-items/place-self, clip-margin-top, skip-ink, text-shadow, decorations
-- Transform demos (rotate, scale, transform, transform-box, transform-origin, translate) use centered stages; table no longer forces a sparse page break before writing-mode
-- Regenerated `output/fixture-62-implemented-props-c.pdf`
-
-### Tooling / samples
-
-- Removed unused `scripts/gen-implemented-prop-fixtures.py` (committed HTML is the source of truth)
-- Replaced parallel fixture-audit / pdf-regression skills with `skills/diagnose-fixture-picture`
-- Regenerated sample PDFs under `output/` after fixture-61 fixes
+- Normalize fixture 60 rows and add focused regression tests for property 29 checkbox alignment and property 111 border containment.
+- Update the fixture 60 HTML for the intended continuation-page behavior.
+- Use a solid border for the fixture 56 divergence cards and regenerate its sample PDF.
+- Regenerate the fixture 60, 61, and 62 sample PDFs.
+- Update the repository guidance to use the capped Makefile test commands for full-suite validation.
 
 ## Impact
 
 | Area | Impact |
 |------|--------|
-| **Performance** | None expected |
-| **Memory** | None expected |
-| **Behavior / correctness** | Column-rule paint width, post-pagination transforms, vertical-rl fit-content width |
+| **Performance** | No material change expected |
+| **Memory** | No material change expected |
+| **Behavior / correctness** | More accurate border, table, transform, opacity, checkbox, and radio rendering |
 | **API / CLI** | None |
 | **Dependencies** | None |
-| **Binary size / build time** | None material |
+| **Binary size / build time** | No material change expected |
 
 ## Breaking changes / migration
 
@@ -55,60 +47,41 @@ Fixes visual Effect-cell demos on fixtures 61 and 62, and a few layout bugs thos
 
 ## Test plan
 
-- [x] Targeted layout tests for column-rule, transform center/restamp, vertical-rl width
-- [x] `go test ./internal/convert -run 'TestGoldenCorpusAllFixtures/fixture-62'`
-- [ ] `make test` (full suite at review time)
-- [ ] `make lint`
-- [ ] `make golden` if reviewing layout/paint changes end to end
-- [ ] Spot-check fixture-61/62 Effect cells vs Chrome for transform and writing-mode rows
+- [x] `make test`
+- [x] `make lint`
+- [x] `make golden`
+- [x] `go test ./internal/layout -run TestFixture60AccentCheckboxTickAndAlignment`
+- [x] Visual inspection of the regenerated fixture 60 PDF for the property 29 checkbox and property 111 thick border
 
 ### Commands
 
 ```sh
-go test ./internal/layout/ -run 'ColumnRule|Transform|VerticalRL|TableCellTransformed' -count=1
-go test ./internal/convert/ -run 'TestGoldenCorpusAllFixtures/fixture-6[12]' -count=1
 make test
 make lint
+make golden
+go test ./internal/layout -run TestFixture60AccentCheckboxTickAndAlignment
 ```
 
 ## Screenshots / sample output
 
-Chrome vs ours writing-mode probe (same HTML): yellow vertical-rl box width ~16.5pt (Chrome) vs ~17.6pt (ours after fix); previously ~40pt wide.
-
-Transform Effect cells on fixture-62 use `.xform-stage` / `.xform-chip`; chips stay inside the dashed stage after pagination restamp.
+- Regenerated samples: `output/fixture-56-architecture-diagram.pdf`, `output/fixture-60-implemented-props-a.pdf`, `output/fixture-61-implemented-props-b.pdf`, and `output/fixture-62-implemented-props-c.pdf`.
+- Fixture 60 property 29 now shows a complete, centered white check on the green checkbox.
+- Fixture 60 property 111 keeps the thick right border inside the effect box.
 
 ## Related issues
 
-- None for this batch
-
-## Commits on branch (`master..HEAD`)
-
-- `3069edc` fix(layout): column-rule px width and fixture-61 multicol demos
-- `f8d35f5` chore(output): regenerate sample PDFs after fixture-61 fixes
-- `e9035bd` fix(fixtures): show live content and counter none demos
-- `0cac57c` fix(fixtures): distinct live demos for grid props 73-85
-- `31e2eac` chore(skills): replace picture audit skills with diagnose-fixture-picture
-- `9497c77` fix(fixtures): live overflow-clip-margin demos on fixture-62
-- `9e52853` fix(fixtures): distinct padding Effect demos on fixture-62
-- `c006af9` chore: remove unused implemented-props fixture generator
-- `daf657c` fix(fixtures): contain transforms and live decoration demos on fixture-62
-- `66e5fb5` fix(fixtures): skip-ink contrast, writing-mode page break, clearer shadow
-- `8dde162` fix(fixtures): opacity, place-items/self, clip-top, and scale demos
-- `93ae738` fix(fixtures): self-framed transform chips and end-table packing
-- `041b9f7` fix(layout): restamp transforms after pagination for centered stages
-- `371a05f` fix(layout): size vertical-rl columns like Chrome shrink-to-fit
+- None identified for this branch.
 
 ## PR metadata checklist (author)
 
 - [x] Self-assigned (`--assignee @me`)
 - [x] Labels applied
-- [x] Related issues filled (none for this batch)
+- [x] Related issues reviewed; none identified
 - [x] Filled body under `plans/PR/pr-fix-fixtures.md`
 
 ## Follow-ups (out of scope)
 
-- Full per-glyph vertical typesetting (upright Latin stacking) beyond the current -90deg lite path
-- Engine clip of transformed paint inside `overflow:hidden` table cells
+- Add pixel-level PDF comparisons if the project adopts a stable raster baseline for these fixtures.
 
 ## Reviewer checklist
 
