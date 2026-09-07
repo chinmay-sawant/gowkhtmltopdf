@@ -295,10 +295,115 @@ def effect_html(prop: str, kind: str, legacy_of: str | None) -> str:
             f'<span style="background:#cde;padding:2px 6px;">3</span></div>'
         )
     if p.startswith("grid") or p == "grid":
+        # Item placement props must live on children; auto/invalid values are not demos.
+        cell = 'padding:2px 4px;font-size:8pt'
+        if p == "grid":
+            return (
+                f'<div style="display:grid;grid:28px 28px / 48px 48px;gap:4px;border:1px solid #336;'
+                f'padding:4px;font-size:8pt;">'
+                f'<span style="background:#cde;{cell}">A</span>'
+                f'<span style="background:#fd8;{cell}">B</span>'
+                f'<span style="background:#cfc;{cell}">C</span>'
+                f'<span style="background:#cde;{cell}">D</span></div>'
+            )
+        if p == "grid-area":
+            return (
+                f'<div style="display:grid;grid-template-columns:40px 40px;grid-template-rows:24px 24px;'
+                f'gap:4px;border:1px solid #336;padding:4px;font-size:8pt;">'
+                f'<span style="grid-area:1/1/2/3;background:#fd8;{cell}">SPAN</span>'
+                f'<span style="background:#cde;{cell}">A</span>'
+                f'<span style="background:#cfc;{cell}">B</span></div>'
+            )
+        if p == "grid-auto-flow":
+            return (
+                f'<div style="display:grid;grid-template-columns:40px 40px;grid-template-rows:20px 20px;'
+                f'grid-auto-flow:column;gap:4px;border:1px solid #336;padding:4px;font-size:8pt;">'
+                f'<span style="background:#cde;{cell}">A</span>'
+                f'<span style="background:#fd8;{cell}">B</span></div>'
+            )
+        if p == "grid-column":
+            return (
+                f'<div style="display:grid;grid-template-columns:40px 40px 40px;gap:4px;border:1px solid #336;'
+                f'padding:4px;font-size:8pt;">'
+                f'<span style="background:#cde;{cell}">A</span>'
+                f'<span style="grid-column:1/-1;background:#fd8;{cell}">FULL</span>'
+                f'<span style="background:#cfc;{cell}">B</span></div>'
+            )
+        if p == "grid-column-end":
+            return (
+                f'<div style="display:grid;grid-template-columns:40px 40px;gap:4px;border:1px solid #336;'
+                f'padding:4px;font-size:8pt;">'
+                f'<span style="grid-column-start:1;grid-column-end:3;background:#fd8;{cell}">END3</span>'
+                f'<span style="background:#cde;{cell}">A</span>'
+                f'<span style="background:#cfc;{cell}">B</span></div>'
+            )
+        if p == "grid-column-start":
+            return (
+                f'<div style="display:grid;grid-template-columns:40px 40px;gap:4px;border:1px solid #336;'
+                f'padding:4px;font-size:8pt;">'
+                f'<span style="grid-column-start:2;background:#fd8;{cell}">S2</span>'
+                f'<span style="background:#cde;{cell}">A</span></div>'
+            )
+        if p == "grid-row":
+            return (
+                f'<div style="display:grid;grid-template-columns:40px 40px;grid-template-rows:20px 20px;'
+                f'gap:4px;border:1px solid #336;padding:4px;font-size:8pt;">'
+                f'<span style="grid-row:1/3;background:#fd8;{cell}">R</span>'
+                f'<span style="background:#cde;{cell}">A</span>'
+                f'<span style="background:#cfc;{cell}">B</span></div>'
+            )
+        if p == "grid-row-end":
+            return (
+                f'<div style="display:grid;grid-template-columns:40px 40px;grid-template-rows:20px 20px;'
+                f'gap:4px;border:1px solid #336;padding:4px;font-size:8pt;">'
+                f'<span style="grid-row-start:1;grid-row-end:3;background:#fd8;{cell}">RE</span>'
+                f'<span style="background:#cde;{cell}">A</span>'
+                f'<span style="background:#cfc;{cell}">B</span></div>'
+            )
+        if p == "grid-row-start":
+            return (
+                f'<div style="display:grid;grid-template-columns:40px 40px;grid-template-rows:20px 20px;'
+                f'gap:4px;border:1px solid #336;padding:4px;font-size:8pt;">'
+                f'<span style="grid-row-start:2;background:#fd8;{cell}">RS</span>'
+                f'<span style="background:#cde;{cell}">A</span></div>'
+            )
+        if p == "grid-template":
+            return (
+                f'<div style="display:grid;grid-template:28px 28px / 48px 48px;gap:4px;border:1px solid #336;'
+                f'padding:4px;font-size:8pt;">'
+                f'<span style="background:#cde;{cell}">A</span>'
+                f'<span style="background:#fd8;{cell}">B</span>'
+                f'<span style="background:#cfc;{cell}">C</span>'
+                f'<span style="background:#cde;{cell}">D</span></div>'
+            )
+        if p == "grid-template-areas":
+            return (
+                f'<div style="display:grid;width:120px;height:56px;grid-template-columns:1fr 1fr;'
+                f'grid-template-areas:&quot;hd hd&quot; &quot;sd mn&quot;;gap:4px;border:1px solid #336;'
+                f'padding:4px;font-size:8pt;">'
+                f'<span style="grid-area:hd;background:#fd8;{cell}">HD</span>'
+                f'<span style="grid-area:sd;background:#cde;{cell}">SD</span>'
+                f'<span style="grid-area:mn;background:#cfc;{cell}">MN</span></div>'
+            )
+        if p == "grid-template-columns" or p.endswith("template-columns"):
+            return (
+                f'<div style="display:grid;grid-template-columns:40px 40px;gap:4px;border:1px solid #336;'
+                f'padding:4px;font-size:8pt;">'
+                f'<span style="background:#cde;{cell}">A</span>'
+                f'<span style="background:#fd8;{cell}">B</span></div>'
+            )
+        if p == "grid-template-rows" or (p.endswith("template-rows") and "columns" not in p):
+            return (
+                f'<div style="display:grid;grid-template-rows:1fr 1fr;width:64px;height:56px;gap:4px;'
+                f'border:1px solid #336;padding:4px;font-size:8pt;">'
+                f'<span style="background:#cde;{cell}">A</span>'
+                f'<span style="background:#fd8;{cell}">B</span></div>'
+            )
         return (
-            f'<div style="display:grid;{p}:{"40px 40px" if "columns" in p or p.endswith("template-columns") else ("1fr 1fr" if "rows" in p else "auto")};'
-            f'gap:4px;border:1px solid #336;padding:4px;">'
-            f'<span style="background:#cde;padding:4px;">A</span><span style="background:#cde;padding:4px;">B</span></div>'
+            f'<div style="display:grid;grid-template-columns:40px 40px;gap:4px;border:1px solid #336;'
+            f'padding:4px;font-size:8pt;">'
+            f'<span style="background:#cde;{cell}">A</span>'
+            f'<span style="background:#fd8;{cell}">B</span></div>'
         )
     if "column" in p or p == "columns":
         # Keep demos distinct: rules need count+gap; span needs a child; width
