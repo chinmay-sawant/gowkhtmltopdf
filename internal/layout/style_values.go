@@ -616,13 +616,17 @@ func parseOutlineStyle(value string) (string, bool) {
 }
 
 func parseOutlineWidth(value string, fsize float64) (float64, bool) {
-	switch strings.ToLower(strings.TrimSpace(value)) {
+	value = strings.ToLower(strings.TrimSpace(value))
+	switch value {
 	case thinKeyword, mediumKeyword, thickKeyword:
-		return borderWidth(value, fsize), true
+		return borderPaintWidth(value, fsize), true
 	}
 
+	// Lengths must go through unit conversion (1px → 0.75pt). borderWidth
+	// returns the raw number and would treat 1px as 1pt for column-rule /
+	// outline (fixture-61 #26).
 	if _, _, ok := css.ParseLength(value); ok {
-		return borderWidth(value, fsize), true
+		return borderPaintWidth(value, fsize), true
 	}
 
 	return 0, false

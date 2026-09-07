@@ -301,7 +301,78 @@ def effect_html(prop: str, kind: str, legacy_of: str | None) -> str:
             f'<span style="background:#cde;padding:4px;">A</span><span style="background:#cde;padding:4px;">B</span></div>'
         )
     if "column" in p or p == "columns":
-        return f'<div style="{p}:{"2" if p in ("columns","column-count") else ("12px" if "gap" in p else ("1px solid #666" if "rule" in p else "auto"))};border:1px solid #888;padding:4px;font-size:8pt;height:48px;">Multi-column sample text repeated. Multi-column sample text repeated. Multi-column sample text repeated.</div>'
+        # Keep demos distinct: rules need count+gap; span needs a child; width
+        # must not be auto beside an explicit count (fixture-61 #26-32).
+        sample = (
+            "Multi-column sample text repeated. Multi-column sample text "
+            "repeated. Multi-column sample text repeated."
+        )
+        if p in ("columns", "column-count"):
+            return (
+                f'<div style="{p}:2;column-gap:14px;border:1px solid #888;'
+                f'padding:4px;font-size:8pt;height:88px;overflow:hidden;">'
+                f'{sample}</div>'
+            )
+        if "gap" in p:
+            return (
+                f'<div style="column-count:2;{p}:12px;border:1px solid #888;'
+                f'padding:4px;font-size:8pt;height:88px;overflow:hidden;">'
+                f'{sample}</div>'
+            )
+        if p == "column-rule":
+            return (
+                f'<div style="column-count:2;column-gap:14px;{p}:1px solid #666;'
+                f'border:1px solid #888;padding:4px;font-size:8pt;height:88px;'
+                f'overflow:hidden;">{sample}</div>'
+            )
+        if p == "column-rule-color":
+            return (
+                f'<div style="column-count:2;column-gap:14px;column-rule-width:3px;'
+                f'column-rule-style:solid;{p}:#c00;border:1px solid #888;'
+                f'padding:4px;font-size:8pt;height:88px;overflow:hidden;">'
+                f'{sample}</div>'
+            )
+        if p == "column-rule-style":
+            return (
+                f'<div style="column-count:2;column-gap:14px;column-rule-width:3px;'
+                f'{p}:dashed;column-rule-color:#666;border:1px solid #888;'
+                f'padding:4px;font-size:8pt;height:88px;overflow:hidden;">'
+                f'{sample}</div>'
+            )
+        if p == "column-rule-width":
+            return (
+                f'<div style="column-count:2;column-gap:14px;{p}:thick;'
+                f'column-rule-style:solid;column-rule-color:#666;border:1px solid #888;'
+                f'padding:4px;font-size:8pt;height:88px;overflow:hidden;">'
+                f'{sample}</div>'
+            )
+        if p == "column-span":
+            return (
+                f'<div style="column-count:2;column-gap:10px;border:1px solid #888;'
+                f'padding:4px;font-size:8pt;height:120px;overflow:hidden;">'
+                f'<p style="margin:0;">Before span. Before span. Before span. Before span.</p>'
+                f'<div style="{p}:all;margin:4px 0;padding:6px 4px;background:#cef;'
+                f'font-weight:bold;font-size:9pt;">SPAN ALL</div>'
+                f'<p style="margin:0;">After span. After span. After span. After span.</p>'
+                f'</div>'
+            )
+        if p == "column-width":
+            return (
+                f'<div style="{p}:48px;column-gap:8px;border:1px solid #888;'
+                f'padding:4px;font-size:8pt;height:88px;overflow:hidden;">'
+                f'{sample} {sample}</div>'
+            )
+        if p == "column-fill":
+            return (
+                f'<div style="column-count:2;column-gap:14px;{p}:auto;border:1px solid #888;'
+                f'padding:4px;font-size:8pt;height:88px;overflow:hidden;">'
+                f'{sample}</div>'
+            )
+        return (
+            f'<div style="column-count:2;{p}:auto;border:1px solid #888;'
+            f'padding:4px;font-size:8pt;height:88px;overflow:hidden;">'
+            f'{sample}</div>'
+        )
     if "break" in p or p.startswith("page"):
         return f'<div style="{p}:{"avoid" if "inside" in p else "auto"};border:1px dashed #a60;padding:4px;font-size:8pt;">fragmentation: <code>{html.escape(p)}</code></div>'
     if p.startswith("list-") or p.startswith("counter") or p in ("quotes", "content"):
