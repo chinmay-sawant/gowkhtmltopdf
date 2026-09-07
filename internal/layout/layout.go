@@ -1312,32 +1312,12 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 
 	curY := e.scalePt(style.PaddingTop) + e.scalePt(borderLayoutWidth(style, style.BorderTop))
 	enclose := e.pushBFCFloats(style, contentX, contentW)
-	children := node.Children
 	widget := node.Name == htmlMeter || node.Name == "progress"
 	chkWidget := isInputCheckbox(node)
-
-	if widget || chkWidget {
-		children = nil // fallback text is replaced by the native-style control
-	}
+	children := blockFlowChildren(node, widget || chkWidget)
 
 	if chkWidget {
-		chkSz := defaultCheckboxSize(e, style)
-
-		if style.Width < 0 && style.WidthPercent < 0 {
-			boxNode.w = chkSz + e.scalePt(style.PaddingLeft) + e.scalePt(style.PaddingRight) +
-				e.scalePt(style.BorderLeft.Width) + e.scalePt(style.BorderRight.Width)
-		}
-
-		if style.Height < 0 && style.HeightPercent < 0 {
-			curY = chkSz + e.scalePt(style.PaddingTop) + e.scalePt(borderLayoutWidth(style, style.BorderTop))
-		}
-	}
-
-	if node.Name == "details" {
-		_, open := node.Attrs["open"]
-		if !open {
-			children = closedDetailsChildren(node)
-		}
+		curY = applyCheckboxAutoSize(e, style, boxNode, curY)
 	}
 
 	curY = e.flowChildren(boxNode, children, style, contentW, contentX, posY, curY)
@@ -1580,6 +1560,25 @@ func closedDetailsChildren(node *html.Node) []*html.Node {
 	}
 
 	return nil
+}
+
+// blockFlowChildren returns the children a block should flow: fallback text is
+// dropped for native controls (meter, progress, checkbox, radio), and a closed
+// details element collapses to its summary.
+func blockFlowChildren(node *html.Node, nativeControl bool) []*html.Node {
+	children := node.Children
+	if nativeControl {
+		children = nil // fallback text is replaced by the native-style control
+	}
+
+	if node.Name == "details" {
+		_, open := node.Attrs["open"]
+		if !open {
+			children = closedDetailsChildren(node)
+		}
+	}
+
+	return children
 }
 
 // applyHeightConstraints enforces the used/min/max-height constraints on the

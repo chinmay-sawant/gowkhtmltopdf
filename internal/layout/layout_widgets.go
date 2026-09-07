@@ -28,6 +28,25 @@ func defaultCheckboxSize(eng *engine, style ResolvedStyle) float64 {
 	return eng.scalePt(defaultCheckboxDimensionPt)
 }
 
+// applyCheckboxAutoSize sizes an auto-sized checkbox or radio to the default
+// form-control box. Width is applied when the style leaves it unspecified;
+// height likewise, and its content-flow endpoint is returned. The endpoint
+// starts from padding-top + top border, matching buildBlock's curY origin.
+func applyCheckboxAutoSize(eng *engine, style ResolvedStyle, boxNode *box, curY float64) float64 {
+	chkSz := defaultCheckboxSize(eng, style)
+
+	if style.Width < 0 && style.WidthPercent < 0 {
+		boxNode.w = chkSz + eng.scalePt(style.PaddingLeft) + eng.scalePt(style.PaddingRight) +
+			eng.scalePt(style.BorderLeft.Width) + eng.scalePt(style.BorderRight.Width)
+	}
+
+	if style.Height < 0 && style.HeightPercent < 0 {
+		curY = chkSz + eng.scalePt(style.PaddingTop) + eng.scalePt(borderLayoutWidth(style, style.BorderTop))
+	}
+
+	return curY
+}
+
 // checkboxGeometry holds the scaled dimensions used when painting a checkbox or radio.
 type checkboxGeometry struct {
 	boxX, boxY, size, radius float64
@@ -51,20 +70,20 @@ const (
 )
 
 // paintCheckboxGeometry computes box position, size, and corner radius.
-func paintCheckboxGeometry(e *engine, isRadio bool, leftX, topY, width, height float64) checkboxGeometry {
+func paintCheckboxGeometry(eng *engine, isRadio bool, leftX, topY, width, height float64) checkboxGeometry {
 	size := width
 	if height < size {
 		size = height
 	}
 
-	maxSz := e.scalePt(chkMaxSzPx)
+	maxSz := eng.scalePt(chkMaxSzPx)
 	if size > maxSz {
 		size = maxSz
 	}
 
 	boxX := leftX + (width-size)/two
 	boxY := topY + (height-size)/two
-	radius := e.scalePt(chkRadiusPx)
+	radius := eng.scalePt(chkRadiusPx)
 
 	if isRadio {
 		radius = size / two
@@ -74,36 +93,36 @@ func paintCheckboxGeometry(e *engine, isRadio bool, leftX, topY, width, height f
 }
 
 // paintCheckedCheckbox paints the filled checkbox (or radio) for a checked input.
-func (e *engine) paintCheckedCheckbox(isRadio bool, color [3]float64, g checkboxGeometry) {
+func (e *engine) paintCheckedCheckbox(isRadio bool, color [3]float64, geo checkboxGeometry) {
 	e.add(Op{ //nolint:exhaustruct // intentional zero fields
 		Kind:   OpFillRect,
-		X:      g.boxX,
-		Y:      g.boxY,
-		W:      g.size,
-		H:      g.size,
+		X:      geo.boxX,
+		Y:      geo.boxY,
+		W:      geo.size,
+		H:      geo.size,
 		R:      color[0],
 		G:      color[1],
 		B:      color[2],
 		Alpha:  1,
-		Radius: g.radius,
+		Radius: geo.radius,
 	})
 
 	if isRadio {
-		e.paintRadioDot(g)
+		e.paintRadioDot(geo)
 	} else {
-		e.paintCheckTick(g)
+		e.paintCheckTick(geo)
 	}
 }
 
 // paintRadioDot paints the inner white dot for a checked radio button.
-func (e *engine) paintRadioDot(g checkboxGeometry) {
-	dotInset := g.size * chkDotInset
-	dotSize := g.size - two*dotInset
+func (e *engine) paintRadioDot(geo checkboxGeometry) {
+	dotInset := geo.size * chkDotInset
+	dotSize := geo.size - two*dotInset
 
 	e.add(Op{ //nolint:exhaustruct // intentional zero fields
 		Kind:   OpFillRect,
-		X:      g.boxX + dotInset,
-		Y:      g.boxY + dotInset,
+		X:      geo.boxX + dotInset,
+		Y:      geo.boxY + dotInset,
 		W:      dotSize,
 		H:      dotSize,
 		R:      1,
@@ -115,7 +134,7 @@ func (e *engine) paintRadioDot(g checkboxGeometry) {
 }
 
 // paintCheckTick paints the white tick mark inside a checked checkbox.
-func (e *engine) paintCheckTick(g checkboxGeometry) {
+func (e *engine) paintCheckTick(geo checkboxGeometry) {
 	checkColor := [3]float64{1, 1, 1}
 	tickW := e.scalePt(chkStrokeWidthPx)
 
@@ -125,10 +144,10 @@ func (e *engine) paintCheckTick(g checkboxGeometry) {
 
 	e.add(Op{ //nolint:exhaustruct // intentional zero fields
 		Kind:  OpLine,
-		X:     g.boxX + chkTick1X*g.size,
-		Y:     g.boxY + chkTick1Y*g.size,
-		W:     chkTick1W * g.size,
-		H:     chkTick1H * g.size,
+		X:     geo.boxX + chkTick1X*geo.size,
+		Y:     geo.boxY + chkTick1Y*geo.size,
+		W:     chkTick1W * geo.size,
+		H:     chkTick1H * geo.size,
 		R:     checkColor[0],
 		G:     checkColor[1],
 		B:     checkColor[2],
@@ -137,10 +156,10 @@ func (e *engine) paintCheckTick(g checkboxGeometry) {
 	})
 	e.add(Op{ //nolint:exhaustruct // intentional zero fields
 		Kind:  OpLine,
-		X:     g.boxX + chkTick2X*g.size,
-		Y:     g.boxY + chkTick2Y*g.size,
-		W:     chkTick2W * g.size,
-		H:     chkTick2H * g.size,
+		X:     geo.boxX + chkTick2X*geo.size,
+		Y:     geo.boxY + chkTick2Y*geo.size,
+		W:     chkTick2W * geo.size,
+		H:     chkTick2H * geo.size,
 		R:     checkColor[0],
 		G:     checkColor[1],
 		B:     checkColor[2],
@@ -150,31 +169,31 @@ func (e *engine) paintCheckTick(g checkboxGeometry) {
 }
 
 // paintUncheckedCheckbox paints the empty checkbox border for an unchecked input.
-func (e *engine) paintUncheckedCheckbox(g checkboxGeometry) {
+func (e *engine) paintUncheckedCheckbox(geo checkboxGeometry) {
 	e.add(Op{ //nolint:exhaustruct // intentional zero fields
 		Kind:   OpFillRect,
-		X:      g.boxX,
-		Y:      g.boxY,
-		W:      g.size,
-		H:      g.size,
+		X:      geo.boxX,
+		Y:      geo.boxY,
+		W:      geo.size,
+		H:      geo.size,
 		R:      1,
 		G:      1,
 		B:      1,
 		Alpha:  1,
-		Radius: g.radius,
+		Radius: geo.radius,
 	})
 	e.add(Op{ //nolint:exhaustruct // intentional zero fields
 		Kind:   OpStrokeRect,
-		X:      g.boxX,
-		Y:      g.boxY,
-		W:      g.size,
-		H:      g.size,
+		X:      geo.boxX,
+		Y:      geo.boxY,
+		W:      geo.size,
+		H:      geo.size,
 		R:      chkUncheckedGray,
 		G:      chkUncheckedGray,
 		B:      chkUncheckedGray,
 		Alpha:  1,
 		Width:  e.scalePt(1),
-		Radius: g.radius,
+		Radius: geo.radius,
 	})
 }
 
@@ -192,12 +211,12 @@ func (e *engine) paintCheckboxWidget(
 		}
 	}
 
-	g := paintCheckboxGeometry(e, isRadio, leftX, topY, width, height)
+	geo := paintCheckboxGeometry(e, isRadio, leftX, topY, width, height)
 	color := widgetValueColor("input", style)
 
 	if isChecked {
-		e.paintCheckedCheckbox(isRadio, color, g)
+		e.paintCheckedCheckbox(isRadio, color, geo)
 	} else {
-		e.paintUncheckedCheckbox(g)
+		e.paintUncheckedCheckbox(geo)
 	}
 }
