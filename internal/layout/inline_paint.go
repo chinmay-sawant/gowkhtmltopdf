@@ -562,7 +562,15 @@ func (e *engine) paintDecoration(
 	if wantUnderline {
 		// Sit clearly below glyph descenders (~1–2mm visual gap).
 		underY := baseline + descent + size*0.22 + item.style.TextUnderlineOffset
-		e.paintUnderline(item, runStart, runSpan, underY, uWidth, size, wsOnly, decColor, und)
+		skipInk := strings.ToLower(strings.TrimSpace(item.style.TextDecorationSkipInk))
+		// Empty keeps legacy continuous underlines. Explicit auto/all gap at
+		// descenders; none keeps a solid stroke through g/j/p/q/y.
+		if !wsOnly && (skipInk == "auto" || skipInk == "all") {
+			und.flush(e)
+			e.paintUnderlineSkipInk(item, runStart, underY, uWidth, decColor)
+		} else {
+			e.paintUnderline(item, runStart, runSpan, underY, uWidth, size, wsOnly, decColor, und)
+		}
 	} else {
 		und.flush(e)
 	}
@@ -667,6 +675,68 @@ func (e *engine) paintOverline(
 			Kind: OpLine, X: runStart, Y: overlineY, W: runSpan, H: 0,
 			Width: uWidth, R: col[0], G: col[1], B: col[2],
 		})
+	}
+}
+
+// descenderRune reports Latin letters whose ink typically crosses an underline.
+func descenderRune(r rune) bool {
+	switch r {
+	case 'g', 'j', 'p', 'q', 'y', 'Q':
+		return true
+	default:
+		return false
+	}
+}
+
+// paintUnderlineSkipInk draws per-glyph underline segments, omitting strokes
+// under descender letters so skip-ink:auto/all is visible in print.
+func (e *engine) paintUnderlineSkipInk(
+	item *inlineItem, runStart, underY, uWidth float64, col [3]float64,
+) {
+	curX := runStart
+	segStart := runStart
+	inGap := false
+	// Nudge the gap a little past the glyph box so the break reads in print.
+	gapPad := uWidth * 1.5
+
+	flushSeg := func(endX float64) {
+		w := endX - segStart
+		if w > 0.01 {
+			e.add(Op{ //nolint:exhaustruct // intentional zero fields
+				Kind: OpLine, X: segStart, Y: underY, W: w, H: 0,
+				Width: uWidth, R: col[0], G: col[1], B: col[2],
+			})
+		}
+	}
+
+	for _, runic := range item.text {
+		adv := e.measureRuneFace(runic, item.style)
+		if adv <= 0 {
+			adv = item.style.FontSize * fallbackAdvanceRatio
+			if adv <= 0 {
+				adv = 6
+			}
+		}
+		if descenderRune(runic) {
+			if !inGap {
+				end := curX - gapPad
+				if end < segStart {
+					end = segStart
+				}
+				flushSeg(end)
+				inGap = true
+			}
+		} else if inGap {
+			segStart = curX + gapPad
+			if segStart > curX+adv {
+				segStart = curX + adv
+			}
+			inGap = false
+		}
+		curX += adv
+	}
+	if !inGap {
+		flushSeg(curX)
 	}
 }
 
