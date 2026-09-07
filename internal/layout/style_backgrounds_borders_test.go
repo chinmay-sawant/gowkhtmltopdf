@@ -95,3 +95,27 @@ func TestBorderImageProps(t *testing.T) {
 		t.Errorf("mismatch on border image props: %+v", s)
 	}
 }
+
+func TestBorderColorFourValues(t *testing.T) {
+	t.Parallel()
+
+	ctx := &styleContext{
+		ctx:       context.Background(),
+		err:       nil,
+		work:      0,
+		sheets:    nil,
+		viewportW: 800,
+	}
+
+	s := initialStyle()
+	raw := map[string]string{
+		"border-color": "#ef4444 #3b82f6 #10b981 #f59e0b",
+	}
+	applyRestProps(&s, raw, ctx, nil)
+
+	if s.BorderTop.Color[0] < 0.9 || s.BorderRight.Color[2] < 0.9 ||
+		s.BorderBottom.Color[1] < 0.7 || s.BorderLeft.Color[0] < 0.9 {
+		t.Errorf("mismatch on four-value border-color: top=%v, right=%v, bot=%v, left=%v",
+			s.BorderTop.Color, s.BorderRight.Color, s.BorderBottom.Color, s.BorderLeft.Color)
+	}
+}

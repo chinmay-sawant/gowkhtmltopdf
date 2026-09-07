@@ -123,26 +123,93 @@ func (e *engine) borderOpsSides(
 	const borderSideCount = 4
 
 	ops := make([]Op, 0, borderSideCount)
-	if top {
-		ops = appendBorderLineOps(ops, posX, posY, wid, 0, e.scalePt(borderPaint(sty.BorderTop)), sty.BorderTop.Style,
-			sty.BorderTop.Color[0], sty.BorderTop.Color[1], sty.BorderTop.Color[2])
+
+	wTop := 0.0
+	if top && sty.BorderTop.Style != cssDisplayNone && borderPaint(sty.BorderTop) > 0 {
+		wTop = e.scalePt(borderPaint(sty.BorderTop))
 	}
 
-	if right {
-		ops = appendBorderLineOps(ops, posX+wid, posY, 0, height,
-			e.scalePt(borderPaint(sty.BorderRight)), sty.BorderRight.Style,
-			sty.BorderRight.Color[0], sty.BorderRight.Color[1], sty.BorderRight.Color[2])
+	wRight := 0.0
+	if right && sty.BorderRight.Style != cssDisplayNone && borderPaint(sty.BorderRight) > 0 {
+		wRight = e.scalePt(borderPaint(sty.BorderRight))
 	}
 
-	if bottom {
-		ops = appendBorderLineOps(ops, posX, posY+height, wid, 0,
-			e.scalePt(borderPaint(sty.BorderBottom)), sty.BorderBottom.Style,
-			sty.BorderBottom.Color[0], sty.BorderBottom.Color[1], sty.BorderBottom.Color[2])
+	wBottom := 0.0
+	if bottom && sty.BorderBottom.Style != cssDisplayNone && borderPaint(sty.BorderBottom) > 0 {
+		wBottom = e.scalePt(borderPaint(sty.BorderBottom))
 	}
 
-	if left {
-		ops = appendBorderLineOps(ops, posX, posY, 0, height, e.scalePt(borderPaint(sty.BorderLeft)), sty.BorderLeft.Style,
-			sty.BorderLeft.Color[0], sty.BorderLeft.Color[1], sty.BorderLeft.Color[2])
+	wLeft := 0.0
+	if left && sty.BorderLeft.Style != cssDisplayNone && borderPaint(sty.BorderLeft) > 0 {
+		wLeft = e.scalePt(borderPaint(sty.BorderLeft))
+	}
+
+	if wTop > 0 {
+		adjL := 0.0
+		if wLeft > 0 && wLeft > wTop {
+			adjL = (wLeft + wTop) / 2.0
+		}
+		adjR := 0.0
+		if wRight > 0 && wRight > wTop {
+			adjR = (wRight + wTop) / 2.0
+		}
+		topX := posX + adjL
+		topW := wid - adjL - adjR
+		if topW > 0 {
+			ops = appendBorderLineOps(ops, topX, posY, topW, 0, wTop, sty.BorderTop.Style,
+				sty.BorderTop.Color[0], sty.BorderTop.Color[1], sty.BorderTop.Color[2])
+		}
+	}
+
+	if wRight > 0 {
+		adjT := 0.0
+		if wTop > 0 && wTop > wRight {
+			adjT = (wTop + wRight) / 2.0
+		}
+		adjB := 0.0
+		if wBottom > 0 && wBottom > wRight {
+			adjB = (wBottom + wRight) / 2.0
+		}
+		rightY := posY + adjT
+		rightH := height - adjT - adjB
+		if rightH > 0 {
+			ops = appendBorderLineOps(ops, posX+wid, rightY, 0, rightH, wRight, sty.BorderRight.Style,
+				sty.BorderRight.Color[0], sty.BorderRight.Color[1], sty.BorderRight.Color[2])
+		}
+	}
+
+	if wBottom > 0 {
+		adjL := 0.0
+		if wLeft > 0 && wLeft > wBottom {
+			adjL = (wLeft + wBottom) / 2.0
+		}
+		adjR := 0.0
+		if wRight > 0 && wRight > wBottom {
+			adjR = (wRight + wBottom) / 2.0
+		}
+		botX := posX + adjL
+		botW := wid - adjL - adjR
+		if botW > 0 {
+			ops = appendBorderLineOps(ops, botX, posY+height, botW, 0, wBottom, sty.BorderBottom.Style,
+				sty.BorderBottom.Color[0], sty.BorderBottom.Color[1], sty.BorderBottom.Color[2])
+		}
+	}
+
+	if wLeft > 0 {
+		adjT := 0.0
+		if wTop > 0 && wTop > wLeft {
+			adjT = (wTop + wLeft) / 2.0
+		}
+		adjB := 0.0
+		if wBottom > 0 && wBottom > wLeft {
+			adjB = (wBottom + wLeft) / 2.0
+		}
+		leftY := posY + adjT
+		leftH := height - adjT - adjB
+		if leftH > 0 {
+			ops = appendBorderLineOps(ops, posX, leftY, 0, leftH, wLeft, sty.BorderLeft.Style,
+				sty.BorderLeft.Color[0], sty.BorderLeft.Color[1], sty.BorderLeft.Color[2])
+		}
 	}
 
 	return ops

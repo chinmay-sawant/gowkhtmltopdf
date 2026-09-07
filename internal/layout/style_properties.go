@@ -1365,13 +1365,7 @@ func setBorderSide(style *ResolvedStyle, side *border, value string, fsize float
 func applyBorderWidthProps(style *ResolvedStyle, prop, value string, fsize float64) bool {
 	switch prop {
 	case borderWidthKeyword:
-		w := borderWidth(value, fsize)
-		pw := borderPaintWidth(value, fsize)
-		style.BorderTop.Width, style.BorderRight.Width, style.BorderBottom.Width, style.BorderLeft.Width = w, w, w, w
-		style.BorderTop.PaintWidth = pw
-		style.BorderRight.PaintWidth = pw
-		style.BorderBottom.PaintWidth = pw
-		style.BorderLeft.PaintWidth = pw
+		setFourBorderWidth(style, value, fsize)
 	case "border-top-width":
 		style.BorderTop.Width = borderWidth(value, fsize)
 		style.BorderTop.PaintWidth = borderPaintWidth(value, fsize)
@@ -1391,20 +1385,104 @@ func applyBorderWidthProps(style *ResolvedStyle, prop, value string, fsize float
 	return true
 }
 
-//nolint:cyclop // border shorthand/property dispatch
-func applyBorderStyleColorProps(style *ResolvedStyle, prop, value string) bool {
-	switch prop {
-	case borderStyleKeyword:
-		s := value
+//nolint:mnd // generic trbl tuple expansion; 1, 2, 3 tokens
+func expandTRBL[T any](vals []T) [4]T {
+	switch len(vals) {
+	case 1:
+		return [4]T{vals[0], vals[0], vals[0], vals[0]}
+	case 2:
+		return [4]T{vals[0], vals[1], vals[0], vals[1]}
+	case 3:
+		return [4]T{vals[0], vals[1], vals[2], vals[1]}
+	default:
+		return [4]T{vals[0], vals[1], vals[2], vals[3]}
+	}
+}
+
+func setFourBorderWidth(style *ResolvedStyle, value string, fsize float64) {
+	var val [4]string
+
+	count := splitSpaceTokens(value, val[:])
+	if count == 0 || count > 4 {
+		return
+	}
+
+	widths := make([]float64, count)
+	pWidths := make([]float64, count)
+
+	for idx := range count {
+		widths[idx] = borderWidth(val[idx], fsize)
+		pWidths[idx] = borderPaintWidth(val[idx], fsize)
+	}
+
+	w := expandTRBL(widths)
+	p := expandTRBL(pWidths)
+
+	style.BorderTop.Width, style.BorderRight.Width = w[0], w[1]
+	style.BorderBottom.Width, style.BorderLeft.Width = w[2], w[3]
+	style.BorderTop.PaintWidth, style.BorderRight.PaintWidth = p[0], p[1]
+	style.BorderBottom.PaintWidth, style.BorderLeft.PaintWidth = p[2], p[3]
+}
+
+func setFourBorderStyle(style *ResolvedStyle, value string) {
+	var val [4]string
+
+	count := splitSpaceTokens(value, val[:])
+	if count == 0 || count > 4 {
+		return
+	}
+
+	styles := make([]string, count)
+
+	for idx := range count {
+		s := strings.ToLower(strings.TrimSpace(val[idx]))
 		if s != solidKeyword && s != borderStyleDashed && s != borderStyleDotted {
 			s = cssDisplayNone
 		}
 
-		style.BorderTop.Style, style.BorderRight.Style, style.BorderBottom.Style, style.BorderLeft.Style = s, s, s, s
-	case borderColorKeyword:
-		if c, ok := parseUsedColor(value, style.Color); ok {
-			style.BorderTop.Color, style.BorderRight.Color, style.BorderBottom.Color, style.BorderLeft.Color = c, c, c, c
+		styles[idx] = s
+	}
+
+	st := expandTRBL(styles)
+	style.BorderTop.Style = st[0]
+	style.BorderRight.Style = st[1]
+	style.BorderBottom.Style = st[2]
+	style.BorderLeft.Style = st[3]
+}
+
+func setFourBorderColor(style *ResolvedStyle, value string) {
+	var val [4]string
+
+	count := splitSpaceTokens(value, val[:])
+	if count == 0 || count > 4 {
+		return
+	}
+
+	colors := make([][3]float64, count)
+
+	for idx := range count {
+		c, ok := parseUsedColor(val[idx], style.Color)
+		if !ok {
+			return
 		}
+
+		colors[idx] = c
+	}
+
+	col := expandTRBL(colors)
+	style.BorderTop.Color = col[0]
+	style.BorderRight.Color = col[1]
+	style.BorderBottom.Color = col[2]
+	style.BorderLeft.Color = col[3]
+}
+
+//nolint:cyclop // border shorthand/property dispatch
+func applyBorderStyleColorProps(style *ResolvedStyle, prop, value string) bool {
+	switch prop {
+	case borderStyleKeyword:
+		setFourBorderStyle(style, value)
+	case borderColorKeyword:
+		setFourBorderColor(style, value)
 	case "border-top-color":
 		setBorderColor(&style.BorderTop, value, style.Color)
 	case "border-right-color":
