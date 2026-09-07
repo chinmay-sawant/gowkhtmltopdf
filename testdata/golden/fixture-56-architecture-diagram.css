@@ -2476,7 +2476,7 @@ section.d02 .dom-notes {
 }
 
 .div-card {
-  border: 1px dotted #9fb0bb;
+  border: 1px solid #9fb0bb;
   border-top: 3px solid #0f766e;
   border-radius: 4px;
   background: #f8fafb;
