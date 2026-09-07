@@ -116,7 +116,7 @@ body { margin: 0; font-size: 16pt; }
 func collectCandidateGridFills(t *testing.T, ops []Op) []Op {
 	t.Helper()
 
-	var out []Op
+	out := make([]Op, 0, len(ops))
 
 	for _, operation := range ops {
 		if operation.Kind != OpFillRect || operation.W <= 2 || operation.H <= 2 {

@@ -39,9 +39,40 @@ func TestTableCellTransformedChipStaysInStage(t *testing.T) {
 // TestScaleTransformRestampAfterPagination is the fixture-62 #65 regression:
 // pagination shifts box/op Y but must rebake transform origins, otherwise
 // scale (and rotate) paint drifts out of the Effect stage on later pages.
-func TestScaleTransformRestampAfterPagination(t *testing.T) { //nolint:funlen // multi-stage restamp test
+func TestScaleTransformRestampAfterPagination(t *testing.T) {
 	t.Parallel()
 
+	const pageH = 400.0
+
+	const margin = 36.0
+
+	contentH := pageH - 2*margin
+
+	doc := parseTestHTML(t, `<html><body style="margin:0"><table style="border-collapse:collapse;width:500px">`+
+		scaleRestampRows()+`</table></body></html>`)
+
+	res, err := Layout(doc, Options{ //nolint:exhaustruct // test viewport only
+		Width:      560,
+		Height:     pageH,
+		Background: true,
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	paginateOps(res, contentH)
+
+	staleDrift := assertScaleChipDriftBeforeRestamp(t, res)
+
+	restampBoxTransforms(res.root, res.Ops)
+
+	assertScaleChipRestamped(t, res, staleDrift)
+}
+
+// scaleRestampRows returns the fixture-62 #65 table body: 18 filler rows push
+// the scale chip row far enough down that pagination shifts its box Y.
+func scaleRestampRows() string {
 	var rows string
 
 	for range 18 {
@@ -57,25 +88,14 @@ func TestScaleTransformRestampAfterPagination(t *testing.T) { //nolint:funlen //
 </div>
 </td></tr>`
 
-	doc := parseTestHTML(t, `<html><body style="margin:0"><table style="border-collapse:collapse;width:500px">`+
-		rows+`</table></body></html>`)
+	return rows
+}
 
-	const pageH = 400.0
-
-	const margin = 36.0
-
-	contentH := pageH - 2*margin
-
-	res, err := Layout(doc, Options{ //nolint:exhaustruct // test viewport only
-		Width:      560,
-		Height:     pageH,
-		Background: true,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	paginateOps(res, contentH)
+// assertScaleChipDriftBeforeRestamp locks the pre-rebake state: the chip is on
+// the page with a stamped transform, and the painted center drift is returned
+// to prove pagination shifted the scale origin.
+func assertScaleChipDriftBeforeRestamp(t *testing.T, res *Result) float64 {
+	t.Helper()
 
 	stage := findXformStageFill(res)
 	chip := findXformChipFill(res, "sc")
@@ -95,19 +115,26 @@ func TestScaleTransformRestampAfterPagination(t *testing.T) { //nolint:funlen //
 	// Without rebake, a shifted scale origin drifts the painted center.
 	staleDrift := math.Hypot(staleX-chipMidX, staleY-chipMidY)
 
-	restampBoxTransforms(res.root, res.Ops)
+	return staleDrift
+}
 
-	chip = findXformChipFill(res, "sc")
+// assertScaleChipRestamped locks the post-rebake contract: the chip keeps its
+// transform stamp, its xformed center stays inside the stage, and the stale
+// drift proves the test actually stressed the bug.
+func assertScaleChipRestamped(t *testing.T, res *Result, staleDrift float64) {
+	t.Helper()
+
+	chip := findXformChipFill(res, "sc")
 
 	if chip == nil || !chip.XformSet {
 		t.Fatal("scale chip lost transform stamp after restamp")
 	}
 
-	chipMidX = chip.X + chip.W/2
-	chipMidY = chip.Y + chip.H/2
+	chipMidX := chip.X + chip.W/2
+	chipMidY := chip.Y + chip.H/2
 	targetX, targetY := chip.Xform.Apply(chipMidX, chipMidY)
 
-	stage = findXformStageFill(res)
+	stage := findXformStageFill(res)
 
 	if stage == nil {
 		t.Fatal("missing stage after restamp")

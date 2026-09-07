@@ -18,6 +18,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/tdewolff/canvas"
 	"github.com/tdewolff/canvas/renderers/rasterizer"
@@ -35,12 +36,16 @@ var (
 	errCanvasEmptySize = errors.New("svg canvas: empty size")
 	errCanvasPanic     = errors.New("svg canvas: panic")
 	errCanvasZeroPixel = errors.New("svg canvas: zero pixel size")
+
+	// canvasMu serializes calls to tdewolff/canvas, which uses mutable package-level
+	// globals in its path intersection algorithms (bentleyOttmann in path_intersection.go).
+	canvasMu sync.Mutex //nolint:gochecknoglobals // guards non-thread-safe tdewolff/canvas package globals
 )
 
 // Rasterize decodes SVG XML into a PNG image via tdewolff/canvas only.
 // maxSide caps the longer edge in pixels (default 512).
 // On failure (not SVG, parse/draw error, empty size, or canvas panic),
-// returns err with nil pngBytes and zero w/h — callers must treat error
+// returns err with nil pngBytes and zero w/h - callers must treat error
 // as "no image". There is no second rasterizer or shell fallback.
 func Rasterize(data []byte, maxSide int) ([]byte, int, int, error) {
 	if maxSide <= 0 {
@@ -83,6 +88,9 @@ func dpmmScaleFactor(targetW, targetH, maxSide int) float64 {
 
 //nolint:nonamedreturns // defer-recover must override the result values
 func rasterizeCanvas(data []byte, maxSide int) (pngBytes []byte, w, h int, err error) {
+	canvasMu.Lock()
+	defer canvasMu.Unlock()
+
 	defer func() {
 		if r := recover(); r != nil {
 			pngBytes, w, h = nil, 0, 0
