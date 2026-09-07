@@ -144,8 +144,18 @@ The real gates, in order of cost:
 | Lint | `make lint` | golangci-lint (pinned v1.64.8) clean; chains `lint-frontend` (npm) |
 | Golden corpus | `make golden` | All 61 fixtures convert with correct structure, page-count envelopes, embedded fonts, ordered text needles |
 
-Run targeted package tests during a session; run the full gate set once at
-session end before claiming done. CI additionally runs `-race` on hot
+Never run bare `go test ./...`: uncapped package and test concurrency
+thrashes swap and can freeze the desktop on this host. Run tests through
+the Makefile targets, which cap concurrency on purpose (`make test` uses
+`-p 2 -parallel 2` by default; see `TEST_P` / `TEST_PARALLEL` in the
+Makefile). Raise the caps when you have RAM to spare (`make test TEST_P=4
+TEST_PARALLEL=4`), force a fresh run (`make test GO_TEST_FLAGS='-count=1'`),
+skip long perf tests (`make test-quick`), or fall back to single-threaded
+(`make test-serial`) when even the defaults freeze the machine.
+
+Run targeted single-package tests during a session (`go test ./internal/<pkg>`
+or `go test ./internal/<pkg> -run '<TestName>'`); run the full gate set once
+at session end before claiming done. CI additionally runs `-race` on hot
 packages (`convert`, `layout`, `pdf`, `imageout`, `load`), a CGO_ENABLED=0
 static build with version-stamp assertion, and a frontend production build
 that fails if `docs/` goes dirty.
@@ -193,6 +203,10 @@ that fails if `docs/` goes dirty.
 14. **Parallel agents on one shared tree.** One agent owns one package
     (e.g. one on `internal/layout`, another on `internal/pdf`, never both on
     `internal/convert`). No two agents run lint on the same tree.
+15. **Bare `go test ./...`.** Uncapped concurrency thrashes swap; full-suite
+    and multi-package runs go through `make test` / `make test-quick` /
+    `make test-serial`, whose concurrency caps live in the Makefile (see
+    Verification gates). Targeted single-package runs are fine.
 
 ## Engine specifics
 
