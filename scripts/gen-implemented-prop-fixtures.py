@@ -375,7 +375,26 @@ def effect_html(prop: str, kind: str, legacy_of: str | None) -> str:
         )
     if "break" in p or p.startswith("page"):
         return f'<div style="{p}:{"avoid" if "inside" in p else "auto"};border:1px dashed #a60;padding:4px;font-size:8pt;">fragmentation: <code>{html.escape(p)}</code></div>'
-    if p.startswith("list-") or p.startswith("counter") or p in ("quotes", "content"):
+    if p == "content":
+        return (
+            '<div style="border:1px solid #888;padding:4px;font-size:8.5pt;">'
+            '<span class="fx-content-show">labeled</span> · '
+            '<span class="fx-content-none">plain (none)</span></div>'
+        )
+    if p == "counter-increment":
+        return (
+            '<div class="fx-ctr-root" style="border:1px solid #888;padding:4px;">'
+            '<span class="fx-ctr-inc">A</span> '
+            '<span class="fx-ctr-inc-none">B</span> '
+            '<span class="fx-ctr-inc">C</span></div>'
+        )
+    if p == "counter-reset":
+        return (
+            '<div class="fx-ctr-root" style="border:1px solid #888;padding:4px;">'
+            '<span class="fx-ctr-inc">A</span> <span class="fx-ctr-inc">B</span> '
+            '<span class="fx-ctr-reset-none"><span class="fx-ctr-inc">C</span></span></div>'
+        )
+    if p.startswith("list-") or p.startswith("counter") or p in ("quotes",):
         return f'<div style="{p}:{"decimal" if "type" in p or p=="list-style-type" else ("inside" if "position" in p else "none")};">list/content demo</div>'
     if p in ("caption-side", "border-collapse", "border-spacing", "table-layout", "empty-cells"):
         return (
@@ -511,6 +530,15 @@ def render_fixture(key: str, meta: dict, font_family: str) -> str:
       border-top: 1px solid #ccd;
       padding-top: 6px;
     }}
+    /* content / counter demos (fixture-61 #42/#44/#45) */
+    .fx-content-show::before {{ content: ">> "; font-weight: bold; color: #103a7a; }}
+    .fx-content-none::before {{ content: none; }}
+    .fx-ctr-root {{ counter-reset: item; font-size: 8.5pt; }}
+    .fx-ctr-inc {{ counter-increment: item; }}
+    .fx-ctr-inc::before {{ content: counter(item) ". "; }}
+    .fx-ctr-inc-none {{ counter-increment: none; }}
+    .fx-ctr-inc-none::before {{ content: counter(item) ". "; }}
+    .fx-ctr-reset-none {{ counter-reset: none; }}
   </style>
 </head>
 <body>

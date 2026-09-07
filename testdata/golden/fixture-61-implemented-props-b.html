@@ -82,6 +82,15 @@
       border-top: 1px solid #ccd;
       padding-top: 6px;
     }
+    /* Rows 42/44/45: content and counters only show on ::before / counter maps. */
+    .fx-content-show::before { content: ">> "; font-weight: bold; color: #103a7a; }
+    .fx-content-none::before { content: none; }
+    .fx-ctr-root { counter-reset: item; font-size: 8.5pt; }
+    .fx-ctr-inc { counter-increment: item; }
+    .fx-ctr-inc::before { content: counter(item) ". "; }
+    .fx-ctr-inc-none { counter-increment: none; }
+    .fx-ctr-inc-none::before { content: counter(item) ". "; }
+    .fx-ctr-reset-none { counter-reset: none; }
   </style>
 </head>
 <body>
@@ -153,10 +162,10 @@
 <tr><td class="idx">39</td><td class="prop"><code>container</code><div class="meta">shorthand · CSS Conditional Rules</div></td><td class="desc">With `container: inherit` the effect should match inherit.</td><td class="effect"><div style="container:inherit;border:1px solid #6a6;padding:4px;background:#f7fff7;"><code>container</code> applied</div></td></tr>
 <tr><td class="idx">40</td><td class="prop"><code>container-name</code><div class="meta">longhand · CSS Conditional Rules</div></td><td class="desc">With `container-name: inherit` the effect should match inherit.</td><td class="effect"><div style="container-name:inherit;border:1px solid #6a6;padding:4px;background:#f7fff7;"><code>container-name</code> applied</div></td></tr>
 <tr><td class="idx">41</td><td class="prop"><code>container-type</code><div class="meta">longhand · CSS Conditional Rules</div></td><td class="desc">With `container-type: inherit` the effect should match inherit.</td><td class="effect"><div style="container-type:inherit;border:1px solid #6a6;padding:4px;background:#f7fff7;"><code>container-type</code> applied</div></td></tr>
-<tr><td class="idx">42</td><td class="prop"><code>content</code><div class="meta">longhand · CSS Generated Content</div></td><td class="desc">With `content: none` the effect should match none.</td><td class="effect"><div style="content:none;">list/content demo</div></td></tr>
+<tr><td class="idx">42</td><td class="prop"><code>content</code><div class="meta">longhand · CSS Generated Content</div></td><td class="desc">With `content: none` on `::before`, no generated prefix should appear (contrast the labeled sibling).</td><td class="effect"><div style="border:1px solid #888;padding:4px;font-size:8.5pt;"><span class="fx-content-show">labeled</span> · <span class="fx-content-none">plain (none)</span></div></td></tr>
 <tr><td class="idx">43</td><td class="prop"><code>content-visibility</code><div class="meta">longhand · CSS Containment</div></td><td class="desc">With `content-visibility: inherit` the effect should match inherit.</td><td class="effect"><div style="content-visibility:inherit;border:1px solid #6a6;padding:4px;background:#f7fff7;"><code>content-visibility</code> applied</div></td></tr>
-<tr><td class="idx">44</td><td class="prop"><code>counter-increment</code><div class="meta">longhand · CSS Lists and Counters</div></td><td class="desc">With `counter-increment: none` the effect should match none.</td><td class="effect"><div style="counter-increment:none;">list/content demo</div></td></tr>
-<tr><td class="idx">45</td><td class="prop"><code>counter-reset</code><div class="meta">longhand · CSS Lists and Counters</div></td><td class="desc">With `counter-reset: none` the effect should match none.</td><td class="effect"><div style="counter-reset:none;">list/content demo</div></td></tr>
+<tr><td class="idx">44</td><td class="prop"><code>counter-increment</code><div class="meta">longhand · CSS Lists and Counters</div></td><td class="desc">With `counter-increment: none` the middle item should keep the prior number (1. A, 1. B, 2. C).</td><td class="effect"><div class="fx-ctr-root" style="border:1px solid #888;padding:4px;"><span class="fx-ctr-inc">A</span> <span class="fx-ctr-inc-none">B</span> <span class="fx-ctr-inc">C</span></div></td></tr>
+<tr><td class="idx">45</td><td class="prop"><code>counter-reset</code><div class="meta">longhand · CSS Lists and Counters</div></td><td class="desc">With nested `counter-reset: none` numbering should continue (1. A 2. B 3. C), not restart.</td><td class="effect"><div class="fx-ctr-root" style="border:1px solid #888;padding:4px;"><span class="fx-ctr-inc">A</span> <span class="fx-ctr-inc">B</span> <span class="fx-ctr-reset-none"><span class="fx-ctr-inc">C</span></span></div></td></tr>
 <tr><td class="idx">46</td><td class="prop"><code>direction</code><div class="meta">longhand · CSS Writing Modes</div></td><td class="desc">With `direction: rtl` the effect should match rtl.</td><td class="effect"><div style="direction:rtl;border:1px solid #888;padding:4px;height:48px;">ABC 123</div></td></tr>
 <tr><td class="idx">47</td><td class="prop"><code>display</code><div class="meta">longhand · CSS Display</div></td><td class="desc">With `display: flex` the layout should be flex.</td><td class="effect"><div style="display:flex;gap:4px;border:1px solid #336;padding:4px;"><span style="background:#cde;padding:2px 6px;">A</span><span style="background:#cde;padding:2px 6px;">B</span></div></td></tr>
 <tr><td class="idx">48</td><td class="prop"><code>dynamic-range-limit</code><div class="meta">longhand · CSS Color</div></td><td class="desc">With `dynamic-range-limit: inherit` the effect should match inherit.</td><td class="effect"><div style="dynamic-range-limit:inherit;border:1px solid #6a6;padding:4px;background:#f7fff7;"><code>dynamic-range-limit</code> applied</div></td></tr>
