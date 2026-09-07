@@ -438,3 +438,11 @@ func findBoxByClass(t *testing.T, res *Result, class string) *box {
 
 	return found
 }
+
+func TestRow16OpacityDebug(t *testing.T) {
+	htmlStr := `<div style="display:inline-flex;align-items:center;gap:6px;"><img src="logo.png" alt="logo" style="-webkit-filter:opacity(0.45);height:28px;"> <span style="-webkit-filter:opacity(0.45);background:#8af;padding:4px 6px;border-radius:3px;">fx</span></div>`
+	res := layoutHTML(t, htmlStr, nil)
+	for i, op := range res.Ops {
+		t.Logf("DEBUG OP %d: Kind=%v Text=%q PaintOpacity=%v Alpha=%v", i, op.Kind, op.Text, op.PaintOpacity, op.Alpha)
+	}
+}
