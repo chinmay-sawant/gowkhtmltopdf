@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -38,14 +39,16 @@ func TestTableCellTransformedChipStaysInStage(t *testing.T) {
 // TestScaleTransformRestampAfterPagination is the fixture-62 #65 regression:
 // pagination shifts box/op Y but must rebake transform origins, otherwise
 // scale (and rotate) paint drifts out of the Effect stage on later pages.
-func TestScaleTransformRestampAfterPagination(t *testing.T) {
+func TestScaleTransformRestampAfterPagination(t *testing.T) { //nolint:funlen // multi-stage restamp test
 	t.Parallel()
 
 	var rows string
-	for i := 0; i < 18; i++ {
+
+	for range 18 {
 		rows += `<tr><td style="border:1px solid #ccc;padding:8px">f</td>` +
 			`<td style="border:1px solid #ccc;padding:8px;width:180px">x</td></tr>`
 	}
+
 	rows += `<tr>
 <td style="border:1px solid #ccc;padding:6px;vertical-align:top">scale</td>
 <td style="border:1px solid #ccc;padding:6px;vertical-align:top;width:180px">
@@ -54,17 +57,20 @@ func TestScaleTransformRestampAfterPagination(t *testing.T) {
 </div>
 </td></tr>`
 
-	doc, err := html.Parse(`<html><body style="margin:0"><table style="border-collapse:collapse;width:500px">` +
-		rows + `</table></body></html>`)
-	if err != nil {
-		t.Fatal(err)
-	}
+	doc := parseTestHTML(t, `<html><body style="margin:0"><table style="border-collapse:collapse;width:500px">`+
+		rows+`</table></body></html>`)
 
 	const pageH = 400.0
+
 	const margin = 36.0
+
 	contentH := pageH - 2*margin
 
-	res, err := Layout(doc, Options{Width: 560, Height: pageH, Background: true})
+	res, err := Layout(doc, Options{ //nolint:exhaustruct // test viewport only
+		Width:      560,
+		Height:     pageH,
+		Background: true,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,9 +79,11 @@ func TestScaleTransformRestampAfterPagination(t *testing.T) {
 
 	stage := findXformStageFill(res)
 	chip := findXformChipFill(res, "sc")
+
 	if stage == nil || chip == nil {
 		t.Fatal("missing stage or scale chip after pagination")
 	}
+
 	if !chip.XformSet {
 		t.Fatal("scale chip missing transform stamp")
 	}
@@ -88,144 +96,234 @@ func TestScaleTransformRestampAfterPagination(t *testing.T) {
 	staleDrift := math.Hypot(staleX-chipMidX, staleY-chipMidY)
 
 	restampBoxTransforms(res.root, res.Ops)
+
 	chip = findXformChipFill(res, "sc")
+
 	if chip == nil || !chip.XformSet {
 		t.Fatal("scale chip lost transform stamp after restamp")
 	}
+
 	chipMidX = chip.X + chip.W/2
 	chipMidY = chip.Y + chip.H/2
-	tx, ty := chip.Xform.Apply(chipMidX, chipMidY)
+	targetX, targetY := chip.Xform.Apply(chipMidX, chipMidY)
+
 	stage = findXformStageFill(res)
+
 	if stage == nil {
 		t.Fatal("missing stage after restamp")
 	}
+
 	stageMidY := stage.Y + stage.H/2
 
 	t.Logf("staleDrift=%.2f afterRestamp layout=(%.1f,%.1f) xformed=(%.1f,%.1f)",
-		staleDrift, chipMidX, chipMidY, tx, ty)
+		staleDrift, chipMidX, chipMidY, targetX, targetY)
 
 	if staleDrift < 0.5 {
 		t.Fatalf("expected stale scale origin drift after pagination, got %.3f (test not stressing the bug)", staleDrift)
 	}
 
+	assertRestampedBounds(t, targetX, targetY, chipMidX, chipMidY, stageMidY, stage)
+}
+
+func assertRestampedBounds(t *testing.T, targetX, targetY, chipMidX, chipMidY, stageMidY float64, stage *Op) {
+	t.Helper()
+
 	const edgePad = 4.0
-	if tx < stage.X+edgePad || tx > stage.X+stage.W-edgePad ||
-		ty < stage.Y+edgePad || ty > stage.Y+stage.H-edgePad {
-		t.Fatalf("scale chip xformed center (%.1f,%.1f) outside stage after restamp", tx, ty)
+
+	if targetX < stage.X+edgePad || targetX > stage.X+stage.W-edgePad ||
+		targetY < stage.Y+edgePad || targetY > stage.Y+stage.H-edgePad {
+		t.Fatalf("scale chip xformed center (%.1f,%.1f) outside stage after restamp", targetX, targetY)
 	}
-	if math.Abs(ty-stageMidY) > stage.H*0.35 {
-		t.Fatalf("scale chip midY=%.1f far from stage midY=%.1f after restamp", ty, stageMidY)
+
+	if math.Abs(targetY-stageMidY) > stage.H*0.35 {
+		t.Fatalf("scale chip midY=%.1f far from stage midY=%.1f after restamp", targetY, stageMidY)
 	}
-	if math.Hypot(tx-chipMidX, ty-chipMidY) > 1.0 {
-		t.Fatalf("restamped scale should keep center fixed, got delta=(%.2f,%.2f)", tx-chipMidX, ty-chipMidY)
+
+	if math.Hypot(targetX-chipMidX, targetY-chipMidY) > 1.0 {
+		t.Fatalf("restamped scale should keep center fixed, got delta=(%.2f,%.2f)", targetX-chipMidX, targetY-chipMidY)
 	}
 }
 
-func assertChipInsideCenteredStage(t *testing.T, chipStyle, label string, fillers int) {
-	t.Helper()
-
+func xformFillerRows(fillers int) string {
 	var fillerRows string
-	for i := 0; i < fillers; i++ {
+
+	for range fillers {
 		fillerRows += `<tr><td style="border:1px solid #ccc;padding:6px">f</td>` +
 			`<td style="border:1px solid #ccc;padding:6px">x</td></tr>`
 	}
 
-	src := `<html><body style="margin:0">
+	return fillerRows
+}
+
+func xformCenteredStageSrc(chipStyle, label, fillerRows string) string {
+	return `<html><body style="margin:0">
 <table style="border-collapse:collapse;table-layout:fixed;width:500px">
 ` + fillerRows + `
 <tr>
 <td style="border:1px solid #ccc;width:300px;padding:6px;vertical-align:top">desc</td>
 <td style="border:1px solid #ccc;width:180px;padding:6px;vertical-align:top;background:#eef">
 <div style="padding:20px 24px;text-align:center;border:1px dashed #888;background:#f7f7f7">
-<div style="` + chipStyle + `;background:#fd8;padding:6px 8px;display:inline-block;border:1px solid #a60">` + label + `</div>
+<div style="` + chipStyle + `;background:#fd8;padding:6px 8px;` +
+		`display:inline-block;border:1px solid #a60">` + label + `</div>
 </div>
 </td>
 </tr>
 </table>
 </body></html>`
+}
+
+func parseTestHTML(t *testing.T, src string) *html.Node {
+	t.Helper()
 
 	doc, err := html.Parse(src)
+
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	res, err := Layout(doc, Options{Width: 560, Height: 800, Background: true})
+	return doc
+}
+
+func layoutXformStage(t *testing.T, src string) *Result {
+	t.Helper()
+
+	doc := parseTestHTML(t, src)
+
+	res, err := Layout(doc, Options{ //nolint:exhaustruct // intentional zero fields
+		Width:      560,
+		Height:     800,
+		Background: true,
+	})
+
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	stage := findXformStageFill(res)
-	chip := findXformChipFill(res, label)
-	if stage == nil {
-		t.Fatal("missing xform-stage fill")
-	}
-	if chip == nil {
-		t.Fatal("missing xform-chip fill")
-	}
-	if !chip.XformSet {
-		t.Fatal("chip transform not stamped")
-	}
+	return res
+}
+
+func requireChipCenterInStage(t *testing.T, stage, chip *Op, paintX, paintY float64) {
+	t.Helper()
 
 	stageMidX := stage.X + stage.W/2
 	stageMidY := stage.Y + stage.H/2
 	chipMidX := chip.X + chip.W/2
-	chipMidY := chip.Y + chip.H/2
-	tx, ty := chip.Xform.Apply(chipMidX, chipMidY)
 
 	const edgePad = 4.0
-	if tx < stage.X+edgePad || tx > stage.X+stage.W-edgePad ||
-		ty < stage.Y+edgePad || ty > stage.Y+stage.H-edgePad {
-		t.Fatalf("transformed chip center (%.1f,%.1f) outside stage", tx, ty)
+
+	if paintX < stage.X+edgePad || paintX > stage.X+stage.W-edgePad ||
+		paintY < stage.Y+edgePad || paintY > stage.Y+stage.H-edgePad {
+		t.Fatalf("transformed chip center (%.1f,%.1f) outside stage", paintX, paintY)
 	}
+
 	if math.Abs(chipMidX-stageMidX) > stage.W*0.25 {
 		t.Fatalf("chip layout midX=%.1f far from stage midX=%.1f", chipMidX, stageMidX)
 	}
-	if math.Abs(ty-stageMidY) > stage.H*0.35 {
-		t.Fatalf("transformed chip midY=%.1f far from stage midY=%.1f", ty, stageMidY)
+
+	if math.Abs(paintY-stageMidY) > stage.H*0.35 {
+		t.Fatalf("transformed chip midY=%.1f far from stage midY=%.1f", paintY, stageMidY)
 	}
+}
+
+func assertChipInsideCenteredStage(t *testing.T, chipStyle, label string, fillers int) {
+	t.Helper()
+
+	fillerRows := xformFillerRows(fillers)
+	src := xformCenteredStageSrc(chipStyle, label, fillerRows)
+	res := layoutXformStage(t, src)
+
+	stage := findXformStageFill(res)
+	chip := findXformChipFill(res, label)
+
+	if stage == nil {
+		t.Fatal("missing xform-stage fill")
+	}
+
+	if chip == nil {
+		t.Fatal("missing xform-chip fill")
+	}
+
+	if !chip.XformSet {
+		t.Fatal("chip transform not stamped")
+	}
+
+	chipMidX := chip.X + chip.W/2
+	chipMidY := chip.Y + chip.H/2
+	paintX, paintY := chip.Xform.Apply(chipMidX, chipMidY)
+
+	requireChipCenterInStage(t, stage, chip, paintX, paintY)
+}
+
+func isXformStageCandidate(fillOp *Op) bool {
+	if fillOp.Kind != OpFillRect || fillOp.XformSet {
+		return false
+	}
+
+	if fillOp.R < 0.95 || fillOp.G < 0.95 || fillOp.B < 0.95 || fillOp.W < 40 || fillOp.H < 30 {
+		return false
+	}
+
+	return true
 }
 
 func findXformStageFill(res *Result) *Op {
 	var best *Op
+
 	for i := range res.Ops {
-		op := &res.Ops[i]
-		if op.Kind != OpFillRect || op.XformSet {
+		fillOp := &res.Ops[i]
+
+		if !isXformStageCandidate(fillOp) {
 			continue
 		}
-		if op.R < 0.95 || op.G < 0.95 || op.B < 0.95 || op.W < 40 || op.H < 30 {
-			continue
-		}
-		if best == nil || op.W*op.H > best.W*best.H {
-			best = op
+
+		if best == nil || fillOp.W*fillOp.H > best.W*best.H {
+			best = fillOp
 		}
 	}
 
 	return best
 }
 
-func findXformChipFill(res *Result, label string) *Op {
-	var textOp *Op
+func findXformLabelText(res *Result, label string) *Op {
 	for i := range res.Ops {
-		op := &res.Ops[i]
-		if op.Kind == OpText && op.Text == label {
-			textOp = op
-			break
+		textOp := &res.Ops[i]
+
+		if textOp.Kind == OpText && textOp.Text == label {
+			return textOp
 		}
 	}
+
+	return nil
+}
+
+func isXformChipCandidate(fillOp, textOp *Op) bool {
+	if fillOp.Kind != OpFillRect || !fillOp.XformSet {
+		return false
+	}
+
+	if fillOp.R < 0.9 || fillOp.G < 0.7 || fillOp.G > 0.95 {
+		return false
+	}
+
+	if math.Abs(fillOp.Y-textOp.Y) >= 40 || math.Abs(fillOp.X-textOp.X) >= 40 {
+		return false
+	}
+
+	return true
+}
+
+func findXformChipFill(res *Result, label string) *Op {
+	textOp := findXformLabelText(res, label)
+
 	if textOp == nil {
 		return nil
 	}
 
 	for i := range res.Ops {
-		op := &res.Ops[i]
-		if op.Kind != OpFillRect || !op.XformSet {
-			continue
-		}
-		if op.R < 0.9 || op.G < 0.7 || op.G > 0.95 {
-			continue
-		}
-		if math.Abs(op.Y-textOp.Y) < 40 && math.Abs(op.X-textOp.X) < 40 {
-			return op
+		fillOp := &res.Ops[i]
+
+		if isXformChipCandidate(fillOp, textOp) {
+			return fillOp
 		}
 	}
 

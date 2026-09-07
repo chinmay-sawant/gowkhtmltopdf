@@ -606,6 +606,7 @@ func gridItemBuildWidth(
 	if cellW <= 0 || !isPlaceAlignmentKeyword(justify) {
 		return cellW
 	}
+
 	if style.Width >= 0 || style.WidthPercent >= 0 {
 		return cellW
 	}
