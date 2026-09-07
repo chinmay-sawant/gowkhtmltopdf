@@ -1314,9 +1314,23 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 	enclose := e.pushBFCFloats(style, contentX, contentW)
 	children := node.Children
 	widget := node.Name == htmlMeter || node.Name == "progress"
+	chkWidget := isInputCheckbox(node)
 
-	if widget {
-		children = nil // fallback text is replaced by the native-style bar
+	if widget || chkWidget {
+		children = nil // fallback text is replaced by the native-style control
+	}
+
+	if chkWidget {
+		chkSz := defaultCheckboxSize(e, style)
+
+		if style.Width < 0 && style.WidthPercent < 0 {
+			boxNode.w = chkSz + e.scalePt(style.PaddingLeft) + e.scalePt(style.PaddingRight) +
+				e.scalePt(style.BorderLeft.Width) + e.scalePt(style.BorderRight.Width)
+		}
+
+		if style.Height < 0 && style.HeightPercent < 0 {
+			curY = chkSz + e.scalePt(style.PaddingTop) + e.scalePt(borderLayoutWidth(style, style.BorderTop))
+		}
 	}
 
 	if node.Name == "details" {
@@ -1359,6 +1373,8 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 	boxNode.height = e.applyHeightConstraints(style, curY)
 	if widget {
 		e.paintValueWidget(node, style, boxNode.x, posY, boxNode.w, boxNode.height)
+	} else if chkWidget {
+		e.paintCheckboxWidget(node, style, boxNode.x, posY, boxNode.w, boxNode.height)
 	}
 
 	e.paintPositionedPseudo(node, style, boxNode, pseudoBefore)
@@ -1537,6 +1553,10 @@ func widgetValueColor(tag string, style ResolvedStyle) [3]float64 {
 
 	if tag == htmlMeter {
 		return style.Color
+	}
+
+	if tag == "input" {
+		return [3]float64{0, 0.46, 1}
 	}
 
 	return [3]float64{0, 0.5, 0}

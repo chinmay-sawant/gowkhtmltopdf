@@ -338,6 +338,16 @@ func (m *cellMeasure) measureElement(nodeN *html.Node, childCS ResolvedStyle, no
 		return
 	}
 
+	if isInputCheckbox(nodeN) {
+		innerW := defaultCheckboxSize(m.engine, childCS)
+		m.noteWord(innerW)
+		m.lineOnlyNowrap = false
+		m.lineHasInk = true
+		m.lineW += innerW
+
+		return
+	}
+
 	if m.measureSpecifiedInlineBlock(childCS) {
 		return
 	}
