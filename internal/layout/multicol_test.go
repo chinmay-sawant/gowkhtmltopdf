@@ -258,6 +258,7 @@ func TestColumnRuleParse(t *testing.T) {
 .d { column-rule-width: thick }
 .e { column-rule-style: none }
 .f { column-rule: dotted }
+.g { column-rule: 1px solid #666 }
 `)
 	root := mustParse(t, `<html><body>
 <div class="a">A</div>
@@ -266,6 +267,7 @@ func TestColumnRuleParse(t *testing.T) {
 <div class="d">D</div>
 <div class="e">E</div>
 <div class="f">F</div>
+<div class="g">G</div>
 </body></html>`)
 	styles := resolveStyles(root, []*css.Stylesheet{cssSheet}, "print", 500, 800)
 
@@ -314,6 +316,66 @@ func TestColumnRuleParse(t *testing.T) {
 
 	if !near(styleF.ColumnRuleWidth, borderWidth(mediumKeyword, 12)) {
 		t.Fatalf("f shorthand width=%.3f, want medium", styleF.ColumnRuleWidth)
+	}
+
+	styleG := styleByClass(t, styles, "g")
+	if !near(styleG.ColumnRuleWidth, borderPaintWidth("1px", 12)) {
+		t.Fatalf("g 1px width=%.3f, want %.3fpt", styleG.ColumnRuleWidth, borderPaintWidth("1px", 12))
+	}
+
+	if styleG.ColumnRuleStyle != solidKeyword {
+		t.Fatalf("g style=%q, want solid", styleG.ColumnRuleStyle)
+	}
+
+	if styleG.ColumnRuleColor != ([3]float64{0.4, 0.4, 0.4}) {
+		t.Fatalf("g color=%v, want #666", styleG.ColumnRuleColor)
+	}
+}
+
+// TestColumnRulePaints proves a vertical gap rule is emitted between columns.
+func TestColumnRulePaints(t *testing.T) {
+	t.Parallel()
+
+	cssSheet := sheet(t, `
+.mc {
+  column-count: 2;
+  column-gap: 20pt;
+  column-rule: 4pt solid #c00;
+  width: 220pt;
+  font-size: 10pt;
+}
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="mc">Multi-column sample text repeated. Multi-column sample text repeated. Multi-column sample text repeated.</div>
+</body></html>`, cssSheet)
+
+	box := findMulticolBoxByCount(res.root, 2)
+	if box == nil {
+		t.Fatal("no multicol box")
+	}
+
+	var rule *Op
+
+	for i := range res.Ops {
+		op := &res.Ops[i]
+		if op.Kind != OpLine || op.W >= 0.5 || op.H < 4 {
+			continue
+		}
+
+		if near(op.R, 0.8) && near(op.G, 0) && near(op.B, 0) && near(op.Width, 4) {
+			rule = op
+
+			break
+		}
+	}
+
+	if rule == nil {
+		t.Fatal("missing red column-rule OpLine between columns")
+	}
+
+	mid := box.x + box.w/2
+	if rule.X < mid-40 || rule.X > mid+40 {
+		t.Fatalf("rule x=%.1f not near column gap mid≈%.1f", rule.X, mid)
 	}
 }
 

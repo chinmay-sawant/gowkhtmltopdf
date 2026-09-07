@@ -27,6 +27,7 @@ const (
 	underlineMinWidth   = 0.25
 	underlineMaxWidth   = 0.45
 	underlineYTolerance = 0.5
+	skipInkGapPadRatio  = 1.5
 
 	dashLenRatio = 4
 	dashGapRatio = 2.8
@@ -54,6 +55,7 @@ const (
 	shadowOpacityFloor = 0.2
 
 	fallbackAdvanceRatio = 0.5
+	fallbackMinAdvance   = 6.0
 )
 
 // undRun accumulates one continuous underline stroke across adjacent
@@ -562,7 +564,15 @@ func (e *engine) paintDecoration(
 	if wantUnderline {
 		// Sit clearly below glyph descenders (~1–2mm visual gap).
 		underY := baseline + descent + size*0.22 + item.style.TextUnderlineOffset
-		e.paintUnderline(item, runStart, runSpan, underY, uWidth, size, wsOnly, decColor, und)
+		skipInk := strings.ToLower(strings.TrimSpace(item.style.TextDecorationSkipInk))
+		// Empty keeps legacy continuous underlines. Explicit auto/all gap at
+		// descenders; none keeps a solid stroke through g/j/p/q/y.
+		if !wsOnly && (skipInk == "auto" || skipInk == columnSpanAll) {
+			und.flush(e)
+			e.paintUnderlineSkipInk(item, runStart, underY, uWidth, decColor)
+		} else {
+			e.paintUnderline(item, runStart, runSpan, underY, uWidth, size, wsOnly, decColor, und)
+		}
 	} else {
 		und.flush(e)
 	}
@@ -667,6 +677,106 @@ func (e *engine) paintOverline(
 			Kind: OpLine, X: runStart, Y: overlineY, W: runSpan, H: 0,
 			Width: uWidth, R: col[0], G: col[1], B: col[2],
 		})
+	}
+}
+
+// descenderRune reports Latin letters whose ink typically crosses an underline.
+func descenderRune(r rune) bool {
+	switch r {
+	case 'g', 'j', 'p', 'q', 'y', 'Q':
+		return true
+	default:
+		return false
+	}
+}
+
+// skipInkGap tracks the active underline segment while skipping descenders.
+type skipInkGap struct {
+	segStart float64
+	inGap    bool
+}
+
+// startSkipInkGap ends the active segment before a descender glyph.
+func startSkipInkGap(gap *skipInkGap, curX, gapPad float64, flush func(float64)) {
+	if gap.inGap {
+		return
+	}
+
+	end := curX - gapPad
+	if end < gap.segStart {
+		end = gap.segStart
+	}
+
+	flush(end)
+
+	gap.inGap = true
+}
+
+// endSkipInkGap resumes the segment after a descender glyph.
+func endSkipInkGap(gap *skipInkGap, curX, adv, gapPad float64) {
+	if !gap.inGap {
+		return
+	}
+
+	gap.segStart = curX + gapPad
+	if gap.segStart > curX+adv {
+		gap.segStart = curX + adv
+	}
+
+	gap.inGap = false
+}
+
+// skipInkAdvance measures one rune for skip-ink gaps with fallback widths.
+func (e *engine) skipInkAdvance(runic rune, style *ResolvedStyle) float64 {
+	adv := e.measureRuneFace(runic, style)
+	if adv > 0 {
+		return adv
+	}
+
+	adv = style.FontSize * fallbackAdvanceRatio
+	if adv > 0 {
+		return adv
+	}
+
+	return fallbackMinAdvance
+}
+
+// paintUnderlineSkipInk draws per-glyph underline segments, omitting strokes
+// under descender letters so skip-ink:auto/all is visible in print.
+func (e *engine) paintUnderlineSkipInk(
+	item *inlineItem, runStart, underY, uWidth float64, col [3]float64,
+) {
+	curX := runStart
+
+	gap := skipInkGap{segStart: runStart, inGap: false}
+
+	// Nudge the gap a little past the glyph box so the break reads in print.
+	gapPad := uWidth * skipInkGapPadRatio
+
+	flushSeg := func(endX float64) {
+		w := endX - gap.segStart
+		if w > emptyRunEpsilon {
+			e.add(Op{ //nolint:exhaustruct // intentional zero fields
+				Kind: OpLine, X: gap.segStart, Y: underY, W: w, H: 0,
+				Width: uWidth, R: col[0], G: col[1], B: col[2],
+			})
+		}
+	}
+
+	for _, runic := range item.text {
+		adv := e.skipInkAdvance(runic, item.style)
+
+		if descenderRune(runic) {
+			startSkipInkGap(&gap, curX, gapPad, flushSeg)
+		} else {
+			endSkipInkGap(&gap, curX, adv, gapPad)
+		}
+
+		curX += adv
+	}
+
+	if !gap.inGap {
+		flushSeg(curX)
 	}
 }
 

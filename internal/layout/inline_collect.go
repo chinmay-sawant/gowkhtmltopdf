@@ -684,7 +684,7 @@ func (e *engine) textItem(text string, style *ResolvedStyle) inlineItem {
 		// block axis. The inline line still occupies only one glyph-width
 		// column; using the full measured string width here makes centered
 		// labels shift left by half their length.
-		textWidth = lineHeight
+		textWidth = verticalWritingColumnWidth(e, style)
 	}
 
 	return inlineItem{ //nolint:exhaustruct // intentional zero fields

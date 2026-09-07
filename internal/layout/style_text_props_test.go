@@ -93,3 +93,42 @@ func TestTextDecorationPropsWave3(t *testing.T) {
 			s.TextShadowSet, s.TextShadowX, s.TextShadowY, s.TextShadowBlur, s.TextShadowColor)
 	}
 }
+
+func TestTextEmphasisPropsReachWave3(t *testing.T) {
+	t.Parallel()
+
+	ctx := &styleContext{
+		ctx:       context.Background(),
+		err:       nil,
+		work:      0,
+		sheets:    nil,
+		viewportW: 800,
+	}
+
+	s := initialStyle()
+	raw := map[string]string{
+		"text-emphasis":          "filled dot",
+		"text-emphasis-style":    "open sesame",
+		"text-emphasis-color":    "#c00",
+		"text-emphasis-position": "under",
+		"text-emphasis-skip":     "spaces",
+		"text-decoration-inset":  "3px",
+	}
+	applyRestProps(&s, raw, ctx, nil)
+
+	if s.CustomProps["__emph_style"] != "open sesame" {
+		t.Errorf("expected __emph_style open sesame, got %q", s.CustomProps["__emph_style"])
+	}
+	if s.CustomProps["__emph_color"] != "#c00" {
+		t.Errorf("expected __emph_color #c00, got %q", s.CustomProps["__emph_color"])
+	}
+	if s.CustomProps["__emph_position"] != "under" {
+		t.Errorf("expected __emph_position under, got %q", s.CustomProps["__emph_position"])
+	}
+	if s.CustomProps["__emph_skip"] != "spaces" {
+		t.Errorf("expected __emph_skip spaces, got %q", s.CustomProps["__emph_skip"])
+	}
+	if s.TextDecorationInset != "3px" {
+		t.Errorf("expected TextDecorationInset 3px, got %q", s.TextDecorationInset)
+	}
+}

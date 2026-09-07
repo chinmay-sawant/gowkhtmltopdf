@@ -8,7 +8,7 @@ description: >
   prior work. Use when TestGoldenCorpusAllFixtures fails, pages = N want [A,B],
   a golden fixture regresses after a layout change, or the user runs
   /diagnose-golden-fixture. Not for visual PDF side-by-side compare (that is
-  fixture-pdf-regression) and not for template look-and-feel pick lists
+  diagnose-fixture-picture) and not for template look-and-feel pick lists
   (debug-html-template).
 ---
 
@@ -120,6 +120,6 @@ Proof: <test commands and pass/fail>
 
 ## Related skills
 
-- `fixture-pdf-regression` - visual good-vs-current PDF region compare
+- `diagnose-fixture-picture` - Effect-cell screenshots, authorship vs engine, picture council
 - `debug-html-template` - template symptom table; wait for user pick
 - diagnosing-bugs (user skill) - general red-loop discipline this skill specializes

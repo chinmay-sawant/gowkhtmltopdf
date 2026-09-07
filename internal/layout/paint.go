@@ -166,6 +166,11 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 
 	opts.pageNames = namedPageNames(res, contentH)
 
+	// Pagination shifts box/op Y; transform matrices were baked against the
+	// pre-shift origins. Rebake so scale/rotate stay with their boxes on
+	// continuation pages (fixture-62 #65 / #104-106 Effect cells).
+	restampBoxTransforms(res.root, res.Ops)
+
 	return paintPages(ctx, doc, res, opts, contentH, fixedIdx)
 }
 
