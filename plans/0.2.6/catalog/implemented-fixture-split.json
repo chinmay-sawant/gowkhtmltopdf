@@ -2390,7 +2390,7 @@
           "group": "CSS Overflow",
           "syntax": "<visual-box> || <length>",
           "code_path": "internal/layout/style_properties.go",
-          "description": "Overflow handling on the indicated axis (visible/hidden/clip/auto/scroll)."
+          "description": "With overflow:clip and overflow-clip-margin:8px, overflowing paint stays visible up to 8px past the border on all sides."
         },
         {
           "property": "overflow-clip-margin-block",
@@ -2399,7 +2399,7 @@
           "group": "(ungrouped)",
           "syntax": "<visual-box> || <length>",
           "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Overflow handling on the indicated axis (visible/hidden/clip/auto/scroll)."
+          "description": "With overflow:clip and overflow-clip-margin-block:8px, overflowing paint stays visible 8px past the top and bottom edges."
         },
         {
           "property": "overflow-clip-margin-block-end",
@@ -2408,7 +2408,7 @@
           "group": "(ungrouped)",
           "syntax": "<visual-box> || <length>",
           "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Overflow handling on the indicated axis (visible/hidden/clip/auto/scroll)."
+          "description": "With overflow:clip and overflow-clip-margin-block-end:8px, overflowing paint stays visible 8px past the bottom edge."
         },
         {
           "property": "overflow-clip-margin-block-start",
@@ -2417,7 +2417,7 @@
           "group": "(ungrouped)",
           "syntax": "<visual-box> || <length>",
           "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Overflow handling on the indicated axis (visible/hidden/clip/auto/scroll)."
+          "description": "With overflow:clip and overflow-clip-margin-block-start:8px, overflowing paint stays visible 8px past the top edge."
         },
         {
           "property": "overflow-clip-margin-bottom",
@@ -2426,7 +2426,7 @@
           "group": "(ungrouped)",
           "syntax": "<visual-box> || <length>",
           "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Overflow handling on the indicated axis (visible/hidden/clip/auto/scroll)."
+          "description": "With overflow:clip and overflow-clip-margin-bottom:8px, overflowing paint stays visible 8px past the bottom edge."
         },
         {
           "property": "overflow-clip-margin-inline",
@@ -2435,7 +2435,7 @@
           "group": "(ungrouped)",
           "syntax": "<visual-box> || <length>",
           "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Overflow handling on the indicated axis (visible/hidden/clip/auto/scroll)."
+          "description": "With overflow:clip and overflow-clip-margin-inline:8px, overflowing paint stays visible 8px past the left and right edges."
         },
         {
           "property": "overflow-clip-margin-inline-end",
@@ -2444,7 +2444,7 @@
           "group": "(ungrouped)",
           "syntax": "<visual-box> || <length>",
           "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Overflow handling on the indicated axis (visible/hidden/clip/auto/scroll)."
+          "description": "With overflow:clip and overflow-clip-margin-inline-end:8px, overflowing paint stays visible 8px past the right edge."
         },
         {
           "property": "overflow-clip-margin-inline-start",
@@ -2453,7 +2453,7 @@
           "group": "(ungrouped)",
           "syntax": "<visual-box> || <length>",
           "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Overflow handling on the indicated axis (visible/hidden/clip/auto/scroll)."
+          "description": "With overflow:clip and overflow-clip-margin-inline-start:8px, overflowing paint stays visible 8px past the left edge."
         },
         {
           "property": "overflow-clip-margin-left",
@@ -2462,7 +2462,7 @@
           "group": "(ungrouped)",
           "syntax": "<visual-box> || <length>",
           "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Overflow handling on the indicated axis (visible/hidden/clip/auto/scroll)."
+          "description": "With overflow:clip and overflow-clip-margin-left:8px, overflowing paint stays visible 8px past the left edge."
         },
         {
           "property": "overflow-clip-margin-right",
@@ -2471,7 +2471,7 @@
           "group": "(ungrouped)",
           "syntax": "<visual-box> || <length>",
           "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Overflow handling on the indicated axis (visible/hidden/clip/auto/scroll)."
+          "description": "With overflow:clip and overflow-clip-margin-right:8px, overflowing paint stays visible 8px past the right edge."
         },
         {
           "property": "overflow-clip-margin-top",
@@ -2480,7 +2480,7 @@
           "group": "(ungrouped)",
           "syntax": "<visual-box> || <length>",
           "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Overflow handling on the indicated axis (visible/hidden/clip/auto/scroll)."
+          "description": "With overflow:clip and overflow-clip-margin-top:8px, overflowing paint stays visible 8px past the top edge."
         },
         {
           "property": "overflow-wrap",
@@ -2489,7 +2489,7 @@
           "group": "CSS Text",
           "syntax": "normal | break-word | anywhere",
           "code_path": "internal/layout/inline.go",
-          "description": "Overflow handling on the indicated axis (visible/hidden/clip/auto/scroll)."
+          "description": "With overflow-wrap:anywhere, long words break mid-word so they fit the box width."
         },
         {
           "property": "overflow-x",

@@ -192,8 +192,46 @@ def effect_html(prop: str, kind: str, legacy_of: str | None) -> str:
         return f'<div style="{p}:72px;background:#cef;border:1px solid #246;">size</div>'
     if p == "box-sizing":
         return f'<div style="{p}:border-box;width:80px;padding:10px;border:4px solid #246;background:#efc;">box</div>'
+    if p.startswith("overflow-clip-margin"):
+        # Expand the clip edge; a red abspos child sticks out on the named sides
+        # so the PDF shows a visible halo past the border (fixture-62 rows 27-37).
+        # Stage uses a fixed width: inline-block shrink-to-fit crushes the clip box
+        # and the overflow pass then noops the protruding fill.
+        child = {
+            "overflow-clip-margin": "left:-10px;top:-10px;width:68px;height:44px",
+            "overflow-clip-margin-block": "left:6px;top:-10px;width:36px;height:44px",
+            "overflow-clip-margin-block-end": "left:6px;bottom:-12px;width:36px;height:18px",
+            "overflow-clip-margin-block-start": "left:6px;top:-12px;width:36px;height:18px",
+            "overflow-clip-margin-bottom": "left:6px;bottom:-12px;width:36px;height:18px",
+            "overflow-clip-margin-inline": "left:-10px;top:4px;width:68px;height:16px",
+            "overflow-clip-margin-inline-end": "right:-12px;top:4px;width:20px;height:16px",
+            "overflow-clip-margin-inline-start": "left:-12px;top:4px;width:20px;height:16px",
+            "overflow-clip-margin-left": "left:-12px;top:4px;width:20px;height:16px",
+            "overflow-clip-margin-right": "right:-12px;top:4px;width:20px;height:16px",
+            "overflow-clip-margin-top": "left:6px;top:-12px;width:36px;height:18px",
+        }.get(p, "left:-10px;top:-10px;width:68px;height:44px")
+        return (
+            f'<div style="background:#ccc;padding:14px;width:90px;height:56px;box-sizing:border-box;">'
+            f'<div style="overflow:clip;{p}:8px;width:48px;height:24px;border:2px solid #333;'
+            f'position:relative;background:#eef;box-sizing:content-box;">'
+            f'<div style="position:absolute;{child};background:#e55;"></div>'
+            f'</div></div>'
+        )
     if p.startswith("overflow"):
-        return f'<div style="{p}:hidden;width:90px;height:32px;border:1px solid #333;font-size:8pt;">overflowing content that should clip here XXXXXXX</div>'
+        if p == "overflow-x":
+            return (
+                f'<div style="{p}:hidden;width:72px;border:1px solid #333;font-size:8pt;'
+                f'white-space:nowrap;">XXXX horizontal clip YYYY</div>'
+            )
+        if p == "overflow-y":
+            return (
+                f'<div style="{p}:hidden;width:90px;height:28px;border:1px solid #333;'
+                f'font-size:8pt;line-height:1.2;">line1<br>line2<br>line3 clipped</div>'
+            )
+        return (
+            f'<div style="{p}:hidden;width:90px;height:28px;border:1px solid #333;'
+            f'font-size:8pt;white-space:nowrap;">CLIP overflowing content XXXXXXXYYYY</div>'
+        )
     if p in ("position",) or p.startswith("inset") or p in ("top", "right", "bottom", "left", "z-index"):
         return (
             f'<div style="position:relative;height:40px;border:1px dashed #888;">'
