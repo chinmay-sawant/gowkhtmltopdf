@@ -8,7 +8,7 @@ import (
 
 // isInputCheckbox reports whether node is an input checkbox or radio control.
 func isInputCheckbox(node *html.Node) bool {
-	if node == nil || node.Name != "input" {
+	if node == nil || node.Name != htmlInput {
 		return false
 	}
 
@@ -212,7 +212,7 @@ func (e *engine) paintCheckboxWidget(
 	}
 
 	geo := paintCheckboxGeometry(e, isRadio, leftX, topY, width, height)
-	color := widgetValueColor("input", style)
+	color := widgetValueColor(htmlInput, style)
 
 	if isChecked {
 		e.paintCheckedCheckbox(isRadio, color, geo)

@@ -31,6 +31,7 @@ const (
 	htmlCaption  = "caption"
 	htmlColgroup = "colgroup"
 	htmlTfoot    = "tfoot"
+	htmlInput    = "input"
 )
 
 // CSS keyword constants shared by the layout engine. Kept here so repeated
@@ -297,6 +298,15 @@ const (
 	StrokeMaskLeft
 )
 
+// LineInset selects the side of a mixed-width CSS border whose stroke should
+// be painted inward from the border-box edge.
+const (
+	LineInsetTop uint8 = 1 << iota
+	LineInsetRight
+	LineInsetBottom
+	LineInsetLeft
+)
+
 // Op is one display-list operation. Coordinates are in canvas points; for
 // OpText and OpBullet, Y is the baseline.
 type Op struct {
@@ -316,6 +326,10 @@ type Op struct {
 	// complete rounded rectangle; non-zero masks are used for mixed CSS
 	// borders whose accented side must retain its corner arcs.
 	StrokeMask uint8
+	// LineInset selects inward paint geometry for mixed-width straight borders.
+	// The logical OpLine coordinates remain on the border-box edge so
+	// pagination ownership checks keep using layout geometry.
+	LineInset uint8
 
 	Text string
 	Font *pdf.Font
@@ -389,6 +403,51 @@ type Op struct {
 
 	// StructElem is the PDF/UA-1 logical structure element associated with this op.
 	StructElem *pdf.StructElem
+}
+
+// PaintLineGeometry returns the line geometry after applying mixed-border
+// inward painting. The returned width is in the same points as the operation.
+func (paintOp Op) PaintLineGeometry() (float64, float64, float64, float64, float64) {
+	width := paintOp.Width
+	if width <= 0 {
+		width = 1
+	}
+
+	lineX, lineY, lineW, lineH := paintOp.X, paintOp.Y, paintOp.W, paintOp.H
+
+	const halfWidthRatio = 0.5
+	halfWidth := width * halfWidthRatio
+
+	switch paintOp.LineInset {
+	case LineInsetTop:
+		lineX += halfWidth
+		lineY += halfWidth
+		lineW -= width
+	case LineInsetRight:
+		lineX -= halfWidth
+		lineY += halfWidth
+		lineH -= width
+	case LineInsetBottom:
+		lineX += halfWidth
+		lineY -= halfWidth
+		lineW -= width
+	case LineInsetLeft:
+		lineX += halfWidth
+		lineY += halfWidth
+		lineH -= width
+	}
+
+	if paintOp.LineInset != 0 {
+		if lineW < 0 {
+			lineW = 0
+		}
+
+		if lineH < 0 {
+			lineH = 0
+		}
+	}
+
+	return lineX, lineY, lineW, lineH, width
 }
 
 type engine struct {
@@ -1535,7 +1594,7 @@ func widgetValueColor(tag string, style ResolvedStyle) [3]float64 {
 		return style.Color
 	}
 
-	if tag == "input" {
+	if tag == htmlInput {
 		return [3]float64{0, 0.46, 1}
 	}
 

@@ -36,6 +36,23 @@ func appendBorderLineOps(
 	return appendDashedLineSegments(dst, posX, posY, boxW, boxH, width, style == borderStyleDotted, red, green, blue)
 }
 
+func appendBorderLineOpsForSide(
+	dst []Op, posX, posY, boxW, boxH, width float64, style string,
+	red, green, blue float64, lineInset uint8,
+) []Op {
+	start := len(dst)
+	dst = appendBorderLineOps(dst, posX, posY, boxW, boxH, width, style, red, green, blue)
+	if lineInset == 0 {
+		return dst
+	}
+
+	for idx := start; idx < len(dst); idx++ {
+		dst[idx].LineInset = lineInset
+	}
+
+	return dst
+}
+
 // appendDashedLineSegments expands a dashed/dotted border edge into segment ops.
 func appendDashedLineSegments(
 	dst []Op, posX, posY, boxW, boxH, width float64, dotted bool, red, green, blue float64,
@@ -144,6 +161,14 @@ func (e *engine) borderOpsSides(
 		wLeft = e.scalePt(borderPaint(sty.BorderLeft))
 	}
 
+	mixed := wTop != wRight || wTop != wBottom || wTop != wLeft
+	topInset, rightInset := uint8(0), uint8(0)
+	bottomInset, leftInset := uint8(0), uint8(0)
+	if mixed {
+		topInset, rightInset = LineInsetTop, LineInsetRight
+		bottomInset, leftInset = LineInsetBottom, LineInsetLeft
+	}
+
 	if wTop > 0 {
 		adjL := 0.0
 		if wLeft > 0 && wLeft > wTop {
@@ -156,8 +181,8 @@ func (e *engine) borderOpsSides(
 		topX := posX + adjL
 		topW := wid - adjL - adjR
 		if topW > 0 {
-			ops = appendBorderLineOps(ops, topX, posY, topW, 0, wTop, sty.BorderTop.Style,
-				sty.BorderTop.Color[0], sty.BorderTop.Color[1], sty.BorderTop.Color[2])
+			ops = appendBorderLineOpsForSide(ops, topX, posY, topW, 0, wTop, sty.BorderTop.Style,
+				sty.BorderTop.Color[0], sty.BorderTop.Color[1], sty.BorderTop.Color[2], topInset)
 		}
 	}
 
@@ -173,8 +198,8 @@ func (e *engine) borderOpsSides(
 		rightY := posY + adjT
 		rightH := height - adjT - adjB
 		if rightH > 0 {
-			ops = appendBorderLineOps(ops, posX+wid, rightY, 0, rightH, wRight, sty.BorderRight.Style,
-				sty.BorderRight.Color[0], sty.BorderRight.Color[1], sty.BorderRight.Color[2])
+			ops = appendBorderLineOpsForSide(ops, posX+wid, rightY, 0, rightH, wRight, sty.BorderRight.Style,
+				sty.BorderRight.Color[0], sty.BorderRight.Color[1], sty.BorderRight.Color[2], rightInset)
 		}
 	}
 
@@ -190,8 +215,8 @@ func (e *engine) borderOpsSides(
 		botX := posX + adjL
 		botW := wid - adjL - adjR
 		if botW > 0 {
-			ops = appendBorderLineOps(ops, botX, posY+height, botW, 0, wBottom, sty.BorderBottom.Style,
-				sty.BorderBottom.Color[0], sty.BorderBottom.Color[1], sty.BorderBottom.Color[2])
+			ops = appendBorderLineOpsForSide(ops, botX, posY+height, botW, 0, wBottom, sty.BorderBottom.Style,
+				sty.BorderBottom.Color[0], sty.BorderBottom.Color[1], sty.BorderBottom.Color[2], bottomInset)
 		}
 	}
 
@@ -207,8 +232,8 @@ func (e *engine) borderOpsSides(
 		leftY := posY + adjT
 		leftH := height - adjT - adjB
 		if leftH > 0 {
-			ops = appendBorderLineOps(ops, posX, leftY, 0, leftH, wLeft, sty.BorderLeft.Style,
-				sty.BorderLeft.Color[0], sty.BorderLeft.Color[1], sty.BorderLeft.Color[2])
+			ops = appendBorderLineOpsForSide(ops, posX, leftY, 0, leftH, wLeft, sty.BorderLeft.Style,
+				sty.BorderLeft.Color[0], sty.BorderLeft.Color[1], sty.BorderLeft.Color[2], leftInset)
 		}
 	}
 
