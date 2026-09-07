@@ -172,7 +172,15 @@ def effect_html(prop: str, kind: str, legacy_of: str | None) -> str:
     if p.startswith("margin"):
         return f'<div style="border:1px solid #333;display:inline-block;"><div style="{p}:10px;background:#dfd;border:1px dashed #080;">margin</div></div>'
     if p.startswith("padding"):
-        return f'<div style="{p}:10px;background:#ddf;border:1px solid #228;">padding</div>'
+        # Fixed content width + contrasting block chip: blue shell shows the
+        # named padding band on each side. Avoid shrink-to-fit inline-block;
+        # that path under-counts right/end padding in Effect cells.
+        # Shell #9cf (not pale #ddf) so the band reads against the page.
+        return (
+            f'<div style="{p}:10px;background:#9cf;border:1px solid #228;width:48px;">'
+            f'<span style="background:#fd8;border:1px dashed #a60;display:block;'
+            f'text-align:center;font-size:8pt;">pad</span></div>'
+        )
     if "radius" in p:
         return f'<div style="{p}:12px;background:#9cf;border:2px solid #246;width:64px;height:36px;"></div>'
     if p.startswith("border") and "image" in p:
