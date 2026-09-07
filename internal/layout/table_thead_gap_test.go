@@ -219,7 +219,7 @@ func TestRowPaintBandPrefersVerticalRules(t *testing.T) {
 }
 
 // Last body row on a page whose next row continues on the following page must
-// get a full-width bottom seal (fixture-60 pages ending at props 33 and 67).
+// get a full-width bottom seal (fixture-60 pages ending at props 31 and 46).
 func TestFixture60PageBottomRowsAreSealed(t *testing.T) {
 	t.Parallel()
 
@@ -231,7 +231,7 @@ func TestFixture60PageBottomRowsAreSealed(t *testing.T) {
 func assertBottomRowsSealed(t *testing.T, table *box, res *Result) {
 	t.Helper()
 
-	for _, want := range []string{"33", "67"} {
+	for _, want := range []string{"31", "46"} {
 		assertBottomRowSealed(t, table, res, want)
 	}
 }

@@ -1,4 +1,4 @@
-//nolint:varnamelen,funlen,cyclop,mnd,wsl,intrange,nlreturn,goconst,gocognit,dupl,unparam,exhaustive // filter
+//nolint:varnamelen,funlen,cyclop,mnd,wsl,intrange,nlreturn,goconst,dupl,unparam,exhaustive // filter
 package layout
 
 import (
@@ -235,6 +235,17 @@ func applyImageFilterToImage(imgBytes []byte, filters []parsedFilter) []byte {
 		return imgBytes
 	}
 
+	hasEffect := false
+	for _, f := range filters {
+		if f.kind != filterOpacity {
+			hasEffect = true
+			break
+		}
+	}
+	if !hasEffect {
+		return imgBytes
+	}
+
 	srcImg, _, err := image.Decode(bytes.NewReader(imgBytes))
 	if err != nil {
 		// try jpeg / png explicitly
@@ -292,18 +303,9 @@ func applyImageFilterToImage(imgBytes []byte, filters []parsedFilter) []byte {
 				}
 			}
 		case filterOpacity:
-			op := clamp01(f.val)
-			for y := 0; y < h; y++ {
-				for x := 0; x < w; x++ {
-					c := nrgba.NRGBAAt(x, y)
-					nrgba.SetNRGBA(x, y, color.NRGBA{
-						R: c.R,
-						G: c.G,
-						B: c.B,
-						A: uint8(math.Round(float64(c.A) * op)),
-					})
-				}
-			}
+			// Handled at the display-list level via style.Opacity and
+			// PaintOpacity in both PDF and raster paths. Scaling pixel alpha
+			// here would double-multiply opacity on images.
 		}
 	}
 

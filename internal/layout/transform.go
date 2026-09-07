@@ -1003,6 +1003,10 @@ func restampBoxTransforms(boxNode *box, ops []Op) {
 	}
 
 	if needsStamp {
+		for idx := range ops {
+			ops[idx].PaintOpacity = 0
+		}
+
 		stampBoxTransforms(boxNode, IdentityMatrix(), ops)
 	}
 }

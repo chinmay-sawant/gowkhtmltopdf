@@ -439,10 +439,51 @@ func findBoxByClass(t *testing.T, res *Result, class string) *box {
 	return found
 }
 
-func TestRow16OpacityDebug(t *testing.T) {
-	htmlStr := `<div style="display:inline-flex;align-items:center;gap:6px;"><img src="logo.png" alt="logo" style="-webkit-filter:opacity(0.45);height:28px;"> <span style="-webkit-filter:opacity(0.45);background:#8af;padding:4px 6px;border-radius:3px;">fx</span></div>`
+func TestRestampBoxTransformsOpacityPreserved(t *testing.T) {
+	t.Parallel()
+
+	htmlStr := `<div style="-webkit-transform:rotate(5deg);display:inline-flex;gap:6px;">` +
+		`<span style="-webkit-filter:opacity(0.45);background:#8af;padding:4px;">fx</span></div>`
 	res := layoutHTML(t, htmlStr, nil)
-	for i, op := range res.Ops {
-		t.Logf("DEBUG OP %d: Kind=%v Text=%q PaintOpacity=%v Alpha=%v", i, op.Kind, op.Text, op.PaintOpacity, op.Alpha)
+
+	var textOpBefore *Op
+
+	for i := range res.Ops {
+		if res.Ops[i].Text == "fx" {
+			textOpBefore = &res.Ops[i]
+
+			break
+		}
+	}
+
+	if textOpBefore == nil {
+		t.Fatal("expected text op for 'fx' before Paint")
+	}
+
+	if math.Abs(textOpBefore.PaintOpacity-0.45) > 1e-4 {
+		t.Fatalf("expected PaintOpacity 0.45 before Paint, got %v", textOpBefore.PaintOpacity)
+	}
+
+	doc := pdf.NewDocument()
+	_ = Paint(doc, res, PaintOptions{
+		PageWidth: 612, PageHeight: 792, MarginTop: 36, MarginBottom: 36, MarginLeft: 36, MarginRight: 36,
+	})
+
+	var textOpAfter *Op
+
+	for i := range res.Ops {
+		if res.Ops[i].Text == "fx" {
+			textOpAfter = &res.Ops[i]
+
+			break
+		}
+	}
+
+	if textOpAfter == nil {
+		t.Fatal("expected text op for 'fx' after Paint")
+	}
+
+	if math.Abs(textOpAfter.PaintOpacity-0.45) > 1e-4 {
+		t.Fatalf("expected PaintOpacity 0.45 after Paint, got %v (compounded opacity bug)", textOpAfter.PaintOpacity)
 	}
 }
