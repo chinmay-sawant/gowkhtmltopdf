@@ -558,6 +558,7 @@ func emitGridItem(
 	align := gridItemAlign(*cstate, containerAlign)
 
 	buildH := gridStretchBuildHeight(align, cellH, *cstate)
+	buildW := gridItemBuildWidth(eng, pbox.n, *cstate, justify, pbox.cellW)
 
 	oldMax := eng.imgMaxW
 
@@ -572,9 +573,9 @@ func emitGridItem(
 		override.Height = buildH
 		override.HeightPercent = -1
 		override.BoxSizing = borderBox
-		cblock = eng.buildWithStyle(pbox.n, &override, pbox.cellW, pbox.cx, targetY)
+		cblock = eng.buildWithStyle(pbox.n, &override, buildW, pbox.cx, targetY)
 	} else {
-		cblock = eng.build(pbox.n, pbox.cellW, pbox.cx, targetY)
+		cblock = eng.build(pbox.n, buildW, pbox.cx, targetY)
 	}
 
 	eng.imgMaxW = oldMax
@@ -594,6 +595,27 @@ func emitGridItem(
 	pbox.b.x += deltaX
 	pbox.b.y += deltaY
 	boxNode.children = append(boxNode.children, pbox.b)
+}
+
+// gridItemBuildWidth is the available width used to build a grid item. Stretch
+// (and auto) fill the grid area; start/end/center use fit-content so
+// place-items / place-self can offset a content-sized box.
+func gridItemBuildWidth(
+	eng *engine, node *html.Node, style ResolvedStyle, justify string, cellW float64,
+) float64 {
+	if cellW <= 0 || !isPlaceAlignmentKeyword(justify) {
+		return cellW
+	}
+	if style.Width >= 0 || style.WidthPercent >= 0 {
+		return cellW
+	}
+
+	fit := eng.blockFitContentMarginBox(node, style)
+	if fit <= 0 || fit >= cellW {
+		return cellW
+	}
+
+	return fit
 }
 
 // gridItemCellHeight sums the track sizes a spanning item occupies (with gaps).
