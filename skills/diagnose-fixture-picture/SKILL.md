@@ -101,7 +101,7 @@ authorship-only verdict).
 
 Exclusive file ownership. Typical split when several rows land together:
 
-1. Fixture HTML + generator (`testdata/golden/fixture-6*.html`, `scripts/gen-implemented-prop-fixtures.py`)
+1. Fixture HTML (`testdata/golden/fixture-6*.html`)
 2. Style parse (`style_values.go`, `style_properties.go`, `style_paint_props.go`, `style_cascade.go`)
 3. Layout consumer (one of `grid.go` / `multicol.go` / `flex.go` / …)
 4. Paint / chrome (`layout_chrome.go`, `outline.go`, `inline_paint.go`, …)
