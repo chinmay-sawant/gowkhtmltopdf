@@ -1585,8 +1585,10 @@ func applyTextGroup(
 	case "text-align-last", "text-align-all", "tab-size", "text-wrap", "text-wrap-mode", "text-wrap-style",
 		"white-space-collapse", "white-space-trim", "hyphens", "hyphenate-character",
 		"text-justify", "line-break", "text-decoration-line", "text-decoration-color",
-		"text-decoration-style", "text-decoration-thickness", "text-underline-offset",
-		"text-underline-position", "text-shadow":
+		"text-decoration-style", "text-decoration-thickness", "text-decoration-inset",
+		"text-underline-offset", "text-underline-position", "text-shadow",
+		"text-emphasis", "text-emphasis-style", "text-emphasis-color",
+		"text-emphasis-position", "text-emphasis-skip":
 		return applyTextPropsWave3(style, prop, value, fsize, parent, hasParent)
 	}
 
