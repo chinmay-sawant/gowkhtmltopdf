@@ -408,33 +408,46 @@ func repeatTableHeaderOnPages(res *Result, tblBox *box, contentH float64) {
 	}
 
 	pages := headerContinuationPages(tblBox, firstPage, res, contentH)
+	processed := map[int]bool{}
 
-	// Process low pages first so later continuation shifts see stable Y.
-	pageList := sortedPageKeys(pages)
-	for _, page := range pageList {
-		if page <= firstPage {
-			continue
-		}
+	for {
+		processedPage := false
 
-		pageTop := float64(page) * contentH
-		shiftFrom, shiftTo, bodyTop := tableBodyRange(tblBox, page, res, contentH)
-
-		if shiftFrom >= 0 && bodyTop >= 0 && bodyTop < pageTop+hdrH-0.5 {
-			deltaY := pageTop + hdrH - bodyTop
-			if deltaY > 0 {
-				shiftFlowY(res, shiftFrom, shiftTo, bodyTop-layoutCoordEpsilon, deltaY)
-				// Table cells are not always moved with the op range (skipBoxShift
-				// edge cases), so keep cell.y in step with the body shift.
-				// normalizeTableRowGaps measures paint gaps, so a cell.y drift
-				// no longer hides white seams between continuation rows.
-				shiftTableBodyBoxesFrom(tblBox, page, contentH, deltaY)
+		// Process low pages first. Reserving header space can move a tail row
+		// onto a new page, so recalculate the page set after each pass.
+		for _, page := range sortedPageKeys(pages) {
+			if page <= firstPage || processed[page] {
+				continue
 			}
+
+			processed[page] = true
+			processedPage = true
+			pageTop := float64(page) * contentH
+			shiftFrom, shiftTo, bodyTop := tableBodyRange(tblBox, page, res, contentH)
+
+			if shiftFrom >= 0 && bodyTop >= 0 && bodyTop < pageTop+hdrH-0.5 {
+				deltaY := pageTop + hdrH - bodyTop
+				if deltaY > 0 {
+					shiftFlowY(res, shiftFrom, shiftTo, bodyTop-layoutCoordEpsilon, deltaY)
+					// Table cells are not always moved with the op range (skipBoxShift
+					// edge cases), so keep cell.y in step with the body shift.
+					// normalizeTableRowGaps measures paint gaps, so a cell.y drift
+					// no longer hides white seams between continuation rows.
+					shiftTableBodyBoxesFrom(tblBox, page, contentH, deltaY)
+				}
+			}
+
+			placeSliverBodyBelowHeader(res, tblBox, pageTop, hdrH)
+			// Guaranteed clearance: body must start at/after the header band.
+			ensureBodyBelowRepeatedHeader(res, tblBox, page, pageTop, hdrH, contentH)
+			cloneHeaderOps(res, hdrFirst, hdrLast, hdrTop, pageTop)
 		}
 
-		placeSliverBodyBelowHeader(res, tblBox, pageTop, hdrH)
-		// Guaranteed clearance: body must start at/after the header band.
-		ensureBodyBelowRepeatedHeader(res, tblBox, page, pageTop, hdrH, contentH)
-		cloneHeaderOps(res, hdrFirst, hdrLast, hdrTop, pageTop)
+		if !processedPage {
+			break
+		}
+
+		pages = headerContinuationPages(tblBox, firstPage, res, contentH)
 	}
 }
 
