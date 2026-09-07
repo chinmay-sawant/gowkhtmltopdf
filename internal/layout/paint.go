@@ -1168,13 +1168,9 @@ func opRadiiPositive(radii [4]float64) bool {
 }
 
 func drawLine(chld *pdf.Content, paintOp *Op, pageIdx int, contentH float64, opts PaintOptions, pageH float64) {
-	xEnd, yEnd := canvasToPDF(paintOp.X, paintOp.Y, pageIdx, contentH, opts, pageH)
-	xTwo, yTwo := canvasToPDF(paintOp.X+paintOp.W, paintOp.Y+paintOp.H, pageIdx, contentH, opts, pageH)
-
-	width := paintOp.Width
-	if width <= 0 {
-		width = 1
-	}
+	x, y, w, h, width := paintOp.PaintLineGeometry()
+	xEnd, yEnd := canvasToPDF(x, y, pageIdx, contentH, opts, pageH)
+	xTwo, yTwo := canvasToPDF(x+w, y+h, pageIdx, contentH, opts, pageH)
 
 	chld.SetStrokeColor(paintOp.R, paintOp.G, paintOp.B)
 	chld.SetLineWidth(width)

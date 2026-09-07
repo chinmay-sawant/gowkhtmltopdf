@@ -65,7 +65,15 @@ func (e *engine) buildFlex(node *html.Node, sty ResolvedStyle, availW, x, posY f
 		node: node, style: e.stylePtr(node), kind: displayBlock, x: x + ml, y: posY,
 	}
 	boxNode.w = resolveUsedWidth(sty, availW, e)
+
+	if sty.IsWebkitBox && sty.Width < 0 && sty.WidthPercent < 0 {
+		if intr := e.measureFlexItemMaxContent(node, sty); intr > 0 && intr < boxNode.w {
+			boxNode.w = intr
+		}
+	}
+
 	contentX, contentW := e.contentBox(boxNode.x, boxNode.w, sty)
+
 	contentStart := len(e.ops)
 	curY := e.scalePt(sty.PaddingTop) + e.scalePt(sty.BorderTop.Width)
 
@@ -570,6 +578,10 @@ func (e *engine) flexItemBaseWidth(node *html.Node, style ResolvedStyle, mainSiz
 
 	if w, ok := e.flexSpecifiedBaseWidth(style, mainSize, pad); ok {
 		return w
+	}
+
+	if isInputCheckbox(node) {
+		return defaultCheckboxSize(e, style) + e.scalePt(style.MarginLeft) + e.scalePt(style.MarginRight)
 	}
 
 	capW := mainSize

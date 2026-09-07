@@ -908,10 +908,10 @@ func TestTableColspan(t *testing.T) {
 		t.Fatalf("texts = %+v", texts)
 	}
 	// "wide" spans cols 0+1; col 2 starts right of it.
-	// Content starts at x=6 (BODY UA margin 8px=6pt) + cell padding 1px=0.75pt.
+	// Content starts at x=6 (BODY UA margin 8px=6pt) + table border-spacing UA 2px=1.5pt + cell padding 1px=0.75pt.
 	wide, cOne := texts[0], texts[1]
-	if !near(wide.X, 6.75) {
-		t.Errorf("wide x = %v, want 6.75 (body 6 + cell padding 0.75)", wide.X)
+	if !near(wide.X, 8.25) {
+		t.Errorf("wide x = %v, want 8.25 (body 6 + spacing 1.5 + cell padding 0.75)", wide.X)
 	}
 
 	if !(cOne.X > wide.X) {
@@ -923,8 +923,8 @@ func TestTableColspan(t *testing.T) {
 		t.Errorf("column order broken: %v %v %v", acc.X, b.X, chld.X)
 	}
 
-	if !near(acc.X, 6.75) {
-		t.Errorf("a x = %v, want 6.75 (body 6 + cell padding 0.75)", acc.X)
+	if !near(acc.X, 8.25) {
+		t.Errorf("a x = %v, want 8.25 (body 6 + spacing 1.5 + cell padding 0.75)", acc.X)
 	}
 
 	if !(chld.X >= cOne.X) {

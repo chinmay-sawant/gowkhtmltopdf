@@ -616,6 +616,10 @@ func (e *engine) inlineBlockAvail(nodeN *html.Node, sty ResolvedStyle, cbW float
 		return width + e.scalePt(sty.MarginLeft) + e.scalePt(sty.MarginRight)
 	}
 
+	if isInputCheckbox(nodeN) {
+		return defaultCheckboxSize(e, sty) + e.scalePt(sty.MarginLeft) + e.scalePt(sty.MarginRight)
+	}
+
 	if isSizeContainer(sty) {
 		// Size containment: shrink-to-fit as-if-empty.
 		intr := e.scalePt(sty.PaddingLeft) + e.scalePt(sty.PaddingRight) +

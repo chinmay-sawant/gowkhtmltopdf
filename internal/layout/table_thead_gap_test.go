@@ -24,6 +24,33 @@ func TestFixture60TheadContinuationRowsHaveNoPaintGap(t *testing.T) {
 	assertContinuationRowsHaveNoPaintGap(t, table, res, contentH)
 }
 
+func TestFixture60TheadRepeatsOnEveryContinuationPage(t *testing.T) {
+	t.Parallel()
+
+	res, table, contentH := layoutFixture60(t)
+	headerPages := map[int]bool{}
+	bodyPages := map[int]bool{}
+
+	for _, op := range res.Ops {
+		if op.Kind == OpText && op.Text == "Property" {
+			headerPages[int(op.Y/contentH)] = true
+		}
+	}
+
+	for _, row := range table.rows[table.headerRows:] {
+		top := rowYBounds(row, res)
+		if top >= 0 {
+			bodyPages[int(top/contentH)] = true
+		}
+	}
+
+	for page := range bodyPages {
+		if page > 0 && !headerPages[page] {
+			t.Errorf("continuation page %d has body rows but no repeated thead", page+1)
+		}
+	}
+}
+
 func layoutFixture60(t *testing.T) (*Result, *box, float64) {
 	t.Helper()
 
@@ -219,7 +246,7 @@ func TestRowPaintBandPrefersVerticalRules(t *testing.T) {
 }
 
 // Last body row on a page whose next row continues on the following page must
-// get a full-width bottom seal (fixture-60 pages ending at props 33 and 67).
+// get a full-width bottom seal (fixture-60 pages ending at props 31 and 46).
 func TestFixture60PageBottomRowsAreSealed(t *testing.T) {
 	t.Parallel()
 
@@ -231,7 +258,7 @@ func TestFixture60PageBottomRowsAreSealed(t *testing.T) {
 func assertBottomRowsSealed(t *testing.T, table *box, res *Result) {
 	t.Helper()
 
-	for _, want := range []string{"33", "67"} {
+	for _, want := range []string{"31", "46"} {
 		assertBottomRowSealed(t, table, res, want)
 	}
 }

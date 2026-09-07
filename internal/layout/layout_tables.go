@@ -645,7 +645,7 @@ func (e *engine) measureTableRows(
 	nRows := len(cellData)
 	rowHeights := make([]float64, nRows)
 	rowTops := make([]float64, nRows)
-	curY := e.scalePt(tableBox.style.PaddingTop) + e.scalePt(tableBox.style.BorderTop.Width)
+	curY := e.scalePt(tableBox.style.PaddingTop) + e.scalePt(tableBox.style.BorderTop.Width) + spacingV
 	// Measure each cell at its final column width; row height from single-row
 	// cells first. Rowspan cells enlarge the spanned rows afterward.
 	// Rows with no local cells (rowspan holes) or only ink-less cells stay at
@@ -672,7 +672,7 @@ func (e *engine) measureTableRows(
 	growRowspanRows(tableBox, nRows, rowHeights, spacingV)
 
 	// Recompute tops and assign final cell heights after rowspan growth.
-	curY = e.scalePt(tableBox.style.PaddingTop) + e.scalePt(tableBox.style.BorderTop.Width)
+	curY = e.scalePt(tableBox.style.PaddingTop) + e.scalePt(tableBox.style.BorderTop.Width) + spacingV
 	for rowIdx := range rowHeights {
 		rowTops[rowIdx] = posY + curY
 		curY += rowHeights[rowIdx] + spacingV
@@ -703,7 +703,7 @@ func (e *engine) measureRowCells(
 
 		cellW += spacing * float64(cell.span-1)
 		cell.w = cellW
-		cell.x = posX + padL
+		cell.x = posX + padL + spacing
 
 		for c := 0; c < cell.col && c < nCols; c++ {
 			cell.x += colW[c] + spacing
