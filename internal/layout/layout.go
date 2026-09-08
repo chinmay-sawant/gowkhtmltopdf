@@ -1464,6 +1464,10 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 		curY = e.nativeWidgetAutoContentBottom(style)
 	}
 
+	if node.Name == "textarea" && style.Height < 0 && style.HeightPercent < 0 {
+		curY = e.textareaAutoContentBottom(style, node, boxStyle, curY)
+	}
+
 	if enclose && e.bfcFloats != nil {
 		curY = e.bfcFloats.extentCy(posY, curY)
 	}
@@ -1514,6 +1518,37 @@ func (e *engine) nativeWidgetAutoContentBottom(style ResolvedStyle) float64 {
 	}
 
 	return topChrome + contentHeight
+}
+
+// textareaAutoContentBottom returns the content-flow endpoint for an
+// auto-sized textarea whose intrinsic height is rows * line-height. The caller
+// has already added top padding/border to curY and will add bottom padding
+// after this call.
+func (e *engine) textareaAutoContentBottom(style ResolvedStyle, node *html.Node, boxStyle boxModelStyle, curY float64) float64 {
+	rowsStr := strings.TrimSpace(node.Attribute("rows"))
+	rows := 2
+	if n, err := strconv.Atoi(rowsStr); err == nil && n > 0 {
+		rows = n
+		// Cap absurd rows to avoid huge pages from malformed HTML.
+		if rows > 30 {
+			rows = 30
+		}
+	}
+
+	lineH := lineHeightOf(&style)
+	if lineH <= 0 {
+		lineH = defaultLineHeightRatio * style.FontSize
+	}
+
+	scaledLineH := e.scalePt(lineH)
+	contentH := scaledLineH * float64(rows)
+	topChrome := e.scalePt(boxStyle.paddingTop) + e.scalePt(borderLayoutWidth(boxStyle, boxStyle.borderTop))
+	desired := topChrome + contentH
+	if curY < desired {
+		return desired
+	}
+
+	return curY
 }
 
 // paintPositionedPseudo paints generated content whose used position takes it

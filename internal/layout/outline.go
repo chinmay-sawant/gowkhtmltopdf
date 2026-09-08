@@ -22,11 +22,11 @@ func effectiveOutline(sty *ResolvedStyle) (float64, string) {
 }
 
 // defaultedOutlineStyle applies the CSS initial-value rule for isolated
-// style longhands: an empty/none style becomes solid when width>0 or a
-// color is set.
+// style longhands: an empty style becomes solid when width>0 or a
+// color is set. An explicit "none" is respected and never defaulted.
 func defaultedOutlineStyle(sty *ResolvedStyle) string {
 	style := sty.OutlineStyle
-	if (style == "" || style == textTransformNone) && (sty.OutlineWidth > 0 || sty.OutlineColorSet) {
+	if style == "" && (sty.OutlineWidth > 0 || sty.OutlineColorSet) {
 		return solidKeyword
 	}
 
