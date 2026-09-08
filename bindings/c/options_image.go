@@ -11,9 +11,9 @@ const (
 	cropUnset = -1
 )
 
-// imageOptions mirrors GwkImageOptions with Go-native types. Zero values
-// select engine defaults exactly like the documented C defaults do; crop
-// axes use cropUnset instead.
+// imageOptions mirrors GwkImageOptions with Go-native types. The C adapter
+// converts zero-initialized structs to the explicit unset markers below before
+// this value reaches the public ImageDocument API.
 type imageOptions struct {
 	format      string
 	baseURL     string
@@ -31,6 +31,16 @@ type imageOptions struct {
 	localFiles  bool
 	restricted  bool
 	timeoutMS   int64
+}
+
+func defaultImageOptions() imageOptions {
+	return imageOptions{
+		smartWidth: smartWidthUnset,
+		cropLeft:   cropUnset,
+		cropTop:    cropUnset,
+		cropWidth:  cropUnset,
+		cropHeight: cropUnset,
+	}
 }
 
 // buildImageDocument maps opts onto a root ImageDocument holding one inline

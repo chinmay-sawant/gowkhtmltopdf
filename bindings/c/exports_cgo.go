@@ -328,7 +328,7 @@ func convertPDFNumbers(cOpts *C.GwkPdfOptions, opts *pdfOptions) {
 // convertImageOptions maps a GwkImageOptions pointer onto imageOptions using
 // the same gates as convertPDFOptions.
 func convertImageOptions(cOpts *C.GwkImageOptions, cErr **C.char) (imageOptions, bool) {
-	var opts imageOptions
+	opts := defaultImageOptions()
 	if cOpts == nil {
 		return opts, true
 	}

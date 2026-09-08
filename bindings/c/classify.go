@@ -52,6 +52,11 @@ func invalidArgument(err error) bool {
 		gowkhtmltopdf.ErrInvalidPDFVersion,
 		gowkhtmltopdf.ErrInvalidPDFProfile,
 		gowkhtmltopdf.ErrInvalidImageFormat,
+		gowkhtmltopdf.ErrInvalidImageQuality,
+		gowkhtmltopdf.ErrInvalidCrop,
+		gowkhtmltopdf.ErrInvalidDimensions,
+		gowkhtmltopdf.ErrInvalidMargin,
+		gowkhtmltopdf.ErrInvalidZoom,
 		gowkhtmltopdf.ErrNilContext,
 		gowkhtmltopdf.ErrMissingPDFOutput,
 	} {

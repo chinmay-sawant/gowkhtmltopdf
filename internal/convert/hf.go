@@ -1,4 +1,3 @@
-//nolint:all
 package convert
 
 import (
@@ -43,7 +42,9 @@ func isKnownPlaceholder(token string) bool {
 
 // substitute applies the --replace map first, then every known [placeholder]
 // token. Unknown placeholders stay literal, matching wkhtmltopdf.
-func (p hfParms) substitute(src string) string { //nolint:cyclop // per-token switch over known placeholders
+//
+//nolint:cyclop,funlen,wsl,varnamelen // token scanning keeps replacement order explicit.
+func (p hfParms) substitute(src string) string {
 	for k, v := range p.replaces {
 		if k == "" {
 			continue
@@ -119,19 +120,21 @@ func (p hfParms) substitute(src string) string { //nolint:cyclop // per-token sw
 }
 
 // knownIn reports whether s contains at least one known placeholder name.
-func knownIn(s string) bool {
-	for i := 0; i < len(s); {
-		open := strings.IndexByte(s[i:], '[')
+//
+//nolint:wsl // token scanning mirrors substitute.
+func knownIn(source string) bool {
+	for offset := 0; offset < len(source); {
+		open := strings.IndexByte(source[offset:], '[')
 		if open < 0 {
 			return false
 		}
-		open += i
-		closeIdx := strings.IndexByte(s[open:], ']')
+		open += offset
+		closeIdx := strings.IndexByte(source[open:], ']')
 		if closeIdx < 0 {
 			return false
 		}
 		closeIdx += open
-		name := s[open+1 : closeIdx]
+		name := source[open+1 : closeIdx]
 		isToken := len(name) > 0
 		for _, ch := range name {
 			if ch < 'a' || ch > 'z' {
@@ -143,7 +146,7 @@ func knownIn(s string) bool {
 		if isToken && isKnownPlaceholder(name) {
 			return true
 		}
-		i = closeIdx + 1
+		offset = closeIdx + 1
 	}
 
 	return false

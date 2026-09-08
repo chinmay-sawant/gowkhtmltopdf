@@ -84,17 +84,20 @@ const (
 
 // Options controls a Layout run.
 type Options struct {
-	Width      float64 // viewport/content width in points
-	Height     float64 // viewport height in points (for % heights)
-	Font       *pdf.Font
-	Faces      *pdf.FaceSet  // optional Liberation family; defaults loaded when nil
-	Registry   *pdf.Registry // optional discovered fonts (--font-path)
-	Sheets     []*css.Stylesheet
-	Media      string // "print" or "screen"; "" = apply "all" rules only
-	Images     func(src string) ([]byte, error)
-	Background bool    // paint background colors
-	DebugBoxes bool    // outline every box for test/golden output
-	Zoom       float64 // zoom factor; style lengths are scaled by it (any positive value, < 1 shrinks)
+	Width    float64 // viewport/content width in points
+	Height   float64 // viewport height in points (for % heights)
+	Font     *pdf.Font
+	Faces    *pdf.FaceSet  // optional Liberation family; defaults loaded when nil
+	Registry *pdf.Registry // optional discovered fonts (--font-path)
+	Sheets   []*css.Stylesheet
+	Media    string // "print" or "screen"; "" = apply "all" rules only
+	// ImagesContext is the cancellation-aware image resolver. When set, it
+	// takes precedence over Images.
+	ImagesContext func(ctx context.Context, src string) ([]byte, error)
+	Images        func(src string) ([]byte, error)
+	Background    bool    // paint background colors
+	DebugBoxes    bool    // outline every box for test/golden output
+	Zoom          float64 // zoom factor; style lengths are scaled by it (any positive value, < 1 shrinks)
 	// PrintLinkUnderline is an opt-in operator policy (--print-link-underline):
 	// after cascade, force text-decoration:underline on a[href]. Default off
 	// so author CSS (including inherit → none) is honored.
@@ -173,6 +176,9 @@ func cloneOps(src []Op) []Op {
 	for i := range src {
 		dst[i] = src[i]
 		dst[i].Image = append([]byte(nil), src[i].Image...)
+		// Structure elements belong to the document that was painted. A clone
+		// must let its destination document build its own structure tree.
+		dst[i].StructElem = nil
 	}
 
 	return dst

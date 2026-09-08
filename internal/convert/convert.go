@@ -41,7 +41,7 @@ const mediaPrint = "print"
 // corpus well below the limit.
 const (
 	maxConversionObjects = 10_000
-	maxConversionCopies  = 1_000
+	maxConversionCopies  = render.MaxCopies
 	maxConversionPages   = 100_000
 	maxStylesheetRules   = 1_000_000
 )
@@ -85,7 +85,7 @@ var ErrMissingOutput = errors.New("convert: output sink is required")
 var ErrMissingOutlineOutput = errors.New("convert: outline output sink is required")
 
 // ErrInvalidCopies reports a request with a non-positive copy count.
-var ErrInvalidCopies = errors.New("convert: copies must be at least one")
+var ErrInvalidCopies = render.ErrInvalidCopies
 
 // ErrNoRenderableObjects reports a request that contains no body object that
 // can be loaded. Table-of-contents objects are metadata, not renderable page
@@ -105,7 +105,6 @@ var errImagesDisabled = errors.New("gowkhtmltopdf: images disabled")
 
 var (
 	errTooManyObjects = errors.New("convert: object limit exceeded")
-	errTooManyCopies  = errors.New("convert: copy limit exceeded")
 	errTooManyPages   = errors.New("convert: page limit exceeded")
 )
 
@@ -152,12 +151,8 @@ func (r *Request) Validate() error {
 		return fmt.Errorf("%w: got %d, limit %d", errTooManyObjects, len(r.Objects), maxConversionObjects)
 	}
 
-	if r.Global.Copies < 1 {
-		return fmt.Errorf("%w: got %d", ErrInvalidCopies, r.Global.Copies)
-	}
-
-	if r.Global.Copies > maxConversionCopies {
-		return fmt.Errorf("%w: got %d, limit %d", errTooManyCopies, r.Global.Copies, maxConversionCopies)
+	if err := render.ValidateCopies(r.Global.Copies); err != nil {
+		return fmt.Errorf("copies: %w", err)
 	}
 
 	if r.Global.DumpOutline && r.OutlineOutput == nil {
@@ -463,7 +458,7 @@ func initTOCState(ctx context.Context, run *runContext, obj *settings.PdfObject,
 // returns the per-object state the later passes need (nil when the load
 // policy skipped the object).
 //
-//nolint:gocognit,cyclop,funlen // per-object rendering lifecycle
+//nolint:cyclop,funlen,wsl // per-object rendering lifecycle
 func renderObject(ctx context.Context, run *runContext, obj *settings.PdfObject, idx int) (*objectState, error) {
 	geom, err := newHFGeom(run.req.Global)
 	if err != nil {
@@ -571,47 +566,21 @@ func renderObject(ctx context.Context, run *runContext, obj *settings.PdfObject,
 		}
 	}
 
-	lres, err := layout.LayoutContext(ctx, root, state.bodyLayoutOpts(objectRender))
+	lres, objectRender, err := layoutBody(
+		ctx,
+		state,
+		objectRender,
+		run.log,
+		func(options layout.Options) (*layout.Result, error) {
+			return layout.LayoutContext(ctx, root, options)
+		},
+		nil,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("object %d (%s): layout: %w", idx+1, obj.Page, err)
+		return nil, fmt.Errorf("object %d (%s): %w", idx+1, obj.Page, err)
 	}
-
-	if run.req.Global.SmartShrinking { //nolint:nestif // sequential width-check/zoom/relayout steps
-		contentW := state.geom.contentW
-		if contentW2 := measuredWidth(lres); contentW2 > contentW+smartShrinkMinOverflow {
-			// Smart shrinking: scale-to-width re-layout. The layout engine
-			// scales everything by Options.Zoom; the page geometry is
-			// unchanged, so the content fits the content area. A user
-			// zoom factor composes multiplicatively.
-			zoom := contentW / contentW2
-			if zoom > 0 && zoom < 1 {
-				line.Emit(run.log, line.Info,
-					"object %d (%s): content width %.1fpt exceeds the %.1fpt content area; smart shrinking with zoom %.3f",
-					idx+1, obj.Page, contentW2, contentW, zoom)
-
-				effZoom := zoom
-				if zf := obj.Load.ZoomFactor; zf > 0 {
-					effZoom = zoom * zf
-				}
-
-				objectRender.zoom = effZoom
-
-				lres, err = layout.LayoutContext(ctx, root, state.bodyLayoutOpts(objectRender))
-				if err != nil {
-					return nil, fmt.Errorf("object %d (%s): smart-shrink layout: %w", idx+1, obj.Page, err)
-				}
-			}
-		}
-	}
-
-	if run.req.Global.ResolveRelativeLinks {
-		resolveRelativeLinkURIs(lres.Ops, state.base)
-	}
-
-	// --no-external-links strips URI link ops before painting (the object
-	// flag is the CLI's --external-links target; it defaults on).
-	if !obj.ExternalLinks {
-		lres.Ops = stripLinkURIs(lres.Ops)
+	if err := applyBodyPolicies(ctx, state, objectRender, lres); err != nil {
+		return nil, fmt.Errorf("object %d (%s): %w", idx+1, obj.Page, err)
 	}
 
 	before := run.doc.PageCount()
@@ -627,6 +596,90 @@ func renderObject(ctx context.Context, run *runContext, obj *settings.PdfObject,
 	state.navigation = collectBodyNavigation(lres)
 
 	return state, nil
+}
+
+type layoutBodyFunc func(layout.Options) (*layout.Result, error)
+
+type layoutReleaseFunc func(*layout.Result)
+
+//nolint:cyclop,wsl // smart-shrink is one bounded second-pass policy.
+func layoutBody(
+	ctx context.Context,
+	state *objectState,
+	render objectRenderContext,
+	log io.Writer,
+	layoutFn layoutBodyFunc,
+	release layoutReleaseFunc,
+) (*layout.Result, objectRenderContext, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, render, fmt.Errorf("layout: %w", err)
+	}
+
+	result, err := layoutFn(state.bodyLayoutOpts(render))
+	if err != nil {
+		return nil, render, fmt.Errorf("layout: %w", err)
+	}
+
+	if !render.global.SmartShrinking {
+		return result, render, nil
+	}
+
+	contentW := state.geom.contentW
+	contentW2 := measuredWidth(result)
+	if contentW2 <= contentW+smartShrinkMinOverflow {
+		return result, render, nil
+	}
+
+	zoom := contentW / contentW2
+	if zoom <= 0 || zoom >= 1 {
+		return result, render, nil
+	}
+
+	line.Emit(log, line.Info,
+		"object %d (%s): content width %.1fpt exceeds the %.1fpt content area; smart shrinking with zoom %.3f",
+		state.idx+1, state.obj.Page, contentW2, contentW, zoom)
+
+	effZoom := zoom
+	if zoomFactor := state.obj.Load.ZoomFactor; zoomFactor > 0 {
+		effZoom = zoom * zoomFactor
+	}
+	render.zoom = effZoom
+	if release != nil {
+		release(result)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, render, fmt.Errorf("smart-shrink layout: %w", err)
+	}
+
+	result, err = layoutFn(state.bodyLayoutOpts(render))
+	if err != nil {
+		return nil, render, fmt.Errorf("smart-shrink layout: %w", err)
+	}
+
+	return result, render, nil
+}
+
+func applyBodyPolicies(
+	ctx context.Context,
+	state *objectState,
+	render objectRenderContext,
+	result *layout.Result,
+) error {
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("body policy: %w", err)
+	}
+
+	if render.global.ResolveRelativeLinks {
+		resolveRelativeLinkURIs(result.Ops, state.base)
+	}
+
+	// --no-external-links strips URI link ops before painting (the object
+	// flag is the CLI's --external-links target; it defaults on).
+	if !state.obj.ExternalLinks {
+		result.Ops = stripLinkURIs(result.Ops)
+	}
+
+	return nil
 }
 
 // bodyLayoutOpts builds layout.Options for a body (or smart-shrink) pass

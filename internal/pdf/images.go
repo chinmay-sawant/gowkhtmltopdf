@@ -152,6 +152,8 @@ func validJPEGDims(width, height int) bool {
 
 // AddJPEGImage embeds a JPEG as a DCTDecode pass-through XObject and paints
 // it into the rect. Errors are returned so the layout can fall back.
+//
+//nolint:cyclop,funlen // validation, grayscale, deduplication, and emission stay together.
 func (c *Content) AddJPEGImage(name string, posX, posY, drawW, drawH float64, data []byte) error {
 	if len(data) > maxEmbeddedEncodedBytes {
 		return fmt.Errorf(
@@ -179,6 +181,18 @@ func (c *Content) AddJPEGImage(name string, posX, posY, drawW, drawH float64, da
 		}
 	}
 
+	grayscale := c.doc != nil && c.doc.grayscale
+	key := imageDedupKey{digest: sha256.Sum256(data), grayscale: grayscale}
+
+	if resource, ok := c.imageDedup[key]; ok {
+		name = c.uniqueImageName(name)
+		c.imageRefs[name] = resource
+		c.imageUses[name] = resource.ref.String()
+		c.drawImageResource(name, posX, posY, drawW, drawH)
+
+		return nil
+	}
+
 	csVal := "DeviceRGB"
 	if components == 1 {
 		csVal = "DeviceGray"
@@ -197,6 +211,7 @@ func (c *Content) AddJPEGImage(name string, posX, posY, drawW, drawH float64, da
 	c.doc.setStream(ref, data)
 	c.imageRefs[name] = &imageResource{ref: ref, width: width, height: height}
 	c.imageUses[name] = ref.String()
+	c.imageDedup[key] = c.imageRefs[name]
 	c.Save()
 	c.Transform(drawW, 0, 0, drawH, posX, posY)
 	c.buf.WriteString("/")

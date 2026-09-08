@@ -28,23 +28,29 @@ func (p *pdfPipeline) RenderObjects(ctx context.Context) error {
 }
 
 func (p *pdfPipeline) Assemble(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("assemble: %w", err)
+	}
+
 	p.run.exclude = parseExcludeSelectors(p.run.req.Global.ExcludeFromOutline, p.run.log)
 
 	if err := p.assembleTOC(ctx); err != nil {
 		return err
 	}
 
-	if err := p.assembleOutline(); err != nil {
+	if err := p.assembleOutline(ctx); err != nil {
 		return err
 	}
 
-	p.assembleLinks()
-
-	if err := p.assembleDocument(); err != nil {
+	if err := p.assembleLinks(ctx); err != nil {
 		return err
 	}
 
-	if err := p.assembleCopies(); err != nil {
+	if err := p.assembleDocument(ctx); err != nil {
+		return err
+	}
+
+	if err := p.assembleCopies(ctx); err != nil {
 		return err
 	}
 
@@ -87,7 +93,12 @@ func (p *pdfPipeline) assembleTOC(ctx context.Context) error {
 	return nil
 }
 
-func (p *pdfPipeline) assembleOutline() error {
+//nolint:wsl // each outline step has a cancellation checkpoint.
+func (p *pdfPipeline) assembleOutline(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("outline assembly: %w", err)
+	}
+
 	run := p.run
 	if !run.req.Global.Outline {
 		return nil
@@ -105,6 +116,9 @@ func (p *pdfPipeline) assembleOutline() error {
 	}
 
 	root := emitOutline(run.doc, outTree, run.bodies, run.tocTotal)
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("outline assembly: %w", err)
+	}
 	if len(root.Children) > 0 {
 		run.doc.SetOutline(root)
 	}
@@ -112,16 +126,34 @@ func (p *pdfPipeline) assembleOutline() error {
 	return nil
 }
 
-func (p *pdfPipeline) assembleLinks() {
+//nolint:wsl // links are assembled in separately cancellable passes.
+func (p *pdfPipeline) assembleLinks(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("link assembly: %w", err)
+	}
+
 	run := p.run
 	if len(run.tocs) > 0 {
 		applyTOCLinks(run.doc, run.tocs, run.bodies, run.tocTotal, run.headings)
 	}
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("link assembly: %w", err)
+	}
 
 	applyInternalLinks(run.doc, run.bodies, run.tocTotal)
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("link assembly: %w", err)
+	}
+
+	return nil
 }
 
-func (p *pdfPipeline) assembleDocument() error {
+//nolint:wsl // document metadata and page planning have explicit checkpoints.
+func (p *pdfPipeline) assembleDocument(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("document assembly: %w", err)
+	}
+
 	run := p.run
 	plan, err := newPagePlan(run.tocs, run.bodies, run.req.Global.Copies, run.req.Global.Collate)
 
@@ -146,17 +178,25 @@ func (p *pdfPipeline) assembleDocument() error {
 	run.doc.SetCompression(run.req.Global.UseCompression)
 	run.doc.SetGrayscale(run.req.Global.Grayscale)
 	run.doc.SetCreationTime(run.req.now())
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("document assembly: %w", err)
+	}
 
 	return nil
 }
 
-func (p *pdfPipeline) assembleCopies() error {
+//nolint:wsl // copy materialization and reordering have explicit checkpoints.
+func (p *pdfPipeline) assembleCopies(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("copy assembly: %w", err)
+	}
+
 	run := p.run
 	if run.plan.copies <= 1 {
 		return nil
 	}
 
-	if err := materializeCopies(run.doc, run.plan.Ranges(), run.plan.copies); err != nil {
+	if err := materializeCopies(ctx, run.doc, run.plan.Ranges(), run.plan.copies); err != nil {
 		return err
 	}
 
@@ -164,7 +204,14 @@ func (p *pdfPipeline) assembleCopies() error {
 		return nil
 	}
 
-	if err := run.doc.ReorderPages(nonCollateOrder(run.plan.Ranges(), run.plan.copies)); err != nil {
+	order, err := nonCollateOrder(run.plan.Ranges(), run.plan.copies)
+	if err != nil {
+		return err
+	}
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("copy assembly: %w", err)
+	}
+	if err := run.doc.ReorderPages(order); err != nil {
 		return fmt.Errorf("assemble copies: %w", err)
 	}
 

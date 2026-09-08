@@ -12,6 +12,7 @@ import (
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/app"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/cli"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/convert"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/errs"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/load"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
@@ -86,9 +87,9 @@ func TestNilCommandUsesCanonicalSentinel(t *testing.T) {
 	if err := app.RunPDF(t.Context(), nil, nil, nil, nil); !errors.Is(err, app.ErrNilCommand) {
 		t.Fatalf("RunPDF(nil command) = %v, want errors.Is(..., %v)", err, app.ErrNilCommand)
 	}
-	// Parked: errs.ErrNilCommand is now a distinct instance from app.ErrNilCommand
-	// (duplicate errors.New). Full hub deletion requires migrating all consumers to
-	// app.ErrNilCommand so errors.Is stays coherent.
+	if app.ErrNilCommand != errs.ErrNilCommand {
+		t.Fatal("app and errs nil-command sentinels must be identical")
+	}
 }
 
 //nolint:wsl // assertions intentionally follow the side-effect checks.

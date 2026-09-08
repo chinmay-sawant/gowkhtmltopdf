@@ -2,6 +2,7 @@ package convert //nolint:testpackage // white-box tests need unexported access
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/convert/prepare"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/convert/render"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/load"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
@@ -50,6 +52,18 @@ func TestRunRequiresDedicatedOutlineSink(t *testing.T) {
 	err := Run(t.Context(), req, io.Discard, nil)
 	if !errors.Is(err, ErrMissingOutlineOutput) {
 		t.Fatalf("Run error = %v, want %v", err, ErrMissingOutlineOutput)
+	}
+}
+
+func TestMaterializeCopiesStopsBeforeWorkWhenCanceled(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	err := materializeCopies(ctx, nil, []render.Range{{Start: 0, Count: 1}}, 2)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("materializeCopies error = %v, want context.Canceled", err)
 	}
 }
 

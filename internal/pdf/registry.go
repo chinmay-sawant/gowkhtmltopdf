@@ -373,8 +373,18 @@ func scanFontFile(out *Registry, path string, entry os.DirEntry) {
 		return
 	}
 
-	data, err := os.ReadFile(path)
+	if info, err := entry.Info(); err == nil && info.Size() > maxFontBytes {
+		return
+	}
+
+	file, err := os.Open(path)
 	if err != nil {
+		return
+	}
+	defer file.Close()
+
+	data, err := io.ReadAll(io.LimitReader(file, int64(maxFontBytes)+1))
+	if err != nil || len(data) > maxFontBytes {
 		return
 	}
 

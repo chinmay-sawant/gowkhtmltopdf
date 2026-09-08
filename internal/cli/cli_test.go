@@ -264,6 +264,9 @@ func TestTerminalActionsAndModeValidation(t *testing.T) {
 	if _, err := Parse([]string{"--dump-default-toc-xsl", "-o", outPDF, "input.html"}, ModePDF); !errors.Is(err, ErrTerminalConflict) {
 		t.Fatalf("terminal conflict = %v", err)
 	}
+	if _, err := Parse([]string{"--dump-default-toc-xsl", "-o", outPDF}, ModePDF); !errors.Is(err, ErrTerminalConflict) {
+		t.Fatalf("output-only terminal conflict = %v", err)
+	}
 	if _, err := Parse([]string{"--dump-default-toc-xsl", "--dump-outline"}, ModePDF); !errors.Is(err, ErrTerminalConflict) {
 		t.Fatalf("dump-outline conflict = %v", err)
 	}

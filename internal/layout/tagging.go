@@ -54,6 +54,14 @@ func buildStructureTree(doc *pdf.Document, res *Result) error {
 	return associateUnmappedOps(doc, res.Ops, docElem)
 }
 
+// clearStructureElements removes document-owned tags before a result is
+// painted into another document. Paint rebuilds the tree for each destination.
+func clearStructureElements(ops []Op) {
+	for idx := range ops {
+		ops[idx].StructElem = nil
+	}
+}
+
 // associateUnmappedOps associates any display ops that were not mapped by the
 // DOM box walk with appropriate semantic structure elements (e.g. Link, Figure, P).
 func associateUnmappedOps(doc *pdf.Document, ops []Op, docElem *pdf.StructElem) error {

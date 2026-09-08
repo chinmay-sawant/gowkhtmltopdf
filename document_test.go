@@ -4,6 +4,7 @@ package gowkhtmltopdf
 import (
 	"bytes"
 	"errors"
+	"math"
 	"strings"
 	"testing"
 
@@ -204,6 +205,36 @@ func TestDocumentValidate(t *testing.T) {
 			want:     []error{ErrInvalidOrientation},
 		},
 		{
+			name:     "partial custom dimensions",
+			document: &Document{Pages: []Page{validPage}, WidthMM: 210},
+			want:     []error{ErrInvalidDimensions},
+		},
+		{
+			name:     "negative custom dimension",
+			document: &Document{Pages: []Page{validPage}, WidthMM: -1, HeightMM: 297},
+			want:     []error{ErrInvalidDimensions},
+		},
+		{
+			name:     "non-finite custom dimension",
+			document: &Document{Pages: []Page{validPage}, WidthMM: math.Inf(1), HeightMM: 297},
+			want:     []error{ErrInvalidDimensions},
+		},
+		{
+			name:     "negative margin",
+			document: &Document{Pages: []Page{validPage}, Margin: Margin{Top: -1}},
+			want:     []error{ErrInvalidMargin},
+		},
+		{
+			name:     "non-finite margin",
+			document: &Document{Pages: []Page{validPage}, Margin: Margin{Left: math.NaN()}},
+			want:     []error{ErrInvalidMargin},
+		},
+		{
+			name:     "non-finite page zoom",
+			document: &Document{Pages: []Page{{Source: validPage.Source, Zoom: math.Inf(1)}}},
+			want:     []error{ErrInvalidZoom},
+		},
+		{
 			name:     "invalid pdf version",
 			document: &Document{Pages: []Page{validPage}, PDFVersion: "9.9"},
 			want:     []error{ErrInvalidPDFVersion},
@@ -271,6 +302,21 @@ func TestImageDocumentValidate(t *testing.T) {
 			want:     []error{ErrInvalidImageFormat},
 		},
 		{name: "jpeg format", document: &ImageDocument{Source: File("image.html"), Format: "JPEG"}},
+		{
+			name:     "negative width",
+			document: &ImageDocument{Source: File("image.html"), Width: -1},
+			want:     []error{ErrInvalidDimensions},
+		},
+		{
+			name:     "negative height",
+			document: &ImageDocument{Source: File("image.html"), Height: -1},
+			want:     []error{ErrInvalidDimensions},
+		},
+		{
+			name:     "non-finite zoom",
+			document: &ImageDocument{Source: File("image.html"), Zoom: math.NaN()},
+			want:     []error{ErrInvalidZoom},
+		},
 	}
 
 	for _, testCase := range tests {
@@ -366,6 +412,21 @@ func TestPublicDocumentOptionsAreRepresentable(t *testing.T) {
 
 	if !bytes.Equal(document.Pages[0].Source.HTML, []byte("<p>report</p>")) {
 		t.Fatal("document page HTML was not retained")
+	}
+}
+
+func TestDocumentOrientationValidationAndMappingUseTrimmedValue(t *testing.T) {
+	t.Parallel()
+
+	document := &Document{
+		Pages:       []Page{{Source: HTML([]byte("<p>page</p>"), "")}},
+		Orientation: " landscape ",
+	}
+	if err := document.Validate(); err != nil {
+		t.Fatalf("Validate: %v", err)
+	}
+	if got := document.pdfGlobal(false).Orientation.String(); got != "Landscape" {
+		t.Fatalf("mapped orientation = %q, want Landscape", got)
 	}
 }
 

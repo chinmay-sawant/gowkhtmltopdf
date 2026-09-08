@@ -6,6 +6,7 @@ import (
 	"io"
 	"maps"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/convert"
@@ -345,8 +346,8 @@ func (d *Document) pdfGlobal(dumpOutline bool) settings.PdfGlobal {
 	if d.WidthMM != 0 || d.HeightMM != 0 {
 		global.Size = settings.Size{Width: d.WidthMM, Height: d.HeightMM}
 	}
-	if d.Orientation != "" {
-		if orientation, err := settings.ParseOrientation(d.Orientation); err == nil {
+	if orientationValue := strings.TrimSpace(d.Orientation); orientationValue != "" {
+		if orientation, err := settings.ParseOrientation(orientationValue); err == nil {
 			global.Orientation = orientation
 		}
 	}

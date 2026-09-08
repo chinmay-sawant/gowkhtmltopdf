@@ -1,10 +1,11 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
+//nolint:testpackage,exhaustruct,wsl,lll,cyclop // layout regressions use internal state and explicit fixtures
 package layout
 
 import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
@@ -140,6 +141,159 @@ func TestLayoutContextHonorsCancellation(t *testing.T) {
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("LayoutContext error = %v, want context.Canceled", err)
 	}
+}
+
+func TestLayoutContextCancelsBlockingImageResolver(t *testing.T) {
+	t.Parallel()
+
+	root := mustParse(t, `<html><body><img src="blocked"></body></html>`)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	started := make(chan struct{})
+	done := make(chan error, 1)
+
+	go func() {
+		_, err := LayoutContext(ctx, root, Options{
+			Width: 300, Height: 300,
+			ImagesContext: func(resolveCtx context.Context, _ string) ([]byte, error) {
+				close(started)
+				<-resolveCtx.Done()
+
+				return nil, resolveCtx.Err()
+			},
+		}) //nolint:exhaustruct // blocking image callback is the only special option
+		done <- err
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("image resolver did not start")
+	}
+
+	cancel()
+
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("LayoutContext error = %v, want context.Canceled", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("LayoutContext remained blocked after image resolver cancellation")
+	}
+}
+
+func TestCloneResultDropsDocumentOwnedStructureElements(t *testing.T) {
+	t.Parallel()
+
+	root := mustParse(t, `<html><body><h1>Title</h1><p>Body</p></body></html>`)
+	res, err := LayoutContext(t.Context(), root, Options{Width: 300, Height: 300}) //nolint:exhaustruct
+	if err != nil {
+		t.Fatalf("LayoutContext: %v", err)
+	}
+
+	first, err := pdf.NewDocumentWithPolicy(pdf.WriterPolicy{
+		Version:            pdf.PDF17,
+		ConformanceProfile: pdf.ProfilePDFUA1,
+	})
+	if err != nil {
+		t.Fatalf("first document: %v", err)
+	}
+	if err := Paint(first, res, PaintOptions{PageWidth: 300, PageHeight: 300}); err != nil {
+		t.Fatalf("first Paint: %v", err)
+	}
+
+	clone := CloneResult(res)
+	for idx, op := range clone.Ops {
+		if op.StructElem != nil {
+			t.Fatalf("clone op %d retained source structure element", idx)
+		}
+	}
+
+	second, err := pdf.NewDocumentWithPolicy(pdf.WriterPolicy{
+		Version:            pdf.PDF17,
+		ConformanceProfile: pdf.ProfilePDFUA1,
+	})
+	if err != nil {
+		t.Fatalf("second document: %v", err)
+	}
+	if err := Paint(second, clone, PaintOptions{PageWidth: 300, PageHeight: 300}); err != nil {
+		t.Fatalf("second Paint: %v", err)
+	}
+
+	firstElems := structureElements(first.StructTreeRoot())
+	secondElems := structureElements(second.StructTreeRoot())
+	if len(firstElems) == 0 || len(secondElems) == 0 {
+		t.Fatalf("structure tree sizes = %d and %d, want non-empty trees", len(firstElems), len(secondElems))
+	}
+	if len(firstElems) != len(secondElems) {
+		t.Fatalf("structure tree sizes = %d and %d, want equal trees", len(firstElems), len(secondElems))
+	}
+	for elem := range firstElems {
+		if secondElems[elem] {
+			t.Fatal("cloned result shared a structure element with the source document")
+		}
+	}
+}
+
+func TestRepeatedTaggedPaintRebuildsDocumentStructure(t *testing.T) {
+	t.Parallel()
+
+	root := mustParse(t, `<html><body><h1>Title</h1><p>Body</p></body></html>`)
+	res, err := LayoutContext(t.Context(), root, Options{Width: 300, Height: 300}) //nolint:exhaustruct
+	if err != nil {
+		t.Fatalf("LayoutContext: %v", err)
+	}
+
+	first, err := pdf.NewDocumentWithPolicy(pdf.WriterPolicy{
+		Version:            pdf.PDF17,
+		ConformanceProfile: pdf.ProfilePDFUA1,
+	})
+	if err != nil {
+		t.Fatalf("first document: %v", err)
+	}
+	if err := Paint(first, res, PaintOptions{PageWidth: 300, PageHeight: 300}); err != nil {
+		t.Fatalf("first Paint: %v", err)
+	}
+
+	second, err := pdf.NewDocumentWithPolicy(pdf.WriterPolicy{
+		Version:            pdf.PDF17,
+		ConformanceProfile: pdf.ProfilePDFUA1,
+	})
+	if err != nil {
+		t.Fatalf("second document: %v", err)
+	}
+	if err := Paint(second, res, PaintOptions{PageWidth: 300, PageHeight: 300}); err != nil {
+		t.Fatalf("repeated Paint: %v", err)
+	}
+
+	firstElems := structureElements(first.StructTreeRoot())
+	secondElems := structureElements(second.StructTreeRoot())
+	if len(firstElems) != len(secondElems) || len(secondElems) < 3 {
+		t.Fatalf("repeated structure tree sizes = %d and %d, want equal trees with headings and paragraphs", len(firstElems), len(secondElems))
+	}
+}
+
+func structureElements(root *pdf.StructTreeRoot) map[*pdf.StructElem]bool {
+	elems := map[*pdf.StructElem]bool{}
+	var walk func(*pdf.StructElem)
+	walk = func(elem *pdf.StructElem) {
+		if elem == nil {
+			return
+		}
+
+		elems[elem] = true
+		for _, child := range elem.Kids {
+			walk(child)
+		}
+	}
+	if root != nil {
+		for _, elem := range root.Children {
+			walk(elem)
+		}
+	}
+
+	return elems
 }
 
 func TestPaintContextHonorsCancellation(t *testing.T) {

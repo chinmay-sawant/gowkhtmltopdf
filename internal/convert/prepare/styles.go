@@ -34,25 +34,7 @@ type SheetOptions struct {
 //
 //nolint:lll // stylesheet collection flow
 func CollectSheets(ctx context.Context, loader *load.Loader, root *html.Node, base string, loadPage settings.LoadPage, opts SheetOptions, log io.Writer) []*css.Stylesheet {
-	if loader == nil {
-		return nil
-	}
-	if ctx == nil { //nolint:wsl // nil-context warning is a separate preflight branch.
-		if log != nil {
-			line.Emit(log, line.Warn, "stylesheet collection: nil context")
-		}
-
-		return nil
-	}
-
-	resources := loader.ForResource(&load.Resource{Base: base}, loadPage) //nolint:exhaustruct,lll // base-only resource reference
-	sheets, err := collectSheets(ctx, resources, root, opts, log)
-
-	if err != nil && log != nil {
-		line.Emit(log, line.Warn, "stylesheet collection: %v", err)
-	}
-
-	return sheets
+	return NewResourceContext(loader, base, loadPage).CollectSheets(ctx, root, opts, log)
 }
 
 type sheetCollector struct {
@@ -393,14 +375,9 @@ func LinkStylesheet(node *html.Node, viewportW, viewportH float64, mediaType str
 
 // MergeFontFaces loads supported @font-face sources into registry.
 //
-//nolint:wsl,lll // font-face collection flow
+//nolint:lll // font-face collection flow
 func MergeFontFaces(ctx context.Context, loader *load.Loader, registry *pdf.Registry, sheets []*css.Stylesheet, base string, loadPage settings.LoadPage, idx int, log io.Writer) *pdf.Registry {
-	if loader == nil {
-		return registry
-	}
-	resources := loader.ForResource(&load.Resource{Base: base}, loadPage) //nolint:exhaustruct,lll // base-only resource reference
-
-	return mergeFontFaces(ctx, resources, registry, sheets, idx, log)
+	return NewResourceContext(loader, base, loadPage).MergeFontFaces(ctx, registry, sheets, idx, log)
 }
 
 //nolint:wsl,nlreturn,lll // font-face collection flow

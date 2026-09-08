@@ -33,9 +33,10 @@ const Version = "1.4"
 
 // object is one indirect object (pre-serialized dict + optional stream).
 type object struct {
-	id     int
-	dict   string // body text before stream (may be empty)
-	stream []byte
+	id        int
+	dict      string // body text before stream (may be empty)
+	stream    []byte
+	hasStream bool
 }
 
 // countingWriter forwards PDF bytes while tracking their exact offset. It
@@ -292,6 +293,7 @@ func (d *Document) setStream(r objRef, raw []byte) {
 	}
 
 	d.objects[idx].stream = raw
+	d.objects[idx].hasStream = true
 }
 
 // Page is one page of the document.
@@ -561,7 +563,7 @@ func writePDFObject(out *countingWriter, obj *object) (int64, error) {
 		return 0, err
 	}
 
-	if len(obj.stream) > 0 {
+	if obj.hasStream {
 		if err := writePDFString(out, "\nstream\n"); err != nil {
 			return 0, err
 		}
@@ -671,11 +673,12 @@ func (d *Document) writeTo(width io.Writer) (int64, error) {
 		return 0, err
 	}
 
-	bufWriter := bufio.NewWriterSize(width, pdfBufferSize)
+	sink := &countingWriter{w: width} //nolint:exhaustruct // count starts at zero
+	bufWriter := bufio.NewWriterSize(sink, pdfBufferSize)
 	out := &countingWriter{w: bufWriter} //nolint:exhaustruct // count starts at zero
 
 	if err := writePDFHeader(out, d.policy); err != nil {
-		return out.n, fmt.Errorf("pdf: write: %w", err)
+		return sink.n, fmt.Errorf("pdf: write: %w", err)
 	}
 
 	offsets := make([]int64, len(d.objects)+1)
@@ -690,21 +693,21 @@ func (d *Document) writeTo(width io.Writer) (int64, error) {
 		offset, err := writePDFObject(out, obj)
 
 		if err != nil {
-			return out.n, fmt.Errorf("pdf: write: %w", err)
+			return sink.n, fmt.Errorf("pdf: write: %w", err)
 		}
 
 		offsets[obj.id] = offset
 	}
 
 	if err := writePDFTrailer(out, d, offsets); err != nil {
-		return out.n, fmt.Errorf("pdf: write: %w", err)
+		return sink.n, fmt.Errorf("pdf: write: %w", err)
 	}
 
 	if err := bufWriter.Flush(); err != nil {
-		return out.n, fmt.Errorf("pdf: flush: %w", err)
+		return sink.n, fmt.Errorf("pdf: flush: %w", err)
 	}
 
-	return out.n, nil
+	return sink.n, nil
 }
 
 // embedICC embeds an ICC profile stream object with compression.

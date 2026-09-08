@@ -15,6 +15,23 @@ func TestCollectBodyNavigationCopiesOnlyPostPaintLinkData(t *testing.T) {
 	assertProjectedFragmentLink(t, nav)
 }
 
+func TestBodyNavigationProjectionIsIndependentOfLayoutResult(t *testing.T) {
+	t.Parallel()
+
+	result := testBodyNavigationResult()
+	nav := collectBodyNavigation(result)
+	result.Locations[0].X = 99
+	result.Ops[0].URI = "#changed"
+
+	if got := nav.ids["target"].X; got != 3 {
+		t.Fatalf("projected destination X = %v, want copied value 3", got)
+	}
+
+	if got := nav.links[0].uri; got != "#target" {
+		t.Fatalf("projected link URI = %q, want copied value #target", got)
+	}
+}
+
 func testBodyNavigationResult() *layout.Result {
 	target := &html.Node{ //nolint:exhaustruct // test needs only id attributes
 		Attrs: map[string]string{"id": "target"},

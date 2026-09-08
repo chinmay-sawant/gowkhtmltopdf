@@ -3,6 +3,7 @@ package gowkhtmltopdf
 import (
 	"errors"
 	"fmt"
+	"math"
 	"net/url"
 	"strings"
 
@@ -27,6 +28,12 @@ var (
 	ErrInvalidImageQuality = errors.New("gowkhtmltopdf: image quality must be between 0 and 100")
 	// ErrInvalidCrop reports negative crop dimensions or offsets.
 	ErrInvalidCrop = errors.New("gowkhtmltopdf: crop dimensions and offsets must be non-negative")
+	// ErrInvalidDimensions reports incomplete, negative, or non-finite page or image dimensions.
+	ErrInvalidDimensions = errors.New("gowkhtmltopdf: invalid dimensions")
+	// ErrInvalidMargin reports negative or non-finite page margins.
+	ErrInvalidMargin = errors.New("gowkhtmltopdf: invalid margin")
+	// ErrInvalidZoom reports a negative or non-finite zoom factor.
+	ErrInvalidZoom = errors.New("gowkhtmltopdf: invalid zoom")
 )
 
 // Validate checks that Content identifies one valid source and that Base is
@@ -74,6 +81,14 @@ func (d *ImageDocument) Validate() error {
 		return fmt.Errorf("source: %w", err)
 	}
 
+	if err := validateImageDimensions(d.Width, d.Height); err != nil {
+		return err
+	}
+
+	if err := validateZoom(d.Zoom); err != nil {
+		return err
+	}
+
 	switch format := strings.ToLower(strings.TrimSpace(d.Format)); format {
 	case "", "png", "jpg", "jpeg":
 	default:
@@ -99,7 +114,16 @@ func validateImageCrop(crop *Crop) error {
 	return nil
 }
 
+//nolint:cyclop // each optional document setting has one independent parser branch.
 func validatePDFOptions(document *Document) error {
+	if err := validatePDFDimensions(document.WidthMM, document.HeightMM); err != nil {
+		return err
+	}
+
+	if err := validateMargins(document.Margin); err != nil {
+		return err
+	}
+
 	if pageSize := strings.TrimSpace(document.PageSize); pageSize != "" {
 		if _, _, err := settings.ParsePageSize(pageSize); err != nil {
 			return fmt.Errorf("%w: %q", ErrInvalidPageSize, document.PageSize)
@@ -142,7 +166,61 @@ func validatePage(name string, page Page) error {
 		return fmt.Errorf("%s: %w", name, err)
 	}
 
+	if err := validateZoom(page.Zoom); err != nil {
+		return fmt.Errorf("%s: %w", name, err)
+	}
+
 	return nil
+}
+
+func validatePDFDimensions(width, height float64) error {
+	if width == 0 && height == 0 {
+		return nil
+	}
+
+	if !finitePositive(width) || !finitePositive(height) {
+		return fmt.Errorf("%w: PDF width and height must both be finite and greater than zero", ErrInvalidDimensions)
+	}
+
+	return nil
+}
+
+func validateImageDimensions(width, height int) error {
+	if width < 0 || height < 0 {
+		return fmt.Errorf("%w: image width and height must be non-negative", ErrInvalidDimensions)
+	}
+
+	return nil
+}
+
+func validateMargins(m Margin) error {
+	for _, value := range []float64{m.Top, m.Right, m.Bottom, m.Left} {
+		if !finiteNonNegative(value) {
+			return fmt.Errorf("%w: margins must be finite and non-negative", ErrInvalidMargin)
+		}
+	}
+
+	return nil
+}
+
+func validateZoom(zoom float64) error {
+	if zoom == 0 {
+		return nil
+	}
+
+	if !finitePositive(zoom) {
+		return fmt.Errorf("%w: zoom must be finite and greater than zero", ErrInvalidZoom)
+	}
+
+	return nil
+}
+
+func finitePositive(value float64) bool {
+	return !math.IsNaN(value) && !math.IsInf(value, 0) && value > 0
+}
+
+func finiteNonNegative(value float64) bool {
+	return !math.IsNaN(value) && !math.IsInf(value, 0) && value >= 0
 }
 
 //nolint:cyclop,wsl // exact-one-source validation has one branch per source kind.

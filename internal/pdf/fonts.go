@@ -32,7 +32,10 @@ var (
 	errFontTruncatedCmap4     = errors.New("font: truncated cmap format 4")
 	errFontTruncatedCmap4Segs = errors.New("font: truncated cmap format 4 segments")
 	errFontTruncatedCmap12    = errors.New("font: truncated cmap format 12")
+	errFontTooLarge           = errors.New("font: input exceeds byte limit")
 )
+
+const maxFontBytes = 32 << 20
 
 // Font is a parsed TrueType/OpenType font (table-directory view). It exposes
 // the metrics needed for text layout and the glyph data needed to embed and
@@ -79,6 +82,10 @@ type Font struct {
 // ParseTTF parses a TrueType (or OpenType with TrueType outlines) font file.
 // CFF-based fonts return an error - this writer targets TrueType outlines.
 func ParseTTF(data []byte) (*Font, error) {
+	if len(data) > maxFontBytes {
+		return nil, fmt.Errorf("%w: %d bytes, limit %d", errFontTooLarge, len(data), maxFontBytes)
+	}
+
 	if len(data) < sfntOffsetTableSize {
 		return nil, errFontTooShort
 	}

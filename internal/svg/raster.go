@@ -25,9 +25,11 @@ import (
 )
 
 const (
-	cssDPI          = 96.0
-	mmPerInch       = 25.4
-	viewBoxNumParts = 4
+	cssDPI           = 96.0
+	mmPerInch        = 25.4
+	viewBoxNumParts  = 4
+	maxSVGBytes      = 32 << 20
+	maxSVGProbeBytes = 4096
 )
 
 // Static errors returned by Rasterize; callers can match with errors.Is.
@@ -36,18 +38,25 @@ var (
 	errCanvasEmptySize = errors.New("svg canvas: empty size")
 	errCanvasPanic     = errors.New("svg canvas: panic")
 	errCanvasZeroPixel = errors.New("svg canvas: zero pixel size")
+	errSVGTooLarge     = errors.New("svg: input exceeds byte limit")
 
 	// canvasMu serializes calls to tdewolff/canvas, which uses mutable package-level
 	// globals in its path intersection algorithms (bentleyOttmann in path_intersection.go).
 	canvasMu sync.Mutex //nolint:gochecknoglobals // guards non-thread-safe tdewolff/canvas package globals
 )
 
-// Rasterize decodes SVG XML into a PNG image via tdewolff/canvas only.
+// Rasterize decodes SVG XML into a PNG image via tdewolff/canvas only. The
+// returned width and height are logical CSS-pixel dimensions. The PNG may
+// contain more pixels because small SVGs are supersampled before encoding.
 // maxSide caps the longer edge in pixels (default 512).
 // On failure (not SVG, parse/draw error, empty size, or canvas panic),
 // returns err with nil pngBytes and zero w/h - callers must treat error
 // as "no image". There is no second rasterizer or shell fallback.
 func Rasterize(data []byte, maxSide int) ([]byte, int, int, error) {
+	if len(data) > maxSVGBytes {
+		return nil, 0, 0, fmt.Errorf("%w: %d bytes, limit %d", errSVGTooLarge, len(data), maxSVGBytes)
+	}
+
 	if maxSide <= 0 {
 		maxSide = 512
 	}
@@ -257,14 +266,34 @@ func svgSizeAttrs(elem xml.StartElement) (float64, float64) {
 }
 
 func looksLikeSVG(data []byte) bool {
-	s := strings.TrimSpace(string(data))
-	if strings.HasPrefix(s, "\xef\xbb\xbf") {
-		s = strings.TrimSpace(s[3:])
+	if len(data) > maxSVGProbeBytes {
+		data = data[:maxSVGProbeBytes]
 	}
 
-	low := strings.ToLower(s)
+	data = bytes.TrimSpace(data)
+	if bytes.HasPrefix(data, []byte("\xef\xbb\xbf")) {
+		data = bytes.TrimSpace(data[3:])
+	}
 
-	return strings.Contains(low, "<svg") || strings.HasPrefix(low, "<?xml")
+	if len(data) >= 5 && bytes.EqualFold(data[:5], []byte("<?xml")) {
+		return true
+	}
+
+	return bytesContainsFold(data, []byte("<svg"))
+}
+
+func bytesContainsFold(data, needle []byte) bool {
+	if len(needle) == 0 {
+		return true
+	}
+
+	for idx := 0; idx+len(needle) <= len(data); idx++ {
+		if bytes.EqualFold(data[idx:idx+len(needle)], needle) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func parseLen(raw string, def float64) float64 {

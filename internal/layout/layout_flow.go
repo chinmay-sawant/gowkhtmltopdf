@@ -69,7 +69,7 @@ type imageRef struct {
 
 // resolveImage fetches (once) and decodes (once) src; nil on any failure.
 func (e *engine) resolveImage(src string) *imageRef {
-	if src == "" || e.opts.Images == nil {
+	if src == "" || e.checkContext() || !e.hasImageResolver() {
 		return nil
 	}
 
@@ -81,7 +81,12 @@ func (e *engine) resolveImage(src string) *imageRef {
 		return ref
 	}
 
-	data, err := e.opts.Images(src)
+	data, err := e.resolveImageData(src)
+
+	if e.checkContext() {
+		return nil
+	}
+
 	if err != nil {
 		// Cache nil-miss? Store a sentinel empty ref so we do not re-fetch.
 		e.imgCache[src] = nil
@@ -99,6 +104,18 @@ func (e *engine) resolveImage(src string) *imageRef {
 	e.imgCache[src] = ref
 
 	return ref
+}
+
+func (e *engine) hasImageResolver() bool {
+	return e.opts.Images != nil || e.opts.ImagesContext != nil
+}
+
+func (e *engine) resolveImageData(src string) ([]byte, error) {
+	if e.opts.ImagesContext != nil {
+		return e.opts.ImagesContext(e.ctx, src)
+	}
+
+	return e.opts.Images(src)
 }
 
 // isInlineChild reports whether n participates in an inline formatting context.

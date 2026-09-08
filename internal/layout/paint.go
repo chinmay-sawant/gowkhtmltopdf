@@ -160,6 +160,8 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 
 	populateLocations(res, contentH, opPage)
 
+	clearStructureElements(res.Ops)
+
 	if err := buildStructureTree(doc, res); err != nil {
 		return err
 	}

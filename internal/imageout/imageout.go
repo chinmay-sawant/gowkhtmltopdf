@@ -1,4 +1,3 @@
-//nolint:all
 package imageout
 
 import (
@@ -539,13 +538,14 @@ func rasterImageHash(data []byte, isJPEG bool) uint64 {
 	// FNV-1a is sufficient as a lookup accelerator; bytes.Equal below keeps
 	// collisions correct. Include the source kind because PNG and JPEG have
 	// different decoders even if their payloads happen to match.
-	h := fnv.New64a()
+	hasher := fnv.New64a()
 	if isJPEG {
-		_, _ = h.Write([]byte{1})
+		_, _ = hasher.Write([]byte{1})
 	}
-	_, _ = h.Write(data)
 
-	return h.Sum64()
+	_, _ = hasher.Write(data)
+
+	return hasher.Sum64()
 }
 
 //nolint:cyclop // raster image decoding pipeline
@@ -755,6 +755,7 @@ func paint(img *image.NRGBA, paintOp *layout.Op, pxPerPt float64, atlas *glyphAt
 	if paintOp == nil || paintOp.Kind == layout.OpLinkURI {
 		return
 	}
+
 	if paintOp.BlendMode != "" && paintOp.BlendMode != "normal" {
 		paintBlended(img, paintOp, pxPerPt, atlas, imageCache)
 
@@ -1685,13 +1686,25 @@ func (p *imagePipeline) Assemble(context.Context) error {
 	return nil
 }
 
-func (p *imagePipeline) Finalize(context.Context) error {
-	return writeEncodedOutput(p.req, p.img, p.log)
+func (p *imagePipeline) Finalize(ctx context.Context) error {
+	return writeEncodedOutput(ctx, p.req, p.img, p.log)
 }
 
 // writeEncodedOutput resolves the format, composites onto white for
-// transparent JPEG, and writes the encoded bytes to req.Output.
-func writeEncodedOutput(req *Request, img image.Image, log io.Writer) error {
+// transparent JPEG, and writes the encoded bytes to req.Output. The context
+// can stop work before encoding and before the external write starts. An
+// io.Writer cannot be interrupted by this context once Write has started.
+//
+//nolint:cyclop // format, transparency, encoding, and sink contract stay together.
+func writeEncodedOutput(ctx context.Context, req *Request, img image.Image, log io.Writer) error {
+	if ctx == nil {
+		return errNilContext
+	}
+
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("imageout: context: %w", err)
+	}
+
 	imgSet := &req.Image
 
 	if req.Output == nil {
@@ -1714,8 +1727,17 @@ func writeEncodedOutput(req *Request, img image.Image, log io.Writer) error {
 		return fmt.Errorf("encode %s: %w", format, err)
 	}
 
-	if _, err := req.Output.Write(data); err != nil {
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("imageout: context: %w", err)
+	}
+
+	count, err := req.Output.Write(data)
+	if err != nil {
 		return fmt.Errorf("write output: %w", err)
+	}
+
+	if count != len(data) {
+		return fmt.Errorf("write output: %w", io.ErrShortWrite)
 	}
 
 	return nil
