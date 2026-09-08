@@ -230,7 +230,7 @@ claim-scan: clean
 
 | Extension | Files | + | - | Note |
 |-----------|-------|---|---|------|
-| `.go` | 296 | 5943 | 2068 | |
+| `.go` | 296 | 5943 | 2068 | Code review remediation plus Go lint cleanup inflated this row |
 | `.md` | 22 | 1202 | 144 | |
 | `.html` | 2 | 40 | 10 | |
 | `.gitattributes` | 1 | 33 | 20 | |

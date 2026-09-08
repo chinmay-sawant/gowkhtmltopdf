@@ -27,6 +27,8 @@ git diff "$BASE"...HEAD --numstat | awk -F'\t' '{p=$3; sub(/.* => /,"",p); sub(/
 git diff "$BASE"...HEAD --shortstat  # Total row
 ```
 
+Fill the Note column yourself on the fly: one short reason per row naming the work that drove that extension's count (example: `.go` inflated by review remediation plus lint cleanup).
+
 ---
 
 ## Open the PR (`gh`) - required metadata
@@ -227,7 +229,7 @@ make run
 
 ## Diff stat by extension
 
-<!-- Generated on the fly with the template generator. Real line counts per extension, base...HEAD. -->
+<!-- Generated on the fly with the template generator. Real line counts per extension, base...HEAD. Write your own one-line reason per row. -->
 
 | Extension | Files | + | - | Note |
 |-----------|-------|---|---|------|
