@@ -539,14 +539,14 @@ func emitGridBoxes(
 	}
 
 	poll := newCtxPoll(eng.ctx)
-	for i := range pboxes {
+	for idx := range pboxes {
 		if poll.poll() {
 			eng.err = poll.err
 
 			return nil
 		}
 
-		emitGridItem(eng, boxNode, &pboxes[i], rows, rowGap, posY, rowYs, containerJustify, containerAlign)
+		emitGridItem(eng, boxNode, &pboxes[idx], rows, rowGap, posY, rowYs, containerJustify, containerAlign)
 	}
 
 	return rowYs

@@ -1,14 +1,17 @@
 ## Summary
 
 Rewrites the README Development section in plain voice: what the engine is,
-who owns what between humans and AI tools, and where the proof lives. No
-behavior change, docs only.
+who owns what between humans and AI tools, and where the proof lives. Also
+clears the 100+ `make lint` findings on this branch (the stacked fixture
+work predates the lint fixes that later landed on master via PR #66), so the
+PR's CI lint gate goes green. No behavior change; all refactors are
+provably neutral via `make test` and `make golden`.
 
 ---
 
 ## Motivation / context
 
-- Plans: none (small docs cleanup)
+- Plans: none (docs cleanup plus lint hygiene on the same branch)
 - Issues: see **Related issues**
 
 ---
@@ -25,6 +28,25 @@ behavior change, docs only.
   `testdata/golden/benchmarks/README.md`, and the CI perf budget test.
 - Fixes grammar in the follow-up sentence about manual validation of the
   50+ sample templates.
+
+### Lint cleanup (same branch, CI gate)
+
+- Exhaustiveness: explicit `OpUnknown` / `NodeUnknown` / `line.Unknown`
+  cases on every flagged switch (grouped with existing no-op arms;
+  zero-value ops carry no ink and were already skipped).
+- `err113`: static sentinel errors plus `%w` wraps in layout, paint,
+  prepare, outline, and load; rendered messages are byte-identical.
+- Dead code deleted: `(*runContext).renderObjects`, the unused
+  `log` parameter of `drawHeadersFootersResult`,
+  `oldCollectBodyNavigation`, and four unused css index helpers.
+- Complexity refactors (behavior-neutral extractions): `settleBeforeAlways`
+  plus `assignFlowPages` in pagination, `decodeImageBytes` in filters,
+  `applyBodyLink` in internal links, `matchSubstringOp` plus
+  `attrWantValue` in attribute matching, `buildAttrSelector` in the
+  selector parser, `paintWidgetControl` in block building.
+- Test hygiene: `t.Parallel` additions, short-name renames, line wraps,
+  `//nolint:testpackage` per repo convention, focused-fixture
+  `//nolint:exhaustruct` with reasons.
 
 ---
 
@@ -52,9 +74,9 @@ behavior change, docs only.
 ## Test plan
 
 - [x] `make claim-scan` (clean, exit 0)
-- [ ] `make test` (not run: docs-only change, no Go files touched)
-- [ ] `make lint` (not run: docs-only change)
-- [ ] `make golden` (not run: docs-only change)
+- [x] `make lint` (clean, exit 0, including frontend)
+- [x] `make test` (full suite green, exit 0)
+- [x] `make golden` (all 61 fixtures pass, exit 0)
 
 ### Commands
 

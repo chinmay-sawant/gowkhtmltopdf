@@ -187,6 +187,8 @@ func (w *lineLog) Write(payload []byte) (int, error) {
 			if w.onInfo != nil {
 				w.onInfo(message)
 			}
+		case line.Unknown:
+			// SeverityOf never returns Unknown; listed for exhaustiveness.
 		}
 	}
 

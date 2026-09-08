@@ -13,6 +13,13 @@ import (
 
 var errNilContext = errs.ErrNilContext
 
+// Static validation errors for PaintOptions. Dynamic values are wrapped with
+// %w at the return site so messages keep their detail.
+var (
+	errInvalidPaintPage   = errors.New("layout: paint page must be finite and greater than zero")
+	errInvalidPaintMargin = errors.New("layout: paint margin")
+)
+
 // Page-break keyword constants shared by the pagination passes.
 const (
 	pageBreakAvoid  = "avoid"
@@ -72,24 +79,24 @@ type PaintOptions struct {
 // the page (see TestHTMLHeaderTallContentClipped) and the engine clips such
 // headers while the body fallback (contentH = PageHeight) keeps conversion
 // alive, matching wkhtmltopdf.
-func (p PaintOptions) validate() error {
-	if !finitePositive(p.PageWidth) || !finitePositive(p.PageHeight) {
-		return fmt.Errorf("layout: paint page must be finite and greater than zero, got %g x %g",
-			p.PageWidth, p.PageHeight)
+func (opts PaintOptions) validate() error {
+	if !finitePositive(opts.PageWidth) || !finitePositive(opts.PageHeight) {
+		return fmt.Errorf("%w, got %g x %g",
+			errInvalidPaintPage, opts.PageWidth, opts.PageHeight)
 	}
 
 	for _, margin := range []struct {
 		name  string
 		value float64
 	}{
-		{name: "top", value: p.MarginTop},
-		{name: "bottom", value: p.MarginBottom},
-		{name: "left", value: p.MarginLeft},
-		{name: "right", value: p.MarginRight},
+		{name: "top", value: opts.MarginTop},
+		{name: "bottom", value: opts.MarginBottom},
+		{name: "left", value: opts.MarginLeft},
+		{name: "right", value: opts.MarginRight},
 	} {
 		if !finiteNonNegative(margin.value) {
-			return fmt.Errorf("layout: paint margin %s must be finite and non-negative, got %g",
-				margin.name, margin.value)
+			return fmt.Errorf("%w %s must be finite and non-negative, got %g",
+				errInvalidPaintMargin, margin.name, margin.value)
 		}
 	}
 
@@ -555,7 +562,7 @@ func (p *pagePainter) drawPageOp(paintOp *Op) {
 		if err != nil && p.err == nil {
 			p.err = err
 		}
-	case OpLinkURI, opKindNoop:
+	case OpLinkURI, OpUnknown, opKindNoop:
 	}
 }
 
@@ -812,7 +819,7 @@ func drawBandOp(
 		if err := drawImage(page, chld, paintOp, 0, contentH, margins, pageH, name); err != nil && *firstErr == nil {
 			*firstErr = err
 		}
-	case OpLinkURI, opKindNoop:
+	case OpLinkURI, OpUnknown, opKindNoop:
 	}
 }
 

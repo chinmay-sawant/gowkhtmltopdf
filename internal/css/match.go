@@ -30,8 +30,8 @@ type parentSibCache struct {
 }
 
 var (
-	sibMu    sync.RWMutex
-	sibCache = make(map[*html.Node]*parentSibCache)
+	sibMu    sync.RWMutex                           //nolint:gochecknoglobals // guards the sibling cache below
+	sibCache = make(map[*html.Node]*parentSibCache) //nolint:gochecknoglobals // process-wide sibling index cache
 )
 
 func getParentCache(parent *html.Node) *parentSibCache {
@@ -119,12 +119,16 @@ func buildParentCache(parent *html.Node) *parentSibCache {
 
 func getSiblingInfo(node *html.Node) siblingInfo {
 	if node == nil || node.Parent == nil {
-		return siblingInfo{index: 1, total: 1, typeIndex: 1, typeLastIndex: 1}
+		// No parent means no sibling edges; only the 1-based indices
+		// carry meaning here.
+		return siblingInfo{ //nolint:exhaustruct // nil prev/next means uncached edges
+			index: 1, total: 1, typeIndex: 1, typeLastIndex: 1,
+		}
 	}
 
 	cached := getParentCache(node.Parent)
 	if cached == nil {
-		return siblingInfo{}
+		return siblingInfo{} //nolint:exhaustruct // zero info for uncached parent
 	}
 
 	return siblingInfo{
@@ -371,14 +375,7 @@ func attrValueMatches(arg AttrSelector, val string) bool {
 		val = strings.ToLower(val)
 	}
 
-	want := arg.Value
-	if arg.IgnoreCase {
-		want = arg.valueLower
-		if want == "" && arg.Value != "" {
-			// Hand-built selector without the parse-time cache.
-			want = strings.ToLower(arg.Value)
-		}
-	}
+	want := attrWantValue(arg)
 
 	switch arg.Op {
 	case "=":
@@ -390,19 +387,41 @@ func attrValueMatches(arg AttrSelector, val string) bool {
 			return false
 		}
 
-		switch arg.Op {
-		case "*=":
-			return strings.Contains(val, want)
-		case "^=":
-			return strings.HasPrefix(val, want)
-		case "$=":
-			return strings.HasSuffix(val, want)
-		}
-		// |= : exact match or value followed by a hyphen (HTML lang / BCP47-style).
-		return val == want || strings.HasPrefix(val, want+"-")
+		return matchSubstringOp(arg.Op, val, want)
 	}
 
 	return false
+}
+
+// attrWantValue resolves the comparison value, using the parse-time lowered
+// cache when available and lowering on the fly for hand-built selectors.
+func attrWantValue(arg AttrSelector) string {
+	if !arg.IgnoreCase {
+		return arg.Value
+	}
+
+	if arg.valueLower != "" || arg.Value == "" {
+		return arg.valueLower
+	}
+
+	// Hand-built selector without the parse-time cache.
+	return strings.ToLower(arg.Value)
+}
+
+// matchSubstringOp evaluates one substring attribute operator against val.
+// want is non-empty; the caller rejects the empty case (which matches
+// nothing) before dispatching here.
+func matchSubstringOp(op, val, want string) bool {
+	switch op {
+	case "*=":
+		return strings.Contains(val, want)
+	case "^=":
+		return strings.HasPrefix(val, want)
+	case "$=":
+		return strings.HasSuffix(val, want)
+	}
+	// |= : exact match or value followed by a hyphen (HTML lang / BCP47-style).
+	return val == want || strings.HasPrefix(val, want+"-")
 }
 
 // containsWord reports whether want (a single space-free word) is one of the
@@ -561,23 +580,6 @@ func nextElementSibling(count *html.Node) *html.Node {
 	}
 
 	return nil
-}
-
-// elementIndex is 1-based among element siblings.
-func elementIndex(count *html.Node) int {
-	if count == nil || count.Parent == nil {
-		return 1
-	}
-
-	if cached := getParentCache(count.Parent); cached != nil {
-		if idx, ok := cached.elemIdx[count]; ok {
-			return idx
-		}
-
-		return 0
-	}
-
-	return 0
 }
 
 // nthKind discriminates the pre-parsed :nth-child() argument forms.
@@ -787,50 +789,4 @@ func matchOfTypePseudo(pseudo PseudoClass, node *html.Node) bool {
 	default:
 		return false
 	}
-}
-
-// ofTypeIndex is 1-based among element siblings with the same tag.
-func ofTypeIndex(node *html.Node) int {
-	if node == nil || node.Type != html.ElementNode {
-		return 0
-	}
-
-	if node.Parent == nil {
-		return 1
-	}
-
-	if cached := getParentCache(node.Parent); cached != nil {
-		if idx, ok := cached.typeIdx[node]; ok {
-			return idx
-		}
-
-		return 0
-	}
-
-	return 0
-}
-
-// ofTypeLastIndex is the reverse 1-based index among same-tag siblings.
-func ofTypeLastIndex(node *html.Node) int {
-	if node == nil || node.Type != html.ElementNode {
-		return 0
-	}
-
-	if node.Parent == nil {
-		return 1
-	}
-
-	if cached := getParentCache(node.Parent); cached != nil {
-		if idx, ok := cached.typeLastIdx[node]; ok {
-			return idx
-		}
-
-		return 0
-	}
-
-	return 0
-}
-
-func sameTypeElement(cur, node *html.Node) bool {
-	return cur.Type == html.ElementNode && strings.EqualFold(cur.Name, node.Name)
 }

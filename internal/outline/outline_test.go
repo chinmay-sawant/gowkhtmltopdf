@@ -246,7 +246,9 @@ func mustBuildTree(t *testing.T, headings []*outline.Heading, opts outline.Optio
 	return tree
 }
 
-func mustBuildTreeBy(t *testing.T, headings []*outline.Heading, opts outline.Options, pageOf outline.PageOf) *outline.Node {
+func mustBuildTreeBy(
+	t *testing.T, headings []*outline.Heading, opts outline.Options, pageOf outline.PageOf,
+) *outline.Node {
 	t.Helper()
 
 	tree, err := outline.BuildTreeBy(headings, opts, pageOf)
@@ -338,24 +340,24 @@ func TestCollectHeadingsNilRoot(t *testing.T) {
 func TestSortHeadingsByNilEntries(t *testing.T) {
 	t.Parallel()
 
-	hs := []*outline.Heading{
+	headings := []*outline.Heading{
 		{Title: "Later", Page: 2, Y: 10},
 		nil,
 		{Title: "Early", Page: 0, Y: 30},
 		{Title: "Mid", Page: 1, Y: 5},
 	}
-	outline.SortHeadingsBy(hs, outline.LocalPage)
+	outline.SortHeadingsBy(headings, outline.LocalPage)
 
-	got := make([]string, 0, len(hs))
+	got := make([]string, 0, len(headings))
 
-	for _, h := range hs {
-		if h == nil {
+	for _, heading := range headings {
+		if heading == nil {
 			got = append(got, "<nil>")
 
 			continue
 		}
 
-		got = append(got, h.Title)
+		got = append(got, heading.Title)
 	}
 
 	// Nil sorts as page 0, y 0, x 0: before Early on the same page.

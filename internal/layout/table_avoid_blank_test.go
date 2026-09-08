@@ -9,6 +9,27 @@ import (
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
 
+// textPagesByPage indexes text-op counts by page and returns the max page.
+func textPagesByPage(ops []Op, opPage []int) (int, map[int]int) {
+	maxPage := 0
+	pagesWithText := map[int]int{}
+
+	for i, op := range ops {
+		if op.Kind != OpText {
+			continue
+		}
+
+		p := opPage[i]
+		if p > maxPage {
+			maxPage = p
+		}
+
+		pagesWithText[p]++
+	}
+
+	return maxPage, pagesWithText
+}
+
 func TestTallTableAvoidInsideNoBlankPages(t *testing.T) {
 	t.Parallel()
 
@@ -47,21 +68,7 @@ td, th { border: 1px solid #aaa; padding: 4pt; }
 		t.Fatal(err)
 	}
 
-	maxPage := 0
-	pagesWithText := map[int]int{}
-
-	for i, op := range res.Ops {
-		if op.Kind != OpText {
-			continue
-		}
-
-		p := opPage[i]
-		if p > maxPage {
-			maxPage = p
-		}
-
-		pagesWithText[p]++
-	}
+	maxPage, pagesWithText := textPagesByPage(res.Ops, opPage)
 
 	blank := 0
 

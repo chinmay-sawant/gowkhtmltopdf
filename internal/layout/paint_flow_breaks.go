@@ -322,7 +322,7 @@ func boxInkExtent(res *Result, boxNode *box) float64 {
 		switch paintOp.Kind {
 		case OpText, OpBullet:
 			outBox += opVisibleInkHeight(paintOp)
-		case OpFillRect, OpStrokeRect, OpLine, OpImage, OpLinkURI, opKindNoop:
+		case OpFillRect, OpStrokeRect, OpLine, OpImage, OpLinkURI, OpUnknown, opKindNoop:
 			if paintOp.H > 0 {
 				outBox += paintOp.H
 			}
@@ -849,7 +849,7 @@ func opInkEdges(paintOp Op) (float64, float64) {
 		} else {
 			yEnd = paintOp.Y + paintOp.H
 		}
-	case OpFillRect, OpStrokeRect, OpImage, OpLinkURI, opKindNoop:
+	case OpFillRect, OpStrokeRect, OpImage, OpLinkURI, OpUnknown, opKindNoop:
 		if paintOp.H > 0 {
 			yEnd = paintOp.Y + paintOp.H
 		}

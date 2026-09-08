@@ -22,7 +22,9 @@ const testViewport = 500.0
 func TestZeroOpKindIsUnknown(t *testing.T) {
 	t.Parallel()
 
-	if got := (Op{}).Kind; got != OpUnknown {
+	var zeroOp Op
+
+	if got := zeroOp.Kind; got != OpUnknown {
 		t.Fatalf("zero Op Kind = %v, want OpUnknown (must not paint as OpFillRect)", got)
 	}
 }

@@ -75,6 +75,7 @@ var (
 	errBodyTooLarge        = errors.New("exceeds max body size")
 	errInvalidBodyLimit    = errors.New("invalid max body size")
 	errInvalidRedirects    = errors.New("invalid max redirects")
+	errNilClient           = errors.New("load: client is nil")
 	errUninitializedLoader = errors.New("loader client is not initialized")
 )
 
@@ -434,48 +435,48 @@ func (l *Loader) SetLog(w io.Writer) {
 
 // SetClient replaces the HTTP client after validating it is non-nil.
 // The caller retains ownership of the client's transport and jar.
-func (l *Loader) SetClient(c *http.Client) error {
+func (l *Loader) SetClient(client *http.Client) error {
 	if l == nil {
 		return ErrNilLoader
 	}
 
-	if c == nil {
-		return errors.New("load: client is nil")
+	if client == nil {
+		return errNilClient
 	}
 
-	l.Client = c
+	l.Client = client
 
 	return nil
 }
 
 // SetMaxBodySize updates the maximum response body size. Negative values
 // are rejected; use 0 for the engine default handling via validateLimits.
-func (l *Loader) SetMaxBodySize(n int64) error {
+func (l *Loader) SetMaxBodySize(maxBodySize int64) error {
 	if l == nil {
 		return ErrNilLoader
 	}
 
-	if err := validateBodyLimit(n); err != nil {
+	if err := validateBodyLimit(maxBodySize); err != nil {
 		return err
 	}
 
-	l.MaxBodySize = n
+	l.MaxBodySize = maxBodySize
 
 	return nil
 }
 
 // SetMaxRedirects updates the maximum redirect count. Negative values are
 // rejected.
-func (l *Loader) SetMaxRedirects(n int) error {
+func (l *Loader) SetMaxRedirects(maxRedirects int) error {
 	if l == nil {
 		return ErrNilLoader
 	}
 
-	if n < 0 {
-		return fmt.Errorf("%w: %d must be non-negative", errInvalidRedirects, n)
+	if maxRedirects < 0 {
+		return fmt.Errorf("%w: %d must be non-negative", errInvalidRedirects, maxRedirects)
 	}
 
-	l.MaxRedirects = n
+	l.MaxRedirects = maxRedirects
 
 	return nil
 }
@@ -1578,16 +1579,16 @@ func urlEncodePost(items []settings.PostItem) string {
 
 // decodeDataURLLimited decodes a data URL while enforcing the same non-negative
 // body cap used by file and HTTP resources.
-func decodeDataURLLimited(s string, maxBytes int64) ([]byte, string, error) {
+func decodeDataURLLimited(rawURL string, maxBytes int64) ([]byte, string, error) {
 	if err := validateBodyLimit(maxBytes); err != nil {
 		return nil, "", err
 	}
 
-	rest := strings.TrimPrefix(s, "data:")
+	rest := strings.TrimPrefix(rawURL, "data:")
 
 	comma := strings.IndexByte(rest, ',')
 	if comma < 0 {
-		return nil, "", fmt.Errorf("data URL %q: %w", clipRef(s), errMalformedDataURL)
+		return nil, "", fmt.Errorf("data URL %q: %w", clipRef(rawURL), errMalformedDataURL)
 	}
 
 	meta, data := rest[:comma], rest[comma+1:]

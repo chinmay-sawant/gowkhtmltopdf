@@ -149,26 +149,7 @@ func TestHasParenAfterQuotedSpan(t *testing.T) {
 		{`div:has([t="a"(x, y)])`, `"a"(x, y)`},
 	}
 	for _, testCase := range cases {
-		sel, ok := parseSelector(testCase.sel)
-		if !ok {
-			t.Errorf("parseSelector(%q) failed", testCase.sel)
-
-			continue
-		}
-
-		if len(sel.Parts) != 1 || len(sel.Parts[0].Pseudos) != 1 {
-			t.Fatalf("parseSelector(%q) = %+v", testCase.sel, sel)
-		}
-
-		p := sel.Parts[0].Pseudos[0]
-		if p.Name != pseudoClassHas || len(p.Has) != 1 || len(p.Has[0].Parts) != 1 {
-			t.Fatalf("parseSelector(%q): pseudo = %+v", testCase.sel, p)
-		}
-
-		attrs := p.Has[0].Parts[0].Attrs
-		if len(attrs) != 1 || attrs[0].Name != "t" || attrs[0].Value != testCase.value {
-			t.Fatalf("parseSelector(%q): attrs = %+v, want value %q", testCase.sel, attrs, testCase.value)
-		}
+		checkHasParenSpan(t, testCase.sel, testCase.value)
 	}
 
 	// takeParenArg must terminate on the outer ')' even when a quoted span
@@ -176,6 +157,33 @@ func TestHasParenAfterQuotedSpan(t *testing.T) {
 	inner, end, ok := takeParenArg(`([t="a"(x)])`, 0)
 	if !ok || inner != `[t="a"(x)]` || end != len(`([t="a"(x)])`) {
 		t.Errorf("takeParenArg = (%q, %d, %v), want (%q, %d, true)", inner, end, ok, `[t="a"(x)]`, len(`([t="a"(x)])`))
+	}
+}
+
+// checkHasParenSpan asserts one :has() attribute case keeps the quoted span
+// and the paren that follows it.
+func checkHasParenSpan(t *testing.T, selSrc, value string) {
+	t.Helper()
+
+	sel, ok := parseSelector(selSrc)
+	if !ok {
+		t.Errorf("parseSelector(%q) failed", selSrc)
+
+		return
+	}
+
+	if len(sel.Parts) != 1 || len(sel.Parts[0].Pseudos) != 1 {
+		t.Fatalf("parseSelector(%q) = %+v", selSrc, sel)
+	}
+
+	p := sel.Parts[0].Pseudos[0]
+	if p.Name != pseudoClassHas || len(p.Has) != 1 || len(p.Has[0].Parts) != 1 {
+		t.Fatalf("parseSelector(%q): pseudo = %+v", selSrc, p)
+	}
+
+	attrs := p.Has[0].Parts[0].Attrs
+	if len(attrs) != 1 || attrs[0].Name != "t" || attrs[0].Value != value {
+		t.Fatalf("parseSelector(%q): attrs = %+v, want value %q", selSrc, attrs, value)
 	}
 }
 

@@ -23,6 +23,10 @@ var (
 	errNoResourceLoader = errors.New("convert: resource context has no loader")
 	errNilLoader        = load.ErrNilLoader
 	errNilContext       = errs.ErrNilContext
+	// Static validation errors: dynamic values wrap with %w at the return
+	// site so messages keep their detail.
+	errInvalidViewport  = errors.New("convert: viewport must be finite and non-negative")
+	errInvalidMediaType = errors.New("convert: media type")
 )
 
 // ResourceContext is the preparation-side behaviour around one load
@@ -159,15 +163,15 @@ type Options struct {
 // stylesheet gating.
 func (o Options) validate() error {
 	if !finiteNonNegative(o.ViewportW) || !finiteNonNegative(o.ViewportH) {
-		return fmt.Errorf("convert: viewport must be finite and non-negative, got %g x %g",
-			o.ViewportW, o.ViewportH)
+		return fmt.Errorf("%w, got %g x %g",
+			errInvalidViewport, o.ViewportW, o.ViewportH)
 	}
 
 	switch strings.ToLower(strings.TrimSpace(o.MediaType)) {
 	case "", "print", "screen":
 		return nil
 	default:
-		return fmt.Errorf("convert: media type %q is not print or screen", o.MediaType)
+		return fmt.Errorf("%w %q is not print or screen", errInvalidMediaType, o.MediaType)
 	}
 }
 

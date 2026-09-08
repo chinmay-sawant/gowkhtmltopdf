@@ -15,23 +15,25 @@ import (
 // tableStressHTML builds a table with nRows rows so layout spends its time in
 // the table row loops (measure/place/emit) rather than in style resolution.
 func tableStressHTML(nRows int) string {
-	var b strings.Builder
+	var buf strings.Builder
 
-	b.WriteString("<html><body><table>")
+	buf.WriteString("<html><body><table>")
 
 	for i := range nRows {
-		_, _ = fmt.Fprintf(&b, "<tr><td>row %d</td><td>%d</td><td>alpha beta gamma</td></tr>", i, i*7)
+		_, _ = fmt.Fprintf(&buf, "<tr><td>row %d</td><td>%d</td><td>alpha beta gamma</td></tr>", i, i*7)
 	}
 
-	b.WriteString("</table></body></html>")
+	buf.WriteString("</table></body></html>")
 
-	return b.String()
+	return buf.String()
 }
 
 // TestLayoutContextCancelDuringTableLayout proves the table row loops poll
 // ctx (LAY-04): a cancel issued while a large table is being laid out aborts
 // LayoutContext with context.Canceled instead of finishing the whole table.
 func TestLayoutContextCancelDuringTableLayout(t *testing.T) {
+	t.Parallel()
+
 	root, err := html.Parse(tableStressHTML(1500))
 	if err != nil {
 		t.Fatal(err)
@@ -48,7 +50,8 @@ func TestLayoutContextCancelDuringTableLayout(t *testing.T) {
 	start := time.Now()
 
 	go func() {
-		_, err := LayoutContext(ctx, root, Options{Width: testViewport, Height: 800}) //nolint:exhaustruct // focused layout options
+		opts := Options{Width: testViewport, Height: 800} //nolint:exhaustruct // focused layout options
+		_, err := LayoutContext(ctx, root, opts)
 		done <- err
 	}()
 
@@ -69,13 +72,15 @@ func TestLayoutContextCancelDuringTableLayout(t *testing.T) {
 // TestPaginateOpsHonorsCancellation proves paginateOps returns the ctx error
 // (LAY-04): the fixpoint loops and the final display-list scan check ctx.
 func TestPaginateOpsHonorsCancellation(t *testing.T) {
+	t.Parallel()
+
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	res := &Result{ //nolint:exhaustruct // minimal display list
 		Ops: []Op{
-			{Kind: OpText, Y: 10, Size: 12},
-			{Kind: OpText, Y: 120, Size: 12},
+			{Kind: OpText, Y: 10, Size: 12},  //nolint:exhaustruct // focused op shape
+			{Kind: OpText, Y: 120, Size: 12}, //nolint:exhaustruct // focused op shape
 		},
 	}
 
@@ -88,14 +93,16 @@ func TestPaginateOpsHonorsCancellation(t *testing.T) {
 // pagination-phase cancellation instead of painting a partially paginated
 // display list.
 func TestPaintContextCancelDuringPagination(t *testing.T) {
+	t.Parallel()
+
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	doc := pdf.NewDocument()
 	res := &Result{ //nolint:exhaustruct // minimal display list
 		Ops: []Op{
-			{Kind: OpFillRect, W: 10, H: 10},
-			{Kind: OpText, Y: 10, Size: 12},
+			{Kind: OpFillRect, W: 10, H: 10}, //nolint:exhaustruct // focused op shape
+			{Kind: OpText, Y: 10, Size: 12},  //nolint:exhaustruct // focused op shape
 		},
 	}
 
@@ -111,12 +118,16 @@ func TestPaintContextCancelDuringPagination(t *testing.T) {
 // zero value is not a real filter, so an unassigned parsedFilter is a no-op
 // instead of a blur.
 func TestFilterKindZeroIsUnknown(t *testing.T) {
+	t.Parallel()
+
 	if filterKind(0) != filterUnknown {
 		t.Fatalf("filterKind zero = %d, want filterUnknown", filterKind(0))
 	}
 
 	input := []byte("not-an-image")
-	if got := applyImageFilterToImage(input, []parsedFilter{{kind: 0}}); string(got) != string(input) { //nolint:exhaustruct // zero-kind filter is the test subject
+	filters := []parsedFilter{{kind: 0}} //nolint:exhaustruct // zero-kind filter is the test subject
+
+	if got := applyImageFilterToImage(input, filters); string(got) != string(input) {
 		t.Fatal("zero-value filter kind must be a no-op on the image bytes")
 	}
 }
@@ -125,12 +136,18 @@ func TestFilterKindZeroIsUnknown(t *testing.T) {
 // zero-value gridTrackSize resolves to zero rather than pretending to be a
 // fixed track.
 func TestTrackSizeKindZeroIsUnknown(t *testing.T) {
+	t.Parallel()
+
 	if trackSizeKind(0) != trackUnknown {
 		t.Fatalf("trackSizeKind zero = %d, want trackUnknown", trackSizeKind(0))
 	}
 
-	eng := &engine{}                                                                                 //nolint:exhaustruct // resolveTrackSide only reads scale on fixed
-	if got := resolveTrackSide(gridTrackSize{}, 500, true, eng, trackIntrinsic{}, false); got != 0 { //nolint:exhaustruct // zero-size is the test subject
+	var eng engine
+
+	zeroTrack := gridTrackSize{}      //nolint:exhaustruct // zero-size is the test subject
+	zeroIntrinsic := trackIntrinsic{} //nolint:exhaustruct // zero intrinsics are the test subject
+
+	if got := resolveTrackSide(zeroTrack, 500, true, &eng, zeroIntrinsic, false); got != 0 {
 		t.Fatalf("resolveTrackSide(zero) = %v, want 0", got)
 	}
 }
@@ -139,6 +156,8 @@ func TestTrackSizeKindZeroIsUnknown(t *testing.T) {
 // (LAY-02): breakNormal and softBreakNone are the safe defaults, so a
 // zero-valued policy never splits a token where the author did not allow it.
 func TestBreakPolicyZeroDefaults(t *testing.T) {
+	t.Parallel()
+
 	if wordBreakPolicy(0) != breakNormal {
 		t.Fatalf("wordBreakPolicy zero = %d, want breakNormal", wordBreakPolicy(0))
 	}

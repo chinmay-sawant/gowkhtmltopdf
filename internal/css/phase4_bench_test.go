@@ -10,13 +10,13 @@ import (
 // manyMediaSheet builds a stylesheet with count @media blocks, the shape that
 // used to lowercase the whole remaining source per at-rule (quadratic).
 func manyMediaSheet(count int) string {
-	var b strings.Builder
+	var buf strings.Builder
 
 	for range count {
-		b.WriteString("@media print { .x { color: red; } }\n")
+		buf.WriteString("@media print { .x { color: red; } }\n")
 	}
 
-	return b.String()
+	return buf.String()
 }
 
 func BenchmarkParseManyAtRules(b *testing.B) {
@@ -51,7 +51,9 @@ func attrCaseSelector(tb testing.TB, sel string) Selector {
 
 func BenchmarkAttrIgnoreCaseMatch(b *testing.B) {
 	sel := attrCaseSelector(b, `[title="helloworld" i]`)
-	node := &html.Node{Type: html.ElementNode, Name: "a", Attrs: map[string]string{"title": "HELLOWORLD"}}
+	node := &html.Node{ //nolint:exhaustruct // bench needs only match fields
+		Type: html.ElementNode, Name: "a", Attrs: map[string]string{"title": "HELLOWORLD"},
+	}
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -65,17 +67,17 @@ func BenchmarkAttrIgnoreCaseMatch(b *testing.B) {
 
 // wideTableHTML builds a table with rowCount rows, each with one cell.
 func wideTableHTML(rowCount int) string {
-	var b strings.Builder
+	var buf strings.Builder
 
-	b.WriteString("<html><body><table>")
+	buf.WriteString("<html><body><table>")
 
 	for range rowCount {
-		b.WriteString("<tr><td>x</td></tr>")
+		buf.WriteString("<tr><td>x</td></tr>")
 	}
 
-	b.WriteString("</table></body></html>")
+	buf.WriteString("</table></body></html>")
 
-	return b.String()
+	return buf.String()
 }
 
 func wideTableRows(b *testing.B, rowCount int) []*html.Node {
@@ -98,7 +100,7 @@ func wideTableRows(b *testing.B, rowCount int) []*html.Node {
 }
 
 // BenchmarkWideTableNthLastOfType matches :nth-last-of-type() on every row of
-// a wide table: ofTypeLastIndex used to scan the shared parent twice per call.
+// a wide table.
 func BenchmarkWideTableNthLastOfType(b *testing.B) {
 	rows := wideTableRows(b, 200)
 	sel := attrCaseSelector(b, "tr:nth-last-of-type(odd)")
@@ -114,7 +116,7 @@ func BenchmarkWideTableNthLastOfType(b *testing.B) {
 }
 
 // BenchmarkWideTableNthChild matches :nth-child() on every row of a wide
-// table (elementIndex keeps its early-exit scan).
+// table.
 func BenchmarkWideTableNthChild(b *testing.B) {
 	rows := wideTableRows(b, 200)
 	sel := attrCaseSelector(b, "tr:nth-child(odd)")

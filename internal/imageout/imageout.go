@@ -833,7 +833,7 @@ func paint(img *image.NRGBA, paintOp *layout.Op, pxPerPt float64, atlas *glyphAt
 	case layout.OpImage:
 		paintImage(img, &opCopy, pxPerPt, imageCache)
 
-	case layout.OpLinkURI: // annotations do not paint
+	case layout.OpLinkURI, layout.OpUnknown: // annotations and zero-value ops do not paint
 	}
 }
 

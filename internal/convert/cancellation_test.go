@@ -42,7 +42,9 @@ func TestDrawHeadersFootersStopsWhenCanceled(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
-	result := drawHeadersFootersResult(ctx, nil, doc, &Request{}, plan, nil, io.Discard) //nolint:exhaustruct // zero request; cancelled ctx short-circuits
+	req := &Request{} //nolint:exhaustruct // zero request; cancelled ctx short-circuits
+	result := drawHeadersFootersResult(ctx, nil, doc, req, plan, nil)
+
 	if err := result.Err(); !errors.Is(err, context.Canceled) {
 		t.Fatalf("Err = %v, want context.Canceled", err)
 	}

@@ -35,6 +35,8 @@ func treeString(node *Node) string {
 			fmt.Fprintf(&buf, "<!--%s-->", node.Text)
 		case DoctypeNode:
 			fmt.Fprintf(&buf, "<!%s>", node.Text)
+		case NodeUnknown:
+			fmt.Fprintf(&buf, "#unknown %q", node.Text)
 		}
 
 		buf.WriteByte('\n')
@@ -968,7 +970,9 @@ func TestParseDeepNesting(t *testing.T) {
 func TestNodeTypeZeroIsUnknown(t *testing.T) {
 	t.Parallel()
 
-	if got := (&Node{}).Type; got != NodeUnknown {
+	var zeroNode Node
+
+	if got := zeroNode.Type; got != NodeUnknown {
 		t.Fatalf("zero Node Type = %v, want NodeUnknown", got)
 	}
 

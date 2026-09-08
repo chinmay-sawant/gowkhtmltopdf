@@ -721,7 +721,7 @@ func effectiveMargins(ctx context.Context, loader *load.Loader, font *pdf.Font, 
 //
 //nolint:lll,unused // compatibility adapter for existing caller
 func drawHeadersFooters(ctx context.Context, hf hfLoader, doc *pdf.Document, req *Request, plan *pagePlan, headings []*outline.Heading, log io.Writer) {
-	res := drawHeadersFootersResult(ctx, hf, doc, req, plan, headings, log)
+	res := drawHeadersFootersResult(ctx, hf, doc, req, plan, headings)
 	res.emitWarnings(log)
 }
 
@@ -731,7 +731,7 @@ func drawHeadersFooters(ctx context.Context, hf hfLoader, doc *pdf.Document, req
 // Returning a result keeps failure handling testable and gives a future
 // caller a precise integration point for a strict policy without changing
 // the current convert.Run signature.
-func drawHeadersFootersResult(ctx context.Context, hf hfLoader, doc *pdf.Document, req *Request, plan *pagePlan, headings []*outline.Heading, log io.Writer) hfDrawResult { //nolint:gocognit,cyclop,funlen,lll // per-page draw dispatch with lazy HF load
+func drawHeadersFootersResult(ctx context.Context, loader hfLoader, doc *pdf.Document, req *Request, plan *pagePlan, headings []*outline.Heading) hfDrawResult { //nolint:gocognit,cyclop,funlen,lll // per-page draw dispatch with lazy HF load
 	var result hfDrawResult
 
 	total := doc.PageCount()
@@ -811,7 +811,7 @@ func drawHeadersFootersResult(ctx context.Context, hf hfLoader, doc *pdf.Documen
 
 					var reg *pdf.Registry
 
-					lst, reg, err = hf.loadHF(ctx, own.st, hfVal.HTMLURL)
+					lst, reg, err = loader.loadHF(ctx, own.st, hfVal.HTMLURL)
 					if err != nil {
 						result.warn(own.st.idx, pVal, band, fmt.Errorf("html load: %w", err))
 
@@ -836,7 +836,7 @@ func drawHeadersFootersResult(ctx context.Context, hf hfLoader, doc *pdf.Documen
 				return
 			}
 
-			drawTextHF(page, hfVal, own.st.geom, parms, hf.defaultFont(), own.st.registry, isHeader)
+			drawTextHF(page, hfVal, own.st.geom, parms, loader.defaultFont(), own.st.registry, isHeader)
 		}
 		draw(own.st.header, true)
 		draw(own.st.footer, false)

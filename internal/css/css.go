@@ -228,26 +228,26 @@ func parse(src string) (*Stylesheet, error) {
 	return str, nil
 }
 
-// hasFoldPrefix reports whether s starts with prefix, comparing ASCII
-// letters case-insensitively without allocating a lowered copy of s.
-func hasFoldPrefix(s, prefix string) bool {
-	if len(s) < len(prefix) {
+// hasFoldPrefix reports whether text starts with prefix, comparing ASCII
+// letters case-insensitively without allocating a lowered copy of text.
+func hasFoldPrefix(text, prefix string) bool {
+	if len(text) < len(prefix) {
 		return false
 	}
 
 	for i := range len(prefix) {
-		sc := s[i]
-		pc := prefix[i]
+		textByte := text[i]
+		prefixByte := prefix[i]
 
-		if sc >= 'A' && sc <= 'Z' {
-			sc += 'a' - 'A'
+		if textByte >= 'A' && textByte <= 'Z' {
+			textByte += 'a' - 'A'
 		}
 
-		if pc >= 'A' && pc <= 'Z' {
-			pc += 'a' - 'A'
+		if prefixByte >= 'A' && prefixByte <= 'Z' {
+			prefixByte += 'a' - 'A'
 		}
 
-		if sc != pc {
+		if textByte != prefixByte {
 			return false
 		}
 	}

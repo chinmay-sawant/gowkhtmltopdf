@@ -23,46 +23,16 @@ func largeNavigationResult(idsCount, opsCount int) *layout.Result {
 
 	locs := make([]layout.ElementLocation, idsCount)
 
-	for i := range locs {
-		n := &html.Node{Attrs: map[string]string{"id": fmt.Sprintf("id-%d", i)}} //nolint:exhaustruct // bench needs only the id
-		locs[i] = layout.ElementLocation{Node: n, Y: float64(i*400 + 5), H: 20}
+	for idx := range locs {
+		nodeAttrs := map[string]string{"id": fmt.Sprintf("id-%d", idx)}
+		n := &html.Node{Attrs: nodeAttrs} //nolint:exhaustruct // bench needs only the id
+		loc := layout.ElementLocation{    //nolint:exhaustruct // bench needs only navigation fields
+			Node: n, Y: float64(idx*400 + 5), H: 20,
+		}
+		locs[idx] = loc
 	}
 
 	return &layout.Result{Locations: locs, Ops: ops} //nolint:exhaustruct // bench needs only navigation fields
-}
-
-// oldCollectBodyNavigation mirrors the pre-index per-id op rescan.
-func oldCollectBodyNavigation(res *layout.Result) bodyNavigation {
-	if res == nil {
-		return bodyNavigation{}
-	}
-
-	nav := bodyNavigation{
-		ids:     make(map[string]layout.ElementLocation),
-		idElems: make(map[string]*pdf.StructElem),
-	}
-
-	for _, loc := range res.Locations {
-		if loc.Node == nil {
-			continue
-		}
-
-		if id := loc.Node.Attribute("id"); id != "" {
-			loc.Node = nil
-			nav.ids[id] = loc
-
-			for i := range res.Ops {
-				op := &res.Ops[i]
-				if op.StructElem != nil && op.Y >= loc.Y && op.Y <= loc.Y+loc.H+20 {
-					nav.idElems[id] = op.StructElem
-
-					break
-				}
-			}
-		}
-	}
-
-	return nav
 }
 
 func BenchmarkCollectBodyNavigationLargeDoc(b *testing.B) {

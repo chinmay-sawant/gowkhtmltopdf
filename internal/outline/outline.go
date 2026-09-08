@@ -8,6 +8,7 @@ package outline
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -35,7 +36,7 @@ type LocationReader interface {
 }
 
 // Compile-time checks: Location satisfies the location reader seam.
-var _ LocationReader = Location{}
+var _ LocationReader = Location{} //nolint:exhaustruct // zero value proves the seam only
 
 // NodeRef returns the associated HTML node.
 func (l Location) NodeRef() *html.Node { return l.Node }
@@ -246,12 +247,15 @@ type Options struct {
 	Exclude []css.Selector
 }
 
+// errNegativeMaxDepth is the static base for negative MaxDepth rejections.
+var errNegativeMaxDepth = errors.New("outline: MaxDepth must be non-negative")
+
 // Validate rejects option values that would silently change tree
 // construction. A negative MaxDepth would be treated as "keep everything"
 // (only positive values gate depth), so it fails fast instead.
 func (o Options) Validate() error {
 	if o.MaxDepth < 0 {
-		return fmt.Errorf("outline: MaxDepth must be non-negative, got %d", o.MaxDepth)
+		return fmt.Errorf("%w, got %d", errNegativeMaxDepth, o.MaxDepth)
 	}
 
 	return nil

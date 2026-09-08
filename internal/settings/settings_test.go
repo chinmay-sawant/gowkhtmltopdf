@@ -481,16 +481,16 @@ func TestParseEnums(t *testing.T) {
 func TestEnumStringReportsUnknownForInvalid(t *testing.T) {
 	t.Parallel()
 
-	if got := ColorMode(99).String(); got != "unknown" {
+	if got := ColorMode(99).String(); got != sUnknown {
 		t.Errorf("ColorMode(99).String() = %q, want unknown", got)
 	}
-	if got := Orientation(99).String(); got != "unknown" { //nolint:wsl // test table
+	if got := Orientation(99).String(); got != sUnknown { //nolint:wsl // test table
 		t.Errorf("Orientation(99).String() = %q, want unknown", got)
 	}
-	if got := LoadErrorHandling(42).String(); got != "unknown" { //nolint:wsl
+	if got := LoadErrorHandling(42).String(); got != sUnknown { //nolint:wsl
 		t.Errorf("LoadErrorHandling(42).String() = %q, want unknown", got)
 	}
-	if got := MediaType(7).String(); got != "unknown" { //nolint:wsl
+	if got := MediaType(7).String(); got != sUnknown { //nolint:wsl
 		t.Errorf("MediaType(7).String() = %q, want unknown", got)
 	}
 }
@@ -507,7 +507,8 @@ func TestMediaTypeZeroIsUnset(t *testing.T) {
 		t.Errorf("ResolveMedia(unset) = %q, want %q", got, sScreen)
 	}
 
-	if got := ResolveMedia(sScreen, Web{MediaType: MediaPrint}, nil); got != sPrint { //nolint:exhaustruct // intentional zero/partial fields
+	printWeb := Web{MediaType: MediaPrint} //nolint:exhaustruct // intentional zero/partial fields
+	if got := ResolveMedia(sScreen, printWeb, nil); got != sPrint {
 		t.Errorf("ResolveMedia(print) = %q, want %q", got, sPrint)
 	}
 }

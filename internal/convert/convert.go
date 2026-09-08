@@ -325,7 +325,9 @@ func (run *runContext) defaultFont() *pdf.Font { return run.font }
 
 // loadHF lazily loads one HTML header/footer band template with the run's
 // loader, fallback font and log (the hfLoader contract).
-func (run *runContext) loadHF(ctx context.Context, state *objectState, rawOrURL string) (*htmlHFLayout, *pdf.Registry, error) {
+func (run *runContext) loadHF(
+	ctx context.Context, state *objectState, rawOrURL string,
+) (*htmlHFLayout, *pdf.Registry, error) {
 	return loadHTMLHF(ctx, run.loader, run.font, state, rawOrURL, run.log)
 }
 
@@ -386,10 +388,6 @@ func renderObjects(
 	}
 
 	return tocs, bodies, nil
-}
-
-func (run *runContext) renderObjects(ctx context.Context) ([]*objectState, []*objectState, error) {
-	return renderObjects(ctx, run, run.req.Objects, run.report)
 }
 
 // Run executes the full PDF conversion pipeline for req. The lifecycle is

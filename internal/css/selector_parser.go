@@ -481,6 +481,13 @@ func parseAttrSelector(sel string) (AttrSelector, bool) {
 
 	name := strings.TrimSpace(inner[:nameEnd])
 	rawVal := strings.TrimSpace(inner[nameEnd+len(oper):])
+
+	return buildAttrSelector(name, oper, rawVal)
+}
+
+// buildAttrSelector validates the name and builds the operator-form
+// attribute selector, pre-lowering the comparison value for the i flag.
+func buildAttrSelector(name, oper, rawVal string) (AttrSelector, bool) {
 	rawVal, ignoreCase := splitAttrIFlag(rawVal)
 	val := stripAttrQuotes(rawVal)
 

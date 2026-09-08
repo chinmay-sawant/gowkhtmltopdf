@@ -24,14 +24,8 @@ func paginateOps(ctx context.Context, res *Result, contentH float64) ([]int, err
 	// boundaries. Otherwise a row near the boundary of the unbroken flow can
 	// move its text alone; a later page-break-before shift then leaves the
 	// collapsed-table chrome behind at the old row position.
-	for range 10 {
-		if err := ctx.Err(); err != nil {
-			return nil, fmt.Errorf("layout: paginate ops: %w", err)
-		}
-
-		if !beforeAlways(res, contentH) {
-			break
-		}
+	if err := settleBeforeAlways(ctx, res, contentH); err != nil {
+		return nil, err
 	}
 
 	// Lift aside callouts that do not fit the remaining Y on this page
@@ -68,16 +62,15 @@ func paginateOps(ctx context.Context, res *Result, contentH float64) ([]int, err
 	normalizeLeadingRoundedCallouts(res, contentH)
 	// Forced breaks win over the callout pack: a same-page snap must not
 	// leave page-break-before:always parked on the previous page.
-	for range 10 {
-		if err := ctx.Err(); err != nil {
-			return nil, fmt.Errorf("layout: paginate ops: %w", err)
-		}
-
-		if !beforeAlways(res, contentH) {
-			break
-		}
+	if err := settleBeforeAlways(ctx, res, contentH); err != nil {
+		return nil, err
 	}
 	// Sticky is applied in Paint after rect splitting (see splitCrossingRects).
+	return assignFlowPages(ctx, res, contentH)
+}
+
+// assignFlowPages maps every display-list op to its settled page.
+func assignFlowPages(ctx context.Context, res *Result, contentH float64) ([]int, error) {
 	opPage := make([]int, len(res.Ops))
 	poll := newCtxPoll(ctx)
 
@@ -95,6 +88,22 @@ func paginateOps(ctx context.Context, res *Result, contentH float64) ([]int, err
 	}
 
 	return opPage, nil
+}
+
+// settleBeforeAlways runs forced section-start resolution to a fixpoint:
+// page-break-before shifts repeat until none move anything.
+func settleBeforeAlways(ctx context.Context, res *Result, contentH float64) error {
+	for range 10 {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("layout: paginate ops: %w", err)
+		}
+
+		if !beforeAlways(res, contentH) {
+			break
+		}
+	}
+
+	return nil
 }
 
 // paginationFixpoint runs the page-break policies until none of them move
@@ -165,7 +174,7 @@ func snapCrossingTextOps(ctx context.Context, res *Result, contentH float64) err
 			if paintOp.Y+opH > boundary+1e-9 {
 				snapOpToBoundary(res, idx, paintOp, boundary)
 			}
-		case OpFillRect, OpStrokeRect, OpLine, opKindNoop:
+		case OpFillRect, OpStrokeRect, OpLine, OpUnknown, opKindNoop:
 		}
 	}
 

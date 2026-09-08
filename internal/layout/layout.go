@@ -84,6 +84,15 @@ const (
 	defaultTabSize          = 8
 )
 
+// Static validation errors for Options and PaintOptions. Dynamic values are
+// wrapped with %w at the return site so messages keep their detail.
+var (
+	errInvalidViewportWidth  = errors.New("layout: width must be finite and greater than zero")
+	errInvalidViewportHeight = errors.New("layout: height must be finite and non-negative")
+	errInvalidZoom           = errors.New("layout: zoom must be zero or a finite positive value")
+	errInvalidMediaValue     = errors.New("layout: media")
+)
+
 // Options controls a Layout run.
 type Options struct {
 	Width    float64 // viewport/content width in points
@@ -112,22 +121,22 @@ type Options struct {
 // 1), and media values other than print, screen, or empty.
 func (o Options) validate() error {
 	if !finitePositive(o.Width) {
-		return fmt.Errorf("layout: width must be finite and greater than zero, got %g", o.Width)
+		return fmt.Errorf("%w, got %g", errInvalidViewportWidth, o.Width)
 	}
 
 	if !finiteNonNegative(o.Height) {
-		return fmt.Errorf("layout: height must be finite and non-negative, got %g", o.Height)
+		return fmt.Errorf("%w, got %g", errInvalidViewportHeight, o.Height)
 	}
 
 	if o.Zoom != 0 && !finitePositive(o.Zoom) {
-		return fmt.Errorf("layout: zoom must be zero or a finite positive value, got %g", o.Zoom)
+		return fmt.Errorf("%w, got %g", errInvalidZoom, o.Zoom)
 	}
 
 	switch strings.ToLower(strings.TrimSpace(o.Media)) {
 	case "", "print", "screen":
 		return nil
 	default:
-		return fmt.Errorf("layout: media %q is not print or screen", o.Media)
+		return fmt.Errorf("%w %q is not print or screen", errInvalidMediaValue, o.Media)
 	}
 }
 
@@ -1223,11 +1232,11 @@ const (
 func (k boxKind) String() string {
 	switch k {
 	case boxKindBlock:
-		return "block"
+		return displayBlock
 	case boxKindTable:
-		return "table"
+		return displayTable
 	case boxKindCell:
-		return "cell"
+		return tableCellKind
 	case boxKindReplaced:
 		return "replaced"
 	default:
@@ -1490,11 +1499,7 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 	}
 
 	boxNode.height = e.applyHeightConstraints(style, curY)
-	if widget {
-		e.paintValueWidget(node, style, boxNode.x, posY, boxNode.w, boxNode.height)
-	} else if chkWidget {
-		e.paintCheckboxWidget(node, style, boxNode.x, posY, boxNode.w, boxNode.height)
-	}
+	e.paintWidgetControl(node, style, boxNode, widget, chkWidget, posY)
 
 	e.paintPositionedPseudo(node, style, boxNode, pseudoBefore)
 	e.paintPositionedPseudo(node, style, boxNode, pseudoAfter)
@@ -1502,6 +1507,18 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 	e.prependChrome(contentStart, boxNode, style, boxNode.x, posY, boxNode.w, boxNode.height)
 
 	return boxNode
+}
+
+// paintWidgetControl paints the native control face for value and checkbox
+// widgets after the box height is final.
+func (e *engine) paintWidgetControl(
+	node *html.Node, style ResolvedStyle, boxNode *box, widget, chkWidget bool, posY float64,
+) {
+	if widget {
+		e.paintValueWidget(node, style, boxNode.x, posY, boxNode.w, boxNode.height)
+	} else if chkWidget {
+		e.paintCheckboxWidget(node, style, boxNode.x, posY, boxNode.w, boxNode.height)
+	}
 }
 
 // nativeWidgetAutoContentBottom returns the content-flow endpoint for an
@@ -1520,18 +1537,25 @@ func (e *engine) nativeWidgetAutoContentBottom(style ResolvedStyle) float64 {
 	return topChrome + contentHeight
 }
 
+// maxTextareaRows caps the rows attribute so malformed HTML cannot size a
+// textarea into a huge page.
+const maxTextareaRows = 30
+
 // textareaAutoContentBottom returns the content-flow endpoint for an
 // auto-sized textarea whose intrinsic height is rows * line-height. The caller
 // has already added top padding/border to curY and will add bottom padding
 // after this call.
-func (e *engine) textareaAutoContentBottom(style ResolvedStyle, node *html.Node, boxStyle boxModelStyle, curY float64) float64 {
+func (e *engine) textareaAutoContentBottom(
+	style ResolvedStyle, node *html.Node, boxStyle boxModelStyle, curY float64,
+) float64 {
 	rowsStr := strings.TrimSpace(node.Attribute("rows"))
 	rows := 2
+
 	if n, err := strconv.Atoi(rowsStr); err == nil && n > 0 {
 		rows = n
 		// Cap absurd rows to avoid huge pages from malformed HTML.
-		if rows > 30 {
-			rows = 30
+		if rows > maxTextareaRows {
+			rows = maxTextareaRows
 		}
 	}
 
@@ -1544,6 +1568,7 @@ func (e *engine) textareaAutoContentBottom(style ResolvedStyle, node *html.Node,
 	contentH := scaledLineH * float64(rows)
 	topChrome := e.scalePt(boxStyle.paddingTop) + e.scalePt(borderLayoutWidth(boxStyle, boxStyle.borderTop))
 	desired := topChrome + contentH
+
 	if curY < desired {
 		return desired
 	}

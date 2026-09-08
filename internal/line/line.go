@@ -34,6 +34,8 @@ func (s Severity) String() string {
 		return "warning"
 	case Error:
 		return "error"
+	case Unknown:
+		return "unknown"
 	default:
 		return "unknown"
 	}

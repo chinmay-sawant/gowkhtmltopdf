@@ -1,4 +1,4 @@
-package imageout
+package imageout //nolint:testpackage // white-box tests need unexported error sentinels
 
 import (
 	"errors"
@@ -19,7 +19,12 @@ func TestRenderOptionsValidate(t *testing.T) {
 		{name: "negative width", opts: RenderOptions{Width: -1}},
 		{name: "negative height", opts: RenderOptions{Height: -10}},
 		{name: "negative crop offset", opts: RenderOptions{Crop: image.Rect(-5, 0, 100, 100)}},
-		{name: "negative crop width", opts: RenderOptions{Crop: image.Rectangle{Min: image.Point{X: 5, Y: 5}, Max: image.Point{X: 1, Y: 100}}}},
+		{
+			name: "negative crop width",
+			opts: RenderOptions{Crop: image.Rectangle{
+				Min: image.Point{X: 5, Y: 5}, Max: image.Point{X: 1, Y: 100},
+			}},
+		},
 		{name: "unknown media", opts: RenderOptions{Media: "tv"}},
 	}
 

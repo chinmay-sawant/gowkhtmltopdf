@@ -71,7 +71,8 @@ func TestResourceContextNilLoaderDegradedPath(t *testing.T) {
 		t.Fatalf("Fetch error = %v, want the no-loader diagnostic", err)
 	}
 
-	if sheets := resources.CollectSheets(t.Context(), nil, prepare.SheetOptions{}, io.Discard); sheets != nil {
+	sheetOpts := prepare.SheetOptions{} //nolint:exhaustruct // degraded path needs no sheet options
+	if sheets := resources.CollectSheets(t.Context(), nil, sheetOpts, io.Discard); sheets != nil {
 		t.Fatalf("CollectSheets = %v, want nil on a degraded context", sheets)
 	}
 

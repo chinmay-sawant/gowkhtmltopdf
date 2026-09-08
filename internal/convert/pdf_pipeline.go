@@ -70,9 +70,11 @@ func (p *pdfPipeline) assembleTOC(ctx context.Context) error {
 
 	run.report("Building table of contents", percent(len(run.req.Objects), len(run.req.Objects)+1))
 
-	tocTree, err := outline.BuildTreeBy(run.headings, outline.Options{ //nolint:exhaustruct // intentional zero-value fields
+	tocOpts := outline.Options{ //nolint:exhaustruct // intentional zero-value fields
 		Exclude: run.exclude,
-	}, outline.DocumentPage)
+	}
+	tocTree, err := outline.BuildTreeBy(run.headings, tocOpts, outline.DocumentPage)
+
 	if err != nil {
 		return fmt.Errorf("toc tree: %w", err)
 	}
@@ -239,7 +241,7 @@ func (p *pdfPipeline) assembleCopies(ctx context.Context) error {
 
 func (p *pdfPipeline) assembleHeadersFooters(ctx context.Context) error {
 	run := p.run
-	hfResult := drawHeadersFootersResult(ctx, run, run.doc, run.req, run.plan, run.headings, run.log)
+	hfResult := drawHeadersFootersResult(ctx, run, run.doc, run.req, run.plan, run.headings)
 
 	if err := hfResult.Err(); err != nil {
 		return fmt.Errorf("header/footer: %w", err)

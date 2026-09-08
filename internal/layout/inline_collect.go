@@ -91,7 +91,7 @@ func (e *engine) collectInlineNode(node *html.Node, out *[]inlineItem) {
 		e.collectInlineText(node, sty, out)
 	case html.ElementNode:
 		e.collectInlineElement(node, sty, out)
-	case html.CommentNode, html.DoctypeNode:
+	case html.CommentNode, html.DoctypeNode, html.NodeUnknown:
 		return
 	}
 }

@@ -84,11 +84,11 @@ func errUnitNotConvertible(ctx, unit string) error {
 
 // Compile-time checks: every settings error value satisfies the error interface.
 var (
-	_ error = invalidError{}        //nolint:exhaustruct,gci // zero-value probe for interface conformance
-	_ error = unknownSettingError{} //nolint:exhaustruct,gci // zero-value probe
-	_ error = parseError{}          //nolint:exhaustruct,gci // zero-value probe
-	_ error = rangeError{}          //nolint:exhaustruct,gci // zero-value probe
-	_ error = unitError{}           //nolint:exhaustruct,gci // zero-value probe
+	_ error = invalidError{}        //nolint:exhaustruct // zero-value probe for interface conformance
+	_ error = unknownSettingError{} //nolint:exhaustruct // zero-value probe
+	_ error = parseError{}          //nolint:exhaustruct // zero-value probe
+	_ error = rangeError{}          //nolint:exhaustruct // zero-value probe
+	_ error = unitError{}           //nolint:exhaustruct // zero-value probe
 )
 
 // Raw string values accepted by the setter helpers.

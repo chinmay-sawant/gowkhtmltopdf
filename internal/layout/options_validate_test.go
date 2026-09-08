@@ -1,4 +1,4 @@
-package layout
+package layout //nolint:testpackage // white-box tests need unexported validate
 
 import (
 	"math"
