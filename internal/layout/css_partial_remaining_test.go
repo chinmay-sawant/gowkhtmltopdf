@@ -1,4 +1,4 @@
-//nolint:testpackage,varnamelen,funlen,exhaustruct,wsl,cyclop // phase 79 test suite
+//nolint:testpackage,varnamelen,funlen,exhaustruct,wsl,cyclop // css partial-remaining suite
 package layout
 
 import (
@@ -22,7 +22,7 @@ func makeTestPNG(w, h int, c color.Color) []byte {
 	return buf.Bytes()
 }
 
-func TestPhase79_Slice79_1_Paint(t *testing.T) {
+func TestCSSPartialRemainingPaint(t *testing.T) {
 	t.Parallel()
 
 	t.Run("linear-gradient-rasterization", func(t *testing.T) {
@@ -89,7 +89,7 @@ func TestPhase79_Slice79_1_Paint(t *testing.T) {
 	})
 }
 
-func TestPhase79_Slice79_2_TablesAndOverflow(t *testing.T) {
+func TestCSSPartialRemainingTablesOverflow(t *testing.T) {
 	t.Parallel()
 
 	t.Run("border-collapse-tie-resolution", func(t *testing.T) {
@@ -134,7 +134,7 @@ func TestPhase79_Slice79_2_TablesAndOverflow(t *testing.T) {
 	})
 }
 
-func TestPhase79_Slice79_3_SizingAndGrid(t *testing.T) {
+func TestCSSPartialRemainingSizingGrid(t *testing.T) {
 	t.Parallel()
 
 	t.Run("max-width-percent-clamping", func(t *testing.T) {
@@ -164,7 +164,7 @@ func TestPhase79_Slice79_3_SizingAndGrid(t *testing.T) {
 	})
 }
 
-func TestPhase79_Slice79_4_TextAndContent(t *testing.T) {
+func TestCSSPartialRemainingTextContent(t *testing.T) {
 	t.Parallel()
 
 	t.Run("word-break-keep-all", func(t *testing.T) {
@@ -189,7 +189,7 @@ func TestPhase79_Slice79_4_TextAndContent(t *testing.T) {
 	})
 }
 
-func TestPhase79_Slice79_5_PagedAndWritingMode(t *testing.T) {
+func TestCSSPartialRemainingPagedWritingMode(t *testing.T) {
 	t.Parallel()
 
 	t.Run("writing-mode-logical-mapping", func(t *testing.T) {
