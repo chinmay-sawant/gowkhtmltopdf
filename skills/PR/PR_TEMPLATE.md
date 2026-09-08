@@ -9,10 +9,23 @@ Use this document as the base when authoring GitHub pull requests for [chinmay-s
 1. **Pick a title** using the convention in [PR title](#pr-title).
 2. **Write a 1-3 sentence summary** - what changed and why (not a file list).
 3. **Fill in each section** - keep `Summary`, `Changes`, `Test plan`, and `Related issues`.
-4. **Link related tickets** in the body **and** in `gh pr create` metadata.
-5. **Choose labels** and **self-assign**.
-6. Save a filled copy under `plans/PR/pr-<short-slug>.md` **before** opening the PR when process-gated.
-7. Open the PR with the CLI checklist so assignee, labels, and body stay in sync.
+4. **Generate the diff-stat-by-extension table** with the [generator](#diff-stat-by-extension-generator) and paste it at the bottom.
+5. **Link related tickets** in the body **and** in `gh pr create` metadata.
+6. **Choose labels** and **self-assign**.
+7. Save a filled copy under `plans/PR/pr-<short-slug>.md` **before** opening the PR when process-gated.
+8. Open the PR with the CLI checklist so assignee, labels, and body stay in sync.
+
+---
+
+## Diff stat by extension (generator)
+
+From the feature branch, against the base branch. Generates the table for the bottom of the PR body on the fly:
+
+```sh
+BASE=main  # or master, match --base
+git diff "$BASE"...HEAD --name-only | awk -F. '{ext = (NF > 1 ? "." $NF : "(no ext)"); c[ext]++} END {for (e in c) printf "| `%s` | %d |\n", e, c[e]}' | sort -t '|' -k 3 -rn
+git diff "$BASE"...HEAD --name-only | wc -l  # Total row
+```
 
 ---
 
@@ -208,6 +221,18 @@ make run
 - [ ] PR has assignee and labels
 - [ ] Related issues use correct Closes/Relates keywords
 - [ ] No secrets or generated artifacts committed
+- [ ] Diff-stat-by-extension table pasted at the bottom
+
+---
+
+## Diff stat by extension
+
+<!-- Generated on the fly with the template generator. Counts files changed per extension, base...HEAD. -->
+
+| Extension | Files changed |
+|-----------|---------------|
+| `.go` | |
+| **Total** | |
 
 ---
 

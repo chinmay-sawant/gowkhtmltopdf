@@ -221,3 +221,23 @@ claim-scan: clean
 - [ ] Confirm fixture PDFs show the described rendering (56 page 10, 59 page 7, 60 props 81-86).
 - [ ] Confirm no unrelated changes beyond the listed commits.
 - [ ] PR has assignee and labels.
+
+---
+
+## Diff stat by extension
+
+<!-- Generated on the fly: `git diff master...HEAD --name-only`, grouped by extension. -->
+
+| Extension | Files changed |
+|-----------|---------------|
+| `.go` | 296 |
+| `.md` | 21 |
+| `.pdf` | 3 |
+| `.py` | 2 |
+| `.html` | 2 |
+| `.yml` | 1 |
+| `.png` | 1 |
+| `.h` | 1 |
+| `.gitattributes` | 1 |
+| `.css` | 1 |
+| **Total** | 329 |
