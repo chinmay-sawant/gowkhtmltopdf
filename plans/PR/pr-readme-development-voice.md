@@ -226,18 +226,18 @@ claim-scan: clean
 
 ## Diff stat by extension
 
-<!-- Generated on the fly: `git diff master...HEAD --name-only`, grouped by extension. -->
+<!-- Generated on the fly: `git diff master...HEAD --numstat`, grouped by extension. Binaries carry no line counts. -->
 
-| Extension | Files changed |
-|-----------|---------------|
-| `.go` | 296 |
-| `.md` | 21 |
-| `.pdf` | 3 |
-| `.py` | 2 |
-| `.html` | 2 |
-| `.yml` | 1 |
-| `.png` | 1 |
-| `.h` | 1 |
-| `.gitattributes` | 1 |
-| `.css` | 1 |
-| **Total** | 329 |
+| Extension | Files | + | - | Note |
+|-----------|-------|---|---|------|
+| `.go` | 296 | 5943 | 2068 | |
+| `.md` | 22 | 1202 | 144 | |
+| `.html` | 2 | 40 | 10 | |
+| `.gitattributes` | 1 | 33 | 20 | |
+| `.py` | 2 | 32 | 2 | |
+| `.h` | 1 | 8 | 3 | |
+| `.yml` | 1 | 8 | 0 | |
+| `.css` | 1 | 2 | 7 | |
+| `.pdf` | 3 | - | - | 3 binary, regenerated samples |
+| `.png` | 1 | - | - | 1 binary, new border-slice asset |
+| **Total** | **330** | **7268** | **2254** | |

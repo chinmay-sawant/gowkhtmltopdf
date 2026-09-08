@@ -19,12 +19,12 @@ Use this document as the base when authoring GitHub pull requests for [chinmay-s
 
 ## Diff stat by extension (generator)
 
-From the feature branch, against the base branch. Generates the table for the bottom of the PR body on the fly:
+From the feature branch, against the base branch. Generates the table for the bottom of the PR body on the fly, with real line counts (`--numstat`, rename-aware, binaries marked):
 
 ```sh
 BASE=main  # or master, match --base
-git diff "$BASE"...HEAD --name-only | awk -F. '{ext = (NF > 1 ? "." $NF : "(no ext)"); c[ext]++} END {for (e in c) printf "| `%s` | %d |\n", e, c[e]}' | sort -t '|' -k 3 -rn
-git diff "$BASE"...HEAD --name-only | wc -l  # Total row
+git diff "$BASE"...HEAD --numstat | awk -F'\t' '{p=$3; sub(/.* => /,"",p); sub(/}$/,"",p); n=split(p,a,"."); ext=(n>1?"."a[n]:"(no ext)"); f[ext]++; if ($1=="-") b[ext]++; else {a[ext]+=$1; d[ext]+=$2}} END {for (e in f) {if (b[e]>0) printf "| `%s` | %d | - | - | %d binary |\n", e, f[e], b[e]; else printf "| `%s` | %d | %d | %d | |\n", e, f[e], a[e], d[e]}}' | sort -t'|' -k3 -rn
+git diff "$BASE"...HEAD --shortstat  # Total row
 ```
 
 ---
@@ -227,12 +227,12 @@ make run
 
 ## Diff stat by extension
 
-<!-- Generated on the fly with the template generator. Counts files changed per extension, base...HEAD. -->
+<!-- Generated on the fly with the template generator. Real line counts per extension, base...HEAD. -->
 
-| Extension | Files changed |
-|-----------|---------------|
-| `.go` | |
-| **Total** | |
+| Extension | Files | + | - | Note |
+|-----------|-------|---|---|------|
+| `.go` | | | | |
+| **Total** | | | | |
 
 ---
 
