@@ -35,8 +35,12 @@ func ParseUnitReal(raw string, impliedUnit string) (UnitReal, error) {
 
 	unit := impliedUnit
 
+	// Match the suffix case-insensitively (like the sibling parsers) but slice
+	// the original: the unit constants are ASCII, so byte offsets are stable.
+	lower := strings.ToLower(raw)
+
 	for _, u := range []string{"rem", "em", "ex", "ch", "mm", "cm", "in", "pt", "px", "m", "%"} {
-		if strings.HasSuffix(raw, u) {
+		if strings.HasSuffix(lower, u) {
 			unit = u
 			raw = raw[:len(raw)-len(u)]
 

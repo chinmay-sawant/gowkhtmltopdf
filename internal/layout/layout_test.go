@@ -19,6 +19,14 @@ import (
 
 const testViewport = 500.0
 
+func TestZeroOpKindIsUnknown(t *testing.T) {
+	t.Parallel()
+
+	if got := (Op{}).Kind; got != OpUnknown {
+		t.Fatalf("zero Op Kind = %v, want OpUnknown (must not paint as OpFillRect)", got)
+	}
+}
+
 func mustParse(t *testing.T, src string) *html.Node {
 	t.Helper()
 

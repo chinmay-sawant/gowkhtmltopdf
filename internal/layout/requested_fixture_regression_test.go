@@ -104,7 +104,7 @@ func TestFixture23RepeatedHeaderHasNoVisualGap(t *testing.T) {
 	var table *box
 	var find func(*box)
 	find = func(b *box) {
-		if b.kind == displayTable && table == nil {
+		if b.kind == boxKindTable && table == nil {
 			table = b
 		}
 		for _, child := range b.children {
@@ -189,7 +189,7 @@ func TestFixture43CardsAndTheadDoNotOverlap(t *testing.T) {
 		if b == nil {
 			return
 		}
-		if b.kind == displayTable && table == nil && len(b.rows) > 4 {
+		if b.kind == boxKindTable && table == nil && len(b.rows) > 4 {
 			table = b
 		}
 		for _, child := range b.children {

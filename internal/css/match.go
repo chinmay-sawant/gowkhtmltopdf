@@ -3,11 +3,139 @@ package css
 import (
 	"strconv"
 	"strings"
+	"sync"
 	"unicode"
 	"unicode/utf8"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
+
+// siblingInfo aggregates all sibling metrics for a node in one cache lookup.
+type siblingInfo struct {
+	prev          *html.Node
+	next          *html.Node
+	index         int
+	total         int
+	typeIndex     int
+	typeLastIndex int
+}
+
+type parentSibCache struct {
+	elemIdx     map[*html.Node]int
+	prev        map[*html.Node]*html.Node
+	next        map[*html.Node]*html.Node
+	typeIdx     map[*html.Node]int
+	typeLastIdx map[*html.Node]int
+	total       int
+}
+
+var (
+	sibMu    sync.RWMutex
+	sibCache = make(map[*html.Node]*parentSibCache)
+)
+
+func getParentCache(parent *html.Node) *parentSibCache {
+	if parent == nil {
+		return nil
+	}
+
+	sibMu.RLock()
+	cached := sibCache[parent]
+	sibMu.RUnlock()
+
+	if cached != nil {
+		return cached
+	}
+
+	cached = buildParentCache(parent)
+
+	sibMu.Lock()
+	if existing := sibCache[parent]; existing != nil {
+		sibMu.Unlock()
+
+		return existing
+	}
+
+	sibCache[parent] = cached
+	sibMu.Unlock()
+
+	return cached
+}
+
+func buildParentCache(parent *html.Node) *parentSibCache {
+	elems := make([]*html.Node, 0, len(parent.Children))
+
+	for _, child := range parent.Children {
+		if child.Type == html.ElementNode {
+			elems = append(elems, child)
+		}
+	}
+
+	total := len(elems)
+	elemIdx := make(map[*html.Node]int, total)
+	prev := make(map[*html.Node]*html.Node, total)
+	next := make(map[*html.Node]*html.Node, total)
+
+	for idx, elem := range elems {
+		elemIdx[elem] = idx + 1
+
+		if idx > 0 {
+			prev[elem] = elems[idx-1]
+		}
+
+		if idx+1 < total {
+			next[elem] = elems[idx+1]
+		}
+	}
+
+	tagTotals := make(map[string]int, total)
+
+	for _, elem := range elems {
+		key := strings.ToLower(elem.Name)
+		tagTotals[key]++
+	}
+
+	typeIdx := make(map[*html.Node]int, total)
+	typeLastIdx := make(map[*html.Node]int, total)
+	seen := make(map[string]int, len(tagTotals))
+
+	for _, elem := range elems {
+		key := strings.ToLower(elem.Name)
+		seen[key]++
+		idx := seen[key]
+		typeIdx[elem] = idx
+		typeLastIdx[elem] = tagTotals[key] - idx + 1
+	}
+
+	return &parentSibCache{
+		elemIdx:     elemIdx,
+		prev:        prev,
+		next:        next,
+		typeIdx:     typeIdx,
+		typeLastIdx: typeLastIdx,
+		total:       total,
+	}
+}
+
+func getSiblingInfo(node *html.Node) siblingInfo {
+	if node == nil || node.Parent == nil {
+		return siblingInfo{index: 1, total: 1, typeIndex: 1, typeLastIndex: 1}
+	}
+
+	cached := getParentCache(node.Parent)
+	if cached == nil {
+		return siblingInfo{}
+	}
+
+	return siblingInfo{
+		prev:          cached.prev[node],
+		next:          cached.next[node],
+		index:         cached.elemIdx[node],
+		total:         cached.total,
+		typeIndex:     cached.typeIdx[node],
+		typeLastIndex: cached.typeLastIdx[node],
+	}
+}
 
 // Match reports whether the selector matches the element node. Matching runs
 // right to left: the last part must match n, earlier parts must match
@@ -226,7 +354,7 @@ func matchAttrs(part SelectorPart, node *html.Node) bool {
 			return false
 		}
 
-		if !attrValueMatches(arg.Op, val, arg.Value, arg.IgnoreCase) {
+		if !attrValueMatches(arg, val) {
 			return false
 		}
 	}
@@ -235,14 +363,24 @@ func matchAttrs(part SelectorPart, node *html.Node) bool {
 }
 
 // attrValueMatches evaluates one attribute operator against a value.
-// ignoreCase is the Selectors 4 ASCII i flag; comparison uses ToLower.
-func attrValueMatches(oper, val, want string, ignoreCase bool) bool {
-	if ignoreCase {
+// ignoreCase is the Selectors 4 ASCII i flag; the selector side is pre-lowered
+// at parse time (AttrSelector.valueLower) and only the element side is lowered
+// per call.
+func attrValueMatches(arg AttrSelector, val string) bool {
+	if arg.IgnoreCase {
 		val = strings.ToLower(val)
-		want = strings.ToLower(want)
 	}
 
-	switch oper {
+	want := arg.Value
+	if arg.IgnoreCase {
+		want = arg.valueLower
+		if want == "" && arg.Value != "" {
+			// Hand-built selector without the parse-time cache.
+			want = strings.ToLower(arg.Value)
+		}
+	}
+
+	switch arg.Op {
 	case "=":
 		return val == want
 	case "~=":
@@ -252,7 +390,7 @@ func attrValueMatches(oper, val, want string, ignoreCase bool) bool {
 			return false
 		}
 
-		switch oper {
+		switch arg.Op {
 		case "*=":
 			return strings.Contains(val, want)
 		case "^=":
@@ -327,11 +465,11 @@ func matchPseudo(pseudo PseudoClass, node *html.Node) bool {
 func matchTreePseudo(pseudo PseudoClass, node *html.Node) bool {
 	switch pseudo.Name {
 	case firstChildPseudo:
-		return previousElementSibling(node) == nil
+		return getSiblingInfo(node).prev == nil
 	case lastChildPseudo:
-		return nextElementSibling(node) == nil
+		return getSiblingInfo(node).next == nil
 	case nthChildPseudo:
-		return matchNth(pseudo.nth, elementIndex(node))
+		return matchNth(pseudo.nth, getSiblingInfo(node).index)
 	case "root":
 		return isRootElement(node)
 	default:
@@ -406,16 +544,8 @@ func previousElementSibling(count *html.Node) *html.Node {
 		return nil
 	}
 
-	var prev *html.Node
-
-	for _, cur := range count.Parent.Children {
-		if cur == count {
-			return prev
-		}
-
-		if cur.Type == html.ElementNode {
-			prev = cur
-		}
+	if cached := getParentCache(count.Parent); cached != nil {
+		return cached.prev[count]
 	}
 
 	return nil
@@ -426,18 +556,8 @@ func nextElementSibling(count *html.Node) *html.Node {
 		return nil
 	}
 
-	seen := false
-
-	for _, cur := range count.Parent.Children {
-		if cur == count {
-			seen = true
-
-			continue
-		}
-
-		if seen && cur.Type == html.ElementNode {
-			return cur
-		}
+	if cached := getParentCache(count.Parent); cached != nil {
+		return cached.next[count]
 	}
 
 	return nil
@@ -449,17 +569,12 @@ func elementIndex(count *html.Node) int {
 		return 1
 	}
 
-	idx := 0
-
-	for _, cur := range count.Parent.Children {
-		if cur.Type != html.ElementNode {
-			continue
-		}
-
-		idx++
-		if cur == count {
+	if cached := getParentCache(count.Parent); cached != nil {
+		if idx, ok := cached.elemIdx[count]; ok {
 			return idx
 		}
+
+		return 0
 	}
 
 	return 0
@@ -658,15 +773,17 @@ func isNthArgPseudo(name string) bool {
 // and :nth-last-of-type(). Index is 1-based among element siblings with the
 // same tag (HTML tag names compare case-insensitively).
 func matchOfTypePseudo(pseudo PseudoClass, node *html.Node) bool {
+	info := getSiblingInfo(node)
+
 	switch pseudo.Name {
 	case firstOfTypePseudo:
-		return matchNth(nthForm{kind: nthInt, a: 1}, ofTypeIndex(node))
+		return matchNth(nthForm{kind: nthInt, a: 1}, info.typeIndex)
 	case lastOfTypePseudo:
-		return matchNth(nthForm{kind: nthInt, a: 1}, ofTypeLastIndex(node))
+		return matchNth(nthForm{kind: nthInt, a: 1}, info.typeLastIndex)
 	case nthOfTypePseudo:
-		return matchNth(pseudo.nth, ofTypeIndex(node))
+		return matchNth(pseudo.nth, info.typeIndex)
 	case nthLastOfTypePseudo:
-		return matchNth(pseudo.nth, ofTypeLastIndex(node))
+		return matchNth(pseudo.nth, info.typeLastIndex)
 	default:
 		return false
 	}
@@ -682,17 +799,12 @@ func ofTypeIndex(node *html.Node) int {
 		return 1
 	}
 
-	idx := 0
-
-	for _, cur := range node.Parent.Children {
-		if !sameTypeElement(cur, node) {
-			continue
-		}
-
-		idx++
-		if cur == node {
+	if cached := getParentCache(node.Parent); cached != nil {
+		if idx, ok := cached.typeIdx[node]; ok {
 			return idx
 		}
+
+		return 0
 	}
 
 	return 0
@@ -708,20 +820,15 @@ func ofTypeLastIndex(node *html.Node) int {
 		return 1
 	}
 
-	total := 0
-
-	for _, cur := range node.Parent.Children {
-		if sameTypeElement(cur, node) {
-			total++
+	if cached := getParentCache(node.Parent); cached != nil {
+		if idx, ok := cached.typeLastIdx[node]; ok {
+			return idx
 		}
-	}
 
-	index := ofTypeIndex(node)
-	if index == 0 {
 		return 0
 	}
 
-	return total - index + 1
+	return 0
 }
 
 func sameTypeElement(cur, node *html.Node) bool {

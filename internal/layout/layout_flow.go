@@ -110,6 +110,9 @@ func (e *engine) hasImageResolver() bool {
 	return e.opts.Images != nil || e.opts.ImagesContext != nil
 }
 
+// resolveImageData fetches one image via the configured resolver. The caller
+// owns the timeout: Layout imposes no deadline on image fetches, so ctx
+// should carry one when network loads must be bounded.
 func (e *engine) resolveImageData(src string) ([]byte, error) {
 	if e.opts.ImagesContext != nil {
 		return e.opts.ImagesContext(e.ctx, src)

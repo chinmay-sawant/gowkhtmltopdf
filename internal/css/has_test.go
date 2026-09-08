@@ -133,6 +133,52 @@ func TestHasSpecificity(t *testing.T) {
 	}
 }
 
+// TestHasParenAfterQuotedSpan guards matchingParen against skipping the byte
+// right after a quoted span. Before the fix the loop's idx++ advanced one
+// byte past the closing quote, so the '(' in :has([t="a"(x)]) was never
+// counted and the inner ')' was taken as the end of the :has() argument.
+func TestHasParenAfterQuotedSpan(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		sel   string
+		value string
+	}{
+		{`div:has([t="a"(x)])`, `"a"(x)`},
+		{`div:has([t='a'(x)])`, `'a'(x)`},
+		{`div:has([t="a"(x, y)])`, `"a"(x, y)`},
+	}
+	for _, testCase := range cases {
+		sel, ok := parseSelector(testCase.sel)
+		if !ok {
+			t.Errorf("parseSelector(%q) failed", testCase.sel)
+
+			continue
+		}
+
+		if len(sel.Parts) != 1 || len(sel.Parts[0].Pseudos) != 1 {
+			t.Fatalf("parseSelector(%q) = %+v", testCase.sel, sel)
+		}
+
+		p := sel.Parts[0].Pseudos[0]
+		if p.Name != pseudoClassHas || len(p.Has) != 1 || len(p.Has[0].Parts) != 1 {
+			t.Fatalf("parseSelector(%q): pseudo = %+v", testCase.sel, p)
+		}
+
+		attrs := p.Has[0].Parts[0].Attrs
+		if len(attrs) != 1 || attrs[0].Name != "t" || attrs[0].Value != testCase.value {
+			t.Fatalf("parseSelector(%q): attrs = %+v, want value %q", testCase.sel, attrs, testCase.value)
+		}
+	}
+
+	// takeParenArg must terminate on the outer ')' even when a quoted span
+	// is directly followed by '('.
+	inner, end, ok := takeParenArg(`([t="a"(x)])`, 0)
+	if !ok || inner != `[t="a"(x)]` || end != len(`([t="a"(x)])`) {
+		t.Errorf("takeParenArg = (%q, %d, %v), want (%q, %d, true)", inner, end, ok, `[t="a"(x)]`, len(`([t="a"(x)])`))
+	}
+}
+
 func TestNotMatch(t *testing.T) {
 	t.Parallel()
 	root := treeFor(t, `<html><body><p class="note">a</p><p>b</p></body></html>`)

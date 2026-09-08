@@ -74,7 +74,7 @@ func TestOutlineTreeNesting(t *testing.T) {
 	headings := outline.CollectHeadings(root)
 	headings = outline.Lookup(headings, fakeLocations(nodes))
 	outline.AssignAnchors(headings)
-	tree := outline.BuildTree(headings, outline.Options{}) //nolint:exhaustruct // intentional zero/partial fields
+	tree := mustBuildTree(t, headings, outline.Options{}) //nolint:exhaustruct // intentional zero/partial fields
 
 	if len(tree.Children) != 2 {
 		t.Fatalf("root children = %d, want 2", len(tree.Children))
@@ -102,7 +102,7 @@ func TestOutlineTreeSortAndClamp(t *testing.T) {
 	nodes := headNodes(t, root)
 	headings := outline.CollectHeadings(root)
 	headings = outline.Lookup(headings, fakeLocations(nodes))
-	tree := outline.BuildTree(headings, outline.Options{}) //nolint:exhaustruct // intentional zero/partial fields
+	tree := mustBuildTree(t, headings, outline.Options{}) //nolint:exhaustruct // intentional zero/partial fields
 
 	if len(tree.Children) != 2 || tree.Children[0].Heading.Title != "A" {
 		t.Fatalf("root = %v, want [A B]", tree.Children)
@@ -132,7 +132,7 @@ func TestOutlineTreeLevelStackAcrossPages(t *testing.T) {
 	}
 	headings := outline.Lookup(outline.CollectHeadings(root), locs)
 
-	tree := outline.BuildTree(headings, outline.Options{}) //nolint:exhaustruct // intentional zero/partial fields
+	tree := mustBuildTree(t, headings, outline.Options{}) //nolint:exhaustruct // intentional zero/partial fields
 	if len(tree.Children) != 1 || len(tree.Children[0].Children) != 1 {
 		t.Fatalf("tree = %+v, want Ch > Late", tree)
 	}
@@ -144,7 +144,7 @@ func TestOutlineDepth(t *testing.T) {
 	nodes := headNodes(t, root)
 	headings := outline.Lookup(outline.CollectHeadings(root), fakeLocations(nodes))
 
-	tree := outline.BuildTree(headings, outline.Options{ //nolint:exhaustruct // intentional zero/partial fields
+	tree := mustBuildTree(t, headings, outline.Options{ //nolint:exhaustruct // intentional zero/partial fields
 		MaxDepth: 1,
 	})
 	if len(tree.Children) != 1 {
@@ -162,7 +162,7 @@ func TestOutlineExclude(t *testing.T) {
 	nodes := headNodes(t, root)
 	headings := outline.Lookup(outline.CollectHeadings(root), fakeLocations(nodes))
 
-	tree := outline.BuildTree(headings, outline.Options{ //nolint:exhaustruct // intentional zero/partial fields
+	tree := mustBuildTree(t, headings, outline.Options{ //nolint:exhaustruct // intentional zero/partial fields
 		Exclude: []css.Selector{
 			parseSel(t, ".hidden"),
 			parseSel(t, "#x"),
@@ -212,7 +212,7 @@ func TestOutlineExcludeNestedAndEmpty(t *testing.T) {
 func excludeTree(t *testing.T, headings []*outline.Heading, sels ...css.Selector) *outline.Node {
 	t.Helper()
 
-	return outline.BuildTree(headings, outline.Options{ //nolint:exhaustruct // intentional zero/partial fields
+	return mustBuildTree(t, headings, outline.Options{ //nolint:exhaustruct // intentional zero/partial fields
 		Exclude: sels,
 	})
 }
@@ -235,6 +235,28 @@ func wantTitles(t *testing.T, ns []*outline.Node, want ...string) {
 }
 
 // titles returns heading titles for a slice of outline nodes (test helper).
+func mustBuildTree(t *testing.T, headings []*outline.Heading, opts outline.Options) *outline.Node {
+	t.Helper()
+
+	tree, err := outline.BuildTree(headings, opts)
+	if err != nil {
+		t.Fatalf("BuildTree: %v", err)
+	}
+
+	return tree
+}
+
+func mustBuildTreeBy(t *testing.T, headings []*outline.Heading, opts outline.Options, pageOf outline.PageOf) *outline.Node {
+	t.Helper()
+
+	tree, err := outline.BuildTreeBy(headings, opts, pageOf)
+	if err != nil {
+		t.Fatalf("BuildTreeBy: %v", err)
+	}
+
+	return tree
+}
+
 func titles(ns []*outline.Node) []string {
 	out := make([]string, len(ns))
 
@@ -305,6 +327,87 @@ func TestSectionOf(t *testing.T) {
 	}
 }
 
+func TestCollectHeadingsNilRoot(t *testing.T) {
+	t.Parallel()
+
+	if got := outline.CollectHeadings(nil); got != nil {
+		t.Fatalf("CollectHeadings(nil) = %+v, want nil", got)
+	}
+}
+
+func TestSortHeadingsByNilEntries(t *testing.T) {
+	t.Parallel()
+
+	hs := []*outline.Heading{
+		{Title: "Later", Page: 2, Y: 10},
+		nil,
+		{Title: "Early", Page: 0, Y: 30},
+		{Title: "Mid", Page: 1, Y: 5},
+	}
+	outline.SortHeadingsBy(hs, outline.LocalPage)
+
+	got := make([]string, 0, len(hs))
+
+	for _, h := range hs {
+		if h == nil {
+			got = append(got, "<nil>")
+
+			continue
+		}
+
+		got = append(got, h.Title)
+	}
+
+	// Nil sorts as page 0, y 0, x 0: before Early on the same page.
+	want := []string{"<nil>", "Early", "Mid", "Later"}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("SortHeadingsBy order = %v, want %v", got, want)
+		}
+	}
+}
+
+func TestSectionOfByNilHeadings(t *testing.T) {
+	t.Parallel()
+
+	t.Run("last only", func(t *testing.T) {
+		t.Parallel()
+
+		hs := []*outline.Heading{
+			nil,
+			{Title: "Sub", Page: 1, Y: 10},
+		}
+
+		sec, sub := outline.SectionOfBy(hs, 1, outline.LocalPage)
+		if sec != "" || sub != "Sub" {
+			t.Errorf("SectionOfBy = %q, %q; want %q, %q", sec, sub, "", "Sub")
+		}
+	})
+
+	t.Run("first only", func(t *testing.T) {
+		t.Parallel()
+
+		hs := []*outline.Heading{
+			{Title: "Intro", Page: 0, Y: 10},
+			nil,
+		}
+		sec, sub := outline.SectionOfBy(hs, 1, outline.LocalPage)
+		if sec != "Intro" || sub != "" { //nolint:wsl // test assertion
+			t.Errorf("SectionOfBy = %q, %q; want %q, %q", sec, sub, "Intro", "")
+		}
+	})
+
+	t.Run("empty and nil slices", func(t *testing.T) {
+		t.Parallel()
+		for _, hs := range [][]*outline.Heading{nil, {}} { //nolint:wsl // table-driven nil cases
+			sec, sub := outline.SectionOfBy(hs, 1, outline.LocalPage)
+			if sec != "" || sub != "" {
+				t.Errorf("SectionOfBy(%v) = %q, %q; want empty", hs, sec, sub)
+			}
+		}
+	})
+}
+
 func TestCollapseWS(t *testing.T) {
 	t.Parallel()
 
@@ -364,7 +467,7 @@ func TestDumpOutlineXML(t *testing.T) {
 	nodes := headNodes(t, root)
 	headings := outline.Lookup(outline.CollectHeadings(root), fakeLocations(nodes))
 	outline.AssignAnchors(headings)
-	tree := outline.BuildTree(headings, outline.Options{}) //nolint:exhaustruct // intentional zero/partial fields
+	tree := mustBuildTree(t, headings, outline.Options{}) //nolint:exhaustruct // intentional zero/partial fields
 	xml := outline.DumpOutlineXML(tree)
 
 	for _, want := range []string{
@@ -392,10 +495,8 @@ func TestExplicitDocumentPageOrderingDoesNotMutateLocalPage(t *testing.T) {
 	headings[1].DocPage = 2
 	localPages := []int{headings[0].Page, headings[1].Page}
 
-	tree := outline.BuildTreeBy(
-		headings, outline.Options{}, //nolint:exhaustruct // intentional zero/partial fields
-		outline.DocumentPage,
-	)
+	tree := mustBuildTreeBy(t, headings, outline.Options{}, //nolint:exhaustruct // intentional zero/partial fields
+		outline.DocumentPage)
 	if got := tree.Children[0].Heading.Title; got != testFirstDocTitle {
 		t.Fatalf("first heading = %q, want First in document", got)
 	}
@@ -438,7 +539,7 @@ func TestNilPageAccessorUsesLocalPage(t *testing.T) {
 	outline.SortHeadingsBy(headings, nil)
 
 	xml := outline.DumpOutlineXMLBy(
-		outline.BuildTreeBy(headings, outline.Options{}, nil), //nolint:exhaustruct // intentional zero/partial fields
+		mustBuildTreeBy(t, headings, outline.Options{}, nil), //nolint:exhaustruct // intentional zero/partial fields
 		0,
 		nil,
 	)

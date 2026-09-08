@@ -651,13 +651,22 @@ func indexVarFunction(value string, start int) int {
 	if start >= len(value) {
 		return -1
 	}
-	low := strings.ToLower(value[start:])
-	idx := strings.Index(low, "var(")
-	if idx < 0 {
-		return -1
+
+	// Case-insensitive scan for "var(" without allocating a lowered copy of
+	// the remainder per call (values carry many var() refs).
+	const varCallLen = len("var(")
+
+	for idx := start; idx+varCallLen <= len(value); idx++ {
+		if value[idx] != 'v' && value[idx] != 'V' {
+			continue
+		}
+
+		if hasFoldPrefix(value[idx:], "var(") {
+			return idx
+		}
 	}
 
-	return start + idx
+	return -1
 }
 
 func matchingVarParen(value string, open int) int {

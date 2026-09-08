@@ -41,7 +41,12 @@ td, th { border: 1px solid #aaa; padding: 4pt; }
 	}
 
 	contentH := 700.0
-	opPage := paginateOps(res, contentH)
+
+	opPage, err := paginateOps(t.Context(), res, contentH)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	maxPage := 0
 	pagesWithText := map[int]int{}
 
@@ -121,7 +126,11 @@ h2 { font-size: 14pt; margin: 8pt 0 4pt; }
 		t.Fatal(err)
 	}
 
-	opPage := paginateOps(res, pageH)
+	opPage, err := paginateOps(t.Context(), res, pageH)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	maxPage := 0
 	pagesWithText := map[int]int{}
 

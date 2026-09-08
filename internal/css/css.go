@@ -148,6 +148,10 @@ type AttrSelector struct {
 	Op         string // "", "=", "~=", "*=", "^=", "$=", "|="
 	Value      string
 	IgnoreCase bool
+	// valueLower caches the ASCII-lowercased Value for IgnoreCase selectors so
+	// per-element matching does not re-lower the selector constant on every
+	// call. Empty when IgnoreCase is false.
+	valueLower string `exhaustruct:"optional"`
 }
 
 // RelativeSelector is a complex selector interpreted relative to a subject
@@ -181,6 +185,23 @@ type Declaration struct {
 // garbage; only unbalanced blocks do. @media preambles are stored raw on
 // Rule.Media and evaluated later via MediaMatches.
 func Parse(src string) (*Stylesheet, error) {
+	return parse(src)
+}
+
+// ParseBytes parses a stylesheet from raw bytes, the entry point for
+// resource bodies held as []byte (linked and imported stylesheets).
+//
+// The parser is string-based (strings.* helpers, comment stripping, and
+// slicing), so src is copied into a string once per stylesheet. The copy is
+// unavoidable without duplicating the parser for []byte; it replaces the
+// previous per-call-site string(resource.Body) conversions and keeps the
+// allocation to one per stylesheet. Callers should not retain src after the
+// call if they want the copy to be GC'd promptly.
+func ParseBytes(src []byte) (*Stylesheet, error) {
+	return parse(string(src))
+}
+
+func parse(src string) (*Stylesheet, error) {
 	str := &Stylesheet{} //nolint:exhaustruct // intentional zero-value fields
 	src = stripComments(src)
 	order := 0
@@ -207,24 +228,49 @@ func Parse(src string) (*Stylesheet, error) {
 	return str, nil
 }
 
+// hasFoldPrefix reports whether s starts with prefix, comparing ASCII
+// letters case-insensitively without allocating a lowered copy of s.
+func hasFoldPrefix(s, prefix string) bool {
+	if len(s) < len(prefix) {
+		return false
+	}
+
+	for i := range len(prefix) {
+		sc := s[i]
+		pc := prefix[i]
+
+		if sc >= 'A' && sc <= 'Z' {
+			sc += 'a' - 'A'
+		}
+
+		if pc >= 'A' && pc <= 'Z' {
+			pc += 'a' - 'A'
+		}
+
+		if sc != pc {
+			return false
+		}
+	}
+
+	return true
+}
+
 // parseAtRule consumes one at-rule at the start of src, appending any
 // resulting rules or font faces to str, and returns the remaining source.
 func parseAtRule(src string, str *Stylesheet, order *int) (string, error) {
-	low := strings.ToLower(src)
-
 	switch {
-	case strings.HasPrefix(low, "@media"):
+	case hasFoldPrefix(src, "@media"):
 		return parseMediaRule(src, str, order)
-	case strings.HasPrefix(low, "@container"):
+	case hasFoldPrefix(src, "@container"):
 		return parseContainerRule(src, str, order)
-	case strings.HasPrefix(low, "@page"):
+	case hasFoldPrefix(src, "@page"):
 		return parsePageRule(src, str)
-	case strings.HasPrefix(low, "@keyframes"), strings.HasPrefix(low, "@-webkit-keyframes"):
+	case hasFoldPrefix(src, "@keyframes"), hasFoldPrefix(src, "@-webkit-keyframes"):
 		// Animations are parse-ignored (static cascaded values only).
 		return skipAtRule(src)
-	case strings.HasPrefix(low, "@font-face"):
+	case hasFoldPrefix(src, "@font-face"):
 		return parseFontFaceRule(src, str)
-	case strings.HasPrefix(low, "@import"):
+	case hasFoldPrefix(src, "@import"):
 		return parseImportRule(src, str)
 	default:
 		return skipAtRule(src)
@@ -622,7 +668,7 @@ func parseRuleList(media string, contQ *ContainerQuery, block string, orderPtr *
 // Nested @container rules are flattened into the media context (the nested
 // query replaces, not combines, the outer query); other at-rules are skipped.
 func parseNestedAtRule(block, media string, orderPtr *int) (string, []Rule, error) {
-	if !strings.HasPrefix(strings.ToLower(block), "@container") {
+	if !hasFoldPrefix(block, "@container") {
 		rest, err := skipAtRule(block)
 		if err != nil {
 			return "", nil, err

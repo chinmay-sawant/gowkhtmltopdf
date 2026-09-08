@@ -981,7 +981,9 @@ func TestFixture56D04ACLMatrixDebug(t *testing.T) { //nolint:paralleltest // fix
 		}
 	}
 	logRows("after before")
-	snapCrossingTextOps(res, contentH)
+	if err := snapCrossingTextOps(t.Context(), res, contentH); err != nil {
+		t.Fatal(err)
+	}
 	logRows("after snap")
 	for iteration := range 10 {
 		changed := avoidInside(res, contentH)

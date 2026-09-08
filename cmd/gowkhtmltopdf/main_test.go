@@ -20,6 +20,7 @@ func captureStdout(t *testing.T, action func() int) (int, []byte) {
 		t.Fatalf("os.Pipe: %v", err)
 	}
 	os.Stdout = writer
+	defer func() { os.Stdout = old }()
 	code := action()
 	if err := writer.Close(); err != nil {
 		t.Fatalf("close stdout: %v", err)

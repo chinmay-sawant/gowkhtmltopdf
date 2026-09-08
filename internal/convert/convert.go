@@ -277,7 +277,10 @@ func ValidateRenderableObjects(objects []settings.PdfObject) error {
 	return settings.ValidateRenderableObjects(objects)
 }
 
-// runContext owns the dependencies for one conversion lifecycle.
+// runContext owns the dependencies for one conversion lifecycle. It is the
+// wiring that implements the narrow stage interfaces (objectRenderer,
+// hfLoader); stage functions take the interface they need instead of the fat
+// struct.
 type runContext struct {
 	req      *Request
 	loader   *load.Loader
@@ -294,6 +297,38 @@ type runContext struct {
 	exclude  []css.Selector
 }
 
+// objectRenderer is the narrow contract the object-loading stage needs: one
+// body object and one TOC object, each producing its objectState. runContext
+// implements it; the stage takes the interface so tests can drive the
+// pipeline with a fake renderer instead of a full run.
+type objectRenderer interface {
+	renderObject(ctx context.Context, obj *settings.PdfObject, idx int) (*objectState, error)
+	initTOC(ctx context.Context, obj *settings.PdfObject, idx int) (*objectState, error)
+}
+
+// hfLoader is the narrow contract the header/footer pass needs: the default
+// fallback font for text bands plus lazy loading of one HTML band template.
+// runContext implements it.
+type hfLoader interface {
+	defaultFont() *pdf.Font
+	loadHF(ctx context.Context, state *objectState, rawOrURL string) (*htmlHFLayout, *pdf.Registry, error)
+}
+
+var (
+	_ objectRenderer = (*runContext)(nil)
+	_ hfLoader       = (*runContext)(nil)
+)
+
+// defaultFont returns the default face used by text header/footer bands
+// (the hfLoader contract; see loadHTMLHF/drawTextHF).
+func (run *runContext) defaultFont() *pdf.Font { return run.font }
+
+// loadHF lazily loads one HTML header/footer band template with the run's
+// loader, fallback font and log (the hfLoader contract).
+func (run *runContext) loadHF(ctx context.Context, state *objectState, rawOrURL string) (*htmlHFLayout, *pdf.Registry, error) {
+	return loadHTMLHF(ctx, run.loader, run.font, state, rawOrURL, run.log)
+}
+
 func (run *runContext) report(phase string, value int) {
 	if run.progress != nil {
 		run.progress(phase, value)
@@ -304,21 +339,33 @@ func (run *runContext) report(phase string, value int) {
 	}
 }
 
-func (run *runContext) renderObjects(ctx context.Context) ([]*objectState, []*objectState, error) {
+// renderObjects drives the per-object loop using only the narrow
+// objectRenderer contract plus the objects slice and report callback.
+// It exists as a standalone stage so tests can supply a fake renderer
+// without constructing a full runContext (which owns 15 fields). The
+// runContext method below wires the real run into this narrow stage.
+func renderObjects(
+	ctx context.Context,
+	renderer objectRenderer,
+	objects []settings.PdfObject,
+	report func(string, int),
+) ([]*objectState, []*objectState, error) {
 	var tocs, bodies []*objectState
 
-	count := len(run.req.Objects)
+	count := len(objects)
 
-	for idx := range run.req.Objects {
+	for idx := range objects {
 		if err := ctx.Err(); err != nil {
 			return nil, nil, fmt.Errorf("object %d: %w", idx+1, err)
 		}
 
-		run.report(fmt.Sprintf("Loading pages (%d/%d)", idx+1, count), percent(idx+1, count))
+		if report != nil {
+			report(fmt.Sprintf("Loading pages (%d/%d)", idx+1, count), percent(idx+1, count))
+		}
 
-		obj := &run.req.Objects[idx]
+		obj := &objects[idx]
 		if obj.IsTableOfContent {
-			state, err := initTOCState(ctx, run, obj, idx)
+			state, err := renderer.initTOC(ctx, obj, idx)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -328,7 +375,7 @@ func (run *runContext) renderObjects(ctx context.Context) ([]*objectState, []*ob
 			continue
 		}
 
-		state, err := renderObject(ctx, run, obj, idx)
+		state, err := renderer.renderObject(ctx, obj, idx)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -341,9 +388,19 @@ func (run *runContext) renderObjects(ctx context.Context) ([]*objectState, []*ob
 	return tocs, bodies, nil
 }
 
+func (run *runContext) renderObjects(ctx context.Context) ([]*objectState, []*objectState, error) {
+	return renderObjects(ctx, run, run.req.Objects, run.report)
+}
+
 // Run executes the full PDF conversion pipeline for req. The lifecycle is
 // delegated to render.Pipeline; this package supplies the PDF-specific adapter
 // and keeps its private state out of the orchestration module.
+//
+// The caller owns the overall conversion timeout: Run never imposes one, so
+// ctx should carry a deadline (or be cancellable) when a bounded run is
+// required. Cancellation is honored between stages and inside long passes;
+// HTTP fetches are additionally bounded per request by the loader's
+// LoadPage.Timeout policy (load.DefaultResponseTimeout when unset).
 func Run(ctx context.Context, req *Request, log io.Writer, progress func(phase string, percent int)) error {
 	if err := req.Validate(); err != nil {
 		return err
@@ -422,9 +479,10 @@ func newHFGeom(glob settings.PdfGlobal) (hfGeom, error) {
 	return geom, nil
 }
 
-// initTOCState builds the per-object state of a table-of-contents object:
+// initTOC builds the per-object state of a table-of-contents object:
 // geometry (with auto margins resolved) and the effective TOC settings.
-func initTOCState(ctx context.Context, run *runContext, obj *settings.PdfObject, idx int) (*objectState, error) {
+// It is the TOC half of the objectRenderer contract.
+func (run *runContext) initTOC(ctx context.Context, obj *settings.PdfObject, idx int) (*objectState, error) {
 	geom, err := newHFGeom(run.req.Global)
 	if err != nil {
 		return nil, fmt.Errorf("object %d: %w", idx+1, err)
@@ -456,10 +514,11 @@ func initTOCState(ctx context.Context, run *runContext, obj *settings.PdfObject,
 
 // renderObject loads, lays out and paints one body object into doc and
 // returns the per-object state the later passes need (nil when the load
-// policy skipped the object).
+// policy skipped the object). It is the body half of the objectRenderer
+// contract.
 //
 //nolint:cyclop,funlen,wsl // per-object rendering lifecycle
-func renderObject(ctx context.Context, run *runContext, obj *settings.PdfObject, idx int) (*objectState, error) {
+func (run *runContext) renderObject(ctx context.Context, obj *settings.PdfObject, idx int) (*objectState, error) {
 	geom, err := newHFGeom(run.req.Global)
 	if err != nil {
 		return nil, fmt.Errorf("object %d (%s): %w", idx+1, obj.Page, err)

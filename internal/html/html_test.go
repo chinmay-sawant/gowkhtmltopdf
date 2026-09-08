@@ -902,3 +902,82 @@ func TestParseDocument(t *testing.T) {
 		}
 	}
 }
+
+func TestParseDocumentBOMStripsWholeBOM(t *testing.T) {
+	t.Parallel()
+
+	// Regression: the old s = s[1:] cut one byte of the 3-byte UTF-8 BOM,
+	// leaving two stray bytes as a leading text node.
+	root, err := ParseDocument([]byte("\ufeff<html><body>ok</body></html>"))
+	if err != nil {
+		t.Fatalf("ParseDocument: %v", err)
+	}
+
+	for _, c := range root.Children {
+		if c.Type == TextNode {
+			t.Errorf("ParseDocument left a leading text node %q", c.Text)
+		}
+	}
+
+	if got := root.TextContent(); strings.Contains(got, "\xbb\xbf") {
+		t.Errorf("ParseDocument left BOM residue bytes in text content %q", got)
+	}
+}
+
+func TestParseDeepNesting(t *testing.T) {
+	t.Parallel()
+
+	// A 100k-deep input must parse without exhausting the stack, and the
+	// tree must stay within maxElementDepth so recursive walks stay bounded.
+	const depth = 100000
+
+	src := strings.Repeat("<div>", depth) + "deep" + strings.Repeat("</div>", depth)
+
+	root, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+
+	maxSeen := 0
+
+	var measure func(*Node, int)
+	measure = func(n *Node, level int) {
+		if level > maxSeen {
+			maxSeen = level
+		}
+
+		for _, c := range n.Children {
+			measure(c, level+1)
+		}
+	}
+	measure(root, 0)
+
+	if maxSeen > maxElementDepth+1 {
+		t.Fatalf("tree depth %d exceeds cap %d", maxSeen, maxElementDepth)
+	}
+
+	visits := 0
+
+	root.Walk(func(*Node) { visits++ })
+
+	if visits > (maxElementDepth+1)*2 {
+		t.Fatalf("Walk visited %d nodes, want bounded by depth cap", visits)
+	}
+}
+
+func TestNodeTypeZeroIsUnknown(t *testing.T) {
+	t.Parallel()
+
+	if got := (&Node{}).Type; got != NodeUnknown {
+		t.Fatalf("zero Node Type = %v, want NodeUnknown", got)
+	}
+
+	root, err := Parse(`<div>text</div>`)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+
+	if got := root.Type; got != ElementNode {
+		t.Fatalf("parsed root Type = %v, want ElementNode", got)
+	}
+}

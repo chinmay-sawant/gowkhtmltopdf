@@ -77,7 +77,11 @@ td, th { border: 1px solid #aaa; padding: 3pt; }
 		t.Fatal(err)
 	}
 
-	opPage := paginateOps(res, pageH)
+	opPage, err := paginateOps(t.Context(), res, pageH)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	maxPage := 0
 	pagesWithText := map[int]int{}
 

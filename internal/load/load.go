@@ -78,6 +78,18 @@ var (
 	errUninitializedLoader = errors.New("loader client is not initialized")
 )
 
+// clipRef shortens a long reference (URL or data URL payload) for error
+// messages so huge inputs cannot bloat logs.
+func clipRef(ref string) string {
+	const maxRefLen = 64
+
+	if len(ref) <= maxRefLen {
+		return ref
+	}
+
+	return ref[:maxRefLen] + "..."
+}
+
 // Kind classifies a resolved input.
 type Kind int
 
@@ -377,7 +389,20 @@ type IPResolver interface {
 	LookupIP(ctx context.Context, network, host string) ([]net.IP, error)
 }
 
+// Compile-time check: the standard resolver satisfies the resolver seam.
+var _ IPResolver = net.DefaultResolver
+
 // Loader fetches resources with the configured network and local-file policy.
+//
+// Exported mutable state (Client, Global, Network, Log, MaxBodySize,
+// MaxRedirects, Resolver, Allow, EnableLocalFileAccess) remains exported for
+// compatibility with existing internal callers that construct and mutate the
+// loader directly. New callers should prefer the validating setters
+// (SetClient, SetMaxBodySize, SetMaxRedirects, SetLog) which reject
+// invalid values before mutation. This exported-field shape is an
+// intentional deviation from the "unexport with setters" rule: changing the
+// visibility would be a breaking API shift for internal/load, and the setters
+// provide the guard without breaking compatibility.
 type Loader struct {
 	Client       *http.Client
 	Global       settings.LoadGlobal
@@ -389,18 +414,89 @@ type Loader struct {
 	// and pinned dials. Nil uses net.DefaultResolver.
 	Resolver IPResolver
 
-	// Global is an owned snapshot of the caller's load policy. Allow and
-	// EnableLocalFileAccess remain exported compatibility fields for existing
-	// internal callers; NewLoader initializes them from cloned policy values,
-	// and file-access checks intentionally read these effective fields.
+	// Allow and EnableLocalFileAccess remain exported compatibility fields for
+	// existing internal callers; NewLoader initializes them from cloned policy
+	// values, and file-access checks intentionally read these effective fields.
 	Allow                 []string
 	EnableLocalFileAccess bool
 	initErr               error
 	testDial              func(ctx context.Context, network, address string) (net.Conn, error)
 }
 
+// SetLog sets the loader's log writer.
+func (l *Loader) SetLog(w io.Writer) {
+	if l == nil {
+		return
+	}
+
+	l.Log = w
+}
+
+// SetClient replaces the HTTP client after validating it is non-nil.
+// The caller retains ownership of the client's transport and jar.
+func (l *Loader) SetClient(c *http.Client) error {
+	if l == nil {
+		return ErrNilLoader
+	}
+
+	if c == nil {
+		return errors.New("load: client is nil")
+	}
+
+	l.Client = c
+
+	return nil
+}
+
+// SetMaxBodySize updates the maximum response body size. Negative values
+// are rejected; use 0 for the engine default handling via validateLimits.
+func (l *Loader) SetMaxBodySize(n int64) error {
+	if l == nil {
+		return ErrNilLoader
+	}
+
+	if err := validateBodyLimit(n); err != nil {
+		return err
+	}
+
+	l.MaxBodySize = n
+
+	return nil
+}
+
+// SetMaxRedirects updates the maximum redirect count. Negative values are
+// rejected.
+func (l *Loader) SetMaxRedirects(n int) error {
+	if l == nil {
+		return ErrNilLoader
+	}
+
+	if n < 0 {
+		return fmt.Errorf("%w: %d must be non-negative", errInvalidRedirects, n)
+	}
+
+	l.MaxRedirects = n
+
+	return nil
+}
+
+// SetResolver replaces the IP resolver. Nil restores the default resolver
+// (net.DefaultResolver) on next lookup.
+func (l *Loader) SetResolver(r IPResolver) {
+	if l == nil {
+		return
+	}
+
+	l.Resolver = r
+}
+
 // NewLoader builds a Loader from global load settings, applying the full
 // load policy (proxy, allow prefixes, local-access flag) in one place.
+//
+// Deprecated: use NewLoaderWithError. This constructor preserves the
+// historical shape for existing callers: when proxy validation fails it
+// returns a Loader that stashes the error in initErr, so the failure surfaces
+// on the first Load/FetchSub instead of at the request boundary.
 func NewLoader(global settings.LoadGlobal) *Loader {
 	loader, err := NewLoaderWithError(global)
 	if err == nil {
@@ -426,7 +522,7 @@ func NewLoader(global settings.LoadGlobal) *Loader {
 
 // NewLoaderWithError builds a Loader from global load settings and validates
 // proxy configuration before installing the HTTP transport. It is the
-// fail-fast constructor; NewLoader remains available for existing callers.
+// fail-fast constructor; NewLoader is deprecated.
 func NewLoaderWithError(global settings.LoadGlobal) (*Loader, error) {
 	effective := ResolveEffectiveLoadGlobal(global, settings.LoadGlobal{}) //nolint:exhaustruct // empty mode override
 
@@ -447,8 +543,9 @@ func networkPolicyFromGlobal(global settings.LoadGlobal) NetworkPolicy {
 }
 
 // NewLoaderWithNetworkPolicy builds a Loader with an explicit network policy.
-// NewLoader and NewLoaderWithError remain compatibility constructors for
-// callers that rely on the historical permissive HTTP behavior.
+// NewLoaderWithError is the fail-fast constructor for callers that use the
+// historical permissive HTTP behavior with global settings; NewLoader is
+// deprecated.
 func NewLoaderWithNetworkPolicy(global settings.LoadGlobal, network NetworkPolicy) (*Loader, error) {
 	policy := ResolveEffectiveLoadGlobal(global, settings.LoadGlobal{}) //nolint:exhaustruct // empty mode override
 
@@ -1228,7 +1325,7 @@ func (l *Loader) fileAccessAllowed(path string, pageLoad settings.LoadPage) bool
 
 func (l *Loader) loadHTTP(ctx context.Context, target string, pageLoad settings.LoadPage) (*Resource, error) {
 	if l.Client == nil {
-		return nil, errUninitializedLoader
+		return nil, fmt.Errorf("load %q: %w", clipRef(target), errUninitializedLoader)
 	}
 
 	parsed, err := url.Parse(target)
@@ -1490,7 +1587,7 @@ func decodeDataURLLimited(s string, maxBytes int64) ([]byte, string, error) {
 
 	comma := strings.IndexByte(rest, ',')
 	if comma < 0 {
-		return nil, "", errMalformedDataURL
+		return nil, "", fmt.Errorf("data URL %q: %w", clipRef(s), errMalformedDataURL)
 	}
 
 	meta, data := rest[:comma], rest[comma+1:]
@@ -1625,7 +1722,7 @@ func unescapeDataLimited(raw string, maxBytes int64) ([]byte, error) {
 		case '%':
 			dec, ok := decodePercentEscape(raw, pos)
 			if !ok {
-				return nil, errInvalidDataURL
+				return nil, fmt.Errorf("data URL %q: %w", clipRef(raw), errInvalidDataURL)
 			}
 
 			cur = dec

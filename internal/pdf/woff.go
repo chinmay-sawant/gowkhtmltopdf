@@ -126,11 +126,11 @@ func decompressWOFFTables(data []byte, entries []woffEntry) ([][]byte, error) {
 			if err != nil {
 				return nil, fmt.Errorf("woff: zlib: %w", err)
 			}
+			defer zreader.Close()
+
 			// Cap read at origLength; reject trailing junk / under-read.
 			limited := io.LimitReader(zreader, int64(entry.orig)+1)
 			plain, err = io.ReadAll(limited)
-
-			zreader.Close()
 
 			if err != nil {
 				return nil, fmt.Errorf("woff: decompress: %w", err)

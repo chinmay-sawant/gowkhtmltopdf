@@ -490,12 +490,17 @@ func parseAttrSelector(sel string) (AttrSelector, bool) {
 
 	switch oper {
 	case "=", "~=", "*=", "^=", "$=", "|=":
-		return AttrSelector{
+		attr := AttrSelector{
 			Name:       strings.ToLower(name),
 			Op:         oper,
 			Value:      val,
 			IgnoreCase: ignoreCase,
-		}, true
+		}
+		if ignoreCase {
+			attr.valueLower = strings.ToLower(val)
+		}
+
+		return attr, true
 	default:
 		return AttrSelector{}, false //nolint:exhaustruct // intentional zero-value fields
 	}

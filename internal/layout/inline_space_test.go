@@ -132,7 +132,9 @@ p { margin: 0 0 6pt 0; }
 		t.Fatal(err)
 	}
 
-	paginateOps(res, pageH)
+	if _, err := paginateOps(t.Context(), res, pageH); err != nil {
+		t.Fatal(err)
+	}
 
 	var headingY, bodyY float64
 	headingY, bodyY = -1, -1

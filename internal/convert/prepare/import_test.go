@@ -258,7 +258,10 @@ func collectImportSheets(
 		t.Fatalf("parse html: %v", err)
 	}
 
-	loader := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // default HTTP loader
+	loader, err := load.NewLoaderWithError(settings.LoadGlobal{}) //nolint:exhaustruct // default HTTP loader
+	if err != nil {
+		t.Fatalf("new loader: %v", err)
+	}
 
 	var logBuf bytes.Buffer
 	sheets := prepare.CollectSheets(

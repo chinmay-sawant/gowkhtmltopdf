@@ -306,8 +306,13 @@ def convert_html_to_pdf(html, opts=None):
             html, len(html), opts_ptr, ctypes.byref(out_data),
             ctypes.byref(out_len), ctypes.byref(out_err),
         )
+        # Copy the message while the lock still holds: the last-error slot is
+        # process-wide and another thread may overwrite it before we raise.
+        message = None
+        if status != _STATUS_OK:
+            message = _take_error_message(lib, out_err, status)
     if status != _STATUS_OK:
-        raise error_from_status(status, _take_error_message(lib, out_err, status))
+        raise error_from_status(status, message)
     try:
         return ctypes.string_at(out_data, out_len.value)
     finally:
@@ -330,8 +335,13 @@ def convert_html_to_image(html, opts=None):
             html, len(html), opts_ptr, ctypes.byref(out_data),
             ctypes.byref(out_len), ctypes.byref(out_err),
         )
+        # Copy the message while the lock still holds: the last-error slot is
+        # process-wide and another thread may overwrite it before we raise.
+        message = None
+        if status != _STATUS_OK:
+            message = _take_error_message(lib, out_err, status)
     if status != _STATUS_OK:
-        raise error_from_status(status, _take_error_message(lib, out_err, status))
+        raise error_from_status(status, message)
     try:
         return ctypes.string_at(out_data, out_len.value)
     finally:

@@ -65,6 +65,37 @@ type PaintOptions struct {
 	pageNames []string `exhaustruct:"optional"`
 }
 
+// validate rejects page geometry that would otherwise be silently reset:
+// non-positive page dimensions and negative margins. The content-height check
+// (margins swallowing the page) is intentionally not an error: header/footer
+// auto margins (Margin.Top <0) can legitimately produce a header taller than
+// the page (see TestHTMLHeaderTallContentClipped) and the engine clips such
+// headers while the body fallback (contentH = PageHeight) keeps conversion
+// alive, matching wkhtmltopdf.
+func (p PaintOptions) validate() error {
+	if !finitePositive(p.PageWidth) || !finitePositive(p.PageHeight) {
+		return fmt.Errorf("layout: paint page must be finite and greater than zero, got %g x %g",
+			p.PageWidth, p.PageHeight)
+	}
+
+	for _, margin := range []struct {
+		name  string
+		value float64
+	}{
+		{name: "top", value: p.MarginTop},
+		{name: "bottom", value: p.MarginBottom},
+		{name: "left", value: p.MarginLeft},
+		{name: "right", value: p.MarginRight},
+	} {
+		if !finiteNonNegative(margin.value) {
+			return fmt.Errorf("layout: paint margin %s must be finite and non-negative, got %g",
+				margin.name, margin.value)
+		}
+	}
+
+	return nil
+}
+
 // PageMargins is one page-box margin set in points.
 type PageMargins struct {
 	Top, Right, Bottom, Left float64
@@ -96,6 +127,10 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 		return errNilContext
 	}
 
+	if err := opts.validate(); err != nil {
+		return err
+	}
+
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -125,7 +160,10 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 
 	applyNamedPageBreaks(res)
 
-	paginateOps(res, contentH)
+	if _, err := paginateOps(ctx, res, contentH); err != nil {
+		return err
+	}
+
 	stretchPaginatedChrome(res)
 
 	if err := validatePaintPageIndices(res.Ops, contentH); err != nil {

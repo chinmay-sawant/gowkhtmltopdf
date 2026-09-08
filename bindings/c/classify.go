@@ -40,26 +40,33 @@ func ctxDone(ctx context.Context) bool {
 	return ctx != nil && ctx.Err() != nil
 }
 
+// invalidArgSentinels is the fixed set of caller-input errors that classify
+// as statusInvalidArg. It lives at package scope so classification does not
+// allocate a fresh slice per error.
+//
+//nolint:gochecknoglobals // fixed sentinel set for ABI classification
+var invalidArgSentinels = []error{
+	gowkhtmltopdf.ErrNoPageObjects,
+	gowkhtmltopdf.ErrEmptyHTML,
+	gowkhtmltopdf.ErrInvalidContent,
+	gowkhtmltopdf.ErrInvalidPageSize,
+	gowkhtmltopdf.ErrInvalidOrientation,
+	gowkhtmltopdf.ErrInvalidPDFVersion,
+	gowkhtmltopdf.ErrInvalidPDFProfile,
+	gowkhtmltopdf.ErrInvalidImageFormat,
+	gowkhtmltopdf.ErrInvalidImageQuality,
+	gowkhtmltopdf.ErrInvalidCrop,
+	gowkhtmltopdf.ErrInvalidDimensions,
+	gowkhtmltopdf.ErrInvalidMargin,
+	gowkhtmltopdf.ErrInvalidZoom,
+	gowkhtmltopdf.ErrNilContext,
+	gowkhtmltopdf.ErrMissingPDFOutput,
+}
+
 // invalidArgument reports whether err originates from caller-supplied
 // document or option validation rather than the rendering pipeline.
 func invalidArgument(err error) bool {
-	for _, sentinel := range []error{
-		gowkhtmltopdf.ErrNoPageObjects,
-		gowkhtmltopdf.ErrEmptyHTML,
-		gowkhtmltopdf.ErrInvalidContent,
-		gowkhtmltopdf.ErrInvalidPageSize,
-		gowkhtmltopdf.ErrInvalidOrientation,
-		gowkhtmltopdf.ErrInvalidPDFVersion,
-		gowkhtmltopdf.ErrInvalidPDFProfile,
-		gowkhtmltopdf.ErrInvalidImageFormat,
-		gowkhtmltopdf.ErrInvalidImageQuality,
-		gowkhtmltopdf.ErrInvalidCrop,
-		gowkhtmltopdf.ErrInvalidDimensions,
-		gowkhtmltopdf.ErrInvalidMargin,
-		gowkhtmltopdf.ErrInvalidZoom,
-		gowkhtmltopdf.ErrNilContext,
-		gowkhtmltopdf.ErrMissingPDFOutput,
-	} {
+	for _, sentinel := range invalidArgSentinels {
 		if errors.Is(err, sentinel) {
 			return true
 		}

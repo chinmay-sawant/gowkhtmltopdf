@@ -15,8 +15,9 @@
  * gowkhtmltopdf_html_to_image:
  *
  *   0  OK            conversion succeeded, out_data/out_len are valid
- *   1  INVALID_ARG   nil or empty HTML, bad abi_version/struct_size, or
- *                    an option value rejected by validation (page size,
+ *   1  INVALID_ARG   nil or empty HTML, bad abi_version/struct_size, a nil
+ *                    out pointer, an allow array longer than 1024 entries,
+ *                    or an option value rejected by validation (page size,
  *                    orientation, PDF version/profile, copies range)
  *   2  LOAD_DENIED   a local-file ACL or network policy rule denied a
  *                    resource needed by the document
@@ -46,6 +47,8 @@
  *     must be released with gowkhtmltopdf_free_string.
  *   - Passing NULL to gowkhtmltopdf_free or gowkhtmltopdf_free_string is
  *     allowed and does nothing.
+ *   - The out_data, out_len, and out_err pointers must all be non-NULL;
+ *     any NULL among them is rejected with INVALID_ARG.
  *
  * Options structs:
  *
@@ -57,7 +60,9 @@
  *   - Passing opts == NULL selects defaults for every field.
  *   - String fields left NULL behave like empty strings and select engine
  *     defaults. The allow array is an array of pointers to NUL-terminated
- *     path prefixes; allow_len entries are read only during the call.
+ *     path prefixes; allow_len entries are read only during the call and
+ *     are capped at 1024 (a larger length is rejected with INVALID_ARG
+ *     before any entry is read).
  *   - network_policy: 0 keeps the compatible default policy (HTTP(S) to any
  *     host, cross-host redirects allowed); 1 installs the restricted policy
  *     (private and link-local destinations blocked unless allowlisted,

@@ -19,7 +19,7 @@ const cssTagSVG = "svg"
 // masthead and hid logo.png.
 func (e *engine) buildInlineSVG(node *html.Node, sty ResolvedStyle, posX, posY float64, paint bool) *box {
 	boxNode := &box{ //nolint:exhaustruct // intentional zero fields
-		node: node, style: e.stylePtr(node), kind: "replaced", x: posX, y: posY,
+		node: node, style: e.stylePtr(node), kind: boxKindReplaced, x: posX, y: posY,
 	}
 
 	data := e.serializeInlineSVG(node)

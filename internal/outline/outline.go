@@ -7,6 +7,8 @@
 package outline
 
 import (
+	"bytes"
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -31,6 +33,9 @@ type LocationReader interface {
 	PageIndex() int
 	Bounds() (float64, float64, float64, float64)
 }
+
+// Compile-time checks: Location satisfies the location reader seam.
+var _ LocationReader = Location{}
 
 // NodeRef returns the associated HTML node.
 func (l Location) NodeRef() *html.Node { return l.Node }
@@ -154,6 +159,10 @@ func parseBookmarkStyle(styleAttr string, baseLevel int) (int, string) {
 // h1..h6 element with its whitespace-collapsed text title. Location fields
 // are zero until Lookup runs.
 func CollectHeadings(root *html.Node) []*Heading {
+	if root == nil {
+		return nil
+	}
+
 	var out []*Heading
 
 	root.Walk(func(node *html.Node) {
@@ -237,6 +246,17 @@ type Options struct {
 	Exclude []css.Selector
 }
 
+// Validate rejects option values that would silently change tree
+// construction. A negative MaxDepth would be treated as "keep everything"
+// (only positive values gate depth), so it fails fast instead.
+func (o Options) Validate() error {
+	if o.MaxDepth < 0 {
+		return fmt.Errorf("outline: MaxDepth must be non-negative, got %d", o.MaxDepth)
+	}
+
+	return nil
+}
+
 // SortHeadings brings headings into the order used by the tree, the TOC and
 // the section lookup: page, y-down within a page, then x.
 func SortHeadings(hs []*Heading) {
@@ -250,16 +270,37 @@ func SortHeadingsBy(hs []*Heading, pageOf PageOf) {
 
 	sort.SliceStable(hs, func(i, j int) bool {
 		leftH, rightH := hs[i], hs[j]
-		if pageOf(leftH) != pageOf(rightH) {
-			return pageOf(leftH) < pageOf(rightH)
+		leftPage, rightPage := pageOf(leftH), pageOf(rightH)
+
+		if leftPage != rightPage {
+			return leftPage < rightPage
 		}
 
-		if leftH.Y != rightH.Y {
-			return leftH.Y < rightH.Y
+		leftY, rightY := headingY(leftH), headingY(rightH)
+		if leftY != rightY {
+			return leftY < rightY
 		}
 
-		return leftH.X < rightH.X
+		return headingX(leftH) < headingX(rightH)
 	})
+}
+
+// headingY returns the heading's Y coordinate, 0 for a nil heading.
+func headingY(h *Heading) float64 {
+	if h == nil {
+		return 0
+	}
+
+	return h.Y
+}
+
+// headingX returns the heading's X coordinate, 0 for a nil heading.
+func headingX(h *Heading) float64 {
+	if h == nil {
+		return 0
+	}
+
+	return h.X
 }
 
 // SectionOf mirrors the wkhtmltopdf outline cache: section = first heading at
@@ -291,6 +332,10 @@ func SectionOfBy(headings []*Heading, page int, pageOf PageOf) (string, string) 
 		return first.Title, ""
 	}
 
+	if last != nil {
+		return "", last.Title
+	}
+
 	return "", ""
 }
 
@@ -304,14 +349,18 @@ func SectionOfBy(headings []*Heading, page int, pageOf PageOf) (string, string) 
 // heading's depth is clamped to previous+1 so the tree stays connected and
 // never skips levels. Titles, anchors and sort order are unaffected by the
 // clamp.
-func BuildTree(headings []*Heading, opts Options) *Node {
+func BuildTree(headings []*Heading, opts Options) (*Node, error) {
 	return BuildTreeBy(headings, opts, LocalPage)
 }
 
 // BuildTreeBy builds an outline tree using pageOf for ordering. The accessor
 // is carried explicitly instead of requiring callers to copy document-global
 // pages into Heading.Page.
-func BuildTreeBy(headings []*Heading, opts Options, pageOf PageOf) *Node {
+func BuildTreeBy(headings []*Heading, opts Options, pageOf PageOf) (*Node, error) {
+	if err := opts.Validate(); err != nil {
+		return nil, err
+	}
+
 	pageOf = normalizePageOf(pageOf)
 	sel := make([]*Heading, 0, len(headings))
 
@@ -350,7 +399,7 @@ func BuildTreeBy(headings []*Heading, opts Options, pageOf PageOf) *Node {
 		stackLevel = append(stackLevel, lvl)
 	}
 
-	return root
+	return root, nil
 }
 
 // Flatten returns the tree's nodes in depth-first document order - the order
@@ -390,17 +439,17 @@ func DumpOutlineXMLOffset(root *Node, pageOffset int) []byte {
 func DumpOutlineXMLBy(root *Node, pageOffset int, pageOf PageOf) []byte {
 	pageOf = normalizePageOf(pageOf)
 
-	var buf strings.Builder
+	var buf bytes.Buffer
 
 	buf.WriteString("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
 	buf.WriteString("<outline xmlns=\"http://wkhtmltopdf.org/outline\">\n")
 	dumpNode(root, &buf, 1, pageOffset, pageOf)
 	buf.WriteString("</outline>\n")
 
-	return []byte(buf.String())
+	return append([]byte(nil), buf.Bytes()...)
 }
 
-func dumpNode(node *Node, buf *strings.Builder, depth, pageOffset int, pageOf PageOf) {
+func dumpNode(node *Node, buf *bytes.Buffer, depth, pageOffset int, pageOf PageOf) {
 	pad := strings.Repeat("  ", depth)
 
 	for _, child := range node.Children {

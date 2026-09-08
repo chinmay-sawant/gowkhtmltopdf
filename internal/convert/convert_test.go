@@ -269,8 +269,8 @@ func TestMediaForPDF(t *testing.T) {
 	if got := mediaFor(glob, &obj); got != mediaPrint {
 		t.Errorf("object media-type print = %q, want print", got)
 	}
-	// MediaIgnore is zero/unset — keeps PDF print default.
-	obj.Load.MediaType = settings.MediaIgnore
+	// MediaUnset is zero/unset — keeps PDF print default.
+	obj.Load.MediaType = settings.MediaUnset
 	if got := mediaFor(glob, &obj); got != mediaPrint {
 		t.Errorf("object media-type ignore/unset = %q, want print", got)
 	}

@@ -68,6 +68,14 @@ var (
 	errRasterTooLarge  = errors.New("imageout: raster exceeds resource budget")
 	errImageTooLarge   = errors.New("imageout: image exceeds resource budget")
 	errEncodedTooLarge = errors.New("imageout: encoded image exceeds resource budget")
+	// errNegativeDimension reports a RenderOptions width or height below
+	// zero; 0 keeps the documented defaults (1024 viewport, content height).
+	errNegativeDimension = errors.New("imageout: width and height must be non-negative")
+	// errInvalidCropRect reports negative crop offsets or dimensions.
+	errInvalidCropRect = errors.New("imageout: crop offsets and dimensions must be non-negative")
+	// errInvalidMediaType reports a media value other than print, screen,
+	// or empty (which applies only "all" rules).
+	errInvalidMediaType = errors.New("imageout: media must be print, screen, or empty")
 )
 
 // ptToPx maps layout canvas points to output pixels. The layout engine works
@@ -113,6 +121,27 @@ type RenderOptions struct {
 	PrintLinkUnderline bool
 }
 
+// Validate rejects caller mistakes before any layout or rasterization
+// work: negative Width/Height (0 keeps the documented defaults), a crop
+// with negative offsets or dimensions (which would silently no-op through
+// applyCrop), and media values other than print, screen, or empty.
+func (o RenderOptions) Validate() error {
+	if o.Width < 0 || o.Height < 0 {
+		return fmt.Errorf("%w: got %dx%d", errNegativeDimension, o.Width, o.Height)
+	}
+
+	if o.Crop.Min.X < 0 || o.Crop.Min.Y < 0 || o.Crop.Dx() < 0 || o.Crop.Dy() < 0 {
+		return fmt.Errorf("%w: got %v", errInvalidCropRect, o.Crop)
+	}
+
+	switch strings.ToLower(strings.TrimSpace(o.Media)) {
+	case "", "print", "screen":
+		return nil
+	default:
+		return fmt.Errorf("%w: got %q", errInvalidMediaType, o.Media)
+	}
+}
+
 // Render lays out root and rasterizes the result. The canvas is the viewport
 // (or, with SmartWidth, the smallest grown viewport that fits the content)
 // wide and max(content height, Height) tall. A non-empty Crop is applied to
@@ -127,6 +156,10 @@ func Render(root *html.Node, opts RenderOptions) (image.Image, error) {
 func RenderContext(ctx context.Context, root *html.Node, opts RenderOptions) (image.Image, error) {
 	if root == nil {
 		return nil, errNilRoot
+	}
+
+	if err := opts.Validate(); err != nil {
+		return nil, err
 	}
 
 	if ctx == nil {
@@ -1594,36 +1627,49 @@ func RunRequest(ctx context.Context, req *Request, log io.Writer) error {
 		log = io.Discard
 	}
 
+	pipeline, err := newImagePipeline(req, log)
+	if err != nil {
+		return err
+	}
+
+	if err := renderpipeline.Run(ctx, pipeline); err != nil {
+		return fmt.Errorf("imageout: render pipeline: %w", err)
+	}
+
+	return nil
+}
+
+// newImagePipeline builds the image pipeline and its dependencies (loader,
+// default font, registry) from the request. RunRequest is then just wiring:
+// construct the pipeline, run it. The loader is built here so the full image
+// load policy applies at construction (Image.Load proxy plus Global.Load
+// ACL), with no post-construction field pokes on the Loader.
+func newImagePipeline(req *Request, log io.Writer) (*imagePipeline, error) {
 	obj := &req.Objects[0]
 
-	// P2-07: full load policy at construction. Image.Load holds image-mode
-	// Proxy; CLI/library ACL (--allow / --enable-local-file-access) lives on
-	// Global.Load. Merge so NewLoader applies everything; no post-construction
-	// field pokes on Loader.
-	loader := load.NewLoader(imageLoadGlobal(req.Global, req.Image))
-	loader.Log = log
+	loader, err := load.NewLoaderWithError(imageLoadGlobal(req.Global, req.Image))
+	if err != nil {
+		return nil, fmt.Errorf("imageout: loader: %w", err)
+	}
+
+	loader.SetLog(log)
 
 	font, err := pdf.DefaultFont()
 	if err != nil {
-		return fmt.Errorf("default font: %w", err)
+		return nil, fmt.Errorf("default font: %w", err)
 	}
 
 	registry := pdf.RegistryFromGlobal(req.Global)
 	pdf.LogFontRegistryScan(req.Global, log)
 
-	pipeline := &imagePipeline{ //nolint:exhaustruct // image is populated during RenderObjects
+	return &imagePipeline{ //nolint:exhaustruct // image is populated during RenderObjects
 		req:      req,
 		obj:      obj,
 		loader:   loader,
 		font:     font,
 		registry: registry,
 		log:      log,
-	}
-	if err := renderpipeline.Run(ctx, pipeline); err != nil {
-		return fmt.Errorf("imageout: render pipeline: %w", err)
-	}
-
-	return nil
+	}, nil
 }
 
 // imagePipeline adapts image-specific state to the shared render lifecycle.
@@ -1638,6 +1684,9 @@ type imagePipeline struct {
 	log      io.Writer
 	img      image.Image
 }
+
+// Compile-time check: imagePipeline satisfies the shared render lifecycle seam.
+var _ renderpipeline.Pipeline = (*imagePipeline)(nil)
 
 func (p *imagePipeline) RenderObjects(ctx context.Context) error {
 	imgSet := &p.req.Image

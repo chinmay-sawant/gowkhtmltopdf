@@ -7,6 +7,7 @@ package settings
 import (
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 )
@@ -54,6 +55,19 @@ func errParse(kind, raw string) error {
 	return parseError{kind: kind, raw: raw}
 }
 
+// rangeError reports a numeric setting value outside its allowed range.
+type rangeError struct {
+	value, allowed string
+}
+
+func (e rangeError) Error() string {
+	return fmt.Sprintf("value %q out of range (allowed: %s)", e.value, e.allowed)
+}
+
+func errRange(value, allowed string) error {
+	return rangeError{value: value, allowed: allowed}
+}
+
 // unitError reports a measurement unit that cannot be converted to millimetres.
 type unitError struct {
 	ctx  string
@@ -67,6 +81,15 @@ func (e unitError) Error() string {
 func errUnitNotConvertible(ctx, unit string) error {
 	return unitError{ctx: ctx, unit: unit}
 }
+
+// Compile-time checks: every settings error value satisfies the error interface.
+var (
+	_ error = invalidError{}        //nolint:exhaustruct,gci // zero-value probe for interface conformance
+	_ error = unknownSettingError{} //nolint:exhaustruct,gci // zero-value probe
+	_ error = parseError{}          //nolint:exhaustruct,gci // zero-value probe
+	_ error = rangeError{}          //nolint:exhaustruct,gci // zero-value probe
+	_ error = unitError{}           //nolint:exhaustruct,gci // zero-value probe
+)
 
 // Raw string values accepted by the setter helpers.
 const (
@@ -256,6 +279,53 @@ func setInt(target *int) setter {
 	}
 }
 
+// Numeric range bounds enforced by the ranged setters. Out-of-range values
+// fail at Set instead of downstream.
+const (
+	minCopies  = 1
+	maxCopies  = 1000 // mirrors the convert engine ceiling (render.MaxCopies)
+	minQuality = 0
+	maxQuality = 100
+	minTimeout = 0
+	minZoom    = 0
+)
+
+// setIntRange parses raw as an int and rejects values outside [low, high].
+func setIntRange(target *int, low, high int) setter {
+	return func(raw string) error {
+		value, err := strconv.Atoi(raw)
+		if err != nil {
+			return errParse("integer", raw)
+		}
+
+		if value < low || value > high {
+			return errRange(raw, fmt.Sprintf("%d to %d", low, high))
+		}
+
+		*target = value
+
+		return nil
+	}
+}
+
+// setFloatMin parses raw as a float and rejects values below minimum.
+func setFloatMin(target *float64, minimum float64) setter {
+	return func(raw string) error {
+		value, err := strconv.ParseFloat(raw, 64)
+		if err != nil {
+			return errParse("number", raw)
+		}
+
+		if value < minimum {
+			return errRange(raw, fmt.Sprintf("at least %g", minimum))
+		}
+
+		*target = value
+
+		return nil
+	}
+}
+
 func setString(target *string) setter {
 	return func(raw string) error {
 		*target = raw
@@ -302,7 +372,7 @@ func setMediaType(media *MediaType) setter {
 	return func(raw string) error {
 		switch normalize(raw) {
 		case "", sIgnore:
-			*media = MediaIgnore
+			*media = MediaUnset
 
 			return nil
 		case sScreen:
@@ -333,31 +403,37 @@ func setGrayscaleFromColorMode(grayscale *bool) setter {
 	}
 }
 
-// marginEdgePtr returns the field of margin named by edge.
-func marginEdgePtr(margin *Margin, edge string) *float64 {
+// marginEdgePtr returns the field of margin named by edge. The bool is false
+// for an unrecognized edge, so a typo cannot silently target Right.
+func marginEdgePtr(margin *Margin, edge string) (*float64, bool) {
 	switch edge {
 	case "top":
-		return &margin.Top
+		return &margin.Top, true
 	case "bottom":
-		return &margin.Bottom
+		return &margin.Bottom, true
 	case "left":
-		return &margin.Left
+		return &margin.Left, true
+	case "right":
+		return &margin.Right, true
 	default:
-		return &margin.Right
+		return nil, false
 	}
 }
 
-// marginValue returns the field of margin named by edge.
-func marginValue(margin *Margin, edge string) float64 {
+// marginValue returns the field of margin named by edge. The bool is false
+// for an unrecognized edge, mirroring marginEdgePtr.
+func marginValue(margin *Margin, edge string) (float64, bool) {
 	switch edge {
 	case "top":
-		return margin.Top
+		return margin.Top, true
 	case "bottom":
-		return margin.Bottom
+		return margin.Bottom, true
 	case "left":
-		return margin.Left
+		return margin.Left, true
+	case "right":
+		return margin.Right, true
 	default:
-		return margin.Right
+		return 0, false
 	}
 }
 
@@ -381,9 +457,19 @@ func setUnitMm(target *float64, ctx string) setter {
 	}
 }
 
-// marginSetter writes one edge of a Margin, storing millimetres.
+var errUnknownMarginEdge = errors.New("unknown margin edge")
+
+// marginSetter writes one edge of a Margin, storing millimetres. An unknown
+// edge is rejected rather than silently targeting the right margin.
 func marginSetter(margin *Margin, edge string) setter {
-	return setUnitMm(marginEdgePtr(margin, edge), "margin "+edge)
+	target, ok := marginEdgePtr(margin, edge)
+	if !ok {
+		return func(string) error {
+			return fmt.Errorf("%w %q (allowed: top|bottom|left|right)", errUnknownMarginEdge, edge)
+		}
+	}
+
+	return setUnitMm(target, "margin "+edge)
 }
 
 func appendString(dst *[]string) setter {
@@ -448,7 +534,7 @@ func registerGlobalKeys(keys keyTable[PdfGlobal]) {
 		func(dst *PdfGlobal) (string, bool) { return fmtInt(dst.PageOffset), true },
 	)
 	regGlobal("copies",
-		func(dst *PdfGlobal, raw string) error { return setInt(&dst.Copies)(raw) },
+		func(dst *PdfGlobal, raw string) error { return setIntRange(&dst.Copies, minCopies, maxCopies)(raw) },
 		func(dst *PdfGlobal) (string, bool) { return fmtInt(dst.Copies), true },
 	)
 	regGlobal("collate",
@@ -586,7 +672,14 @@ func registerGlobalGeometryKeys(keys keyTable[PdfGlobal]) {
 	for _, edge := range []string{"top", "bottom", "left", "right"} {
 		regGlobal("margin."+edge,
 			func(dst *PdfGlobal, raw string) error { return marginSetter(&dst.Margin, edge)(raw) },
-			func(dst *PdfGlobal) (string, bool) { return fmtFloat(marginValue(&dst.Margin, edge)), true },
+			func(dst *PdfGlobal) (string, bool) {
+				val, ok := marginValue(&dst.Margin, edge)
+				if !ok {
+					return "", false
+				}
+
+				return fmtFloat(val), true
+			},
 		)
 	}
 
@@ -597,7 +690,9 @@ func registerGlobalGeometryKeys(keys keyTable[PdfGlobal]) {
 				return err
 			}
 
-			dst.PageSize = val
+			// Store the canonical (table-key) case so Set/Get round-trips
+			// are stable regardless of the caller's spelling.
+			dst.PageSize = strings.ToLower(val)
 
 			return nil
 		},
@@ -750,7 +845,7 @@ func registerWebKeys(globals keyTable[PdfGlobal], objects keyTable[PdfObject], i
 func registerLoadPageKeys(objects keyTable[PdfObject]) {
 	for key, entry := range subTable([]subEntry[LoadPage]{
 		{"zoomfactor",
-			func(l *LoadPage, raw string) error { return setFloat(&l.ZoomFactor)(raw) },
+			func(l *LoadPage, raw string) error { return setFloatMin(&l.ZoomFactor, minZoom)(raw) },
 			func(l *LoadPage) (string, bool) { return fmtFloat(l.ZoomFactor), true },
 		},
 		{"blocklocalfileaccess",
@@ -778,7 +873,7 @@ func registerLoadPageKeys(objects keyTable[PdfObject]) {
 			func(l *LoadPage) (string, bool) { return fmtBool(l.PrintMediaType), true },
 		},
 		{"timeout",
-			func(l *LoadPage, raw string) error { return setInt(&l.Timeout)(raw) },
+			func(l *LoadPage, raw string) error { return setIntRange(&l.Timeout, minTimeout, math.MaxInt)(raw) },
 			func(l *LoadPage) (string, bool) { return fmtInt(l.Timeout), true },
 		},
 	}) {
@@ -835,7 +930,9 @@ func registerImageKeys(keys keyTable[ImageGlobal]) {
 		func(dst *ImageGlobal) (string, bool) { return fmtInt(dst.Height), true },
 	)
 	regImage("quality",
-		func(dst *ImageGlobal, raw string) error { return setInt(&dst.Quality)(raw) },
+		func(dst *ImageGlobal, raw string) error {
+			return setIntRange(&dst.Quality, minQuality, maxQuality)(raw)
+		},
 		func(dst *ImageGlobal) (string, bool) { return fmtInt(dst.Quality), true },
 	)
 	regImage("smartwidth",

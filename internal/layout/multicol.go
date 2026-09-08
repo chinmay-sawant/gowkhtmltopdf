@@ -33,7 +33,7 @@ type multicolSeg struct {
 // path (best-effort; not Chrome-balanced with floats).
 func (e *engine) buildMulticol(node *html.Node, style ResolvedStyle, availW, x, yPos float64) *box {
 	boxNode := &box{ //nolint:exhaustruct // intentional zero fields
-		node: node, style: e.stylePtr(node), kind: displayBlock, x: x, y: yPos,
+		node: node, style: e.stylePtr(node), kind: boxKindBlock, x: x, y: yPos,
 	}
 	boxNode.w = resolveUsedWidth(style, availW, e)
 	boxNode.x = x + e.multicolAutoMargin(style, availW, boxNode.w)

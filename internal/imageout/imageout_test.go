@@ -547,7 +547,10 @@ func TestPrepareImageDocumentUsesImageWidthViewport(t *testing.T) {
 		</style></head><body>Hello</body></html>`,
 	}
 
-	loader := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // default loader
+	loader, err := load.NewLoaderWithError(settings.LoadGlobal{}) //nolint:exhaustruct // default loader
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	prep, _, err := prepareImageDocument(t.Context(), loader, obj, settings.PdfGlobal{}, imgSet, nil, io.Discard)
 	if err != nil {

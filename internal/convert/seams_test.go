@@ -124,7 +124,11 @@ func TestPrepareDocumentBindsSharedResourceContext(t *testing.T) { //nolint:cycl
 	lineP := settings.DefaultLoadPage()
 	lineP.InlineHTML = []byte(`<html><head><style>body { color: #123456 }</style></head><body>hello</body></html>`)
 	lineP.InlineBase = "https://example.test/reports/"
-	loader := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero-value fields
+
+	loader, err := load.NewLoaderWithError(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero-value fields
+	if err != nil {
+		t.Fatalf("new loader: %v", err)
+	}
 
 	prep, err := prepare.Document(t.Context(), loader, "ignored", lineP, nil, prepare.Options{ //nolint:exhaustruct,lll // intentional zero-value fields
 		ViewportW:   500,
@@ -170,7 +174,12 @@ func TestPrepareDocumentPreservesSkipForCallerPolicy(t *testing.T) {
 	defer srv.Close()
 
 	global := settings.LoadGlobal{} //nolint:exhaustruct // intentional zero-value fields
-	loader := load.NewLoader(global)
+
+	loader, err := load.NewLoaderWithError(global)
+	if err != nil {
+		t.Fatalf("new loader: %v", err)
+	}
+
 	lp := settings.DefaultLoadPage()
 	lp.LoadErrorHandling = settings.LoadErrorSkip
 

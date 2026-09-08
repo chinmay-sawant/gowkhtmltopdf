@@ -576,7 +576,10 @@ func TestGoldenFixture03Performance(t *testing.T) { //nolint:funlen // perf harn
 	cmd := requestForFixture(t, "fixture-03-multi-page-invoice.html")
 
 	ctx := t.Context()
-	loader := load.NewLoader(cmd.Global.Load)
+	loader, err := load.NewLoaderWithError(cmd.Global.Load)
+	if err != nil {
+		t.Fatalf("new loader: %v", err)
+	}
 
 	res, err := loader.Load(ctx, cmd.Objects[0].Page, cmd.Objects[0].Load)
 	if err != nil {

@@ -524,6 +524,9 @@ func (d *Document) WriteTo(width io.Writer) (int64, error) {
 	return d.writeTo(width)
 }
 
+// Compile-time check: Document satisfies io.WriterTo.
+var _ io.WriterTo = (*Document)(nil)
+
 func writePDFFormat(out *countingWriter, format string, args ...any) error {
 	_, err := fmt.Fprintf(out, format, args...)
 

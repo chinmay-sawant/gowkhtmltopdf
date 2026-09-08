@@ -50,7 +50,11 @@ func TestImageLoadGlobalUsesOneEffectivePolicy(t *testing.T) {
 		t.Fatalf("image effective load global = %+v, want %+v", effective, want)
 	}
 
-	loader := load.NewLoader(effective)
+	loader, err := load.NewLoaderWithError(effective)
+	if err != nil {
+		t.Fatalf("new loader: %v", err)
+	}
+
 	if !reflect.DeepEqual(loader.Network.AllowedSchemes, want.NetworkAllowedSchemes) ||
 		!reflect.DeepEqual(loader.Network.AllowedHosts, want.NetworkAllowedHosts) ||
 		!loader.Network.BlockPrivateNetworks || !loader.Network.BlockCrossHostRedirects {

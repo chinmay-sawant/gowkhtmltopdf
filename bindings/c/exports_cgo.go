@@ -178,6 +178,10 @@ func runPDFWithContext(ctx context.Context, html []byte, opts pdfOptions) (int32
 // runImageWithContext renders one inline HTML page to encoded image bytes
 // using the same conventions as runPDFWithContext.
 func runImageWithContext(ctx context.Context, html []byte, opts imageOptions) (int32, []byte, string) {
+	if message, ok := validateImageRange(opts); !ok {
+		return statusInvalidArg, nil, message
+	}
+
 	var output bytes.Buffer
 	if err := buildImageDocument(html, opts).WriteImage(ctx, &output); err != nil {
 		return classifyError(err, ctx), nil, err.Error()
@@ -279,7 +283,11 @@ func convertPDFOptions(cOpts *C.GwkPdfOptions, cErr **C.char) (pdfOptions, bool)
 		return opts, false
 	}
 
-	convertPDFStrings(cOpts, &opts)
+	if !convertPDFStrings(cOpts, &opts) {
+		rejectRequest(allowListMessage(int64(cOpts.allow_len)), cErr)
+
+		return opts, false
+	}
 	convertPDFNumbers(cOpts, &opts)
 
 	return opts, true
@@ -287,7 +295,8 @@ func convertPDFOptions(cOpts *C.GwkPdfOptions, cErr **C.char) (pdfOptions, bool)
 
 // convertPDFStrings copies the borrowed string and array fields of a PDF
 // options struct. Nil strings behave like empty ones per the header contract.
-func convertPDFStrings(cOpts *C.GwkPdfOptions, opts *pdfOptions) {
+// The bool is false when the allow array length exceeds the cap.
+func convertPDFStrings(cOpts *C.GwkPdfOptions, opts *pdfOptions) bool {
 	if cOpts.page_size != nil {
 		opts.pageSize = C.GoString(cOpts.page_size)
 	}
@@ -307,7 +316,13 @@ func convertPDFStrings(cOpts *C.GwkPdfOptions, opts *pdfOptions) {
 		opts.baseURL = C.GoString(cOpts.base_url)
 	}
 
-	opts.allow = convertAllowList(cOpts.allow, cOpts.allow_len)
+	allow, ok := convertAllowList(cOpts.allow, cOpts.allow_len)
+	if !ok {
+		return false
+	}
+	opts.allow = allow
+
+	return true
 }
 
 // convertPDFNumbers copies the scalar fields of a PDF options struct.
@@ -351,7 +366,14 @@ func convertImageOptions(cOpts *C.GwkImageOptions, cErr **C.char) (imageOptions,
 	if cOpts.base_url != nil {
 		opts.baseURL = C.GoString(cOpts.base_url)
 	}
-	opts.allow = convertAllowList(cOpts.allow, cOpts.allow_len)
+
+	allow, ok := convertAllowList(cOpts.allow, cOpts.allow_len)
+	if !ok {
+		rejectRequest(allowListMessage(int64(cOpts.allow_len)), cErr)
+
+		return opts, false
+	}
+	opts.allow = allow
 
 	opts.width = int(cOpts.width)
 	opts.height = int(cOpts.height)
@@ -370,11 +392,21 @@ func convertImageOptions(cOpts *C.GwkImageOptions, cErr **C.char) (imageOptions,
 	return opts, true
 }
 
+// maxAllowEntries is defined in options_image.go and caps caller-controlled
+// allow array lengths before an unsafe slice is formed. The allow array is
+// borrowed from the caller, so an unbounded length would read out of bounds
+// and crash the process from inside an exported call.
+
 // convertAllowList copies allow_len entries from the borrowed allow array.
 // Nil entries are skipped because the header lets callers leave slots empty.
-func convertAllowList(allow **C.char, allowLen C.size_t) []string {
+// The bool is false when allow_len exceeds maxAllowEntries; no slice is
+// formed in that case.
+func convertAllowList(allow **C.char, allowLen C.size_t) ([]string, bool) {
 	if allow == nil || allowLen == 0 {
-		return nil
+		return nil, true
+	}
+	if allowLen > maxAllowEntries {
+		return nil, false
 	}
 
 	entries := unsafe.Slice(allow, int(allowLen))
@@ -387,10 +419,85 @@ func convertAllowList(allow **C.char, allowLen C.size_t) []string {
 	}
 
 	if len(copied) == 0 {
-		return nil
+		return nil, true
 	}
 
-	return copied
+	return copied, true
+}
+
+// probeAllowListTooLong reports whether convertAllowList rejects a length
+// above the cap without touching the array. The pointer is a single dummy
+// slot, so any read past the guard would be out of bounds. Test-only helper:
+// cgo is not supported in test files, so C pointer work stays here.
+func probeAllowListTooLong() ([]string, bool) {
+	var slot *C.char
+
+	return convertAllowList(&slot, C.size_t(maxAllowEntries+1))
+}
+
+// probeAllowListCopies drives convertAllowList over a C array holding the
+// given strings, leaving nil entries where nilAt marks the index. The
+// borrowed C memory is released before returning.
+func probeAllowListCopies(values []string, nilAt map[int]bool) ([]string, bool) {
+	cValues := make([]*C.char, len(values))
+	defer func() {
+		for _, p := range cValues {
+			if p != nil {
+				C.free(unsafe.Pointer(p))
+			}
+		}
+	}()
+
+	for i, v := range values {
+		if nilAt[i] {
+			continue
+		}
+		cValues[i] = C.CString(v)
+	}
+
+	return convertAllowList(&cValues[0], C.size_t(len(cValues)))
+}
+
+// probeFinishResult drives finishResult with Go-side flags selecting which
+// out parameters are nil, releasing every allocation before returning. The
+// returned message is the diagnostic that would land in cErr (empty on
+// success).
+func probeFinishResult(
+	status int32,
+	data []byte,
+	message string,
+	nilOutData, nilOutLen, nilErr bool,
+) (int32, int, string) {
+	var out *C.uchar
+	var outLen C.size_t
+	var cErr *C.char
+
+	var outDataP **C.uchar
+	var outLenP *C.size_t
+	var errP **C.char
+	if !nilOutData {
+		outDataP = &out
+	}
+	if !nilOutLen {
+		outLenP = &outLen
+	}
+	if !nilErr {
+		errP = &cErr
+	}
+
+	got := finishResult(status, data, message, outDataP, outLenP, errP)
+
+	if out != nil {
+		gowkhtmltopdf_free(unsafe.Pointer(out))
+	}
+	if cErr == nil {
+		return int32(got), int(outLen), ""
+	}
+
+	msg := C.GoString(cErr)
+	gowkhtmltopdf_free_string(cErr)
+
+	return int32(got), int(outLen), msg
 }
 
 // finishResult writes the success payload or the failure diagnostic into the
@@ -406,6 +513,12 @@ func finishResult(
 	cOutLen *C.size_t,
 	cErr **C.char,
 ) C.int {
+	if cOutData == nil || cOutLen == nil || cErr == nil {
+		rejectRequest("nil out parameter", cErr)
+
+		return C.int(statusInvalidArg)
+	}
+
 	if status == statusOK && len(data) > 0 {
 		*cOutData = (*C.uchar)(C.CBytes(data))
 		*cOutLen = C.size_t(len(data))

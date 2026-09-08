@@ -430,12 +430,19 @@ type hfDrawWarning struct {
 
 type hfDrawResult struct {
 	warnings []hfDrawWarning
+	// fatal carries a run-level failure (cancellation) that is not a
+	// per-band recoverable error. It takes precedence over warnings.
+	fatal error
 }
 
 // Err returns the aggregate failure for strict conversion callers. The
 // compatibility adapter may still emit warnings, but the primary PDF engine
 // must not report success when required header/footer content was omitted.
 func (r *hfDrawResult) Err() error {
+	if r.fatal != nil {
+		return r.fatal
+	}
+
 	if len(r.warnings) == 0 {
 		return nil
 	}
@@ -713,8 +720,8 @@ func effectiveMargins(ctx context.Context, loader *load.Loader, font *pdf.Font, 
 // collected, and the adapter emits one warning per failed band.
 //
 //nolint:lll,unused // compatibility adapter for existing caller
-func drawHeadersFooters(ctx context.Context, loader *load.Loader, font *pdf.Font, doc *pdf.Document, req *Request, plan *pagePlan, headings []*outline.Heading, log io.Writer) {
-	res := drawHeadersFootersResult(ctx, loader, font, doc, req, plan, headings, log)
+func drawHeadersFooters(ctx context.Context, hf hfLoader, doc *pdf.Document, req *Request, plan *pagePlan, headings []*outline.Heading, log io.Writer) {
+	res := drawHeadersFootersResult(ctx, hf, doc, req, plan, headings, log)
 	res.emitWarnings(log)
 }
 
@@ -724,7 +731,7 @@ func drawHeadersFooters(ctx context.Context, loader *load.Loader, font *pdf.Font
 // Returning a result keeps failure handling testable and gives a future
 // caller a precise integration point for a strict policy without changing
 // the current convert.Run signature.
-func drawHeadersFootersResult(ctx context.Context, loader *load.Loader, font *pdf.Font, doc *pdf.Document, req *Request, plan *pagePlan, headings []*outline.Heading, log io.Writer) hfDrawResult { //nolint:gocognit,cyclop,funlen,lll // per-page draw dispatch with lazy HF load
+func drawHeadersFootersResult(ctx context.Context, hf hfLoader, doc *pdf.Document, req *Request, plan *pagePlan, headings []*outline.Heading, log io.Writer) hfDrawResult { //nolint:gocognit,cyclop,funlen,lll // per-page draw dispatch with lazy HF load
 	var result hfDrawResult
 
 	total := doc.PageCount()
@@ -739,6 +746,12 @@ func drawHeadersFootersResult(ctx context.Context, loader *load.Loader, font *pd
 	}
 
 	for pVal := range total {
+		if err := ctx.Err(); err != nil {
+			result.fatal = err
+
+			break
+		}
+
 		own, ok := plan.OwnerOf(pVal)
 		if !ok || own.st == nil {
 			continue
@@ -798,7 +811,7 @@ func drawHeadersFootersResult(ctx context.Context, loader *load.Loader, font *pd
 
 					var reg *pdf.Registry
 
-					lst, reg, err = loadHTMLHF(ctx, loader, font, own.st, hfVal.HTMLURL, log)
+					lst, reg, err = hf.loadHF(ctx, own.st, hfVal.HTMLURL)
 					if err != nil {
 						result.warn(own.st.idx, pVal, band, fmt.Errorf("html load: %w", err))
 
@@ -823,7 +836,7 @@ func drawHeadersFootersResult(ctx context.Context, loader *load.Loader, font *pd
 				return
 			}
 
-			drawTextHF(page, hfVal, own.st.geom, parms, font, own.st.registry, isHeader)
+			drawTextHF(page, hfVal, own.st.geom, parms, hf.defaultFont(), own.st.registry, isHeader)
 		}
 		draw(own.st.header, true)
 		draw(own.st.footer, false)

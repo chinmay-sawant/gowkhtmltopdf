@@ -22,9 +22,9 @@ func TestPolicyValidation(t *testing.T) {
 		wantErr error
 	}{
 		{
-			name:    "default zero value is valid PDF14",
+			name:    "zero value PDFUnknown is rejected",
 			policy:  WriterPolicy{}, //nolint:exhaustruct // testing zero-value behavior
-			wantErr: nil,
+			wantErr: ErrUnsupportedPDFVersion,
 		},
 		{
 			name:    "explicit PDF14 is valid",

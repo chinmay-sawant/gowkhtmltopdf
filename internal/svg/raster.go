@@ -95,7 +95,7 @@ func dpmmScaleFactor(targetW, targetH, maxSide int) float64 {
 	return scale
 }
 
-//nolint:nonamedreturns // defer-recover must override the result values
+//nolint:nonamedreturns,cyclop // defer-recover must override the result values; SVG raster has inherent branches
 func rasterizeCanvas(data []byte, maxSide int) (pngBytes []byte, w, h int, err error) {
 	canvasMu.Lock()
 	defer canvasMu.Unlock()
@@ -113,7 +113,11 @@ func rasterizeCanvas(data []byte, maxSide int) (pngBytes []byte, w, h int, err e
 	}
 
 	canvasW, canvasH := svgCanvas.Size()
-	if canvasW <= 0 || canvasH <= 0 {
+	// NaN fails <= 0, so both non-finite and non-positive sizes must be
+	// rejected explicitly before they reach the rasterizer.
+	if canvasW <= 0 || canvasH <= 0 ||
+		math.IsNaN(canvasW) || math.IsNaN(canvasH) ||
+		math.IsInf(canvasW, 0) || math.IsInf(canvasH, 0) {
 		return nil, 0, 0, errCanvasEmptySize
 	}
 

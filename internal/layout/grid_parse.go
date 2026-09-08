@@ -7,10 +7,15 @@ import (
 
 // --- Track parsing (minmax / fr / intrinsic) --------------------------------
 
+// trackSizeKind names one CSS grid track sizing keyword. trackUnknown is the
+// zero value: a gridTrackSize that was never assigned a kind means "no
+// resolved size", so every producer (parseTrackSize and friends) assigns an
+// explicit member.
 type trackSizeKind int
 
 const (
-	trackFixed trackSizeKind = iota
+	trackUnknown trackSizeKind = iota
+	trackFixed
 	trackFr
 	trackAuto
 	trackMinContent

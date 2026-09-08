@@ -132,7 +132,7 @@ func findFixture60Table(t *testing.T, res *Result) *box {
 	var table *box
 
 	for _, b := range flowBoxList(res) {
-		if b.kind == displayTable && len(b.rows) > 100 {
+		if b.kind == boxKindTable && len(b.rows) > 100 {
 			table = b
 
 			break

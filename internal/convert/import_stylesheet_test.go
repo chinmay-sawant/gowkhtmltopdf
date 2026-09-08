@@ -23,7 +23,11 @@ func TestImportStylesheet(t *testing.T) {
 .from-a { color: #ff0000 }`)
 	writeImportCSS(t, dir, "b.css", `.from-b { color: #0000ff }`)
 
-	loader := load.NewLoader(cmd.Global.Load)
+	loader, err := load.NewLoaderWithError(cmd.Global.Load)
+	if err != nil {
+		t.Fatalf("new loader: %v", err)
+	}
+
 	root, err := html.ParseDocument([]byte(htmlDoc))
 
 	if err != nil {

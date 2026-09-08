@@ -61,7 +61,9 @@ func TestScaleTransformRestampAfterPagination(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	paginateOps(res, contentH)
+	if _, err := paginateOps(t.Context(), res, contentH); err != nil {
+		t.Fatal(err)
+	}
 
 	staleDrift := assertScaleChipDriftBeforeRestamp(t, res)
 

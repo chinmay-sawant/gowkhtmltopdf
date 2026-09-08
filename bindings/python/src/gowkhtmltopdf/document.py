@@ -452,6 +452,26 @@ class ImageDocument:
                 'unsupported image format "{0}"; expected png, jpg, or'
                 " jpeg".format(self.format),
             )
+        if (
+            isinstance(self.quality, bool)
+            or not isinstance(self.quality, int)
+            or self.quality < 0
+            or self.quality > 100
+        ):
+            raise InvalidArgumentError(
+                1,
+                "quality must be an integer between 0 and 100: got {0}".format(
+                    self.quality
+                ),
+            )
+        if self.crop is not None:
+            for field in ("left", "top", "width", "height"):
+                value = getattr(self.crop, field)
+                if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                    raise InvalidArgumentError(
+                        1,
+                        "crop {0} {1} must be non-negative".format(field, value),
+                    )
 
     def image(self, timeout=None):
         # type: (Optional[float]) -> bytes

@@ -1,12 +1,15 @@
 package prepare_test
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/convert/prepare"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/load"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
@@ -26,7 +29,11 @@ func TestResourceContextFetchUsesPrivateLoadSeam(t *testing.T) {
 	}))
 	defer server.Close()
 
-	loader := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // the test only needs the default HTTP loader
+	loader, err := load.NewLoaderWithError(settings.LoadGlobal{}) //nolint:exhaustruct // default HTTP loader
+	if err != nil {
+		t.Fatalf("new loader: %v", err)
+	}
+
 	loadPage := settings.DefaultLoadPage()
 	loadPage.CustomHeaders = map[string]string{"X-Resource-Policy": canonicalHeader}
 	resources := prepare.NewResourceContext(loader, server.URL+"/root.html", loadPage)
@@ -45,5 +52,31 @@ func TestResourceContextFetchUsesPrivateLoadSeam(t *testing.T) {
 
 	if got := string(resource.Body); got != "canonical resource" {
 		t.Fatalf("resource body = %q, want canonical resource", got)
+	}
+}
+
+// TestResourceContextNilLoaderDegradedPath pins the documented degraded
+// behavior of NewResourceContext(nil, ...): Fetch fails, stylesheet
+// collection returns nil, and font-face merging leaves the registry
+// unchanged. Document rejects nil loaders up front, so this path is only
+// reachable through direct construction.
+func TestResourceContextNilLoaderDegradedPath(t *testing.T) {
+	t.Parallel()
+
+	resources := prepare.NewResourceContext(nil, "https://example.test/root.html", settings.DefaultLoadPage())
+
+	if _, err := resources.Fetch(t.Context(), "child.txt"); err == nil {
+		t.Fatal("Fetch on a nil-loader context must fail")
+	} else if !strings.Contains(err.Error(), "no loader") {
+		t.Fatalf("Fetch error = %v, want the no-loader diagnostic", err)
+	}
+
+	if sheets := resources.CollectSheets(t.Context(), nil, prepare.SheetOptions{}, io.Discard); sheets != nil {
+		t.Fatalf("CollectSheets = %v, want nil on a degraded context", sheets)
+	}
+
+	registry := pdf.NewRegistry()
+	if got := resources.MergeFontFaces(t.Context(), registry, nil, 1, io.Discard); got != registry {
+		t.Fatal("MergeFontFaces must return the input registry unchanged on a degraded context")
 	}
 }

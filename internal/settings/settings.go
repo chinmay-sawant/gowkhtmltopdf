@@ -12,6 +12,7 @@ const (
 	sPDFVersion14 = "1.4"
 	sPDFVersion17 = "1.7"
 	sPDFVersion20 = "2.0"
+	sUnknown      = "unknown"
 )
 
 const (
@@ -44,6 +45,7 @@ var (
 
 	// ErrProfilePDF20Unsupported indicates PDF 2.0 conformance profiles are unsupported
 	// (historical sentinel; never returned).
+	//nolint:staticcheck // deprecated sentinel kept for compatibility
 	ErrProfilePDF20Unsupported = pdfprofile.ErrProfilePDF20Unsupported
 
 	// ErrProfilePDFA1Unsupported indicates PDF/A-1 is unsupported.
@@ -99,16 +101,20 @@ const (
 )
 
 func (m ColorMode) String() string {
-	if m == ColorModeGrayscale {
+	switch m {
+	case ColorModeColor:
+		return "color"
+	case ColorModeGrayscale:
 		return "grayscale"
 	}
 
-	return "color"
+	return sUnknown
 }
 
-// ParseColorMode accepts "color" (default) or "grayscale".
+// ParseColorMode accepts "color" (default) or "grayscale" (case-insensitive,
+// matching ParseOrientation and ParseLoadErrorHandling).
 func ParseColorMode(value string) (ColorMode, error) {
-	switch value {
+	switch normalize(value) {
 	case "", "color":
 		return ColorModeColor, nil
 	case "grayscale":
@@ -127,11 +133,14 @@ const (
 )
 
 func (o Orientation) String() string {
-	if o == OrientationLandscape {
+	switch o {
+	case OrientationPortrait:
+		return "Portrait"
+	case OrientationLandscape:
 		return "Landscape"
 	}
 
-	return "Portrait"
+	return sUnknown
 }
 
 // ParseOrientation accepts "portrait" or "landscape" (case-insensitive).
@@ -165,7 +174,7 @@ func (h LoadErrorHandling) String() string {
 		return sIgnore
 	}
 
-	return sAbort
+	return sUnknown
 }
 
 // ParseLoadErrorHandling accepts abort|skip|ignore.
@@ -187,14 +196,21 @@ func ParseLoadErrorHandling(value string) (LoadErrorHandling, error) {
 type MediaType int
 
 const (
-	MediaIgnore MediaType = iota
+	// MediaUnset is the zero value: the field was never set, so media
+	// resolution falls through to the next source (see ResolveMedia). It is
+	// NOT an explicit ignore; wkhtmltopdf "ignore" input maps here for
+	// compatibility, and the comment on ResolveMedia states how unset
+	// differs from screen/print.
+	MediaUnset MediaType = iota
 	MediaScreen
 	MediaPrint
 )
 
 func (m MediaType) String() string {
 	switch m {
-	case MediaIgnore:
+	case MediaUnset:
+		// wkhtmltopdf compatibility: "--media-type ignore" is accepted and
+		// stores MediaUnset, so its getter still reports "ignore".
 		return sIgnore
 	case MediaScreen:
 		return sScreen
@@ -202,13 +218,15 @@ func (m MediaType) String() string {
 		return sPrint
 	}
 
-	return sIgnore
+	return sUnknown
 }
 
 // ResolveMedia computes the effective CSS media type: the print-media-type
 // override (either home) wins, then the object media-type, then the global
 // media-type, falling back to base (the mode default: "print" for PDF,
-// "screen" for image). obj may be nil.
+// "screen" for image). MediaUnset (the zero value) means "not set" and lets
+// resolution fall through to the next source; it is never an explicit
+// ignore. obj may be nil.
 func ResolveMedia(base string, global Web, obj *Web) string {
 	if global.PrintMediaType || obj != nil && obj.PrintMediaType {
 		return sPrint
@@ -216,7 +234,7 @@ func ResolveMedia(base string, global Web, obj *Web) string {
 
 	media := global.MediaType
 
-	if obj != nil && obj.MediaType != MediaIgnore {
+	if obj != nil && obj.MediaType != MediaUnset {
 		media = obj.MediaType
 	}
 
@@ -225,7 +243,7 @@ func ResolveMedia(base string, global Web, obj *Web) string {
 		return sPrint
 	case MediaScreen:
 		return sScreen
-	case MediaIgnore:
+	case MediaUnset:
 	}
 
 	return base
@@ -241,7 +259,7 @@ func ResolvePDFMedia(glob PdfGlobal, obj *PdfObject) string {
 			PrintMediaType: obj.Load.PrintMediaType || obj.Web.PrintMediaType,
 			MediaType:      obj.Load.MediaType,
 		}
-		if obj.Web.MediaType != MediaIgnore {
+		if obj.Web.MediaType != MediaUnset {
 			objView.MediaType = obj.Web.MediaType
 		}
 
@@ -259,7 +277,7 @@ func ResolveImageMedia(global PdfGlobal, image ImageGlobal, obj *PdfObject) stri
 		web.PrintMediaType = true
 	}
 
-	if web.MediaType == MediaIgnore {
+	if web.MediaType == MediaUnset {
 		web.MediaType = global.Web.MediaType
 	}
 
@@ -270,7 +288,7 @@ func ResolveImageMedia(global PdfGlobal, image ImageGlobal, obj *PdfObject) stri
 			PrintMediaType: obj.Load.PrintMediaType || obj.Web.PrintMediaType,
 			MediaType:      obj.Load.MediaType,
 		}
-		if obj.Web.MediaType != MediaIgnore {
+		if obj.Web.MediaType != MediaUnset {
 			objView.MediaType = obj.Web.MediaType
 		}
 

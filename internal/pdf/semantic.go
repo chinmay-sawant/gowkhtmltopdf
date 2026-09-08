@@ -21,20 +21,87 @@ var (
 	semanticLiteralRE      = regexp.MustCompile(`(?s)(\((?:\\.|[^\\)])*\))\s*Tj`)
 	semanticHexRE          = regexp.MustCompile(`(?s)<([0-9A-Fa-f]*)>\s*Tj`)
 	semanticDestRE         = regexp.MustCompile(`/Dest\s*\[\s*(\d+)\s+0\s+R`)
-	semanticRegexCache     sync.Map
+	semanticRegexCache     = newRegexCache()
 )
 
-func getOrCompileRE(patternStr string) *regexp.Regexp {
-	if val, ok := semanticRegexCache.Load(patternStr); ok {
-		if re, isRE := val.(*regexp.Regexp); isRE {
-			return re
+// semanticRegexCacheCap bounds the compiled-pattern cache. Patterns are
+// derived from dict keys, so the working set is small and fixed in practice;
+// the cap only guarantees hostile input cannot grow memory without bound.
+const semanticRegexCacheCap = 64
+
+// regexCache is a small LRU of compiled regexes. The full pattern string is
+// the key; hit moves the entry to the most-recent position, and overflow
+// evicts the least-recent one.
+type regexCache struct {
+	mu    sync.Mutex
+	re    map[string]*regexp.Regexp
+	order []string
+}
+
+func newRegexCache() *regexCache {
+	return &regexCache{ //nolint:exhaustruct // zero-value mutex is intentional
+		re:    make(map[string]*regexp.Regexp, semanticRegexCacheCap),
+		order: make([]string, 0, semanticRegexCacheCap),
+	}
+}
+
+func (c *regexCache) get(patternStr string) (*regexp.Regexp, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	regex, ok := c.re[patternStr]
+	if !ok {
+		return nil, false
+	}
+
+	for i, key := range c.order {
+		if key == patternStr {
+			c.order = append(c.order[:i], c.order[i+1:]...)
+
+			break
 		}
 	}
 
-	re := regexp.MustCompile(patternStr)
-	semanticRegexCache.Store(patternStr, re)
+	c.order = append(c.order, patternStr)
 
-	return re
+	return regex, true
+}
+
+func (c *regexCache) put(patternStr string, regex *regexp.Regexp) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if _, ok := c.re[patternStr]; ok {
+		return
+	}
+
+	if len(c.order) >= semanticRegexCacheCap {
+		oldest := c.order[0]
+		c.order = c.order[1:]
+		delete(c.re, oldest)
+	}
+
+	c.re[patternStr] = regex
+	c.order = append(c.order, patternStr)
+}
+
+// compileSemanticRE returns the compiled pattern for a dict-key lookup,
+// compiling on a cache miss. The patterns are QuoteMeta'd keys plus fixed
+// suffixes, so compile errors are not expected; they are returned instead of
+// panicking.
+func compileSemanticRE(patternStr string) (*regexp.Regexp, error) {
+	if regex, ok := semanticRegexCache.get(patternStr); ok {
+		return regex, nil
+	}
+
+	regex, err := regexp.Compile(patternStr)
+	if err != nil {
+		return nil, fmt.Errorf("compile semantic pattern %q: %w", patternStr, err)
+	}
+
+	semanticRegexCache.put(patternStr, regex)
+
+	return regex, nil
 }
 
 // SemanticDoc is a small, production-safe view of a PDF this package emits.
@@ -565,14 +632,12 @@ func decodeSemanticStream(object semanticObject) ([]byte, error) {
 func extractSemanticText(stream []byte) string {
 	var text strings.Builder
 
-	streamText := string(stream)
-
-	for _, match := range semanticLiteralRE.FindAllStringSubmatch(streamText, -1) {
-		text.WriteString(decodePDFLiteral(match[1]))
+	for _, match := range semanticLiteralRE.FindAllSubmatch(stream, -1) {
+		text.WriteString(decodePDFLiteral(string(match[1])))
 	}
 
-	for _, match := range semanticHexRE.FindAllStringSubmatch(streamText, -1) {
-		text.WriteString(decodePDFHex(match[1]))
+	for _, match := range semanticHexRE.FindAllSubmatch(stream, -1) {
+		text.WriteString(decodePDFHex(string(match[1])))
 	}
 
 	return text.String()
@@ -748,7 +813,11 @@ func requiredRef(dict, key string) (int, error) {
 }
 
 func optionalRef(dict, key string) (int, bool) {
-	pattern := getOrCompileRE(regexp.QuoteMeta(key) + `\s+(\d+)\s+0\s+R`)
+	pattern, err := compileSemanticRE(regexp.QuoteMeta(key) + `\s+(\d+)\s+0\s+R`)
+	if err != nil {
+		return 0, false
+	}
+
 	match := pattern.FindStringSubmatch(dict)
 
 	if match == nil {
@@ -774,7 +843,11 @@ func requiredRefArray(dict, key string) ([]int, error) {
 }
 
 func optionalRefArray(dict, key string) ([]int, bool) {
-	pattern := getOrCompileRE(regexp.QuoteMeta(key) + `\s*\[([^\]]*)\]`)
+	pattern, err := compileSemanticRE(regexp.QuoteMeta(key) + `\s*\[([^\]]*)\]`)
+	if err != nil {
+		return nil, false
+	}
+
 	match := pattern.FindStringSubmatch(dict)
 
 	if match == nil {
@@ -796,7 +869,11 @@ func optionalRefArray(dict, key string) ([]int, bool) {
 }
 
 func requiredNumberArray(dict, key string, want int) ([]float64, error) {
-	pattern := getOrCompileRE(regexp.QuoteMeta(key) + `\s*\[([^\]]*)\]`)
+	pattern, err := compileSemanticRE(regexp.QuoteMeta(key) + `\s*\[([^\]]*)\]`)
+	if err != nil {
+		return nil, fmt.Errorf("compile pattern for %s: %w", key, err)
+	}
+
 	match := pattern.FindStringSubmatch(dict)
 
 	if match == nil {
@@ -825,7 +902,11 @@ func requiredNumberArray(dict, key string, want int) ([]float64, error) {
 }
 
 func requiredInt(dict, key string) (int, error) {
-	pattern := getOrCompileRE(regexp.QuoteMeta(key) + `\s+(\d+)`)
+	pattern, err := compileSemanticRE(regexp.QuoteMeta(key) + `\s+(\d+)`)
+	if err != nil {
+		return 0, fmt.Errorf("compile pattern for %s: %w", key, err)
+	}
+
 	match := pattern.FindStringSubmatch(dict)
 
 	if match == nil {
@@ -843,7 +924,11 @@ func requiredInt(dict, key string) (int, error) {
 }
 
 func optionalLiteral(dict, key string) (string, bool) {
-	pattern := getOrCompileRE(regexp.QuoteMeta(key) + `\s+(\((?:\\.|[^\\)])*\))`)
+	pattern, err := compileSemanticRE(regexp.QuoteMeta(key) + `\s+(\((?:\\.|[^\\)])*\))`)
+	if err != nil {
+		return "", false
+	}
+
 	match := pattern.FindStringSubmatch(dict)
 
 	if match == nil {

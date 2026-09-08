@@ -52,7 +52,10 @@ func TestParsePDFProfileValid(t *testing.T) {
 		if got != tc.want {
 			t.Errorf("Parse(%q) = %q, want %q", tc.input, got, tc.want)
 		}
-		if canonical := pdfprofile.Canonical(tc.input); canonical != tc.want {
+		canonical, canonicalErr := pdfprofile.Canonical(tc.input)
+		if canonicalErr != nil {
+			t.Errorf("Canonical(%q) unexpected error: %v", tc.input, canonicalErr)
+		} else if canonical != tc.want {
 			t.Errorf("Canonical(%q) = %q, want %q", tc.input, canonical, tc.want)
 		}
 	}
@@ -73,8 +76,12 @@ func TestParsePDFProfileRejected(t *testing.T) {
 		if !errors.Is(err, pdfprofile.ErrInvalidPDFProfile) {
 			t.Errorf("Parse(%q) error = %v, want ErrInvalidPDFProfile", input, err)
 		}
-		if canonical := pdfprofile.Canonical(input); canonical != "" {
-			t.Errorf("Canonical(%q) = %q, want empty string", input, canonical)
+		canonical, canonicalErr := pdfprofile.Canonical(input)
+		if canonicalErr == nil {
+			t.Errorf("Canonical(%q) expected error, got %q", input, canonical)
+		}
+		if !errors.Is(canonicalErr, pdfprofile.ErrInvalidPDFProfile) {
+			t.Errorf("Canonical(%q) error = %v, want ErrInvalidPDFProfile", input, canonicalErr)
 		}
 	}
 }

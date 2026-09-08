@@ -40,7 +40,7 @@ func TestLeadingTHRowsRepeatAsHeader(t *testing.T) { //nolint:cyclop,funlen
 
 	var walk func(b *box)
 	walk = func(boxNode *box) {
-		if boxNode.kind == displayTable {
+		if boxNode.kind == boxKindTable {
 			tblBox = boxNode
 
 			return
@@ -103,7 +103,7 @@ func TestMixedFirstRowNotHeader(t *testing.T) {
 
 	var walk func(b *box)
 	walk = func(boxNode *box) {
-		if boxNode.kind == displayTable {
+		if boxNode.kind == boxKindTable {
 			tblBox = boxNode
 
 			return

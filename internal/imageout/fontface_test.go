@@ -66,7 +66,10 @@ func collectFontLayout(
 ) (*layout.Result, *pdf.Registry) {
 	t.Helper()
 
-	loader := load.NewLoader(imageLoadGlobalCmd(cmd))
+	loader, err := load.NewLoaderWithError(imageLoadGlobalCmd(cmd))
+	if err != nil {
+		t.Fatalf("new loader: %v", err)
+	}
 
 	res, err := loader.Load(t.Context(), htmlPath, cmd.Objects[0].Load)
 	if err != nil {

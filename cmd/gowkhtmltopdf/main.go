@@ -34,6 +34,10 @@ func run(argv []string) int {
 			cli.PrintLicense(os.Stdout)
 
 			return cli.ExitOK
+		case errors.Is(err, cli.ErrMissingOutput):
+			fmt.Fprintln(os.Stderr, "gowkhtmltopdf: no output file specified (use '-' for stdout)")
+
+			return cli.ExitError
 		}
 
 		fmt.Fprintf(os.Stderr, "gowkhtmltopdf: %v\n", err)
@@ -47,12 +51,6 @@ func run(argv []string) int {
 		fmt.Fprint(os.Stdout, app.DefaultTOCXSL())
 
 		return cli.ExitOK
-	}
-
-	if cmd.Output == "" {
-		fmt.Fprintln(os.Stderr, "gowkhtmltopdf: no output file specified (use '-' for stdout)")
-
-		return cli.ExitError
 	}
 
 	// --quiet suppresses progress/info/warning output but never errors, which

@@ -14,8 +14,11 @@ import (
 type Severity int
 
 const (
+	// Unknown is the zero value of Severity. The engine never emits it; a
+	// zero Severity must not silently print as "info".
+	Unknown Severity = iota
 	// Info is a plain log line (phases, progress, diagnostics).
-	Info Severity = iota
+	Info
 	// Warn is a warning line: non-fatal, conversion continues.
 	Warn
 	// Error is an error line: the failure was reported.
@@ -32,7 +35,7 @@ func (s Severity) String() string {
 	case Error:
 		return "error"
 	default:
-		return "info"
+		return "unknown"
 	}
 }
 
@@ -49,20 +52,48 @@ func Emit(writer io.Writer, sev Severity, format string, args ...any) {
 		return
 	}
 
-	fmt.Fprintf(writer, sev.Prefix()+format+"\n", args...)
+	prefix := sev.Prefix()
+	if len(args) == 0 {
+		_, _ = io.WriteString(writer, prefix)
+		_, _ = io.WriteString(writer, format)
+		_, _ = io.WriteString(writer, "\n")
+
+		return
+	}
+
+	// Avoid prefix+format allocation: write prefix, then formatted message.
+	_, _ = io.WriteString(writer, prefix)
+	_, _ = fmt.Fprintf(writer, format+"\n", args...)
 }
 
-// SeverityOf classifies one engine log line by its leading marker token;
-// lines without a marker (or with an unknown one) are Info.
+// SeverityOf classifies one engine log line by its leading marker token.
+// Lines without a marker (or with an unknown one) are Info by design: the
+// engine prints bare progress lines ("Loading pages (1/1)", "Done") with no
+// prefix, and those must classify as the least alarming level. Unknown (the
+// zero value) is never returned here; it exists so a zero Severity used as
+// an Emit argument is visible in output as "unknown" instead of masquerading
+// as info.
 func SeverityOf(s string) Severity {
-	lower := strings.ToLower(strings.TrimSpace(s))
-
-	switch {
-	case strings.HasPrefix(lower, "warning:"), strings.HasPrefix(lower, "warn:"):
-		return Warn
-	case strings.HasPrefix(lower, "error:"), strings.HasPrefix(lower, "err:"):
-		return Error
-	default:
+	trimmed := strings.TrimSpace(s)
+	if len(trimmed) == 0 {
 		return Info
 	}
+
+	if len(trimmed) >= 8 && strings.EqualFold(trimmed[:8], "warning:") {
+		return Warn
+	}
+
+	if len(trimmed) >= 5 && strings.EqualFold(trimmed[:5], "warn:") {
+		return Warn
+	}
+
+	if len(trimmed) >= 6 && strings.EqualFold(trimmed[:6], "error:") {
+		return Error
+	}
+
+	if len(trimmed) >= 4 && strings.EqualFold(trimmed[:4], "err:") {
+		return Error
+	}
+
+	return Info
 }

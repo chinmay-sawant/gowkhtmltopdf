@@ -319,7 +319,7 @@ func dumpBoxTree(b *box, indent string) string {
 		}
 	}
 
-	out := indent + name + " kind=" + b.kind + "\n"
+	out := indent + name + " kind=" + b.kind.String() + "\n"
 	for _, child := range b.children {
 		out += dumpBoxTree(child, indent+"  ")
 	}

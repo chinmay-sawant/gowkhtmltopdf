@@ -8,10 +8,11 @@ import (
 )
 
 var (
-	errSubsetBadHead = errors.New("font: bad head in subset")
-	errSubsetBadMaxp = errors.New("font: bad maxp in subset")
-	errSubsetBadHhea = errors.New("font: bad hhea in subset")
-	errSubsetNoMaps  = errors.New("font: empty cmap mappings")
+	errSubsetBadHead      = errors.New("font: bad head in subset")
+	errSubsetBadMaxp      = errors.New("font: bad maxp in subset")
+	errSubsetBadHhea      = errors.New("font: bad hhea in subset")
+	errSubsetNoMaps       = errors.New("font: empty cmap mappings")
+	errSubsetUnknownScope = errors.New("font: unknown subset scope")
 )
 
 // subsetResult is a minimal TrueType subset for PDF embedding.
@@ -27,8 +28,11 @@ type subsetResult struct {
 type subsetScope int
 
 const (
-	subsetSimple  subsetScope = iota // Latin-1 single-byte PDF fonts
-	subsetUnicode                    // Unicode BMP (Type0 / CIDToGIDMap)
+	// subsetUnknown is the zero value. subsetFont rejects it instead of
+	// silently narrowing to simple, because an unset scope is a caller bug.
+	subsetUnknown subsetScope = iota
+	subsetSimple              // Latin-1 single-byte PDF fonts
+	subsetUnicode             // Unicode BMP (Type0 / CIDToGIDMap)
 )
 
 // subsetFont builds a minimal TrueType font containing only the glyphs used
@@ -36,6 +40,10 @@ const (
 // scope=subsetSimple keeps Latin-1 only; scope=subsetUnicode keeps BMP
 // (codes above U+FFFF are skipped).
 func subsetFont(fnt *Font, used []rune, scope subsetScope) (*subsetResult, error) {
+	if scope == subsetUnknown {
+		return nil, errSubsetUnknownScope
+	}
+
 	accept := func(r rune) bool {
 		if scope == subsetSimple {
 			return simpleFontRune(r)

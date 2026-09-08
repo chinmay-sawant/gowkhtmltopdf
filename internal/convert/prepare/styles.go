@@ -120,13 +120,16 @@ func (collector *sheetCollector) collectLink(ctx context.Context, node *html.Nod
 		return
 	}
 
+	// Fetch is bounded per request by the loader's timeout policy
+	// (LoadPage.Timeout, or load.DefaultResponseTimeout when unset); ctx
+	// carries the caller's overall deadline and cancellation.
 	resource, err := collector.resources.Fetch(ctx, node.Attribute("href"))
 	if err != nil {
 		collector.warn("skipping <link href=%q>: %v", node.Attribute("href"), err)
 		return
 	}
 
-	sheet, err := css.Parse(string(resource.Body))
+	sheet, err := css.ParseBytes(resource.Body)
 	if err != nil {
 		collector.warn("skipping <link href=%q>: %v", node.Attribute("href"), err)
 		return
@@ -229,7 +232,7 @@ func (collector *sheetCollector) loadImportedSheet(ctx context.Context, base, re
 
 	collector.noteSeen(resource.URL)
 
-	sheet, err := css.Parse(string(resource.Body))
+	sheet, err := css.ParseBytes(resource.Body)
 	if err != nil {
 		collector.warn("skipping @import %q: %v", ref, err)
 

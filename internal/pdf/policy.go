@@ -12,8 +12,11 @@ import (
 type PDFVersion int
 
 const (
-	// PDF14 is PDF version 1.4 (default).
-	PDF14 PDFVersion = iota
+	// PDFUnknown is the zero value of PDFVersion. WriterPolicy{} must not
+	// validate: an unset version is a caller bug, not an implicit 1.4.
+	PDFUnknown PDFVersion = iota
+	// PDF14 is PDF version 1.4 (default when explicitly selected).
+	PDF14
 	// PDF17 is PDF version 1.7 (ISO 32000-1).
 	PDF17
 	// PDF20 is PDF version 2.0 (ISO 32000-2).
@@ -95,9 +98,16 @@ type WriterPolicy struct {
 }
 
 // CanonicalProfile normalizes profile strings (and common aliases) to canonical constants.
-// Returns an empty string if the profile is not recognized or is empty.
+// Returns an empty string if the profile is not recognized or is empty; the
+// error is still surfaced through Validate, which is the fail-fast gate callers
+// use before predicates like IsPDFA3 run.
 func (p WriterPolicy) CanonicalProfile() string {
-	return pdfprofile.Canonical(p.ConformanceProfile)
+	canonical, err := pdfprofile.Canonical(p.ConformanceProfile)
+	if err != nil {
+		return ""
+	}
+
+	return canonical
 }
 
 // IsPDFA3 reports whether the policy specifies PDF/A-3 archival conformance.
@@ -137,6 +147,8 @@ func (p WriterPolicy) HasConformanceProfile() bool {
 
 // Validate checks whether the policy specifies a supported PDF version and valid feature set.
 func (p WriterPolicy) Validate() error {
+	// PDFUnknown (the zero value) is caught by the lower bound, so an unset
+	// version fails instead of silently validating as PDF 1.4.
 	if p.Version < PDF14 || p.Version > PDF20 {
 		return ErrUnsupportedPDFVersion
 	}
@@ -211,6 +223,8 @@ func isPDF20Profile(canonicalProfile string) bool {
 // HeaderVersion returns the version token for the PDF file header (e.g. "1.4", "1.7", or "2.0").
 func (p WriterPolicy) HeaderVersion() string {
 	switch p.Version {
+	case PDFUnknown:
+		return versionToken14
 	case PDF14:
 		return versionToken14
 	case PDF17:

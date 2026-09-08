@@ -17,7 +17,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
+	"strings"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/errs"
@@ -102,6 +104,39 @@ type Options struct {
 	// after cascade, force text-decoration:underline on a[href]. Default off
 	// so author CSS (including inherit → none) is honored.
 	PrintLinkUnderline bool
+}
+
+// validate rejects option values that would otherwise be silently clamped
+// or ignored: a non-positive viewport width, a negative viewport height (0
+// means unset), a negative or non-finite zoom (zoomScale would clamp it to
+// 1), and media values other than print, screen, or empty.
+func (o Options) validate() error {
+	if !finitePositive(o.Width) {
+		return fmt.Errorf("layout: width must be finite and greater than zero, got %g", o.Width)
+	}
+
+	if !finiteNonNegative(o.Height) {
+		return fmt.Errorf("layout: height must be finite and non-negative, got %g", o.Height)
+	}
+
+	if o.Zoom != 0 && !finitePositive(o.Zoom) {
+		return fmt.Errorf("layout: zoom must be zero or a finite positive value, got %g", o.Zoom)
+	}
+
+	switch strings.ToLower(strings.TrimSpace(o.Media)) {
+	case "", "print", "screen":
+		return nil
+	default:
+		return fmt.Errorf("layout: media %q is not print or screen", o.Media)
+	}
+}
+
+func finitePositive(value float64) bool {
+	return !math.IsNaN(value) && !math.IsInf(value, 0) && value > 0
+}
+
+func finiteNonNegative(value float64) bool {
+	return !math.IsNaN(value) && !math.IsInf(value, 0) && value >= 0
 }
 
 // Result is a display list plus the canvas bounds.
@@ -287,7 +322,11 @@ func (loc ElementLocation) Bounds() (float64, float64, float64, float64) {
 type OpKind int
 
 const (
-	OpFillRect OpKind = iota
+	// OpUnknown is the zero value of OpKind. Layout never emits it; a zero
+	// Op must not silently paint as OpFillRect, so the unknown sentinel leads
+	// the enum and painters treat it as inert (no painter matches it).
+	OpUnknown OpKind = iota
+	OpFillRect
 	OpStrokeRect
 	OpLine
 	OpText
@@ -899,6 +938,10 @@ func layoutContext(
 		return nil, errors.New("layout: nil root") //nolint:err113 // static sentinel-free message matches legacy behavior
 	}
 
+	if err := opts.validate(); err != nil {
+		return nil, err
+	}
+
 	if ctx == nil {
 		return nil, errs.ErrNilContext
 	}
@@ -1166,6 +1209,32 @@ func estimateOpCapacity(root *html.Node) int {
 	return capacity
 }
 
+// boxKind is the internal layout role of a box. uint8 avoids a per-box
+// string header (16 bytes) and keeps the hot box struct small.
+type boxKind uint8
+
+const (
+	boxKindBlock    boxKind = iota // "block"
+	boxKindTable                   // "table"
+	boxKindCell                    // "cell"
+	boxKindReplaced                // "replaced"
+)
+
+func (k boxKind) String() string {
+	switch k {
+	case boxKindBlock:
+		return "block"
+	case boxKindTable:
+		return "table"
+	case boxKindCell:
+		return "cell"
+	case boxKindReplaced:
+		return "replaced"
+	default:
+		return "unknown"
+	}
+}
+
 // box is one laid-out box.
 type box struct {
 	node *html.Node
@@ -1175,7 +1244,15 @@ type box struct {
 	style     *ResolvedStyle
 	x, y      float64 // border-box top-left
 	w, height float64 // border-box size
-	kind      string  // "block" | "table" | "cell" | "replaced"
+	kind      boxKind
+	// packed flags — keep together to avoid padding.
+	paginationShifted bool // row was moved by a table pagination fixpoint
+	hasInk            bool // cell has non-whitespace ink (see nodeHasTableInk)
+	sticky            bool
+	stickyTopSet      bool
+	stickyRightSet    bool
+	stickyBottomSet   bool
+	stickyLeftSet     bool
 	// opStart/opEnd bound the inclusive range of e.ops indices that this
 	// box's subtree emitted. opEnd < opStart means the box emitted nothing
 	// (e.g. boxes built during a noEmit measure pass).
@@ -1184,14 +1261,9 @@ type box struct {
 	flowIndex      int // transient index in Result.boxes during pagination
 	firstBaseline  float64
 	// table cells
-	col, span         int
-	row               int  // owning table row index, set once at placement
-	rowSpan           int  // vertical span (default 1) for <td rowspan>
-	paginationShifted bool // row was moved by a table pagination fixpoint
-	// hasInk is set at cell build time from nodeHasTableInk (any
-	// non-whitespace text, br, img, svg, video or canvas in the subtree);
-	// row collapse uses the flag instead of re-walking each cell's tree.
-	hasInk bool
+	col, span int
+	row       int // owning table row index, set once at placement
+	rowSpan   int // vertical span (default 1) for <td rowspan>
 	// rowBoxH is the height of the cell's starting row only. For rowspan>1,
 	// h covers the full span (background/borders) while rowBoxH is what
 	// rowsIntact uses so bottom-edge paint ops do not make the first row
@@ -1210,14 +1282,11 @@ type box struct {
 	// points; cb* is filled at pagination time from the parent box.
 	// stickyPort is the nearest overflow:auto|scroll|hidden|clip ancestor
 	// (scrollport at offset 0); nil means page content box is the scrollport.
-	sticky                         bool
-	stickyID                       int
-	stickyTop, stickyRight         float64
-	stickyBottom, stickyLeft       float64
-	stickyTopSet, stickyRightSet   bool
-	stickyBottomSet, stickyLeftSet bool
-	stickyPort                     *box
-	cbX, cbY, cbW, cbH             float64
+	stickyID                 int
+	stickyTop, stickyRight   float64
+	stickyBottom, stickyLeft float64
+	stickyPort               *box
+	cbX, cbY, cbW, cbH       float64
 	// replaced image (nil when missing/failed); shared decode via resolveImage.
 	img *imageRef
 }
@@ -1362,7 +1431,7 @@ func useBlockForTableDisplay(node *html.Node) bool {
 //nolint:cyclop // block layout owns ordered CSS flow phases
 func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, posY float64) *box {
 	boxNode := &box{ //nolint:exhaustruct // intentional zero fields
-		node: node, style: e.stylePtr(node), kind: displayBlock, x: posX, y: posY,
+		node: node, style: e.stylePtr(node), kind: boxKindBlock, x: posX, y: posY,
 	}
 	boxStyle := boxModelStyleOf(&style)
 	w, margL := resolveBlockWidth(e, boxStyle, availW)

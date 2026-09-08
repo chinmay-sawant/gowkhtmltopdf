@@ -80,7 +80,7 @@ func TestTheadUADisplay(t *testing.T) {
 
 	var walk func(b *box)
 	walk = func(boxNode *box) {
-		if boxNode.kind == displayTable {
+		if boxNode.kind == boxKindTable {
 			tblBox = boxNode
 
 			return

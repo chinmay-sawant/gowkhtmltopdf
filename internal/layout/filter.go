@@ -13,10 +13,14 @@ import (
 	"strings"
 )
 
+// filterKind names one CSS filter function. filterUnknown is the zero value:
+// a parsedFilter that was never assigned a kind is not a valid filter, so
+// every producer (parseFilterList) assigns an explicit member.
 type filterKind int
 
 const (
-	filterBlur filterKind = iota
+	filterUnknown filterKind = iota
+	filterBlur
 	filterOpacity
 	filterDropShadow
 	filterGrayscale
@@ -237,7 +241,7 @@ func applyImageFilterToImage(imgBytes []byte, filters []parsedFilter) []byte {
 
 	hasEffect := false
 	for _, f := range filters {
-		if f.kind != filterOpacity {
+		if f.kind != filterOpacity && f.kind != filterUnknown {
 			hasEffect = true
 			break
 		}
@@ -264,6 +268,8 @@ func applyImageFilterToImage(imgBytes []byte, filters []parsedFilter) []byte {
 
 	for _, f := range filters {
 		switch f.kind {
+		case filterUnknown:
+			// Zero-value filter: never produced by parseFilterList; no-op.
 		case filterBlur:
 			nrgba = applyGaussianBlur(nrgba, f.val)
 		case filterGrayscale:

@@ -215,8 +215,8 @@ func TestFloatOnTableCellBlockifies(t *testing.T) { //nolint:cyclop,funlen
 		t.Fatal("expected floated cell box")
 	}
 
-	if aBox.kind == displayTable {
-		t.Fatalf("blockified float should not build as empty table, kind=%s w=%.1f", aBox.kind, aBox.w)
+	if aBox.kind == boxKindTable {
+		t.Fatalf("blockified float should not build as empty table, kind=%v w=%.1f", aBox.kind, aBox.w)
 	}
 
 	if aBox.w < 70 {

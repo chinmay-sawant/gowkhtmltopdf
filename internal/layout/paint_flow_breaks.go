@@ -37,7 +37,7 @@ func avoidInside(res *Result, contentH float64) bool {
 	var walk func(b *box, inTable bool) bool
 	walk = func(boxNode *box, inTable bool) bool {
 		changed := false
-		childInTable := inTable || boxNode.kind == displayTable
+		childInTable := inTable || boxNode.kind == boxKindTable
 
 		for _, c := range boxNode.children {
 			if walk(c, childInTable) {
@@ -74,7 +74,7 @@ func keepImplicitAsides(res *Result, contentH float64) bool {
 	var walk func(b *box, inTable bool) bool
 	walk = func(boxNode *box, inTable bool) bool {
 		changed := false
-		childInTable := inTable || boxNode.kind == displayTable
+		childInTable := inTable || boxNode.kind == boxKindTable
 
 		for _, child := range boxNode.children {
 			if walk(child, childInTable) {
