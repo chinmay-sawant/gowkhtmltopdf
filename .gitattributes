@@ -9,24 +9,24 @@ makefile text eol=lf
 # Force CRLF for PowerShell scripts on Windows
 *.ps1 text eol=crlf
 
-# Mark common binary formats
-*.png binary
-*.jpg binary
-*.jpeg binary
-*.gif binary
-*.ico binary
-*.pdf binary
-*.zip binary
-*.tar.gz binary
-*.tar binary
-*.gz binary
-*.bz2 binary
-*.7z binary
-*.woff binary
-*.woff2 binary
-*.ttf binary
-*.otf binary
-*.wasm binary
+# Mark common binary formats (also vendored so they don't count toward Go diff stats)
+*.png binary linguist-vendored
+*.jpg binary linguist-vendored
+*.jpeg binary linguist-vendored
+*.gif binary linguist-vendored
+*.ico binary linguist-vendored
+*.pdf binary linguist-vendored
+*.zip binary linguist-vendored
+*.tar.gz binary linguist-vendored
+*.tar binary linguist-vendored
+*.gz binary linguist-vendored
+*.bz2 binary linguist-vendored
+*.7z binary linguist-vendored
+*.woff binary linguist-vendored
+*.woff2 binary linguist-vendored
+*.ttf binary linguist-vendored
+*.otf binary linguist-vendored
+*.wasm binary linguist-vendored
 
 # Exclude build/vendored/generated directories from language statistics
 /bin/** linguist-vendored
@@ -78,5 +78,18 @@ go.sum linguist-generated
 /scripts/chunks/** linguist-vendored
 /scripts/findings/** linguist-vendored
 
-# Docs stay in the repo for clones but are omitted from export archives
-*.md export-ignore
+# Docs stay in the repo for clones but are omitted from export archives and diff stats
+*.md export-ignore linguist-vendored
+*.markdown export-ignore linguist-vendored
+*.rst export-ignore linguist-vendored
+
+# Generated/sample output and fixtures should not count toward Go diff stats
+/testdata/** linguist-vendored
+/output/** linguist-vendored
+/docs/** linguist-vendored
+/frontend/** linguist-vendored
+
+# Fallback: any other non-Go files should not count toward diff stats
+* linguist-vendored
+*.go linguist-vendored=false linguist-language=Go
+go.mod linguist-vendored=false linguist-language=Go
