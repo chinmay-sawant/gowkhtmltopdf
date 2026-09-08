@@ -45,13 +45,13 @@ The layout package has real internal seams, context-aware entry points, sequenti
 
 ### Phase 2: Stage coupling and cleanup
 
-- [x] `C-3` `internal/layout/style.go:105-381` - the measured boundary keeps cascade storage intact and uses pointer access for stage reads; a full stage-view split was not justified by the benchmark because value copies allocate zero bytes and the existing pointer seam is already available. Proof: `BenchmarkResolvedStyleAccess` records zero allocations and the layout race suite passes.
+- [x] `C-3` `internal/layout/style_views.go` - sizing and content-box helpers now consume a narrow `boxModelStyle` view, while cascade storage remains in `ResolvedStyle` for unrelated stages. The benchmark still guards against a broad value-copy refactor; this is the first concrete stage seam. Proof: box-model projection tests, layout tests, `make golden`, and the layout race gate pass.
 - [x] `C-4` `internal/layout/style.go:701-767` - dead style-interning structures and unused helpers were removed. Proof: layout tests and lint pass.
 
 ## Hypotheses
 
-- [x] `C-H1` `internal/layout/layout.go:453-518` - no extension case crossed unrelated state without an existing helper seam; the suspected god-object violation was not reproducible. Proof: focused layout architecture tests pass.
-- [x] `C-H2` `internal/layout/paint.go:126-172` - repeated tagged paints rebuild independent structure trees instead of sharing document-owned mutation. Proof: `TestRepeatedTaggedPaintRebuildsDocumentStructure` passes.
+- [x] `C-H1` `internal/layout/layout.go:453-518` - validated non-finding: no reviewed extension case crossed unrelated engine state without an existing helper seam. This row records source and test evidence, not a claimed architectural rewrite. Proof: focused layout architecture tests pass.
+- [x] `C-H2` `internal/layout/paint.go:126-172` - shipped ownership fix: repeated tagged paints rebuild independent structure trees instead of sharing document-owned mutation. Proof: `TestRepeatedTaggedPaintRebuildsDocumentStructure` passes.
 
 ## Area score
 

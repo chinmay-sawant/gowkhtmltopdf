@@ -98,12 +98,13 @@ func TestCertifiedIslandsApplyGenericLinkPolicies(t *testing.T) {
 	}
 }
 
-func TestRelativeHTMLAnchorsUseTheExistingLayoutContract(t *testing.T) {
+func TestRelativeHTMLAnchorsResolveForGenericAndCertifiedRendering(t *testing.T) {
 	t.Parallel()
 
 	html := `<!DOCTYPE html>
 <!-- report.html.tmpl: paginated benchmark report -->
-<html><body><section class="benchmark-page"><a href="docs/item.html">relative</a></section></body></html>`
+<html><body><section class="benchmark-page"><a href="docs/item.html">relative</a> ` +
+		`<a href="//cdn.example/item">protocol relative</a></section></body></html>`
 	global := settings.DefaultPdfGlobal()
 	obj := settings.DefaultPdfObject()
 	obj.Page = ""
@@ -124,8 +125,12 @@ func TestRelativeHTMLAnchorsUseTheExistingLayoutContract(t *testing.T) {
 		"generic": &genericOut,
 		"islands": &islandOut,
 	} {
-		if strings.Contains(output.String(), "https://example.test/reports/docs/item.html") {
-			t.Fatalf("%s relative HTML anchor unexpectedly became a URI annotation", name)
+		if !strings.Contains(output.String(), "https://example.test/reports/docs/item.html") {
+			t.Fatalf("%s relative HTML anchor missing resolved URI annotation", name)
+		}
+
+		if !strings.Contains(output.String(), "https://cdn.example/item") {
+			t.Fatalf("%s protocol-relative HTML anchor missing resolved URI annotation", name)
 		}
 	}
 }

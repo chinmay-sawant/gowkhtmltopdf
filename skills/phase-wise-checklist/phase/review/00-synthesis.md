@@ -90,9 +90,9 @@ Total = 7.225, reported as 7.2/10
 ### Phase 3: Performance, resource safety, and cleanup
 
 - [x] `PB-001` `internal/convert/render/pipeline.go:37-55` - assembly and copy work now check cancellation before later work or output. Proof: cancellation tests pass.
-- [x] `PB-002` `internal/convert/convert.go:564-615` - certified islands use the shared smart-shrink and body-policy path, with generic and island link behavior tested together. Proof: differential island tests pass.
+- [x] `PB-002` `internal/convert/convert.go:564-615` - certified islands use the shared smart-shrink and body-policy path. Relative and protocol-relative links now resolve to URI annotations in both paths, while fragments remain local. Proof: differential island and URI classification tests pass.
 - [x] `PB-005` `internal/convert/hf.go:1` - the file-wide lint suppression is gone and `make lint` passes with only narrow suppressions.
-- [x] `C-3` `internal/layout/style.go:105-381` - benchmark evidence supports the existing pointer-access seam; a stage-view split was not justified because value copies allocate zero bytes. Proof: `BenchmarkResolvedStyleAccess` and layout race tests pass.
+- [x] `C-3` `internal/layout/style_views.go` - sizing and content-box helpers now consume a narrow `boxModelStyle` view. The benchmark still rules out a broad value-copy refactor, while this concrete seam reduces cross-stage style coupling. Proof: projection tests, `BenchmarkResolvedStyleAccess`, golden output, and layout race tests pass.
 - [x] `C-4` `internal/layout/style.go:701-767` - dead style interning structures were removed. Proof: layout tests and lint pass.
 - [x] `PDF-FONT-RES-01` `internal/pdf/registry.go:368-381` - font scans and direct parsing enforce the shared 32 MiB limit. Proof: oversized-input tests pass.
 - [x] `IMG-CTX-01` `internal/imageout/imageout.go:1684-1721` - image finalization checks cancellation before encoding and writing. Proof: cancellation tests pass.

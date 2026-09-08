@@ -113,6 +113,7 @@ func TestResolveRelativeLinkURIs(t *testing.T) {
 
 	ops := []layout.Op{
 		{Kind: layout.OpLinkURI, URI: "docs/a.html"},           //nolint:exhaustruct // intentional zero-value fields
+		{Kind: layout.OpLinkURI, URI: "//cdn.example/a.css"},   //nolint:exhaustruct // intentional zero-value fields
 		{Kind: layout.OpLinkURI, URI: "#frag"},                 //nolint:exhaustruct // intentional zero-value fields
 		{Kind: layout.OpLinkURI, URI: "https://example.com/x"}, //nolint:exhaustruct // intentional zero-value fields
 		{Kind: layout.OpLinkURI, URI: "mailto:a@b.c"},          //nolint:exhaustruct // intentional zero-value fields
@@ -123,15 +124,19 @@ func TestResolveRelativeLinkURIs(t *testing.T) {
 		t.Errorf("relative = %q", ops[0].URI)
 	}
 
-	if ops[1].URI != "#frag" {
-		t.Errorf("fragment mutated: %q", ops[1].URI)
+	if ops[1].URI != "https://cdn.example/a.css" {
+		t.Errorf("protocol-relative = %q", ops[1].URI)
 	}
 
-	if ops[2].URI != "https://example.com/x" {
-		t.Errorf("absolute mutated: %q", ops[2].URI)
+	if ops[2].URI != "#frag" {
+		t.Errorf("fragment mutated: %q", ops[2].URI)
 	}
 
-	if ops[3].URI != "mailto:a@b.c" {
-		t.Errorf("mailto mutated: %q", ops[3].URI)
+	if ops[3].URI != "https://example.com/x" {
+		t.Errorf("absolute mutated: %q", ops[3].URI)
+	}
+
+	if ops[4].URI != "mailto:a@b.c" {
+		t.Errorf("mailto mutated: %q", ops[4].URI)
 	}
 }

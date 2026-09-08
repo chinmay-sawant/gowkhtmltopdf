@@ -38,7 +38,7 @@ func (e *engine) buildMulticol(node *html.Node, style ResolvedStyle, availW, x, 
 	boxNode.w = resolveUsedWidth(style, availW, e)
 	boxNode.x = x + e.multicolAutoMargin(style, availW, boxNode.w)
 
-	contentX, contentW := e.contentBox(boxNode.x, boxNode.w, style)
+	contentX, contentW := e.contentBox(boxNode.x, boxNode.w, boxModelStyleOf(&style))
 	contentStart := len(e.ops)
 
 	curY := e.scalePt(style.PaddingTop) + e.scalePt(style.BorderTop.Width)
@@ -226,7 +226,7 @@ func (e *engine) flowMulticolSpanner(boxNode *box, nodes []*html.Node, contentW,
 // up table-row pagination into blank pages.
 func clampMulticolHeight(curY float64, style ResolvedStyle, eng *engine) float64 {
 	curY += eng.scalePt(style.PaddingBottom)
-	if h, ok := resolveUsedHeight(style, -1, eng); ok {
+	if h, ok := resolveUsedHeight(boxModelStyleOf(&style), -1, eng); ok {
 		curY = h
 	}
 

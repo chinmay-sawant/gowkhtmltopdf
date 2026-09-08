@@ -41,7 +41,7 @@ The conversion package has a useful lifecycle interface, early request validatio
 ### Phase 1: Correctness and policy parity
 
 - [x] `PB-003` `internal/convert/convert.go:155-160` - copy validation is owned by `render.ValidateCopies`; request, page-plan, and non-collated paths share the same bounds and wrapped errors. Proof: `TestCopySeamsShareValidation` and `TestNonCollateOrder` pass.
-- [x] `PB-002` `internal/convert/convert.go:564-571` - certified islands now use the shared smart-shrink and body-policy path; generic and certified output agree for external and relative-link behavior, including the current contract that relative HTML anchors do not emit URI annotations. Proof: `TestGenericVsCertifiedIslandsDifferentiallyEqual`, `TestCertifiedIslandsApplyGenericLinkPolicies`, and `TestRelativeHTMLAnchorsUseTheExistingLayoutContract` pass.
+- [x] `PB-002` `internal/convert/convert.go:564-571` - certified islands use the shared smart-shrink and body-policy path. Relative and protocol-relative HTML links now become resolved URI annotations in both generic and certified output; fragments remain local links and unsupported schemes are ignored. Proof: `TestGenericVsCertifiedIslandsDifferentiallyEqual`, `TestCertifiedIslandsApplyGenericLinkPolicies`, `TestRelativeHTMLAnchorsResolveForGenericAndCertifiedRendering`, and URI classification tests pass.
 
 ### Phase 2: Cancellation and resource seams
 
@@ -51,8 +51,10 @@ The conversion package has a useful lifecycle interface, early request validatio
 
 ## Hypotheses
 
-- [x] `B-H1` `internal/convert/outline.go:32-83` - no unsafe ownership crossing was found; navigation is projected into copied locations and links. Proof: `TestBodyNavigationProjectionIsIndependentOfLayoutResult` passes.
-- [x] `B-H2` `internal/convert/convert.go:467-629` - the suspected testing barrier was not reproducible; layout, policy, and smart-shrink seams are directly replaceable in focused tests. Proof: `TestLayoutBodyKeepsSmartShrinkAtAReplaceableSeam` passes.
+- [x] `B-H1` `internal/convert/outline.go:32-83` - validated non-finding: navigation is projected into copied locations and links without retaining unsafe layout ownership. This row records a disproved hypothesis, not a new architecture claim. Proof: `TestBodyNavigationProjectionIsIndependentOfLayoutResult` passes.
+- [x] `B-H2` `internal/convert/convert.go:467-629` - validated design decision: the suspected testing barrier was not reproduced because layout, policy, and smart-shrink seams are directly replaceable in focused tests. No extra abstraction was added. Proof: `TestLayoutBodyKeepsSmartShrinkAtAReplaceableSeam` passes.
+
+Rows marked as validated non-findings or validated design decisions close a review question through source and test evidence. They do not claim that production architecture changed.
 
 ## Area score
 

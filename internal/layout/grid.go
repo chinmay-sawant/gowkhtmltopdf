@@ -47,7 +47,7 @@ func (e *engine) buildGrid(node *html.Node, sty ResolvedStyle, availW, posX, pos
 		node: node, style: e.stylePtr(node), kind: displayBlock, x: posX + ml, y: posY,
 	}
 	boxNode.w = resolveUsedWidth(sty, availW, e)
-	contentX, contentW := e.contentBox(boxNode.x, boxNode.w, sty)
+	contentX, contentW := e.contentBox(boxNode.x, boxNode.w, boxModelStyleOf(&sty))
 
 	contentStart := len(e.ops)
 	curY := e.scalePt(sty.PaddingTop) + e.scalePt(sty.BorderTop.Width)

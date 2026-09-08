@@ -55,9 +55,11 @@ The output packages document ownership, use typed PDF references, bound raster w
 
 ## Hypotheses
 
-- [x] `D-H1` `internal/pdf/pdf.go:776-829` - late write failure leaves the document retryable without duplicated finalization state. Proof: repeated-write regression test passes.
-- [x] `D-H2` `internal/pdf/images.go:153-324` - repeated JPEG payloads now share the image deduplication path. Proof: repeated-image object-count test passes.
-- [x] `D-H3` `internal/svg/raster.go:71-128` - raster dimensions describe logical CSS size while PNG pixels include supersampling. Proof: dimension-contract regression test passes.
+- [x] `D-H1` `internal/pdf/pdf.go:776-829` - shipped retry-safety fix: late write failure leaves the document retryable without duplicated finalization state. Proof: repeated-write regression test passes.
+- [x] `D-H2` `internal/pdf/images.go:153-324` - shipped deduplication fix: repeated JPEG payloads now share the image deduplication path. Proof: repeated-image object-count test passes.
+- [x] `D-H3` `internal/svg/raster.go:71-128` - shipped dimension-contract fix: raster dimensions describe logical CSS size while PNG pixels include supersampling. Proof: dimension-contract regression test passes.
+
+Rows marked as validated non-findings or validated design decisions close a review question through source and test evidence. They do not claim that production architecture changed.
 
 ## Area score
 

@@ -8,6 +8,52 @@ import (
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
 
+func TestLinkHrefClassification(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		href string
+		want bool
+	}{
+		{href: "docs/item.html", want: true},
+		{href: "../item.html", want: true},
+		{href: "?page=2", want: true},
+		{href: "//cdn.example/item", want: true},
+		{href: "#section", want: true},
+		{href: "https://example.test/item", want: true},
+		{href: "mailto:person@example.test", want: true},
+		{href: "javascript:void(0)", want: false},
+		{href: "data:text/plain,hello", want: false},
+		{href: "ftp://example.test/item", want: false},
+		{href: "", want: false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.href, func(t *testing.T) {
+			t.Parallel()
+
+			if got := isLinkHref(test.href); got != test.want {
+				t.Errorf("isLinkHref(%q) = %v, want %v", test.href, got, test.want)
+			}
+		})
+	}
+}
+
+func TestRelativeAnchorEmitsURIAndUnsupportedSchemesDoNot(t *testing.T) {
+	t.Parallel()
+
+	res := layoutHTML(t, `<html><body>`+
+		`<a href="docs/item.html">relative</a>`+
+		`<a href="javascript:void(0)">script</a>`+
+		`<a href="ftp://example.test/item">ftp</a>`+
+		`</body></html>`)
+
+	links := opsOfKind(res, OpLinkURI)
+	if len(links) != 1 || links[0].URI != "docs/item.html" {
+		t.Fatalf("links = %+v, want one raw relative URI", links)
+	}
+}
+
 // TestLinkAnnotationHasHitHeight: URI link ops must cover the glyph box so
 // PDF viewers give a usable hover/click target (not a zero-height line).
 func TestLinkAnnotationHasHitHeight(t *testing.T) {

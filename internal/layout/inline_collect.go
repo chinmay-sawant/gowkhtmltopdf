@@ -521,8 +521,8 @@ func (e *engine) collectInlineSpan(node *html.Node, sty ResolvedStyle, out *[]in
 	href := ""
 
 	if node.Name == cssTagA {
-		h := node.Attribute("href")
-		if isExternalHref(h) || isInternalHref(h) {
+		h := strings.TrimSpace(node.Attribute("href"))
+		if isLinkHref(h) {
 			href = h
 		}
 	}

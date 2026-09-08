@@ -26,3 +26,16 @@ func BenchmarkResolvedStyleAccess(b *testing.B) {
 		}
 	})
 }
+
+// BenchmarkBoxModelStyleProjection checks that the narrow sizing view stays a
+// value projection with no heap cost at the boundary.
+func BenchmarkBoxModelStyleProjection(b *testing.B) {
+	style := initialStyle()
+
+	b.ReportAllocs()
+
+	for range b.N {
+		view := boxModelStyleOf(&style)
+		resolvedStyleAccessSink += view.width + view.height + view.paddingLeft
+	}
+}

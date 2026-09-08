@@ -141,7 +141,7 @@ func TestPhase79_Slice79_3_SizingAndGrid(t *testing.T) {
 		t.Parallel()
 		eng := &engine{scale: 1}
 		st := ResolvedStyle{MaxWidthPercent: 50, MaxWidth: -1}
-		w := clampBlockMinMax(eng, st, 200, 150)
+		w := clampBlockMinMax(eng, boxModelStyleOf(&st), 200, 150)
 		if w != 100 {
 			t.Fatalf("clampBlockMinMax width = %.1f, want 100", w)
 		}

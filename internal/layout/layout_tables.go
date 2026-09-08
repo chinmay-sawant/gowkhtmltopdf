@@ -1237,7 +1237,7 @@ func (e *engine) emitCell(cell *box, skipBorders bool) {
 	}
 
 	contentStart := len(e.ops)
-	curX, contentW := e.contentBox(cell.x, cell.w, sty)
+	curX, contentW := e.contentBox(cell.x, cell.w, boxModelStyleOf(&sty))
 	curY := cell.y + e.scalePt(sty.PaddingTop) + e.scalePt(sty.BorderTop.Width)
 	curY = cellVerticalAlignOffset(cell, curY)
 	// flowChildren advances cy; cell content is rooted at absolute canvas y
