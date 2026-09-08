@@ -4,7 +4,7 @@
   Proves: visual audit of Implemented CSS properties (slice A of 3: 118 names),
   each with a plain-language description and a live Effect cell.
   Fonts: Liberation Sans via --font-path testdata/fonts/implemented-audit (SIL OFL 1.1).
-  Images: logo.png + assets/asteria-lake.png + inline data URI.
+  Images: logo.png + assets/asteria-lake.png + assets/border-slice.png + inline data URI.
   Expected: multi-page; envelope in fixturePageBounds.
 -->
 <html lang="en">
@@ -21,6 +21,36 @@
       color: #1a1f24;
       margin: 0;
       padding: 0;
+    }
+    /* Shared 9-slice demos for border-image* (props 81-86). Source has
+       distinct corner colors and striped edges so stretch/round/slice/width read. */
+    .bi-box {
+      border: 12px solid transparent;
+      border-image-source: url(assets/border-slice.png);
+      border-image-slice: 12;
+      border-image-repeat: stretch;
+      border-image-width: 12px;
+      background: #f8fafc;
+      padding: 6px 8px;
+      font-size: 9px;
+      text-align: center;
+      color: #334155;
+      min-height: 28px;
+    }
+    .bi-pair { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+    .bi-label { font-size: 8px; color: #64748b; display: block; margin-bottom: 2px; }
+    .bi-outset-wrap {
+      display: inline-block;
+      border: 1px dashed #64748b;
+      padding: 8px;
+      background: #fff;
+    }
+    .bi-thumb {
+      width: 36px;
+      height: 36px;
+      image-rendering: pixelated;
+      border: 1px solid #cbd5e1;
+      flex-shrink: 0;
     }
     header.masthead {
       display: flex;
@@ -193,12 +223,12 @@
 <tr><td class="idx">78</td><td class="prop"><code>border-color</code><div class="meta">shorthand · CSS Backgrounds and Borders</div></td><td class="desc">With `border-color: #ef4444 #3b82f6 #10b981 #f59e0b` top red, right blue, bottom green, left amber.</td><td class="effect"><div style="border:3px solid;border-color:#ef4444 #3b82f6 #10b981 #f59e0b;padding:3px 8px;background:#fafafa;display:inline-block;font-size:11px;">4 colors</div></td></tr>
 <tr><td class="idx">79</td><td class="prop"><code>border-end-end-radius</code><div class="meta">longhand · CSS Logical Properties and Values</div></td><td class="desc">With `border-end-end-radius: 14px` the logical end-end (bottom-right) corner is curved.</td><td class="effect"><div style="border:2px solid #2563eb;border-end-end-radius:14px;background:#eff6ff;width:70px;height:26px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:bold;">EE (BR)</div></td></tr>
 <tr><td class="idx">80</td><td class="prop"><code>border-end-start-radius</code><div class="meta">longhand · CSS Logical Properties and Values</div></td><td class="desc">With `border-end-start-radius: 14px` the logical end-start (bottom-left) corner is curved.</td><td class="effect"><div style="border:2px solid #2563eb;border-end-start-radius:14px;background:#eff6ff;width:70px;height:26px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:bold;">ES (BL)</div></td></tr>
-<tr><td class="idx">81</td><td class="prop"><code>border-image</code><div class="meta">shorthand · CSS Backgrounds and Borders</div></td><td class="desc">With `border-image: url(logo.png) 10 stretch` the logo slices tile as stretched borders.</td><td class="effect"><div style="border:6px solid transparent;border-image:url(logo.png) 10 stretch;padding:3px 6px;width:75px;font-size:10px;">img border</div></td></tr>
-<tr><td class="idx">82</td><td class="prop"><code>border-image-outset</code><div class="meta">longhand · CSS Backgrounds and Borders</div></td><td class="desc">With `border-image-outset: 4px` the image border renders outside the border box.</td><td class="effect"><div style="border:6px solid transparent;border-image-source:url(logo.png);border-image-slice:10;border-image-repeat:stretch;border-image-outset:4px;padding:3px 6px;width:75px;font-size:10px;">outset</div></td></tr>
-<tr><td class="idx">83</td><td class="prop"><code>border-image-repeat</code><div class="meta">longhand · CSS Backgrounds and Borders</div></td><td class="desc">With `border-image-repeat: round` edge slices scale to fit a whole number of tiles.</td><td class="effect"><div style="border:6px solid transparent;border-image-source:url(logo.png);border-image-slice:10;border-image-repeat:round;padding:3px 6px;width:75px;font-size:10px;">repeat round</div></td></tr>
-<tr><td class="idx">84</td><td class="prop"><code>border-image-slice</code><div class="meta">longhand · CSS Backgrounds and Borders</div></td><td class="desc">With `border-image-slice: 8` the border image is sliced 8px inward from each edge.</td><td class="effect"><div style="border:6px solid transparent;border-image-source:url(logo.png);border-image-slice:8;border-image-repeat:stretch;padding:3px 6px;width:75px;font-size:10px;">slice 8</div></td></tr>
-<tr><td class="idx">85</td><td class="prop"><code>border-image-source</code><div class="meta">longhand · CSS Backgrounds and Borders</div></td><td class="desc">With `border-image-source: url(logo.png)` specifies the image used for border slices.</td><td class="effect"><div style="border:6px solid transparent;border-image-source:url(logo.png);border-image-slice:10;border-image-repeat:stretch;padding:3px 6px;width:75px;font-size:10px;">img source</div></td></tr>
-<tr><td class="idx">86</td><td class="prop"><code>border-image-width</code><div class="meta">longhand · CSS Backgrounds and Borders</div></td><td class="desc">With `border-image-width: 6px` the rendered thickness of image border slices is 6px.</td><td class="effect"><div style="border:6px solid transparent;border-image-source:url(logo.png);border-image-slice:10;border-image-repeat:stretch;border-image-width:6px;padding:3px 6px;width:75px;font-size:10px;">width 6px</div></td></tr>
+<tr><td class="idx">81</td><td class="prop"><code>border-image</code><div class="meta">shorthand · CSS Backgrounds and Borders</div></td><td class="desc">With `border-image: url(assets/border-slice.png) 12 stretch` red/green/orange/blue corners and striped edges stretch around the box.</td><td class="effect"><div class="bi-box" style="border-image:url(assets/border-slice.png) 12 / 12px stretch;width:110px;">stretch frame</div></td></tr>
+<tr><td class="idx">82</td><td class="prop"><code>border-image-outset</code><div class="meta">longhand · CSS Backgrounds and Borders</div></td><td class="desc">With `border-image-outset: 8px` the image border paints outside the dashed border box.</td><td class="effect"><div class="bi-outset-wrap"><div class="bi-box" style="border-image-outset:8px;width:88px;">outset 8px</div></div></td></tr>
+<tr><td class="idx">83</td><td class="prop"><code>border-image-repeat</code><div class="meta">longhand · CSS Backgrounds and Borders</div></td><td class="desc">With `border-image-repeat: round` striped edge tiles scale so a whole number fits each side.</td><td class="effect"><div class="bi-box" style="border-image-repeat:round;width:130px;">round tiles</div></td></tr>
+<tr><td class="idx">84</td><td class="prop"><code>border-image-slice</code><div class="meta">longhand · CSS Backgrounds and Borders</div></td><td class="desc">With `border-image-slice: 4` vs `16` the corner pieces shrink or grow from the same source.</td><td class="effect"><div class="bi-pair"><div><span class="bi-label">slice 4</span><div class="bi-box" style="border-image-slice:4;width:64px;">4</div></div><div><span class="bi-label">slice 16</span><div class="bi-box" style="border-image-slice:16;width:64px;">16</div></div></div></td></tr>
+<tr><td class="idx">85</td><td class="prop"><code>border-image-source</code><div class="meta">longhand · CSS Backgrounds and Borders</div></td><td class="desc">With `border-image-source: url(assets/border-slice.png)` the framed box uses that 9-slice image (thumbnail shown).</td><td class="effect"><div class="bi-pair"><img class="bi-thumb" src="assets/border-slice.png" alt="slice src"><div class="bi-box" style="width:88px;">from source</div></div></td></tr>
+<tr><td class="idx">86</td><td class="prop"><code>border-image-width</code><div class="meta">longhand · CSS Backgrounds and Borders</div></td><td class="desc">With `border-image-width: 4px` vs `16px` the painted image border is thin or thick while the slice source stays the same.</td><td class="effect"><div class="bi-pair"><div><span class="bi-label">width 4px</span><div class="bi-box" style="border:4px solid transparent;border-image-width:4px;width:64px;padding:4px;">4px</div></div><div><span class="bi-label">width 16px</span><div class="bi-box" style="border:16px solid transparent;border-image-width:16px;width:88px;padding:4px;">16px</div></div></div></td></tr>
 <tr><td class="idx">87</td><td class="prop"><code>border-inline</code><div class="meta">shorthand · CSS Logical Properties and Values</div></td><td class="desc">With `border-inline: 3px solid #dc2626` left and right inline borders are 3px red.</td><td class="effect"><div style="border:1px solid #e2e8f0;border-inline:3px solid #dc2626;padding:3px 8px;background:#fef2f2;display:inline-block;font-size:11px;">left + right</div></td></tr>
 <tr><td class="idx">88</td><td class="prop"><code>border-inline-color</code><div class="meta">shorthand · CSS Logical Properties and Values</div></td><td class="desc">With `border-inline-color: #16a34a` left and right borders turn green while top/bottom stay slate.</td><td class="effect"><div style="border:2px solid #94a3b8;border-inline-color:#16a34a;padding:3px 8px;background:#f0fdf4;display:inline-block;font-size:11px;">green inline</div></td></tr>
 <tr><td class="idx">89</td><td class="prop"><code>border-inline-end</code><div class="meta">shorthand · CSS Logical Properties and Values</div></td><td class="desc">With `border-inline-end: 3px solid #d97706` only the right inline edge is thick amber.</td><td class="effect"><div style="border:1px solid #e2e8f0;border-inline-end:3px solid #d97706;padding:3px 8px;background:#fffbeb;display:inline-block;font-size:11px;">right rail</div></td></tr>

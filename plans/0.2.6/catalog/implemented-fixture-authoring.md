@@ -14,6 +14,7 @@ Three golden HTML fixtures, each documenting ~118-120 Implemented CSS properties
 ## Images (required, local only for golden reliability)
 - `logo.png` (relative)
 - `assets/asteria-lake.png` (relative)
+- `assets/border-slice.png` (relative; 9-slice source for `border-image*` Effect cells)
 - plus small data-URI PNG/SVG if needed
 - Do not depend on live internet URLs (golden/CI has no network guarantee)
 
