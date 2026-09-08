@@ -1,4 +1,3 @@
-//nolint:testpackage // exercises unexported helpers
 package layout
 
 import (

@@ -53,7 +53,7 @@ func BuildOptions(viewportW, viewportH float64, media string, objectIndex int, w
 	opts := Options{ //nolint:exhaustruct // Simplify fields filled below
 		ViewportW:   viewportW,
 		ViewportH:   viewportH,
-		MediaType:   media,
+		MediaType:   strings.ToLower(strings.TrimSpace(media)),
 		ObjectIndex: objectIndex,
 	}
 

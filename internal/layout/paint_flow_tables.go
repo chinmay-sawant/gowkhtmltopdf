@@ -46,7 +46,7 @@ func normalizeTableRowGaps(res *Result, contentH float64) {
 	}
 
 	for _, table := range flowBoxList(res) {
-		if table.kind != displayTable || len(table.rows) < 2 {
+		if table.kind != boxKindTable || len(table.rows) < 2 {
 			continue
 		}
 
@@ -374,7 +374,7 @@ func tableBoxes(root *box) []*box {
 
 	var walk func(b *box)
 	walk = func(b *box) {
-		if b.kind == displayTable && b.headerRows > 0 && b.headerRows < len(b.rows) {
+		if b.kind == boxKindTable && b.headerRows > 0 && b.headerRows < len(b.rows) {
 			tables = append(tables, b)
 		}
 

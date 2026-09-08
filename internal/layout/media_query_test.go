@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -31,7 +30,7 @@ func TestMediaFeatureQueryPrint(t *testing.T) { //nolint:cyclop,funlen
 		t.Fatal(err)
 	}
 	// Viewport 500pt — matches min-width 400px (300pt), not 2000px / max 100px.
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: testViewport, Height: 800, Sheets: []*css.Stylesheet{cssSheet},
 		Media: "print", Background: true,
 	})

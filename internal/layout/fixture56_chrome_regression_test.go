@@ -1,4 +1,4 @@
-//nolint:testpackage,wsl,nlreturn // white-box fixture chrome regressions
+//nolint:wsl,nlreturn // white-box fixture chrome regressions
 package layout
 
 import (
@@ -29,7 +29,7 @@ func TestFixture56Domain03HasNoBlueTopRail(t *testing.T) { //nolint:paralleltest
 		margin = 10 * 72.0 / 25.4
 	)
 	contentH := pageH - 2*margin
-	res, err := Layout(root, Options{ //nolint:exhaustruct
+	res, err := Layout(root, Options{
 		Width: pageW - 2*margin, Height: contentH,
 		Background: true, Sheets: []*css.Stylesheet{sheet}, Media: "print",
 	})
@@ -119,7 +119,7 @@ func TestFixture56SectionFooterKeepsBottomPadding(t *testing.T) { //nolint:paral
 		margin = 10 * 72.0 / 25.4
 	)
 	contentH := pageH - 2*margin
-	res, err := Layout(root, Options{ //nolint:exhaustruct
+	res, err := Layout(root, Options{
 		Width: pageW - 2*margin, Height: contentH,
 		Background: true, Sheets: []*css.Stylesheet{sheet}, Media: "print",
 	})
@@ -190,7 +190,7 @@ func TestFixture56MultiPageSectionFrameClosesOnlyOnLastPage(t *testing.T) {
 		margin = 10 * 72.0 / 25.4
 	)
 	contentH := pageH - 2*margin
-	res, err := Layout(root, Options{ //nolint:exhaustruct
+	res, err := Layout(root, Options{
 		Width: pageW - 2*margin, Height: contentH,
 		Background: true, Sheets: []*css.Stylesheet{sheet}, Media: "print",
 	})
@@ -225,7 +225,7 @@ func TestFixture56ShortPageKeepsPaperWashToBottom(t *testing.T) { //nolint:paral
 		margin = 10 * 72.0 / 25.4
 	)
 	contentH := pageH - 2*margin
-	res, err := Layout(root, Options{ //nolint:exhaustruct
+	res, err := Layout(root, Options{
 		Width: pageW - 2*margin, Height: contentH,
 		Background: true, Sheets: []*css.Stylesheet{sheet}, Media: "print",
 	})
@@ -358,7 +358,7 @@ func TestFixture56Domain08PageHasProgressAndNoStrayBottomLine(t *testing.T) {
 	)
 	contentH := pageH - 2*margin
 	contentW := pageW - 2*margin
-	res, err := Layout(root, Options{ //nolint:exhaustruct
+	res, err := Layout(root, Options{
 		Width: contentW, Height: contentH,
 		Background: true, Sheets: []*css.Stylesheet{sheet}, Media: "print",
 	})

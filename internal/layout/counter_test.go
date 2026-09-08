@@ -1,4 +1,4 @@
-//nolint:testpackage,wsl,cyclop // counter parse and layout proofs
+//nolint:wsl,cyclop // counter parse and layout proofs
 package layout
 
 import (

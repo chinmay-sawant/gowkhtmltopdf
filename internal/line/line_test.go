@@ -46,6 +46,26 @@ func TestEmit(t *testing.T) {
 	}
 }
 
+func TestSeverityString(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		sev  line.Severity
+		want string
+	}{
+		{line.Unknown, "unknown"},
+		{line.Info, "info"},
+		{line.Warn, "warning"},
+		{line.Error, "error"},
+		{line.Severity(99), "unknown"},
+	}
+	for _, tc := range cases {
+		if got := tc.sev.String(); got != tc.want {
+			t.Errorf("Severity(%d).String() = %q, want %q", tc.sev, got, tc.want)
+		}
+	}
+}
+
 type w struct{ s string }
 
 func (w *w) Write(p []byte) (int, error) {

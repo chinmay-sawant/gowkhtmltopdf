@@ -14,7 +14,7 @@ func (e *engine) buildTable(node *html.Node, style ResolvedStyle, availW, posX, 
 	headerRows = resolveHeaderRows(rows, headerRows)
 
 	tableBox := &box{ //nolint:exhaustruct // intentional zero fields
-		node: node, style: e.stylePtr(node), kind: displayTable, x: posX, y: posY, headerRows: headerRows,
+		node: node, style: e.stylePtr(node), kind: boxKindTable, x: posX, y: posY, headerRows: headerRows,
 	}
 	if len(rows) == 0 {
 		return tableBox
@@ -31,6 +31,9 @@ func (e *engine) buildTable(node *html.Node, style ResolvedStyle, availW, posX, 
 
 	fixedTable := style.TableLayout == positionFixed
 	colW, colMin, colPct, colAbs, cellData := e.measureTableColumns(placed, nCols, fixedTable)
+	if e.checkContext() {
+		return tableBox
+	}
 
 	// table width
 	// border-collapse: collapse suppresses the separate-border gap so colspan
@@ -86,6 +89,9 @@ func (e *engine) layoutTableGrid(
 	rowHeights, rowTops, curY := e.measureTableRows(
 		tableBox, rows, cellData, colW, spacingH, spacingV, nCols, posX, tableY, padL,
 	)
+	if e.checkContext() {
+		return
+	}
 
 	tableBox.rows = cellData
 	tableHeight := curY + e.scalePt(style.PaddingBottom) + e.scalePt(style.BorderBottom.Width)
@@ -298,7 +304,14 @@ func (e *engine) emitTableCells(
 		// of reallocating nCols+1 floats per row inside emitCollapsedRowGrid.
 		xList := gridColumnEdges(posX+padL, colW)
 
+		poll := newCtxPoll(e.ctx)
 		for rowIdx, cells := range cellData {
+			if poll.poll() {
+				e.err = poll.err
+
+				return
+			}
+
 			for _, cell := range cells {
 				// Skip paint for collapsed empty rows (h≈0); content was
 				// ink-less and would only re-inflate phantom bands.
@@ -316,7 +329,7 @@ func (e *engine) emitTableCells(
 	}
 
 	for _, cell := range tableBox.children {
-		if cell.kind != tableCellKind {
+		if cell.kind != boxKindCell {
 			continue
 		}
 		if cell.height > 0.01 {
@@ -550,7 +563,14 @@ func (e *engine) measureTableColumns(
 		cellData[i] = make([]*box, 0, rowCounts[i])
 	}
 
+	poll := newCtxPoll(e.ctx)
 	for _, page := range placed {
+		if poll.poll() {
+			e.err = poll.err
+
+			return nil, nil, nil, nil, nil
+		}
+
 		cell := e.buildCell(page.node, page.col, page.cSpan)
 		cell.row, cell.rowSpan = page.row, page.rSpan
 		cellData[page.row] = append(cellData[page.row], cell)
@@ -650,7 +670,14 @@ func (e *engine) measureTableRows(
 	// cells first. Rowspan cells enlarge the spanned rows afterward.
 	// Rows with no local cells (rowspan holes) or only ink-less cells stay at
 	// height 0 until rowspan growth — do not invent a 1pt phantom band.
+	poll := newCtxPoll(e.ctx)
 	for rowIdx, cells := range cellData {
+		if poll.poll() {
+			e.err = poll.err
+
+			return rowHeights, rowTops, curY
+		}
+
 		rowTops[rowIdx] = posY + curY
 		rowH := e.measureRowCells(tableBox, cells, rowIdx, colW, spacingH, nCols, posX, padL, rowTops)
 		// Collapse rows whose cells have no ink (only padding/borders of empty
@@ -728,7 +755,7 @@ func (e *engine) measureRowCells(
 //nolint:wsl // table geometry guards intentionally stay adjacent to the scan
 func growRowspanRows(tableBox *box, nRows int, rowHeights []float64, spacing float64) {
 	for _, cell := range tableBox.children {
-		if cell.kind != tableCellKind {
+		if cell.kind != boxKindCell {
 			continue
 		}
 		if cell.rowSpan <= 1 {
@@ -767,7 +794,7 @@ func growRowspanRows(tableBox *box, nRows int, rowHeights []float64, spacing flo
 //nolint:wsl // table geometry guards intentionally stay adjacent to the scan
 func assignFinalCellHeights(tb *box, nRows int, rowHeights, rowTops []float64, spacing float64) {
 	for _, cell := range tb.children {
-		if cell.kind != tableCellKind {
+		if cell.kind != boxKindCell {
 			continue
 		}
 		start := cell.row
@@ -996,7 +1023,7 @@ func horizontalTableBorder(tableBox *box, boundary, col int) (border, bool) {
 	)
 
 	for _, cell := range tableBox.children {
-		if cell.kind != tableCellKind {
+		if cell.kind != boxKindCell {
 			continue
 		}
 
@@ -1034,7 +1061,7 @@ func verticalTableBorder(tableBox *box, row, boundary int) (border, bool) {
 	)
 
 	for _, cell := range tableBox.children {
-		if cell.kind != tableCellKind {
+		if cell.kind != boxKindCell {
 			continue
 		}
 
@@ -1099,7 +1126,7 @@ func expandRowOpRange(row []*box, start, end int) {
 //nolint:wsl // table coverage predicates are intentionally sequential
 func rowspanCovers(tb *box, above, below, cidx int) bool {
 	for _, cell := range tb.children {
-		if cell.kind != tableCellKind {
+		if cell.kind != boxKindCell {
 			continue
 		}
 		if cell.rowSpan <= 1 {
@@ -1141,7 +1168,7 @@ func colspanCovers(tableBox *box, rowIdx, leftCol, rightCol int) bool {
 //nolint:wsl // table coverage predicates are intentionally sequential
 func rowspanCellCovers(tableBox *box, rowIdx, leftCol, rightCol int) bool {
 	for _, cell := range tableBox.children {
-		if cell.kind != tableCellKind {
+		if cell.kind != boxKindCell {
 			continue
 		}
 		start := cell.row
@@ -1172,7 +1199,7 @@ func (e *engine) buildCell(node *html.Node, col, span int) *box {
 	cellBox := &box{ //nolint:exhaustruct // intentional zero fields
 		node:   node,
 		style:  cellStyle,
-		kind:   tableCellKind,
+		kind:   boxKindCell,
 		col:    col,
 		span:   span,
 		hasInk: nodeHasTableInk(node),
@@ -1237,7 +1264,7 @@ func (e *engine) emitCell(cell *box, skipBorders bool) {
 	}
 
 	contentStart := len(e.ops)
-	curX, contentW := e.contentBox(cell.x, cell.w, sty)
+	curX, contentW := e.contentBox(cell.x, cell.w, boxModelStyleOf(&sty))
 	curY := cell.y + e.scalePt(sty.PaddingTop) + e.scalePt(sty.BorderTop.Width)
 	curY = cellVerticalAlignOffset(cell, curY)
 	// flowChildren advances cy; cell content is rooted at absolute canvas y

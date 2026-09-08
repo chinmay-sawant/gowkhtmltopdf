@@ -84,7 +84,7 @@ func (e *engine) collectAndPrepareInlineItems(nodes []*html.Node, contentW float
 }
 
 func (e *engine) injectBlockPseudos(boxNode *box, items []inlineItem) []inlineItem {
-	if boxNode == nil || boxNode.node == nil || boxNode.style == nil || boxNode.kind != displayBlock {
+	if boxNode == nil || boxNode.node == nil || boxNode.style == nil || boxNode.kind != boxKindBlock {
 		return items
 	}
 
@@ -712,6 +712,11 @@ func tailRemaining(items []inlineItem, i int) (float64, float64) {
 }
 
 // softBreakMode selects where splitTextToWidth may insert breaks inside a token.
+//
+// Intent: softBreakNone is intentionally the zero value. It is the narrowest
+// mode (grapheme-only splits), so an uninitialized mode never introduces
+// emergency URL/hyphen breaks a caller did not ask for; the only producer
+// (softModeOf) returns an explicit member.
 type softBreakMode int
 
 const (

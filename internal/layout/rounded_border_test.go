@@ -1,4 +1,3 @@
-//nolint:testpackage // white-box test exercises the PDF path directly
 package layout
 
 import (
@@ -12,7 +11,7 @@ func TestRoundedTopPDFStrokeEmitsCornerCurves(t *testing.T) {
 	t.Parallel()
 
 	content := pdf.NewContent()
-	drawStroke(content, &Op{ //nolint:exhaustruct // focused rounded-border operation
+	drawStroke(content, &Op{
 		Kind: OpStrokeRect, X: 12, Y: 16, W: 120, H: 40,
 		R: 0.1, G: 0.7, B: 0.4, Width: 4,
 		Radius: 8, StrokeMask: StrokeMaskTop,
@@ -29,7 +28,7 @@ func TestRoundedLeftPDFStrokeEmitsCornerCurves(t *testing.T) {
 	t.Parallel()
 
 	content := pdf.NewContent()
-	drawStroke(content, &Op{ //nolint:exhaustruct // focused rounded-border operation
+	drawStroke(content, &Op{
 		Kind: OpStrokeRect, X: 12, Y: 16, W: 120, H: 40,
 		R: 0.1, G: 0.7, B: 0.4, Width: 4,
 		Radius: 8, StrokeMask: StrokeMaskLeft,
@@ -52,19 +51,19 @@ func TestRoundedLeftPDFStrokeEmitsCornerCurves(t *testing.T) {
 func TestPaintBandMatchesBodyRoundedAndVerticalText(t *testing.T) {
 	t.Parallel()
 
-	stroke := Op{ //nolint:exhaustruct // focused band vs body policy probe
+	stroke := Op{
 		Kind: OpStrokeRect, X: 10, Y: 20, W: 80, H: 30,
 		R: 0.2, G: 0.4, B: 0.8, Width: 3,
 		Radius: 6, StrokeMask: StrokeMaskTop,
 	}
-	text := Op{ //nolint:exhaustruct // vertical-rl glyph matrix probe
+	text := Op{
 		Kind: OpText, X: 12, Y: 40, W: 10, H: 40,
 		Text: "V", Size: 12, RotateDeg: -90,
 		R: 0, G: 0, B: 0,
 	}
 
 	body := pdf.NewContent()
-	margins := PaintOptions{ //nolint:exhaustruct // origin-aligned with band
+	margins := PaintOptions{
 		MarginLeft: 5,
 	}
 
@@ -77,7 +76,7 @@ func TestPaintBandMatchesBodyRoundedAndVerticalText(t *testing.T) {
 	page := doc.AddPage(300, 300)
 	band := pdf.NewContent()
 
-	err := PaintBand(page, band, []Op{stroke, text}, BandOptions{ //nolint:exhaustruct
+	err := PaintBand(page, band, []Op{stroke, text}, BandOptions{
 		OriginX: 5, OriginY: pageH,
 	})
 	if err != nil {

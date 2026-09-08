@@ -258,7 +258,10 @@ func collectImportSheets(
 		t.Fatalf("parse html: %v", err)
 	}
 
-	loader := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // default HTTP loader
+	loader, err := load.NewLoaderWithError(settings.LoadGlobal{})
+	if err != nil {
+		t.Fatalf("new loader: %v", err)
+	}
 
 	var logBuf bytes.Buffer
 	sheets := prepare.CollectSheets(
@@ -267,7 +270,7 @@ func collectImportSheets(
 		root,
 		server.URL+"/index.html",
 		settings.DefaultLoadPage(),
-		prepare.SheetOptions{ //nolint:exhaustruct // test viewport/media only
+		prepare.SheetOptions{
 			ViewportW: 600, ViewportH: 800, MediaType: fixture.media,
 		},
 		&logBuf,

@@ -27,7 +27,10 @@ var (
 type NodeType int
 
 const (
-	ElementNode NodeType = iota
+	// NodeUnknown is the zero value of NodeType. Parsed trees never produce
+	// it; a zero-constructed Node must not classify as an ElementNode.
+	NodeUnknown NodeType = iota
+	ElementNode
 	TextNode
 	CommentNode
 	DoctypeNode
@@ -78,25 +81,54 @@ func (n *Node) TextContent() string {
 
 // Walk visits n and every descendant in pre-order (document order).
 func (n *Node) Walk(f func(*Node)) {
-	f(n)
+	n.WalkUntil(func(node *Node) bool {
+		f(node)
 
-	for _, c := range n.Children {
-		c.Walk(f)
+		return true
+	})
+}
+
+// WalkUntil visits n and every descendant in pre-order, stopping when f returns false.
+// It reports whether the full tree was visited.
+func (n *Node) WalkUntil(f func(*Node) bool) bool {
+	if !f(n) {
+		return false
 	}
+
+	for _, child := range n.Children {
+		if !child.WalkUntil(f) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// FindFirst returns the first node in pre-order for which pred returns true, or nil.
+func (n *Node) FindFirst(pred func(*Node) bool) *Node {
+	var found *Node
+
+	n.WalkUntil(func(node *Node) bool {
+		if pred(node) {
+			found = node
+
+			return false
+		}
+
+		return true
+	})
+
+	return found
 }
 
 // TextContentOf returns the text content of the first element descendant
 // named name, or "" when there is none.
 func (n *Node) TextContentOf(name string) string {
-	var out string
+	if found := n.FindFirst(func(c *Node) bool { return c.Type == ElementNode && c.Name == name }); found != nil {
+		return found.TextContent()
+	}
 
-	n.Walk(func(c *Node) {
-		if out == "" && c.Type == ElementNode && c.Name == name {
-			out = c.TextContent()
-		}
-	})
-
-	return out
+	return ""
 }
 
 func (n *Node) appendText(buf *strings.Builder) {
@@ -187,7 +219,11 @@ func (b *treeBuilder) appendTextToken(data string) {
 	if len(top.Children) > 0 {
 		last := top.Children[len(top.Children)-1]
 		if last.Type == TextNode {
-			last.Text += decoded
+			var merged strings.Builder
+			merged.Grow(len(last.Text) + len(decoded))
+			merged.WriteString(last.Text)
+			merged.WriteString(decoded)
+			last.Text = merged.String()
 
 			return
 		}
@@ -198,6 +234,11 @@ func (b *treeBuilder) appendTextToken(data string) {
 	top.Children = append(top.Children, node)
 }
 
+// maxElementDepth caps element nesting. Elements that would nest deeper are
+// dropped by openElement, so recursive walks (Walk, appendText) stay bounded
+// on adversarial input instead of exhausting the stack.
+const maxElementDepth = 1024
+
 // openElement applies one start tag to the open-element stack. Token data is
 // already lowercased by the tokenizer.
 func (b *treeBuilder) openElement(tokItem token) {
@@ -207,6 +248,10 @@ func (b *treeBuilder) openElement(tokItem token) {
 	}
 
 	b.autoCloseOpen(name)
+
+	if len(b.stack)-1 >= maxElementDepth {
+		return // deeper than the cap: drop the element, content flattens up
+	}
 
 	top := b.top()
 
@@ -308,10 +353,7 @@ func (b *treeBuilder) closeElement(data string) {
 // stripping a leading UTF-8 BOM (mirroring load.IsHTML). Only UTF-8/ASCII
 // sources are supported; the charset rule is enforced at the load seam.
 func ParseDocument(body []byte) (*Node, error) {
-	s := string(body)
-	if strings.HasPrefix(s, "\ufeff") { // BOM, mirroring load.IsHTML
-		s = s[1:]
-	}
+	s := strings.TrimPrefix(string(body), "\ufeff") // BOM, mirroring load.IsHTML
 
 	return Parse(s)
 }

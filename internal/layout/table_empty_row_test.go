@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -26,7 +25,7 @@ td, th { border: 1px solid #999; padding: 2pt; }
 
 	var walk func(b *box)
 	walk = func(boxNode *box) {
-		if boxNode.kind == displayTable {
+		if boxNode.kind == boxKindTable {
 			tblBox = boxNode
 
 			return
@@ -104,7 +103,7 @@ td, th { border: 1px solid #999; padding: 4pt; }
 
 	var walk func(b *box)
 	walk = func(boxNode *box) {
-		if boxNode.kind == displayTable {
+		if boxNode.kind == boxKindTable {
 			tblBox = boxNode
 
 			return
@@ -157,7 +156,7 @@ th, td { border: 1px solid #ccc; padding: 2pt; }
 
 	var walk func(b *box)
 	walk = func(boxNode *box) {
-		if boxNode.kind == displayTable {
+		if boxNode.kind == boxKindTable {
 			tblBox = boxNode
 
 			return

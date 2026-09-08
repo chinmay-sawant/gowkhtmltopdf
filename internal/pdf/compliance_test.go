@@ -1,4 +1,4 @@
-//nolint:testpackage,exhaustruct,cyclop,funlen,varnamelen,wsl,gosec,lll,dupl // compliance tests
+//nolint:cyclop,funlen,varnamelen,wsl,gosec,lll,dupl // compliance tests
 package pdf
 
 import (

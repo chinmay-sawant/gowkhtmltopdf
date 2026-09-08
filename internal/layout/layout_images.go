@@ -202,7 +202,7 @@ func (e *engine) imageMaxWidth(style ResolvedStyle, cssW bool) float64 {
 
 func (e *engine) buildImage(node *html.Node, sty ResolvedStyle, posX, posY float64, paint bool) *box {
 	boxNode := &box{ //nolint:exhaustruct // intentional zero fields
-		node: node, style: e.stylePtr(node), kind: "replaced", x: posX, y: posY,
+		node: node, style: e.stylePtr(node), kind: boxKindReplaced, x: posX, y: posY,
 	}
 	boxNode.img = e.resolveImage(node.Attribute("src"))
 	size := e.usedImageSize(node, sty, boxNode.img)
@@ -330,7 +330,7 @@ func (e *engine) isGridOrFlexItem(n *html.Node) bool {
 
 func (e *engine) buildHR(n *html.Node, sty ResolvedStyle, availW, posX, posY float64) *box {
 	boxNode := &box{ //nolint:exhaustruct // intentional zero fields
-		node: n, style: e.stylePtr(n), kind: "replaced", x: posX, y: posY, w: availW,
+		node: n, style: e.stylePtr(n), kind: boxKindReplaced, x: posX, y: posY, w: availW,
 	}
 	if sty.Width >= 0 {
 		boxNode.w = e.scalePt(sty.Width)

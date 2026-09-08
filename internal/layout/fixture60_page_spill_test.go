@@ -1,4 +1,3 @@
-//nolint:testpackage // intimate engine test needs unexported helpers
 package layout
 
 import (
@@ -44,7 +43,7 @@ func TestFixture60BackgroundImagesStayWithTheirRows(t *testing.T) {
 	contentW := pageW - 2*margin
 	contentH := pageH - 2*margin
 
-	res, err := Layout(doc, Options{ //nolint:exhaustruct
+	res, err := Layout(doc, Options{
 		Width: contentW, Height: contentH, Background: true, Media: "print", Zoom: 0.995,
 		Sheets: []*css.Stylesheet{sheet},
 		Images: func(src string) ([]byte, error) {
@@ -66,7 +65,7 @@ func TestFixture60BackgroundImagesStayWithTheirRows(t *testing.T) {
 
 	pdfDoc := pdf.NewDocument()
 
-	if err := Paint(pdfDoc, res, PaintOptions{ //nolint:exhaustruct,nolintlint // PaintOptions has optional fields
+	if err := Paint(pdfDoc, res, PaintOptions{ //nolint:nolintlint // PaintOptions has optional fields
 		PageWidth: pageW, PageHeight: pageH,
 		MarginTop: margin, MarginBottom: margin, MarginLeft: margin, MarginRight: margin,
 	}); err != nil {

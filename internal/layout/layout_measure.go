@@ -402,7 +402,14 @@ func (m *cellMeasure) walkBlockChildren(nodeN *html.Node, childCS ResolvedStyle,
 
 	childNowrap := nowrap || childCS.WhiteSpace == cssWhiteSpaceNowrap || childCS.WhiteSpace == cssWhiteSpacePre
 
+	poll := newCtxPoll(m.engine.ctx)
 	for _, child := range nodeN.Children {
+		if poll.poll() {
+			m.engine.err = poll.err
+
+			return
+		}
+
 		childStyle := childCS
 
 		if child.Type == html.ElementNode {
@@ -423,6 +430,12 @@ func (m *cellMeasure) walkBlockChildren(nodeN *html.Node, childCS ResolvedStyle,
 // wordBreakPolicy is the single table for "how may a token split?" —
 // white-space, word-break and overflow-wrap combine into one enum.
 // Shared by intrinsic min-content measurement and inline overflow packing.
+//
+// Intent: breakNormal is intentionally the zero value. It is both the CSS
+// default (ordinary wrapping) and the safe conservative fallback, and the
+// only producer (wordBreakOf) always returns an explicit member. An
+// uninitialized policy therefore behaves as normal wrapping rather than as
+// an unknown mode that would need handling at every consumer.
 type wordBreakPolicy int
 
 const (
@@ -713,7 +726,7 @@ func (e *engine) measureLargestImageWidth(node *html.Node) float64 {
 
 // layoutCell measures the height of a cell's content (no ops emitted).
 func (e *engine) layoutCell(n *html.Node, sty ResolvedStyle, width float64) float64 {
-	_, contentW := e.contentBox(0, width, sty)
+	_, contentW := e.contentBox(0, width, boxModelStyleOf(&sty))
 	curY := e.scalePt(sty.PaddingTop) + e.scalePt(sty.BorderTop.Width)
 	enclose := e.pushBFCFloats(sty, 0, contentW)
 	curY = e.flowChildren(nil, n.Children, sty, contentW, 0, 0, curY)

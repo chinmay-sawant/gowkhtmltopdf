@@ -1,4 +1,4 @@
-//nolint:testpackage,wsl // generated-quote layout proofs
+//nolint:wsl // generated-quote layout proofs
 package layout
 
 import (

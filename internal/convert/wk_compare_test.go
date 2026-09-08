@@ -90,7 +90,7 @@ func TestCompareWithWkhtmltopdfBinary(t *testing.T) {
 	rows := make([]cliCompareRow, 0, len(sizes))
 
 	for _, pages := range sizes {
-		htmlBytes := executeBenchmarkTemplate(t, tpl, benchmarkTemplateData{ //nolint:exhaustruct // partial template data
+		htmlBytes := executeBenchmarkTemplate(t, tpl, benchmarkTemplateData{
 			Pages: benchmarkPages(pages),
 		})
 		htmlFile := filepath.Join(tmpDir, fmt.Sprintf("doc_%d.html", pages))

@@ -1,4 +1,4 @@
-package layout //nolint:testpackage // cancellation benchmark exercises the unexported style resolver.
+package layout
 
 import (
 	"context"
@@ -34,11 +34,11 @@ func (c *cancelAfterStyleChecks) Value(any) any { return nil }
 func styleStressFixture(tb testing.TB) (*html.Node, *css.Stylesheet) {
 	tb.Helper()
 
-	root := &html.Node{ //nolint:exhaustruct // stress tree only needs element fields
+	root := &html.Node{
 		Type: html.ElementNode, Name: "body", Attrs: map[string]string{},
 	}
 	for range 2048 {
-		child := &html.Node{ //nolint:exhaustruct // stress tree only needs element fields
+		child := &html.Node{
 			Type:   html.ElementNode,
 			Name:   "div",
 			Attrs:  map[string]string{"class": "item"},
@@ -68,9 +68,9 @@ func styleStressFixture(tb testing.TB) (*html.Node, *css.Stylesheet) {
 func TestResolveStylesContextStopsDuringCascade(t *testing.T) {
 	t.Parallel()
 	root, sheet := styleStressFixture(t)
-	ctx := &cancelAfterStyleChecks{after: 40} //nolint:exhaustruct // test context only needs threshold
+	ctx := &cancelAfterStyleChecks{after: 40}
 
-	_, err := resolveStylesWithContext(ctx, root, Options{ //nolint:exhaustruct // focused style options
+	_, err := resolveStylesWithContext(ctx, root, Options{
 		Sheets: sheetSlice(sheet), Width: testViewport, Height: 800,
 	}, nil)
 	if !errors.Is(err, context.Canceled) {
@@ -81,7 +81,7 @@ func TestResolveStylesContextStopsDuringCascade(t *testing.T) {
 //nolint:wsl // benchmark timing boundaries intentionally surround the loop.
 func BenchmarkStyleResolutionContext(b *testing.B) {
 	root, sheet := styleStressFixture(b)
-	opts := Options{Sheets: sheetSlice(sheet), Width: testViewport, Height: 800} //nolint:exhaustruct
+	opts := Options{Sheets: sheetSlice(sheet), Width: testViewport, Height: 800}
 	b.ReportAllocs()
 	b.ResetTimer()
 

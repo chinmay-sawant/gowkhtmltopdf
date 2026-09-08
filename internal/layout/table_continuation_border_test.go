@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -50,7 +49,7 @@ td, th { border: 1px solid #333; padding: 3pt; }
 		pageW = 500.0
 	)
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: pageW, Height: pageH, Sheets: []*css.Stylesheet{cssSheet},
 		Media: "print", Background: true,
 	})
@@ -97,7 +96,7 @@ td, th { border: 1px solid #333; padding: 3pt; }
 
 		info := pages[page]
 		if info == nil {
-			info = &pageInfo{} //nolint:exhaustruct // intentional zero fields
+			info = &pageInfo{}
 			pages[page] = info
 		}
 

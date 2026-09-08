@@ -1,4 +1,3 @@
-//nolint:testpackage // white-box test drives ttfDrawString and ptToPx directly
 package imageout
 
 import (

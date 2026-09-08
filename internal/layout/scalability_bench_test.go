@@ -1,4 +1,4 @@
-package layout //nolint:testpackage // benchmark exercises unexported layout and paint stages.
+package layout
 
 import (
 	"bytes"
@@ -46,7 +46,7 @@ func BenchmarkDeepChromeAndForcedBreaks(b *testing.B) {
 	for _, count := range []int{10, 100, 1000} {
 		b.Run(fmt.Sprintf("%d-items", count), func(b *testing.B) {
 			root, sheet := scalabilityFixture(b, count)
-			opts := Options{Width: 500, Height: 700, Sheets: []*css.Stylesheet{sheet}, Background: true} //nolint:exhaustruct
+			opts := Options{Width: 500, Height: 700, Sheets: []*css.Stylesheet{sheet}, Background: true}
 			b.ReportAllocs()
 			b.ResetTimer()
 			for range b.N {
@@ -69,7 +69,7 @@ func TestDeepChromeOutputStable(t *testing.T) {
 		t.Run(fmt.Sprintf("%d-items", count), func(t *testing.T) {
 			t.Parallel()
 			root, sheet := scalabilityFixture(t, count)
-			opts := Options{Width: 500, Height: 700, Sheets: []*css.Stylesheet{sheet}, Background: true} //nolint:exhaustruct
+			opts := Options{Width: 500, Height: 700, Sheets: []*css.Stylesheet{sheet}, Background: true}
 			first := renderScalabilityPDF(t, root, opts)
 			second := renderScalabilityPDF(t, root, opts)
 			if !bytes.Equal(first, second) {
@@ -88,7 +88,7 @@ func renderScalabilityPDF(t *testing.T, root *html.Node, opts Options) []byte {
 	}
 
 	doc := pdf.NewDocument()
-	if err := Paint(doc, res, PaintOptions{PageWidth: 500, PageHeight: 700}); err != nil { //nolint:exhaustruct
+	if err := Paint(doc, res, PaintOptions{PageWidth: 500, PageHeight: 700}); err != nil {
 		t.Fatalf("Paint: %v", err)
 	}
 

@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -90,19 +89,19 @@ func TestOrphansWidowsLineAwareKeepTogether(t *testing.T) {
 	// that Class B break illegal → whole block shifts to the next page.
 	contentH := 100.0
 	ops := []Op{
-		{Kind: OpText, Y: 70, Text: "1", Size: 10},  //nolint:exhaustruct // intentional zero fields
-		{Kind: OpText, Y: 85, Text: "2", Size: 10},  //nolint:exhaustruct // intentional zero fields
-		{Kind: OpText, Y: 105, Text: "3", Size: 10}, //nolint:exhaustruct // intentional zero fields
-		{Kind: OpText, Y: 120, Text: "4", Size: 10}, //nolint:exhaustruct // intentional zero fields
-		{Kind: OpText, Y: 135, Text: "5", Size: 10}, //nolint:exhaustruct // intentional zero fields
+		{Kind: OpText, Y: 70, Text: "1", Size: 10},
+		{Kind: OpText, Y: 85, Text: "2", Size: 10},
+		{Kind: OpText, Y: 105, Text: "3", Size: 10},
+		{Kind: OpText, Y: 120, Text: "4", Size: 10},
+		{Kind: OpText, Y: 135, Text: "5", Size: 10},
 	}
 
-	root := &box{ //nolint:exhaustruct // intentional zero fields
-		kind: displayBlock, y: 60, height: 90, opStart: 0, opEnd: 4,
-		style: &ResolvedStyle{Orphans: 4, Widows: 2}, //nolint:exhaustruct // intentional zero fields
+	root := &box{
+		kind: boxKindBlock, y: 60, height: 90, opStart: 0, opEnd: 4,
+		style: &ResolvedStyle{Orphans: 4, Widows: 2},
 	}
 
-	res := &Result{Ops: ops, root: root} //nolint:exhaustruct // intentional zero fields
+	res := &Result{Ops: ops, root: root}
 	if !orphansWidows(res, contentH) {
 		t.Fatal("expected Rule 3 keep-together shift for orphans:4 with 2|3 split")
 	}
@@ -119,19 +118,19 @@ func TestOrphansWidowsLineAwareKeepTogether(t *testing.T) {
 
 	// Legal split (orphans:2, widows:2 with 2|3) must not move.
 	ops2 := []Op{
-		{Kind: OpText, Y: 70, Text: "1", Size: 10},  //nolint:exhaustruct // intentional zero fields
-		{Kind: OpText, Y: 85, Text: "2", Size: 10},  //nolint:exhaustruct // intentional zero fields
-		{Kind: OpText, Y: 105, Text: "3", Size: 10}, //nolint:exhaustruct // intentional zero fields
-		{Kind: OpText, Y: 120, Text: "4", Size: 10}, //nolint:exhaustruct // intentional zero fields
-		{Kind: OpText, Y: 135, Text: "5", Size: 10}, //nolint:exhaustruct // intentional zero fields
+		{Kind: OpText, Y: 70, Text: "1", Size: 10},
+		{Kind: OpText, Y: 85, Text: "2", Size: 10},
+		{Kind: OpText, Y: 105, Text: "3", Size: 10},
+		{Kind: OpText, Y: 120, Text: "4", Size: 10},
+		{Kind: OpText, Y: 135, Text: "5", Size: 10},
 	}
 
-	root2 := &box{ //nolint:exhaustruct // intentional zero fields
-		kind: displayBlock, y: 60, height: 90, opStart: 0, opEnd: 4,
-		style: &ResolvedStyle{Orphans: 2, Widows: 2}, //nolint:exhaustruct // intentional zero fields
+	root2 := &box{
+		kind: boxKindBlock, y: 60, height: 90, opStart: 0, opEnd: 4,
+		style: &ResolvedStyle{Orphans: 2, Widows: 2},
 	}
 
-	res2 := &Result{Ops: ops2, root: root2} //nolint:exhaustruct // intentional zero fields
+	res2 := &Result{Ops: ops2, root: root2}
 	if orphansWidows(res2, contentH) {
 		t.Fatal("legal 2|3 split with orphans:2 widows:2 must not shift")
 	}
@@ -207,13 +206,13 @@ func TestOrphansWidowsHeuristicFallback(t *testing.T) {
 	t.Parallel()
 	// Geometric fallback: short straddling block (~14–60pt) moves wholly when
 	// it fits the next page (no line boxes required).
-	res := &Result{ //nolint:exhaustruct // intentional zero fields
-		Ops: []Op{{Kind: OpFillRect, Y: 830, H: 30}}, //nolint:exhaustruct // intentional zero fields
+	res := &Result{
+		Ops: []Op{{Kind: OpFillRect, Y: 830, H: 30}},
 	}
 
-	b := &box{ //nolint:exhaustruct // intentional zero fields
-		kind: displayBlock, y: 830, height: 30, opStart: 0, opEnd: 0,
-		style: &ResolvedStyle{Orphans: 2, Widows: 2}, //nolint:exhaustruct // intentional zero fields
+	b := &box{
+		kind: boxKindBlock, y: 830, height: 30, opStart: 0, opEnd: 0,
+		style: &ResolvedStyle{Orphans: 2, Widows: 2},
 	}
 
 	if !orphansWidowsHeuristic(res, b, 842) {
@@ -224,7 +223,7 @@ func TestOrphansWidowsHeuristicFallback(t *testing.T) {
 		t.Fatalf("op Y = %v, want ≥ 842 after shift", res.Ops[0].Y)
 	}
 	// Outside the short-band → no heuristic move.
-	b2 := &box{kind: displayBlock, y: 800, height: 80, opStart: 0, opEnd: 0} //nolint:exhaustruct // zero fields
+	b2 := &box{kind: boxKindBlock, y: 800, height: 80, opStart: 0, opEnd: 0}
 	if orphansWidowsHeuristic(res, b2, 842) {
 		t.Fatal("heuristic must not move tall blocks (>60pt)")
 	}

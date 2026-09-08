@@ -36,7 +36,7 @@ func orphansWidows(res *Result, contentH float64) bool {
 // orphansWidowsBox applies Rule 3 (or the geometric fallback) to one block
 // box. Returns whether anything moved.
 func orphansWidowsBox(res *Result, boxNode *box, contentH float64) bool {
-	if boxNode.kind != displayBlock || boxNode.height <= 0 || boxNode.opStart > boxNode.opEnd {
+	if boxNode.kind != boxKindBlock || boxNode.height <= 0 || boxNode.opStart > boxNode.opEnd {
 		return false
 	}
 	// Nested block containers: children apply Rule 3; only heuristic on
@@ -170,7 +170,7 @@ func orphansWidowsHeuristic(res *Result, boxNode *box, contentH float64) bool {
 
 func hasNestedFlowChild(boxNode *box) bool {
 	for _, c := range boxNode.children {
-		if c.kind == displayBlock || c.kind == displayTable {
+		if c.kind == boxKindBlock || c.kind == boxKindTable {
 			return true
 		}
 	}

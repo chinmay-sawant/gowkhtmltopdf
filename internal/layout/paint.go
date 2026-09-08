@@ -13,6 +13,13 @@ import (
 
 var errNilContext = errs.ErrNilContext
 
+// Static validation errors for PaintOptions. Dynamic values are wrapped with
+// %w at the return site so messages keep their detail.
+var (
+	errInvalidPaintPage   = errors.New("layout: paint page must be finite and greater than zero")
+	errInvalidPaintMargin = errors.New("layout: paint margin")
+)
+
 // Page-break keyword constants shared by the pagination passes.
 const (
 	pageBreakAvoid  = "avoid"
@@ -65,6 +72,37 @@ type PaintOptions struct {
 	pageNames []string `exhaustruct:"optional"`
 }
 
+// validate rejects page geometry that would otherwise be silently reset:
+// non-positive page dimensions and negative margins. The content-height check
+// (margins swallowing the page) is intentionally not an error: header/footer
+// auto margins (Margin.Top <0) can legitimately produce a header taller than
+// the page (see TestHTMLHeaderTallContentClipped) and the engine clips such
+// headers while the body fallback (contentH = PageHeight) keeps conversion
+// alive, matching wkhtmltopdf.
+func (opts PaintOptions) validate() error {
+	if !finitePositive(opts.PageWidth) || !finitePositive(opts.PageHeight) {
+		return fmt.Errorf("%w, got %g x %g",
+			errInvalidPaintPage, opts.PageWidth, opts.PageHeight)
+	}
+
+	for _, margin := range []struct {
+		name  string
+		value float64
+	}{
+		{name: "top", value: opts.MarginTop},
+		{name: "bottom", value: opts.MarginBottom},
+		{name: "left", value: opts.MarginLeft},
+		{name: "right", value: opts.MarginRight},
+	} {
+		if !finiteNonNegative(margin.value) {
+			return fmt.Errorf("%w %s must be finite and non-negative, got %g",
+				errInvalidPaintMargin, margin.name, margin.value)
+		}
+	}
+
+	return nil
+}
+
 // PageMargins is one page-box margin set in points.
 type PageMargins struct {
 	Top, Right, Bottom, Left float64
@@ -96,6 +134,10 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 		return errNilContext
 	}
 
+	if err := opts.validate(); err != nil {
+		return err
+	}
+
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -125,7 +167,10 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 
 	applyNamedPageBreaks(res)
 
-	paginateOps(res, contentH)
+	if _, err := paginateOps(ctx, res, contentH); err != nil {
+		return err
+	}
+
 	stretchPaginatedChrome(res)
 
 	if err := validatePaintPageIndices(res.Ops, contentH); err != nil {
@@ -159,6 +204,8 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 	opPage := buildPagesAfterSplits(res, contentH, fixedIdx)
 
 	populateLocations(res, contentH, opPage)
+
+	clearStructureElements(res.Ops)
 
 	if err := buildStructureTree(doc, res); err != nil {
 		return err
@@ -515,7 +562,7 @@ func (p *pagePainter) drawPageOp(paintOp *Op) {
 		if err != nil && p.err == nil {
 			p.err = err
 		}
-	case OpLinkURI, opKindNoop:
+	case OpLinkURI, OpUnknown, opKindNoop:
 	}
 }
 
@@ -772,7 +819,7 @@ func drawBandOp(
 		if err := drawImage(page, chld, paintOp, 0, contentH, margins, pageH, name); err != nil && *firstErr == nil {
 			*firstErr = err
 		}
-	case OpLinkURI, opKindNoop:
+	case OpLinkURI, OpUnknown, opKindNoop:
 	}
 }
 

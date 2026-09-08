@@ -36,6 +36,9 @@ var (
 
 	// ErrProfilePDF20Unsupported indicates PDF 2.0 conformance profiles are unsupported
 	// (historical sentinel; never returned).
+	//
+	// Deprecated: PDF/A-4 and PDF/UA-2 profiles are supported since v0.2.2;
+	// this sentinel is never returned and exists only for source compatibility.
 	ErrProfilePDF20Unsupported = errors.New(
 		"settings: PDF 2.0 conformance profiles (PDF/A-4, PDF/UA-2) are unsupported",
 	)
@@ -45,14 +48,10 @@ var (
 )
 
 // Canonical normalizes profile strings and aliases to canonical constants.
-// Returns an empty string if the profile is unrecognized or empty.
-func Canonical(value string) string {
-	res, err := Parse(value)
-	if err != nil {
-		return ProfileNone
-	}
-
-	return res
+// Unrecognized values return the same error as Parse instead of silently
+// degrading to ProfileNone; a valid empty input returns ProfileNone, nil.
+func Canonical(value string) (string, error) {
+	return Parse(value)
 }
 
 // Parse validates and normalizes a PDF conformance profile string.

@@ -237,7 +237,7 @@ func (e *engine) isOwnChromeOp(op *Op, boxNode *box) bool {
 		}
 
 		return e.isOwnOutlineLine(op, boxNode)
-	case OpText, OpImage, OpLinkURI, OpBullet, opKindNoop:
+	case OpText, OpImage, OpLinkURI, OpBullet, OpUnknown, opKindNoop:
 		return false
 	default:
 		return false
@@ -329,7 +329,7 @@ func clipPaintOp(op *Op, clip clipRect) {
 		clipLineOp(op, clip)
 	case OpText, OpBullet:
 		clipTextOp(op, clip)
-	case opKindNoop:
+	case OpUnknown, opKindNoop:
 	}
 }
 

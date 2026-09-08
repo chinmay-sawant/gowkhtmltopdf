@@ -1,4 +1,4 @@
-package convert //nolint:testpackage // shares newCommand with convert_test.go
+package convert
 
 import (
 	"io"
@@ -23,7 +23,11 @@ func TestImportStylesheet(t *testing.T) {
 .from-a { color: #ff0000 }`)
 	writeImportCSS(t, dir, "b.css", `.from-b { color: #0000ff }`)
 
-	loader := load.NewLoader(cmd.Global.Load)
+	loader, err := load.NewLoaderWithError(cmd.Global.Load)
+	if err != nil {
+		t.Fatalf("new loader: %v", err)
+	}
+
 	root, err := html.ParseDocument([]byte(htmlDoc))
 
 	if err != nil {
@@ -37,7 +41,7 @@ func TestImportStylesheet(t *testing.T) {
 		root,
 		"file://"+filepath.ToSlash(dir)+"/",
 		page.Load,
-		prepare.SheetOptions{ //nolint:exhaustruct // test viewport/media only
+		prepare.SheetOptions{
 			ViewportW: 600, ViewportH: 800, MediaType: mediaPrint,
 		},
 		io.Discard,

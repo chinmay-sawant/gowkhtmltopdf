@@ -20,7 +20,7 @@ func TestMastheadFlexImagesPaint(t *testing.T) {
   <img class="logo" src="logo.png" alt="logo" style="height:36px">
 </header>
 </body></html>`)
-	res, err := Layout(root, Options{ //nolint:exhaustruct
+	res, err := Layout(root, Options{
 		Width: 500, Height: 200, Sheets: []*css.Stylesheet{sheet(t, `body{margin:0}`)}, Media: "print",
 		Images: func(src string) ([]byte, error) {
 			if src == "logo.png" {

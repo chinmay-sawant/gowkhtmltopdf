@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -28,7 +27,7 @@ func TestTheadRepeatOnContinuationPages(t *testing.T) { //nolint:cyclop
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 400, Height: 200, Background: true,
 	})
 	if err != nil {
@@ -80,7 +79,7 @@ func TestTheadUADisplay(t *testing.T) {
 
 	var walk func(b *box)
 	walk = func(boxNode *box) {
-		if boxNode.kind == displayTable {
+		if boxNode.kind == boxKindTable {
 			tblBox = boxNode
 
 			return
@@ -124,7 +123,7 @@ func TestContinuationHeaderNotOverlappedByBodyRow(t *testing.T) { //nolint:cyclo
 
 	const contentH = 220.0
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // continuation header geometry
+	res, err := Layout(root, Options{
 		Width: 500, Height: contentH, Background: true,
 	})
 	if err != nil {

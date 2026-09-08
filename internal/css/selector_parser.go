@@ -481,6 +481,13 @@ func parseAttrSelector(sel string) (AttrSelector, bool) {
 
 	name := strings.TrimSpace(inner[:nameEnd])
 	rawVal := strings.TrimSpace(inner[nameEnd+len(oper):])
+
+	return buildAttrSelector(name, oper, rawVal)
+}
+
+// buildAttrSelector validates the name and builds the operator-form
+// attribute selector, pre-lowering the comparison value for the i flag.
+func buildAttrSelector(name, oper, rawVal string) (AttrSelector, bool) {
 	rawVal, ignoreCase := splitAttrIFlag(rawVal)
 	val := stripAttrQuotes(rawVal)
 
@@ -490,12 +497,17 @@ func parseAttrSelector(sel string) (AttrSelector, bool) {
 
 	switch oper {
 	case "=", "~=", "*=", "^=", "$=", "|=":
-		return AttrSelector{
+		attr := AttrSelector{
 			Name:       strings.ToLower(name),
 			Op:         oper,
 			Value:      val,
 			IgnoreCase: ignoreCase,
-		}, true
+		}
+		if ignoreCase {
+			attr.valueLower = strings.ToLower(val)
+		}
+
+		return attr, true
 	default:
 		return AttrSelector{}, false //nolint:exhaustruct // intentional zero-value fields
 	}

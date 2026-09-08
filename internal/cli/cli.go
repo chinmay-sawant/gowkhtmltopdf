@@ -323,7 +323,7 @@ func isLegacyObjectToken(arg string) bool {
 //nolint:cyclop,funlen,wsl // source validation and ordered assembly are one parser boundary.
 func (c *Command) resolveFree(cur *objectCtx, free []string) error {
 	if c.Global.DumpDefaultTOCXSL {
-		if len(free) != 0 || len(c.Objects) != 0 {
+		if c.outputSet || len(free) != 0 || len(c.Objects) != 0 {
 			return fmt.Errorf("%w: --dump-default-toc-xsl cannot be combined with input/output arguments", ErrTerminalConflict)
 		}
 

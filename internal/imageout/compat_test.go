@@ -1,4 +1,3 @@
-//nolint:testpackage // compatibility adapter exercises private engine seams.
 package imageout
 
 import (

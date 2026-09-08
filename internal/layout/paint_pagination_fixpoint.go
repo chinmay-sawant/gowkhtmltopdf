@@ -1,34 +1,54 @@
 package layout
 
+import (
+	"context"
+	"fmt"
+)
+
 // paginateOps assigns every op a page. Crossing text/image/link ops snap to
 // the next page boundary (taking following flow with them so row spacing is
 // preserved); then page-break policies are applied as canvas-Y shifts; finally
 // pages derive from the final Y positions. Rect-type ops crossing a boundary
 // are split by Paint.
-func paginateOps(res *Result, contentH float64) []int {
+//
+// ctx is polled once per fixpoint iteration and every 64 op slots; on
+// cancellation it returns the error and the caller abandons the partially
+// shifted display list.
+func paginateOps(ctx context.Context, res *Result, contentH float64) ([]int, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, fmt.Errorf("layout: paginate ops: %w", err)
+	}
+
 	ensureFlowIndex(res, contentH)
 	// Resolve forced section starts before snapping text to provisional page
 	// boundaries. Otherwise a row near the boundary of the unbroken flow can
 	// move its text alone; a later page-break-before shift then leaves the
 	// collapsed-table chrome behind at the old row position.
-	for range 10 {
-		if !beforeAlways(res, contentH) {
-			break
-		}
+	if err := settleBeforeAlways(ctx, res, contentH); err != nil {
+		return nil, err
 	}
 
 	// Lift aside callouts that do not fit the remaining Y on this page
 	// before snapCrossingTextOps splits their last lines off to the next
 	// page top (that snap-then-shift left an internal gap in the card).
 	for range 10 {
+		if err := ctx.Err(); err != nil {
+			return nil, fmt.Errorf("layout: paginate ops: %w", err)
+		}
+
 		if !keepImplicitAsides(res, contentH) {
 			break
 		}
 	}
 
-	snapCrossingTextOps(res, contentH)
+	if err := snapCrossingTextOps(ctx, res, contentH); err != nil {
+		return nil, fmt.Errorf("layout: paginate ops: %w", err)
+	}
 
-	paginationFixpoint(res, contentH)
+	if err := paginationFixpoint(ctx, res, contentH); err != nil {
+		return nil, err
+	}
+
 	// After flow has settled, clone <thead> onto continuation pages.
 	// Blank avoid-list bands are controlled by preferSplitOverBlank during
 	// the fixpoint above (former packAvoidGaps sibling packing was a no-op).
@@ -42,15 +62,23 @@ func paginateOps(res *Result, contentH float64) []int {
 	normalizeLeadingRoundedCallouts(res, contentH)
 	// Forced breaks win over the callout pack: a same-page snap must not
 	// leave page-break-before:always parked on the previous page.
-	for range 10 {
-		if !beforeAlways(res, contentH) {
-			break
-		}
+	if err := settleBeforeAlways(ctx, res, contentH); err != nil {
+		return nil, err
 	}
 	// Sticky is applied in Paint after rect splitting (see splitCrossingRects).
+	return assignFlowPages(ctx, res, contentH)
+}
+
+// assignFlowPages maps every display-list op to its settled page.
+func assignFlowPages(ctx context.Context, res *Result, contentH float64) ([]int, error) {
 	opPage := make([]int, len(res.Ops))
+	poll := newCtxPoll(ctx)
 
 	for opIdx := range res.Ops {
+		if poll.poll() {
+			return nil, fmt.Errorf("layout: paginate ops: %w", poll.err)
+		}
+
 		page, ok := checkedFlowPageOfY(res.Ops[opIdx].Y, contentH)
 		if !ok {
 			opPage[opIdx] = -1
@@ -59,13 +87,35 @@ func paginateOps(res *Result, contentH float64) []int {
 		}
 	}
 
-	return opPage
+	return opPage, nil
+}
+
+// settleBeforeAlways runs forced section-start resolution to a fixpoint:
+// page-break-before shifts repeat until none move anything.
+func settleBeforeAlways(ctx context.Context, res *Result, contentH float64) error {
+	for range 10 {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("layout: paginate ops: %w", err)
+		}
+
+		if !beforeAlways(res, contentH) {
+			break
+		}
+	}
+
+	return nil
 }
 
 // paginationFixpoint runs the page-break policies until none of them move
-// anything or the iteration cap is reached.
-func paginationFixpoint(res *Result, contentH float64) {
+// anything or the iteration cap is reached. ctx is checked once per
+// iteration: each iteration is a full display-list pass, so a check keeps
+// cancellation latency under one pass instead of ten.
+func paginationFixpoint(ctx context.Context, res *Result, contentH float64) error {
 	for range 10 {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("layout: pagination fixpoint: %w", err)
+		}
+
 		changed := avoidInside(res, contentH)
 		if beforeAlways(res, contentH) {
 			changed = true
@@ -91,14 +141,21 @@ func paginationFixpoint(res *Result, contentH float64) {
 			break
 		}
 	}
+
+	return nil
 }
 
 // snapCrossingTextOps moves text/image/link ops that cross a page boundary to
 // the next page (taking following flow with them so row spacing is preserved).
-func snapCrossingTextOps(res *Result, contentH float64) {
+func snapCrossingTextOps(ctx context.Context, res *Result, contentH float64) error {
+	poll := newCtxPoll(ctx)
 	tableRanges := tablePaintRanges(res)
 
 	for idx := range len(res.Ops) {
+		if poll.poll() {
+			return fmt.Errorf("snap crossing ops: %w", poll.err)
+		}
+
 		paintOp := &res.Ops[idx]
 		if paintOp.Fixed || opInPaintRange(idx, tableRanges) {
 			continue
@@ -117,9 +174,11 @@ func snapCrossingTextOps(res *Result, contentH float64) {
 			if paintOp.Y+opH > boundary+1e-9 {
 				snapOpToBoundary(res, idx, paintOp, boundary)
 			}
-		case OpFillRect, OpStrokeRect, OpLine, opKindNoop:
+		case OpFillRect, OpStrokeRect, OpLine, OpUnknown, opKindNoop:
 		}
 	}
+
+	return nil
 }
 
 type paintRange struct{ first, last int }
@@ -132,7 +191,7 @@ func tablePaintRanges(res *Result) []paintRange {
 	ranges := make([]paintRange, 0)
 
 	for _, boxNode := range flowBoxList(res) {
-		if boxNode.kind != displayTable || boxNode.opStart > boxNode.opEnd {
+		if boxNode.kind != boxKindTable || boxNode.opStart > boxNode.opEnd {
 			continue
 		}
 

@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -39,7 +38,7 @@ sup.reference { font-size: 8pt; }
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 420, Height: 800, Sheets: []*css.Stylesheet{cssSheet}, Background: true,
 	})
 	if err != nil {
@@ -150,7 +149,7 @@ sup.reference { font-size: 8pt; white-space: nowrap; }
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 200, Height: 800, Sheets: []*css.Stylesheet{cssSheet}, Background: true,
 	})
 	if err != nil {

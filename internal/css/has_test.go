@@ -1,4 +1,4 @@
-package css //nolint:testpackage // exercises unexported parseSelector and shared test helpers
+package css
 
 import (
 	"testing"
@@ -130,6 +130,60 @@ func TestHasSpecificity(t *testing.T) {
 		if a != testCase.a || b != testCase.b || c != testCase.c {
 			t.Errorf("Specificity(%q) = (%d,%d,%d), want (%d,%d,%d)", testCase.sel, a, b, c, testCase.a, testCase.b, testCase.c)
 		}
+	}
+}
+
+// TestHasParenAfterQuotedSpan guards matchingParen against skipping the byte
+// right after a quoted span. Before the fix the loop's idx++ advanced one
+// byte past the closing quote, so the '(' in :has([t="a"(x)]) was never
+// counted and the inner ')' was taken as the end of the :has() argument.
+func TestHasParenAfterQuotedSpan(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		sel   string
+		value string
+	}{
+		{`div:has([t="a"(x)])`, `"a"(x)`},
+		{`div:has([t='a'(x)])`, `'a'(x)`},
+		{`div:has([t="a"(x, y)])`, `"a"(x, y)`},
+	}
+	for _, testCase := range cases {
+		checkHasParenSpan(t, testCase.sel, testCase.value)
+	}
+
+	// takeParenArg must terminate on the outer ')' even when a quoted span
+	// is directly followed by '('.
+	inner, end, ok := takeParenArg(`([t="a"(x)])`, 0)
+	if !ok || inner != `[t="a"(x)]` || end != len(`([t="a"(x)])`) {
+		t.Errorf("takeParenArg = (%q, %d, %v), want (%q, %d, true)", inner, end, ok, `[t="a"(x)]`, len(`([t="a"(x)])`))
+	}
+}
+
+// checkHasParenSpan asserts one :has() attribute case keeps the quoted span
+// and the paren that follows it.
+func checkHasParenSpan(t *testing.T, selSrc, value string) {
+	t.Helper()
+
+	sel, ok := parseSelector(selSrc)
+	if !ok {
+		t.Errorf("parseSelector(%q) failed", selSrc)
+
+		return
+	}
+
+	if len(sel.Parts) != 1 || len(sel.Parts[0].Pseudos) != 1 {
+		t.Fatalf("parseSelector(%q) = %+v", selSrc, sel)
+	}
+
+	p := sel.Parts[0].Pseudos[0]
+	if p.Name != pseudoClassHas || len(p.Has) != 1 || len(p.Has[0].Parts) != 1 {
+		t.Fatalf("parseSelector(%q): pseudo = %+v", selSrc, p)
+	}
+
+	attrs := p.Has[0].Parts[0].Attrs
+	if len(attrs) != 1 || attrs[0].Name != "t" || attrs[0].Value != value {
+		t.Fatalf("parseSelector(%q): attrs = %+v, want value %q", selSrc, attrs, value)
 	}
 }
 

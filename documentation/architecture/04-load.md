@@ -72,7 +72,7 @@ computational engine.
 
 | Symbol | Location | Purpose |
 |--------|----------|---------|
-| `NewLoader(global settings.LoadGlobal)` | `load.go:282` | Historical constructor shape: builds the loader but defers proxy-validation failure to the first `Load`/`FetchSub` call (recorded in `initErr`). Exists for existing internal callers. |
+| `NewLoader(global settings.LoadGlobal)` | `load.go:282` | Deprecated compatibility shim: builds the loader but defers proxy-validation failure to the first `Load`/`FetchSub` call (recorded in `initErr`). Kept for historical callers; new callers use `NewLoaderWithError`. |
 | `NewLoaderWithError(global settings.LoadGlobal) (*Loader, error)` | `load.go:308` | Fail-fast constructor: validates proxy config and installs the HTTP transport before returning. **This is the one new callers use** — `convert.Run` and `imageout` construct the loader at the request boundary so invalid policy fails before any pipeline state is built. |
 
 ### 3.3 Primary load entry points
@@ -221,7 +221,7 @@ mutate the loader's snapshot after construction.
 | `internal/convert/prepare/prepare.go` | `loader.Load` (primary), `loader.ForResource` → `ResourceContext` for all subresources. |
 | `internal/convert/prepare/styles.go` | `loader.ForResource` for stylesheet collection. |
 | `internal/convert/hf.go:227,243` | `load.IsHTML` + `loader.Load` for header/footer HTML. |
-| `internal/imageout/imageout.go:1124` | `load.NewLoader(imageLoadGlobal(...))` for image mode. |
+| `internal/imageout/imageout.go:1603` | `load.NewLoaderWithError(imageLoadGlobal(...))` for image mode. |
 | `internal/html/html.go:291-295` | Comment-level mirror of `load.IsHTML` BOM handling. |
 | `internal/settings/reflect.go` | Registers dotted keys that land on `LoadGlobal`/`LoadPage` (`enablelocalfileaccess` at `reflect.go:498`, `allow` at `reflect.go:527`, `load.*` object keys via `registerLoadPageKeys` at `reflect.go:701`). |
 

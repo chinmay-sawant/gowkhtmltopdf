@@ -1,5 +1,5 @@
 //nolint:all
-package convert //nolint:testpackage // white-box tests need unexported access
+package convert
 
 import (
 	"bytes"
@@ -241,206 +241,206 @@ type fixtureBounds struct {
 
 // pagination behaviour across releases: a change to wrapping, table layout.
 var fixturePageBounds = map[string]fixtureBounds{ //nolint:gochecknoglobals // immutable test corpus
-	"fixture-01-simple-invoice.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-01-simple-invoice.html": {
 		minPages: 1, maxPages: 1, needles: []string{"Invoice", "234.40"},
 	},
-	"fixture-02-table-heavy-invoice.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-02-table-heavy-invoice.html": {
 		minPages: 1, maxPages: 2,
 	},
-	"fixture-03-multi-page-invoice.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-03-multi-page-invoice.html": {
 		minPages: 2, maxPages: 0,
 	},
-	"fixture-04-two-column-layout.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-04-two-column-layout.html": {
 		minPages: 1, maxPages: 1,
 	},
-	"fixture-05-linked-stylesheet.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-05-linked-stylesheet.html": {
 		minPages: 1, maxPages: 1,
 	},
-	"fixture-06-external-link.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-06-external-link.html": {
 		minPages: 1, maxPages: 1, uris: true, needles: []string{"Partner Handbook"},
 	},
-	"fixture-07-image-logo.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-07-image-logo.html": {
 		minPages: 1, maxPages: 1, images: true, needles: []string{"Nordwind"},
 	},
-	"fixture-08-forced-page-breaks.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-08-forced-page-breaks.html": {
 		minPages: 5, maxPages: 5,
 	},
-	"fixture-09-multi-section-doc.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-09-multi-section-doc.html": {
 		minPages: 2, maxPages: 0,
 	},
-	"fixture-10-table-colspan.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-10-table-colspan.html": {
 		minPages: 1, maxPages: 1,
 	},
-	"fixture-11-long-text-wrap.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-11-long-text-wrap.html": {
 		minPages: 3, maxPages: 0,
 	},
-	"fixture-12-lists.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-12-lists.html": {
 		minPages: 1, maxPages: 1,
 	},
-	"fixture-13-pre-code-block.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-13-pre-code-block.html": {
 		minPages: 1, maxPages: 1,
 	},
-	"fixture-14-colorful-report.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-14-colorful-report.html": {
 		minPages: 1, maxPages: 1,
 	},
-	"fixture-15-bulleted-requirements.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-15-bulleted-requirements.html": {
 		minPages: 1, maxPages: 2,
 	},
-	"fixture-16-invoice-with-css.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-16-invoice-with-css.html": {
 		minPages: 1, maxPages: 2,
 	},
-	"fixture-17-cover-and-content.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-17-cover-and-content.html": {
 		minPages: 2, maxPages: 2,
 	},
-	"fixture-18-typography.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-18-typography.html": {
 		minPages: 1, maxPages: 1,
 	},
-	"fixture-19-margin-and-sizing.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-19-margin-and-sizing.html": {
 		minPages: 1, maxPages: 1,
 	},
-	"fixture-20-image-grid.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-20-image-grid.html": {
 		minPages: 1, maxPages: 1, images: true,
 	},
-	"fixture-21-detailed-report.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-21-detailed-report.html": {
 		minPages: 3, maxPages: 0,
 	},
-	"fixture-22-float-invoice-chrome.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-22-float-invoice-chrome.html": {
 		minPages: 1, maxPages: 1,
 	},
-	"fixture-23-thead-repeat.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-23-thead-repeat.html": {
 		minPages: 2, maxPages: 0,
 	},
-	"fixture-24-internal-anchors.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-24-internal-anchors.html": {
 		minPages: 2, maxPages: 2, needles: []string{"Internal link report", "Appendix"},
 	},
-	"fixture-25-flex-row.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-25-flex-row.html": {
 		minPages: 1, maxPages: 1,
 	},
-	"fixture-26-position-lite.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-26-position-lite.html": {
 		minPages: 1, maxPages: 1,
 	},
-	"fixture-27-cjk-fontpath.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-27-cjk-fontpath.html": {
 		minPages: 1, maxPages: 1,
 	},
-	"fixture-28-flex-wrap-grid-fixed.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-28-flex-wrap-grid-fixed.html": {
 		minPages: 2, maxPages: 2,
 	},
-	"fixture-29-float-beside-table.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-29-float-beside-table.html": {
 		minPages: 1, maxPages: 1,
 	},
-	"fixture-30-orphans-heuristic.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-30-orphans-heuristic.html": {
 		minPages: 2, maxPages: 0,
 	},
-	"fixture-31-sticky-top.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-31-sticky-top.html": {
 		minPages: 2, maxPages: 0,
 	},
-	"fixture-32-flex-grid-full.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-32-flex-grid-full.html": {
 		minPages: 1, maxPages: 1,
 	},
-	"fixture-33-flex-cyclic-basis.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-33-flex-cyclic-basis.html": {
 		minPages: 1, maxPages: 1,
 	},
-	"fixture-34-grid-areas-dense.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-34-grid-areas-dense.html": {
 		minPages: 1, maxPages: 1,
 	},
-	"fixture-35-grid-minmax-intrinsic.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-35-grid-minmax-intrinsic.html": {
 		minPages: 1, maxPages: 1,
 	},
-	"fixture-36-hf-nested-flex.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-36-hf-nested-flex.html": {
 		minPages: 1, maxPages: 1, images: true,
 	},
-	"fixture-37-orphans-css.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-37-orphans-css.html": {
 		minPages: 2, maxPages: 0,
 	},
-	"fixture-38-float-inside-td.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-38-float-inside-td.html": {
 		minPages: 1, maxPages: 1,
 	},
-	"fixture-39-multicol-article.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-39-multicol-article.html": {
 		minPages: 2, maxPages: 0,
 	},
-	"fixture-40-transform-badge.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-40-transform-badge.html": {
 		minPages: 1, maxPages: 1,
 	},
-	"fixture-41-has-selector.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-41-has-selector.html": {
 		minPages: 1, maxPages: 1,
 	},
-	"fixture-42-container-inline-size.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-42-container-inline-size.html": {
 		minPages: 1, maxPages: 1,
 	},
-	"fixture-43-complex-dossier.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-43-complex-dossier.html": {
 		minPages: 5, maxPages: 5, images: true,
 	},
-	"fixture-44-receipt.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-44-receipt.html": {
 		minPages: 1, maxPages: 1,
 	},
-	"fixture-45-purchase-order.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-45-purchase-order.html": {
 		minPages: 1, maxPages: 1,
 	},
-	"fixture-46-contract.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-46-contract.html": {
 		minPages: 1, maxPages: 1,
 	},
-	"fixture-47-certificate.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-47-certificate.html": {
 		minPages: 1, maxPages: 1, images: true,
 	},
-	"fixture-48-shipping-document.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-48-shipping-document.html": {
 		minPages: 1, maxPages: 1,
 	},
-	"fixture-49-night-train-poster.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-49-night-train-poster.html": {
 		minPages: 1, maxPages: 1, images: true,
 	},
-	"fixture-50-letter-template.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-50-letter-template.html": {
 		minPages: 1, maxPages: 1, images: true,
 	},
-	"fixture-51-asteria-storybook.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-51-asteria-storybook.html": {
 		minPages: 4, maxPages: 4, images: true,
 	},
-	"fixture-52-airline-boarding-pass.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-52-airline-boarding-pass.html": {
 		minPages: 1, maxPages: 1,
 	},
-	"fixture-53-asteria-observatory-poster.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-53-asteria-observatory-poster.html": {
 		minPages: 1, maxPages: 1, images: true,
 	},
-	"fixture-54-ember-harbor-storybook.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-54-ember-harbor-storybook.html": {
 		minPages: 4, maxPages: 4, images: true, needles: []string{"Ember Harbor"},
 	},
-	"fixture-55-lantern-cooperative-report.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-55-lantern-cooperative-report.html": {
 		minPages: 3, maxPages: 3, needles: []string{"NORTHLINE"},
 	},
-	"font-examples.html": { //nolint:exhaustruct // fallback Liberation; page count varies with wrap
+	"font-examples.html": {
 		minPages: 1, maxPages: 30,
 	},
-	"complex-css.html": { //nolint:exhaustruct // catalog stress fixture
+	"complex-css.html": {
 		minPages: 1, maxPages: 40, needles: []string{"Alexandria"},
 	},
-	"architecture-diagram.html": { //nolint:exhaustruct // corpus fixture; not written by testdata/golden/api
+	"architecture-diagram.html": {
 		minPages: 1, maxPages: 12, needles: []string{"Architecture"},
 	},
-	"fixture-56-architecture-diagram.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-56-architecture-diagram.html": {
 		// gap and logical margin/padding now apply, but dom-foot orphans are
 		// excluded so the footer stays with its section; page count is 20.
 		minPages: 20, maxPages: 20,
 	},
-	"fixture-57-vanguard-telemetry-audit.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-57-vanguard-telemetry-audit.html": {
 		minPages: 9, maxPages: 9,
 		needles: []string{"VANGUARD", "TELEMETRY", "VANGUARD-CSS-356-IMPLEMENTED"},
 	},
-	"fixture-58-unsupported-worklist-audit.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-58-unsupported-worklist-audit.html": {
 		minPages: 9, maxPages: 9,
 		needles: []string{"UNSUPPORTED-WORKLIST-AUDIT", "VANGUARD-CSS-UNSUPPORTED-SAFE"},
 	},
-	"fixture-59-apex-digital-landing.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-59-apex-digital-landing.html": {
 		minPages: 7, maxPages: 9, images: true,
 		needles: []string{"Core Solutions", "Recent Work", "Transparent Pricing"},
 	},
-	"fixture-60-implemented-props-a.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-60-implemented-props-a.html": {
 		minPages: 7, maxPages: 9, images: true,
 		needles: []string{"IMPLEMENTED-PROPS-A"},
 	},
-	"fixture-61-implemented-props-b.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-61-implemented-props-b.html": {
 		minPages: 5, maxPages: 8, images: true,
 		needles: []string{"IMPLEMENTED-PROPS-B"},
 	},
-	"fixture-62-implemented-props-c.html": { //nolint:exhaustruct // intentional zero-value fields
+	"fixture-62-implemented-props-c.html": {
 		minPages: 5, maxPages: 9, images: true,
 		needles: []string{"IMPLEMENTED-PROPS-C"},
 	},
@@ -576,7 +576,10 @@ func TestGoldenFixture03Performance(t *testing.T) { //nolint:funlen // perf harn
 	cmd := requestForFixture(t, "fixture-03-multi-page-invoice.html")
 
 	ctx := t.Context()
-	loader := load.NewLoader(cmd.Global.Load)
+	loader, err := load.NewLoaderWithError(cmd.Global.Load)
+	if err != nil {
+		t.Fatalf("new loader: %v", err)
+	}
 
 	res, err := loader.Load(ctx, cmd.Objects[0].Page, cmd.Objects[0].Load)
 	if err != nil {
@@ -609,7 +612,7 @@ func TestGoldenFixture03Performance(t *testing.T) { //nolint:funlen // perf harn
 
 	layoutStart := time.Now()
 
-	lres, err := layout.Layout(root, layout.Options{ //nolint:exhaustruct // intentional zero-value fields
+	lres, err := layout.Layout(root, layout.Options{
 		Width:      contentW,
 		Height:     contentH,
 		Font:       font,

@@ -1,4 +1,4 @@
-package convert //nolint:testpackage // white-box tests need unexported access
+package convert
 
 import (
 	"bytes"
@@ -42,7 +42,7 @@ func assertPageFirstGeom(t *testing.T, unnamedPt, firstPt float64) {
 		t.Fatalf("unnamed @page margin = %+v, want 10mm", sheet.Page)
 	}
 
-	initGeom := hfGeom{ //nolint:exhaustruct // test initial geometry
+	initGeom := hfGeom{
 		pageW: 595.28, pageH: 841.89,
 		marginTop:    unnamedPt,
 		marginBottom: unnamedPt,

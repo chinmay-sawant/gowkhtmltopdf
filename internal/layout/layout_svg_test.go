@@ -57,7 +57,7 @@ func TestSerializeInlineSVGBakesFill(t *testing.T) {
 </body></html>`)
 	sheets := []*css.Stylesheet{sheet(t, `body{margin:0}`)}
 	styles := resolveStyles(root, sheets, "print", 500, 800)
-	eng := &engine{styles: styles, scale: 1} //nolint:exhaustruct
+	eng := &engine{styles: styles, scale: 1}
 	var svgNode *html.Node
 	root.Walk(func(node *html.Node) {
 		if svgNode == nil && node.Type == html.ElementNode && node.Name == "svg" {

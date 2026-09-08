@@ -30,9 +30,7 @@ func basePDFOptions() pdfOptions {
 
 // baseImageOptions returns the all-defaults image option set.
 func baseImageOptions() imageOptions {
-	var opts imageOptions
-
-	return opts
+	return defaultImageOptions()
 }
 
 // requirePDFShape asserts the structural PDF contract used by the golden
@@ -186,6 +184,32 @@ func TestCSharedImagePNG(t *testing.T) {
 	}
 	if !bytes.HasPrefix(data, []byte("\x89PNG")) {
 		t.Errorf("expected PNG signature, got %q", data[:min(8, len(data))])
+	}
+}
+
+func TestCSharedImageOptionValidation(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		mutate func(*imageOptions)
+	}{
+		{name: "quality above 100", mutate: func(opts *imageOptions) { opts.quality = 101 }},
+		{name: "negative crop", mutate: func(opts *imageOptions) { opts.cropLeft = -2 }},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			opts := baseImageOptions()
+			testCase.mutate(&opts)
+
+			status, data, message := runImageWithContext(t.Context(), []byte("<h1>image</h1>"), opts)
+			if status != statusInvalidArg {
+				t.Fatalf("status = %d, want %d (%s)", status, statusInvalidArg, message)
+			}
+			if data != nil || message == "" {
+				t.Fatalf("rejected image result = %d bytes, %q", len(data), message)
+			}
+		})
 	}
 }
 

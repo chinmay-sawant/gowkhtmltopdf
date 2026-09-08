@@ -1,4 +1,4 @@
-//nolint:testpackage,gochecknoglobals,exhaustruct,cyclop,varnamelen,wsl,lll // tests reach into unexported state for benchmarks
+//nolint:gochecknoglobals,cyclop,varnamelen,wsl // tests reach into unexported state for benchmarks
 package pdf
 
 import (

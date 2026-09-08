@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -8,6 +7,27 @@ import (
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
+
+// textPagesByPage indexes text-op counts by page and returns the max page.
+func textPagesByPage(ops []Op, opPage []int) (int, map[int]int) {
+	maxPage := 0
+	pagesWithText := map[int]int{}
+
+	for i, op := range ops {
+		if op.Kind != OpText {
+			continue
+		}
+
+		p := opPage[i]
+		if p > maxPage {
+			maxPage = p
+		}
+
+		pagesWithText[p]++
+	}
+
+	return maxPage, pagesWithText
+}
 
 func TestTallTableAvoidInsideNoBlankPages(t *testing.T) {
 	t.Parallel()
@@ -32,7 +52,7 @@ td, th { border: 1px solid #aaa; padding: 4pt; }
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 538, Height: 700, Sheets: []*css.Stylesheet{cssSheet},
 		Media: "print", Background: true,
 	})
@@ -41,22 +61,13 @@ td, th { border: 1px solid #aaa; padding: 4pt; }
 	}
 
 	contentH := 700.0
-	opPage := paginateOps(res, contentH)
-	maxPage := 0
-	pagesWithText := map[int]int{}
 
-	for i, op := range res.Ops {
-		if op.Kind != OpText {
-			continue
-		}
-
-		p := opPage[i]
-		if p > maxPage {
-			maxPage = p
-		}
-
-		pagesWithText[p]++
+	opPage, err := paginateOps(t.Context(), res, contentH)
+	if err != nil {
+		t.Fatal(err)
 	}
+
+	maxPage, pagesWithText := textPagesByPage(res.Ops, opPage)
 
 	blank := 0
 
@@ -113,7 +124,7 @@ h2 { font-size: 14pt; margin: 8pt 0 4pt; }
 
 	const pageH = 750.0
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 538, Height: pageH, Sheets: []*css.Stylesheet{cssSheet},
 		Media: "print", Background: true,
 	})
@@ -121,7 +132,11 @@ h2 { font-size: 14pt; margin: 8pt 0 4pt; }
 		t.Fatal(err)
 	}
 
-	opPage := paginateOps(res, pageH)
+	opPage, err := paginateOps(t.Context(), res, pageH)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	maxPage := 0
 	pagesWithText := map[int]int{}
 

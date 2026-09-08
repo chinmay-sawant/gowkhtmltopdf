@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise display-list geometry and resolved styles
 package layout
 
 import (
@@ -196,7 +195,7 @@ body { margin: 0; font-size: 10pt; }
 .panel li, .panel code { font-size: 8.5pt; }
 .panel code { padding: 1pt 2pt; border: 1pt solid #ccc; }
 `)
-	res, err := Layout(root, Options{ //nolint:exhaustruct
+	res, err := Layout(root, Options{
 		Width: 400, Height: 400, Sheets: []*css.Stylesheet{cssSheet}, Media: "print",
 	})
 
@@ -242,7 +241,7 @@ body { margin: 0; font-family: Arial, sans-serif; font-size: 10pt; }
 			if paintOp.Width < 0.74 || paintOp.Width > 0.76 {
 				t.Fatalf("one CSS pixel border lost its 0.75pt metric: %+v", paintOp)
 			}
-		case OpFillRect, OpStrokeRect, OpImage, OpLinkURI, OpBullet, opKindNoop:
+		case OpFillRect, OpStrokeRect, OpImage, OpLinkURI, OpBullet, OpUnknown, opKindNoop:
 		}
 	}
 
@@ -353,14 +352,14 @@ body { margin: 0; font-size: 10pt; }
  border-left: 4pt solid #d97706; border-radius: 0 8pt 8pt 0;
 }
 `)
-	res, err := Layout(root, Options{ //nolint:exhaustruct
+	res, err := Layout(root, Options{
 		Width: 220, Height: 100, Sheets: []*css.Stylesheet{cssSheet}, Media: "print",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := Paint(pdf.NewDocument(), res, PaintOptions{ //nolint:exhaustruct
+	if err := Paint(pdf.NewDocument(), res, PaintOptions{
 		PageWidth: 220, PageHeight: 100,
 	}); err != nil {
 		t.Fatal(err)
@@ -400,7 +399,7 @@ body { margin: 0; }
 .page { position: relative; width: 200pt; height: 100pt; }
 .footer { position: absolute; left: 10pt; right: 10pt; bottom: 0; height: 10pt; }
 `)
-	res, err := Layout(root, Options{ //nolint:exhaustruct
+	res, err := Layout(root, Options{
 		Width: 300, Height: 200, Sheets: []*css.Stylesheet{cssSheet}, Media: "print",
 	})
 
@@ -431,7 +430,7 @@ body { margin: 0; }
 .node { position: relative; width: 100pt; height: 30pt; }
 .node::after { content: "→"; position: absolute; margin-top: 10pt; font-size: 16pt; font-weight: 700; }
 `)
-	res, err := Layout(root, Options{ //nolint:exhaustruct
+	res, err := Layout(root, Options{
 		Width: 300, Height: 200, Sheets: []*css.Stylesheet{cssSheet}, Media: "print",
 	})
 
@@ -484,14 +483,14 @@ func TestAPIFixtureFlowMetricsDoNotOverlapPreviousFlexItems(t *testing.T) {
 	})
 
 	cssSheet := sheet(t, cssText.String())
-	res, err := Layout(root, Options{ //nolint:exhaustruct // focused fixture regression
+	res, err := Layout(root, Options{
 		Width: 595.28, Height: 841.89, Sheets: []*css.Stylesheet{cssSheet}, Media: "print",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := Paint(pdf.NewDocument(), res, PaintOptions{ //nolint:exhaustruct // exercise pagination chrome repair
+	if err := Paint(pdf.NewDocument(), res, PaintOptions{
 		PageWidth: 595.28, PageHeight: 841.89,
 	}); err != nil {
 		t.Fatal(err)
@@ -540,7 +539,7 @@ body { margin: 0; font-size: 12pt; }
 .page { position: relative; width: 200pt; height: 60pt; border: 1pt dashed #888; }
 .pill { position: absolute; left: 4pt; background: #fd8; padding: 2pt 6pt; }
 `)
-	res, err := Layout(root, Options{ //nolint:exhaustruct
+	res, err := Layout(root, Options{
 		Width: 300, Height: 200, Sheets: []*css.Stylesheet{cssSheet}, Media: "print",
 	})
 

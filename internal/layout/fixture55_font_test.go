@@ -1,4 +1,3 @@
-//nolint:testpackage // white-box test exercises the layout-to-PDF paint seam
 package layout
 
 import (
@@ -14,7 +13,7 @@ import (
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
 )
 
-//nolint:gocognit,cyclop,funlen,wsl,exhaustruct,varnamelen,nlreturn
+//nolint:gocognit,cyclop,funlen,wsl,varnamelen,nlreturn
 func TestFixture55MastheadPreservesLetterSpacing(t *testing.T) {
 	t.Parallel()
 

@@ -1,4 +1,3 @@
-//nolint:testpackage // parity checks the private descriptor registry.
 package settings
 
 import "testing"

@@ -3,6 +3,7 @@ package layout
 
 import (
 	"bytes"
+	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
@@ -13,10 +14,14 @@ import (
 	"strings"
 )
 
+// filterKind names one CSS filter function. filterUnknown is the zero value:
+// a parsedFilter that was never assigned a kind is not a valid filter, so
+// every producer (parseFilterList) assigns an explicit member.
 type filterKind int
 
 const (
-	filterBlur filterKind = iota
+	filterUnknown filterKind = iota
+	filterBlur
 	filterOpacity
 	filterDropShadow
 	filterGrayscale
@@ -229,6 +234,26 @@ func toNRGBA(img image.Image) *image.NRGBA {
 	return nrgba
 }
 
+// decodeImageBytes decodes PNG/JPEG bytes, retrying with the explicit
+// decoders when the sniffed format probe fails.
+func decodeImageBytes(imgBytes []byte) (image.Image, error) {
+	if srcImg, _, err := image.Decode(bytes.NewReader(imgBytes)); err == nil {
+		return srcImg, nil
+	}
+
+	// Try jpeg/png explicitly.
+	if srcImg, err := png.Decode(bytes.NewReader(imgBytes)); err == nil {
+		return srcImg, nil
+	}
+
+	decoded, err := jpeg.Decode(bytes.NewReader(imgBytes))
+	if err != nil {
+		return nil, fmt.Errorf("layout: image decode: %w", err)
+	}
+
+	return decoded, nil
+}
+
 // applyImageFilterToImage decodes PNG/JPEG, applies filters (blur, grayscale, etc.), and returns PNG bytes.
 func applyImageFilterToImage(imgBytes []byte, filters []parsedFilter) []byte {
 	if len(imgBytes) == 0 || len(filters) == 0 {
@@ -237,7 +262,7 @@ func applyImageFilterToImage(imgBytes []byte, filters []parsedFilter) []byte {
 
 	hasEffect := false
 	for _, f := range filters {
-		if f.kind != filterOpacity {
+		if f.kind != filterOpacity && f.kind != filterUnknown {
 			hasEffect = true
 			break
 		}
@@ -246,16 +271,9 @@ func applyImageFilterToImage(imgBytes []byte, filters []parsedFilter) []byte {
 		return imgBytes
 	}
 
-	srcImg, _, err := image.Decode(bytes.NewReader(imgBytes))
+	srcImg, err := decodeImageBytes(imgBytes)
 	if err != nil {
-		// try jpeg / png explicitly
-		srcImg, err = png.Decode(bytes.NewReader(imgBytes))
-		if err != nil {
-			srcImg, err = jpeg.Decode(bytes.NewReader(imgBytes))
-			if err != nil {
-				return imgBytes
-			}
-		}
+		return imgBytes
 	}
 
 	nrgba := toNRGBA(srcImg)
@@ -264,6 +282,8 @@ func applyImageFilterToImage(imgBytes []byte, filters []parsedFilter) []byte {
 
 	for _, f := range filters {
 		switch f.kind {
+		case filterUnknown:
+			// Zero-value filter: never produced by parseFilterList; no-op.
 		case filterBlur:
 			nrgba = applyGaussianBlur(nrgba, f.val)
 		case filterGrayscale:

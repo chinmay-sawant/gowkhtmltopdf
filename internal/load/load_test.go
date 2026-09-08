@@ -26,6 +26,18 @@ func defaultLP() settings.LoadPage {
 	return settings.DefaultLoadPage()
 }
 
+// mustLoader builds a default loader, failing the test on construction error.
+func mustLoader(t *testing.T) *load.Loader {
+	t.Helper()
+
+	loader, err := load.NewLoaderWithError(settings.LoadGlobal{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return loader
+}
+
 const (
 	mutatedShared = "mutated-shared"
 	mutatedImage  = "mutated-image"
@@ -44,7 +56,7 @@ func TestResolveEffectiveLoadGlobalSharedPolicyWins(t *testing.T) {
 		NetworkBlockPrivate:   true,
 		NetworkBlockCrossHost: true,
 	}
-	mode := settings.LoadGlobal{ //nolint:exhaustruct // focused mode policy override
+	mode := settings.LoadGlobal{
 		Proxy:                 "http://image-proxy.example",
 		Allow:                 []string{"/image"},
 		NetworkPolicySet:      true,
@@ -72,8 +84,8 @@ func TestResolveEffectiveLoadGlobalSharedPolicyWins(t *testing.T) {
 func TestResolveEffectiveLoadGlobalModePolicyFallback(t *testing.T) {
 	t.Parallel()
 
-	global := settings.LoadGlobal{Proxy: "http://shared-proxy.example"} //nolint:exhaustruct // focused shared policy
-	mode := settings.LoadGlobal{                                        //nolint:exhaustruct // mode policy
+	global := settings.LoadGlobal{Proxy: "http://shared-proxy.example"}
+	mode := settings.LoadGlobal{
 		NetworkPolicySet:      true,
 		NetworkAllowedSchemes: []string{"https"},
 		NetworkAllowedHosts:   []string{"image.example"},
@@ -95,12 +107,12 @@ func TestResolveEffectiveLoadGlobalModePolicyFallback(t *testing.T) {
 func TestResolveEffectiveLoadGlobalOwnsPolicySlices(t *testing.T) {
 	t.Parallel()
 
-	global := settings.LoadGlobal{ //nolint:exhaustruct // focused shared policy
+	global := settings.LoadGlobal{
 		Allow:                 []string{"/shared"},
 		NetworkAllowedSchemes: []string{"https"},
 		NetworkAllowedHosts:   []string{"shared.example"},
 	}
-	mode := settings.LoadGlobal{ //nolint:exhaustruct // focused mode policy override
+	mode := settings.LoadGlobal{
 		Allow:                 []string{"/image"},
 		NetworkAllowedSchemes: []string{"http"},
 		NetworkAllowedHosts:   []string{"image.example"},
@@ -188,7 +200,7 @@ func TestLoadHTTPBasic(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	loader := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	loader := mustLoader(t)
 
 	res, err := loader.Load(t.Context(), srv.URL+"/page", defaultLP())
 	if err != nil {
@@ -233,7 +245,7 @@ func TestLoadHTTPCustomHeadersAndAuth(t *testing.T) {
 	pageLoad.CustomHeaders = map[string]string{"X-Token": "secret"}
 	pageLoad.Username = "bob"
 	pageLoad.Password = "hunter2"
-	loader := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	loader := mustLoader(t)
 
 	if _, err := loader.Load(t.Context(), srv.URL, pageLoad); err != nil {
 		t.Fatal(err)
@@ -275,7 +287,7 @@ func TestLoadHTTPPost(t *testing.T) {
 
 	pageLoad := defaultLP()
 	pageLoad.Post = []settings.PostItem{{Name: "q", Value: "hello world"}, {Name: "x", Value: "1"}}
-	loader := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	loader := mustLoader(t)
 
 	res, err := loader.Load(t.Context(), srv.URL, pageLoad)
 	if err != nil {
@@ -304,7 +316,7 @@ func TestLoadHTTPErrorCodes(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	loader := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	loader := mustLoader(t)
 
 	for _, testCase := range []struct {
 		path string
@@ -372,7 +384,7 @@ func TestLoadCookies(t *testing.T) {
 
 	pageLoad := defaultLP()
 	pageLoad.Cookies = map[string]string{"session": "abc123"}
-	loader := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	loader := mustLoader(t)
 
 	if _, err := loader.Load(t.Context(), srv.URL, pageLoad); err != nil {
 		t.Fatal(err)
@@ -395,8 +407,8 @@ func TestACLDefaultDeny(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pageLoad := defaultLP()                         // BlockLocalFileAccess = true, no allow prefixes
-	loader := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	pageLoad := defaultLP() // BlockLocalFileAccess = true, no allow prefixes
+	loader := mustLoader(t)
 
 	_, err := loader.Load(t.Context(), secret, pageLoad)
 	if err == nil {
@@ -422,7 +434,7 @@ func TestACLAllowPrefix(t *testing.T) {
 	}
 
 	pageLoad := defaultLP()
-	loader := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	loader := mustLoader(t)
 	loader.Allow = []string{filepath.Join(dir, "public")}
 
 	res, err := loader.Load(t.Context(), allowed, pageLoad)
@@ -456,7 +468,7 @@ func TestACLEnableLocalFileAccess(t *testing.T) {
 
 	pageLoad := defaultLP()
 	pageLoad.BlockLocalFileAccess = false
-	loader := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	loader := mustLoader(t)
 	loader.EnableLocalFileAccess = true
 
 	if _, err := loader.Load(t.Context(), filePath, pageLoad); err != nil {
@@ -465,7 +477,7 @@ func TestACLEnableLocalFileAccess(t *testing.T) {
 
 	// global on but object still blocks → denied
 	lp2 := defaultLP()
-	l2 := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	l2 := mustLoader(t)
 	l2.EnableLocalFileAccess = true
 
 	if _, err := l2.Load(t.Context(), filePath, lp2); err == nil {
@@ -489,7 +501,7 @@ func TestSubresourceFetch(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	loader := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	loader := mustLoader(t)
 
 	res, err := loader.FetchSub(t.Context(), srv.URL+"/page.html", "/style.css", defaultLP())
 	if err != nil {
@@ -520,7 +532,7 @@ func TestConcurrentLoads(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	loader := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	loader := mustLoader(t)
 
 	var waitGroup sync.WaitGroup
 
@@ -564,7 +576,7 @@ func TestRedirectLimit(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	loader := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	loader := mustLoader(t)
 
 	_, err := loader.Load(t.Context(), srv.URL, defaultLP())
 	if err == nil {
@@ -584,14 +596,14 @@ func TestACLFileURL(t *testing.T) {
 	}
 
 	// default policy denies file:// loads
-	denyLoader := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	denyLoader := mustLoader(t)
 	if _, err := denyLoader.Load(t.Context(), "file://"+filePath, defaultLP()); err == nil {
 		t.Error("default policy must deny file:// loads")
 	}
 
 	pageLoad := defaultLP()
 	pageLoad.BlockLocalFileAccess = false
-	loader := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	loader := mustLoader(t)
 	loader.EnableLocalFileAccess = true
 
 	res, err := loader.Load(t.Context(), "file://"+filePath, pageLoad)
@@ -633,7 +645,7 @@ func TestACLPathTraversal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	loader := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	loader := mustLoader(t)
 	loader.Allow = []string{public}
 
 	// a file inside the prefix stays readable
@@ -687,7 +699,7 @@ func TestACLSymlinkEscape(t *testing.T) {
 		t.Skipf("symlinks unsupported: %v", err)
 	}
 
-	loader := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	loader := mustLoader(t)
 	loader.Allow = []string{public}
 
 	// a symlink inside the prefix pointing outside it must be denied
@@ -716,14 +728,14 @@ func TestSubresourceFileACL(t *testing.T) {
 
 	base := "file://" + dir + "/page.html"
 
-	loader := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	loader := mustLoader(t)
 	if _, err := loader.FetchSub(t.Context(), base, "x.png", defaultLP()); err == nil {
 		t.Error("file subresource must be denied by default")
 	}
 
 	pageLoad := defaultLP()
 	pageLoad.BlockLocalFileAccess = false
-	l2 := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	l2 := mustLoader(t)
 	l2.EnableLocalFileAccess = true
 
 	res, err := l2.FetchSub(t.Context(), base, "x.png", pageLoad)
@@ -795,7 +807,7 @@ func TestMaxBodySizeHTTP(t *testing.T) {
 
 	liar := lyingContentLength(t)
 
-	loader := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	loader := mustLoader(t)
 	loader.MaxBodySize = 1024
 
 	for _, targetURL := range []string{srv.URL + "/big", liar} {
@@ -841,7 +853,7 @@ func TestMaxBodySizeFile(t *testing.T) {
 
 	pageLoad := defaultLP()
 	pageLoad.BlockLocalFileAccess = false
-	loader := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	loader := mustLoader(t)
 	loader.EnableLocalFileAccess = true
 	loader.MaxBodySize = 1024
 
@@ -869,7 +881,7 @@ func TestSlowServerTimeout(t *testing.T) {
 
 	pageLoad := defaultLP()
 	pageLoad.Timeout = 1
-	loader := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	loader := mustLoader(t)
 	start := time.Now()
 
 	_, err := loader.Load(t.Context(), srv.URL, pageLoad)
@@ -902,7 +914,7 @@ func TestContextCancelAbortsBodyRead(t *testing.T) {
 	defer srv.Close()
 
 	ctx, cancel := context.WithCancel(t.Context())
-	loader := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	loader := mustLoader(t)
 	errCh := make(chan error, 1)
 
 	go func() {
@@ -937,7 +949,7 @@ func TestRedirectLimitExact(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	loader := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	loader := mustLoader(t)
 	loader.MaxRedirects = 2
 
 	res, err := loader.Load(t.Context(), srv.URL+"/r/2", defaultLP())
@@ -966,7 +978,7 @@ func TestHTTPLocalhostAllowedByDesign(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	loader := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	loader := mustLoader(t)
 
 	res, err := loader.Load(t.Context(), srv.URL, defaultLP())
 	if err != nil {
@@ -987,7 +999,7 @@ func TestRestrictedNetworkPolicyBlocksPrivateAddress(t *testing.T) {
 	defer srv.Close()
 
 	loader, err := load.NewLoaderWithNetworkPolicy(
-		settings.LoadGlobal{}, //nolint:exhaustruct // compatibility global settings are intentionally empty
+		settings.LoadGlobal{},
 		load.RestrictedNetworkPolicy(),
 	)
 
@@ -1016,7 +1028,7 @@ func TestRestrictedNetworkPolicyAllowsExplicitHostException(t *testing.T) { //no
 	policy := load.RestrictedNetworkPolicy()
 	policy.AllowedHosts = []string{parsed.Hostname()}
 	loader, err := load.NewLoaderWithNetworkPolicy(
-		settings.LoadGlobal{}, //nolint:exhaustruct // compatibility global settings are intentionally empty
+		settings.LoadGlobal{},
 		policy,
 	)
 
@@ -1061,7 +1073,7 @@ func TestRestrictedNetworkPolicyBlocksCrossHostRedirect(t *testing.T) {
 	policy := load.RestrictedNetworkPolicy()
 	policy.AllowedHosts = []string{originURL.Hostname(), targetURL.Hostname()}
 	loader, err := load.NewLoaderWithNetworkPolicy(
-		settings.LoadGlobal{}, //nolint:exhaustruct // compatibility global settings are intentionally empty
+		settings.LoadGlobal{},
 		policy,
 	)
 
@@ -1079,7 +1091,7 @@ func TestRestrictedNetworkPolicyBlocksCrossHostRedirect(t *testing.T) {
 func TestLoadInlineHTML(t *testing.T) {
 	t.Parallel()
 
-	loader := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	loader := mustLoader(t)
 	pageLoad := defaultLP()
 	pageLoad.InlineHTML = []byte("<html><body>inline</body></html>")
 	pageLoad.InlineBase = "https://example.com/docs/page.html"
@@ -1119,7 +1131,7 @@ func TestLoadInlineHTML(t *testing.T) {
 func TestDataURLHonorsBodyLimitForPrimaryAndSubresource(t *testing.T) {
 	t.Parallel()
 
-	loader := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	loader := mustLoader(t)
 	loader.MaxBodySize = 4
 	pageLoad := defaultLP()
 
@@ -1154,7 +1166,7 @@ func TestDataURLHonorsBodyLimitForPrimaryAndSubresource(t *testing.T) {
 func TestInlineHTMLHonorsBodyLimit(t *testing.T) {
 	t.Parallel()
 
-	loader := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	loader := mustLoader(t)
 	loader.MaxBodySize = 4
 	pageLoad := defaultLP()
 	pageLoad.InlineHTML = []byte("12345")
@@ -1175,7 +1187,7 @@ func TestEmptyInlineBaseRejectsRelativeSubresources(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	loader := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	loader := mustLoader(t)
 	// Even with local access enabled, an inline document without a base must
 	// not reinterpret a relative reference as a process-working-directory
 	// file. The reference is unresolved, not an implicit local path.
@@ -1210,10 +1222,10 @@ func TestResourceContextBindsBaseAndPolicy(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	loader := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	loader := mustLoader(t)
 	loader.EnableLocalFileAccess = true
 	pageURL := "file://" + filepath.ToSlash(filepath.Join(dir, "page.html"))
-	base := &load.Resource{Base: pageURL} //nolint:exhaustruct // intentional zero/partial fields
+	base := &load.Resource{Base: pageURL}
 	pageLoad := defaultLP()
 	pageLoad.BlockLocalFileAccess = false
 	ctx := loader.ForResource(base, pageLoad)
@@ -1237,7 +1249,7 @@ func TestLoadCharsetContentType(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	loader := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	loader := mustLoader(t)
 	for _, testCase := range []struct {
 		ct     string
 		okPath bool
@@ -1277,7 +1289,7 @@ func TestLoadCharsetMetaDecl(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	loader := load.NewLoader(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero/partial fields
+	loader := mustLoader(t)
 
 	for _, testCase := range []struct {
 		name, head string
@@ -1322,7 +1334,7 @@ func (f *fakeResolver) LookupIP(_ context.Context, _, host string) ([]net.IP, er
 		return ips, nil
 	}
 
-	return nil, &net.DNSError{ //nolint:exhaustruct // stdlib error type with many optional fields
+	return nil, &net.DNSError{
 		Err: "no such host", Name: host, IsNotFound: true,
 	}
 }
@@ -1331,7 +1343,7 @@ func newRestrictedLoader(t *testing.T, resolver load.IPResolver) *load.Loader {
 	t.Helper()
 
 	loader, err := load.NewLoaderWithNetworkPolicy(
-		settings.LoadGlobal{}, //nolint:exhaustruct
+		settings.LoadGlobal{},
 		load.RestrictedNetworkPolicy(),
 	)
 	if err != nil {
@@ -1348,7 +1360,7 @@ func TestRestrictedPinnedDialNeverRedialsHostname(t *testing.T) {
 
 	const publicHost = "public.example.test"
 
-	resolver := &fakeResolver{ips: map[string][]net.IP{ //nolint:exhaustruct // calls field filled by LookupIP under test
+	resolver := &fakeResolver{ips: map[string][]net.IP{
 		publicHost: {net.ParseIP("93.184.216.34")},
 	}}
 	loader := newRestrictedLoader(t, resolver)
@@ -1409,7 +1421,7 @@ func TestRestrictedBlocksPrivateResolvedRecords(t *testing.T) {
 			t.Parallel()
 
 			host := testCase.name + ".private.test"
-			resolver := &fakeResolver{ips: map[string][]net.IP{ //nolint:exhaustruct // calls field filled by LookupIP under test
+			resolver := &fakeResolver{ips: map[string][]net.IP{
 				host: {net.ParseIP(testCase.ip)},
 			}}
 			loader := newRestrictedLoader(t, resolver)
@@ -1425,7 +1437,7 @@ func TestRestrictedBlocksPrivateResolvedRecords(t *testing.T) {
 func TestRestrictedBlocksMixedPublicAndLoopbackRecords(t *testing.T) {
 	t.Parallel()
 
-	resolver := &fakeResolver{ips: map[string][]net.IP{ //nolint:exhaustruct // calls field filled by LookupIP under test
+	resolver := &fakeResolver{ips: map[string][]net.IP{
 		"mixed.example.test": {net.ParseIP("93.184.216.34"), net.ParseIP("127.0.0.1")},
 	}}
 	loader := newRestrictedLoader(t, resolver)
@@ -1439,7 +1451,7 @@ func TestRestrictedBlocksMixedPublicAndLoopbackRecords(t *testing.T) {
 func TestRestrictedProxyToPrivateTargetDenied(t *testing.T) {
 	t.Parallel()
 
-	global := settings.LoadGlobal{ //nolint:exhaustruct
+	global := settings.LoadGlobal{
 		Proxy: "http://127.0.0.1:9",
 	}
 
@@ -1457,14 +1469,14 @@ func TestRestrictedProxyToPrivateTargetDenied(t *testing.T) {
 func TestRestrictedWildcardAllowlistStillBlocksPrivateIP(t *testing.T) {
 	t.Parallel()
 
-	resolver := &fakeResolver{ips: map[string][]net.IP{ //nolint:exhaustruct // calls field filled by LookupIP under test
+	resolver := &fakeResolver{ips: map[string][]net.IP{
 		"evil.com": {net.ParseIP("127.0.0.1")},
 	}}
 	policy := load.RestrictedNetworkPolicy()
 	policy.AllowedHosts = []string{"*.com"}
 
 	loader, err := load.NewLoaderWithNetworkPolicy(
-		settings.LoadGlobal{}, //nolint:exhaustruct
+		settings.LoadGlobal{},
 		policy,
 	)
 	if err != nil {
@@ -1494,7 +1506,7 @@ func TestRestrictedExactAllowlistPermitsPrivateLiteral(t *testing.T) { //nolint:
 	policy := load.RestrictedNetworkPolicy()
 	policy.AllowedHosts = []string{parsed.Hostname()}
 	loader, err := load.NewLoaderWithNetworkPolicy(
-		settings.LoadGlobal{}, //nolint:exhaustruct
+		settings.LoadGlobal{},
 		policy,
 	)
 
@@ -1537,7 +1549,7 @@ func TestWildcardAllowlistIsLabelBoundary(t *testing.T) {
 	policy := load.RestrictedNetworkPolicy()
 	policy.AllowedHosts = []string{"*.example.com"}
 	loader, err := load.NewLoaderWithNetworkPolicy(
-		settings.LoadGlobal{}, //nolint:exhaustruct
+		settings.LoadGlobal{},
 		policy,
 	)
 

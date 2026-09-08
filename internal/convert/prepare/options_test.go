@@ -1,10 +1,13 @@
 package prepare_test
 
 import (
+	"io"
+	"math"
 	"reflect"
 	"testing"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/convert/prepare"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/load"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
@@ -19,7 +22,6 @@ type buildOptionsCase struct {
 func TestBuildOptionsSharedAcrossPDFAndImageLayers(t *testing.T) {
 	t.Parallel()
 
-	//nolint:exhaustruct // table rows intentionally omit unused Web layers
 	cases := []buildOptionsCase{
 		{
 			name: "defaults",
@@ -56,7 +58,7 @@ func TestBuildOptionsSharedAcrossPDFAndImageLayers(t *testing.T) {
 }
 
 func baseWant() prepare.Options {
-	return prepare.Options{ //nolint:exhaustruct // Simplify filled by withSimplify
+	return prepare.Options{
 		ViewportW: 100, ViewportH: 200, MediaType: "print", ObjectIndex: 1,
 	}
 }
@@ -90,5 +92,45 @@ func assertBuildOptionsCase(t *testing.T, testCase buildOptionsCase) {
 
 	if !reflect.DeepEqual(imageOpts, testCase.want) {
 		t.Fatalf("image BuildOptions = %+v, want %+v", imageOpts, testCase.want)
+	}
+}
+
+func TestBuildOptionsNormalizesMedia(t *testing.T) {
+	t.Parallel()
+
+	opts := prepare.BuildOptions(100, 200, " PRINT ", 1)
+	if opts.MediaType != "print" {
+		t.Fatalf("MediaType = %q, want print", opts.MediaType)
+	}
+}
+
+func TestPrepareDocumentRejectsBadOptions(t *testing.T) {
+	t.Parallel()
+
+	loader, err := load.NewLoaderWithError(settings.LoadGlobal{})
+	if err != nil {
+		t.Fatalf("new loader: %v", err)
+	}
+
+	lineP := settings.DefaultLoadPage()
+	lineP.InlineHTML = []byte(`<html><body>x</body></html>`)
+
+	cases := []struct {
+		name string
+		opts prepare.Options
+	}{
+		{name: "negative viewport", opts: prepare.Options{ViewportW: -1, ViewportH: 100, MediaType: "print"}},
+		{name: "nan viewport", opts: prepare.Options{ViewportW: math.NaN(), ViewportH: 100, MediaType: "print"}},
+		{name: "unknown media", opts: prepare.Options{ViewportW: 100, ViewportH: 100, MediaType: "tv"}},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			if _, err := prepare.Document(t.Context(), loader, "ignored", lineP, nil, testCase.opts, io.Discard); err == nil {
+				t.Fatal("Document accepted invalid options")
+			}
+		})
 	}
 }

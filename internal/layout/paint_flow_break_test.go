@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -67,12 +66,12 @@ func TestShiftSamePageFromYLeavesLaterPages(t *testing.T) {
 
 	const contentH = 100.0
 
-	res := &Result{ //nolint:exhaustruct // index-only fixture
+	res := &Result{
 		Ops: []Op{
-			{Y: 12},  //nolint:exhaustruct // index-only fixture
-			{Y: 110}, //nolint:exhaustruct // index-only fixture
+			{Y: 12},
+			{Y: 110},
 		},
-		root: &box{ //nolint:exhaustruct // index-only fixture
+		root: &box{
 			y: 10,
 			children: []*box{
 				{y: 12},

@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -147,7 +146,7 @@ body { margin: 0; font-size: 12pt; }
 		t.Fatal("flow-root must establish BFC")
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 500, Height: 800, Sheets: []*css.Stylesheet{cssSheet}, Background: true,
 	})
 	if err != nil {

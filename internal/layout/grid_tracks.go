@@ -319,6 +319,9 @@ func resolveTrackSide(
 	isMin bool,
 ) float64 {
 	switch size.kind {
+	case trackUnknown:
+		// Zero-value size: never produced by parseTrackSize; resolves to zero.
+		return 0
 	case trackFixed:
 		return resolveTrackFixedSide(size, contentSize, definite, eng, isMin)
 	case trackFr:

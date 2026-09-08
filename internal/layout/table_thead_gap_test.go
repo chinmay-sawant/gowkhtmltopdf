@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported table pagination helpers
 package layout
 
 import (
@@ -94,7 +93,7 @@ func layoutFixture60Result(
 	contentW := pageW - 2*margin
 	contentH := pageH - 2*margin
 
-	res, err := Layout(doc, Options{ //nolint:exhaustruct
+	res, err := Layout(doc, Options{
 		Width: contentW, Height: contentH, Background: true, Media: "print", Zoom: 1,
 		Sheets: []*css.Stylesheet{parsedSheet},
 		Images: func(src string) ([]byte, error) {
@@ -132,7 +131,7 @@ func findFixture60Table(t *testing.T, res *Result) *box {
 	var table *box
 
 	for _, b := range flowBoxList(res) {
-		if b.kind == displayTable && len(b.rows) > 100 {
+		if b.kind == boxKindTable && len(b.rows) > 100 {
 			table = b
 
 			break
@@ -222,15 +221,15 @@ func assertNoPaintGap(
 func TestRowPaintBandPrefersVerticalRules(t *testing.T) {
 	t.Parallel()
 
-	res := &Result{ //nolint:exhaustruct
+	res := &Result{
 		Ops: []Op{
-			{Kind: OpText, X: 10, Y: 100, H: 12, Text: "a"}, //nolint:exhaustruct // band probe
-			{Kind: OpLine, X: 0, Y: 90, W: 0, H: 40},        //nolint:exhaustruct // vertical rule
-			{Kind: OpLine, X: 50, Y: 90, W: 0, H: 40},       //nolint:exhaustruct // vertical rule
-			{Kind: OpText, X: 10, Y: 105, H: 10, Text: "b"}, //nolint:exhaustruct // band probe
+			{Kind: OpText, X: 10, Y: 100, H: 12, Text: "a"},
+			{Kind: OpLine, X: 0, Y: 90, W: 0, H: 40},
+			{Kind: OpLine, X: 50, Y: 90, W: 0, H: 40},
+			{Kind: OpText, X: 10, Y: 105, H: 10, Text: "b"},
 		},
 	}
-	cell := &box{ //nolint:exhaustruct
+	cell := &box{
 		opStart: 0, opEnd: 3, y: 100, height: 30,
 	}
 	row := []*box{cell}

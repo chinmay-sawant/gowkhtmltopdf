@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -125,14 +124,16 @@ p { margin: 0 0 6pt 0; }
 
 	const pageH = 400.0
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 400, Height: pageH, Sheets: []*css.Stylesheet{cssSheet}, Background: true,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	paginateOps(res, pageH)
+	if _, err := paginateOps(t.Context(), res, pageH); err != nil {
+		t.Fatal(err)
+	}
 
 	var headingY, bodyY float64
 	headingY, bodyY = -1, -1

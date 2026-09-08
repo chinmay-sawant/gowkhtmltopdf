@@ -1,4 +1,3 @@
-//nolint:testpackage,exhaustruct // border-image display-list coverage
 package layout
 
 import (
@@ -24,8 +23,8 @@ func TestBorderImageStretchUsesSlicedBorderOps(t *testing.T) {
 }
 
 func newBorderImageStretchEngine() *engine {
-	return &engine{ //nolint:exhaustruct // image resolver only
-		opts: Options{ //nolint:exhaustruct // image provider only
+	return &engine{
+		opts: Options{
 			Images: func(string) ([]byte, error) {
 				return tinyPNG(4, 4), nil
 			},
@@ -35,7 +34,7 @@ func newBorderImageStretchEngine() *engine {
 }
 
 func newBorderImageStretchStyle() ResolvedStyle {
-	return ResolvedStyle{ //nolint:exhaustruct // border-image fields under test
+	return ResolvedStyle{
 		BorderImageSource: "url(border.png)",
 		BorderImageSlice:  "1",
 		BorderImageRepeat: "stretch",

@@ -657,7 +657,7 @@ func lastInkBottom(res *Result, idxs []int, pageTop, pageBot float64) (float64, 
 			bot = paintOp.Y + height
 		case OpImage:
 			bot = paintOp.Y + paintOp.H
-		case OpFillRect, OpStrokeRect, OpLine, OpLinkURI, opKindNoop:
+		case OpFillRect, OpStrokeRect, OpLine, OpLinkURI, OpUnknown, opKindNoop:
 			continue
 		}
 
@@ -724,7 +724,7 @@ func stripOrphanRowOp(paintOp *Op, lastInkBot float64) bool {
 
 			return true
 		}
-	case OpText, OpImage, OpLinkURI, OpBullet, opKindNoop:
+	case OpText, OpImage, OpLinkURI, OpBullet, OpUnknown, opKindNoop:
 	}
 
 	return false
@@ -835,7 +835,7 @@ func clipTrailingBandOp(res *Result, paintOp *Op, pageTop, pageBot, contentBot f
 		} else if isTrailingContinuationRule(res, paintOp, pageBot, contentBot) {
 			paintOp.Y = contentBot
 		}
-	case OpStrokeRect, OpText, OpImage, OpLinkURI, OpBullet, opKindNoop:
+	case OpStrokeRect, OpText, OpImage, OpLinkURI, OpBullet, OpUnknown, opKindNoop:
 	}
 }
 
@@ -975,7 +975,7 @@ func clipStickySectionChromeOp(paintOp *Op, target stickySectionChromeTarget, co
 		if target.sideMatches(paintOp) {
 			paintOp.H = contentBot - paintOp.Y
 		}
-	case OpStrokeRect, OpText, OpImage, OpLinkURI, OpBullet, opKindNoop:
+	case OpStrokeRect, OpText, OpImage, OpLinkURI, OpBullet, OpUnknown, opKindNoop:
 	}
 }
 
@@ -1102,7 +1102,7 @@ func clipSectionChromeOp(paintOp *Op, target stickySectionChromeTarget, closeY f
 		if isSectionChromeSideBorder(paintOp, target, closeY) {
 			paintOp.H = closeY - paintOp.Y
 		}
-	case OpStrokeRect, OpText, OpImage, OpLinkURI, OpBullet, opKindNoop:
+	case OpStrokeRect, OpText, OpImage, OpLinkURI, OpBullet, OpUnknown, opKindNoop:
 	}
 }
 

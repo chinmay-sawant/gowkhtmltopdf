@@ -1,4 +1,3 @@
-//nolint:all
 package convert
 
 import (
@@ -43,7 +42,9 @@ func isKnownPlaceholder(token string) bool {
 
 // substitute applies the --replace map first, then every known [placeholder]
 // token. Unknown placeholders stay literal, matching wkhtmltopdf.
-func (p hfParms) substitute(src string) string { //nolint:cyclop // per-token switch over known placeholders
+//
+//nolint:cyclop,funlen,wsl,varnamelen // token scanning keeps replacement order explicit.
+func (p hfParms) substitute(src string) string {
 	for k, v := range p.replaces {
 		if k == "" {
 			continue
@@ -119,19 +120,21 @@ func (p hfParms) substitute(src string) string { //nolint:cyclop // per-token sw
 }
 
 // knownIn reports whether s contains at least one known placeholder name.
-func knownIn(s string) bool {
-	for i := 0; i < len(s); {
-		open := strings.IndexByte(s[i:], '[')
+//
+//nolint:wsl // token scanning mirrors substitute.
+func knownIn(source string) bool {
+	for offset := 0; offset < len(source); {
+		open := strings.IndexByte(source[offset:], '[')
 		if open < 0 {
 			return false
 		}
-		open += i
-		closeIdx := strings.IndexByte(s[open:], ']')
+		open += offset
+		closeIdx := strings.IndexByte(source[open:], ']')
 		if closeIdx < 0 {
 			return false
 		}
 		closeIdx += open
-		name := s[open+1 : closeIdx]
+		name := source[open+1 : closeIdx]
 		isToken := len(name) > 0
 		for _, ch := range name {
 			if ch < 'a' || ch > 'z' {
@@ -143,7 +146,7 @@ func knownIn(s string) bool {
 		if isToken && isKnownPlaceholder(name) {
 			return true
 		}
-		i = closeIdx + 1
+		offset = closeIdx + 1
 	}
 
 	return false
@@ -427,12 +430,19 @@ type hfDrawWarning struct {
 
 type hfDrawResult struct {
 	warnings []hfDrawWarning
+	// fatal carries a run-level failure (cancellation) that is not a
+	// per-band recoverable error. It takes precedence over warnings.
+	fatal error
 }
 
 // Err returns the aggregate failure for strict conversion callers. The
 // compatibility adapter may still emit warnings, but the primary PDF engine
 // must not report success when required header/footer content was omitted.
 func (r *hfDrawResult) Err() error {
+	if r.fatal != nil {
+		return r.fatal
+	}
+
 	if len(r.warnings) == 0 {
 		return nil
 	}
@@ -710,8 +720,8 @@ func effectiveMargins(ctx context.Context, loader *load.Loader, font *pdf.Font, 
 // collected, and the adapter emits one warning per failed band.
 //
 //nolint:lll,unused // compatibility adapter for existing caller
-func drawHeadersFooters(ctx context.Context, loader *load.Loader, font *pdf.Font, doc *pdf.Document, req *Request, plan *pagePlan, headings []*outline.Heading, log io.Writer) {
-	res := drawHeadersFootersResult(ctx, loader, font, doc, req, plan, headings, log)
+func drawHeadersFooters(ctx context.Context, hf hfLoader, doc *pdf.Document, req *Request, plan *pagePlan, headings []*outline.Heading, log io.Writer) {
+	res := drawHeadersFootersResult(ctx, hf, doc, req, plan, headings)
 	res.emitWarnings(log)
 }
 
@@ -721,7 +731,7 @@ func drawHeadersFooters(ctx context.Context, loader *load.Loader, font *pdf.Font
 // Returning a result keeps failure handling testable and gives a future
 // caller a precise integration point for a strict policy without changing
 // the current convert.Run signature.
-func drawHeadersFootersResult(ctx context.Context, loader *load.Loader, font *pdf.Font, doc *pdf.Document, req *Request, plan *pagePlan, headings []*outline.Heading, log io.Writer) hfDrawResult { //nolint:gocognit,cyclop,funlen,lll // per-page draw dispatch with lazy HF load
+func drawHeadersFootersResult(ctx context.Context, loader hfLoader, doc *pdf.Document, req *Request, plan *pagePlan, headings []*outline.Heading) hfDrawResult { //nolint:gocognit,cyclop,funlen,lll // per-page draw dispatch with lazy HF load
 	var result hfDrawResult
 
 	total := doc.PageCount()
@@ -736,6 +746,12 @@ func drawHeadersFootersResult(ctx context.Context, loader *load.Loader, font *pd
 	}
 
 	for pVal := range total {
+		if err := ctx.Err(); err != nil {
+			result.fatal = err
+
+			break
+		}
+
 		own, ok := plan.OwnerOf(pVal)
 		if !ok || own.st == nil {
 			continue
@@ -795,7 +811,7 @@ func drawHeadersFootersResult(ctx context.Context, loader *load.Loader, font *pd
 
 					var reg *pdf.Registry
 
-					lst, reg, err = loadHTMLHF(ctx, loader, font, own.st, hfVal.HTMLURL, log)
+					lst, reg, err = loader.loadHF(ctx, own.st, hfVal.HTMLURL)
 					if err != nil {
 						result.warn(own.st.idx, pVal, band, fmt.Errorf("html load: %w", err))
 
@@ -820,7 +836,7 @@ func drawHeadersFootersResult(ctx context.Context, loader *load.Loader, font *pd
 				return
 			}
 
-			drawTextHF(page, hfVal, own.st.geom, parms, font, own.st.registry, isHeader)
+			drawTextHF(page, hfVal, own.st.geom, parms, loader.defaultFont(), own.st.registry, isHeader)
 		}
 		draw(own.st.header, true)
 		draw(own.st.footer, false)

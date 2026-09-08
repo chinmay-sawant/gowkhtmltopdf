@@ -1,4 +1,4 @@
-//nolint:testpackage,wsl // white-box PDF resource test
+//nolint:wsl // white-box PDF resource test
 package pdf
 
 import (

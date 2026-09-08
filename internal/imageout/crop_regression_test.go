@@ -1,4 +1,4 @@
-package imageout //nolint:testpackage // uses RenderOptions internals
+package imageout
 
 import (
 	"image"
@@ -40,7 +40,7 @@ func TestCropWindowsStayInkful(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			img, err := Render(root, RenderOptions{Width: 240, Height: 80, Background: true}) //nolint:exhaustruct
+			img, err := Render(root, RenderOptions{Width: 240, Height: 80, Background: true})
 			if err != nil {
 				t.Fatal(err)
 			}

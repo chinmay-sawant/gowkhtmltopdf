@@ -34,24 +34,24 @@ const (
 	alphaBase = 26
 )
 
-func (e *engine) contentBox(posX, boxW float64, style ResolvedStyle) (float64, float64) {
-	borderLeft := borderLayoutWidth(style, style.BorderLeft)
-	borderRight := borderLayoutWidth(style, style.BorderRight)
-	contentW := boxW - e.scalePt(style.PaddingLeft) - e.scalePt(style.PaddingRight) -
+func (e *engine) contentBox(posX, boxW float64, style boxModelStyle) (float64, float64) {
+	borderLeft := borderLayoutWidth(style, style.borderLeft)
+	borderRight := borderLayoutWidth(style, style.borderRight)
+	contentW := boxW - e.scalePt(style.paddingLeft) - e.scalePt(style.paddingRight) -
 		e.scalePt(borderLeft) - e.scalePt(borderRight)
 
 	if contentW < 0 {
 		contentW = 0
 	}
 
-	return posX + e.scalePt(borderLeft) + e.scalePt(style.PaddingLeft), contentW
+	return posX + e.scalePt(borderLeft) + e.scalePt(style.paddingLeft), contentW
 }
 
 // borderLayoutWidth uses the device width for border-image boxes. Border
 // image replaces the normal border paint, so its content area must use the
 // same converted width as the emitted image slices.
-func borderLayoutWidth(style ResolvedStyle, side border) float64 {
-	if style.BorderImageSource != "" && side.PaintWidth > 0 {
+func borderLayoutWidth(style boxModelStyle, side border) float64 {
+	if style.borderImageSource != "" && side.PaintWidth > 0 {
 		return side.PaintWidth
 	}
 
@@ -69,7 +69,7 @@ type imageRef struct {
 
 // resolveImage fetches (once) and decodes (once) src; nil on any failure.
 func (e *engine) resolveImage(src string) *imageRef {
-	if src == "" || e.opts.Images == nil {
+	if src == "" || e.checkContext() || !e.hasImageResolver() {
 		return nil
 	}
 
@@ -81,7 +81,12 @@ func (e *engine) resolveImage(src string) *imageRef {
 		return ref
 	}
 
-	data, err := e.opts.Images(src)
+	data, err := e.resolveImageData(src)
+
+	if e.checkContext() {
+		return nil
+	}
+
 	if err != nil {
 		// Cache nil-miss? Store a sentinel empty ref so we do not re-fetch.
 		e.imgCache[src] = nil
@@ -99,6 +104,21 @@ func (e *engine) resolveImage(src string) *imageRef {
 	e.imgCache[src] = ref
 
 	return ref
+}
+
+func (e *engine) hasImageResolver() bool {
+	return e.opts.Images != nil || e.opts.ImagesContext != nil
+}
+
+// resolveImageData fetches one image via the configured resolver. The caller
+// owns the timeout: Layout imposes no deadline on image fetches, so ctx
+// should carry one when network loads must be bounded.
+func (e *engine) resolveImageData(src string) ([]byte, error) {
+	if e.opts.ImagesContext != nil {
+		return e.opts.ImagesContext(e.ctx, src)
+	}
+
+	return e.opts.Images(src)
 }
 
 // isInlineChild reports whether n participates in an inline formatting context.

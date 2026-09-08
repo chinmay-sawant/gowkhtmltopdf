@@ -1,4 +1,4 @@
-package convert //nolint:testpackage // white-box tests need unexported access
+package convert
 
 import (
 	"bytes"
@@ -160,15 +160,15 @@ func TestAppendSimplifySheetNoopWhenOff(t *testing.T) {
 func TestSimplifyDOMEnabled(t *testing.T) {
 	t.Parallel()
 
-	if prepare.SimplifyDOMEnabled(settings.Web{}, settings.Web{}) { //nolint:exhaustruct // intentional zero-value fields
+	if prepare.SimplifyDOMEnabled(settings.Web{}, settings.Web{}) {
 		t.Fatal("default must be off")
 	}
 
-	if !prepare.SimplifyDOMEnabled(settings.Web{SimplifyDOM: true}, settings.Web{}) { //nolint:exhaustruct,lll // intentional zero-value fields
+	if !prepare.SimplifyDOMEnabled(settings.Web{SimplifyDOM: true}, settings.Web{}) { //nolint:lll // intentional zero-value fields
 		t.Fatal("global on")
 	}
 
-	if !prepare.SimplifyDOMEnabled(settings.Web{}, settings.Web{ //nolint:exhaustruct // intentional zero-value fields
+	if !prepare.SimplifyDOMEnabled(settings.Web{}, settings.Web{
 		SimplifyDOM: true,
 	}) {
 		t.Fatal("object on")
@@ -178,19 +178,19 @@ func TestSimplifyDOMEnabled(t *testing.T) {
 func TestSimplifyDOMProfile(t *testing.T) {
 	t.Parallel()
 
-	empty := settings.Web{} //nolint:exhaustruct // intentional zero-value fields
+	empty := settings.Web{}
 	if prepare.SimplifyDOMProfile(empty, empty) != "" {
 		t.Fatal("default profile empty")
 	}
 
-	if prepare.SimplifyDOMProfile(settings.Web{ //nolint:exhaustruct // intentional zero-value fields
+	if prepare.SimplifyDOMProfile(settings.Web{
 		SimplifyDOMProfile: mediawikiProfile,
-	}, settings.Web{}, //nolint:exhaustruct // intentional zero-value fields
+	}, settings.Web{},
 	) != mediawikiProfile {
 		t.Fatal("global mediawiki")
 	}
 
-	if prepare.SimplifyDOMProfile(settings.Web{}, settings.Web{ //nolint:exhaustruct // intentional zero-value fields
+	if prepare.SimplifyDOMProfile(settings.Web{}, settings.Web{
 		SimplifyDOMProfile: "wiki",
 	}) != mediawikiProfile {
 		t.Fatal("object wiki alias")
@@ -200,7 +200,7 @@ func TestSimplifyDOMProfile(t *testing.T) {
 func layoutMust(t *testing.T, root *html.Node, sheets []*css.Stylesheet, font *pdf.Font) *layout.Result {
 	t.Helper()
 
-	res, err := layout.Layout(root, layout.Options{ //nolint:exhaustruct // intentional zero-value fields
+	res, err := layout.Layout(root, layout.Options{
 		Width:  500,
 		Height: 700,
 		Font:   font,

@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -44,7 +43,7 @@ b { font-weight: 700; }
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 500, Height: 200, Sheets: []*css.Stylesheet{cssSheet}, Media: "print",
 	})
 	if err != nil {
@@ -94,7 +93,7 @@ i { font-style: italic; }
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 600, Height: 200, Sheets: []*css.Stylesheet{cssSheet}, Media: "print",
 	})
 	if err != nil {
@@ -123,7 +122,7 @@ World</a></p></body></html>`)
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 400, Height: 100, Sheets: []*css.Stylesheet{cssSheet}, Media: "print",
 	})
 	if err != nil {
@@ -159,7 +158,7 @@ func TestUnderlineStrokeWidthClamp(t *testing.T) { //nolint:cyclop
 				t.Fatal(err)
 			}
 
-			res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+			res, err := Layout(root, Options{
 				Width: 200, Height: 80, Sheets: []*css.Stylesheet{cssSheet}, Media: "print",
 			})
 			if err != nil {
@@ -221,7 +220,7 @@ func TestUnderlineWrappedURLOnePerLine(t *testing.T) {
 
 	const contentW = 220.0
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: contentW, Height: 800, Sheets: []*css.Stylesheet{cssSheet}, Media: "print",
 	})
 	if err != nil {
@@ -274,7 +273,7 @@ a { color: #36c; text-decoration: none; }
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // print link chrome
+	res, err := Layout(root, Options{
 		Width: 200, Height: 400, Sheets: []*css.Stylesheet{cssSheet}, Media: "print",
 	})
 	if err != nil {

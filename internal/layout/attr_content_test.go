@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -34,7 +33,7 @@ a { text-decoration: none; color: inherit; }
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 500, Height: 400, Sheets: []*css.Stylesheet{cssSheet}, Background: true,
 	})
 	if err != nil {
@@ -69,7 +68,7 @@ a { text-decoration: none; color: inherit; }
 func TestParseContentValueAttr(t *testing.T) {
 	t.Parallel()
 
-	node := &html.Node{ //nolint:exhaustruct // intentional zero fields
+	node := &html.Node{
 		Type:  html.ElementNode,
 		Name:  "a",
 		Attrs: map[string]string{"href": "https://ex.test/x"},

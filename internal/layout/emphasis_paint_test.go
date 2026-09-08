@@ -1,4 +1,3 @@
-//nolint:testpackage // layoutHTML/sheet test helpers and Result.Ops internals are tested from the same package
 package layout
 
 import (
@@ -18,7 +17,7 @@ func TestTextEmphasisPaintsDots(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 400, Height: 200, Media: "print",
 	})
 	if err != nil {
@@ -88,7 +87,7 @@ body { margin: 0; font-size: 16pt; }
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 500, Height: 200, Sheets: []*css.Stylesheet{cssSheet}, Media: "print",
 	})
 	if err != nil {
@@ -149,7 +148,7 @@ body { margin: 0; font-size: 12pt; }
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 400, Height: 200, Sheets: []*css.Stylesheet{cssSheet}, Media: "print", Background: true,
 	})
 	if err != nil {
@@ -207,7 +206,7 @@ body { margin: 0; font-size: 12pt; }
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 400, Height: 200, Sheets: []*css.Stylesheet{cssSheet}, Media: "print", Background: true,
 	})
 	if err != nil {

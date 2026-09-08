@@ -1635,6 +1635,29 @@ func isExternalHref(href string) bool {
 	return strings.HasPrefix(low, "http://") || strings.HasPrefix(low, "https://") || strings.HasPrefix(low, "mailto:")
 }
 
+// isLinkHref reports whether an anchor target can become a PDF URI or an
+// internal fragment link. Relative references are retained for conversion to
+// resolve against the document base URL.
+func isLinkHref(href string) bool {
+	href = strings.TrimSpace(href)
+	if href == "" {
+		return false
+	}
+
+	if isExternalHref(href) || isInternalHref(href) {
+		return true
+	}
+
+	low := strings.ToLower(href)
+	for _, prefix := range []string{"javascript:", "data:", "blob:"} {
+		if strings.HasPrefix(low, prefix) {
+			return false
+		}
+	}
+
+	return !strings.Contains(href, "://") && !strings.Contains(href, ":")
+}
+
 // isInternalHref reports a same-document fragment link (#id).
 func isInternalHref(href string) bool {
 	return strings.HasPrefix(href, "#") && len(href) > 1

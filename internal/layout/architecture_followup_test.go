@@ -1,10 +1,11 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
+//nolint:wsl,lll,cyclop // layout regressions use internal state and explicit fixtures
 package layout
 
 import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
@@ -26,16 +27,16 @@ func TestContainerStateEqualityIncludesFontSize(t *testing.T) {
 func TestSplitCrossingRectsRemapsBoxRangeAndPreservesIdentity(t *testing.T) {
 	t.Parallel()
 
-	root := &box{ //nolint:exhaustruct // intentional zero fields
-		node:    &html.Node{}, //nolint:exhaustruct // intentional zero fields
+	root := &box{
+		node:    &html.Node{},
 		opStart: 0,
 		opEnd:   0,
 	}
 
-	res := &Result{ //nolint:exhaustruct // intentional zero fields
+	res := &Result{
 		root: root,
 		Ops: []Op{
-			{Kind: OpFillRect, X: 10, Y: 40, W: 20, H: 30}, //nolint:exhaustruct // intentional zero fields
+			{Kind: OpFillRect, X: 10, Y: 40, W: 20, H: 30},
 		},
 	}
 	splitCrossingRects(res, 50)
@@ -85,18 +86,18 @@ func TestUsedImageSizeUsesOneAspectAndConstraintPolicy(t *testing.T) { //nolint:
 		t.Fatal("parsed image missing")
 	}
 
-	eng := &engine{ //nolint:exhaustruct // intentional zero fields
-		opts:    Options{Width: 300}, //nolint:exhaustruct // intentional zero fields
+	eng := &engine{
+		opts:    Options{Width: 300},
 		scale:   1,
 		imgMaxW: 80,
 	}
 
-	ref := &imageRef{ //nolint:exhaustruct // intentional zero fields
+	ref := &imageRef{
 		w: 400,
 		h: 200,
 	}
 
-	base := ResolvedStyle{ //nolint:exhaustruct // intentional zero fields
+	base := ResolvedStyle{
 		Width: -1, WidthPercent: -1, Height: -1, HeightPercent: -1,
 		MaxWidth: -1, MaxWidthPercent: -1, MaxHeight: -1,
 	}
@@ -136,10 +137,163 @@ func TestLayoutContextHonorsCancellation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = LayoutContext(ctx, root, Options{Width: 300, Height: 300}) //nolint:exhaustruct // intentional zero fields
+	_, err = LayoutContext(ctx, root, Options{Width: 300, Height: 300})
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("LayoutContext error = %v, want context.Canceled", err)
 	}
+}
+
+func TestLayoutContextCancelsBlockingImageResolver(t *testing.T) {
+	t.Parallel()
+
+	root := mustParse(t, `<html><body><img src="blocked"></body></html>`)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	started := make(chan struct{})
+	done := make(chan error, 1)
+
+	go func() {
+		_, err := LayoutContext(ctx, root, Options{
+			Width: 300, Height: 300,
+			ImagesContext: func(resolveCtx context.Context, _ string) ([]byte, error) {
+				close(started)
+				<-resolveCtx.Done()
+
+				return nil, resolveCtx.Err()
+			},
+		})
+		done <- err
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("image resolver did not start")
+	}
+
+	cancel()
+
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("LayoutContext error = %v, want context.Canceled", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("LayoutContext remained blocked after image resolver cancellation")
+	}
+}
+
+func TestCloneResultDropsDocumentOwnedStructureElements(t *testing.T) {
+	t.Parallel()
+
+	root := mustParse(t, `<html><body><h1>Title</h1><p>Body</p></body></html>`)
+	res, err := LayoutContext(t.Context(), root, Options{Width: 300, Height: 300})
+	if err != nil {
+		t.Fatalf("LayoutContext: %v", err)
+	}
+
+	first, err := pdf.NewDocumentWithPolicy(pdf.WriterPolicy{
+		Version:            pdf.PDF17,
+		ConformanceProfile: pdf.ProfilePDFUA1,
+	})
+	if err != nil {
+		t.Fatalf("first document: %v", err)
+	}
+	if err := Paint(first, res, PaintOptions{PageWidth: 300, PageHeight: 300}); err != nil {
+		t.Fatalf("first Paint: %v", err)
+	}
+
+	clone := CloneResult(res)
+	for idx, op := range clone.Ops {
+		if op.StructElem != nil {
+			t.Fatalf("clone op %d retained source structure element", idx)
+		}
+	}
+
+	second, err := pdf.NewDocumentWithPolicy(pdf.WriterPolicy{
+		Version:            pdf.PDF17,
+		ConformanceProfile: pdf.ProfilePDFUA1,
+	})
+	if err != nil {
+		t.Fatalf("second document: %v", err)
+	}
+	if err := Paint(second, clone, PaintOptions{PageWidth: 300, PageHeight: 300}); err != nil {
+		t.Fatalf("second Paint: %v", err)
+	}
+
+	firstElems := structureElements(first.StructTreeRoot())
+	secondElems := structureElements(second.StructTreeRoot())
+	if len(firstElems) == 0 || len(secondElems) == 0 {
+		t.Fatalf("structure tree sizes = %d and %d, want non-empty trees", len(firstElems), len(secondElems))
+	}
+	if len(firstElems) != len(secondElems) {
+		t.Fatalf("structure tree sizes = %d and %d, want equal trees", len(firstElems), len(secondElems))
+	}
+	for elem := range firstElems {
+		if secondElems[elem] {
+			t.Fatal("cloned result shared a structure element with the source document")
+		}
+	}
+}
+
+func TestRepeatedTaggedPaintRebuildsDocumentStructure(t *testing.T) {
+	t.Parallel()
+
+	root := mustParse(t, `<html><body><h1>Title</h1><p>Body</p></body></html>`)
+	res, err := LayoutContext(t.Context(), root, Options{Width: 300, Height: 300})
+	if err != nil {
+		t.Fatalf("LayoutContext: %v", err)
+	}
+
+	first, err := pdf.NewDocumentWithPolicy(pdf.WriterPolicy{
+		Version:            pdf.PDF17,
+		ConformanceProfile: pdf.ProfilePDFUA1,
+	})
+	if err != nil {
+		t.Fatalf("first document: %v", err)
+	}
+	if err := Paint(first, res, PaintOptions{PageWidth: 300, PageHeight: 300}); err != nil {
+		t.Fatalf("first Paint: %v", err)
+	}
+
+	second, err := pdf.NewDocumentWithPolicy(pdf.WriterPolicy{
+		Version:            pdf.PDF17,
+		ConformanceProfile: pdf.ProfilePDFUA1,
+	})
+	if err != nil {
+		t.Fatalf("second document: %v", err)
+	}
+	if err := Paint(second, res, PaintOptions{PageWidth: 300, PageHeight: 300}); err != nil {
+		t.Fatalf("repeated Paint: %v", err)
+	}
+
+	firstElems := structureElements(first.StructTreeRoot())
+	secondElems := structureElements(second.StructTreeRoot())
+	if len(firstElems) != len(secondElems) || len(secondElems) < 3 {
+		t.Fatalf("repeated structure tree sizes = %d and %d, want equal trees with headings and paragraphs", len(firstElems), len(secondElems))
+	}
+}
+
+func structureElements(root *pdf.StructTreeRoot) map[*pdf.StructElem]bool {
+	elems := map[*pdf.StructElem]bool{}
+	var walk func(*pdf.StructElem)
+	walk = func(elem *pdf.StructElem) {
+		if elem == nil {
+			return
+		}
+
+		elems[elem] = true
+		for _, child := range elem.Kids {
+			walk(child)
+		}
+	}
+	if root != nil {
+		for _, elem := range root.Children {
+			walk(elem)
+		}
+	}
+
+	return elems
 }
 
 func TestPaintContextHonorsCancellation(t *testing.T) {
@@ -149,14 +303,14 @@ func TestPaintContextHonorsCancellation(t *testing.T) {
 	cancel()
 
 	doc := pdf.NewDocument()
-	res := &Result{ //nolint:exhaustruct // intentional zero fields
+	res := &Result{
 		Width: 100, Height: 100,
 		Ops: []Op{
-			{Kind: OpFillRect, W: 10, H: 10}, //nolint:exhaustruct // intentional zero fields
+			{Kind: OpFillRect, W: 10, H: 10},
 		},
 	}
 
-	err := PaintContext(ctx, doc, res, PaintOptions{ //nolint:exhaustruct // intentional zero fields
+	err := PaintContext(ctx, doc, res, PaintOptions{
 		PageWidth: 100, PageHeight: 100,
 	})
 	if !errors.Is(err, context.Canceled) {
@@ -167,8 +321,8 @@ func TestPaintContextHonorsCancellation(t *testing.T) {
 func TestShiftOpsOnlyMaintainsFlowIndex(t *testing.T) {
 	t.Parallel()
 
-	res := &Result{ //nolint:exhaustruct // intentional zero fields
-		Ops:          []Op{{Y: 10}, {Y: 20}}, //nolint:exhaustruct // intentional zero fields
+	res := &Result{
+		Ops:          []Op{{Y: 10}, {Y: 20}},
 		flowPageSize: 100,
 	}
 
@@ -190,8 +344,8 @@ func TestShiftOpsOnlyMaintainsFlowIndex(t *testing.T) {
 func TestShiftFlowYNegativeMaintainsFlowIndex(t *testing.T) {
 	t.Parallel()
 
-	res := &Result{ //nolint:exhaustruct // intentional zero fields
-		Ops:          []Op{{Y: 110}, {Y: 210}}, //nolint:exhaustruct // intentional zero fields
+	res := &Result{
+		Ops:          []Op{{Y: 110}, {Y: 210}},
 		flowPageSize: 100,
 	}
 
@@ -217,8 +371,8 @@ func TestShiftFlowYNegativeMaintainsFlowIndex(t *testing.T) {
 func TestGeneratedPaginationOpsInvalidateFlowIndex(t *testing.T) {
 	t.Parallel()
 
-	res := &Result{ //nolint:exhaustruct // intentional zero fields
-		Ops:          []Op{{Kind: OpLine, Y: 10}}, //nolint:exhaustruct // intentional zero fields
+	res := &Result{
+		Ops:          []Op{{Kind: OpLine, Y: 10}},
 		flowPageOf:   []int{0},
 		flowPages:    [][]int{{0}},
 		flowPos:      []int{0},
@@ -233,7 +387,7 @@ func TestGeneratedPaginationOpsInvalidateFlowIndex(t *testing.T) {
 }
 
 func BenchmarkUsedImageSize(b *testing.B) {
-	eng := &engine{opts: Options{Width: 640}, scale: 1, imgMaxW: 320} //nolint:exhaustruct // intentional zero fields
+	eng := &engine{opts: Options{Width: 640}, scale: 1, imgMaxW: 320}
 
 	root, err := html.Parse(`<img width="400" src="x">`)
 	if err != nil {
@@ -260,12 +414,12 @@ func BenchmarkUsedImageSize(b *testing.B) {
 	}
 	walk(root)
 
-	baseStyle := ResolvedStyle{ //nolint:exhaustruct // intentional zero fields
+	baseStyle := ResolvedStyle{
 		Width: -1, WidthPercent: -1, Height: -1, HeightPercent: -1,
 		MaxWidth: -1, MaxWidthPercent: -1, MaxHeight: -1,
 	}
 
-	ref := &imageRef{ //nolint:exhaustruct // intentional zero fields
+	ref := &imageRef{
 		w: 800,
 		h: 400,
 	}
@@ -281,7 +435,7 @@ func BenchmarkDisplayListIdentity10kOps100Pages(b *testing.B) {
 	makeResult := func() *Result {
 		ops := make([]Op, 10_000)
 		for idx := range ops {
-			ops[idx] = Op{ //nolint:exhaustruct // intentional zero fields
+			ops[idx] = Op{
 				Kind: OpFillRect,
 				X:    float64(idx % 100),
 				Y:    float64(idx/100) * 100,
@@ -291,9 +445,9 @@ func BenchmarkDisplayListIdentity10kOps100Pages(b *testing.B) {
 			}
 		}
 
-		return &Result{ //nolint:exhaustruct // intentional zero fields
+		return &Result{
 			Width: 640, Height: 10_000, Ops: ops,
-			root: &box{opStart: 0, opEnd: len(ops) - 1, height: 10_000}, //nolint:exhaustruct // intentional zero fields
+			root: &box{opStart: 0, opEnd: len(ops) - 1, height: 10_000},
 		}
 	}
 
@@ -303,7 +457,7 @@ func BenchmarkDisplayListIdentity10kOps100Pages(b *testing.B) {
 		res := makeResult()
 		doc := pdf.NewDocument()
 
-		if err := PaintContext(b.Context(), doc, res, PaintOptions{ //nolint:exhaustruct // intentional zero fields
+		if err := PaintContext(b.Context(), doc, res, PaintOptions{
 			PageWidth: 640, PageHeight: 100,
 		}); err != nil {
 			b.Fatal(err)

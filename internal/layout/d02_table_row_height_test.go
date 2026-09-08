@@ -1,4 +1,3 @@
-//nolint:testpackage // probes table row box heights for fixture-56 d02-table
 package layout
 
 import (
@@ -70,7 +69,7 @@ func TestD02SurfaceTableRowHeightsFullFixture(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := Layout(doc, Options{ //nolint:exhaustruct // fixture print geometry only
+	res, err := Layout(doc, Options{
 		Width: 527.2, Height: 20000, Sheets: []*css.Stylesheet{cssSheet},
 		Background: true, Media: "print",
 	})
@@ -190,7 +189,7 @@ func TestD02SurfaceTableRowHeightsAfterPagination(t *testing.T) {
 	contentW := pageW - 2*margin
 	contentH := pageH - 2*margin
 
-	res, err := Layout(doc, Options{ //nolint:exhaustruct // fixture print geometry only
+	res, err := Layout(doc, Options{
 		Width: contentW, Height: contentH, Sheets: []*css.Stylesheet{cssSheet},
 		Background: true, Media: "print",
 	})
@@ -199,7 +198,9 @@ func TestD02SurfaceTableRowHeightsAfterPagination(t *testing.T) {
 	}
 
 	// Run the same pagination fixpoint Paint uses (without writing a PDF).
-	paginateOps(res, contentH)
+	if _, err := paginateOps(t.Context(), res, contentH); err != nil {
+		t.Fatal(err)
+	}
 
 	assertSurfaceContractGaps(t, res, "after-paginate")
 }

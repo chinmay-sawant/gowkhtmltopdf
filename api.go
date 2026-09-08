@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/convert"
@@ -140,6 +141,9 @@ type lineLog struct {
 	onError func(string)
 }
 
+// Compile-time check: lineLog satisfies io.Writer.
+var _ io.Writer = (*lineLog)(nil)
+
 // Write splits engine log lines and routes them to the corresponding public
 // callback. The loop is deliberately kept here so partial writes are buffered
 // across engine calls.
@@ -183,6 +187,8 @@ func (w *lineLog) Write(payload []byte) (int, error) {
 			if w.onInfo != nil {
 				w.onInfo(message)
 			}
+		case line.Unknown:
+			// SeverityOf never returns Unknown; listed for exhaustiveness.
 		}
 	}
 

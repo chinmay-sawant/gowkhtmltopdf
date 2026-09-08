@@ -1,4 +1,3 @@
-//nolint:testpackage // tests reach into unexported state
 package pdf
 
 import (
@@ -71,7 +70,7 @@ func buildRichDoc(t *testing.T) []byte {
 		}
 	}
 
-	doc.SetOutline(&Outline{ //nolint:exhaustruct // intentional zero-value fields
+	doc.SetOutline(&Outline{
 		Title: "root",
 		Children: []*Outline{
 			{Title: "one", PageRef: "1 0 R", X: 10, Y: 20},

@@ -1,6 +1,9 @@
 package convert
 
 import (
+	"context"
+	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
@@ -8,6 +11,11 @@ import (
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/outline"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
 )
+
+// idMatchSlopPt is the y-band slop when matching struct-tree elements to id
+// anchor locations: element boxes recorded during layout can sit slightly
+// above or below the location entry for the same anchor.
+const idMatchSlopPt = 20
 
 // bodyLinkIntent is the information from a same-document link operation that
 // later needs document-wide destinations. It deliberately omits the display
@@ -44,6 +52,24 @@ func collectBodyNavigation(res *layout.Result) bodyNavigation {
 		idElems: make(map[string]*pdf.StructElem),
 	}
 
+	// structOps indexes the ops that carry a PDF/UA structure element once,
+	// ordered by Y (stable: op order breaks ties), so id locations binary-search
+	// instead of rescanning the whole op list per id.
+	type structOpEntry struct {
+		y    float64
+		elem *pdf.StructElem
+	}
+
+	structOps := make([]structOpEntry, 0)
+
+	for i := range res.Ops {
+		if res.Ops[i].StructElem != nil {
+			structOps = append(structOps, structOpEntry{y: res.Ops[i].Y, elem: res.Ops[i].StructElem})
+		}
+	}
+
+	sort.SliceStable(structOps, func(a, b int) bool { return structOps[a].y < structOps[b].y })
+
 	for _, loc := range res.Locations {
 		if loc.Node == nil {
 			continue
@@ -53,13 +79,13 @@ func collectBodyNavigation(res *layout.Result) bodyNavigation {
 			loc.Node = nil
 			nav.ids[id] = loc
 
-			for i := range res.Ops {
-				op := &res.Ops[i]
-				if op.StructElem != nil && op.Y >= loc.Y && op.Y <= loc.Y+loc.H+20 {
-					nav.idElems[id] = op.StructElem
+			lo, hi := loc.Y, loc.Y+loc.H+idMatchSlopPt
 
-					break
-				}
+			first := sort.Search(len(structOps), func(i int) bool { return structOps[i].y >= lo })
+			for first < len(structOps) && structOps[first].y <= hi {
+				nav.idElems[id] = structOps[first].elem
+
+				break
 			}
 		}
 	}
@@ -158,10 +184,10 @@ func attachLinkStructElem(doc *pdf.Document, page *pdf.Page, elem *pdf.StructEle
 // anchors that have a paint box (text runs), and convert resolves them to
 // GoTo destinations via element id / heading locations.
 //
-//nolint:gocognit,cyclop,funlen,lll,wsl // forward/back link passes over entry locations
-func applyTOCLinks(doc *pdf.Document, tocs []*objectState, bodies []*objectState, tocTotal int, headings []*outline.Heading) {
+//nolint:gocognit,cyclop,funlen,lll,wsl,nestif // forward/back link passes over entry locations
+func applyTOCLinks(ctx context.Context, doc *pdf.Document, tocs []*objectState, bodies []*objectState, tocTotal int, headings []*outline.Heading, warn func(format string, args ...any)) error {
 	if len(tocs) == 0 {
-		return
+		return nil
 	}
 
 	byAnchor := map[string]*outline.Heading{}
@@ -185,6 +211,10 @@ func applyTOCLinks(doc *pdf.Document, tocs []*objectState, bodies []*objectState
 	}
 
 	for _, trVal := range tocs {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("toc links: %w", err)
+		}
+
 		if !trVal.toc.ForwardLinks && !trVal.toc.BackLinks {
 			continue
 		}
@@ -193,11 +223,19 @@ func applyTOCLinks(doc *pdf.Document, tocs []*objectState, bodies []*objectState
 		for anchor, eloc := range entryLocs {
 			hVal := byAnchor[anchor]
 			if hVal == nil {
+				if warn != nil {
+					warn("object %d: toc anchor %q has no matching heading; link skipped", trVal.idx+1, anchor)
+				}
+
 				continue
 			}
 
 			srcPage := doc.PageAt(trVal.start + eloc.Page)
 			if srcPage == nil {
+				if warn != nil {
+					warn("object %d: toc anchor %q source page %d missing; link skipped", trVal.idx+1, anchor, trVal.start+eloc.Page)
+				}
+
 				continue
 			}
 
@@ -228,11 +266,17 @@ func applyTOCLinks(doc *pdf.Document, tocs []*objectState, bodies []*objectState
 						}
 						annotRef := page.AddLinkDest(stVal.geom.pdfRect(hLoc), destPage, destX, destY)
 						attachLinkStructElem(doc, page, nil, annotRef)
+					} else if warn != nil {
+						warn("object %d: toc back link target page %d missing; link skipped", trVal.idx+1, tocTotal+docPage)
 					}
+				} else if warn != nil {
+					warn("object %d: toc back link target object for page %d missing; link skipped", trVal.idx+1, docPage)
 				}
 			}
 		}
 	}
+
+	return nil
 }
 
 // headingDest returns the PDF destination (x, y-up) of a heading's top-left
@@ -301,15 +345,20 @@ func remapPageForCopies(srcPage, copies int, collate bool) int {
 	return plan.Remap(1, srcPage)
 }
 
-//nolint:cyclop,wsl // per-state/per-op fragment resolution
-func applyInternalLinks(doc *pdf.Document, bodies []*objectState, tocTotal int) {
+func applyInternalLinks(
+	ctx context.Context, doc *pdf.Document, bodies []*objectState, tocTotal int, warn func(format string, args ...any),
+) error {
 	if doc == nil {
-		return
+		return nil
 	}
 
 	idLoc := buildBodyIDIndex(bodies)
 
 	for _, state := range bodies {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("internal links: %w", err)
+		}
+
 		if state == nil || state.geom.contentH <= 0 {
 			continue
 		}
@@ -317,42 +366,62 @@ func applyInternalLinks(doc *pdf.Document, bodies []*objectState, tocTotal int) 
 		useLocal := state.obj.LocalLinks
 
 		for _, link := range state.navigation.links {
-			frag := strings.TrimPrefix(link.uri, "#")
-
-			if !useLocal || frag == "" {
-				continue
-			}
-
-			dest, ok := idLoc[frag]
-			if !ok {
-				continue
-			}
-
-			srcPageIdx := tocTotal + state.offset + int(link.loc.Y/state.geom.contentH)
-
-			srcPage := doc.PageAt(srcPageIdx)
-			if srcPage == nil {
-				continue
-			}
-
-			srcLoc := link.loc
-			srcLoc.Page = int(link.loc.Y / state.geom.contentH)
-
-			if srcLoc.H <= 0 {
-				srcLoc.H = 10
-			}
-
-			if srcLoc.W <= 0 {
-				srcLoc.W = 10
-			}
-
-			destPage := logicalDestPage(dest, tocTotal)
-			dx, dy := dest.st.geom.pdfXY(dest.loc)
-			annotRef := srcPage.AddLinkDest(state.geom.pdfRect(srcLoc), destPage, dx, dy)
-			attachLinkStructElem(doc, srcPage, link.elem, annotRef)
-			if dest.elem != nil {
-				srcPage.SetLinkDestStruct(dest.elem)
-			}
+			applyBodyLink(doc, state, link, useLocal, idLoc, tocTotal, warn)
 		}
+	}
+
+	return nil
+}
+
+// applyBodyLink wires one same-document fragment link to its destination,
+// warning and skipping when the anchor or source page is missing.
+func applyBodyLink(
+	doc *pdf.Document, state *objectState, link bodyLinkIntent, useLocal bool,
+	idLoc map[string]bodyIDDest, tocTotal int, warn func(format string, args ...any),
+) {
+	frag := strings.TrimPrefix(link.uri, "#")
+
+	if !useLocal || frag == "" {
+		return
+	}
+
+	dest, ok := idLoc[frag]
+	if !ok {
+		if warn != nil {
+			warn("object %d: link #%s has no matching element id; link skipped", state.idx+1, frag)
+		}
+
+		return
+	}
+
+	srcPageIdx := tocTotal + state.offset + int(link.loc.Y/state.geom.contentH)
+
+	srcPage := doc.PageAt(srcPageIdx)
+	if srcPage == nil {
+		if warn != nil {
+			warn("object %d: link #%s source page %d missing; link skipped", state.idx+1, frag, srcPageIdx)
+		}
+
+		return
+	}
+
+	srcLoc := link.loc
+	srcLoc.Page = int(link.loc.Y / state.geom.contentH)
+
+	if srcLoc.H <= 0 {
+		srcLoc.H = 10
+	}
+
+	if srcLoc.W <= 0 {
+		srcLoc.W = 10
+	}
+
+	destPage := logicalDestPage(dest, tocTotal)
+	dx, dy := dest.st.geom.pdfXY(dest.loc)
+	annotRef := srcPage.AddLinkDest(state.geom.pdfRect(srcLoc), destPage, dx, dy)
+	attachLinkStructElem(doc, srcPage, link.elem, annotRef)
+
+	if dest.elem != nil {
+		srcPage.SetLinkDestStruct(dest.elem)
 	}
 }

@@ -30,7 +30,7 @@ type repeatedResourceServer struct {
 func newRepeatedResourceServer(tb testing.TB) *repeatedResourceServer {
 	tb.Helper()
 
-	resources := &repeatedResourceServer{ //nolint:exhaustruct // server and counters are initialized below
+	resources := &repeatedResourceServer{
 		image: benchmarkPNG(),
 	}
 	mux := http.NewServeMux()

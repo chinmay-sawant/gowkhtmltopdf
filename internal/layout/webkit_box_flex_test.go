@@ -33,7 +33,7 @@ func TestWebkitBoxOrientVerticalStacks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := Layout(root, Options{ //nolint:exhaustruct
+	res, err := Layout(root, Options{
 		Width: 200, Height: 200, Background: true, Sheets: []*css.Stylesheet{sheet},
 	})
 	if err != nil {
@@ -74,7 +74,7 @@ func TestWebkitBoxFlexGrows(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := Layout(root, Options{ //nolint:exhaustruct
+	res, err := Layout(root, Options{
 		Width: 200, Height: 200, Background: true, Sheets: []*css.Stylesheet{sheet},
 	})
 	if err != nil {

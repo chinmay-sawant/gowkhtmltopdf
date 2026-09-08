@@ -17,7 +17,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
+	"strings"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/errs"
@@ -82,23 +84,68 @@ const (
 	defaultTabSize          = 8
 )
 
+// Static validation errors for Options and PaintOptions. Dynamic values are
+// wrapped with %w at the return site so messages keep their detail.
+var (
+	errInvalidViewportWidth  = errors.New("layout: width must be finite and greater than zero")
+	errInvalidViewportHeight = errors.New("layout: height must be finite and non-negative")
+	errInvalidZoom           = errors.New("layout: zoom must be zero or a finite positive value")
+	errInvalidMediaValue     = errors.New("layout: media")
+)
+
 // Options controls a Layout run.
 type Options struct {
-	Width      float64 // viewport/content width in points
-	Height     float64 // viewport height in points (for % heights)
-	Font       *pdf.Font
-	Faces      *pdf.FaceSet  // optional Liberation family; defaults loaded when nil
-	Registry   *pdf.Registry // optional discovered fonts (--font-path)
-	Sheets     []*css.Stylesheet
-	Media      string // "print" or "screen"; "" = apply "all" rules only
-	Images     func(src string) ([]byte, error)
-	Background bool    // paint background colors
-	DebugBoxes bool    // outline every box for test/golden output
-	Zoom       float64 // zoom factor; style lengths are scaled by it (any positive value, < 1 shrinks)
+	Width    float64 // viewport/content width in points
+	Height   float64 // viewport height in points (for % heights)
+	Font     *pdf.Font
+	Faces    *pdf.FaceSet  // optional Liberation family; defaults loaded when nil
+	Registry *pdf.Registry // optional discovered fonts (--font-path)
+	Sheets   []*css.Stylesheet
+	Media    string // "print" or "screen"; "" = apply "all" rules only
+	// ImagesContext is the cancellation-aware image resolver. When set, it
+	// takes precedence over Images.
+	ImagesContext func(ctx context.Context, src string) ([]byte, error)
+	Images        func(src string) ([]byte, error)
+	Background    bool    // paint background colors
+	DebugBoxes    bool    // outline every box for test/golden output
+	Zoom          float64 // zoom factor; style lengths are scaled by it (any positive value, < 1 shrinks)
 	// PrintLinkUnderline is an opt-in operator policy (--print-link-underline):
 	// after cascade, force text-decoration:underline on a[href]. Default off
 	// so author CSS (including inherit → none) is honored.
 	PrintLinkUnderline bool
+}
+
+// validate rejects option values that would otherwise be silently clamped
+// or ignored: a non-positive viewport width, a negative viewport height (0
+// means unset), a negative or non-finite zoom (zoomScale would clamp it to
+// 1), and media values other than print, screen, or empty.
+func (o Options) validate() error {
+	if !finitePositive(o.Width) {
+		return fmt.Errorf("%w, got %g", errInvalidViewportWidth, o.Width)
+	}
+
+	if !finiteNonNegative(o.Height) {
+		return fmt.Errorf("%w, got %g", errInvalidViewportHeight, o.Height)
+	}
+
+	if o.Zoom != 0 && !finitePositive(o.Zoom) {
+		return fmt.Errorf("%w, got %g", errInvalidZoom, o.Zoom)
+	}
+
+	switch strings.ToLower(strings.TrimSpace(o.Media)) {
+	case "", "print", "screen":
+		return nil
+	default:
+		return fmt.Errorf("%w %q is not print or screen", errInvalidMediaValue, o.Media)
+	}
+}
+
+func finitePositive(value float64) bool {
+	return !math.IsNaN(value) && !math.IsInf(value, 0) && value > 0
+}
+
+func finiteNonNegative(value float64) bool {
+	return !math.IsNaN(value) && !math.IsInf(value, 0) && value >= 0
 }
 
 // Result is a display list plus the canvas bounds.
@@ -173,6 +220,9 @@ func cloneOps(src []Op) []Op {
 	for i := range src {
 		dst[i] = src[i]
 		dst[i].Image = append([]byte(nil), src[i].Image...)
+		// Structure elements belong to the document that was painted. A clone
+		// must let its destination document build its own structure tree.
+		dst[i].StructElem = nil
 	}
 
 	return dst
@@ -281,7 +331,11 @@ func (loc ElementLocation) Bounds() (float64, float64, float64, float64) {
 type OpKind int
 
 const (
-	OpFillRect OpKind = iota
+	// OpUnknown is the zero value of OpKind. Layout never emits it; a zero
+	// Op must not silently paint as OpFillRect, so the unknown sentinel leads
+	// the enum and painters treat it as inert (no painter matches it).
+	OpUnknown OpKind = iota
+	OpFillRect
 	OpStrokeRect
 	OpLine
 	OpText
@@ -893,6 +947,10 @@ func layoutContext(
 		return nil, errors.New("layout: nil root") //nolint:err113 // static sentinel-free message matches legacy behavior
 	}
 
+	if err := opts.validate(); err != nil {
+		return nil, err
+	}
+
 	if ctx == nil {
 		return nil, errs.ErrNilContext
 	}
@@ -1160,6 +1218,32 @@ func estimateOpCapacity(root *html.Node) int {
 	return capacity
 }
 
+// boxKind is the internal layout role of a box. uint8 avoids a per-box
+// string header (16 bytes) and keeps the hot box struct small.
+type boxKind uint8
+
+const (
+	boxKindBlock    boxKind = iota // "block"
+	boxKindTable                   // "table"
+	boxKindCell                    // "cell"
+	boxKindReplaced                // "replaced"
+)
+
+func (k boxKind) String() string {
+	switch k {
+	case boxKindBlock:
+		return displayBlock
+	case boxKindTable:
+		return displayTable
+	case boxKindCell:
+		return tableCellKind
+	case boxKindReplaced:
+		return "replaced"
+	default:
+		return "unknown"
+	}
+}
+
 // box is one laid-out box.
 type box struct {
 	node *html.Node
@@ -1169,7 +1253,15 @@ type box struct {
 	style     *ResolvedStyle
 	x, y      float64 // border-box top-left
 	w, height float64 // border-box size
-	kind      string  // "block" | "table" | "cell" | "replaced"
+	kind      boxKind
+	// packed flags — keep together to avoid padding.
+	paginationShifted bool // row was moved by a table pagination fixpoint
+	hasInk            bool // cell has non-whitespace ink (see nodeHasTableInk)
+	sticky            bool
+	stickyTopSet      bool
+	stickyRightSet    bool
+	stickyBottomSet   bool
+	stickyLeftSet     bool
 	// opStart/opEnd bound the inclusive range of e.ops indices that this
 	// box's subtree emitted. opEnd < opStart means the box emitted nothing
 	// (e.g. boxes built during a noEmit measure pass).
@@ -1178,14 +1270,9 @@ type box struct {
 	flowIndex      int // transient index in Result.boxes during pagination
 	firstBaseline  float64
 	// table cells
-	col, span         int
-	row               int  // owning table row index, set once at placement
-	rowSpan           int  // vertical span (default 1) for <td rowspan>
-	paginationShifted bool // row was moved by a table pagination fixpoint
-	// hasInk is set at cell build time from nodeHasTableInk (any
-	// non-whitespace text, br, img, svg, video or canvas in the subtree);
-	// row collapse uses the flag instead of re-walking each cell's tree.
-	hasInk bool
+	col, span int
+	row       int // owning table row index, set once at placement
+	rowSpan   int // vertical span (default 1) for <td rowspan>
 	// rowBoxH is the height of the cell's starting row only. For rowspan>1,
 	// h covers the full span (background/borders) while rowBoxH is what
 	// rowsIntact uses so bottom-edge paint ops do not make the first row
@@ -1204,14 +1291,11 @@ type box struct {
 	// points; cb* is filled at pagination time from the parent box.
 	// stickyPort is the nearest overflow:auto|scroll|hidden|clip ancestor
 	// (scrollport at offset 0); nil means page content box is the scrollport.
-	sticky                         bool
-	stickyID                       int
-	stickyTop, stickyRight         float64
-	stickyBottom, stickyLeft       float64
-	stickyTopSet, stickyRightSet   bool
-	stickyBottomSet, stickyLeftSet bool
-	stickyPort                     *box
-	cbX, cbY, cbW, cbH             float64
+	stickyID                 int
+	stickyTop, stickyRight   float64
+	stickyBottom, stickyLeft float64
+	stickyPort               *box
+	cbX, cbY, cbW, cbH       float64
 	// replaced image (nil when missing/failed); shared decode via resolveImage.
 	img *imageRef
 }
@@ -1356,20 +1440,21 @@ func useBlockForTableDisplay(node *html.Node) bool {
 //nolint:cyclop // block layout owns ordered CSS flow phases
 func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, posY float64) *box {
 	boxNode := &box{ //nolint:exhaustruct // intentional zero fields
-		node: node, style: e.stylePtr(node), kind: displayBlock, x: posX, y: posY,
+		node: node, style: e.stylePtr(node), kind: boxKindBlock, x: posX, y: posY,
 	}
-	w, margL := resolveBlockWidth(e, style, availW)
+	boxStyle := boxModelStyleOf(&style)
+	w, margL := resolveBlockWidth(e, boxStyle, availW)
 	boxNode.w = w
 
 	boxNode.x = posX + margL
-	contentX, contentW := e.contentBox(boxNode.x, boxNode.w, style)
+	contentX, contentW := e.contentBox(boxNode.x, boxNode.w, boxStyle)
 
 	// Content ops are recorded first so we know the box height; background
 	// and borders are then inserted *before* those ops so paint order is
 	// bg → borders → children (otherwise fills cover text).
 	contentStart := len(e.ops)
 
-	curY := e.scalePt(style.PaddingTop) + e.scalePt(borderLayoutWidth(style, style.BorderTop))
+	curY := e.scalePt(boxStyle.paddingTop) + e.scalePt(borderLayoutWidth(boxStyle, boxStyle.borderTop))
 	enclose := e.pushBFCFloats(style, contentX, contentW)
 	widget := node.Name == htmlMeter || node.Name == "progress"
 	chkWidget := isInputCheckbox(node)
@@ -1388,6 +1473,10 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 		curY = e.nativeWidgetAutoContentBottom(style)
 	}
 
+	if node.Name == "textarea" && style.Height < 0 && style.HeightPercent < 0 {
+		curY = e.textareaAutoContentBottom(style, node, boxStyle, curY)
+	}
+
 	if enclose && e.bfcFloats != nil {
 		curY = e.bfcFloats.extentCy(posY, curY)
 	}
@@ -1395,9 +1484,9 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 	e.popBFCFloats(enclose)
 	// padding-bottom is inside the border box (space above border-bottom /
 	// letterhead rules — fixture-07/16).
-	curY += e.scalePt(style.PaddingBottom)
-	if style.BorderImageSource != "" && style.Height < 0 && style.HeightPercent < 0 {
-		curY += e.scalePt(borderLayoutWidth(style, style.BorderBottom))
+	curY += e.scalePt(boxStyle.paddingBottom)
+	if boxStyle.borderImageSource != "" && boxStyle.height < 0 && boxStyle.heightPercent < 0 {
+		curY += e.scalePt(borderLayoutWidth(boxStyle, boxStyle.borderBottom))
 	}
 
 	if isVerticalWritingMode(style.WritingMode) {
@@ -1410,11 +1499,7 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 	}
 
 	boxNode.height = e.applyHeightConstraints(style, curY)
-	if widget {
-		e.paintValueWidget(node, style, boxNode.x, posY, boxNode.w, boxNode.height)
-	} else if chkWidget {
-		e.paintCheckboxWidget(node, style, boxNode.x, posY, boxNode.w, boxNode.height)
-	}
+	e.paintWidgetControl(node, style, boxNode, widget, chkWidget, posY)
 
 	e.paintPositionedPseudo(node, style, boxNode, pseudoBefore)
 	e.paintPositionedPseudo(node, style, boxNode, pseudoAfter)
@@ -1422,6 +1507,18 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 	e.prependChrome(contentStart, boxNode, style, boxNode.x, posY, boxNode.w, boxNode.height)
 
 	return boxNode
+}
+
+// paintWidgetControl paints the native control face for value and checkbox
+// widgets after the box height is final.
+func (e *engine) paintWidgetControl(
+	node *html.Node, style ResolvedStyle, boxNode *box, widget, chkWidget bool, posY float64,
+) {
+	if widget {
+		e.paintValueWidget(node, style, boxNode.x, posY, boxNode.w, boxNode.height)
+	} else if chkWidget {
+		e.paintCheckboxWidget(node, style, boxNode.x, posY, boxNode.w, boxNode.height)
+	}
 }
 
 // nativeWidgetAutoContentBottom returns the content-flow endpoint for an
@@ -1438,6 +1535,45 @@ func (e *engine) nativeWidgetAutoContentBottom(style ResolvedStyle) float64 {
 	}
 
 	return topChrome + contentHeight
+}
+
+// maxTextareaRows caps the rows attribute so malformed HTML cannot size a
+// textarea into a huge page.
+const maxTextareaRows = 30
+
+// textareaAutoContentBottom returns the content-flow endpoint for an
+// auto-sized textarea whose intrinsic height is rows * line-height. The caller
+// has already added top padding/border to curY and will add bottom padding
+// after this call.
+func (e *engine) textareaAutoContentBottom(
+	style ResolvedStyle, node *html.Node, boxStyle boxModelStyle, curY float64,
+) float64 {
+	rowsStr := strings.TrimSpace(node.Attribute("rows"))
+	rows := 2
+
+	if n, err := strconv.Atoi(rowsStr); err == nil && n > 0 {
+		rows = n
+		// Cap absurd rows to avoid huge pages from malformed HTML.
+		if rows > maxTextareaRows {
+			rows = maxTextareaRows
+		}
+	}
+
+	lineH := lineHeightOf(&style)
+	if lineH <= 0 {
+		lineH = defaultLineHeightRatio * style.FontSize
+	}
+
+	scaledLineH := e.scalePt(lineH)
+	contentH := scaledLineH * float64(rows)
+	topChrome := e.scalePt(boxStyle.paddingTop) + e.scalePt(borderLayoutWidth(boxStyle, boxStyle.borderTop))
+	desired := topChrome + contentH
+
+	if curY < desired {
+		return desired
+	}
+
+	return curY
 }
 
 // paintPositionedPseudo paints generated content whose used position takes it
@@ -1463,7 +1599,7 @@ func (e *engine) paintPositionedPseudo( //nolint:cyclop
 		return
 	}
 
-	contentX, contentW := e.contentBox(boxNode.x, boxNode.w, host)
+	contentX, contentW := e.contentBox(boxNode.x, boxNode.w, boxModelStyleOf(&host))
 	pseudoX := contentX + e.scalePt(style.MarginLeft)
 
 	if !style.LeftAuto {
@@ -1554,7 +1690,7 @@ func (e *engine) paintValueWidget(node *html.Node, style ResolvedStyle, leftX, t
 		ratio = 1
 	}
 
-	contentX, contentW := e.contentBox(leftX, width, style)
+	contentX, contentW := e.contentBox(leftX, width, boxModelStyleOf(&style))
 	contentY := topY + e.scalePt(style.BorderTop.Width) + e.scalePt(style.PaddingTop)
 
 	contentH := height - e.scalePt(style.BorderTop.Width+style.BorderBottom.Width) -
@@ -1644,13 +1780,13 @@ func blockFlowChildren(node *html.Node, nativeControl bool) []*html.Node {
 // current content height (extracted so buildBlock stays readable).
 // cbH is the containing-block height for % heights: <0 means indefinite (auto).
 func (e *engine) applyHeightConstraints(style ResolvedStyle, curY float64) float64 {
-	return e.applyHeightConstraintsWithCB(style, curY, -1)
+	return e.applyHeightConstraintsWithCB(boxModelStyleOf(&style), curY, -1)
 }
 
-func (e *engine) clampBlockMaxHeight(style ResolvedStyle, curY, cbH, vChrome float64) float64 {
-	if style.MaxHeightPercent >= 0 && cbH >= 0 && cbH < 1e12 {
-		maxH := cbH * style.MaxHeightPercent / oneHundred
-		if style.BoxSizing != borderBox {
+func (e *engine) clampBlockMaxHeight(style boxModelStyle, curY, cbH, vChrome float64) float64 {
+	if style.maxHeightPercent >= 0 && cbH >= 0 && cbH < 1e12 {
+		maxH := cbH * style.maxHeightPercent / oneHundred
+		if style.boxSizing != borderBox {
 			maxH += vChrome
 		}
 
@@ -1661,9 +1797,9 @@ func (e *engine) clampBlockMaxHeight(style ResolvedStyle, curY, cbH, vChrome flo
 		return curY
 	}
 
-	if style.MaxHeight >= 0 {
-		maxHeight := e.scalePt(style.MaxHeight)
-		if style.BoxSizing != borderBox {
+	if style.maxHeight >= 0 {
+		maxHeight := e.scalePt(style.maxHeight)
+		if style.boxSizing != borderBox {
 			maxHeight += vChrome
 		}
 
@@ -1675,10 +1811,10 @@ func (e *engine) clampBlockMaxHeight(style ResolvedStyle, curY, cbH, vChrome flo
 	return curY
 }
 
-func (e *engine) calcMinHeight(style ResolvedStyle, cbH, vChrome float64) float64 {
-	if style.MinHeightPercent >= 0 && cbH >= 0 && cbH < 1e12 {
-		minH := cbH * style.MinHeightPercent / oneHundred
-		if style.BoxSizing != borderBox {
+func (e *engine) calcMinHeight(style boxModelStyle, cbH, vChrome float64) float64 {
+	if style.minHeightPercent >= 0 && cbH >= 0 && cbH < 1e12 {
+		minH := cbH * style.minHeightPercent / oneHundred
+		if style.boxSizing != borderBox {
 			minH += vChrome
 		}
 
@@ -1689,8 +1825,8 @@ func (e *engine) calcMinHeight(style ResolvedStyle, cbH, vChrome float64) float6
 		return minH
 	}
 
-	minHeight := e.scalePt(style.MinHeight)
-	if style.BoxSizing != borderBox {
+	minHeight := e.scalePt(style.minHeight)
+	if style.boxSizing != borderBox {
 		minHeight += vChrome
 	}
 
@@ -1701,7 +1837,7 @@ func (e *engine) calcMinHeight(style ResolvedStyle, cbH, vChrome float64) float6
 	return minHeight
 }
 
-func (e *engine) clampBlockMinHeight(style ResolvedStyle, curY, cbH, vChrome float64) float64 {
+func (e *engine) clampBlockMinHeight(style boxModelStyle, curY, cbH, vChrome float64) float64 {
 	minH := e.calcMinHeight(style, cbH, vChrome)
 	if minH > 0 && curY < minH {
 		return minH
@@ -1711,7 +1847,7 @@ func (e *engine) clampBlockMinHeight(style ResolvedStyle, curY, cbH, vChrome flo
 }
 
 // applyHeightConstraintsWithCB is the definite-CB form for min/max percent.
-func (e *engine) applyHeightConstraintsWithCB(style ResolvedStyle, curY float64, cbH float64) float64 {
+func (e *engine) applyHeightConstraintsWithCB(style boxModelStyle, curY float64, cbH float64) float64 {
 	if h, ok := resolveUsedHeight(style, cbH, e); ok {
 		if curY < h {
 			curY = h
@@ -1719,9 +1855,8 @@ func (e *engine) applyHeightConstraintsWithCB(style ResolvedStyle, curY float64,
 	}
 
 	vChrome := 0.0
-	if style.BoxSizing != borderBox {
-		vChrome = e.scalePt(style.PaddingTop) + e.scalePt(style.PaddingBottom) +
-			e.scalePt(style.BorderTop.Width) + e.scalePt(style.BorderBottom.Width)
+	if style.boxSizing != borderBox {
+		vChrome = style.verticalChrome(e)
 	}
 
 	curY = e.clampBlockMaxHeight(style, curY, cbH, vChrome)
@@ -1731,9 +1866,9 @@ func (e *engine) applyHeightConstraintsWithCB(style ResolvedStyle, curY float64,
 
 // resolveBlockWidth computes a block's used border-box width and the scaled
 // left margin. Horizontal auto margins center (or push) a definite-width box.
-func resolveBlockWidth(eng *engine, style ResolvedStyle, availW float64) (float64, float64) {
-	margR := eng.scalePt(style.MarginRight)
-	margL := eng.scalePt(style.MarginLeft)
+func resolveBlockWidth(eng *engine, style boxModelStyle, availW float64) (float64, float64) {
+	margR := eng.scalePt(style.marginRight)
+	margL := eng.scalePt(style.marginLeft)
 	// Default: fill remaining width after horizontal margins.
 	width := availW - margL - margR
 	if width < 0 {
@@ -1744,9 +1879,8 @@ func resolveBlockWidth(eng *engine, style ResolvedStyle, availW float64) (float6
 	// content-box (default): specified width is the content width, so the
 	// border box grows by horizontal padding + border. border-box: specified
 	// width already is the border-box size.
-	if definiteW && style.BoxSizing != borderBox {
-		width += eng.scalePt(style.PaddingLeft) + eng.scalePt(style.PaddingRight) +
-			eng.scalePt(style.BorderLeft.Width) + eng.scalePt(style.BorderRight.Width)
+	if definiteW && style.boxSizing != borderBox {
+		width += style.horizontalChrome(eng)
 	}
 
 	width = clampBlockMinMax(eng, style, availW, width)
@@ -1757,17 +1891,17 @@ func resolveBlockWidth(eng *engine, style ResolvedStyle, availW float64) (float6
 
 // resolveAutoMargins centers (or pushes) a definite-width block via auto
 // horizontal margins (CSS2.1 §10.3.3).
-func resolveAutoMargins(style ResolvedStyle, definiteW bool, width, availW, margL, margR float64) float64 {
-	if definiteW && (style.MarginLeftAuto || style.MarginRightAuto) {
+func resolveAutoMargins(style boxModelStyle, definiteW bool, width, availW, margL, margR float64) float64 {
+	if definiteW && (style.marginLeftAuto || style.marginRightAuto) {
 		free := availW - width
 		if free < 0 {
 			free = 0
 		}
 
 		switch {
-		case style.MarginLeftAuto && style.MarginRightAuto:
+		case style.marginLeftAuto && style.marginRightAuto:
 			margL = free / two
-		case style.MarginLeftAuto:
+		case style.marginLeftAuto:
 			margL = free - margR
 			if margL < 0 {
 				margL = 0
@@ -1780,42 +1914,41 @@ func resolveAutoMargins(style ResolvedStyle, definiteW bool, width, availW, marg
 
 // resolveDefiniteWidth applies the width/width% to *w. Returns false when the
 // width resolves to auto (cyclic % honesty: indefinite containing block).
-func resolveDefiniteWidth(eng *engine, style ResolvedStyle, availW float64, width *float64) bool {
-	definiteW := style.Width >= 0 || style.WidthPercent >= 0
+func resolveDefiniteWidth(eng *engine, style boxModelStyle, availW float64, width *float64) bool {
+	definiteW := style.width >= 0 || style.widthPercent >= 0
 
 	switch {
-	case style.WidthPercent >= 0:
+	case style.widthPercent >= 0:
 		// Cyclic % honesty: indefinite containing block → treat as auto.
 		if availW > 0 && availW < 1e12 {
-			*width = availW * style.WidthPercent / oneHundred
+			*width = availW * style.widthPercent / oneHundred
 		} else {
 			definiteW = false
 		}
-	case style.Width >= 0:
-		*width = eng.scalePt(style.Width)
+	case style.width >= 0:
+		*width = eng.scalePt(style.width)
 	}
 
 	return definiteW
 }
 
 // clampBlockMinMax applies the min/max-width constraints to w.
-func clampBlockMinMax(eng *engine, style ResolvedStyle, availW, width float64) float64 {
+func clampBlockMinMax(eng *engine, style boxModelStyle, availW, width float64) float64 {
 	width = clampBlockMaxWidth(eng, style, availW, width)
 
 	return clampBlockMinWidth(eng, style, availW, width)
 }
 
-func clampBlockMinWidth(eng *engine, style ResolvedStyle, availW, width float64) float64 {
+func clampBlockMinWidth(eng *engine, style boxModelStyle, availW, width float64) float64 {
 	hChrome := 0.0
-	if style.BoxSizing != borderBox {
-		hChrome = eng.scalePt(style.PaddingLeft) + eng.scalePt(style.PaddingRight) +
-			eng.scalePt(style.BorderLeft.Width) + eng.scalePt(style.BorderRight.Width)
+	if style.boxSizing != borderBox {
+		hChrome = style.horizontalChrome(eng)
 	}
 
-	if style.MinWidthPercent >= 0 && availW > 0 && availW < 1e12 {
-		minW := availW * style.MinWidthPercent / oneHundred
+	if style.minWidthPercent >= 0 && availW > 0 && availW < 1e12 {
+		minW := availW * style.minWidthPercent / oneHundred
 
-		if style.BoxSizing != borderBox {
+		if style.boxSizing != borderBox {
 			minW += hChrome
 		}
 
@@ -1826,9 +1959,9 @@ func clampBlockMinWidth(eng *engine, style ResolvedStyle, availW, width float64)
 		return width
 	}
 
-	if style.MinWidth > 0 {
-		minW := eng.scalePt(style.MinWidth)
-		if style.BoxSizing != borderBox {
+	if style.minWidth > 0 {
+		minW := eng.scalePt(style.minWidth)
+		if style.boxSizing != borderBox {
 			minW += hChrome
 		}
 
@@ -1840,17 +1973,16 @@ func clampBlockMinWidth(eng *engine, style ResolvedStyle, availW, width float64)
 	return width
 }
 
-func clampBlockMaxWidth(eng *engine, style ResolvedStyle, availW, width float64) float64 {
+func clampBlockMaxWidth(eng *engine, style boxModelStyle, availW, width float64) float64 {
 	hChrome := 0.0
-	if style.BoxSizing != borderBox {
-		hChrome = eng.scalePt(style.PaddingLeft) + eng.scalePt(style.PaddingRight) +
-			eng.scalePt(style.BorderLeft.Width) + eng.scalePt(style.BorderRight.Width)
+	if style.boxSizing != borderBox {
+		hChrome = style.horizontalChrome(eng)
 	}
 
-	if style.MaxWidthPercent >= 0 && availW > 0 && availW < 1e12 {
-		maxW := availW * style.MaxWidthPercent / oneHundred
+	if style.maxWidthPercent >= 0 && availW > 0 && availW < 1e12 {
+		maxW := availW * style.maxWidthPercent / oneHundred
 
-		if style.BoxSizing != borderBox {
+		if style.boxSizing != borderBox {
 			maxW += hChrome
 		}
 
@@ -1861,9 +1993,9 @@ func clampBlockMaxWidth(eng *engine, style ResolvedStyle, availW, width float64)
 		return width
 	}
 
-	if style.MaxWidth >= 0 {
-		maxW := eng.scalePt(style.MaxWidth)
-		if style.BoxSizing != borderBox {
+	if style.maxWidth >= 0 {
+		maxW := eng.scalePt(style.maxWidth)
+		if style.boxSizing != borderBox {
 			maxW += hChrome
 		}
 
@@ -1878,29 +2010,27 @@ func clampBlockMaxWidth(eng *engine, style ResolvedStyle, availW, width float64)
 // resolveUsedHeight returns a definite border-box height when the style has a
 // usable height. HeightPercent requires a definite containing-block height
 // (cbH >= 0); otherwise the percentage is treated as auto (cyclic honesty).
-func resolveUsedHeight(sty ResolvedStyle, cbH float64, engN *engine) (float64, bool) {
-	if sty.HeightPercent >= 0 {
+func resolveUsedHeight(sty boxModelStyle, cbH float64, engN *engine) (float64, bool) {
+	if sty.heightPercent >= 0 {
 		if cbH < 0 {
 			return 0, false
 		}
 
-		height := cbH * sty.HeightPercent / oneHundred
-		if sty.BoxSizing != borderBox {
-			height += engN.scalePt(sty.PaddingTop) + engN.scalePt(sty.PaddingBottom) +
-				engN.scalePt(sty.BorderTop.Width) + engN.scalePt(sty.BorderBottom.Width)
+		height := cbH * sty.heightPercent / oneHundred
+		if sty.boxSizing != borderBox {
+			height += sty.verticalChrome(engN)
 		}
 
 		return height, true
 	}
 
-	if sty.Height < 0 {
+	if sty.height < 0 {
 		return 0, false
 	}
 
-	height := engN.scalePt(sty.Height)
-	if sty.BoxSizing != borderBox {
-		height += engN.scalePt(sty.PaddingTop) + engN.scalePt(sty.PaddingBottom) +
-			engN.scalePt(sty.BorderTop.Width) + engN.scalePt(sty.BorderBottom.Width)
+	height := engN.scalePt(sty.height)
+	if sty.boxSizing != borderBox {
+		height += sty.verticalChrome(engN)
 	}
 
 	return height, true

@@ -30,7 +30,7 @@ td.right { width: 150pt; background: #eef; }
 		t.Fatal(err)
 	}
 
-	res, err := layout.Layout(root, layout.Options{ //nolint:exhaustruct
+	res, err := layout.Layout(root, layout.Options{
 		Width: 400, Height: 200, Background: true, Sheets: []*css.Stylesheet{sheet},
 	})
 	if err != nil {

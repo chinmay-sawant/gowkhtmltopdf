@@ -31,12 +31,12 @@ func FuzzConvertHTML(f *testing.F) {
 		defer cancel()
 
 		global := settings.DefaultPdfGlobal()
-		obj := settings.PdfObject{} //nolint:exhaustruct // intentional zero-value fields
+		obj := settings.PdfObject{}
 		obj.Load.InlineHTML = []byte(htmlSrc)
 		objects := []settings.PdfObject{obj}
 
 		var out bytes.Buffer
-		req := &convert.Request{ //nolint:exhaustruct // fuzz fills only PDF fields
+		req := &convert.Request{
 			Global:  global,
 			Objects: objects,
 			Output:  &out,

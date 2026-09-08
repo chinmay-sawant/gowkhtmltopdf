@@ -6,6 +6,7 @@ import (
 	"io"
 	"maps"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/convert"
@@ -239,6 +240,12 @@ func (d *Document) writePDF(
 }
 
 // PDF returns the PDF bytes produced by the document.
+//
+// It buffers the entire PDF in memory and then returns an owned copy, so peak
+// memory is about twice the PDF size (the staging buffer plus the returned
+// slice). For large documents prefer WritePDF, which streams directly to the
+// supplied io.Writer without retaining a second copy. The returned slice is
+// owned by the caller and the staging buffer is not retained after return.
 func (d *Document) PDF(ctx context.Context) ([]byte, error) {
 	if d == nil {
 		return nil, ErrNilDocument
@@ -300,6 +307,13 @@ func (d *ImageDocument) WriteImage(ctx context.Context, writer io.Writer) error 
 }
 
 // Image returns encoded PNG or JPEG bytes produced by the image document.
+//
+// It buffers the entire image in memory and then returns an owned copy, so
+// peak memory is about twice the image size (the staging buffer plus the
+// returned slice). For large renders prefer WriteImage, which streams directly
+// to the supplied io.Writer without retaining a second copy. The returned
+// slice is owned by the caller and the staging buffer is not retained after
+// return.
 func (d *ImageDocument) Image(ctx context.Context) ([]byte, error) {
 	if d == nil {
 		return nil, ErrNilImageDocument
@@ -345,8 +359,8 @@ func (d *Document) pdfGlobal(dumpOutline bool) settings.PdfGlobal {
 	if d.WidthMM != 0 || d.HeightMM != 0 {
 		global.Size = settings.Size{Width: d.WidthMM, Height: d.HeightMM}
 	}
-	if d.Orientation != "" {
-		if orientation, err := settings.ParseOrientation(d.Orientation); err == nil {
+	if orientationValue := strings.TrimSpace(d.Orientation); orientationValue != "" {
+		if orientation, err := settings.ParseOrientation(orientationValue); err == nil {
 			global.Orientation = orientation
 		}
 	}

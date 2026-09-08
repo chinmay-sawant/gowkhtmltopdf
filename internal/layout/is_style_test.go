@@ -1,4 +1,4 @@
-//nolint:testpackage,cyclop,varnamelen // :is() cascade proofs
+//nolint:cyclop,varnamelen // :is() cascade proofs
 package layout
 
 import (

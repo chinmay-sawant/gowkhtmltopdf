@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -55,7 +54,7 @@ p { margin: 0.4em 0; }
 
 	const pageH = 750.0
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 538, Height: pageH, Sheets: []*css.Stylesheet{cssSheet},
 		Media: "print", Background: true,
 	})
@@ -64,7 +63,7 @@ p { margin: 0.4em 0; }
 	}
 
 	doc := pdf.NewDocument()
-	po := PaintOptions{ //nolint:exhaustruct // intentional zero fields
+	po := PaintOptions{
 		PageWidth: 595, PageHeight: pageH + 50, MarginTop: 25, MarginBottom: 25,
 	}
 

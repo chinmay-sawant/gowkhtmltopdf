@@ -91,7 +91,7 @@ func (e *engine) collectInlineNode(node *html.Node, out *[]inlineItem) {
 		e.collectInlineText(node, sty, out)
 	case html.ElementNode:
 		e.collectInlineElement(node, sty, out)
-	case html.CommentNode, html.DoctypeNode:
+	case html.CommentNode, html.DoctypeNode, html.NodeUnknown:
 		return
 	}
 }
@@ -521,8 +521,8 @@ func (e *engine) collectInlineSpan(node *html.Node, sty ResolvedStyle, out *[]in
 	href := ""
 
 	if node.Name == cssTagA {
-		h := node.Attribute("href")
-		if isExternalHref(h) || isInternalHref(h) {
+		h := strings.TrimSpace(node.Attribute("href"))
+		if isLinkHref(h) {
 			href = h
 		}
 	}

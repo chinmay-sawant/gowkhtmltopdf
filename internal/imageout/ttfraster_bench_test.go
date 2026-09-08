@@ -1,4 +1,4 @@
-package imageout //nolint:testpackage // benchmark exercises the unexported raster hot path.
+package imageout
 
 import (
 	"image"

@@ -9,9 +9,27 @@ import (
 	"slices"
 )
 
-const maxCopies = 1_000
+const MaxCopies = 1_000
 
-var errCopyLimit = errors.New("render: copy limit exceeded")
+var (
+	ErrInvalidCopies = errors.New("render: copies must be at least one")
+	ErrTooManyCopies = errors.New("render: copy limit exceeded")
+)
+
+// ValidateCopies is the single copy-count contract used by page planning and
+// copy materialization. Zero means "use the caller's default" only before a
+// request reaches this package.
+func ValidateCopies(copies int) error {
+	if copies < 1 {
+		return fmt.Errorf("%w: got %d", ErrInvalidCopies, copies)
+	}
+
+	if copies > MaxCopies {
+		return fmt.Errorf("%w: got %d, limit %d", ErrTooManyCopies, copies, MaxCopies)
+	}
+
+	return nil
+}
 
 // Range is a half-open span [Start, Start+Count) in the pre-copy document.
 type Range struct {
@@ -38,12 +56,8 @@ type Plan struct {
 func NewPlan(
 	tocPages, bodyPages []int, copies int, collate bool,
 ) (*Plan, error) {
-	if copies < 1 {
-		copies = 1
-	}
-
-	if copies > maxCopies {
-		return nil, fmt.Errorf("%w: got %d, limit %d", errCopyLimit, copies, maxCopies)
+	if err := ValidateCopies(copies); err != nil {
+		return nil, err
 	}
 
 	plan := &Plan{copies: copies, collate: collate} //nolint:exhaustruct // owners are appended below
@@ -134,7 +148,11 @@ func (p *Plan) Ranges() []Range {
 // NonCollateOrder builds the page permutation for non-collated copies.
 //
 //nolint:wsl,nlreturn // permutation loops are intentionally local
-func NonCollateOrder(ranges []Range, copies int) []int {
+func NonCollateOrder(ranges []Range, copies int) ([]int, error) {
+	if err := ValidateCopies(copies); err != nil {
+		return nil, err
+	}
+
 	original := 0
 	for _, span := range ranges {
 		original += span.Count
@@ -147,5 +165,5 @@ func NonCollateOrder(ranges []Range, copies int) []int {
 			}
 		}
 	}
-	return order
+	return order, nil
 }

@@ -1,4 +1,4 @@
-//nolint:testpackage,varnamelen,cyclop,funlen // cascade paint apply proofs
+//nolint:varnamelen,cyclop,funlen // cascade paint apply proofs
 package layout
 
 import (

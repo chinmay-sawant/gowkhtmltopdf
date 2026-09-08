@@ -44,10 +44,10 @@ func (e *engine) buildGrid(node *html.Node, sty ResolvedStyle, availW, posX, pos
 
 	ml := e.scalePt(sty.MarginLeft)
 	boxNode := &box{ //nolint:exhaustruct // intentional zero fields
-		node: node, style: e.stylePtr(node), kind: displayBlock, x: posX + ml, y: posY,
+		node: node, style: e.stylePtr(node), kind: boxKindBlock, x: posX + ml, y: posY,
 	}
 	boxNode.w = resolveUsedWidth(sty, availW, e)
-	contentX, contentW := e.contentBox(boxNode.x, boxNode.w, sty)
+	contentX, contentW := e.contentBox(boxNode.x, boxNode.w, boxModelStyleOf(&sty))
 
 	contentStart := len(e.ops)
 	curY := e.scalePt(sty.PaddingTop) + e.scalePt(sty.BorderTop.Width)
@@ -447,7 +447,14 @@ func measureGridPreferredHeights(
 ) []gridPlacedBox {
 	pboxes := make([]gridPlacedBox, 0, len(placed))
 
+	poll := newCtxPoll(eng.ctx)
 	for _, page := range placed {
+		if poll.poll() {
+			eng.err = poll.err
+
+			return nil
+		}
+
 		contW, curX := gridCellExtent(cols, columnGap, contentX, page)
 
 		was := eng.noEmit
@@ -531,8 +538,15 @@ func emitGridBoxes(
 		containerAlign = fxStretch
 	}
 
-	for i := range pboxes {
-		emitGridItem(eng, boxNode, &pboxes[i], rows, rowGap, posY, rowYs, containerJustify, containerAlign)
+	poll := newCtxPoll(eng.ctx)
+	for idx := range pboxes {
+		if poll.poll() {
+			eng.err = poll.err
+
+			return nil
+		}
+
+		emitGridItem(eng, boxNode, &pboxes[idx], rows, rowGap, posY, rowYs, containerJustify, containerAlign)
 	}
 
 	return rowYs

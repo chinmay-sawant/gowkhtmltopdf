@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -52,7 +51,7 @@ a { text-decoration: none; color: #36c }
 		t.Fatalf("decoration=%q: inherit must not force underline without --print-link-underline", st.TextDecoration)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 500, Height: 800, Sheets: []*css.Stylesheet{cssSheet},
 		Media: "print", Background: true,
 	})
@@ -87,7 +86,7 @@ a { text-decoration: none; color: #36c }
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 500, Height: 800, Sheets: []*css.Stylesheet{cssSheet},
 		Media: "print", Background: true, PrintLinkUnderline: true,
 	})

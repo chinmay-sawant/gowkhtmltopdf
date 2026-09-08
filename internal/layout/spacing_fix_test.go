@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -60,7 +59,7 @@ func TestLogoTitleGap(t *testing.T) { //nolint:cyclop
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 595 - 56.7, Height: 842, Sheets: sheets, Background: true,
 		Images: func(src string) ([]byte, error) {
 			if strings.HasPrefix(src, "data:") {
@@ -105,7 +104,7 @@ func TestBlockMarginBottomGap(t *testing.T) {
 
 	root, sheets := loadFixture(t, "fixture-19-margin-and-sizing.html")
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 595, Height: 842, Sheets: sheets, Background: true,
 	})
 	if err != nil {
@@ -136,7 +135,7 @@ func TestNestedTableStaysInCell(t *testing.T) {
 	root, sheets := loadFixture(t, "fixture-10-table-colspan.html")
 	contW := 595.0 - 2*28.346
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: contW, Height: 842, Sheets: sheets, Background: true,
 	})
 	if err != nil {
@@ -161,7 +160,7 @@ func TestPositionLiteFixtureReservesOverlaySpace(t *testing.T) { //nolint:cyclop
 
 	root, sheets := loadFixture(t, "fixture-26-position-lite.html")
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 595 - 56.7, Height: 842, Sheets: sheets, Background: true,
 	})
 	if err != nil {
@@ -217,7 +216,7 @@ func TestLetterheadPaddingBeforeBorder(t *testing.T) { //nolint:cyclop
 
 	root, sheets := loadFixture(t, "fixture-16-invoice-with-css.html")
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 595 - 56.7, Height: 842, Sheets: sheets, Background: true,
 	})
 	if err != nil {

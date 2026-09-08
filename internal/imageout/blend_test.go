@@ -1,4 +1,3 @@
-//nolint:testpackage,exhaustruct // white-box raster compositing test
 package imageout
 
 import (

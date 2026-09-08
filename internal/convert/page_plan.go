@@ -2,6 +2,7 @@
 package convert
 
 import (
+	"context"
 	"fmt"
 	"math"
 
@@ -17,8 +18,6 @@ func percent(i, n int) int {
 
 	return int(math.Round(float64(i) * float64(progressComplete) / float64(n)))
 }
-
-
 
 // pageOwner is one logical (pre-copy) page and the object that owns it.
 type pageOwner struct {
@@ -41,12 +40,8 @@ type pagePlan struct {
 //
 //nolint:cyclop,wsl // page ownership adapter
 func newPagePlan(tocs, bodies []*objectState, copies int, collate bool) (*pagePlan, error) {
-	if copies < 1 {
-		copies = 1
-	}
-
-	if copies > maxConversionCopies {
-		return nil, fmt.Errorf("%w: got %d, limit %d", errTooManyCopies, copies, maxConversionCopies)
+	if err := render.ValidateCopies(copies); err != nil {
+		return nil, err
 	}
 
 	logicalPages := 0
@@ -179,13 +174,9 @@ func tocFirstOrder(tocs, bodies []*objectState) []int {
 	return order
 }
 
-func materializeCopies(doc *pdf.Document, ranges []render.Range, copies int) error {
-	if copies < 1 {
-		return nil
-	}
-
-	if copies > maxConversionCopies {
-		return fmt.Errorf("%w: got %d, limit %d", errTooManyCopies, copies, maxConversionCopies)
+func materializeCopies(ctx context.Context, doc *pdf.Document, ranges []render.Range, copies int) error {
+	if err := render.ValidateCopies(copies); err != nil {
+		return err
 	}
 
 	original := 0
@@ -198,8 +189,14 @@ func materializeCopies(doc *pdf.Document, ranges []render.Range, copies int) err
 	}
 
 	for copyIndex := 1; copyIndex < copies; copyIndex++ {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("assemble copies: %w", err)
+		}
 		for _, span := range ranges {
 			for page := span.Start; page < span.Start+span.Count; page++ {
+				if err := ctx.Err(); err != nil {
+					return fmt.Errorf("assemble copies: %w", err)
+				}
 				if _, err := doc.DuplicatePage(page); err != nil {
 					return fmt.Errorf("assemble copies: %w", err)
 				}
@@ -210,6 +207,6 @@ func materializeCopies(doc *pdf.Document, ranges []render.Range, copies int) err
 	return nil
 }
 
-func nonCollateOrder(ranges []render.Range, copies int) []int {
+func nonCollateOrder(ranges []render.Range, copies int) ([]int, error) {
 	return render.NonCollateOrder(ranges, copies)
 }

@@ -79,7 +79,7 @@ test files where listed.
 | `doc.go` | Package overview + HTTP-status error note | 6 |
 | `convert_test.go` | End-to-end `RunPDF*` tests: objects, copies, media, progress, quiet, cancel, smart-shrink | 704 |
 | `seams_test.go` | Sink contract tests (`Run` requires explicit output/outline sinks), mode-specific request constructors, `PrepareDocument` seam | 158 |
-| `phase6_test.go` | Phase-6 curated behavior: HF text/HTML, TOC, outline wiring, auto margins, links, cover exclusion, placeholders | 414 |
+| `headers_toc_outline_links_test.go` | Phase-6 curated behavior: HF text/HTML, TOC, outline wiring, auto margins, links, cover exclusion, placeholders | 414 |
 | `golden_test.go` | Golden-fixture comparisons produced from `testdata/golden/*.html` (regenerate with `make samples`) | 626 |
 | `hf_links_test.go` | Header/footer + link interactions (dest wiring, page history) | 385 |
 | `links_resolve_test.go` | `collectBodyNavigation`, `buildBodyIDIndex`, `resolveRelativeLinkURIs` | 118 |
@@ -490,7 +490,7 @@ constructs, but it is the enforcement point for several security rules:
   outline sinks; writer errors propagate; `NewPDFRequest` / `ValidatePDF`
   invariants; `PrepareDocument` binds the shared resource context. Image
   request validation lives under `internal/imageout`.
-- **Phase-6 behavior tests** (phase6_test.go): text HF, `[page]`/`[frompage]`
+- **Phase-6 behavior tests** (headers_toc_outline_links_test.go): text HF, `[page]`/`[frompage]`
   placeholders, section/subsection, TOC, outline on/off, internal link
   destinations, HTML header with per-page placeholders, raw-markup rejection,
   CWD-relative HF paths, auto margins, cover pages without HF, external links

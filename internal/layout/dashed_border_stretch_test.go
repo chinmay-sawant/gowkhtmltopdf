@@ -1,4 +1,3 @@
-//nolint:testpackage // white-box: asserts dash segment geometry after Paint
 package layout
 
 import (
@@ -156,7 +155,7 @@ func verifyDashedBorderGolden(t *testing.T, file, className string) {
 		margin = 28.35
 	)
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: pageW - 2*margin, Height: pageH - 2*margin,
 		Sheets: []*css.Stylesheet{sheet}, Background: true, Faces: faces,
 	})

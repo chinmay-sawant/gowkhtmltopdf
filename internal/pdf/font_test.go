@@ -1,9 +1,9 @@
-//nolint:testpackage,exhaustruct // tests reach into unexported state
 package pdf
 
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"strings"
 	"testing"
 )
@@ -178,6 +178,15 @@ func TestSubsetChecksum(t *testing.T) {
 
 	if got := checksum(sub.data); got != 0xB1B0AFBA {
 		t.Errorf("font checksum = %#x, want 0xB1B0AFBA", got)
+	}
+}
+
+func TestSubsetFontRejectsUnknownScope(t *testing.T) {
+	t.Parallel()
+	fnt := testFont(t)
+
+	if _, err := subsetFont(fnt, []rune("abc"), subsetUnknown); !errors.Is(err, errSubsetUnknownScope) {
+		t.Fatalf("subsetFont(subsetUnknown) err = %v, want errSubsetUnknownScope", err)
 	}
 }
 

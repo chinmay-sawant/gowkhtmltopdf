@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -18,6 +17,16 @@ import (
 )
 
 const testViewport = 500.0
+
+func TestZeroOpKindIsUnknown(t *testing.T) {
+	t.Parallel()
+
+	var zeroOp Op
+
+	if got := zeroOp.Kind; got != OpUnknown {
+		t.Fatalf("zero Op Kind = %v, want OpUnknown (must not paint as OpFillRect)", got)
+	}
+}
 
 func mustParse(t *testing.T, src string) *html.Node {
 	t.Helper()
@@ -40,7 +49,7 @@ func layoutHTMLZoom(t *testing.T, src string, zoom float64, sheets ...*css.Style
 	t.Helper()
 	root := mustParse(t, src)
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: testViewport, Height: 800, Sheets: sheets, Background: true, Zoom: zoom,
 	})
 	if err != nil {
@@ -82,7 +91,7 @@ func firstText(res *Result) Op {
 		}
 	}
 
-	return Op{} //nolint:exhaustruct // intentional zero fields
+	return Op{}
 }
 
 // findBox returns the first box in document order whose node is an element
@@ -411,7 +420,7 @@ func TestMarginCollapse(t *testing.T) {
 	}
 	// collapsed gap = max(20, 30) = 30; no body margin in this sheet
 	dy := texts[1].Y - texts[0].Y
-	want := lineHeightOf(&ResolvedStyle{FontSize: 12}) + 30 //nolint:exhaustruct // intentional zero fields
+	want := lineHeightOf(&ResolvedStyle{FontSize: 12}) + 30
 
 	if !near(dy, want) {
 		t.Errorf("gap between lines = %v, want %v (collapsed)", dy, want)
@@ -639,7 +648,7 @@ func TestIPAGlyphRegistryFallback(t *testing.T) { //nolint:cyclop
 	ipa := "ˈaɾ"
 	root := mustParse(t, `<html><body><p style="font-family: Liberation Sans, sans-serif">`+ipa+`</p></body></html>`)
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: testViewport, Height: 400, Registry: reg, Media: "print",
 	})
 	if err != nil {
@@ -970,7 +979,7 @@ func layoutHTMLWithImages(t *testing.T, src string, img []byte, imgSrc string) *
 		return img, nil
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: testViewport, Height: 800, Images: provider, Background: true,
 	})
 	if err != nil {
@@ -1074,7 +1083,7 @@ func TestDebugBoxes(t *testing.T) {
 
 	root := mustParse(t, `<html><body><div>x</div></body></html>`)
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: testViewport, Height: 800, DebugBoxes: true,
 	})
 	if err != nil {
@@ -1174,7 +1183,7 @@ func TestPageBreakParsing(t *testing.T) {
 
 // paintOpts is a full-page-content geometry for pagination tests.
 func paintOpts() PaintOptions {
-	return PaintOptions{PageWidth: 595, PageHeight: 842} //nolint:exhaustruct // intentional zero fields — contentH = 842
+	return PaintOptions{PageWidth: 595, PageHeight: 842}
 }
 
 // pageOf returns the page (0-based) of the first op whose text contains want.
@@ -1293,7 +1302,7 @@ func TestSplitCrossingFloatBoundaryNoHang(t *testing.T) {
 	contentH := 785.1970866141731
 	// Y just below a page top so truncating division sticks on the prior page.
 	y := contentH*52 - 1e-10
-	res := &Result{Ops: []Op{{ //nolint:exhaustruct // intentional zero fields
+	res := &Result{Ops: []Op{{
 		Kind: OpLine, X: 10, Y: y, W: 0, H: 15.8, Width: 1,
 	}}}
 	done := make(chan struct{})

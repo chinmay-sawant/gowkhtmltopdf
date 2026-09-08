@@ -1,4 +1,4 @@
-//nolint:cyclop,exhaustruct,wsl,lll,err113,testpackage // parser table tests intentionally cover private grammar state.
+//nolint:cyclop,wsl,lll,err113 // parser table tests intentionally cover private grammar state.
 package cli
 
 import (
@@ -61,7 +61,7 @@ func TestDocumentGrammarBuildsPagesFromPositionalFiles(t *testing.T) {
 	if cmd.Objects[0].Page != "page-1.html" || cmd.Objects[1].Page != "page-2.html" {
 		t.Fatalf("pages = %+v", cmd.Objects)
 	}
-	if cmd.Global.PageSize != "Letter" || cmd.Global.Orientation != settings.OrientationLandscape {
+	if cmd.Global.PageSize != "letter" || cmd.Global.Orientation != settings.OrientationLandscape {
 		t.Fatalf("geometry = %+v", cmd.Global)
 	}
 	if cmd.Global.Margin.Top != 20 || cmd.Global.Title != testReportTitle || cmd.Global.OutlineDepth != 2 {
@@ -219,7 +219,7 @@ func TestBooleanAndShortFlagSyntax(t *testing.T) {
 	t.Parallel()
 
 	cmd := parsePDF(t, "--outline=false", "--outline", "-s", "A5", "-O", "Landscape", "-o", outPDF, "input.html")
-	if !cmd.Global.Outline || cmd.Global.PageSize != "A5" || cmd.Global.Orientation != settings.OrientationLandscape {
+	if !cmd.Global.Outline || cmd.Global.PageSize != "a5" || cmd.Global.Orientation != settings.OrientationLandscape {
 		t.Fatalf("boolean/short flags = %+v", cmd.Global)
 	}
 	if _, err := Parse([]string{"--outline=maybe", "-o", outPDF, "input.html"}, ModePDF); !errors.Is(err, errInvalidBoolValue) {
@@ -264,6 +264,9 @@ func TestTerminalActionsAndModeValidation(t *testing.T) {
 	if _, err := Parse([]string{"--dump-default-toc-xsl", "-o", outPDF, "input.html"}, ModePDF); !errors.Is(err, ErrTerminalConflict) {
 		t.Fatalf("terminal conflict = %v", err)
 	}
+	if _, err := Parse([]string{"--dump-default-toc-xsl", "-o", outPDF}, ModePDF); !errors.Is(err, ErrTerminalConflict) {
+		t.Fatalf("output-only terminal conflict = %v", err)
+	}
 	if _, err := Parse([]string{"--dump-default-toc-xsl", "--dump-outline"}, ModePDF); !errors.Is(err, ErrTerminalConflict) {
 		t.Fatalf("dump-outline conflict = %v", err)
 	}
@@ -284,7 +287,7 @@ func TestExitCodeAndOutputWriter(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	cmd := &Command{Output: "/tmp/unused.pdf", OutputWriter: &buf} //nolint:exhaustruct // sink precedence only
+	cmd := &Command{Output: "/tmp/unused.pdf", OutputWriter: &buf}
 	writer, closeWriter, err := cmd.OpenOutput()
 	if err != nil || writer != &buf {
 		t.Fatalf("OpenOutput = %v, %v", writer, err)

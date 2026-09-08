@@ -1,4 +1,4 @@
-//nolint:testpackage,wsl,varnamelen,paralleltest,unparam // box-shadow chrome probes
+//nolint:wsl,varnamelen,paralleltest,unparam // box-shadow chrome probes
 package layout
 
 import (
@@ -30,8 +30,8 @@ func TestBoxShadowPositionLonghandDoesNotOverrideShorthandRaw(t *testing.T) {
 		t.Fatalf("BoxShadowRaw = %q, want shorthand lengths", sty.BoxShadowRaw)
 	}
 
-	eng := &engine{scale: 1, opts: Options{Background: true}} //nolint:exhaustruct // chrome probe
-	boxNode := &box{style: sty, w: 80, height: 36}            //nolint:exhaustruct // geometry probe
+	eng := &engine{scale: 1, opts: Options{Background: true}}
+	boxNode := &box{style: sty, w: 80, height: 36}
 	eng.prependChrome(0, boxNode, *sty, 10, 20, 80, 36)
 	ops := eng.deferredChrome[0].ops
 	// Outer shadow: dark fill before cream background, larger/offset from box.
@@ -111,8 +111,8 @@ func TestBoxShadowPaints(t *testing.T) {
 func testBoxShadowInsetAfterBackground(t *testing.T) {
 	t.Parallel()
 
-	eng := &engine{scale: 1, opts: Options{Background: true}} //nolint:exhaustruct // chrome probe
-	sty := ResolvedStyle{                                     //nolint:exhaustruct // shadow fields under test
+	eng := &engine{scale: 1, opts: Options{Background: true}}
+	sty := ResolvedStyle{
 		BGColor:        [4]float64{1, 1, 0.933, 1},
 		BoxShadowX:     2,
 		BoxShadowY:     2,
@@ -122,7 +122,7 @@ func testBoxShadowInsetAfterBackground(t *testing.T) {
 		BoxShadowSet:   true,
 		BoxShadowRaw:   "inset 2pt 2pt 8pt #333",
 	}
-	boxNode := &box{style: &sty, w: 80, height: 30} //nolint:exhaustruct // geometry probe
+	boxNode := &box{style: &sty, w: 80, height: 30}
 	eng.prependChrome(0, boxNode, sty, 10, 20, 80, 30)
 
 	if len(eng.deferredChrome) != 1 {
@@ -142,8 +142,8 @@ func testBoxShadowInsetAfterBackground(t *testing.T) {
 func testBoxShadowInsetTopLeftRim(t *testing.T) {
 	t.Parallel()
 
-	eng := &engine{scale: 1, opts: Options{Background: true}} //nolint:exhaustruct // chrome probe
-	sty := ResolvedStyle{                                     //nolint:exhaustruct // shadow fields under test
+	eng := &engine{scale: 1, opts: Options{Background: true}}
+	sty := ResolvedStyle{
 		BGColor:        [4]float64{1, 1, 0.933, 1},
 		BoxShadowX:     2,
 		BoxShadowY:     2,
@@ -153,7 +153,7 @@ func testBoxShadowInsetTopLeftRim(t *testing.T) {
 		BoxShadowSet:   true,
 		BoxShadowRaw:   "inset 2pt 2pt 8pt #333",
 	}
-	boxNode := &box{style: &sty, w: 80, height: 30} //nolint:exhaustruct // geometry probe
+	boxNode := &box{style: &sty, w: 80, height: 30}
 	eng.prependChrome(0, boxNode, sty, 10, 20, 80, 30)
 	ops := eng.deferredChrome[0].ops
 
@@ -166,8 +166,8 @@ func testBoxShadowInsetTopLeftRim(t *testing.T) {
 func testBoxShadowSpreadFill(t *testing.T) {
 	t.Parallel()
 
-	eng := &engine{scale: 1, opts: Options{Background: true}} //nolint:exhaustruct // chrome probe
-	sty := ResolvedStyle{                                     //nolint:exhaustruct // shadow fields under test
+	eng := &engine{scale: 1, opts: Options{Background: true}}
+	sty := ResolvedStyle{
 		BGColor:         [4]float64{1, 1, 1, 1},
 		BoxShadowX:      2,
 		BoxShadowY:      2,
@@ -175,7 +175,7 @@ func testBoxShadowSpreadFill(t *testing.T) {
 		BoxShadowColor:  [3]float64{0, 0, 0},
 		BoxShadowSet:    true,
 	}
-	boxNode := &box{style: &sty, w: 100, height: 50} //nolint:exhaustruct // geometry probe
+	boxNode := &box{style: &sty, w: 100, height: 50}
 	eng.prependChrome(0, boxNode, sty, 10, 20, 100, 50)
 
 	if len(eng.deferredChrome) != 1 {
@@ -198,8 +198,8 @@ func TestBoxShadowBlurPaints(t *testing.T) {
 func testBoxShadowBlurStackedFills(t *testing.T) {
 	t.Parallel()
 
-	eng := &engine{scale: 1, opts: Options{Background: true}} //nolint:exhaustruct // chrome probe
-	sharp := ResolvedStyle{                                   //nolint:exhaustruct // shadow fields under test
+	eng := &engine{scale: 1, opts: Options{Background: true}}
+	sharp := ResolvedStyle{
 		BoxShadowX:     2,
 		BoxShadowY:     2,
 		BoxShadowColor: [3]float64{0, 0, 0},
@@ -207,7 +207,7 @@ func testBoxShadowBlurStackedFills(t *testing.T) {
 	}
 	soft := sharp
 	soft.BoxShadowBlur = 4
-	boxNode := &box{style: &sharp, w: 100, height: 50} //nolint:exhaustruct // geometry probe
+	boxNode := &box{style: &sharp, w: 100, height: 50}
 
 	eng.prependChrome(0, boxNode, sharp, 10, 20, 100, 50)
 	sharpFills := countBlackFills(eng.deferredChrome[0].ops)
@@ -264,15 +264,15 @@ body { margin: 0 }
 func testBoxShadowOffsetFill(t *testing.T) {
 	t.Parallel()
 
-	eng := &engine{scale: 1, opts: Options{Background: true}} //nolint:exhaustruct // chrome probe
-	sty := ResolvedStyle{                                     //nolint:exhaustruct // shadow fields under test
+	eng := &engine{scale: 1, opts: Options{Background: true}}
+	sty := ResolvedStyle{
 		BGColor:        [4]float64{1, 1, 1, 1},
 		BoxShadowX:     2,
 		BoxShadowY:     2,
 		BoxShadowColor: [3]float64{0, 0, 0},
 		BoxShadowSet:   true,
 	}
-	boxNode := &box{style: &sty, w: 100, height: 50} //nolint:exhaustruct // geometry probe
+	boxNode := &box{style: &sty, w: 100, height: 50}
 	eng.prependChrome(0, boxNode, sty, 10, 20, 100, 50)
 
 	if len(eng.deferredChrome) != 1 {
@@ -305,12 +305,12 @@ body { margin: 0 }
 func testBoxShadowRoundedFill(t *testing.T) {
 	t.Parallel()
 
-	eng := &engine{scale: 1, opts: Options{Background: true}} //nolint:exhaustruct // chrome probe
-	sty := ResolvedStyle{                                     //nolint:exhaustruct // rounded shadow fields under test
+	eng := &engine{scale: 1, opts: Options{Background: true}}
+	sty := ResolvedStyle{
 		BoxShadowX: 2, BoxShadowY: 2, BoxShadowColor: [3]float64{0, 0, 0}, BoxShadowSet: true,
 		BorderRadius: 8, BorderRadiusPercent: -1,
 	}
-	boxNode := &box{style: &sty, w: 100, height: 50} //nolint:exhaustruct // geometry probe
+	boxNode := &box{style: &sty, w: 100, height: 50}
 	eng.prependChrome(0, boxNode, sty, 10, 20, 100, 50)
 
 	for _, op := range eng.deferredChrome[0].ops {

@@ -1,4 +1,4 @@
-package settings //nolint:testpackage // exercises unexported key tables via getForKey
+package settings
 
 import (
 	"errors"
@@ -131,8 +131,8 @@ func globalDottedGeometryChecks(global *PdfGlobal) []dottedCheck {
 			check: func() bool { return math.Abs(global.Margin.Left-25.4) < 1e-6 },
 		},
 		{
-			key: "size.pagesize", val: "Letter", desc: "pagesize must be Letter on both homes",
-			check: func() bool { return global.PageSize == "Letter" },
+			key: "size.pagesize", val: "Letter", desc: "pagesize must store the canonical lowercase form",
+			check: func() bool { return global.PageSize == "letter" },
 		},
 		{
 			key: "size.width", val: "210mm", desc: "size.width must be 210mm",
@@ -230,6 +230,61 @@ func TestGlobalSetUnknownKey(t *testing.T) {
 	global := DefaultPdfGlobal()
 	if err := global.Set("bogus.key", "1"); err == nil {
 		t.Error("expected error for unknown key")
+	}
+}
+
+func TestCopiesSetterRange(t *testing.T) {
+	t.Parallel()
+
+	global := DefaultPdfGlobal()
+	if err := global.Set("copies", "0"); err == nil {
+		t.Error("copies=0 must be rejected at Set")
+	}
+
+	if err := global.Set("copies", "1001"); err == nil {
+		t.Error("copies=1001 must be rejected at Set")
+	}
+
+	if err := global.Set("copies", "3"); err != nil || global.Copies != 3 {
+		t.Errorf("copies=3 = %d, err %v", global.Copies, err)
+	}
+}
+
+func TestLoadTimeoutZoomSetterRange(t *testing.T) {
+	t.Parallel()
+
+	obj := DefaultPdfObject()
+	if err := obj.Set("load.timeout", "-30"); err == nil {
+		t.Error("timeout=-30 must be rejected at Set")
+	}
+
+	if err := obj.Set("load.timeout", "30"); err != nil || obj.Load.Timeout != 30 {
+		t.Errorf("timeout=30 = %d, err %v", obj.Load.Timeout, err)
+	}
+
+	if err := obj.Set("load.zoomfactor", "-1"); err == nil {
+		t.Error("zoomfactor=-1 must be rejected at Set")
+	}
+
+	if err := obj.Set("load.zoomfactor", "0.5"); err != nil || obj.Load.ZoomFactor != 0.5 {
+		t.Errorf("zoomfactor=0.5 = %v, err %v", obj.Load.ZoomFactor, err)
+	}
+}
+
+func TestImageQualitySetterRange(t *testing.T) {
+	t.Parallel()
+
+	img := DefaultImageGlobal()
+	if err := img.Set("quality", "999"); err == nil {
+		t.Error("quality=999 must be rejected at Set")
+	}
+
+	if err := img.Set("quality", "0"); err != nil || img.Quality != 0 {
+		t.Errorf("quality=0 = %d, err %v", img.Quality, err)
+	}
+
+	if err := img.Set("quality", "100"); err != nil || img.Quality != 100 {
+		t.Errorf("quality=100 = %d, err %v", img.Quality, err)
 	}
 }
 
@@ -406,8 +461,82 @@ func TestParseEnums(t *testing.T) {
 		t.Error("color-mode grayscale")
 	}
 
+	if v, _ := ParseColorMode("GRAYSCALE"); v != ColorModeGrayscale {
+		t.Error("color-mode grayscale must be case-insensitive")
+	}
+
+	if v, _ := ParseColorMode("Color"); v != ColorModeColor {
+		t.Error("color-mode color must be case-insensitive")
+	}
+
+	if v, err := ParseColorMode("sepia"); err == nil || v != ColorModeColor {
+		t.Error("invalid color-mode must error")
+	}
+
 	if v, _ := ParseLoadErrorHandling("skip"); v != LoadErrorSkip {
 		t.Error("load-error-handling skip")
+	}
+}
+
+func TestEnumStringReportsUnknownForInvalid(t *testing.T) {
+	t.Parallel()
+
+	if got := ColorMode(99).String(); got != sUnknown {
+		t.Errorf("ColorMode(99).String() = %q, want unknown", got)
+	}
+	if got := Orientation(99).String(); got != sUnknown { //nolint:wsl // test table
+		t.Errorf("Orientation(99).String() = %q, want unknown", got)
+	}
+	if got := LoadErrorHandling(42).String(); got != sUnknown { //nolint:wsl
+		t.Errorf("LoadErrorHandling(42).String() = %q, want unknown", got)
+	}
+	if got := MediaType(7).String(); got != sUnknown { //nolint:wsl
+		t.Errorf("MediaType(7).String() = %q, want unknown", got)
+	}
+}
+
+func TestMediaTypeZeroIsUnset(t *testing.T) {
+	t.Parallel()
+
+	if MediaType(0) != MediaUnset {
+		t.Fatalf("MediaType zero value = %d, want MediaUnset", MediaType(0))
+	}
+
+	// Unset falls through to the base; screen/print remain explicit.
+	if got := ResolveMedia(sScreen, Web{}, nil); got != sScreen {
+		t.Errorf("ResolveMedia(unset) = %q, want %q", got, sScreen)
+	}
+
+	printWeb := Web{MediaType: MediaPrint}
+	if got := ResolveMedia(sScreen, printWeb, nil); got != sPrint {
+		t.Errorf("ResolveMedia(print) = %q, want %q", got, sPrint)
+	}
+}
+
+func TestMarginEdgeUnknown(t *testing.T) {
+	t.Parallel()
+
+	global := DefaultPdfGlobal()
+	m := global.Margin //nolint:varnamelen // short name for margin in test
+
+	if err := marginSetter(&m, "side")("12mm"); err == nil {
+		t.Fatal("unknown margin edge must error")
+	}
+	if m != global.Margin { //nolint:wsl
+		t.Errorf("unknown edge must not mutate margins, got %+v want %+v", m, global.Margin)
+	}
+
+	ptr, ok := marginEdgePtr(&m, "side")
+	if ok || ptr != nil {
+		t.Errorf("marginEdgePtr(unknown) = (%v, %v), want (nil, false)", ptr, ok)
+	}
+
+	if _, ok := marginValue(&m, "side"); ok {
+		t.Error("marginValue(unknown) must report not-found")
+	}
+
+	if ptr, ok := marginEdgePtr(&m, "top"); !ok || ptr != &m.Top {
+		t.Errorf("marginEdgePtr(top) = (%v, %v), want (&m.Top, true)", ptr, ok)
 	}
 }
 
@@ -580,10 +709,10 @@ func TestResolveMedia(t *testing.T) {
 	t.Parallel()
 
 	base := sPrint
-	none := Web{}                            //nolint:exhaustruct // intentional zero/partial fields
-	pmt := Web{PrintMediaType: true}         //nolint:exhaustruct // intentional zero/partial fields
-	screen := Web{MediaType: MediaScreen}    //nolint:exhaustruct // intentional zero/partial fields
-	printMedia := Web{MediaType: MediaPrint} //nolint:exhaustruct // intentional zero/partial fields
+	none := Web{}
+	pmt := Web{PrintMediaType: true}
+	screen := Web{MediaType: MediaScreen}
+	printMedia := Web{MediaType: MediaPrint}
 
 	if got := ResolveMedia(base, none, nil); got != sPrint {
 		t.Errorf("default PDF = %q", got)

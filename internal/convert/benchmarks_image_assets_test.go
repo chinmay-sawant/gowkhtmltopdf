@@ -18,7 +18,7 @@ func BenchmarkImageAssets(b *testing.B) {
 	sources := make(map[int][]byte, len(benchmarkPageSizes))
 
 	for _, images := range benchmarkPageSizes {
-		sources[images] = executeBenchmarkTemplate(b, tpl, benchmarkTemplateData{ //nolint:exhaustruct,lll // intentional zero-value fields
+		sources[images] = executeBenchmarkTemplate(b, tpl, benchmarkTemplateData{ //nolint:lll // intentional zero-value fields
 			Images: benchmarkImages(images, imageURL),
 		})
 	}

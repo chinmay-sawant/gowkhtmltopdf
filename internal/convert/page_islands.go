@@ -38,6 +38,7 @@ func benchmarkPageIslandPlan(root *html.Node) (pageIslandPlan, bool) {
 	return pageIslandPlan{sections: plan.Sections}, true
 }
 
+//nolint:wsl // each island is an independent cancellation boundary.
 func renderBenchmarkPageIslands(
 	ctx context.Context, doc *pdf.Document, state *objectState, root *html.Node, plan pageIslandPlan,
 	render objectRenderContext, log io.Writer,
@@ -62,6 +63,9 @@ func renderBenchmarkPageIslands(
 	}
 
 	for index, section := range plan.sections {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("certified island assembly: %w", err)
+		}
 		if err := island.render(ctx, section); err != nil {
 			return err
 		}
@@ -86,26 +90,39 @@ type pageIslandRenderContext struct {
 	log       io.Writer
 }
 
+//nolint:funlen,wsl // one island owns layout, policy, paint, and navigation handoff.
 func (island pageIslandRenderContext) render(ctx context.Context, section *html.Node) error {
 	islandRoot := islands.Root(island.root, section)
 
-	res, err := layout.WithWorkspace(ctx, islandRoot, island.state.bodyLayoutOpts(
-		objectRenderContext{
-			global:             island.renderCtx.global,
-			obj:                island.renderCtx.obj,
-			font:               island.renderCtx.font,
-			registry:           island.renderCtx.registry,
-			sheets:             island.sheets,
-			zoom:               island.renderCtx.zoom,
-			imagesFn:           island.renderCtx.imagesFn,
-			printLinkUnderline: island.renderCtx.printLinkUnderline,
+	render := objectRenderContext{
+		global:             island.renderCtx.global,
+		obj:                island.renderCtx.obj,
+		font:               island.renderCtx.font,
+		registry:           island.renderCtx.registry,
+		sheets:             island.sheets,
+		zoom:               island.renderCtx.zoom,
+		imagesFn:           island.renderCtx.imagesFn,
+		printLinkUnderline: island.renderCtx.printLinkUnderline,
+	}
+	res, render, err := layoutBody(
+		ctx,
+		island.state,
+		render,
+		island.log,
+		func(options layout.Options) (*layout.Result, error) {
+			return layout.WithWorkspace(ctx, islandRoot, options, island.workspace)
 		},
-	), island.workspace)
+		island.workspace.Release,
+	)
 	if err != nil {
 		return fmt.Errorf("layout certified page island: %w", err)
 	}
 
 	defer island.workspace.Release(res)
+
+	if err := applyBodyPolicies(ctx, island.state, render, res); err != nil {
+		return fmt.Errorf("policy certified page island: %w", err)
+	}
 
 	before := island.doc.PageCount()
 

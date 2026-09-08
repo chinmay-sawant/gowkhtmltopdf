@@ -62,7 +62,7 @@ type flexPlacedItem struct {
 func (e *engine) buildFlex(node *html.Node, sty ResolvedStyle, availW, x, posY float64) *box {
 	ml := e.scalePt(sty.MarginLeft)
 	boxNode := &box{ //nolint:exhaustruct // intentional zero fields
-		node: node, style: e.stylePtr(node), kind: displayBlock, x: x + ml, y: posY,
+		node: node, style: e.stylePtr(node), kind: boxKindBlock, x: x + ml, y: posY,
 	}
 	boxNode.w = resolveUsedWidth(sty, availW, e)
 
@@ -72,7 +72,7 @@ func (e *engine) buildFlex(node *html.Node, sty ResolvedStyle, availW, x, posY f
 		}
 	}
 
-	contentX, contentW := e.contentBox(boxNode.x, boxNode.w, sty)
+	contentX, contentW := e.contentBox(boxNode.x, boxNode.w, boxModelStyleOf(&sty))
 
 	contentStart := len(e.ops)
 	curY := e.scalePt(sty.PaddingTop) + e.scalePt(sty.BorderTop.Width)
@@ -230,7 +230,14 @@ func (e *engine) flowFlexRow(
 
 	placed := make([]flexLinePlace, 0, len(lines))
 
+	poll := newCtxPoll(e.ctx)
 	for lidx, line := range lines {
+		if poll.poll() {
+			e.err = poll.err
+
+			return curY
+		}
+
 		startChild := 0
 		if parent != nil {
 			startChild = len(parent.children)
@@ -309,7 +316,14 @@ func (e *engine) flexWrapLines(
 	line := make([]flexMeas, 0, len(items))
 	used := 0.0
 
+	poll := newCtxPoll(e.ctx)
 	for _, item := range items {
+		if poll.poll() {
+			e.err = poll.err
+
+			return nil
+		}
+
 		need := item.hypotheticalW
 		if len(line) > 0 {
 			need += colGap
@@ -1114,7 +1128,14 @@ func (e *engine) buildRowItems(
 	rowH := 0.0
 	leftX := startX
 
+	poll := newCtxPoll(e.ctx)
 	for idx, item := range items {
+		if poll.poll() {
+			e.err = poll.err
+
+			return nil, rowH
+		}
+
 		cstate := e.styles[item.n]
 
 		forceStretch := flexItemCrossStretch(style, *cstate) && targetCross > 0
@@ -1496,7 +1517,14 @@ func (e *engine) buildColumnItems(
 	leftY := startY
 	endY := curY
 	autoMargins := 0
+	poll := newCtxPoll(e.ctx)
 	for _, item := range items {
+		if poll.poll() {
+			e.err = poll.err
+
+			return endY
+		}
+
 		itemStyle := e.styles[item.n]
 		if itemStyle.MarginTopAuto {
 			autoMargins++

@@ -1,4 +1,4 @@
-package layout //nolint:testpackage // page-name tests inspect unexported layout state
+package layout
 
 import (
 	"testing"

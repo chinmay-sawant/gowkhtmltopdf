@@ -1,4 +1,4 @@
-package layout //nolint:testpackage // internal paint order test
+package layout
 
 import "testing"
 
@@ -6,11 +6,11 @@ func TestPaintOrderSharedPolicyKeepsStableMetadataOrder(t *testing.T) {
 	t.Parallel()
 
 	ops := []Op{
-		{Kind: OpText, ZIndexSet: true},     //nolint:exhaustruct // ordering-only operation
-		{Kind: OpFillRect, ZIndexSet: true}, //nolint:exhaustruct // ordering-only operation
-		{Kind: OpText, ZIndexSet: true},     //nolint:exhaustruct // ordering-only operation
-		{Kind: OpFillRect, ZIndexSet: true}, //nolint:exhaustruct // ordering-only operation
-		{Kind: OpLinkURI, ZIndexSet: true},  //nolint:exhaustruct // metadata-only operation
+		{Kind: OpText, ZIndexSet: true},
+		{Kind: OpFillRect, ZIndexSet: true},
+		{Kind: OpText, ZIndexSet: true},
+		{Kind: OpFillRect, ZIndexSet: true},
+		{Kind: OpLinkURI, ZIndexSet: true},
 	}
 	// The test intentionally sets the actual z-index values below after the
 	// compact literals keep the operation kinds easy to scan.

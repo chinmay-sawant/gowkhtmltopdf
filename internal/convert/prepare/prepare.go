@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
+	"strings"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/errs"
@@ -21,6 +23,10 @@ var (
 	errNoResourceLoader = errors.New("convert: resource context has no loader")
 	errNilLoader        = load.ErrNilLoader
 	errNilContext       = errs.ErrNilContext
+	// Static validation errors: dynamic values wrap with %w at the return
+	// site so messages keep their detail.
+	errInvalidViewport  = errors.New("convert: viewport must be finite and non-negative")
+	errInvalidMediaType = errors.New("convert: media type")
 )
 
 // ResourceContext is the preparation-side behaviour around one load
@@ -48,6 +54,13 @@ type ResourceContext struct {
 
 // NewResourceContext creates the resource seam shared by PDF and image
 // preparation.
+//
+// A nil loader produces a degraded context (ready=false): Bound returns the
+// zero resource context, Fetch fails with errNoResourceLoader, and
+// CollectSheets / MergeFontFaces no-op (nil sheets, unchanged registry).
+// This matches the legacy warn-and-continue callers. Document rejects nil
+// loaders before construction, so new code should go through Document and
+// treat a degraded context as a construction mistake, not a feature.
 //
 //nolint:wsl // extracted preparation flow
 func NewResourceContext(loader *load.Loader, base string, loadPage settings.LoadPage) ResourceContext {
@@ -143,6 +156,29 @@ type Options struct {
 	SimplifyProfile string
 }
 
+// validate rejects viewport and media values that would silently mis-gate
+// stylesheet collection. A zero viewport is allowed (callers may leave it
+// to the engine default); negative or non-finite values and unknown media
+// types are caller mistakes and fail fast instead of producing empty
+// stylesheet gating.
+func (o Options) validate() error {
+	if !finiteNonNegative(o.ViewportW) || !finiteNonNegative(o.ViewportH) {
+		return fmt.Errorf("%w, got %g x %g",
+			errInvalidViewport, o.ViewportW, o.ViewportH)
+	}
+
+	switch strings.ToLower(strings.TrimSpace(o.MediaType)) {
+	case "", "print", "screen":
+		return nil
+	default:
+		return fmt.Errorf("%w %q is not print or screen", errInvalidMediaType, o.MediaType)
+	}
+}
+
+func finiteNonNegative(value float64) bool {
+	return !math.IsNaN(value) && !math.IsInf(value, 0) && value >= 0
+}
+
 // Prepared is the output of the shared load/parse/resource phase.
 type Prepared struct {
 	Resource  *load.Resource
@@ -162,6 +198,10 @@ func Document(ctx context.Context, loader *load.Loader, page string, loadPage se
 	}
 	if ctx == nil {
 		return nil, errNilContext
+	}
+
+	if err := opts.validate(); err != nil {
+		return nil, err
 	}
 
 	res, err := loader.Load(ctx, page, loadPage)

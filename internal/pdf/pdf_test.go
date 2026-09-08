@@ -1,4 +1,3 @@
-//nolint:testpackage,exhaustruct // tests reach into unexported state
 package pdf
 
 import (
@@ -81,7 +80,7 @@ func TestDeterministicOutput(t *testing.T) {
 		cur.TextAt(10, 20)
 		cur.TextShow("hello")
 		cur.EndText()
-		data.SetOutline(&Outline{ //nolint:exhaustruct // intentional zero-value fields
+		data.SetOutline(&Outline{
 			Title:    "root",
 			Children: []*Outline{{Title: "child"}},
 		})
@@ -369,13 +368,13 @@ func TestOutlines(t *testing.T) {
 	data.SetCompression(false)
 	data.AddPage(200, 200)
 
-	child := &Outline{ //nolint:exhaustruct // intentional zero-value fields
+	child := &Outline{
 		Title:   "child",
 		PageRef: "4 0 R",
 		X:       10,
 		Y:       100,
 	}
-	data.SetOutline(&Outline{ //nolint:exhaustruct // intentional zero-value fields
+	data.SetOutline(&Outline{
 		Title:    "root",
 		Children: []*Outline{{Title: "first", Children: []*Outline{child}}, {Title: "second"}},
 	})
@@ -443,9 +442,9 @@ func TestInfoDict(t *testing.T) {
 func TestOutlineCountAndSort(t *testing.T) {
 	t.Parallel()
 
-	arg := &Outline{Title: "a", PageRef: "2 0 R", Y: 10} //nolint:exhaustruct // intentional zero-value fields
-	b := &Outline{Title: "b", PageRef: "2 0 R", Y: 5}    //nolint:exhaustruct // intentional zero-value fields
-	c := &Outline{Title: "c", PageRef: "1 0 R", Y: 3}    //nolint:exhaustruct // intentional zero-value fields
+	arg := &Outline{Title: "a", PageRef: "2 0 R", Y: 10}
+	b := &Outline{Title: "b", PageRef: "2 0 R", Y: 5}
+	c := &Outline{Title: "c", PageRef: "1 0 R", Y: 3}
 	nodes := []*Outline{arg, b, c}
 	SortOutlines(nodes)
 
@@ -453,7 +452,7 @@ func TestOutlineCountAndSort(t *testing.T) {
 		t.Errorf("sort order wrong: %q %q %q", nodes[0].Title, nodes[1].Title, nodes[2].Title)
 	}
 
-	if got := outlineCount(&Outline{ //nolint:exhaustruct // intentional zero-value fields
+	if got := outlineCount(&Outline{
 		Children: []*Outline{{}, {Children: []*Outline{{}}}},
 	}); got != 3 {
 		t.Errorf("outlineCount = %d, want 3", got)
@@ -520,7 +519,7 @@ func TestOutlineBadPageRefFails(t *testing.T) {
 	for _, ref := range []string{"", "999999 0 R", "garbage", "4 0 X", "0 0 R"} {
 		data := fixedDoc(t)
 		data.AddPage(200, 200)
-		data.SetOutline(&Outline{ //nolint:exhaustruct // intentional zero-value fields
+		data.SetOutline(&Outline{
 			Title:    "root",
 			Children: []*Outline{{Title: "bad", PageRef: ref}},
 		})
@@ -544,7 +543,7 @@ func TestOutlineBadPageRefFails(t *testing.T) {
 	doc := fixedDoc(t)
 	doc.SetCompression(false)
 	doc.AddPage(200, 200)
-	doc.SetOutline(&Outline{ //nolint:exhaustruct // intentional zero-value fields
+	doc.SetOutline(&Outline{
 		Title:    "root",
 		Children: []*Outline{{Title: "ok", PageRef: "1 0 R", X: 5, Y: 6}},
 	})
@@ -854,7 +853,7 @@ func TestPDF17RichDocument(t *testing.T) {
 	content2.EndText()
 
 	// 6. Outline hierarchy
-	rootOutline := &Outline{ //nolint:exhaustruct // intentional zero-value fields
+	rootOutline := &Outline{
 		Title: "root",
 		Children: []*Outline{
 			{
@@ -1029,7 +1028,7 @@ func TestPDF17RichDocument(t *testing.T) {
 	c2_2.TextShow("Destination Page 2 Content")
 	c2_2.EndText()
 
-	doc2.SetOutline(&Outline{ //nolint:exhaustruct // intentional zero-value fields
+	doc2.SetOutline(&Outline{
 		Title: "root",
 		Children: []*Outline{
 			{

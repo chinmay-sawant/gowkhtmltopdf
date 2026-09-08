@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -49,9 +48,9 @@ func TestStickySectionChromeRepairUsesContainingBlock(t *testing.T) { //nolint:f
 
 	borderRGB := [3]float64{0.271, 0.353, 0.392}
 	background := [4]float64{0.925, 0.937, 0.945, 1}
-	section := &box{ //nolint:exhaustruct // intentional zero fields
+	section := &box{
 		x: 10, y: 0, w: 100,
-		style: &ResolvedStyle{ //nolint:exhaustruct // intentional zero fields
+		style: &ResolvedStyle{
 			BGColor:      background,
 			BorderLeft:   border{Width: 1, PaintWidth: 1, Style: "solid", Color: borderRGB},
 			BorderRight:  border{Width: 1, PaintWidth: 1, Style: "solid", Color: borderRGB},
@@ -59,39 +58,39 @@ func TestStickySectionChromeRepairUsesContainingBlock(t *testing.T) { //nolint:f
 		},
 	}
 	section.children = []*box{{sticky: true}}
-	root := &box{ //nolint:exhaustruct // intentional zero fields
+	root := &box{
 		children: []*box{section},
 	}
 
-	priorFill := Op{ //nolint:exhaustruct // intentional zero fields
+	priorFill := Op{
 		Kind: OpFillRect, X: 10, Y: 0, W: 100, H: 50, R: background[0], G: background[1], B: background[2],
 	}
 
-	targetFill := Op{ //nolint:exhaustruct // intentional zero fields
+	targetFill := Op{
 		Kind: OpFillRect, X: 10, Y: 100, W: 100, H: 50, R: background[0], G: background[1], B: background[2],
 	}
 
-	targetLeft := Op{ //nolint:exhaustruct // intentional zero fields
+	targetLeft := Op{
 		Kind: OpLine, X: 10, Y: 100, H: 50, R: borderRGB[0], G: borderRGB[1], B: borderRGB[2],
 	}
 
-	targetRight := Op{ //nolint:exhaustruct // intentional zero fields
+	targetRight := Op{
 		Kind: OpLine, X: 110, Y: 100, H: 50, R: borderRGB[0], G: borderRGB[1], B: borderRGB[2],
 	}
 
-	targetBottom := Op{ //nolint:exhaustruct // intentional zero fields
+	targetBottom := Op{
 		Kind: OpLine, X: 10, Y: 180, W: 100, R: borderRGB[0], G: borderRGB[1], B: borderRGB[2],
 	}
 
-	unrelatedFill := Op{ //nolint:exhaustruct // intentional zero fields
+	unrelatedFill := Op{
 		Kind: OpFillRect, X: 200, Y: 100, W: 300, H: 50, R: background[0], G: background[1], B: background[2],
 	}
 
-	unrelatedBottom := Op{ //nolint:exhaustruct // intentional zero fields
+	unrelatedBottom := Op{
 		Kind: OpLine, X: 200, Y: 180, W: 300, R: borderRGB[0], G: borderRGB[1], B: borderRGB[2],
 	}
 
-	res := &Result{ //nolint:exhaustruct // intentional zero fields
+	res := &Result{
 		root: root,
 		Ops:  []Op{priorFill, targetFill, targetLeft, targetRight, targetBottom, unrelatedFill, unrelatedBottom},
 	}
@@ -153,7 +152,7 @@ func paintGoldenFixture(t *testing.T, name string) (*Result, float64) {
 	mat := 28.35
 	contentH := pageH - 2*mat
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: pageW - 2*mat, Height: contentH, Background: true,
 		Sheets: []*css.Stylesheet{sheet}, Media: "print",
 	})

@@ -1,4 +1,3 @@
-//nolint:testpackage // white-box tests need the ACL merge helper and Run internals
 package imageout
 
 import (
@@ -66,7 +65,10 @@ func collectFontLayout(
 ) (*layout.Result, *pdf.Registry) {
 	t.Helper()
 
-	loader := load.NewLoader(imageLoadGlobalCmd(cmd))
+	loader, err := load.NewLoaderWithError(imageLoadGlobalCmd(cmd))
+	if err != nil {
+		t.Fatalf("new loader: %v", err)
+	}
 
 	res, err := loader.Load(t.Context(), htmlPath, cmd.Objects[0].Load)
 	if err != nil {
@@ -84,7 +86,7 @@ func collectFontLayout(
 		root,
 		res.Base,
 		cmd.Objects[0].Load,
-		prepare.SheetOptions{ //nolint:exhaustruct // intentional zero/partial fields
+		prepare.SheetOptions{
 			ViewportW: 768, ViewportH: 576, MediaType: "screen",
 		},
 		io.Discard,
@@ -97,7 +99,7 @@ func collectFontLayout(
 		t.Fatalf("default font: %v", err)
 	}
 
-	lay, err := layout.Layout(root, layout.Options{ //nolint:exhaustruct // intentional zero/partial fields
+	lay, err := layout.Layout(root, layout.Options{
 		Width: 200 * 0.75, Height: 200 * 0.75,
 		Font: def, Registry: reg, Sheets: sheets, Background: true,
 	})
@@ -196,11 +198,11 @@ func TestFontFaceACLDeny(t *testing.T) {
 	}
 
 	pngOut := filepath.Join(t.TempDir(), "out.png")
-	cmd := &cli.Command{ //nolint:exhaustruct // intentional zero/partial fields
+	cmd := &cli.Command{
 		Global: settings.DefaultPdfGlobal(),
 		Image:  settings.DefaultImageGlobal(),
 		Objects: []settings.PdfObject{
-			{Page: htmlPath, Load: settings.DefaultLoadPage()}, //nolint:exhaustruct // intentional zero/partial fields
+			{Page: htmlPath, Load: settings.DefaultLoadPage()},
 		},
 		Output: pngOut,
 	}

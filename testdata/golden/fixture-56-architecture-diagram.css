@@ -1387,15 +1387,10 @@ section.d06 .d06-here {
   font-weight: 700;
 }
 
-/* Chevron drawn with borders + transform rotate (no unicode glyph needed).
-   If transform is dropped the element degrades to a small square - acceptable. */
 section.d06 .d06-arrow {
   display: inline-block;
-  width: 0.5em;
-  height: 0.5em;
-  border-top: 2px solid var(--muted);
-  border-right: 2px solid var(--muted);
-  transform: rotate(45deg);
+  color: var(--muted);
+  font-weight: 700;
   margin: 0 0.1em;
 }
 

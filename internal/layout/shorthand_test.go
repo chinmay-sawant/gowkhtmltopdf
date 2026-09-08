@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported shorthand expansion
 package layout
 
 import (

@@ -1,4 +1,4 @@
-//nolint:testpackage,wsl,varnamelen,funlen,paralleltest,err113 // list-style-image probes
+//nolint:wsl,varnamelen,funlen,paralleltest,err113 // list-style-image probes
 package layout
 
 import (
@@ -100,7 +100,7 @@ func testListStyleImagePaints(t *testing.T) {
 
 		return png, nil
 	})
-	sty := ResolvedStyle{ //nolint:exhaustruct // image marker fields under test
+	sty := ResolvedStyle{
 		ListStyleImage: `url("x.png")`,
 		FontSize:       12,
 	}
@@ -123,7 +123,7 @@ func testListStyleImagePaints(t *testing.T) {
 		t.Errorf("fetched = %q, want [x.png]", fetched)
 	}
 
-	if bullets := opsOfKind(&Result{Ops: eng.ops}, OpBullet); len(bullets) != 0 { //nolint:exhaustruct // ops only
+	if bullets := opsOfKind(&Result{Ops: eng.ops}, OpBullet); len(bullets) != 0 {
 		t.Fatalf("image marker also painted type bullets = %+v", bullets)
 	}
 }
@@ -134,18 +134,18 @@ func testListStyleImageMissingFallsBack(t *testing.T) {
 	eng := newBackgroundImageEngine(func(string) ([]byte, error) {
 		return nil, errors.New("missing")
 	})
-	sty := ResolvedStyle{ //nolint:exhaustruct // missing fetch falls back to disc
+	sty := ResolvedStyle{
 		ListStyleImage: "missing.png",
 		ListStyleType:  listStyleDisc,
 		FontSize:       12,
 	}
 	eng.emitListMarker(nil, sty, 40, 30)
 
-	if images := opsOfKind(&Result{Ops: eng.ops}, OpImage); len(images) != 0 { //nolint:exhaustruct // ops only
+	if images := opsOfKind(&Result{Ops: eng.ops}, OpImage); len(images) != 0 {
 		t.Fatalf("missing image still painted OpImage = %+v", images)
 	}
 
-	bullets := opsOfKind(&Result{Ops: eng.ops}, OpBullet) //nolint:exhaustruct // ops only
+	bullets := opsOfKind(&Result{Ops: eng.ops}, OpBullet)
 	if len(bullets) != 1 {
 		t.Fatalf("missing image bullets = %+v, want 1 type marker", bullets)
 	}
@@ -164,7 +164,7 @@ func testListStyleImageNoneClears(t *testing.T) {
 
 		return tinyPNG(2, 2), nil
 	})
-	sty := ResolvedStyle{ //nolint:exhaustruct // none must not fetch
+	sty := ResolvedStyle{
 		ListStyleImage: "",
 		ListStyleType:  listStyleDisc,
 		FontSize:       12,
@@ -181,11 +181,11 @@ func testListStyleImageNoneClears(t *testing.T) {
 		t.Fatal("list-style-image:none still fetched")
 	}
 
-	if images := opsOfKind(&Result{Ops: eng.ops}, OpImage); len(images) != 0 { //nolint:exhaustruct // ops only
+	if images := opsOfKind(&Result{Ops: eng.ops}, OpImage); len(images) != 0 {
 		t.Fatalf("none painted OpImage = %+v", images)
 	}
 
-	if bullets := opsOfKind(&Result{Ops: eng.ops}, OpBullet); len(bullets) != 1 { //nolint:exhaustruct // ops only
+	if bullets := opsOfKind(&Result{Ops: eng.ops}, OpBullet); len(bullets) != 1 {
 		t.Fatalf("none bullets = %+v, want 1 type marker", bullets)
 	}
 }
@@ -198,7 +198,7 @@ func testListStyleImagePosition(t *testing.T) {
 		eng := newBackgroundImageEngine(func(string) ([]byte, error) {
 			return png, nil
 		})
-		sty := ResolvedStyle{ //nolint:exhaustruct // position vs image marker X
+		sty := ResolvedStyle{
 			ListStyleImage:    "x.png",
 			ListStylePosition: position,
 			FontSize:          12,
@@ -270,7 +270,7 @@ func layoutListStyleImage(
 	t.Helper()
 
 	root := mustParse(t, src)
-	res, err := Layout(root, Options{ //nolint:exhaustruct // viewport plus image fetch
+	res, err := Layout(root, Options{
 		Width: testViewport, Height: 800, Sheets: sheets, Background: true,
 		Images: func(src string) ([]byte, error) {
 			if wantSrc != "" && src != wantSrc {

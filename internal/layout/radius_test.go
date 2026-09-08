@@ -1,4 +1,4 @@
-//nolint:testpackage,wsl // radius slash / elliptical longhand proofs
+//nolint:wsl // radius slash / elliptical longhand proofs
 package layout
 
 import (
@@ -147,5 +147,5 @@ func redFillOp(t *testing.T, ops []Op) Op {
 
 	t.Fatal("missing red fill op")
 
-	return Op{} //nolint:exhaustruct // unreachable
+	return Op{}
 }

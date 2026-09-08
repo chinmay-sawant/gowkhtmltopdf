@@ -1,4 +1,4 @@
-//nolint:testpackage,exhaustruct,cyclop,funlen,varnamelen,wsl,lll,exhaustive,nlreturn // tests exercise unexported tagging internals
+//nolint:cyclop,funlen,varnamelen,wsl,exhaustive,nlreturn // tests exercise unexported tagging internals
 package layout
 
 import (
@@ -7,7 +7,7 @@ import (
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
 )
 
-//nolint:cyclop,funlen,varnamelen,wsl,lll,exhaustive,nlreturn,exhaustruct
+//nolint:cyclop,funlen,varnamelen,wsl,exhaustive,nlreturn
 func TestStructureTreeTableHierarchy(t *testing.T) {
 	t.Parallel()
 
@@ -113,7 +113,7 @@ th, td { border: 1px solid #ccc; padding: 4pt }
 	}
 }
 
-//nolint:cyclop,funlen,varnamelen,wsl,lll,exhaustive,nlreturn,exhaustruct
+//nolint:cyclop,funlen,varnamelen,wsl,exhaustive,nlreturn
 func TestStructureTreeListTagging(t *testing.T) {
 	t.Parallel()
 
@@ -213,7 +213,7 @@ func TestStructureTreeListTagging(t *testing.T) {
 	}
 }
 
-//nolint:cyclop,funlen,varnamelen,wsl,lll,exhaustive,nlreturn,exhaustruct
+//nolint:cyclop,funlen,varnamelen,wsl,exhaustive,nlreturn
 func TestStructureTreeHeadingNormalization(t *testing.T) {
 	t.Parallel()
 
@@ -319,7 +319,7 @@ func dumpBoxTree(b *box, indent string) string {
 		}
 	}
 
-	out := indent + name + " kind=" + b.kind + "\n"
+	out := indent + name + " kind=" + b.kind.String() + "\n"
 	for _, child := range b.children {
 		out += dumpBoxTree(child, indent+"  ")
 	}
@@ -375,7 +375,7 @@ func assertListHierarchy(t *testing.T, elem *pdf.StructElem) {
 	}
 }
 
-//nolint:cyclop,funlen,varnamelen,wsl,lll,exhaustive,nlreturn,exhaustruct
+//nolint:cyclop,funlen,varnamelen,wsl,exhaustive,nlreturn
 func TestStructureTreeListLinkHierarchy(t *testing.T) {
 	t.Parallel()
 

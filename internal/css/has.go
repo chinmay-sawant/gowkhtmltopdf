@@ -1,6 +1,7 @@
 package css
 
 import (
+	"iter"
 	"strings"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
@@ -16,10 +17,12 @@ func matchingParen(str string, open int) (int, bool) {
 
 	depth := 0
 
-	for idx := open; idx < len(str); idx++ {
+	for idx := open; idx < len(str); {
 		switch str[idx] {
 		case '"', '\'':
 			idx = skipQuoted(str, idx, str[idx])
+
+			continue
 		case '(':
 			depth++
 		case ')':
@@ -28,6 +31,8 @@ func matchingParen(str string, open int) (int, bool) {
 				return idx, true
 			}
 		}
+
+		idx++
 	}
 
 	return -1, false
@@ -108,7 +113,17 @@ func parseSelectorCtx(str string, insideHas bool) (Selector, bool) {
 		sel.Parts = append(sel.Parts, part)
 	}
 
-	return sel, len(sel.Parts) > 0
+	if len(sel.Parts) == 0 {
+		return sel, false
+	}
+
+	// Cache specificity at parse time so nested selectors (:has/:not/:is
+	// arguments) do not recompute it on every match.
+	a, b, c := computeSpecificity(sel)
+	sel.spec = [3]int{a, b, c}
+	sel.specValid = true
+
+	return sel, true
 }
 
 // combinatorFor maps a chain separator to the combinator stored on the part
@@ -211,7 +226,7 @@ func matchRelative(rel RelativeSelector, subject *html.Node) bool {
 // sel with its leftmost-match element anchored at subject (directly when
 // direct is true, or anywhere beneath it otherwise).
 func matchRelativeDescendant(sel Selector, subject *html.Node, direct bool) bool {
-	for _, d := range elementDescendants(subject) {
+	for d := range elementDescendants(subject) {
 		if !Match(sel, d) {
 			continue
 		}
@@ -240,8 +255,12 @@ func matchRelativeFrom(sel Selector, anchor *html.Node) bool {
 		return false
 	}
 
-	cands := append([]*html.Node{anchor}, elementDescendants(anchor)...)
-	for _, d := range cands {
+	// The anchor itself is a candidate before any of its descendants.
+	if Match(sel, anchor) && leftmostMatch(sel, anchor) == anchor {
+		return true
+	}
+
+	for d := range elementDescendants(anchor) {
 		if Match(sel, d) && leftmostMatch(sel, d) == anchor {
 			return true
 		}
@@ -250,26 +269,32 @@ func matchRelativeFrom(sel Selector, anchor *html.Node) bool {
 	return false
 }
 
-func elementDescendants(count *html.Node) []*html.Node {
-	var out []*html.Node
+// elementDescendants yields every element descendant of count in depth-first
+// pre-order. It is a lazy walk: callers stop as soon as they have a match
+// instead of materializing the whole subtree per subject.
+func elementDescendants(count *html.Node) iter.Seq[*html.Node] {
+	return func(yield func(*html.Node) bool) {
+		var walk func(*html.Node) bool
 
-	var walk func(*html.Node)
+		walk = func(node *html.Node) bool {
+			for _, cur := range node.Children {
+				if cur.Type != html.ElementNode {
+					continue
+				}
 
-	walk = func(node *html.Node) {
-		for _, cur := range node.Children {
-			if cur.Type != html.ElementNode {
-				continue
+				// Short-circuit keeps the walk lazy: a false yield or a
+				// stopped subtree both end the sequence.
+				if !yield(cur) || !walk(cur) {
+					return false
+				}
 			}
 
-			out = append(out, cur)
-			walk(cur)
+			return true
+		}
+		if count != nil {
+			walk(count)
 		}
 	}
-	if count != nil {
-		walk(count)
-	}
-
-	return out
 }
 
 func isElementDescendant(n, ancestor *html.Node) bool {
