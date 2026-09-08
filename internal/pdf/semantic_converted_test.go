@@ -25,30 +25,30 @@ func TestSemanticPDFOracleConvertedFixtures(t *testing.T) {
 		image    bool
 		dest     bool
 	}{
-		{ //nolint:exhaustruct // zero-value fields not exercised by this case
+		{
 			file:     "fixture-01-simple-invoice.html",
 			minPages: 1,
 			needles:  []string{"Invoice", "234.40"},
 		},
-		{ //nolint:exhaustruct // zero-value fields not exercised by this case
+		{
 			file:     "fixture-06-external-link.html",
 			minPages: 1,
 			needles:  []string{"Partner Handbook"},
 			uri:      true,
 		},
-		{ //nolint:exhaustruct // zero-value fields not exercised by this case
+		{
 			file:     "fixture-07-image-logo.html",
 			minPages: 1,
 			needles:  []string{"Nordwind"},
 			image:    true,
 		},
-		{ //nolint:exhaustruct // zero-value fields not exercised by this case
+		{
 			file:     "fixture-24-internal-anchors.html",
 			minPages: 2,
 			needles:  []string{"Internal link report", "Appendix"},
 			dest:     true,
 		},
-		{ //nolint:exhaustruct // zero-value fields not exercised by this case
+		{
 			file:     "fixture-55-lantern-cooperative-report.html",
 			minPages: 3,
 			needles:  []string{"NORTHLINE"},
@@ -115,30 +115,30 @@ func TestSemanticPDF17OracleConvertedFixtures(t *testing.T) {
 		image    bool
 		dest     bool
 	}{
-		{ //nolint:exhaustruct // zero-value fields not exercised by this case
+		{
 			file:     "fixture-01-simple-invoice.html",
 			minPages: 1,
 			needles:  []string{"Invoice", "234.40"},
 		},
-		{ //nolint:exhaustruct // zero-value fields not exercised by this case
+		{
 			file:     "fixture-06-external-link.html",
 			minPages: 1,
 			needles:  []string{"Partner Handbook"},
 			uri:      true,
 		},
-		{ //nolint:exhaustruct // zero-value fields not exercised by this case
+		{
 			file:     "fixture-07-image-logo.html",
 			minPages: 1,
 			needles:  []string{"Nordwind"},
 			image:    true,
 		},
-		{ //nolint:exhaustruct // zero-value fields not exercised by this case
+		{
 			file:     "fixture-24-internal-anchors.html",
 			minPages: 2,
 			needles:  []string{"Internal link report", "Appendix"},
 			dest:     true,
 		},
-		{ //nolint:exhaustruct // zero-value fields not exercised by this case
+		{
 			file:     "fixture-55-lantern-cooperative-report.html",
 			minPages: 3,
 			needles:  []string{"NORTHLINE"},
@@ -206,24 +206,24 @@ func TestSemanticPDF20OracleConvertedFixtures(t *testing.T) {
 		image    bool
 		dest     bool
 	}{
-		{ //nolint:exhaustruct // zero-value fields not exercised by this case
+		{
 			file:     "fixture-01-simple-invoice.html",
 			minPages: 1,
 			needles:  []string{"Invoice", "234.40"},
 		},
-		{ //nolint:exhaustruct // zero-value fields not exercised by this case
+		{
 			file:     "fixture-06-external-link.html",
 			minPages: 1,
 			needles:  []string{"Partner Handbook"},
 			uri:      true,
 		},
-		{ //nolint:exhaustruct // zero-value fields not exercised by this case
+		{
 			file:     "fixture-07-image-logo.html",
 			minPages: 1,
 			needles:  []string{"Nordwind"},
 			image:    true,
 		},
-		{ //nolint:exhaustruct // zero-value fields not exercised by this case
+		{
 			file:     "fixture-24-internal-anchors.html",
 			minPages: 2,
 			needles:  []string{"Internal link report", "Appendix"},

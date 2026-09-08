@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -60,7 +59,7 @@ p::before { content: ''; display: block; width: 120pt; overflow: hidden; page-br
 		t.Fatalf("p width=%.1f leaked from p::before", st.Width)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: contentW, Height: 800, Sheets: []*css.Stylesheet{cssSheet},
 		Media: "print", Background: true,
 	})

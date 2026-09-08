@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -16,7 +15,7 @@ func TestRealBoldFaceOps(t *testing.T) { //nolint:cyclop
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 400, Height: 400, Background: true,
 	})
 	if err != nil {
@@ -65,7 +64,7 @@ func TestCoalesceSameStyleWords(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{Width: 500, Height: 200}) //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{Width: 500, Height: 200})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +96,7 @@ func TestNthChildZebraSheet(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 300, Height: 400,
 		Sheets:     []*css.Stylesheet{sheet},
 		Background: true,

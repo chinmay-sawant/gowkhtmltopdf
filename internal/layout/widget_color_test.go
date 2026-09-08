@@ -1,4 +1,3 @@
-//nolint:testpackage // layoutHTML/sheet test helpers and Result.Ops internals are tested from the same package
 package layout
 
 import (

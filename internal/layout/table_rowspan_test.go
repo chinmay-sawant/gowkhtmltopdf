@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -30,7 +29,7 @@ td, th { border: 1px solid #aaa; padding: 2pt; text-align: left; }
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 500, Height: 400, Sheets: []*css.Stylesheet{cssSheet},
 		Media: "print", Background: true,
 	})
@@ -114,7 +113,7 @@ td, th { border: 1px solid #333; padding: 3pt; }
 
 	const pageH = 400.0
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 500, Height: pageH, Sheets: []*css.Stylesheet{cssSheet},
 		Media: "print", Background: true,
 	})

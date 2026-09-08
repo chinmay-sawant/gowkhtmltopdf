@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -167,7 +166,7 @@ func TestOverflowWrapInheritsToText(t *testing.T) {
 
 	const contentW = 280.0
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: contentW, Height: 800, Sheets: []*css.Stylesheet{cssSheet}, Background: true,
 	})
 	if err != nil {

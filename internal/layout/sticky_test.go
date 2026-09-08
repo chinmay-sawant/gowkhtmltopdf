@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -50,7 +49,7 @@ p { margin: 4pt 0; font-size: 12pt; }
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 400, Height: 200, Background: true,
 		Sheets: []*css.Stylesheet{cssSheet}, Media: "print",
 	})
@@ -161,7 +160,7 @@ func TestStickyOverflowClampAtOffsetZero(t *testing.T) {
 func TestStickyClampYTop(t *testing.T) {
 	t.Parallel()
 
-	boxNode := &box{ //nolint:exhaustruct // intentional zero fields
+	boxNode := &box{
 		sticky:       true,
 		stickyTopSet: true,
 		stickyTop:    0,
@@ -182,7 +181,7 @@ func TestStickyClampYTop(t *testing.T) {
 func TestStickyClampYContainingBlockLimit(t *testing.T) {
 	t.Parallel()
 
-	boxNode := &box{ //nolint:exhaustruct // intentional zero fields
+	boxNode := &box{
 		sticky:       true,
 		stickyTopSet: true,
 		stickyTop:    0,
@@ -232,7 +231,7 @@ p { margin: 4pt 0; font-size: 12pt; }
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 400, Height: 200, Background: true,
 		Sheets: []*css.Stylesheet{cssSheet}, Media: "print",
 	})
@@ -295,7 +294,7 @@ p { margin: 2pt 0; font-size: 11pt; }
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 400, Height: 200, Background: true,
 		Sheets: []*css.Stylesheet{cssSheet}, Media: "print",
 	})
@@ -374,7 +373,7 @@ p { margin: 3pt 0; font-size: 12pt; }
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 400, Height: 200, Background: true,
 		Sheets: []*css.Stylesheet{cssSheet}, Media: "print",
 	})
@@ -818,7 +817,7 @@ func paintFixture31(t *testing.T) (*Result, float64, *pdf.Document) {
 	contentW := pageW - 2*mat
 	contentH := pageH - 2*mat
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: contentW, Height: contentH, Background: true,
 		Sheets: []*css.Stylesheet{sheet}, Media: "print",
 	})

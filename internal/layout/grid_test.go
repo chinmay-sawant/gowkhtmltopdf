@@ -1,5 +1,4 @@
 //nolint:all
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -13,7 +12,7 @@ import (
 func TestParseGridTracksSubtractsGap(t *testing.T) {
 	t.Parallel()
 
-	eng := &engine{scale: 1} //nolint:exhaustruct // intentional zero fields
+	eng := &engine{scale: 1}
 
 	const contentW = 300.0
 
@@ -458,7 +457,7 @@ func TestGridGapSurvivesPaint(t *testing.T) { //nolint:cyclop,funlen
 </div>
 </body></html>`, cssSheet)
 
-	if err := Paint(pdf.NewDocument(), res, PaintOptions{ //nolint:exhaustruct
+	if err := Paint(pdf.NewDocument(), res, PaintOptions{
 		PageWidth: 400, PageHeight: 400,
 	}); err != nil {
 		t.Fatal(err)
@@ -848,7 +847,7 @@ func TestGridAutoFlowColumn(t *testing.T) {
 func TestParseGridTracksMinmax(t *testing.T) {
 	t.Parallel()
 
-	e := &engine{scale: 1} //nolint:exhaustruct // intentional zero fields
+	e := &engine{scale: 1}
 
 	const contentW = 300.0
 
@@ -874,7 +873,7 @@ func TestParseGridTracksMinmax(t *testing.T) {
 func TestParseGridTracksMinmaxPercent(t *testing.T) {
 	t.Parallel()
 
-	e := &engine{scale: 1} //nolint:exhaustruct // intentional zero fields
+	e := &engine{scale: 1}
 
 	cols := parseGridTracks("minmax(10%, 1fr) 1fr", 200, 0, e)
 	if len(cols) != 2 {
@@ -893,7 +892,7 @@ func TestParseGridTracksMinmaxPercent(t *testing.T) {
 func TestParseGridTracksRepeatMinmax(t *testing.T) {
 	t.Parallel()
 
-	e := &engine{scale: 1} //nolint:exhaustruct // intentional zero fields
+	e := &engine{scale: 1}
 
 	cols := parseGridTracks("repeat(3, minmax(40pt, 1fr))", 300, 0, e)
 	if len(cols) != 3 {

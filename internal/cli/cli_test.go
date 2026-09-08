@@ -1,4 +1,4 @@
-//nolint:cyclop,exhaustruct,wsl,lll,err113,testpackage // parser table tests intentionally cover private grammar state.
+//nolint:cyclop,wsl,lll,err113 // parser table tests intentionally cover private grammar state.
 package cli
 
 import (
@@ -287,7 +287,7 @@ func TestExitCodeAndOutputWriter(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	cmd := &Command{Output: "/tmp/unused.pdf", OutputWriter: &buf} //nolint:exhaustruct // sink precedence only
+	cmd := &Command{Output: "/tmp/unused.pdf", OutputWriter: &buf}
 	writer, closeWriter, err := cmd.OpenOutput()
 	if err != nil || writer != &buf {
 		t.Fatalf("OpenOutput = %v, %v", writer, err)

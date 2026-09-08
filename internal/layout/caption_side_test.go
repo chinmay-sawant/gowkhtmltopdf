@@ -1,4 +1,4 @@
-//nolint:testpackage,wsl // caption-side layout probes
+//nolint:wsl // caption-side layout probes
 package layout
 
 import (

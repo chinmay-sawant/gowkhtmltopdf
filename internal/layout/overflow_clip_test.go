@@ -1,4 +1,4 @@
-//nolint:testpackage,wsl,varnamelen,paralleltest,prealloc,exhaustruct // overflow clip probes
+//nolint:wsl,varnamelen,paralleltest,prealloc // overflow clip probes
 package layout
 
 import (
@@ -63,7 +63,7 @@ func testOverflowVisibleUnclipped(t *testing.T) {
 func testOverflowClipRectIntersect(t *testing.T) {
 	t.Parallel()
 
-	op := Op{Kind: OpFillRect, X: 0, Y: 0, W: 80, H: 200} //nolint:exhaustruct // clip geometry
+	op := Op{Kind: OpFillRect, X: 0, Y: 0, W: 80, H: 200}
 	clipPaintOp(&op, clipRect{x: 0, y: 0, w: 80, h: 50})
 
 	if op.Kind != OpFillRect {
@@ -74,7 +74,7 @@ func testOverflowClipRectIntersect(t *testing.T) {
 		t.Fatalf("clipped fill = %+v, want 80x50 at y=0", op)
 	}
 
-	outside := Op{Kind: OpFillRect, X: 0, Y: 80, W: 10, H: 10} //nolint:exhaustruct // fully outside
+	outside := Op{Kind: OpFillRect, X: 0, Y: 80, W: 10, H: 10}
 	clipPaintOp(&outside, clipRect{x: 0, y: 0, w: 50, h: 50})
 	if outside.Kind != opKindNoop {
 		t.Fatalf("outside fill kind = %v, want noop", outside.Kind)

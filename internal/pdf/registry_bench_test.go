@@ -1,4 +1,3 @@
-//nolint:testpackage // benchmark exercises the registry's private face list.
 package pdf
 
 import "testing"

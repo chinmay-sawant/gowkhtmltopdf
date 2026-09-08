@@ -1,4 +1,4 @@
-package convert //nolint:testpackage // white-box tests need unexported access
+package convert
 
 import (
 	"bytes"
@@ -212,7 +212,7 @@ func TestLinkStylesheetMediaMatches(t *testing.T) {
 	t.Parallel()
 
 	mark := func(media string) *html.Node {
-		return &html.Node{ //nolint:exhaustruct // intentional zero-value fields
+		return &html.Node{
 			Type:  html.ElementNode,
 			Name:  "link",
 			Attrs: map[string]string{"rel": "stylesheet", "href": "x.css", "media": media},
@@ -661,7 +661,6 @@ func decodeStreams(data []byte) []byte {
 	return out
 }
 
-//nolint:exhaustruct // test initial geometry and stylesheets
 func TestCSSPageSizeAndMargins(t *testing.T) {
 	t.Parallel()
 
@@ -833,52 +832,52 @@ func TestPDFVersionNegativeValidation(t *testing.T) {
 		}{
 			{
 				"encryption",
-				pdf.WriterPolicy{Version: pdf.PDF17, Encryption: true}, //nolint:exhaustruct // test case
+				pdf.WriterPolicy{Version: pdf.PDF17, Encryption: true},
 				pdf.ErrEncryptionUnsupported,
 			},
 			{
 				"forms",
-				pdf.WriterPolicy{Version: pdf.PDF17, Forms: true}, //nolint:exhaustruct // test case
+				pdf.WriterPolicy{Version: pdf.PDF17, Forms: true},
 				pdf.ErrFormsUnsupported,
 			},
 			{
 				"signatures",
-				pdf.WriterPolicy{Version: pdf.PDF17, Signatures: true}, //nolint:exhaustruct // test case
+				pdf.WriterPolicy{Version: pdf.PDF17, Signatures: true},
 				pdf.ErrSignaturesUnsupported,
 			},
 			{
 				"object_streams",
-				pdf.WriterPolicy{Version: pdf.PDF17, ObjectStreams: true}, //nolint:exhaustruct // test case
+				pdf.WriterPolicy{Version: pdf.PDF17, ObjectStreams: true},
 				pdf.ErrObjectStreamsUnsupported,
 			},
 			{
 				"pdf_a",
-				pdf.WriterPolicy{Version: pdf.PDF17, ConformanceProfile: "PDF/A-4"}, //nolint:exhaustruct // test case
+				pdf.WriterPolicy{Version: pdf.PDF17, ConformanceProfile: "PDF/A-4"},
 				pdf.ErrConformanceRequiresPDF20,
 			},
 			{
 				"pdf_ua",
-				pdf.WriterPolicy{Version: pdf.PDF17, ConformanceProfile: "PDF/UA-2"}, //nolint:exhaustruct // test case
+				pdf.WriterPolicy{Version: pdf.PDF17, ConformanceProfile: "PDF/UA-2"},
 				pdf.ErrConformanceRequiresPDF20,
 			},
 			{
 				"pdf20_encryption",
-				pdf.WriterPolicy{Version: pdf.PDF20, Encryption: true}, //nolint:exhaustruct // test case
+				pdf.WriterPolicy{Version: pdf.PDF20, Encryption: true},
 				pdf.ErrEncryptionUnsupported,
 			},
 			{
 				"pdf20_forms",
-				pdf.WriterPolicy{Version: pdf.PDF20, Forms: true}, //nolint:exhaustruct // test case
+				pdf.WriterPolicy{Version: pdf.PDF20, Forms: true},
 				pdf.ErrFormsUnsupported,
 			},
 			{
 				"pdf20_signatures",
-				pdf.WriterPolicy{Version: pdf.PDF20, Signatures: true}, //nolint:exhaustruct // test case
+				pdf.WriterPolicy{Version: pdf.PDF20, Signatures: true},
 				pdf.ErrSignaturesUnsupported,
 			},
 			{
 				"pdf20_object_streams",
-				pdf.WriterPolicy{Version: pdf.PDF20, ObjectStreams: true}, //nolint:exhaustruct // test case
+				pdf.WriterPolicy{Version: pdf.PDF20, ObjectStreams: true},
 				pdf.ErrObjectStreamsUnsupported,
 			},
 		}

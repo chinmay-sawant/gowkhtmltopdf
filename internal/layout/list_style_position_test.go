@@ -1,4 +1,4 @@
-//nolint:testpackage,wsl,varnamelen,usetesting // list-style-position probes
+//nolint:wsl,varnamelen,usetesting // list-style-position probes
 package layout
 
 import (
@@ -94,7 +94,7 @@ func layoutListStylePositionStamped(t *testing.T, src, position string, sheets .
 	t.Helper()
 
 	root := mustParse(t, src)
-	opts := Options{ //nolint:exhaustruct // matches layoutHTML viewport
+	opts := Options{
 		Width: testViewport, Height: 800, Sheets: sheets, Background: true,
 	}
 

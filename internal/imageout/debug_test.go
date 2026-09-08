@@ -1,4 +1,3 @@
-//nolint:testpackage // white-box test shares unexported helpers (redPNG, renderHTMLOpts) with imageout_test.go
 package imageout
 
 import (
@@ -12,7 +11,7 @@ func TestDebugDataURIRegion(t *testing.T) {
 	src := `<html><body><img src="data:image/png;base64,` +
 		base64.StdEncoding.EncodeToString(raw) + `"></body></html>`
 
-	img, err := renderHTMLOpts(src, RenderOptions{ //nolint:exhaustruct // intentional zero/partial fields
+	img, err := renderHTMLOpts(src, RenderOptions{
 		Images: dataURIImages,
 	})
 	if err != nil {

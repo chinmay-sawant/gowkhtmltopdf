@@ -28,6 +28,14 @@ issues:
   # Report every finding (default caps hide most of an enable-all run).
   max-issues-per-linter: 0
   max-same-issues: 0
+  exclude-rules:
+    # White-box tests intentionally use `package foo` to reach unexported
+    # internals; table fixtures intentionally leave struct fields zero.
+    # Centralized here so _test.go files do not need per-file //nolint.
+    - path: _test\.go
+      linters:
+        - testpackage
+        - exhaustruct
   # npm install drops a vendored Go file under flatted; never lint that tree.
   # bindings/c is cgo glue for the Python shared library (Phase 40); its C
   # interop, unsafe, and struct-mirroring patterns are validated via go vet

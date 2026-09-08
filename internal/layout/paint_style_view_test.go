@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported style-view internals
 package layout
 
 import "testing"
@@ -6,16 +5,16 @@ import "testing"
 func TestPaintChromeStyleViewCopiesOnlyChromeState(t *testing.T) {
 	t.Parallel()
 
-	boxNode := &box{ //nolint:exhaustruct // only style ownership is under test
-		style: &ResolvedStyle{ //nolint:exhaustruct // only view fields are under test
+	boxNode := &box{
+		style: &ResolvedStyle{
 			PaddingBottom: 12,
 			Float:         floatLeft,
 			Position:      positionFixed,
-			BorderLeft: border{ //nolint:exhaustruct // only width and style are relevant
+			BorderLeft: border{
 				Width: 2,
 				Style: borderStyleDashed,
 			},
-			BorderRight: border{Width: 3}, //nolint:exhaustruct // only width is relevant
+			BorderRight: border{Width: 3},
 		},
 	}
 

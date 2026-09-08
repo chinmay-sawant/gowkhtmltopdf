@@ -1,4 +1,4 @@
-package settings //nolint:testpackage // exercises unexported key tables via getForKey
+package settings
 
 import (
 	"errors"
@@ -503,11 +503,11 @@ func TestMediaTypeZeroIsUnset(t *testing.T) {
 	}
 
 	// Unset falls through to the base; screen/print remain explicit.
-	if got := ResolveMedia(sScreen, Web{}, nil); got != sScreen { //nolint:exhaustruct // intentional zero/partial fields
+	if got := ResolveMedia(sScreen, Web{}, nil); got != sScreen {
 		t.Errorf("ResolveMedia(unset) = %q, want %q", got, sScreen)
 	}
 
-	printWeb := Web{MediaType: MediaPrint} //nolint:exhaustruct // intentional zero/partial fields
+	printWeb := Web{MediaType: MediaPrint}
 	if got := ResolveMedia(sScreen, printWeb, nil); got != sPrint {
 		t.Errorf("ResolveMedia(print) = %q, want %q", got, sPrint)
 	}
@@ -709,10 +709,10 @@ func TestResolveMedia(t *testing.T) {
 	t.Parallel()
 
 	base := sPrint
-	none := Web{}                            //nolint:exhaustruct // intentional zero/partial fields
-	pmt := Web{PrintMediaType: true}         //nolint:exhaustruct // intentional zero/partial fields
-	screen := Web{MediaType: MediaScreen}    //nolint:exhaustruct // intentional zero/partial fields
-	printMedia := Web{MediaType: MediaPrint} //nolint:exhaustruct // intentional zero/partial fields
+	none := Web{}
+	pmt := Web{PrintMediaType: true}
+	screen := Web{MediaType: MediaScreen}
+	printMedia := Web{MediaType: MediaPrint}
 
 	if got := ResolveMedia(base, none, nil); got != sPrint {
 		t.Errorf("default PDF = %q", got)

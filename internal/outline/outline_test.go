@@ -74,7 +74,7 @@ func TestOutlineTreeNesting(t *testing.T) {
 	headings := outline.CollectHeadings(root)
 	headings = outline.Lookup(headings, fakeLocations(nodes))
 	outline.AssignAnchors(headings)
-	tree := mustBuildTree(t, headings, outline.Options{}) //nolint:exhaustruct // intentional zero/partial fields
+	tree := mustBuildTree(t, headings, outline.Options{})
 
 	if len(tree.Children) != 2 {
 		t.Fatalf("root children = %d, want 2", len(tree.Children))
@@ -102,7 +102,7 @@ func TestOutlineTreeSortAndClamp(t *testing.T) {
 	nodes := headNodes(t, root)
 	headings := outline.CollectHeadings(root)
 	headings = outline.Lookup(headings, fakeLocations(nodes))
-	tree := mustBuildTree(t, headings, outline.Options{}) //nolint:exhaustruct // intentional zero/partial fields
+	tree := mustBuildTree(t, headings, outline.Options{})
 
 	if len(tree.Children) != 2 || tree.Children[0].Heading.Title != "A" {
 		t.Fatalf("root = %v, want [A B]", tree.Children)
@@ -132,7 +132,7 @@ func TestOutlineTreeLevelStackAcrossPages(t *testing.T) {
 	}
 	headings := outline.Lookup(outline.CollectHeadings(root), locs)
 
-	tree := mustBuildTree(t, headings, outline.Options{}) //nolint:exhaustruct // intentional zero/partial fields
+	tree := mustBuildTree(t, headings, outline.Options{})
 	if len(tree.Children) != 1 || len(tree.Children[0].Children) != 1 {
 		t.Fatalf("tree = %+v, want Ch > Late", tree)
 	}
@@ -144,7 +144,7 @@ func TestOutlineDepth(t *testing.T) {
 	nodes := headNodes(t, root)
 	headings := outline.Lookup(outline.CollectHeadings(root), fakeLocations(nodes))
 
-	tree := mustBuildTree(t, headings, outline.Options{ //nolint:exhaustruct // intentional zero/partial fields
+	tree := mustBuildTree(t, headings, outline.Options{
 		MaxDepth: 1,
 	})
 	if len(tree.Children) != 1 {
@@ -162,7 +162,7 @@ func TestOutlineExclude(t *testing.T) {
 	nodes := headNodes(t, root)
 	headings := outline.Lookup(outline.CollectHeadings(root), fakeLocations(nodes))
 
-	tree := mustBuildTree(t, headings, outline.Options{ //nolint:exhaustruct // intentional zero/partial fields
+	tree := mustBuildTree(t, headings, outline.Options{
 		Exclude: []css.Selector{
 			parseSel(t, ".hidden"),
 			parseSel(t, "#x"),
@@ -212,7 +212,7 @@ func TestOutlineExcludeNestedAndEmpty(t *testing.T) {
 func excludeTree(t *testing.T, headings []*outline.Heading, sels ...css.Selector) *outline.Node {
 	t.Helper()
 
-	return mustBuildTree(t, headings, outline.Options{ //nolint:exhaustruct // intentional zero/partial fields
+	return mustBuildTree(t, headings, outline.Options{
 		Exclude: sels,
 	})
 }
@@ -469,7 +469,7 @@ func TestDumpOutlineXML(t *testing.T) {
 	nodes := headNodes(t, root)
 	headings := outline.Lookup(outline.CollectHeadings(root), fakeLocations(nodes))
 	outline.AssignAnchors(headings)
-	tree := mustBuildTree(t, headings, outline.Options{}) //nolint:exhaustruct // intentional zero/partial fields
+	tree := mustBuildTree(t, headings, outline.Options{})
 	xml := outline.DumpOutlineXML(tree)
 
 	for _, want := range []string{
@@ -497,7 +497,7 @@ func TestExplicitDocumentPageOrderingDoesNotMutateLocalPage(t *testing.T) {
 	headings[1].DocPage = 2
 	localPages := []int{headings[0].Page, headings[1].Page}
 
-	tree := mustBuildTreeBy(t, headings, outline.Options{}, //nolint:exhaustruct // intentional zero/partial fields
+	tree := mustBuildTreeBy(t, headings, outline.Options{},
 		outline.DocumentPage)
 	if got := tree.Children[0].Heading.Title; got != testFirstDocTitle {
 		t.Fatalf("first heading = %q, want First in document", got)
@@ -541,7 +541,7 @@ func TestNilPageAccessorUsesLocalPage(t *testing.T) {
 	outline.SortHeadingsBy(headings, nil)
 
 	xml := outline.DumpOutlineXMLBy(
-		mustBuildTreeBy(t, headings, outline.Options{}, nil), //nolint:exhaustruct // intentional zero/partial fields
+		mustBuildTreeBy(t, headings, outline.Options{}, nil),
 		0,
 		nil,
 	)

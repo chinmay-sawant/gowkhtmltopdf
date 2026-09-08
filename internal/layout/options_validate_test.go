@@ -1,4 +1,4 @@
-package layout //nolint:testpackage // white-box tests need unexported validate
+package layout
 
 import (
 	"math"
@@ -10,7 +10,6 @@ import (
 func TestOptionsValidate(t *testing.T) {
 	t.Parallel()
 
-	//nolint:exhaustruct // table rows exercise one bad field at a time
 	cases := []struct {
 		name string
 		opts Options
@@ -38,7 +37,6 @@ func TestOptionsValidate(t *testing.T) {
 func TestOptionsValidateAcceptsDefaults(t *testing.T) {
 	t.Parallel()
 
-	//nolint:exhaustruct // table rows exercise zero/default option shapes
 	opts := []Options{
 		{Width: 500, Height: 800},
 		{Width: 500, Height: 0, Zoom: 0.95, Media: "print"},
@@ -55,7 +53,6 @@ func TestOptionsValidateAcceptsDefaults(t *testing.T) {
 func TestPaintOptionsValidate(t *testing.T) {
 	t.Parallel()
 
-	//nolint:exhaustruct // table rows exercise one bad field at a time
 	cases := []struct {
 		name string
 		opts PaintOptions
@@ -80,7 +77,6 @@ func TestPaintOptionsValidate(t *testing.T) {
 func TestPaintOptionsValidateAcceptsDefaults(t *testing.T) {
 	t.Parallel()
 
-	//nolint:exhaustruct // table rows exercise default paint geometry
 	opts := []PaintOptions{
 		{PageWidth: 595, PageHeight: 842},
 		{PageWidth: 595, PageHeight: 842, MarginTop: 28.35, MarginBottom: 28.35, MarginLeft: 28.35, MarginRight: 28.35},
@@ -101,7 +97,7 @@ func TestLayoutContextRejectsNegativeZoom(t *testing.T) {
 
 	root := mustParse(t, `<html><body><p>x</p></body></html>`)
 
-	_, err := Layout(root, Options{ //nolint:exhaustruct // focused invalid zoom
+	_, err := Layout(root, Options{
 		Width: 500, Height: 800, Zoom: -1,
 	})
 	if err == nil {
@@ -113,7 +109,7 @@ func TestPaintContextRejectsMarginsThatSwallowPage(t *testing.T) {
 	t.Parallel()
 
 	doc := pdf.NewDocument()
-	res := &Result{ //nolint:exhaustruct // minimal empty display list
+	res := &Result{
 		Ops: []Op{},
 	}
 
@@ -121,7 +117,7 @@ func TestPaintContextRejectsMarginsThatSwallowPage(t *testing.T) {
 	// auto margins can legitimately produce this shape (tall HTML header) and
 	// the engine clips such headers while the body fallback (contentH =
 	// PageHeight) keeps conversion alive. Paint must not reject it.
-	err := Paint(doc, res, PaintOptions{ //nolint:exhaustruct // focused large margins
+	err := Paint(doc, res, PaintOptions{
 		PageWidth: 595, PageHeight: 842, MarginTop: 500, MarginBottom: 500,
 	})
 	if err != nil {

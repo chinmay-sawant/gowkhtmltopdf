@@ -1,4 +1,4 @@
-package convert //nolint:testpackage // white-box constructors
+package convert
 
 import (
 	"bytes"

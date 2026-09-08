@@ -1,4 +1,4 @@
-package convert //nolint:testpackage // shares newCommand with convert_test.go
+package convert
 
 import (
 	"io"
@@ -41,7 +41,7 @@ func TestImportStylesheet(t *testing.T) {
 		root,
 		"file://"+filepath.ToSlash(dir)+"/",
 		page.Load,
-		prepare.SheetOptions{ //nolint:exhaustruct // test viewport/media only
+		prepare.SheetOptions{
 			ViewportW: 600, ViewportH: 800, MediaType: mediaPrint,
 		},
 		io.Discard,

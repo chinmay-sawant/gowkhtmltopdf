@@ -1,4 +1,4 @@
-package convert //nolint:testpackage // white-box tests need unexported access
+package convert
 
 import (
 	"testing"
@@ -33,18 +33,16 @@ func TestBodyNavigationProjectionIsIndependentOfLayoutResult(t *testing.T) {
 }
 
 func testBodyNavigationResult() *layout.Result {
-	target := &html.Node{ //nolint:exhaustruct // test needs only id attributes
+	target := &html.Node{
 		Attrs: map[string]string{"id": "target"},
 	}
 
-	return &layout.Result{ //nolint:exhaustruct // test needs only navigation fields
+	return &layout.Result{
 		Locations: []layout.ElementLocation{
 			{Node: target, Page: 2, X: 3, Y: 4, W: 5, H: 6},
 		},
 		Ops: []layout.Op{
-			//nolint:exhaustruct // test needs only fragment geometry
 			{Kind: layout.OpLinkURI, URI: "#target", X: 7, Y: 8, W: 9, H: 10},
-			//nolint:exhaustruct // test needs only URI filtering
 			{Kind: layout.OpLinkURI, URI: "https://example.com", X: 11, Y: 12},
 		},
 	}
@@ -83,7 +81,7 @@ func assertProjectedFragmentLink(t *testing.T, nav bodyNavigation) {
 func TestBuildBodyIDIndexKeepsLaterDuplicate(t *testing.T) {
 	t.Parallel()
 
-	first := &objectState{ //nolint:exhaustruct // test needs only indexed destination
+	first := &objectState{
 		navigation: bodyNavigation{
 			ids: map[string]layout.ElementLocation{
 				"duplicate": {Node: nil, Page: 0, X: 1, Y: 0, W: 0, H: 0},
@@ -92,7 +90,7 @@ func TestBuildBodyIDIndexKeepsLaterDuplicate(t *testing.T) {
 			links:   nil,
 		},
 	}
-	later := &objectState{ //nolint:exhaustruct // test needs only indexed destination
+	later := &objectState{
 		navigation: bodyNavigation{
 			ids: map[string]layout.ElementLocation{
 				"duplicate": {Node: nil, Page: 1, X: 2, Y: 0, W: 0, H: 0},
@@ -112,11 +110,11 @@ func TestResolveRelativeLinkURIs(t *testing.T) {
 	t.Parallel()
 
 	ops := []layout.Op{
-		{Kind: layout.OpLinkURI, URI: "docs/a.html"},           //nolint:exhaustruct // intentional zero-value fields
-		{Kind: layout.OpLinkURI, URI: "//cdn.example/a.css"},   //nolint:exhaustruct // intentional zero-value fields
-		{Kind: layout.OpLinkURI, URI: "#frag"},                 //nolint:exhaustruct // intentional zero-value fields
-		{Kind: layout.OpLinkURI, URI: "https://example.com/x"}, //nolint:exhaustruct // intentional zero-value fields
-		{Kind: layout.OpLinkURI, URI: "mailto:a@b.c"},          //nolint:exhaustruct // intentional zero-value fields
+		{Kind: layout.OpLinkURI, URI: "docs/a.html"},
+		{Kind: layout.OpLinkURI, URI: "//cdn.example/a.css"},
+		{Kind: layout.OpLinkURI, URI: "#frag"},
+		{Kind: layout.OpLinkURI, URI: "https://example.com/x"},
+		{Kind: layout.OpLinkURI, URI: "mailto:a@b.c"},
 	}
 	resolveRelativeLinkURIs(ops, "https://example.com/base/page.html")
 

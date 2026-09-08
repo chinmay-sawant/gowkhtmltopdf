@@ -1,4 +1,3 @@
-//nolint:testpackage // white-box tests need raster internals (paint order, ptToPx)
 package imageout
 
 import (
@@ -21,10 +20,10 @@ func TestRasterPaintOrderMatchesPDFLayerPolicy(t *testing.T) {
 	t.Parallel()
 
 	ops := []layout.Op{
-		{Kind: layout.OpText, ZIndex: 0, ZIndexSet: true},      //nolint:exhaustruct // intentional zero/partial fields
-		{Kind: layout.OpFillRect, ZIndex: 0, ZIndexSet: true},  //nolint:exhaustruct // intentional zero/partial fields
-		{Kind: layout.OpText, ZIndex: 2, ZIndexSet: true},      //nolint:exhaustruct // intentional zero/partial fields
-		{Kind: layout.OpFillRect, ZIndex: -1, ZIndexSet: true}, //nolint:exhaustruct // intentional zero/partial fields
+		{Kind: layout.OpText, ZIndex: 0, ZIndexSet: true},
+		{Kind: layout.OpFillRect, ZIndex: 0, ZIndexSet: true},
+		{Kind: layout.OpText, ZIndex: 2, ZIndexSet: true},
+		{Kind: layout.OpFillRect, ZIndex: -1, ZIndexSet: true},
 	}
 	order := rasterPaintOrder(ops)
 	want := []int{3, 1, 0, 2}
@@ -47,15 +46,15 @@ func TestRoundedBorderTopOverlayKeepsAccentThroughCorners(t *testing.T) {
 		radius = 8.0
 	)
 
-	res := &layout.Result{ //nolint:exhaustruct // synthetic raster result
+	res := &layout.Result{
 		Width:  110,
 		Height: 70,
 		Ops: []layout.Op{
-			{ //nolint:exhaustruct // synthetic rounded stroke
+			{
 				Kind: layout.OpStrokeRect, X: boxX, Y: boxY, W: boxW, H: boxH,
 				R: 0.7, G: 0.8, B: 0.85, Width: 1.5, Radius: radius,
 			},
-			{ //nolint:exhaustruct // synthetic accent line
+			{
 				Kind: layout.OpLine, X: boxX + radius, Y: boxY, W: boxW - 2*radius,
 				R: 0.1, G: 0.7, B: 0.4, Width: 4,
 			},
@@ -98,10 +97,10 @@ func TestRoundedTopStrokeLeavesOutsideCornerUnpainted(t *testing.T) {
 		radius = 8.0
 	)
 
-	res := &layout.Result{ //nolint:exhaustruct // synthetic rounded raster result
+	res := &layout.Result{
 		Width:  110,
 		Height: 70,
-		Ops: []layout.Op{{ //nolint:exhaustruct // focused rounded-border operation
+		Ops: []layout.Op{{
 			Kind: layout.OpStrokeRect, X: boxX, Y: boxY, W: boxW, H: boxH,
 			R: 0.1, G: 0.7, B: 0.4, Width: 4, Radius: radius,
 			StrokeMask: layout.StrokeMaskTop,
@@ -133,23 +132,23 @@ func TestAxisAlignedBorderLinesFillOuterCorners(t *testing.T) {
 		width = 4.0
 	)
 
-	res := &layout.Result{ //nolint:exhaustruct // synthetic four-side border
+	res := &layout.Result{
 		Width:  100,
 		Height: 80,
 		Ops: []layout.Op{
-			{ //nolint:exhaustruct // top
+			{
 				Kind: layout.OpLine, X: boxX, Y: boxY, W: boxW, H: 0,
 				Width: width, R: 0.1, G: 0.2, B: 0.4,
 			},
-			{ //nolint:exhaustruct // right
+			{
 				Kind: layout.OpLine, X: boxX + boxW, Y: boxY, W: 0, H: boxH,
 				Width: width, R: 0.1, G: 0.2, B: 0.4,
 			},
-			{ //nolint:exhaustruct // bottom
+			{
 				Kind: layout.OpLine, X: boxX, Y: boxY + boxH, W: boxW, H: 0,
 				Width: width, R: 0.1, G: 0.2, B: 0.4,
 			},
-			{ //nolint:exhaustruct // left
+			{
 				Kind: layout.OpLine, X: boxX, Y: boxY, W: 0, H: boxH,
 				Width: width, R: 0.1, G: 0.2, B: 0.4,
 			},
@@ -209,7 +208,7 @@ func TestFixture56UsesRoundedTopOverlayGeometry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := layout.Layout(root, layout.Options{ //nolint:exhaustruct // fixture image-mode geometry
+	res, err := layout.Layout(root, layout.Options{
 		Width: 1024 * cssPxToPt, Height: 1024 * cssPxToPt,
 		Font: font, Sheets: []*css.Stylesheet{sheet}, Media: "screen", Background: true,
 	})
@@ -240,7 +239,7 @@ func TestRenderContextHonorsCancellation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = RenderContext(ctx, root, RenderOptions{Width: 200}) //nolint:exhaustruct // intentional zero/partial fields
+	_, err = RenderContext(ctx, root, RenderOptions{Width: 200})
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("RenderContext error = %v, want context.Canceled", err)
 	}
@@ -259,7 +258,7 @@ func TestTTFRasterAntiAliased(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	img, err := Render(root, RenderOptions{ //nolint:exhaustruct // intentional zero/partial fields
+	img, err := Render(root, RenderOptions{
 		Width: 400, Font: face, Background: true,
 	})
 	if err != nil {
@@ -347,7 +346,7 @@ func TestTTFAdvanceMatchesLayoutWidth(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	minX, maxX := renderForInk(t, root, RenderOptions{ //nolint:exhaustruct // intentional zero/partial fields
+	minX, maxX := renderForInk(t, root, RenderOptions{
 		Width: 200, Font: face, SmartWidth: false, Background: true,
 	})
 	if maxX <= minX {
@@ -361,7 +360,7 @@ func TestTTFAdvanceMatchesLayoutWidth(t *testing.T) {
 	}
 }
 
-//nolint:funlen,wsl,exhaustruct // subtest table for raster op policies
+//nolint:funlen,wsl // subtest table for raster op policies
 func TestRasterOpPolicyParity(t *testing.T) {
 	t.Parallel()
 

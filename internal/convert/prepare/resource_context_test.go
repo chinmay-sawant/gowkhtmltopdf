@@ -29,7 +29,7 @@ func TestResourceContextFetchUsesPrivateLoadSeam(t *testing.T) {
 	}))
 	defer server.Close()
 
-	loader, err := load.NewLoaderWithError(settings.LoadGlobal{}) //nolint:exhaustruct // default HTTP loader
+	loader, err := load.NewLoaderWithError(settings.LoadGlobal{})
 	if err != nil {
 		t.Fatalf("new loader: %v", err)
 	}
@@ -71,7 +71,7 @@ func TestResourceContextNilLoaderDegradedPath(t *testing.T) {
 		t.Fatalf("Fetch error = %v, want the no-loader diagnostic", err)
 	}
 
-	sheetOpts := prepare.SheetOptions{} //nolint:exhaustruct // degraded path needs no sheet options
+	sheetOpts := prepare.SheetOptions{}
 	if sheets := resources.CollectSheets(t.Context(), nil, sheetOpts, io.Discard); sheets != nil {
 		t.Fatalf("CollectSheets = %v, want nil on a degraded context", sheets)
 	}

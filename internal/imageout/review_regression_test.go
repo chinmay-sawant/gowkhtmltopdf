@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise the finalization and write seams.
 package imageout
 
 import (
@@ -50,7 +49,7 @@ func TestWriteEncodedOutputRejectsSilentShortWrites(t *testing.T) {
 			out := &reviewShortWriter{Buffer: bytes.Buffer{}, limit: 1}
 			req := &Request{
 				Global:  settings.DefaultPdfGlobal(),
-				Image:   settings.ImageGlobal{Format: format, Quality: 80}, //nolint:exhaustruct // focused output settings
+				Image:   settings.ImageGlobal{Format: format, Quality: 80},
 				Objects: []settings.PdfObject{},
 				Now:     nil,
 				Output:  out,
@@ -74,7 +73,7 @@ func TestImagePipelineFinalizeChecksCancellation(t *testing.T) {
 	pipeline := &imagePipeline{
 		req: &Request{
 			Global:  settings.DefaultPdfGlobal(),
-			Image:   settings.ImageGlobal{Format: formatPNG}, //nolint:exhaustruct // focused output settings
+			Image:   settings.ImageGlobal{Format: formatPNG},
 			Objects: []settings.PdfObject{},
 			Now:     nil,
 			Output:  out,

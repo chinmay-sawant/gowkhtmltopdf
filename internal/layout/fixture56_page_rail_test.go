@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported layout pagination internals
 package layout
 
 import (
@@ -19,7 +18,7 @@ func TestFixture56DomainSectionOmitsAccentTopRail(t *testing.T) { //nolint:paral
 	)
 	contentHeight := pageHeight - 2*margin
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // fixture uses the standard print geometry
+	res, err := Layout(root, Options{
 		Width: pageWidth - 2*margin, Height: contentHeight,
 		Background: true, Sheets: []*css.Stylesheet{sheet}, Media: "print",
 	})

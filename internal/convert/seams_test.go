@@ -1,4 +1,4 @@
-package convert //nolint:testpackage // white-box tests need unexported access
+package convert
 
 import (
 	"bytes"
@@ -20,7 +20,7 @@ import (
 func TestRunRequiresExplicitOutputSink(t *testing.T) {
 	t.Parallel()
 
-	req := &Request{Global: settings.DefaultPdfGlobal()} //nolint:exhaustruct // intentional zero-value fields
+	req := &Request{Global: settings.DefaultPdfGlobal()}
 
 	err := Run(t.Context(), req, io.Discard, nil)
 	if !errors.Is(err, ErrMissingOutput) {
@@ -31,7 +31,7 @@ func TestRunRequiresExplicitOutputSink(t *testing.T) {
 func TestRunValidatesRenderableObjectsBeforeContext(t *testing.T) {
 	t.Parallel()
 
-	req := &Request{ //nolint:exhaustruct // focused invalid request
+	req := &Request{
 		Global: settings.DefaultPdfGlobal(),
 		Output: &bytes.Buffer{},
 	}
@@ -47,7 +47,7 @@ func TestRunRequiresDedicatedOutlineSink(t *testing.T) {
 
 	global := settings.DefaultPdfGlobal()
 	global.DumpOutline = true
-	req := &Request{Global: global, Output: &bytes.Buffer{}} //nolint:exhaustruct // intentional zero-value fields
+	req := &Request{Global: global, Output: &bytes.Buffer{}}
 
 	err := Run(t.Context(), req, io.Discard, nil)
 	if !errors.Is(err, ErrMissingOutlineOutput) {
@@ -80,7 +80,7 @@ func TestRunPropagatesDocumentWriterError(t *testing.T) {
 
 	req := NewPDFRequest(
 		settings.DefaultPdfGlobal(),
-		[]settings.PdfObject{{ //nolint:exhaustruct // intentional zero-value fields
+		[]settings.PdfObject{{
 			Page: "inline:<html><body><p>writer failure</p></body></html>",
 		}},
 		failingWriter{},
@@ -97,7 +97,7 @@ func TestModeSpecificRequestConstructors(t *testing.T) {
 	t.Parallel()
 
 	global := settings.DefaultPdfGlobal()
-	objects := []settings.PdfObject{{ //nolint:exhaustruct // intentional zero-value fields
+	objects := []settings.PdfObject{{
 		Page: "inline:<html><body>test</body></html>",
 	}}
 
@@ -107,7 +107,7 @@ func TestModeSpecificRequestConstructors(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	req := &Request{ //nolint:exhaustruct // intentional zero-value fields
+	req := &Request{
 		Global:  global,
 		Objects: objects,
 		Output:  &out,
@@ -125,12 +125,12 @@ func TestPrepareDocumentBindsSharedResourceContext(t *testing.T) { //nolint:cycl
 	lineP.InlineHTML = []byte(`<html><head><style>body { color: #123456 }</style></head><body>hello</body></html>`)
 	lineP.InlineBase = "https://example.test/reports/"
 
-	loader, err := load.NewLoaderWithError(settings.LoadGlobal{}) //nolint:exhaustruct // intentional zero-value fields
+	loader, err := load.NewLoaderWithError(settings.LoadGlobal{})
 	if err != nil {
 		t.Fatalf("new loader: %v", err)
 	}
 
-	prep, err := prepare.Document(t.Context(), loader, "ignored", lineP, nil, prepare.Options{ //nolint:exhaustruct,lll // intentional zero-value fields
+	prep, err := prepare.Document(t.Context(), loader, "ignored", lineP, nil, prepare.Options{ //nolint:lll // intentional zero-value fields
 		ViewportW:   500,
 		ViewportH:   700,
 		MediaType:   mediaPrint,
@@ -173,7 +173,7 @@ func TestPrepareDocumentPreservesSkipForCallerPolicy(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	global := settings.LoadGlobal{} //nolint:exhaustruct // intentional zero-value fields
+	global := settings.LoadGlobal{}
 
 	loader, err := load.NewLoaderWithError(global)
 	if err != nil {
@@ -184,7 +184,7 @@ func TestPrepareDocumentPreservesSkipForCallerPolicy(t *testing.T) {
 	lp.LoadErrorHandling = settings.LoadErrorSkip
 
 	prep, err := prepare.Document(
-		t.Context(), loader, srv.URL, lp, nil, prepare.Options{}, //nolint:exhaustruct // intentional zero-value fields
+		t.Context(), loader, srv.URL, lp, nil, prepare.Options{},
 		io.Discard,
 	)
 	if err != nil {

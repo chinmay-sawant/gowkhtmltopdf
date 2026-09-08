@@ -1,4 +1,3 @@
-//nolint:testpackage // benchmark isolates the unexported raster pool.
 package imageout
 
 import (
@@ -17,7 +16,7 @@ func BenchmarkSupersamplePool(b *testing.B) {
 		{name: "large", width: 512, height: 512},
 	} {
 		b.Run(size.name, func(b *testing.B) {
-			result := &layout.Result{ //nolint:exhaustruct // empty display list isolates raster buffer policy
+			result := &layout.Result{
 				Width:  size.width,
 				Height: size.height,
 			}

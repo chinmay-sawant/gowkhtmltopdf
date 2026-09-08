@@ -1,4 +1,4 @@
-//nolint:testpackage,wsl,cyclop // display-list regression assertions stay together for readability.
+//nolint:wsl,cyclop // display-list regression assertions stay together for readability.
 package layout
 
 import (

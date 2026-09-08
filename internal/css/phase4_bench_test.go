@@ -1,4 +1,4 @@
-package css //nolint:testpackage // exercises unexported selector matching via Match
+package css
 
 import (
 	"strings"
@@ -51,7 +51,7 @@ func attrCaseSelector(tb testing.TB, sel string) Selector {
 
 func BenchmarkAttrIgnoreCaseMatch(b *testing.B) {
 	sel := attrCaseSelector(b, `[title="helloworld" i]`)
-	node := &html.Node{ //nolint:exhaustruct // bench needs only match fields
+	node := &html.Node{
 		Type: html.ElementNode, Name: "a", Attrs: map[string]string{"title": "HELLOWORLD"},
 	}
 

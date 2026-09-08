@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -88,7 +87,7 @@ func TestWikiLogoWordmarkAboveTagline(t *testing.T) { //nolint:cyclop,funlen
 
 	_ = cont
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 700, Height: 200, Sheets: []*css.Stylesheet{cssSheet}, Background: true,
 		Images: func(_ string) ([]byte, error) { return png, nil },
 	})

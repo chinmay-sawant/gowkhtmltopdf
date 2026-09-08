@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -72,7 +71,7 @@ td.amount { text-align: right; }
 	margin := 10 * mm
 	contentH := pageH - 2*margin
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: pageW - 2*margin, Height: contentH,
 		Sheets: []*css.Stylesheet{sheet}, Media: "print", Background: true,
 	})

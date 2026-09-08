@@ -94,4 +94,4 @@ func TestRasterizeArcPath(t *testing.T) {
 }
 
 // ensure image import used when decoding wordmark in other tests.
-var _ = image.RGBA{} //nolint:exhaustruct // intentional zero/partial fields
+var _ = image.RGBA{}

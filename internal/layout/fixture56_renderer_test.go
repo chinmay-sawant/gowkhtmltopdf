@@ -1,5 +1,5 @@
 //nolint:all
-//nolint:testpackage,wsl,nlreturn,varnamelen,lll // fixture assertions inspect layout internals
+//nolint:wsl,nlreturn,varnamelen,lll // fixture assertions inspect layout internals
 package layout
 
 import (
@@ -245,7 +245,7 @@ func fixture56Result(t *testing.T, zoom float64) (*html.Node, *Result) {
 	t.Helper()
 	root, sheet := loadFixture56(t)
 	const contentHeight = 841.89 - 2*28.35
-	res, err := Layout(root, Options{ //nolint:exhaustruct // fixture uses the standard print layout path
+	res, err := Layout(root, Options{
 		Width: 595.28 - 2*28.35, Height: contentHeight,
 		Background: true, Sheets: []*css.Stylesheet{sheet}, Media: "print", Zoom: zoom,
 	})
@@ -261,7 +261,7 @@ func fixture56Result(t *testing.T, zoom float64) (*html.Node, *Result) {
 //nolint:gocognit,gocyclo,cyclop,funlen // fixture seam assertions intentionally remain together
 func TestFixture56RendererSeams(t *testing.T) { //nolint:maintidx,paralleltest // fixture seam assertions intentionally remain together
 	root, sheet := loadFixture56(t)
-	opts := Options{ //nolint:exhaustruct // fixture uses the standard print layout path
+	opts := Options{
 		Width: 595.28 - 2*28.35, Height: 841.89 - 2*28.35,
 		Background: true, Sheets: []*css.Stylesheet{sheet}, Media: "print",
 	}
@@ -439,7 +439,7 @@ func TestFixture56PageComposition(t *testing.T) { //nolint:paralleltest // rende
 
 	const contentHeight = 841.89 - 2*28.35
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // fixture uses the standard print layout path
+	res, err := Layout(root, Options{
 		Width: 595.28 - 2*28.35, Height: contentHeight,
 		Background: true, Sheets: []*css.Stylesheet{sheet}, Media: "print", Zoom: 0.98,
 	})
@@ -530,7 +530,7 @@ func TestFixture56PageComposition(t *testing.T) { //nolint:paralleltest // rende
 func TestFixture56PageBackgroundDoesNotUseHeroFill(t *testing.T) { //nolint:paralleltest,cyclop // renderer fixture uses shared font state
 	root, sheet := loadFixture56(t)
 	contentHeight := 841.89 - 2*28.35
-	res, err := Layout(root, Options{ //nolint:exhaustruct // fixture uses the standard print layout path
+	res, err := Layout(root, Options{
 		Width: 595.28 - 2*28.35, Height: contentHeight,
 		Background: true, Sheets: []*css.Stylesheet{sheet}, Media: "print", Zoom: 0.98,
 	})
@@ -630,7 +630,7 @@ func TestFixture56D02VerticalTabBaselineMatchesBoxTop(t *testing.T) {
 func TestFixture56ArchitectureSectionsStartOnFreshPages(t *testing.T) { //nolint:paralleltest // renderer fixture uses shared font state
 	root, sheet := loadFixture56(t)
 	contentHeight := 841.89 - 2*28.35
-	res, err := Layout(root, Options{ //nolint:exhaustruct // fixture uses the standard print layout path
+	res, err := Layout(root, Options{
 		Width: 595.28 - 2*28.35, Height: contentHeight,
 		Background: true, Sheets: []*css.Stylesheet{sheet}, Media: "print", Zoom: 0.98,
 	})
@@ -661,7 +661,7 @@ func TestFixture56ArchitectureSectionsStartOnFreshPages(t *testing.T) { //nolint
 func TestFixture56DoesNotRepeatAncestorSideRails(t *testing.T) { //nolint:paralleltest,cyclop // renderer fixture uses shared font state
 	root, sheet := loadFixture56(t)
 	contentHeight := 841.89 - 2*28.35
-	res, err := Layout(root, Options{ //nolint:exhaustruct // fixture uses the standard print layout path
+	res, err := Layout(root, Options{
 		Width: 595.28 - 2*28.35, Height: contentHeight,
 		Background: true, Sheets: []*css.Stylesheet{sheet}, Media: "print", Zoom: 0.98,
 	})
@@ -722,7 +722,7 @@ func TestFixture56SectionRailsFlushWithFrame(t *testing.T) { //nolint:cyclop,par
 func TestFixture56DomainRailsStartAtFrameTop(t *testing.T) { //nolint:cyclop,paralleltest // fixture seam assertions intentionally remain together
 	root, sheet := loadFixture56(t)
 	contentHeight := 841.89 - 2*28.35
-	res, err := Layout(root, Options{ //nolint:exhaustruct // fixture uses the standard print layout path
+	res, err := Layout(root, Options{
 		Width: 595.28 - 2*28.35, Height: contentHeight,
 		Background: true, Sheets: []*css.Stylesheet{sheet}, Media: "print", Zoom: 1,
 	})
@@ -764,7 +764,7 @@ func TestFixture56DAGStaysTogetherAtCLIPageGeometry(t *testing.T) { //nolint:par
 		margin     = 10 * 72.0 / 25.4
 	)
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // fixture uses the CLI print geometry
+	res, err := Layout(root, Options{
 		Width: pageWidth - 2*margin, Height: pageHeight - 2*margin,
 		Background: true, Sheets: []*css.Stylesheet{sheet}, Media: "print", Zoom: 1,
 	})
@@ -865,7 +865,7 @@ func TestFixture56NotesCalloutsStayOnOnePage(t *testing.T) { //nolint:parallelte
 	)
 
 	contentHeight := pageHeight - 2*margin
-	res, err := Layout(root, Options{ //nolint:exhaustruct // fixture uses CLI print geometry
+	res, err := Layout(root, Options{
 		Width: pageWidth - 2*margin, Height: contentHeight,
 		Background: true, Sheets: []*css.Stylesheet{sheet}, Media: "print",
 	})
@@ -900,7 +900,7 @@ func TestFixture56D04FlowFitsFourBoxesOnFirstLine(t *testing.T) { //nolint:cyclo
 	const pageHeight = 841.89
 	contentWidth := pageWidth - 2*margin
 	contentHeight := pageHeight - 2*margin
-	res, err := Layout(root, Options{ //nolint:exhaustruct // fixture uses the standard print layout path
+	res, err := Layout(root, Options{
 		Width: contentWidth, Height: contentHeight,
 		Background: true, Sheets: []*css.Stylesheet{sheet}, Media: "print", Zoom: 0.98,
 	})
@@ -938,7 +938,7 @@ func TestFixture56D04FlowFitsFourBoxesOnFirstLine(t *testing.T) { //nolint:cyclo
 //nolint:cyclop,funlen // staged pagination diagnostics intentionally log each phase
 func TestFixture56D04ACLMatrixDebug(t *testing.T) { //nolint:paralleltest // fixture uses shared font state
 	root, sheet := loadFixture56(t)
-	res, err := Layout(root, Options{ //nolint:exhaustruct // fixture uses the standard print layout path
+	res, err := Layout(root, Options{
 		Width: 595.28 - 2*28.35, Height: 841.89 - 2*28.35,
 		Background: true, Sheets: []*css.Stylesheet{sheet}, Media: "print", Zoom: 1,
 	})
@@ -1028,7 +1028,7 @@ func TestFixture56D04ACLMatrixRowsStayContiguous(t *testing.T) { //nolint:parall
 	root, sheet := loadFixture56(t)
 	const contentHeight = 841.89 - 2*28.35
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // fixture uses the standard print layout path
+	res, err := Layout(root, Options{
 		Width: 595.28 - 2*28.35, Height: contentHeight,
 		Background: true, Sheets: []*css.Stylesheet{sheet}, Media: "print", Zoom: 1,
 	})
@@ -1072,7 +1072,7 @@ func TestFixture56PaginationChromeAndWidgetGeometry(t *testing.T) { //nolint:par
 	root, sheet := loadFixture56(t)
 	const contentHeight = 841.89 - 2*28.35
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // fixture uses the standard print layout path
+	res, err := Layout(root, Options{
 		Width: 595.28 - 2*28.35, Height: contentHeight,
 		Background: true, Sheets: []*css.Stylesheet{sheet}, Media: "print", Zoom: 0.98,
 	})

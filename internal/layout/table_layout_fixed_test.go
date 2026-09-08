@@ -1,4 +1,4 @@
-//nolint:testpackage,wsl,cyclop // table-layout:fixed column share proof
+//nolint:wsl,cyclop // table-layout:fixed column share proof
 package layout
 
 import (

@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise the private font-size and registry seams.
 package pdf
 
 import (

@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported style-view internals
 package layout
 
 import "testing"
@@ -6,7 +5,7 @@ import "testing"
 func TestBoxModelStyleProjection(t *testing.T) { //nolint:cyclop // each field group is checked explicitly
 	t.Parallel()
 
-	style := &ResolvedStyle{ //nolint:exhaustruct // projection fields are explicit below
+	style := &ResolvedStyle{
 		BoxSizing:         borderBox,
 		Width:             100,
 		WidthPercent:      25,
@@ -28,10 +27,10 @@ func TestBoxModelStyleProjection(t *testing.T) { //nolint:cyclop // each field g
 		PaddingRight:      6,
 		PaddingBottom:     7,
 		PaddingLeft:       8,
-		BorderTop:         border{Width: 1}, //nolint:exhaustruct // width is the projection under test
-		BorderRight:       border{Width: 2}, //nolint:exhaustruct // width is the projection under test
-		BorderBottom:      border{Width: 3}, //nolint:exhaustruct // width is the projection under test
-		BorderLeft:        border{Width: 4}, //nolint:exhaustruct // width is the projection under test
+		BorderTop:         border{Width: 1},
+		BorderRight:       border{Width: 2},
+		BorderBottom:      border{Width: 3},
+		BorderLeft:        border{Width: 4},
 		BorderImageSource: "frame.png",
 	}
 

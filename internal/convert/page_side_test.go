@@ -1,4 +1,4 @@
-package convert //nolint:testpackage // white-box tests need unexported access
+package convert
 
 import (
 	"math"
@@ -109,7 +109,7 @@ func assertPageFirstOverSideGeom(t *testing.T, firstPt, leftPt float64) {
 }
 
 func sideInitGeom(unnamedPt float64) hfGeom {
-	return hfGeom{ //nolint:exhaustruct // test initial geometry
+	return hfGeom{
 		pageW:        595.28,
 		pageH:        841.89,
 		marginTop:    unnamedPt,

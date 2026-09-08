@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -62,7 +61,7 @@ p { font-size: 12pt; margin: 0; font-family: Georgia, serif; font-weight: normal
 
 	const zoom = 8.0 / 12.0
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 400, Height: 200, Sheets: []*css.Stylesheet{cssSheet},
 		Media: "print", Zoom: zoom,
 	})

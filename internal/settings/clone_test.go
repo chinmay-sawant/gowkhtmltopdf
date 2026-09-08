@@ -1,4 +1,4 @@
-package settings //nolint:testpackage // exercises unexported clone helpers.
+package settings
 
 import "testing"
 

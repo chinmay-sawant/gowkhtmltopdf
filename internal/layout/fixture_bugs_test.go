@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -31,7 +30,7 @@ func TestRowBackgroundShowsThroughCells(t *testing.T) { //nolint:cyclop
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 400, Height: 300, Sheets: []*css.Stylesheet{cssSheet}, Background: true,
 	})
 	if err != nil {
@@ -76,7 +75,7 @@ func TestRGBABackgroundCompositesLight(t *testing.T) { //nolint:cyclop
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 400, Height: 200, Sheets: []*css.Stylesheet{cssSheet}, Background: true,
 	})
 	if err != nil {
@@ -114,7 +113,7 @@ func TestNestedTableNoMeasureLeak(t *testing.T) { //nolint:cyclop,funlen
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 500, Height: 400, Background: true,
 	})
 	if err != nil {
@@ -182,7 +181,7 @@ func TestBackgroundPaintsUnderText(t *testing.T) { //nolint:cyclop
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 400, Height: 200, Sheets: []*css.Stylesheet{cssSheet}, Background: true,
 	})
 	if err != nil {
@@ -234,7 +233,7 @@ func TestTableCellRowHeightUsesFinalWidth(t *testing.T) { //nolint:cyclop
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 500, Height: 400, Sheets: []*css.Stylesheet{cssSheet}, Background: true,
 	})
 	if err != nil {
@@ -285,7 +284,7 @@ func TestTableCellBackgroundHeight(t *testing.T) { //nolint:cyclop
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 400, Height: 400, Sheets: []*css.Stylesheet{cssSheet}, Background: true,
 	})
 	if err != nil {
@@ -325,7 +324,7 @@ func TestPrePreservesNewlines(t *testing.T) { //nolint:cyclop
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 400, Height: 400, Background: true,
 	})
 	if err != nil {
@@ -371,7 +370,7 @@ func TestMarginAutoCenters(t *testing.T) { //nolint:cyclop,funlen
 
 	const viewPortW = 300.0
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: viewPortW, Height: 400, Sheets: []*css.Stylesheet{cssSheet}, Background: true,
 	})
 	if err != nil {
@@ -471,7 +470,7 @@ func TestFixture16HeaderBG(t *testing.T) { //nolint:cyclop
 	}
 	walk(root)
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 595, Height: 842, Sheets: sheets, Background: true,
 	})
 	if err != nil {
@@ -506,7 +505,7 @@ func TestMultiImageUniqueOps(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 200, Height: 200, Background: true,
 		Images: func(src string) ([]byte, error) {
 			if src == "a.png" {

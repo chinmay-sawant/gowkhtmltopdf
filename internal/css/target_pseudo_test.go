@@ -1,4 +1,4 @@
-package css //nolint:testpackage // exercises unexported parseSelector
+package css
 
 import (
 	"testing"

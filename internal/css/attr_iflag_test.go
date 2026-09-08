@@ -1,4 +1,4 @@
-package css //nolint:testpackage // exercises unexported parseAttrSelector and Match
+package css
 
 import (
 	"testing"

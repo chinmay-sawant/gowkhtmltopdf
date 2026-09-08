@@ -30,7 +30,7 @@ func defaultLP() settings.LoadPage {
 func mustLoader(t *testing.T) *load.Loader {
 	t.Helper()
 
-	loader, err := load.NewLoaderWithError(settings.LoadGlobal{}) //nolint:exhaustruct // default policy
+	loader, err := load.NewLoaderWithError(settings.LoadGlobal{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +56,7 @@ func TestResolveEffectiveLoadGlobalSharedPolicyWins(t *testing.T) {
 		NetworkBlockPrivate:   true,
 		NetworkBlockCrossHost: true,
 	}
-	mode := settings.LoadGlobal{ //nolint:exhaustruct // focused mode policy override
+	mode := settings.LoadGlobal{
 		Proxy:                 "http://image-proxy.example",
 		Allow:                 []string{"/image"},
 		NetworkPolicySet:      true,
@@ -84,8 +84,8 @@ func TestResolveEffectiveLoadGlobalSharedPolicyWins(t *testing.T) {
 func TestResolveEffectiveLoadGlobalModePolicyFallback(t *testing.T) {
 	t.Parallel()
 
-	global := settings.LoadGlobal{Proxy: "http://shared-proxy.example"} //nolint:exhaustruct // focused shared policy
-	mode := settings.LoadGlobal{                                        //nolint:exhaustruct // mode policy
+	global := settings.LoadGlobal{Proxy: "http://shared-proxy.example"}
+	mode := settings.LoadGlobal{
 		NetworkPolicySet:      true,
 		NetworkAllowedSchemes: []string{"https"},
 		NetworkAllowedHosts:   []string{"image.example"},
@@ -107,12 +107,12 @@ func TestResolveEffectiveLoadGlobalModePolicyFallback(t *testing.T) {
 func TestResolveEffectiveLoadGlobalOwnsPolicySlices(t *testing.T) {
 	t.Parallel()
 
-	global := settings.LoadGlobal{ //nolint:exhaustruct // focused shared policy
+	global := settings.LoadGlobal{
 		Allow:                 []string{"/shared"},
 		NetworkAllowedSchemes: []string{"https"},
 		NetworkAllowedHosts:   []string{"shared.example"},
 	}
-	mode := settings.LoadGlobal{ //nolint:exhaustruct // focused mode policy override
+	mode := settings.LoadGlobal{
 		Allow:                 []string{"/image"},
 		NetworkAllowedSchemes: []string{"http"},
 		NetworkAllowedHosts:   []string{"image.example"},
@@ -999,7 +999,7 @@ func TestRestrictedNetworkPolicyBlocksPrivateAddress(t *testing.T) {
 	defer srv.Close()
 
 	loader, err := load.NewLoaderWithNetworkPolicy(
-		settings.LoadGlobal{}, //nolint:exhaustruct // compatibility global settings are intentionally empty
+		settings.LoadGlobal{},
 		load.RestrictedNetworkPolicy(),
 	)
 
@@ -1028,7 +1028,7 @@ func TestRestrictedNetworkPolicyAllowsExplicitHostException(t *testing.T) { //no
 	policy := load.RestrictedNetworkPolicy()
 	policy.AllowedHosts = []string{parsed.Hostname()}
 	loader, err := load.NewLoaderWithNetworkPolicy(
-		settings.LoadGlobal{}, //nolint:exhaustruct // compatibility global settings are intentionally empty
+		settings.LoadGlobal{},
 		policy,
 	)
 
@@ -1073,7 +1073,7 @@ func TestRestrictedNetworkPolicyBlocksCrossHostRedirect(t *testing.T) {
 	policy := load.RestrictedNetworkPolicy()
 	policy.AllowedHosts = []string{originURL.Hostname(), targetURL.Hostname()}
 	loader, err := load.NewLoaderWithNetworkPolicy(
-		settings.LoadGlobal{}, //nolint:exhaustruct // compatibility global settings are intentionally empty
+		settings.LoadGlobal{},
 		policy,
 	)
 
@@ -1225,7 +1225,7 @@ func TestResourceContextBindsBaseAndPolicy(t *testing.T) {
 	loader := mustLoader(t)
 	loader.EnableLocalFileAccess = true
 	pageURL := "file://" + filepath.ToSlash(filepath.Join(dir, "page.html"))
-	base := &load.Resource{Base: pageURL} //nolint:exhaustruct // intentional zero/partial fields
+	base := &load.Resource{Base: pageURL}
 	pageLoad := defaultLP()
 	pageLoad.BlockLocalFileAccess = false
 	ctx := loader.ForResource(base, pageLoad)
@@ -1334,7 +1334,7 @@ func (f *fakeResolver) LookupIP(_ context.Context, _, host string) ([]net.IP, er
 		return ips, nil
 	}
 
-	return nil, &net.DNSError{ //nolint:exhaustruct // stdlib error type with many optional fields
+	return nil, &net.DNSError{
 		Err: "no such host", Name: host, IsNotFound: true,
 	}
 }
@@ -1343,7 +1343,7 @@ func newRestrictedLoader(t *testing.T, resolver load.IPResolver) *load.Loader {
 	t.Helper()
 
 	loader, err := load.NewLoaderWithNetworkPolicy(
-		settings.LoadGlobal{}, //nolint:exhaustruct
+		settings.LoadGlobal{},
 		load.RestrictedNetworkPolicy(),
 	)
 	if err != nil {
@@ -1360,7 +1360,7 @@ func TestRestrictedPinnedDialNeverRedialsHostname(t *testing.T) {
 
 	const publicHost = "public.example.test"
 
-	resolver := &fakeResolver{ips: map[string][]net.IP{ //nolint:exhaustruct // calls field filled by LookupIP under test
+	resolver := &fakeResolver{ips: map[string][]net.IP{
 		publicHost: {net.ParseIP("93.184.216.34")},
 	}}
 	loader := newRestrictedLoader(t, resolver)
@@ -1421,7 +1421,7 @@ func TestRestrictedBlocksPrivateResolvedRecords(t *testing.T) {
 			t.Parallel()
 
 			host := testCase.name + ".private.test"
-			resolver := &fakeResolver{ips: map[string][]net.IP{ //nolint:exhaustruct // calls field filled by LookupIP under test
+			resolver := &fakeResolver{ips: map[string][]net.IP{
 				host: {net.ParseIP(testCase.ip)},
 			}}
 			loader := newRestrictedLoader(t, resolver)
@@ -1437,7 +1437,7 @@ func TestRestrictedBlocksPrivateResolvedRecords(t *testing.T) {
 func TestRestrictedBlocksMixedPublicAndLoopbackRecords(t *testing.T) {
 	t.Parallel()
 
-	resolver := &fakeResolver{ips: map[string][]net.IP{ //nolint:exhaustruct // calls field filled by LookupIP under test
+	resolver := &fakeResolver{ips: map[string][]net.IP{
 		"mixed.example.test": {net.ParseIP("93.184.216.34"), net.ParseIP("127.0.0.1")},
 	}}
 	loader := newRestrictedLoader(t, resolver)
@@ -1451,7 +1451,7 @@ func TestRestrictedBlocksMixedPublicAndLoopbackRecords(t *testing.T) {
 func TestRestrictedProxyToPrivateTargetDenied(t *testing.T) {
 	t.Parallel()
 
-	global := settings.LoadGlobal{ //nolint:exhaustruct
+	global := settings.LoadGlobal{
 		Proxy: "http://127.0.0.1:9",
 	}
 
@@ -1469,14 +1469,14 @@ func TestRestrictedProxyToPrivateTargetDenied(t *testing.T) {
 func TestRestrictedWildcardAllowlistStillBlocksPrivateIP(t *testing.T) {
 	t.Parallel()
 
-	resolver := &fakeResolver{ips: map[string][]net.IP{ //nolint:exhaustruct // calls field filled by LookupIP under test
+	resolver := &fakeResolver{ips: map[string][]net.IP{
 		"evil.com": {net.ParseIP("127.0.0.1")},
 	}}
 	policy := load.RestrictedNetworkPolicy()
 	policy.AllowedHosts = []string{"*.com"}
 
 	loader, err := load.NewLoaderWithNetworkPolicy(
-		settings.LoadGlobal{}, //nolint:exhaustruct
+		settings.LoadGlobal{},
 		policy,
 	)
 	if err != nil {
@@ -1506,7 +1506,7 @@ func TestRestrictedExactAllowlistPermitsPrivateLiteral(t *testing.T) { //nolint:
 	policy := load.RestrictedNetworkPolicy()
 	policy.AllowedHosts = []string{parsed.Hostname()}
 	loader, err := load.NewLoaderWithNetworkPolicy(
-		settings.LoadGlobal{}, //nolint:exhaustruct
+		settings.LoadGlobal{},
 		policy,
 	)
 
@@ -1549,7 +1549,7 @@ func TestWildcardAllowlistIsLabelBoundary(t *testing.T) {
 	policy := load.RestrictedNetworkPolicy()
 	policy.AllowedHosts = []string{"*.example.com"}
 	loader, err := load.NewLoaderWithNetworkPolicy(
-		settings.LoadGlobal{}, //nolint:exhaustruct
+		settings.LoadGlobal{},
 		policy,
 	)
 

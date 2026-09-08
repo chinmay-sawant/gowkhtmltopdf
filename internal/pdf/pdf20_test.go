@@ -1,4 +1,3 @@
-//nolint:testpackage,exhaustruct // tests reach into unexported state
 package pdf
 
 import (

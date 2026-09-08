@@ -1,4 +1,4 @@
-//nolint:testpackage,exhaustruct,wsl,lll,cyclop // layout regressions use internal state and explicit fixtures
+//nolint:wsl,lll,cyclop // layout regressions use internal state and explicit fixtures
 package layout
 
 import (
@@ -27,16 +27,16 @@ func TestContainerStateEqualityIncludesFontSize(t *testing.T) {
 func TestSplitCrossingRectsRemapsBoxRangeAndPreservesIdentity(t *testing.T) {
 	t.Parallel()
 
-	root := &box{ //nolint:exhaustruct // intentional zero fields
-		node:    &html.Node{}, //nolint:exhaustruct // intentional zero fields
+	root := &box{
+		node:    &html.Node{},
 		opStart: 0,
 		opEnd:   0,
 	}
 
-	res := &Result{ //nolint:exhaustruct // intentional zero fields
+	res := &Result{
 		root: root,
 		Ops: []Op{
-			{Kind: OpFillRect, X: 10, Y: 40, W: 20, H: 30}, //nolint:exhaustruct // intentional zero fields
+			{Kind: OpFillRect, X: 10, Y: 40, W: 20, H: 30},
 		},
 	}
 	splitCrossingRects(res, 50)
@@ -86,18 +86,18 @@ func TestUsedImageSizeUsesOneAspectAndConstraintPolicy(t *testing.T) { //nolint:
 		t.Fatal("parsed image missing")
 	}
 
-	eng := &engine{ //nolint:exhaustruct // intentional zero fields
-		opts:    Options{Width: 300}, //nolint:exhaustruct // intentional zero fields
+	eng := &engine{
+		opts:    Options{Width: 300},
 		scale:   1,
 		imgMaxW: 80,
 	}
 
-	ref := &imageRef{ //nolint:exhaustruct // intentional zero fields
+	ref := &imageRef{
 		w: 400,
 		h: 200,
 	}
 
-	base := ResolvedStyle{ //nolint:exhaustruct // intentional zero fields
+	base := ResolvedStyle{
 		Width: -1, WidthPercent: -1, Height: -1, HeightPercent: -1,
 		MaxWidth: -1, MaxWidthPercent: -1, MaxHeight: -1,
 	}
@@ -137,7 +137,7 @@ func TestLayoutContextHonorsCancellation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = LayoutContext(ctx, root, Options{Width: 300, Height: 300}) //nolint:exhaustruct // intentional zero fields
+	_, err = LayoutContext(ctx, root, Options{Width: 300, Height: 300})
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("LayoutContext error = %v, want context.Canceled", err)
 	}
@@ -161,7 +161,7 @@ func TestLayoutContextCancelsBlockingImageResolver(t *testing.T) {
 
 				return nil, resolveCtx.Err()
 			},
-		}) //nolint:exhaustruct // blocking image callback is the only special option
+		})
 		done <- err
 	}()
 
@@ -187,7 +187,7 @@ func TestCloneResultDropsDocumentOwnedStructureElements(t *testing.T) {
 	t.Parallel()
 
 	root := mustParse(t, `<html><body><h1>Title</h1><p>Body</p></body></html>`)
-	res, err := LayoutContext(t.Context(), root, Options{Width: 300, Height: 300}) //nolint:exhaustruct
+	res, err := LayoutContext(t.Context(), root, Options{Width: 300, Height: 300})
 	if err != nil {
 		t.Fatalf("LayoutContext: %v", err)
 	}
@@ -240,7 +240,7 @@ func TestRepeatedTaggedPaintRebuildsDocumentStructure(t *testing.T) {
 	t.Parallel()
 
 	root := mustParse(t, `<html><body><h1>Title</h1><p>Body</p></body></html>`)
-	res, err := LayoutContext(t.Context(), root, Options{Width: 300, Height: 300}) //nolint:exhaustruct
+	res, err := LayoutContext(t.Context(), root, Options{Width: 300, Height: 300})
 	if err != nil {
 		t.Fatalf("LayoutContext: %v", err)
 	}
@@ -303,14 +303,14 @@ func TestPaintContextHonorsCancellation(t *testing.T) {
 	cancel()
 
 	doc := pdf.NewDocument()
-	res := &Result{ //nolint:exhaustruct // intentional zero fields
+	res := &Result{
 		Width: 100, Height: 100,
 		Ops: []Op{
-			{Kind: OpFillRect, W: 10, H: 10}, //nolint:exhaustruct // intentional zero fields
+			{Kind: OpFillRect, W: 10, H: 10},
 		},
 	}
 
-	err := PaintContext(ctx, doc, res, PaintOptions{ //nolint:exhaustruct // intentional zero fields
+	err := PaintContext(ctx, doc, res, PaintOptions{
 		PageWidth: 100, PageHeight: 100,
 	})
 	if !errors.Is(err, context.Canceled) {
@@ -321,8 +321,8 @@ func TestPaintContextHonorsCancellation(t *testing.T) {
 func TestShiftOpsOnlyMaintainsFlowIndex(t *testing.T) {
 	t.Parallel()
 
-	res := &Result{ //nolint:exhaustruct // intentional zero fields
-		Ops:          []Op{{Y: 10}, {Y: 20}}, //nolint:exhaustruct // intentional zero fields
+	res := &Result{
+		Ops:          []Op{{Y: 10}, {Y: 20}},
 		flowPageSize: 100,
 	}
 
@@ -344,8 +344,8 @@ func TestShiftOpsOnlyMaintainsFlowIndex(t *testing.T) {
 func TestShiftFlowYNegativeMaintainsFlowIndex(t *testing.T) {
 	t.Parallel()
 
-	res := &Result{ //nolint:exhaustruct // intentional zero fields
-		Ops:          []Op{{Y: 110}, {Y: 210}}, //nolint:exhaustruct // intentional zero fields
+	res := &Result{
+		Ops:          []Op{{Y: 110}, {Y: 210}},
 		flowPageSize: 100,
 	}
 
@@ -371,8 +371,8 @@ func TestShiftFlowYNegativeMaintainsFlowIndex(t *testing.T) {
 func TestGeneratedPaginationOpsInvalidateFlowIndex(t *testing.T) {
 	t.Parallel()
 
-	res := &Result{ //nolint:exhaustruct // intentional zero fields
-		Ops:          []Op{{Kind: OpLine, Y: 10}}, //nolint:exhaustruct // intentional zero fields
+	res := &Result{
+		Ops:          []Op{{Kind: OpLine, Y: 10}},
 		flowPageOf:   []int{0},
 		flowPages:    [][]int{{0}},
 		flowPos:      []int{0},
@@ -387,7 +387,7 @@ func TestGeneratedPaginationOpsInvalidateFlowIndex(t *testing.T) {
 }
 
 func BenchmarkUsedImageSize(b *testing.B) {
-	eng := &engine{opts: Options{Width: 640}, scale: 1, imgMaxW: 320} //nolint:exhaustruct // intentional zero fields
+	eng := &engine{opts: Options{Width: 640}, scale: 1, imgMaxW: 320}
 
 	root, err := html.Parse(`<img width="400" src="x">`)
 	if err != nil {
@@ -414,12 +414,12 @@ func BenchmarkUsedImageSize(b *testing.B) {
 	}
 	walk(root)
 
-	baseStyle := ResolvedStyle{ //nolint:exhaustruct // intentional zero fields
+	baseStyle := ResolvedStyle{
 		Width: -1, WidthPercent: -1, Height: -1, HeightPercent: -1,
 		MaxWidth: -1, MaxWidthPercent: -1, MaxHeight: -1,
 	}
 
-	ref := &imageRef{ //nolint:exhaustruct // intentional zero fields
+	ref := &imageRef{
 		w: 800,
 		h: 400,
 	}
@@ -435,7 +435,7 @@ func BenchmarkDisplayListIdentity10kOps100Pages(b *testing.B) {
 	makeResult := func() *Result {
 		ops := make([]Op, 10_000)
 		for idx := range ops {
-			ops[idx] = Op{ //nolint:exhaustruct // intentional zero fields
+			ops[idx] = Op{
 				Kind: OpFillRect,
 				X:    float64(idx % 100),
 				Y:    float64(idx/100) * 100,
@@ -445,9 +445,9 @@ func BenchmarkDisplayListIdentity10kOps100Pages(b *testing.B) {
 			}
 		}
 
-		return &Result{ //nolint:exhaustruct // intentional zero fields
+		return &Result{
 			Width: 640, Height: 10_000, Ops: ops,
-			root: &box{opStart: 0, opEnd: len(ops) - 1, height: 10_000}, //nolint:exhaustruct // intentional zero fields
+			root: &box{opStart: 0, opEnd: len(ops) - 1, height: 10_000},
 		}
 	}
 
@@ -457,7 +457,7 @@ func BenchmarkDisplayListIdentity10kOps100Pages(b *testing.B) {
 		res := makeResult()
 		doc := pdf.NewDocument()
 
-		if err := PaintContext(b.Context(), doc, res, PaintOptions{ //nolint:exhaustruct // intentional zero fields
+		if err := PaintContext(b.Context(), doc, res, PaintOptions{
 			PageWidth: 640, PageHeight: 100,
 		}); err != nil {
 			b.Fatal(err)

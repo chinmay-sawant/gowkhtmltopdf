@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -70,7 +69,7 @@ a { color: inherit; text-decoration: underline; }
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 400, Height: 200, Sheets: []*css.Stylesheet{cssSheet},
 		Media: "print", Background: true,
 	})
@@ -110,7 +109,7 @@ func TestUnderlineSitsBelowDescenders(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 200, Height: 100, Sheets: []*css.Stylesheet{cssSheet}, Media: "print",
 	})
 	if err != nil {

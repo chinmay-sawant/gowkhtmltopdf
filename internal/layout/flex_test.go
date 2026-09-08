@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -465,7 +464,7 @@ func TestFlexWrapRowGapSurvivesPaint(t *testing.T) {
 <div class="wrap"><div>A</div><div>B</div><div>C</div><div>D</div></div>
 </body></html>`, cssSheet)
 
-	if err := Paint(pdf.NewDocument(), res, PaintOptions{ //nolint:exhaustruct
+	if err := Paint(pdf.NewDocument(), res, PaintOptions{
 		PageWidth: 400, PageHeight: 400,
 	}); err != nil {
 		t.Fatal(err)

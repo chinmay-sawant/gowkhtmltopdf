@@ -1,4 +1,4 @@
-//nolint:exhaustruct,funlen,wsl,testpackage,copyloopvar
+//nolint:funlen,wsl,copyloopvar
 package gowkhtmltopdf
 
 import (

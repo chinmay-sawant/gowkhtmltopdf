@@ -1,4 +1,4 @@
-//nolint:testpackage,wsl,nlreturn,varnamelen,lll // white-box geometry regression tests
+//nolint:wsl,nlreturn,varnamelen,lll // white-box geometry regression tests
 package layout
 
 import (

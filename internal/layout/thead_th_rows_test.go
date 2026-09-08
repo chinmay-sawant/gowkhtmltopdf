@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -29,7 +28,7 @@ func TestLeadingTHRowsRepeatAsHeader(t *testing.T) { //nolint:cyclop,funlen
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 400, Height: 200, Background: true,
 	})
 	if err != nil {

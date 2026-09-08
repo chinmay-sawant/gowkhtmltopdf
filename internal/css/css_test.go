@@ -1,4 +1,4 @@
-package css //nolint:testpackage // exercises unexported parseSelector/isImportant
+package css
 
 import (
 	"fmt"
@@ -402,6 +402,7 @@ func TestParseInline(t *testing.T) {
 	}
 }
 
+//nolint:funlen // table-driven selector compound cases
 func TestParseSelectorCompounds(t *testing.T) {
 	t.Parallel()
 
@@ -410,49 +411,49 @@ func TestParseSelectorCompounds(t *testing.T) {
 		want []SelectorPart
 	}{
 		{"*", []SelectorPart{
-			{Tag: "*"}, //nolint:exhaustruct // intentional zero-value fields
+			{Tag: "*"},
 		}},
 		{"div", []SelectorPart{
-			{Tag: "div"}, //nolint:exhaustruct // intentional zero-value fields
+			{Tag: "div"},
 		}},
 		{".cls", []SelectorPart{
-			{Tag: "*", Classes: []string{"cls"}}, //nolint:exhaustruct // intentional zero-value fields
+			{Tag: "*", Classes: []string{"cls"}},
 		}},
 		{"#id", []SelectorPart{
-			{Tag: "*", ID: "id"}, //nolint:exhaustruct // intentional zero-value fields
+			{Tag: "*", ID: "id"},
 		}},
 		{"div.a.b", []SelectorPart{
-			{Tag: "div", Classes: []string{"a", "b"}}, //nolint:exhaustruct // intentional zero-value fields
+			{Tag: "div", Classes: []string{"a", "b"}},
 		}},
 		{"div#x.y", []SelectorPart{
-			{Tag: "div", ID: "x", Classes: []string{"y"}}, //nolint:exhaustruct // intentional zero-value fields
+			{Tag: "div", ID: "x", Classes: []string{"y"}},
 		}},
 		{"a:hover", []SelectorPart{
-			{Tag: "a"}, //nolint:exhaustruct // intentional zero-value fields
+			{Tag: "a"},
 		}},
 		{"a[href]", []SelectorPart{
-			{Tag: "a"}, //nolint:exhaustruct // intentional zero-value fields
+			{Tag: "a"},
 		}},
 		{"[disabled]", []SelectorPart{
-			{Tag: "*"}, //nolint:exhaustruct // intentional zero-value fields
+			{Tag: "*"},
 		}},
 		{"div > p", []SelectorPart{
-			{Tag: "div"},                //nolint:exhaustruct // intentional zero-value fields
-			{Tag: "p", Combinator: ">"}, //nolint:exhaustruct // intentional zero-value fields
+			{Tag: "div"},
+			{Tag: "p", Combinator: ">"},
 		}},
 		{"div p", []SelectorPart{
-			{Tag: "div"},                //nolint:exhaustruct // intentional zero-value fields
-			{Tag: "p", Combinator: " "}, //nolint:exhaustruct // intentional zero-value fields
+			{Tag: "div"},
+			{Tag: "p", Combinator: " "},
 		}},
 		{"ul li a", []SelectorPart{
-			{Tag: "ul"},                  //nolint:exhaustruct // intentional zero-value fields
-			{Tag: "li", Combinator: " "}, //nolint:exhaustruct // intentional zero-value fields
-			{Tag: "a", Combinator: " "},  //nolint:exhaustruct // intentional zero-value fields
+			{Tag: "ul"},
+			{Tag: "li", Combinator: " "},
+			{Tag: "a", Combinator: " "},
 		}},
 		{"div.a > p.b i", []SelectorPart{
-			{Tag: "div", Classes: []string{"a"}},                //nolint:exhaustruct // intentional zero-value fields
-			{Tag: "p", Classes: []string{"b"}, Combinator: ">"}, //nolint:exhaustruct // intentional zero-value fields
-			{Tag: "i", Combinator: " "},                         //nolint:exhaustruct // intentional zero-value fields
+			{Tag: "div", Classes: []string{"a"}},
+			{Tag: "p", Classes: []string{"b"}, Combinator: ">"},
+			{Tag: "i", Combinator: " "},
 		}},
 	}
 	for _, testCase := range cases {

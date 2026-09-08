@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise the resolved style cascade
 package layout
 
 import (
@@ -174,7 +173,7 @@ func TestWritingModeInherits(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := Layout(doc, Options{Width: 800, Height: 600}) //nolint:exhaustruct // test options
+	res, err := Layout(doc, Options{Width: 800, Height: 600})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -226,7 +225,7 @@ func TestTextIndentInheritsAndShiftsFirstLine(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	resPlain, err := Layout(docPlain, Options{Width: 800, Height: 600}) //nolint:exhaustruct
+	resPlain, err := Layout(docPlain, Options{Width: 800, Height: 600})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -236,7 +235,7 @@ func TestTextIndentInheritsAndShiftsFirstLine(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	resIndent, err := Layout(docIndent, Options{Width: 800, Height: 600}) //nolint:exhaustruct
+	resIndent, err := Layout(docIndent, Options{Width: 800, Height: 600})
 	if err != nil {
 		t.Fatal(err)
 	}

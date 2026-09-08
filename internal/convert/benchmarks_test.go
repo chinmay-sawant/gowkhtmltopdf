@@ -238,7 +238,7 @@ func benchmarkImagesFromShows(shows []tvMazeShow, count int) []benchmarkImage {
 
 func fetchTVMazeShows(ctx context.Context, client *http.Client) ([]tvMazeShow, int, error) {
 	if client == nil {
-		client = &http.Client{Timeout: 30 * time.Second} //nolint:exhaustruct // intentional zero-value fields
+		client = &http.Client{Timeout: 30 * time.Second}
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, tvMazeShowsURL, nil)
@@ -315,7 +315,7 @@ func liveBenchmarkShows(tb testing.TB) []tvMazeShow {
 	ctx, cancel := context.WithTimeout(tb.Context(), 30*time.Second)
 	defer cancel()
 
-	shows, _, err := fetchTVMazeShows(ctx, &http.Client{ //nolint:exhaustruct // intentional zero-value fields
+	shows, _, err := fetchTVMazeShows(ctx, &http.Client{
 		Timeout: 30 * time.Second,
 	})
 	if err != nil {
@@ -411,7 +411,7 @@ func BenchmarkPDFPages(b *testing.B) {
 	sources := make(map[int][]byte, len(benchmarkPageSizes))
 
 	for _, pages := range benchmarkPageSizes {
-		sources[pages] = executeBenchmarkTemplate(b, tpl, benchmarkTemplateData{ //nolint:exhaustruct,lll // intentional zero-value fields
+		sources[pages] = executeBenchmarkTemplate(b, tpl, benchmarkTemplateData{
 			Pages: benchmarkPages(pages),
 		})
 	}
@@ -459,7 +459,7 @@ func BenchmarkTemplatePages(b *testing.B) {
 			benchmarkPDFMetadata(b, mode)
 
 			for _, pages := range benchmarkPageSizes {
-				data := benchmarkTemplateData{Pages: benchmarkPages(pages)} //nolint:exhaustruct // intentional zero-value fields
+				data := benchmarkTemplateData{Pages: benchmarkPages(pages)}
 				b.Run(fmt.Sprintf("%dPages", pages), func(b *testing.B) {
 					var output bytes.Buffer
 					req := benchmarkPDFRequest(nil, &output, mode)
@@ -574,7 +574,7 @@ func TestGenerateBenchmarkOutputs(t *testing.T) { //nolint:cyclop,funlen // mate
 
 	reportTemplate := loadBenchmarkTemplate(t, "report.html.tmpl")
 	for _, pages := range benchmarkPageSizes {
-		source := executeBenchmarkTemplate(t, reportTemplate, benchmarkTemplateData{ //nolint:exhaustruct,lll // intentional zero-value fields
+		source := executeBenchmarkTemplate(t, reportTemplate, benchmarkTemplateData{ //nolint:lll // intentional zero-value fields
 			Pages: benchmarkPages(pages),
 		})
 
@@ -594,7 +594,7 @@ func TestGenerateBenchmarkOutputs(t *testing.T) { //nolint:cyclop,funlen // mate
 		output.Reset()
 		templateRequest := benchmarkPDFRequest(nil, &output, benchmarkPDFCertifiedIslands)
 
-		if err := reportTemplate.Execute(&output, benchmarkTemplateData{ //nolint:exhaustruct,lll // intentional zero-value fields
+		if err := reportTemplate.Execute(&output, benchmarkTemplateData{
 			Pages: benchmarkPages(pages),
 		}); err != nil {
 			t.Fatalf("render report template for %d pages: %v", pages, err)
@@ -626,7 +626,7 @@ func TestGenerateBenchmarkOutputs(t *testing.T) { //nolint:cyclop,funlen // mate
 	webTemplate := loadBenchmarkTemplate(t, "web-fetch-image.html.tmpl")
 
 	for _, images := range benchmarkPageSizes {
-		source := executeBenchmarkTemplate(t, webTemplate, benchmarkTemplateData{ //nolint:exhaustruct,lll // intentional zero-value fields
+		source := executeBenchmarkTemplate(t, webTemplate, benchmarkTemplateData{ //nolint:lll // intentional zero-value fields
 			Images: benchmarkImagesFromShows(shows, images),
 		})
 
@@ -645,7 +645,7 @@ func TestGenerateBenchmarkOutputs(t *testing.T) { //nolint:cyclop,funlen // mate
 	imageURL := benchmarkDataURL(pngData)
 
 	for _, images := range benchmarkPageSizes {
-		source := executeBenchmarkTemplate(t, imageTemplate, benchmarkTemplateData{ //nolint:exhaustruct,lll // intentional zero-value fields
+		source := executeBenchmarkTemplate(t, imageTemplate, benchmarkTemplateData{ //nolint:lll // intentional zero-value fields
 			Images: benchmarkImages(images, imageURL),
 		})
 
@@ -716,7 +716,7 @@ func TestGenerateLiveMovieOutput(t *testing.T) {
 func BenchmarkLiveMovieData(b *testing.B) {
 	liveBenchmarkEnabled(b)
 
-	client := &http.Client{Timeout: 30 * time.Second} //nolint:exhaustruct // intentional zero-value fields
+	client := &http.Client{Timeout: 30 * time.Second}
 
 	var bodyBytes int
 
@@ -780,7 +780,7 @@ func BenchmarkWebFetchImage(b *testing.B) {
 
 	sources := make(map[int][]byte, len(benchmarkPageSizes))
 	for _, images := range benchmarkPageSizes {
-		sources[images] = executeBenchmarkTemplate(b, tpl, benchmarkTemplateData{ //nolint:exhaustruct,lll // intentional zero-value fields
+		sources[images] = executeBenchmarkTemplate(b, tpl, benchmarkTemplateData{ //nolint:lll // intentional zero-value fields
 			Images:   benchmarkImages(images, "/benchmark-image.png"),
 			ImageSrc: "/benchmark-image.png",
 		})

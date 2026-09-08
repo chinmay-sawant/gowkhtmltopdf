@@ -1,4 +1,3 @@
-//nolint:testpackage // these checks inspect renderer geometry and display-list ownership
 package layout
 
 import (
@@ -70,7 +69,7 @@ func linkedFixtureLayout(t *testing.T, name, stylesheet string) (*html.Node, *Re
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // fixture uses print geometry
+	res, err := Layout(root, Options{
 		Width: 595.28 - 2*28.35, Height: 841.89 - 2*28.35,
 		Background: true, Sheets: []*css.Stylesheet{sheet}, Media: "print",
 	})
@@ -265,7 +264,7 @@ func TestFixture56CaptionAndFlowStayVisible(t *testing.T) {
 	t.Parallel()
 
 	root, sheet := loadFixture56(t)
-	res, err := Layout(root, Options{ //nolint:exhaustruct // fixture uses standard print layout
+	res, err := Layout(root, Options{
 		Width: 595.28 - 2*28.35, Height: 841.89 - 2*28.35,
 		Background: true, Sheets: []*css.Stylesheet{sheet}, Media: "print",
 	})

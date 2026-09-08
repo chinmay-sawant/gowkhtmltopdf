@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise PDF object and sink internals.
 package pdf
 
 import (

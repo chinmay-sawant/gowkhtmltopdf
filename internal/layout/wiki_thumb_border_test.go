@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -65,7 +64,7 @@ func layoutWikiThumb(t *testing.T, extraLeading string, height float64) *Result 
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // probe uses the standard print layout path
+	res, err := Layout(root, Options{
 		Width: 538, Height: height, Sheets: []*css.Stylesheet{cssSheet},
 		Background: true,
 		Images: func(src string) ([]byte, error) {

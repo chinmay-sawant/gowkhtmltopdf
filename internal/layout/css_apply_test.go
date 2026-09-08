@@ -1,4 +1,4 @@
-//nolint:testpackage,wsl,varnamelen,cyclop // cascade apply proofs
+//nolint:wsl,varnamelen,cyclop // cascade apply proofs
 package layout
 
 import (

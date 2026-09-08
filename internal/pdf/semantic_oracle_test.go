@@ -1,4 +1,4 @@
-//nolint:testpackage,cyclop,varnamelen,wsl // test-only parser
+//nolint:cyclop,varnamelen,wsl // test-only parser
 package pdf
 
 import (
@@ -120,7 +120,7 @@ func buildSemanticPDF(t *testing.T) []byte {
 	secondContent.TextShow("second page")
 	secondContent.EndText()
 
-	doc.SetOutline(&Outline{ //nolint:exhaustruct // test fixture intentionally omits the root title.
+	doc.SetOutline(&Outline{
 		Children: []*Outline{{Title: "First page", PageRef: doc.PageRef(0), X: 40, Y: 740}},
 	})
 
@@ -299,7 +299,7 @@ func buildSemanticPDF17(t *testing.T) []byte {
 		t.Fatalf("DefaultFont: %v", err)
 	}
 
-	doc, err := NewDocumentWithPolicy(WriterPolicy{Version: PDF17}) //nolint:exhaustruct // test policy
+	doc, err := NewDocumentWithPolicy(WriterPolicy{Version: PDF17})
 	if err != nil {
 		t.Fatalf("NewDocumentWithPolicy(PDF17): %v", err)
 	}
@@ -333,7 +333,7 @@ func buildSemanticPDF17(t *testing.T) []byte {
 	secondContent.TextShow("second page")
 	secondContent.EndText()
 
-	doc.SetOutline(&Outline{ //nolint:exhaustruct // test fixture intentionally omits the root title.
+	doc.SetOutline(&Outline{
 		Children: []*Outline{{Title: "First page", PageRef: doc.PageRef(0), X: 40, Y: 740}},
 	})
 

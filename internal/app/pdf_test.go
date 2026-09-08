@@ -20,9 +20,9 @@ import (
 func TestBuildPDFRequestPreservesEngineContract(t *testing.T) {
 	t.Parallel()
 
-	cmd := &cli.Command{ //nolint:exhaustruct // intentional zero/partial fields
+	cmd := &cli.Command{
 		Global:  settings.DefaultPdfGlobal(),
-		Objects: []settings.PdfObject{{Page: "inline:<html></html>"}}, //nolint:exhaustruct // intentional zero/partial fields
+		Objects: []settings.PdfObject{{Page: "inline:<html></html>"}},
 	}
 
 	var out, outline bytes.Buffer
@@ -46,7 +46,7 @@ func TestBuildPDFRequestPreservesEngineContract(t *testing.T) {
 func TestBuildPDFRequestRejectsMissingOutput(t *testing.T) {
 	t.Parallel()
 
-	cmd := &cli.Command{Global: settings.DefaultPdfGlobal()} //nolint:exhaustruct // intentional zero/partial fields
+	cmd := &cli.Command{Global: settings.DefaultPdfGlobal()}
 
 	_, err := app.BuildPDFRequest(cmd, nil, nil)
 	if err == nil {
@@ -62,7 +62,7 @@ func TestRunPDFValidatesBeforeOpeningOutput(t *testing.T) {
 	t.Parallel()
 
 	output := filepath.Join(t.TempDir(), "out.pdf")
-	cmd := &cli.Command{ //nolint:exhaustruct // focused invalid command
+	cmd := &cli.Command{
 		Global: settings.DefaultPdfGlobal(),
 		Output: output,
 	}
@@ -98,9 +98,9 @@ func TestRunPDFRejectsOutlineAndPDFOnStdout(t *testing.T) {
 
 	global := settings.DefaultPdfGlobal()
 	global.DumpOutline = true
-	cmd := &cli.Command{ //nolint:exhaustruct // intentional zero/partial fields
+	cmd := &cli.Command{
 		Global: global,
-		Objects: []settings.PdfObject{{ //nolint:exhaustruct // intentional zero/partial fields
+		Objects: []settings.PdfObject{{
 			Page: "inline:<html><body>stdout conflict</body></html>",
 		}},
 		Output: "-",
@@ -123,9 +123,9 @@ func TestRunPDFKeepsPDFFileAndOutlineXMLSeparate(t *testing.T) {
 	global := settings.DefaultPdfGlobal()
 	global.DumpOutline = true
 	output := filepath.Join(t.TempDir(), "out.pdf")
-	cmd := &cli.Command{ //nolint:exhaustruct // intentional zero/partial fields
+	cmd := &cli.Command{
 		Global: global,
-		Objects: []settings.PdfObject{{ //nolint:exhaustruct // intentional zero/partial fields
+		Objects: []settings.PdfObject{{
 			Page: "inline:<html><body><h1>Separate outputs</h1></body></html>",
 		}},
 		Output: output,

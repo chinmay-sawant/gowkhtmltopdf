@@ -35,7 +35,7 @@ func TestBackgroundRepeatXTiles(t *testing.T) {
 	rootDir, _ := filepath.Abs("../..")
 	logoPath := filepath.Join(rootDir, "testdata/golden/logo.png")
 
-	res, err := layout.Layout(root, layout.Options{ //nolint:exhaustruct
+	res, err := layout.Layout(root, layout.Options{
 		Width: 400, Height: 200, Background: true, Media: "print",
 		Sheets: []*css.Stylesheet{sheet},
 		Images: func(src string) ([]byte, error) {

@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -51,7 +50,7 @@ func TestScaleTransformRestampAfterPagination(t *testing.T) {
 	doc := parseTestHTML(t, `<html><body style="margin:0"><table style="border-collapse:collapse;width:500px">`+
 		scaleRestampRows()+`</table></body></html>`)
 
-	res, err := Layout(doc, Options{ //nolint:exhaustruct // test viewport only
+	res, err := Layout(doc, Options{
 		Width:      560,
 		Height:     pageH,
 		Background: true,
@@ -218,7 +217,7 @@ func layoutXformStage(t *testing.T, src string) *Result {
 
 	doc := parseTestHTML(t, src)
 
-	res, err := Layout(doc, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(doc, Options{
 		Width:      560,
 		Height:     800,
 		Background: true,

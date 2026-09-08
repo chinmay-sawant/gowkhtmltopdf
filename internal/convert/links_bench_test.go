@@ -1,4 +1,4 @@
-package convert //nolint:testpackage // white-box benchmark of body navigation collection
+package convert
 
 import (
 	"fmt"
@@ -17,7 +17,7 @@ func largeNavigationResult(idsCount, opsCount int) *layout.Result {
 	for i := range ops {
 		ops[i].Y = float64(i * 10)
 		if i%3 == 0 {
-			ops[i].StructElem = &pdf.StructElem{} //nolint:exhaustruct // bench needs only the pointer
+			ops[i].StructElem = &pdf.StructElem{}
 		}
 	}
 
@@ -25,14 +25,14 @@ func largeNavigationResult(idsCount, opsCount int) *layout.Result {
 
 	for idx := range locs {
 		nodeAttrs := map[string]string{"id": fmt.Sprintf("id-%d", idx)}
-		n := &html.Node{Attrs: nodeAttrs} //nolint:exhaustruct // bench needs only the id
-		loc := layout.ElementLocation{    //nolint:exhaustruct // bench needs only navigation fields
+		n := &html.Node{Attrs: nodeAttrs}
+		loc := layout.ElementLocation{
 			Node: n, Y: float64(idx*400 + 5), H: 20,
 		}
 		locs[idx] = loc
 	}
 
-	return &layout.Result{Locations: locs, Ops: ops} //nolint:exhaustruct // bench needs only navigation fields
+	return &layout.Result{Locations: locs, Ops: ops}
 }
 
 func BenchmarkCollectBodyNavigationLargeDoc(b *testing.B) {

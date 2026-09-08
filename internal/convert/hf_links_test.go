@@ -1,4 +1,4 @@
-package convert //nolint:testpackage // white-box tests need unexported access
+package convert
 
 import (
 	"bytes"

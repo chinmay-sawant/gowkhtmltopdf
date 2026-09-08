@@ -1,4 +1,4 @@
-package convert //nolint:testpackage // white-box tests need unexported access
+package convert
 
 import (
 	"context"
@@ -18,7 +18,7 @@ func TestPipelineFinalizeStopsWhenCanceled(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
-	p := &pdfPipeline{run: &runContext{}} //nolint:exhaustruct // cancelled ctx short-circuits before any state use
+	p := &pdfPipeline{run: &runContext{}}
 
 	err := p.Finalize(ctx)
 	if !errors.Is(err, context.Canceled) {
@@ -42,7 +42,7 @@ func TestDrawHeadersFootersStopsWhenCanceled(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
-	req := &Request{} //nolint:exhaustruct // zero request; cancelled ctx short-circuits
+	req := &Request{}
 	result := drawHeadersFootersResult(ctx, nil, doc, req, plan, nil)
 
 	if err := result.Err(); !errors.Is(err, context.Canceled) {

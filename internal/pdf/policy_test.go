@@ -1,4 +1,3 @@
-//nolint:testpackage,exhaustruct // tests verify internal serialization and policy behavior
 package pdf
 
 import (
@@ -23,7 +22,7 @@ func TestPolicyValidation(t *testing.T) {
 	}{
 		{
 			name:    "zero value PDFUnknown is rejected",
-			policy:  WriterPolicy{}, //nolint:exhaustruct // testing zero-value behavior
+			policy:  WriterPolicy{},
 			wantErr: ErrUnsupportedPDFVersion,
 		},
 		{
@@ -179,7 +178,7 @@ func TestPolicyHeaderAndProducerStrings(t *testing.T) {
 		wantProducer string
 	}{
 		{
-			policy:       WriterPolicy{}, //nolint:exhaustruct // zero value
+			policy:       WriterPolicy{},
 			wantHeader:   "1.4",
 			wantProducer: "gowkhtmltopdf 1.4",
 		},
@@ -536,7 +535,7 @@ func TestCatalogAndMetadataStream(t *testing.T) {
 	}
 }
 
-//nolint:cyclop // tests Info dictionary and outline UTF-16BE / Latin-1 paths
+//nolint:cyclop,funlen // tests Info dictionary and outline UTF-16BE / Latin-1 paths
 func TestPDF17InfoAndOutlineUnicodeUTF16BE(t *testing.T) {
 	t.Parallel()
 
@@ -549,7 +548,7 @@ func TestPDF17InfoAndOutlineUnicodeUTF16BE(t *testing.T) {
 	doc17.SetInfo("Title", "Annual Report — 2026")
 	page := doc17.AddPage(200, 200)
 
-	doc17.SetOutline(&Outline{ //nolint:exhaustruct // intentional zero-value fields
+	doc17.SetOutline(&Outline{
 		Title: "root",
 		Children: []*Outline{
 			{Title: "Section — Overview", PageRef: page.ref.String()},
@@ -814,7 +813,7 @@ func TestPDF17XrefOffsets(t *testing.T) {
 	content2.TextShow("PDF 1.7 page two")
 	content2.EndText()
 
-	doc.SetOutline(&Outline{ //nolint:exhaustruct // test outline
+	doc.SetOutline(&Outline{
 		Title: "root",
 		Children: []*Outline{
 			{Title: "Section 1", PageRef: doc.PageRef(0), X: 20, Y: 350},

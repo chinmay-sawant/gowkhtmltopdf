@@ -16,11 +16,11 @@ func TestRunImageResolvesFormatPerExecution(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
-	cmd := &cli.Command{ //nolint:exhaustruct // repeated format resolution only needs one source
+	cmd := &cli.Command{
 		Global: settings.DefaultPdfGlobal(),
 		Image:  settings.DefaultImageGlobal(),
-		Objects: []settings.PdfObject{{ //nolint:exhaustruct // inline source only
-			Load: settings.LoadPage{ //nolint:exhaustruct // inline source only
+		Objects: []settings.PdfObject{{
+			Load: settings.LoadPage{
 				InlineHTML: []byte("<h1>format</h1>"),
 			},
 		}},
@@ -61,7 +61,7 @@ func TestRunImageDelegatesPreflightBeforeOpeningOutput(t *testing.T) {
 	t.Parallel()
 
 	output := filepath.Join(t.TempDir(), "out.png")
-	cmd := &cli.Command{ //nolint:exhaustruct // focused invalid command
+	cmd := &cli.Command{
 		Global: settings.DefaultPdfGlobal(),
 		Image:  settings.DefaultImageGlobal(),
 		Output: output,
@@ -81,12 +81,12 @@ func TestRunImageRejectsMultipleObjectsBeforeOpeningOutput(t *testing.T) {
 	t.Parallel()
 
 	output := filepath.Join(t.TempDir(), "out.png")
-	cmd := &cli.Command{ //nolint:exhaustruct // focused invalid command
+	cmd := &cli.Command{
 		Global: settings.DefaultPdfGlobal(),
 		Image:  settings.DefaultImageGlobal(),
 		Objects: []settings.PdfObject{
-			{Page: "first.html"},  //nolint:exhaustruct // only page source matters
-			{Page: "second.html"}, //nolint:exhaustruct // only page source matters
+			{Page: "first.html"},
+			{Page: "second.html"},
 		},
 		Output: output,
 	}

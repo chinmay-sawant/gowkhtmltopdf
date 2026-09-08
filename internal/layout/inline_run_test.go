@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported package internals
 package layout
 
 import (
@@ -13,7 +12,7 @@ func TestCollectInlineRunUsesContiguousChildren(t *testing.T) {
 	root := mustParse(t, `<div>one<span>two</span> three</div>`)
 	container := firstElementNamed(root, "div")
 	span := firstElementNamed(root, "span")
-	eng := &engine{ //nolint:exhaustruct // only style lookup is needed
+	eng := &engine{
 		styles: map[*html.Node]*ResolvedStyle{
 			span: {Display: cssDisplayInline, Float: cssDisplayNone},
 		},
@@ -41,7 +40,7 @@ func TestCollectInlineRunFiltersDisplayNoneChildren(t *testing.T) {
 	root := mustParse(t, `<div>one<span>hidden</span>two</div>`)
 	container := firstElementNamed(root, "div")
 	span := firstElementNamed(root, "span")
-	eng := &engine{ //nolint:exhaustruct // only style lookup is needed
+	eng := &engine{
 		styles: map[*html.Node]*ResolvedStyle{
 			span: {Display: cssDisplayNone, Float: cssDisplayNone},
 		},

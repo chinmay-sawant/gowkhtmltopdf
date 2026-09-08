@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise block-flow geometry
 package layout
 
 import (

@@ -1,4 +1,4 @@
-//nolint:testpackage,wsl // white-box compositing tests use private style and layout seams
+//nolint:wsl // white-box compositing tests use private style and layout seams
 package layout
 
 import "testing"

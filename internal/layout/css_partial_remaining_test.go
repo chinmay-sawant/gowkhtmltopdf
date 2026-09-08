@@ -1,4 +1,4 @@
-//nolint:testpackage,varnamelen,funlen,exhaustruct,wsl,cyclop // css partial-remaining suite
+//nolint:varnamelen,funlen,wsl,cyclop // css partial-remaining suite
 package layout
 
 import (

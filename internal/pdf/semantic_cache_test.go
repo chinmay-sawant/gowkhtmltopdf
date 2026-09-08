@@ -1,4 +1,3 @@
-//nolint:testpackage // exercises the unexported regex cache
 package pdf
 
 import (

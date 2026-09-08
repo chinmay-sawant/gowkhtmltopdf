@@ -1,4 +1,3 @@
-//nolint:testpackage // tokenizer/tree internals (tokenize, tokenKind) are tested from the same package
 package html
 
 import (

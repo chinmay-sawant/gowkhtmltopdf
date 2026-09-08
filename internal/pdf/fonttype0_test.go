@@ -1,4 +1,3 @@
-//nolint:testpackage,exhaustruct // tests reach into unexported state
 package pdf
 
 import (
@@ -212,7 +211,7 @@ func TestFontEmbedErrorPropagates(t *testing.T) {
 	// error, not silently drop the resource (which renders text invisible).
 	data := fixedDoc(t)
 	p := data.AddPage(100, 100)
-	p.Content().UseEmbeddedFont("F1", &Font{}) //nolint:exhaustruct // intentional zero-value fields
+	p.Content().UseEmbeddedFont("F1", &Font{})
 
 	var buf bytes.Buffer
 

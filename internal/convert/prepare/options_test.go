@@ -22,7 +22,6 @@ type buildOptionsCase struct {
 func TestBuildOptionsSharedAcrossPDFAndImageLayers(t *testing.T) {
 	t.Parallel()
 
-	//nolint:exhaustruct // table rows intentionally omit unused Web layers
 	cases := []buildOptionsCase{
 		{
 			name: "defaults",
@@ -59,7 +58,7 @@ func TestBuildOptionsSharedAcrossPDFAndImageLayers(t *testing.T) {
 }
 
 func baseWant() prepare.Options {
-	return prepare.Options{ //nolint:exhaustruct // Simplify filled by withSimplify
+	return prepare.Options{
 		ViewportW: 100, ViewportH: 200, MediaType: "print", ObjectIndex: 1,
 	}
 }
@@ -108,7 +107,7 @@ func TestBuildOptionsNormalizesMedia(t *testing.T) {
 func TestPrepareDocumentRejectsBadOptions(t *testing.T) {
 	t.Parallel()
 
-	loader, err := load.NewLoaderWithError(settings.LoadGlobal{}) //nolint:exhaustruct // default HTTP loader
+	loader, err := load.NewLoaderWithError(settings.LoadGlobal{})
 	if err != nil {
 		t.Fatalf("new loader: %v", err)
 	}
@@ -116,7 +115,6 @@ func TestPrepareDocumentRejectsBadOptions(t *testing.T) {
 	lineP := settings.DefaultLoadPage()
 	lineP.InlineHTML = []byte(`<html><body>x</body></html>`)
 
-	//nolint:exhaustruct // table rows exercise one bad field at a time
 	cases := []struct {
 		name string
 		opts prepare.Options

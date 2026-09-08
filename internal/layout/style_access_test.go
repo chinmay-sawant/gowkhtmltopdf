@@ -1,4 +1,3 @@
-//nolint:testpackage // benchmark compares the internal resolved-style record
 package layout
 
 import "testing"

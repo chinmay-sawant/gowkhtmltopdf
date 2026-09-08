@@ -1,5 +1,4 @@
 //nolint:all
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -212,7 +211,7 @@ body { margin: 0 }
 </body></html>`)
 	pageH := 120.0
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 220, Height: pageH, Sheets: []*css.Stylesheet{cssSheet}, Background: true,
 	})
 	if err != nil {

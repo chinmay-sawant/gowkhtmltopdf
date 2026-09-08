@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -40,7 +39,7 @@ img { display: block; width: 80pt; height: 60pt; }
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 360, Height: 400, Sheets: []*css.Stylesheet{cssSheet}, Background: true,
 		Images: func(string) ([]byte, error) { return png, nil },
 	})
@@ -106,7 +105,7 @@ img { display: block; width: 100pt; height: 120pt; }
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 360, Height: 500, Sheets: []*css.Stylesheet{cssSheet}, Background: true,
 		Images: func(string) ([]byte, error) { return png, nil },
 	})
@@ -154,7 +153,7 @@ body { margin: 0; font-size: 10pt; }
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 360, Height: 200, Sheets: []*css.Stylesheet{cssSheet}, Background: true,
 	})
 	if err != nil {

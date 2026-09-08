@@ -1,4 +1,3 @@
-//nolint:testpackage // probes unexported vertical-cluster seal helpers
 package layout
 
 import "testing"

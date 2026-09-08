@@ -1,4 +1,3 @@
-//nolint:testpackage // white-box test exercises the image policy resolver.
 package imageout
 
 import (
@@ -12,7 +11,7 @@ import (
 func TestImageLoadGlobalUsesOneEffectivePolicy(t *testing.T) {
 	t.Parallel()
 
-	global := settings.PdfGlobal{ //nolint:exhaustruct // focused shared load policy
+	global := settings.PdfGlobal{
 		Load: settings.LoadGlobal{
 			Proxy:                 "http://shared-proxy.example",
 			Allow:                 []string{"/shared"},
@@ -24,8 +23,8 @@ func TestImageLoadGlobalUsesOneEffectivePolicy(t *testing.T) {
 			NetworkBlockCrossHost: true,
 		},
 	}
-	image := settings.ImageGlobal{ //nolint:exhaustruct // focused image load policy
-		Load: settings.LoadGlobal{ //nolint:exhaustruct // focused image load policy
+	image := settings.ImageGlobal{
+		Load: settings.LoadGlobal{
 			Proxy:                 "http://image-proxy.example",
 			Allow:                 []string{"/image"},
 			NetworkPolicySet:      true,

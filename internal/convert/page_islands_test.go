@@ -1,4 +1,4 @@
-package convert //nolint:testpackage // white-box certification tests need unexported access
+package convert
 
 import (
 	"bytes"
@@ -14,8 +14,8 @@ func TestPageIslandsRequireExplicitBenchmarkRequest(t *testing.T) {
 	t.Parallel()
 
 	global := settings.DefaultPdfGlobal()
-	objects := []settings.PdfObject{{ //nolint:exhaustruct // focused request opt-in test
-		Load: settings.LoadPage{ //nolint:exhaustruct // focused request opt-in test
+	objects := []settings.PdfObject{{
+		Load: settings.LoadPage{
 			InlineHTML: []byte("<html><body>marker</body></html>"),
 		},
 	}}

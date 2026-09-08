@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -36,7 +35,7 @@ is a Cuban-born actress holding citizenship.</p>
 
 	const pageW = 500.0
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: pageW, Height: 700, Sheets: []*css.Stylesheet{cssSheet},
 		Media: "print", Background: true,
 	})

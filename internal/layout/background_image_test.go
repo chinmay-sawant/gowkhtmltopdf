@@ -1,4 +1,4 @@
-//nolint:testpackage,wsl,varnamelen,exhaustruct,err113,usetesting,goconst // image chrome probes
+//nolint:wsl,varnamelen,err113,usetesting,goconst // image chrome probes
 package layout
 
 import (
@@ -56,7 +56,7 @@ func TestBackgroundImagePaints(t *testing.T) {
 
 		return png, nil
 	})
-	sty := ResolvedStyle{ //nolint:exhaustruct // paint field under test
+	sty := ResolvedStyle{
 		BackgroundImage:  `url("x.png")`,
 		BackgroundRepeat: "no-repeat",
 	}
@@ -89,7 +89,7 @@ func TestBackgroundImagePaintsOverColor(t *testing.T) {
 	eng := newBackgroundImageEngine(func(string) ([]byte, error) {
 		return png, nil
 	})
-	sty := ResolvedStyle{ //nolint:exhaustruct // color then image paint order
+	sty := ResolvedStyle{
 		BGColor:          [4]float64{1, 0, 0, 1},
 		BackgroundImage:  `url("x.png")`,
 		BackgroundRepeat: "no-repeat",
@@ -120,7 +120,7 @@ func TestBackgroundImageEmptySkips(t *testing.T) {
 
 		return nil, errors.New("should not fetch")
 	})
-	eng.prependChrome(0, &box{}, ResolvedStyle{}, 0, 0, 100, 50) //nolint:exhaustruct // empty style
+	eng.prependChrome(0, &box{}, ResolvedStyle{}, 0, 0, 100, 50)
 
 	if called {
 		t.Fatal("empty BackgroundImage fetched an image")
@@ -137,7 +137,7 @@ func TestBackgroundImageMissingSkips(t *testing.T) {
 	eng := newBackgroundImageEngine(func(string) ([]byte, error) {
 		return nil, errors.New("missing")
 	})
-	sty := ResolvedStyle{BackgroundImage: "missing.png"} //nolint:exhaustruct // missing fetch
+	sty := ResolvedStyle{BackgroundImage: "missing.png"}
 	eng.prependChrome(0, &box{}, sty, 0, 0, 100, 50)
 
 	if len(eng.deferredChrome) != 0 {
@@ -158,7 +158,7 @@ func TestBackgroundImageGradientRenders(t *testing.T) {
 
 		return tinyPNG(2, 2), nil
 	})
-	sty := ResolvedStyle{BackgroundImage: "linear-gradient(red, blue)"} //nolint:exhaustruct // gradient
+	sty := ResolvedStyle{BackgroundImage: "linear-gradient(red, blue)"}
 	eng.prependChrome(0, &box{}, sty, 0, 0, 100, 50)
 
 	if called {
@@ -179,7 +179,7 @@ func TestBackgroundImageMultiLayer(t *testing.T) {
 
 		return tinyPNG(2, 2), nil
 	})
-	sty := ResolvedStyle{BackgroundImage: `url("a.png"), url("b.png")`} //nolint:exhaustruct // two layers
+	sty := ResolvedStyle{BackgroundImage: `url("a.png"), url("b.png")`}
 	eng.prependChrome(0, &box{}, sty, 0, 0, 40, 20)
 
 	if len(fetched) != 2 || fetched[0] != "b.png" || fetched[1] != "a.png" {
@@ -193,7 +193,7 @@ func TestBackgroundBlendModeFollowsBackgroundLayerOrder(t *testing.T) {
 	eng := newBackgroundImageEngine(func(string) ([]byte, error) {
 		return tinyPNG(2, 2), nil
 	})
-	sty := ResolvedStyle{ //nolint:exhaustruct // background blend layer test
+	sty := ResolvedStyle{
 		BackgroundImage:     `url("a.png"), url("b.png")`,
 		BackgroundBlendMode: "multiply, screen",
 		BackgroundRepeat:    "no-repeat",
@@ -222,7 +222,7 @@ func TestBackgroundImageNoBackgroundFlag(t *testing.T) {
 		return tinyPNG(2, 2), nil
 	})
 	eng.opts.Background = false
-	sty := ResolvedStyle{BackgroundImage: `url("x.png")`} //nolint:exhaustruct // gated by Background
+	sty := ResolvedStyle{BackgroundImage: `url("x.png")`}
 	eng.prependChrome(0, &box{}, sty, 0, 0, 100, 50)
 
 	if called {
@@ -240,7 +240,7 @@ func TestBackgroundImageLayoutPaints(t *testing.T) {
 	png := tinyPNG(10, 20)
 	cssSheet := sheet(t, backgroundImageLayoutCSS)
 	root := mustParse(t, `<html><body><div class="bg">hi</div></body></html>`)
-	opts := Options{ //nolint:exhaustruct // layoutHTML viewport plus image fetch
+	opts := Options{
 		Width: testViewport, Height: 800, Sheets: []*css.Stylesheet{cssSheet}, Background: true,
 		Images: func(src string) ([]byte, error) {
 			if src != "x.png" {
@@ -325,7 +325,7 @@ func TestBackgroundImageBarePath(t *testing.T) {
 
 		return png, nil
 	})
-	sty := ResolvedStyle{ //nolint:exhaustruct // sibling may store a bare path
+	sty := ResolvedStyle{
 		BackgroundImage:  "logo.png",
 		BackgroundRepeat: "no-repeat",
 	}
@@ -351,7 +351,7 @@ func TestBackgroundOriginContentBoxOverflowsIntoPadding(t *testing.T) {
 	eng := newBackgroundImageEngine(func(string) ([]byte, error) {
 		return png, nil
 	})
-	sty := ResolvedStyle{ //nolint:exhaustruct // origin/clip behavior under test
+	sty := ResolvedStyle{
 		BackgroundImage:  `url("x.png")`,
 		BackgroundRepeat: "no-repeat",
 		BackgroundOrigin: "content-box",
@@ -381,7 +381,7 @@ func TestBackgroundPositionUsesCSSPxIntrinsicSize(t *testing.T) {
 	eng := newBackgroundImageEngine(func(string) ([]byte, error) {
 		return png, nil
 	})
-	sty := ResolvedStyle{ //nolint:exhaustruct // position + auto size under test
+	sty := ResolvedStyle{
 		BackgroundImage:  `url("logo.png")`,
 		BackgroundRepeat: "no-repeat",
 		BackgroundPosX:   "right",
@@ -403,8 +403,8 @@ func TestBackgroundPositionUsesCSSPxIntrinsicSize(t *testing.T) {
 }
 
 func newBackgroundImageEngine(images func(string) ([]byte, error)) *engine {
-	return &engine{ //nolint:exhaustruct // test engine
-		opts: Options{ //nolint:exhaustruct // Images + Background only
+	return &engine{
+		opts: Options{
 			Images:     images,
 			Background: true,
 		},

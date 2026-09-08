@@ -1,4 +1,4 @@
-//nolint:testpackage,wsl,varnamelen,paralleltest,cyclop // outline stroke probes
+//nolint:wsl,varnamelen,paralleltest,cyclop // outline stroke probes
 package layout
 
 import (
@@ -95,15 +95,15 @@ body { margin: 0 }
 func testOutlinePrependChrome(t *testing.T) {
 	t.Parallel()
 
-	eng := &engine{scale: 1, opts: Options{Background: true}} //nolint:exhaustruct // chrome probe
-	sty := ResolvedStyle{                                     //nolint:exhaustruct // outline fields under test
+	eng := &engine{scale: 1, opts: Options{Background: true}}
+	sty := ResolvedStyle{
 		OutlineWidth:    10,
 		OutlineStyle:    solidKeyword,
 		OutlineColor:    [3]float64{1, 0, 0},
 		OutlineColorSet: true,
 		OutlineOffset:   4,
 	}
-	boxNode := &box{style: &sty, w: 100, height: 50} //nolint:exhaustruct // geometry probe
+	boxNode := &box{style: &sty, w: 100, height: 50}
 	eng.prependChrome(0, boxNode, sty, 0, 0, 100, 50)
 
 	if len(eng.deferredChrome) != 1 {

@@ -1,4 +1,4 @@
-//nolint:exhaustruct,wsl,testpackage,usetesting,lll // same-package tests exercise the native adapter boundary.
+//nolint:wsl,usetesting,lll // same-package tests exercise the native adapter boundary.
 package gowkhtmltopdf
 
 import (

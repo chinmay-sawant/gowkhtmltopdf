@@ -1,4 +1,4 @@
-//nolint:testpackage,exhaustruct,gocognit,varnamelen,wsl,lll,cyclop,funlen,gocyclo,maintidx // tests verify internal tagged PDF structures and object streams
+//nolint:gocognit,varnamelen,wsl,lll,cyclop,funlen,gocyclo,maintidx // tests verify internal tagged PDF structures and object streams
 package pdf
 
 import (
@@ -1051,7 +1051,7 @@ func TestDefaultPathIsolation(t *testing.T) {
 	}
 
 	page := doc.AddPage(600, 800)
-	dummyElem := &StructElem{Tag: StructTypeP} //nolint:exhaustruct // test dummy
+	dummyElem := &StructElem{Tag: StructTypeP}
 	if mcid := page.AllocMCID(dummyElem); mcid != -1 {
 		t.Errorf("page.AllocMCID() on 1.4 = %d, want -1", mcid)
 	}

@@ -1,4 +1,4 @@
-package convert //nolint:testpackage // white-box tests need unexported access
+package convert
 
 import (
 	"bytes"
@@ -464,7 +464,7 @@ func TestSingleDocumentChildUnderStructTreeRoot(t *testing.T) {
 	body2 := `<!DOCTYPE html><html><head><title>Doc 2</title></head><body><p>Body 2</p></body></html>`
 
 	cmd, _ := newCommand(t, body1, filepath.Join(t.TempDir(), "out.pdf"))
-	cmd.Objects = append(cmd.Objects, settings.PdfObject{ //nolint:exhaustruct // test object
+	cmd.Objects = append(cmd.Objects, settings.PdfObject{
 		Page: body2,
 	})
 	cmd.Global.PdfProfile = settings.ProfilePDFUA1

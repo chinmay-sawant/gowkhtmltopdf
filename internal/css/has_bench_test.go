@@ -1,4 +1,4 @@
-package css //nolint:testpackage // exercises unexported selector matching via Match
+package css
 
 import (
 	"strings"

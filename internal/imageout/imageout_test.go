@@ -1,4 +1,3 @@
-//nolint:testpackage // white-box tests need raster internals (glyph atlas, downscale, format helpers)
 package imageout
 
 import (
@@ -28,7 +27,7 @@ import (
 func renderHTML(t *testing.T, src string) image.Image {
 	t.Helper()
 
-	img, err := renderHTMLOpts(src, RenderOptions{ //nolint:exhaustruct // intentional zero/partial fields
+	img, err := renderHTMLOpts(src, RenderOptions{
 		Width: 200, Background: true,
 	})
 	if err != nil {
@@ -57,7 +56,7 @@ func TestRunValidatesBeforeOpeningOutput(t *testing.T) {
 	t.Parallel()
 
 	output := filepath.Join(t.TempDir(), "out.png")
-	cmd := &cli.Command{ //nolint:exhaustruct // focused invalid command
+	cmd := &cli.Command{
 		Global: settings.DefaultPdfGlobal(),
 		Image:  settings.DefaultImageGlobal(),
 		Output: output,
@@ -78,7 +77,7 @@ func TestRunValidatesBeforeOpeningOutput(t *testing.T) {
 func asNRGBA(c color.Color) color.NRGBA {
 	n, ok := color.NRGBAModel.Convert(c).(color.NRGBA)
 	if !ok {
-		return color.NRGBA{} //nolint:exhaustruct // intentional zero/partial fields
+		return color.NRGBA{}
 	}
 
 	return n
@@ -103,7 +102,7 @@ func redPNG(t *testing.T, w, h int) []byte {
 	t.Helper()
 
 	img := image.NewNRGBA(image.Rect(0, 0, w, h))
-	drawSolid(img, color.NRGBA{R: 255, A: 255}) //nolint:exhaustruct // intentional zero/partial fields
+	drawSolid(img, color.NRGBA{R: 255, A: 255})
 
 	var buf bytes.Buffer
 	if err := png.Encode(&buf, img); err != nil {
@@ -161,7 +160,7 @@ func TestRenderSolidColor(t *testing.T) {
 		t.Errorf("canvas height = %d, want >= 50", got)
 	}
 
-	want := color.NRGBA{R: 255, A: 255} //nolint:exhaustruct // intentional zero/partial fields
+	want := color.NRGBA{R: 255, A: 255}
 	if count := countPixels(img, image.Rect(0, 0, 200, img.Bounds().Dy()), want); count == 0 {
 		t.Error("no solid red pixels found")
 	}
@@ -179,7 +178,7 @@ func TestRenderTransparent(t *testing.T) {
 	src := `<html><body><div style="background-color:#ff0000;width:100px;height:50px"></div></body></html>`
 
 	img, err := renderHTMLOpts(src,
-		RenderOptions{Width: 200, Transparent: true}) //nolint:exhaustruct // intentional zero/partial fields
+		RenderOptions{Width: 200, Transparent: true})
 	if err != nil {
 		t.Fatalf("Render: %v", err)
 	}
@@ -188,7 +187,7 @@ func TestRenderTransparent(t *testing.T) {
 		t.Errorf("background alpha = %d, want 0 (transparent)", got.A)
 	}
 
-	want := color.NRGBA{R: 255, A: 255} //nolint:exhaustruct // intentional zero/partial fields
+	want := color.NRGBA{R: 255, A: 255}
 	if count := countPixels(img, image.Rect(0, 0, 200, img.Bounds().Dy()), want); count == 0 {
 		t.Error("no opaque red pixels found")
 	}
@@ -201,7 +200,7 @@ func TestRenderCrop(t *testing.T) {
 
 	src := `<html><body><div style="background-color:#0000ff;width:120px;height:60px"></div></body></html>`
 
-	full, err := renderHTMLOpts(src, RenderOptions{ //nolint:exhaustruct // intentional zero/partial fields
+	full, err := renderHTMLOpts(src, RenderOptions{
 		Width: 200, Height: 100,
 	})
 	if err != nil {
@@ -214,7 +213,7 @@ func TestRenderCrop(t *testing.T) {
 
 	crop := image.Rect(50, 50, 150, 100)
 
-	img, err := renderHTMLOpts(src, RenderOptions{ //nolint:exhaustruct // intentional zero/partial fields
+	img, err := renderHTMLOpts(src, RenderOptions{
 		Width: 200, Height: 100, Crop: crop,
 	})
 	if err != nil {
@@ -241,7 +240,7 @@ func TestRenderText(t *testing.T) {
 
 	img := renderHTML(t, `<html><body><b>Hi</b></body></html>`)
 
-	want := color.NRGBA{A: 255} //nolint:exhaustruct // intentional zero/partial fields
+	want := color.NRGBA{A: 255}
 	if count := countPixels(img, img.Bounds(), want); count == 0 {
 		t.Fatal("canvas is entirely background")
 	}
@@ -269,14 +268,14 @@ func TestRenderImageDataURI(t *testing.T) {
 	src := `<html><body><img src="data:image/png;base64,` +
 		base64.StdEncoding.EncodeToString(raw) + `"></body></html>`
 
-	img, err := renderHTMLOpts(src, RenderOptions{ //nolint:exhaustruct // intentional zero/partial fields
+	img, err := renderHTMLOpts(src, RenderOptions{
 		Images: dataURIImages,
 	})
 	if err != nil {
 		t.Fatalf("Render: %v", err)
 	}
 	// the image sits at the body margin (8 px) with natural size 16x16
-	want := color.NRGBA{R: 255, A: 255} //nolint:exhaustruct // intentional zero/partial fields
+	want := color.NRGBA{R: 255, A: 255}
 	if count := countPixels(img, image.Rect(8, 8, 8+16, 8+16), want); count == 0 {
 		t.Error("no red pixels in the <img> region")
 	}
@@ -287,16 +286,16 @@ func TestScaleNearest(t *testing.T) {
 	t.Parallel()
 
 	src := image.NewNRGBA(image.Rect(0, 0, 2, 2))
-	src.SetNRGBA(0, 0, color.NRGBA{R: 255, A: 255}) //nolint:exhaustruct // intentional zero/partial fields
+	src.SetNRGBA(0, 0, color.NRGBA{R: 255, A: 255})
 
 	dst := scaleNearest(src, 4, 4)
 
-	wantRed := color.NRGBA{R: 255, A: 255} //nolint:exhaustruct // intentional zero/partial fields
+	wantRed := color.NRGBA{R: 255, A: 255}
 	if got := dst.At(0, 0); color.NRGBAModel.Convert(got) != wantRed {
 		t.Errorf("scaled (0,0) = %v, want red", got)
 	}
 
-	wantEmpty := color.NRGBA{} //nolint:exhaustruct // intentional zero/partial fields
+	wantEmpty := color.NRGBA{}
 	if got := dst.At(3, 3); color.NRGBAModel.Convert(got) != wantEmpty {
 		t.Errorf("scaled (3,3) = %v, want transparent", got)
 	}
@@ -495,7 +494,7 @@ func TestSmartWidth(t *testing.T) {
 
 	src := `<html><body><div style="width:1500px;height:10px;background-color:#0000ff"></div></body></html>`
 
-	smart, err := renderHTMLOpts(src, RenderOptions{ //nolint:exhaustruct // intentional zero/partial fields
+	smart, err := renderHTMLOpts(src, RenderOptions{
 		Width: 1024, SmartWidth: true,
 	})
 	if err != nil {
@@ -506,7 +505,7 @@ func TestSmartWidth(t *testing.T) {
 		t.Errorf("smart width canvas = %d, want 1536 (1024*1.5)", got)
 	}
 
-	fixed, err := renderHTMLOpts(src, RenderOptions{ //nolint:exhaustruct // intentional zero/partial fields
+	fixed, err := renderHTMLOpts(src, RenderOptions{
 		Width: 1024, SmartWidth: false,
 	})
 	if err != nil {
@@ -522,7 +521,7 @@ func TestSmartWidth(t *testing.T) {
 		t.Fatalf("parse: %v", err)
 	}
 
-	def, err := Render(defRoot, RenderOptions{ //nolint:exhaustruct // intentional zero/partial fields
+	def, err := Render(defRoot, RenderOptions{
 		Width: 0, SmartWidth: false, Background: true,
 	})
 	if err != nil {
@@ -534,7 +533,6 @@ func TestSmartWidth(t *testing.T) {
 	}
 }
 
-//nolint:exhaustruct // test settings struct
 func TestPrepareImageDocumentUsesImageWidthViewport(t *testing.T) {
 	t.Parallel()
 
@@ -547,7 +545,7 @@ func TestPrepareImageDocumentUsesImageWidthViewport(t *testing.T) {
 		</style></head><body>Hello</body></html>`,
 	}
 
-	loader, err := load.NewLoaderWithError(settings.LoadGlobal{}) //nolint:exhaustruct // default loader
+	loader, err := load.NewLoaderWithError(settings.LoadGlobal{})
 	if err != nil {
 		t.Fatal(err)
 	}

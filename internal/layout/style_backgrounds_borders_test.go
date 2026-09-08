@@ -1,4 +1,4 @@
-//nolint:wsl,varnamelen,exhaustruct,usetesting,testpackage // targeted unit tests for Phase 80
+//nolint:wsl,varnamelen,usetesting // targeted unit tests for Phase 80
 package layout
 
 import (

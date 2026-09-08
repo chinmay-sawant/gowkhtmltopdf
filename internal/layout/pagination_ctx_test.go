@@ -1,4 +1,4 @@
-package layout //nolint:testpackage // row-loop cancellation and enum sentinels are white-box.
+package layout
 
 import (
 	"context"
@@ -50,7 +50,7 @@ func TestLayoutContextCancelDuringTableLayout(t *testing.T) {
 	start := time.Now()
 
 	go func() {
-		opts := Options{Width: testViewport, Height: 800} //nolint:exhaustruct // focused layout options
+		opts := Options{Width: testViewport, Height: 800}
 		_, err := LayoutContext(ctx, root, opts)
 		done <- err
 	}()
@@ -77,10 +77,10 @@ func TestPaginateOpsHonorsCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
-	res := &Result{ //nolint:exhaustruct // minimal display list
+	res := &Result{
 		Ops: []Op{
-			{Kind: OpText, Y: 10, Size: 12},  //nolint:exhaustruct // focused op shape
-			{Kind: OpText, Y: 120, Size: 12}, //nolint:exhaustruct // focused op shape
+			{Kind: OpText, Y: 10, Size: 12},
+			{Kind: OpText, Y: 120, Size: 12},
 		},
 	}
 
@@ -99,14 +99,14 @@ func TestPaintContextCancelDuringPagination(t *testing.T) {
 	cancel()
 
 	doc := pdf.NewDocument()
-	res := &Result{ //nolint:exhaustruct // minimal display list
+	res := &Result{
 		Ops: []Op{
-			{Kind: OpFillRect, W: 10, H: 10}, //nolint:exhaustruct // focused op shape
-			{Kind: OpText, Y: 10, Size: 12},  //nolint:exhaustruct // focused op shape
+			{Kind: OpFillRect, W: 10, H: 10},
+			{Kind: OpText, Y: 10, Size: 12},
 		},
 	}
 
-	err := PaintContext(ctx, doc, res, PaintOptions{ //nolint:exhaustruct // focused paint options
+	err := PaintContext(ctx, doc, res, PaintOptions{
 		PageWidth: 100, PageHeight: 100,
 	})
 	if !errors.Is(err, context.Canceled) {
@@ -125,7 +125,7 @@ func TestFilterKindZeroIsUnknown(t *testing.T) {
 	}
 
 	input := []byte("not-an-image")
-	filters := []parsedFilter{{kind: 0}} //nolint:exhaustruct // zero-kind filter is the test subject
+	filters := []parsedFilter{{kind: 0}}
 
 	if got := applyImageFilterToImage(input, filters); string(got) != string(input) {
 		t.Fatal("zero-value filter kind must be a no-op on the image bytes")
@@ -144,8 +144,8 @@ func TestTrackSizeKindZeroIsUnknown(t *testing.T) {
 
 	var eng engine
 
-	zeroTrack := gridTrackSize{}      //nolint:exhaustruct // zero-size is the test subject
-	zeroIntrinsic := trackIntrinsic{} //nolint:exhaustruct // zero intrinsics are the test subject
+	zeroTrack := gridTrackSize{}
+	zeroIntrinsic := trackIntrinsic{}
 
 	if got := resolveTrackSide(zeroTrack, 500, true, &eng, zeroIntrinsic, false); got != 0 {
 		t.Fatalf("resolveTrackSide(zero) = %v, want 0", got)

@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -38,7 +37,7 @@ figcaption { font-size: 8pt; width: 120pt; }
 <p>Body text beside the float.</p>
 </body></html>`)
 
-	out, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	out, err := Layout(root, Options{
 		Width: 400, Height: 400, Sheets: []*css.Stylesheet{cssSheet}, Background: true,
 		Images: func(string) ([]byte, error) { return png, nil },
 	})

@@ -21,7 +21,7 @@ func TestVerticalRLInlineBlockMatchesChromeColumnWidth(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := layout.Layout(doc, layout.Options{Width: 400, Height: 200, Background: true}) //nolint:exhaustruct
+	res, err := layout.Layout(doc, layout.Options{Width: 400, Height: 200, Background: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +88,7 @@ func TestVerticalRLFlexItemColumnWidth(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	opts := layout.Options{ //nolint:exhaustruct // test viewport only
+	opts := layout.Options{
 		Width: 400, Height: 200, Background: true,
 	}
 

@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise the bounded SVG probe seam.
 package svg
 
 import (

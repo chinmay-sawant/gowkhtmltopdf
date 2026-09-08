@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -11,7 +10,7 @@ import (
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
 )
 
-func TestCJKFontFamilyFallback(t *testing.T) { //nolint:cyclop
+func TestCJKFontFamilyFallback(t *testing.T) { //nolint:cyclop,funlen
 	t.Parallel()
 
 	notoPath := filepath.Join("..", "..", "testdata", "fonts")
@@ -37,7 +36,7 @@ func TestCJKFontFamilyFallback(t *testing.T) { //nolint:cyclop
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: testViewport, Height: 800,
 		Sheets: []*css.Stylesheet{cssSheet}, Background: true, Registry: reg,
 	})

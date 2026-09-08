@@ -1,4 +1,3 @@
-//nolint:testpackage // tests exercise unexported package internals via shared helpers
 package layout
 
 import (
@@ -25,7 +24,7 @@ a { color: #0645ad; text-decoration: underline; }
 		t.Fatal(err)
 	}
 
-	res, err := Layout(root, Options{ //nolint:exhaustruct // intentional zero fields
+	res, err := Layout(root, Options{
 		Width: 500, Height: 400, Sheets: []*css.Stylesheet{cssSheet},
 	})
 	if err != nil {

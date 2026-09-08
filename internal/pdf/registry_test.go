@@ -1,4 +1,4 @@
-package pdf //nolint:testpackage // registry tie-breaks require private face identity fields.
+package pdf
 
 import "testing"
 

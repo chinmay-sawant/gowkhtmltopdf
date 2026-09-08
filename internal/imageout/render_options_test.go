@@ -1,4 +1,4 @@
-package imageout //nolint:testpackage // white-box tests need unexported error sentinels
+package imageout
 
 import (
 	"errors"
@@ -11,7 +11,6 @@ import (
 func TestRenderOptionsValidate(t *testing.T) {
 	t.Parallel()
 
-	//nolint:exhaustruct // table rows exercise one bad field at a time
 	cases := []struct {
 		name string
 		opts RenderOptions
@@ -42,7 +41,6 @@ func TestRenderOptionsValidate(t *testing.T) {
 func TestRenderOptionsValidateAcceptsDefaults(t *testing.T) {
 	t.Parallel()
 
-	//nolint:exhaustruct // table rows exercise zero/default option shapes
 	opts := []RenderOptions{
 		{},
 		{Width: 100, Height: 50, Media: "print"},
@@ -65,12 +63,12 @@ func TestRenderContextRejectsNegativeWidthBeforeLayout(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = Render(root, RenderOptions{Width: -1}) //nolint:exhaustruct // focused invalid width
+	_, err = Render(root, RenderOptions{Width: -1})
 	if !errors.Is(err, errNegativeDimension) {
 		t.Fatalf("Render error = %v, want errNegativeDimension", err)
 	}
 
-	_, err = Render(root, RenderOptions{Media: "tv"}) //nolint:exhaustruct // focused invalid media
+	_, err = Render(root, RenderOptions{Media: "tv"})
 	if !errors.Is(err, errInvalidMediaType) {
 		t.Fatalf("Render error = %v, want errInvalidMediaType", err)
 	}

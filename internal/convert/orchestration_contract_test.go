@@ -1,4 +1,4 @@
-package convert //nolint:testpackage // white-box seam fixtures
+package convert
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
-//nolint:exhaustruct,wsl // focused white-box seam fixture.
+//nolint:wsl // focused white-box seam fixture.
 func TestLayoutBodyKeepsSmartShrinkAtAReplaceableSeam(t *testing.T) {
 	t.Parallel()
 
@@ -54,7 +54,7 @@ func TestLayoutBodyKeepsSmartShrinkAtAReplaceableSeam(t *testing.T) {
 	}
 }
 
-//nolint:exhaustruct,wsl // focused white-box seam fixture.
+//nolint:wsl // focused white-box seam fixture.
 func TestLayoutBodyStopsBeforeLayoutWhenCanceled(t *testing.T) {
 	t.Parallel()
 

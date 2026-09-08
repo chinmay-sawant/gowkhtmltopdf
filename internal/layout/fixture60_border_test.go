@@ -1,4 +1,3 @@
-//nolint:testpackage // test exercises unexported layout geometry.
 package layout
 
 import (
@@ -55,7 +54,7 @@ func fixture60Property111Fixture(t *testing.T) (*Result, *html.Node) {
 		t.Fatal(err)
 	}
 
-	res, err := Layout(doc, Options{ //nolint:exhaustruct // fixture geometry probe
+	res, err := Layout(doc, Options{
 		Width: 571.64, Height: 817.89, Background: true, Media: "print", Zoom: 1,
 		Sheets: []*css.Stylesheet{parsedSheet},
 	})
@@ -102,5 +101,5 @@ func fixture60RightBorder(t *testing.T, res *Result, boxNode *box) Op {
 
 	t.Fatal("property 111 right border operation not found")
 
-	return Op{} //nolint:exhaustruct // t.Fatal stops the test before this fallback
+	return Op{}
 }

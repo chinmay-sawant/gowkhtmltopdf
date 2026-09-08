@@ -1,4 +1,4 @@
-//nolint:testpackage,wsl // white-box background repeat axis coverage
+//nolint:wsl // white-box background repeat axis coverage
 package layout
 
 import (
@@ -45,7 +45,7 @@ func TestBackgroundRepeatLonghandsKeepTheOtherAxisAtInitialRepeat(t *testing.T) 
 				t.Fatal(err)
 			}
 
-			result, err := Layout(root, Options{ //nolint:exhaustruct // image and background options under test
+			result, err := Layout(root, Options{
 				Width: 200, Height: 200, Background: true,
 				Sheets: []*css.Stylesheet{sheet},
 				Images: func(string) ([]byte, error) {

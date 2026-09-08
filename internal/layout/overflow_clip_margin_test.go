@@ -1,4 +1,4 @@
-//nolint:testpackage,wsl // overflow-clip-margin probes
+//nolint:wsl // overflow-clip-margin probes
 package layout
 
 import "testing"
