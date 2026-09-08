@@ -143,6 +143,12 @@ The real gates, in order of cost:
 | Claims | `make claim-scan` | No forbidden claims (stdlib-only, Qt WebKit, byte-identical determinism, etc.) in doc.go, README, documentation/, frontend content, cli help |
 | Lint | `make lint` | golangci-lint (pinned v1.64.8) clean; chains `lint-frontend` (npm) |
 | Golden corpus | `make golden` | All 61 fixtures convert with correct structure, page-count envelopes, embedded fonts, ordered text needles |
+| Release | `RELEASE.md` checklist | Hard gates for any release: `make check-versions`, `make test`, `make golden`, `make claim-scan`, `make lint`, plus `make build` with version-stamp check; Python and frontend extras when touched |
+
+Release work always starts at `RELEASE.md`. It holds the version-source
+table (binary `internal/cli.Version` vs library `LibraryVersion` / C ABI /
+Python package), the Python-ships / WASM-does-not-ship status, and the
+hard-gate order. `skills/release-note/SKILL.md` remains the promote flow.
 
 Never run bare `go test ./...`: uncapped package and test concurrency
 thrashes swap and can freeze the desktop on this host. Run tests through
