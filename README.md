@@ -180,7 +180,8 @@ golden fixtures, and test suites.
 Much of the code starts as an AI draft. It does not ship unchecked. Human
 maintainers own the pipeline of load, parse, style, layout, paginate, paint,
 and write. Humans review changes and require proof before merge: `make test`,
-`make lint`, `make golden`, and `make claim-scan` and also validates the all of the 50+ sample templates manually.
+`make lint`, `make golden`, and `make claim-scan`, and they also validate
+all 50+ sample templates manually.
 
 Performance is part of that proof. The full record lives in
 [documentation/performance.md](documentation/performance.md). Raw numbers and
