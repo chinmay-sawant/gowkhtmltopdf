@@ -172,7 +172,24 @@ path on the same `report.html.tmpl` fixture (20 invoice rows per page) that
 
 ## Development
 
-gowkhtmltopdf was designed and built as a clean-room pure-Go engine, pairing human architecture and domain design with modern AI-assisted engineering tools (including Grok, OpenAI Codex, OpenCode, and Cursor) for accelerated implementation, golden fixture visual verification, and comprehensive test suites.
+gowkhtmltopdf is a pure-Go rendering engine written from scratch. Humans own
+the architecture and domain design. AI tools including Grok, OpenAI Codex,
+OpenCode, and Cursor help with implementation drafts, visual checks against
+golden fixtures, and test suites.
+
+Much of the code starts as an AI draft. It does not ship unchecked. Human
+maintainers own the pipeline of load, parse, style, layout, paginate, paint,
+and write. Humans review changes and require proof before merge: `make test`,
+`make lint`, `make golden`, and `make claim-scan` and also validates the all of the 50+ sample templates manually.
+
+Performance is part of that proof. The full record lives in
+[documentation/performance.md](documentation/performance.md). Raw numbers and
+reproduce steps live in
+[testdata/golden/benchmarks/README.md](testdata/golden/benchmarks/README.md).
+Profile with `go test -cpuprofile` plus `go tool pprof -top`; see
+[How to measure](documentation/performance.md#how-to-measure). The CI perf
+budget is `TestTenPageTableReportPerformance` in
+[internal/convert/perf_test.go](internal/convert/perf_test.go).
 
 ## License
 
