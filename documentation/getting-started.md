@@ -71,7 +71,7 @@ compatibility id, not the release number. See [library-api.md](library-api.md#ve
 ## Browser preview
 
 Run `make wasm` and then build the frontend to create the inline HTML browser
-converter. The `/wasm` route supports PDF, PNG, and JPEG output in a Web
+converter. The `/live-demo` route supports PDF, PNG, and JPEG output in a Web
 Worker. Read [Browser WASM conversion](wasm.md) for the request contract,
 limits, and resource boundary.
 

@@ -50,7 +50,7 @@ export default function LandingPage() {
             <Link className="button button-primary" to="/getting-started">
               Get started <span aria-hidden="true">-&gt;</span>
             </Link>
-            <Link className="button button-secondary" to="/wasm">Try Live Demo</Link>
+            <Link className="button button-secondary" to="/live-demo">Try Live Demo</Link>
             <Link className="button button-secondary" to="/showcase">View samples</Link>
           </div>
           <p className="landing-micro">

@@ -72,7 +72,8 @@ export default function App() {
             <Route path="/dossier" element={<DossierPage />} />
             <Route path="/showcase" element={<ShowcasePage />} />
             <Route path="/benchmarks" element={<BenchmarksPage />} />
-            <Route path="/wasm" element={<LiveDemoPage />} />
+            <Route path="/live-demo" element={<LiveDemoPage />} />
+            <Route path="/wasm" element={<Navigate to="/live-demo" replace />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>
           <Route path="/documentation" element={<Navigate to="/documentation/cli" replace />} />

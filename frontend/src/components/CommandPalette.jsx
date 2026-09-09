@@ -9,7 +9,7 @@ const DOC_ITEMS = [
     title: 'Live browser converter',
     desc: 'Convert inline HTML to PDF, PNG, or JPEG locally in a web worker',
     category: 'Documentation',
-    url: '/wasm',
+    url: '/live-demo',
     keywords: 'wasm webassembly browser pdf png jpeg image worker local preview converter live demo',
     icon: 'api',
   },

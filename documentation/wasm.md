@@ -136,7 +136,7 @@ These limits are defined in `bindings/wasm/contract.go` and
 
 ## Preview PDF and images
 
-The `/wasm` page in the generated site provides an HTML editor, a sample
+The `/live-demo` page in the generated site provides an HTML editor, a sample
 loader, a reset action, output selection, image padding, and download and open
 actions. Image padding uses output pixels and expands the PNG or JPEG canvas by
 the same amount on every side. PNG keeps transparent pixels. JPEG composites

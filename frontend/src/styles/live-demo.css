@@ -7,13 +7,16 @@
 
 .live-demo-hero { max-width: none; margin-bottom: 40px; }
 .live-demo-hero h1 {
-  max-width: 680px;
+  max-width: min(100%, 1100px);
   margin: 8px 0 18px;
   font-family: var(--serif);
   font-size: clamp(42px, 6vw, 76px);
   font-weight: 500;
   letter-spacing: -0.045em;
   line-height: 0.98;
+}
+.live-demo-hero .lede {
+  max-width: min(100%, 1100px);
 }
 .live-demo-kicker {
   margin: 0;
