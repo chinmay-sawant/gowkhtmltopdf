@@ -85,6 +85,10 @@ func (d *ImageDocument) Validate() error {
 		return err
 	}
 
+	if d.Padding < 0 {
+		return fmt.Errorf("%w: image padding must be non-negative", ErrInvalidDimensions)
+	}
+
 	if err := validateZoom(d.Zoom); err != nil {
 		return err
 	}

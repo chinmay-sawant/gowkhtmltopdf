@@ -77,5 +77,6 @@ Implementation plans and roadmaps for `gowkhtmltopdf`, partitioned by release ve
 - [property-counts.md](0.2.6/property-counts.md) - Implemented / Partial / Unsupported / Ignored counts
 - [ignored-inventory.json](0.2.6/ignored-inventory.json) - Ownership map for the 247 Ignored names (phases 68-78)
 - [AGENTS.md](0.2.6/AGENTS.md) - Agent rules for this ledger
+- [86-canonical-0.2.6-wasm.md](0.2.6/86-canonical-0.2.6-wasm.md) - Browser WASM conversion, PDF preview, and image output phases 86-93
 
 Phases 57-67 closed Partials (174 Implemented / 0 Partial). Phases 68-78 reopen all 247 Ignored for browser-level print. Leftover CSS rows in `0.2.0/phases/pending-phase-items/` move here with `[~]` pointers. WOFF2 sidecar cited in KB is not in this worktree unless amended.

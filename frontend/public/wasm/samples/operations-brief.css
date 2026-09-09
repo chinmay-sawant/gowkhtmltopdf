@@ -1,0 +1,25 @@
+@page { size: A4; margin: 12mm; }
+* { box-sizing: border-box; }
+body { margin: 0; color: #1a1f24; font-family: "Liberation Sans", sans-serif; font-size: 9.5pt; line-height: 1.35; }
+h1, h2, h3, p { margin-top: 0; }
+h1, h2 { color: #1f4b99; }
+h1 { margin-bottom: 2px; font-size: 16pt; }
+h2 { margin-bottom: 6px; font-size: 15pt; }
+h3 { margin-bottom: 5px; color: #103a7a; font-size: 10.5pt; }
+.masthead { display: flex; align-items: center; gap: 12px; border-bottom: 3px solid #1f4b99; padding-bottom: 8px; margin-bottom: 15px; }
+.mark { display: grid; place-items: center; width: 42px; height: 36px; background: #1f4b99; color: white; font-family: "Liberation Mono", monospace; font-size: 10pt; }
+.titles { flex: 1; }.titles p, .section-heading p { margin: 0; color: #556; font-size: 8.5pt; }
+.needle { display: inline-block; border-radius: 3px; background: #1f4b99; color: #fff; padding: 2px 8px; letter-spacing: .04em; }
+.hero-line { display: flex; align-items: end; justify-content: space-between; border-bottom: 1px solid #b8c0cc; padding-bottom: 8px; }
+.eyebrow { margin-bottom: 3px; color: #667; font-family: "Liberation Mono", monospace; font-size: 8pt; text-transform: uppercase; }
+.overall { color: #176b3a; font-family: "Liberation Mono", monospace; font-size: 23pt; }
+.health-grid, .action-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 16px 0; }
+.health-grid article, .action-grid article { border: 1px solid #b8c0cc; border-top: 4px solid #1f4b99; background: #f7f9fc; padding: 10px; }
+.health-grid span, .health-grid strong, .health-grid small { display: block; }.health-grid strong { margin: 8px 0 2px; color: #176b3a; font-size: 14pt; }.health-grid small { color: #667; font-size: 8pt; }
+.service-table, .check-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.service-table th, .service-table td, .check-table th, .check-table td { border: 1px solid #b8c0cc; padding: 7px; text-align: left; }.service-table th, .check-table th { background: #e8eef8; }.service-table tr:nth-child(even) td, .check-table tr:nth-child(even) td { background: #f7f9fc; }
+.state { display: inline-block; border-radius: 3px; padding: 2px 6px; font-size: 8pt; }.stable { background: #dcefe1; color: #176b3a; }.review { background: #fff0c2; color: #855d00; }
+.note { margin-top: 14px; border-top: 1px solid #ccd; padding-top: 6px; color: #556; font-size: 8pt; }.page-break { page-break-before: always; }
+.section-heading { display: flex; gap: 10px; border-bottom: 1px solid #b8c0cc; padding-bottom: 8px; margin-bottom: 18px; }.section-heading > span { color: #1f4b99; font-family: "Liberation Mono", monospace; font-size: 16pt; }
+.timeline { border-left: 3px solid #1f4b99; }.timeline article { display: grid; grid-template-columns: 72px 1fr; gap: 12px; padding: 0 0 18px 14px; }.timeline time { color: #1f4b99; font-family: "Liberation Mono", monospace; font-weight: bold; }.timeline p, .action-grid p { margin: 0; color: #556; }.quote { margin-top: 18px; border: 1px solid #fd8; background: #fff5cc; padding: 14px; color: #855d00; font-family: "Liberation Serif", serif; font-size: 13pt; }
+.action-grid article { border-top-color: #fd8; }.action-grid article > strong { color: #1f4b99; font-family: "Liberation Mono", monospace; font-size: 15pt; }.action-grid h3 { margin-top: 8px; }.check-table { margin-top: 22px; }.signoff { display: flex; justify-content: space-between; margin-top: 78px; border-top: 1px solid #667; padding-top: 6px; color: #556; font-size: 8pt; }

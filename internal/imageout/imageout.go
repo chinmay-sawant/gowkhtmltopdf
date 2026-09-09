@@ -108,6 +108,7 @@ const maxSmartWidthLayouts = 8
 type RenderOptions struct {
 	Width       int // viewport width in pixels; <= 0 means 1024
 	Height      int // minimum canvas height in pixels; 0 = content height
+	Padding     int // output pixels added to every canvas edge
 	Font        *pdf.Font
 	Registry    *pdf.Registry // optional --font-path / system faces (CJK)
 	Sheets      []*css.Stylesheet
@@ -126,8 +127,8 @@ type RenderOptions struct {
 // with negative offsets or dimensions (which would silently no-op through
 // applyCrop), and media values other than print, screen, or empty.
 func (o RenderOptions) Validate() error {
-	if o.Width < 0 || o.Height < 0 {
-		return fmt.Errorf("%w: got %dx%d", errNegativeDimension, o.Width, o.Height)
+	if o.Width < 0 || o.Height < 0 || o.Padding < 0 {
+		return fmt.Errorf("%w: got %dx%d with %dpx padding", errNegativeDimension, o.Width, o.Height, o.Padding)
 	}
 
 	if o.Crop.Min.X < 0 || o.Crop.Min.Y < 0 || o.Crop.Dx() < 0 || o.Crop.Dy() < 0 {
@@ -185,7 +186,7 @@ func RenderContext(ctx context.Context, root *html.Node, opts RenderOptions) (im
 		return nil, err
 	}
 
-	img, err := rasterizeContext(ctx, res, maxHeight(res, opts), opts.Transparent)
+	img, err := rasterizeContext(ctx, res, maxHeight(res, opts), opts.Transparent, opts.Padding)
 	if err != nil {
 		return nil, err
 	}
@@ -353,15 +354,19 @@ type pixBuffer struct {
 var supersamplePixPool sync.Pool
 
 //nolint:cyclop,funlen,mnd // supersampled rasterization pipeline
-func rasterizeContext(ctx context.Context, res *layout.Result, height float64, transparent bool) (*image.NRGBA, error) {
+func rasterizeContext(
+	ctx context.Context, res *layout.Result, height float64, transparent bool, padding int,
+) (*image.NRGBA, error) {
 	pxPerPt := ptToPx * float64(rasterSS)
+	paddingPt := float64(padding) * cssPxToPt
+	paddingPx := paddingPt * pxPerPt
 
-	widthPx, err := rasterDimension(res.Width*pxPerPt, maxRasterWidth)
+	widthPx, err := rasterDimension(res.Width*pxPerPt+paddingPx*2, maxRasterWidth)
 	if err != nil {
 		return nil, err
 	}
 
-	heightPx, err := rasterDimension(height*pxPerPt, maxRasterHeight)
+	heightPx, err := rasterDimension(height*pxPerPt+paddingPx*2, maxRasterHeight)
 	if err != nil {
 		return nil, err
 	}
@@ -410,7 +415,9 @@ func rasterizeContext(ctx context.Context, res *layout.Result, height float64, t
 			return nil, fmt.Errorf("imageout: context: %w", err)
 		}
 
-		paint(img, &res.Ops[opIndex], pxPerPt, atlas, imageCache)
+		op := res.Ops[opIndex]
+		offsetPaintOp(&op, paddingPt)
+		paint(img, &op, pxPerPt, atlas, imageCache)
 	}
 
 	if rasterSS <= 1 {
@@ -430,6 +437,19 @@ func rasterizeContext(ctx context.Context, res *layout.Result, height float64, t
 	}
 
 	return downscaled, nil
+}
+
+// offsetPaintOp moves layout output into the padded canvas. Transformed ops
+// need the same translation in their matrix so their visual position changes
+// without changing the transform around the operation itself.
+func offsetPaintOp(paintOp *layout.Op, paddingPt float64) {
+	paintOp.X += paddingPt
+	paintOp.Y += paddingPt
+
+	if paintOp.XformSet {
+		paintOp.Xform.E += paddingPt
+		paintOp.Xform.F += paddingPt
+	}
 }
 
 func rasterDimension(value float64, maxVal int) (int, error) {
@@ -1720,6 +1740,7 @@ func (p *imagePipeline) RenderObjects(ctx context.Context) error {
 		Transparent:        imgSet.Transparent,
 		Crop:               cropRect(imgSet.Crop),
 		SmartWidth:         imgSet.SmartWidth,
+		Padding:            imgSet.Padding,
 		PrintLinkUnderline: printLinkUnderline,
 	})
 	if err != nil {

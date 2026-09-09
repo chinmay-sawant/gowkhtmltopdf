@@ -289,6 +289,7 @@ html[data-theme='dark'] .cardbox {
   max-width: 720px;
   width: 100%;
   max-height: 88vh;
+  height: min(88vh, 900px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -451,22 +452,29 @@ html[data-theme='dark'] .cardbox {
   padding: 14px 16px;
   background: var(--soft);
   border-bottom: 1px solid var(--line);
+  min-height: 0;
+  height: 0;
+  flex: 1;
   overflow: hidden;
 }
 
 .cardbox-page {
   flex: 1;
   min-width: 0;
+  min-height: 0;
+  height: 100%;
   display: flex;
   justify-content: center;
   align-items: center;
-  overflow: hidden;
+  overflow: auto;
   position: relative;
   user-select: none;
 }
 
 .cardbox-page.is-zoomed {
-  touch-action: none;
+  align-items: flex-start;
+  justify-content: flex-start;
+  cursor: zoom-out;
 }
 
 .cardbox-page img {
@@ -478,6 +486,11 @@ html[data-theme='dark'] .cardbox {
   border-radius: 3px;
   background: var(--surface);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.cardbox-page.is-zoomed img {
+  flex: none;
+  border-radius: 0;
 }
 
 .cardbox-hints {

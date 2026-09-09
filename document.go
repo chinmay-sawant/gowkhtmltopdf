@@ -149,6 +149,7 @@ type ImageDocument struct {
 
 	Width       int
 	Height      int
+	Padding     int
 	Format      string
 	Quality     int
 	SmartWidth  *bool
@@ -504,6 +505,9 @@ func (d *ImageDocument) toImageRequest(output io.Writer) *imageout.Request {
 	}
 	if d.Height != 0 {
 		image.Height = d.Height
+	}
+	if d.Padding != 0 {
+		image.Padding = d.Padding
 	}
 	if d.Quality != 0 {
 		image.Quality = d.Quality

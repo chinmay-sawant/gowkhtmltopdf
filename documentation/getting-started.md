@@ -11,7 +11,9 @@ Related: [CLI reference](cli.md) · [Library API](library-api.md) ·
 - The first build may download the two allowlisted direct modules in
   [`go.mod`](../go.mod) (`go-text/typesetting`, `tdewolff/canvas`) and their
   transitive graph. After that, builds can run offline from the module cache.
-- No browser, native converter, Qt, or cgo toolchain is required.
+- Native CLI builds require no browser process, native converter, Qt, or cgo
+  toolchain. The optional browser preview uses the WASM build in
+  [wasm.md](wasm.md).
 
 ## Install with Go
 
@@ -65,6 +67,13 @@ Check the stamp:
 `VERSION` (currently `0.2.4`) is the project release. The library constant
 `LibraryVersion` (`0.12.7-dev`) is a **wkhtmltopdf settings-surface**
 compatibility id, not the release number. See [library-api.md](library-api.md#versioning).
+
+## Browser preview
+
+Run `make wasm` and then build the frontend to create the inline HTML browser
+converter. The `/wasm` route supports PDF, PNG, and JPEG output in a Web
+Worker. Read [Browser WASM conversion](wasm.md) for the request contract,
+limits, and resource boundary.
 
 ## First local PDF
 

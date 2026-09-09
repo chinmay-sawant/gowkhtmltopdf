@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<!--
+  wasm-sample
+  Proves: inline HTML, print CSS, table layout, forced page breaks, and a
+  self-contained data-URL image for PDF, PNG, and JPEG browser output.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>WASM conversion sample</title>
+  <style>
+    @page { size: A4; margin: 18mm; }
+    body { color: #20242b; font-family: sans-serif; font-size: 12pt; }
+    h1 { color: #245b8f; margin: 0 0 8pt; }
+    h2 { color: #245b8f; margin: 0 0 6pt; }
+    table { border-collapse: collapse; margin-top: 12pt; width: 100%; }
+    th, td { border: 1px solid #b8c4d0; padding: 5pt; text-align: left; }
+    th { background: #e9f0f7; }
+    .badge { float: right; width: 48px; height: 48px; }
+    .page-two { page-break-before: always; }
+    .note { border-left: 3px solid #245b8f; padding-left: 8pt; }
+  </style>
+</head>
+<body>
+  <img
+    class="badge"
+    alt="one pixel sample"
+    src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+  >
+  <h1>Browser WASM conversion</h1>
+  <p class="note">This sample is rendered by the same Go document engine in PDF and image modes.</p>
+  <table>
+    <thead><tr><th>Output</th><th>Format</th><th>Browser action</th></tr></thead>
+    <tbody>
+      <tr><td>Document</td><td>PDF</td><td>Preview pages and download</td></tr>
+      <tr><td>ImageDocument</td><td>PNG or JPEG</td><td>Preview pixels and download</td></tr>
+    </tbody>
+  </table>
+
+  <section class="page-two">
+    <h2>Second page</h2>
+    <p>The forced break keeps this heading on a separate PDF page.</p>
+    <p>Inline resources remain available without filesystem access or a network request.</p>
+  </section>
+</body>
+</html>

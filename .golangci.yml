@@ -44,6 +44,9 @@ issues:
     - node_modules
     - frontend/dist
     - bindings
+    # Scratch programs under temps are exploratory artifacts, not product
+    # packages. They have never been part of the supported build or test path.
+    - temps
 
 output:
   sort-results: true

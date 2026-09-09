@@ -16,18 +16,14 @@ export default function Cardbox({ item, onClose }) {
   const compactPager = total > 10
   const [page, setPage] = useState(1)
   const [zoom, setZoom] = useState(1)
-  const [pan, setPan] = useState({ x: 0, y: 0 })
-  const [isDragging, setIsDragging] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
 
   const closeRef = useRef(null)
   const innerRef = useRef(null)
   const openerRef = useRef(document.activeElement)
-  const dragStartRef = useRef({ startX: 0, startY: 0, panX: 0, panY: 0 })
 
   const resetZoom = useCallback(() => {
     setZoom(1)
-    setPan({ x: 0, y: 0 })
   }, [])
 
   const zoomIn = useCallback(() => {
@@ -37,7 +33,6 @@ export default function Cardbox({ item, onClose }) {
   const zoomOut = useCallback(() => {
     setZoom((z) => {
       const next = Math.max(MIN_ZOOM, Math.round((z - 0.5) * 10) / 10)
-      if (next <= 1) setPan({ x: 0, y: 0 })
       return next
     })
   }, [])
@@ -69,78 +64,14 @@ export default function Cardbox({ item, onClose }) {
     resetZoom()
   }, [total, resetZoom])
 
-  // Mouse pan handling
-  const handleMouseDown = (e) => {
-    if (zoom <= 1) return
-    if (e.button !== 0) return
-    e.preventDefault()
-    setIsDragging(true)
-    dragStartRef.current = {
-      startX: e.clientX,
-      startY: e.clientY,
-      panX: pan.x,
-      panY: pan.y,
-    }
-  }
-
-  // Touch pan handling
-  const handleTouchStart = (e) => {
-    if (zoom <= 1 || e.touches.length !== 1) return
-    const touch = e.touches[0]
-    setIsDragging(true)
-    dragStartRef.current = {
-      startX: touch.clientX,
-      startY: touch.clientY,
-      panX: pan.x,
-      panY: pan.y,
-    }
-  }
-
-  const handleTouchMove = (e) => {
-    if (!isDragging || e.touches.length !== 1) return
-    const touch = e.touches[0]
-    const dx = touch.clientX - dragStartRef.current.startX
-    const dy = touch.clientY - dragStartRef.current.startY
-    setPan({
-      x: dragStartRef.current.panX + dx,
-      y: dragStartRef.current.panY + dy,
-    })
-  }
-
-  const handleTouchEnd = () => {
-    setIsDragging(false)
-  }
-
   // Double click toggles between 1x and 2x
   const handleDoubleClick = () => {
     if (zoom > 1) {
       resetZoom()
     } else {
       setZoom(2)
-      setPan({ x: 0, y: 0 })
     }
   }
-
-  useEffect(() => {
-    if (!isDragging) return
-    const handleMouseMove = (e) => {
-      const dx = e.clientX - dragStartRef.current.startX
-      const dy = e.clientY - dragStartRef.current.startY
-      setPan({
-        x: dragStartRef.current.panX + dx,
-        y: dragStartRef.current.panY + dy,
-      })
-    }
-    const handleMouseUp = () => {
-      setIsDragging(false)
-    }
-    window.addEventListener('mousemove', handleMouseMove)
-    window.addEventListener('mouseup', handleMouseUp)
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove)
-      window.removeEventListener('mouseup', handleMouseUp)
-    }
-  }, [isDragging])
 
   useEffect(() => {
     const onFsChange = () => {
@@ -177,10 +108,10 @@ export default function Cardbox({ item, onClose }) {
         prev()
       } else if (e.key === 'ArrowRight') {
         next()
-      } else if (e.key === '+' || e.key === '=') {
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '=')) {
         e.preventDefault()
         zoomIn()
-      } else if (e.key === '-' || e.key === '_') {
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === '-' || e.key === '_')) {
         e.preventDefault()
         zoomOut()
       } else if (e.key === '0') {
@@ -315,26 +246,19 @@ export default function Cardbox({ item, onClose }) {
             </button>
           )}
           <div
-            className={`cardbox-page${zoom > 1 ? ' is-zoomed' : ''}${isDragging ? ' is-dragging' : ''}`}
-            onMouseDown={handleMouseDown}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
+            className={`cardbox-page${zoom > 1 ? ' is-zoomed' : ''}`}
             onDoubleClick={handleDoubleClick}
-            style={{
-              cursor: zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
-            }}
+            style={{ cursor: zoom > 1 ? 'zoom-out' : 'default' }}
           >
             {pageUrl(item, page) ? (
               <img
                 src={pageUrl(item, page)}
                 alt={`${item.title} page ${page}`}
                 style={{
-                  transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`,
-                  transformOrigin: 'center center',
-                  transition: isDragging ? 'none' : 'transform 0.15s cubic-bezier(0.2, 0, 0, 1)',
+                  width: zoom > 1 ? `${zoom * 100}%` : undefined,
+                  maxWidth: zoom > 1 ? 'none' : undefined,
+                  maxHeight: zoom > 1 ? 'none' : undefined,
                   userSelect: 'none',
-                  pointerEvents: zoom > 1 ? 'none' : 'auto',
                 }}
                 draggable={false}
               />
@@ -357,7 +281,7 @@ export default function Cardbox({ item, onClose }) {
           {zoom > 1 && (
             <>
               <span className="hint-sep">•</span>
-              <span className="hint-item hint-pan">Drag to Pan</span>
+              <span className="hint-item hint-pan">Scroll to pan</span>
             </>
           )}
           <span className="hint-sep">•</span>
@@ -401,5 +325,4 @@ export default function Cardbox({ item, onClose }) {
     </div>
   )
 }
-
 

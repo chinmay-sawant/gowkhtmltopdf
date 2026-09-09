@@ -36,7 +36,7 @@ export default function LandingPage() {
 
       <section className="landing-hero-minimal" aria-labelledby="landing-title">
         <div className="landing-hero-main">
-          <p className="landing-kicker">HTML to PDF &middot; Pure Go &middot; No browser, no cgo</p>
+          <p className="landing-kicker">HTML to PDF &middot; Pure Go &middot; No browser process, no cgo</p>
           <h1 id="landing-title">
             Your HTML,
             <br />
@@ -50,6 +50,7 @@ export default function LandingPage() {
             <Link className="button button-primary" to="/getting-started">
               Get started <span aria-hidden="true">-&gt;</span>
             </Link>
+            <Link className="button button-secondary" to="/wasm">Try Live Demo</Link>
             <Link className="button button-secondary" to="/showcase">View samples</Link>
           </div>
           <p className="landing-micro">
@@ -102,7 +103,7 @@ export default function LandingPage() {
       <section className="landing-flow" aria-labelledby="flow-heading">
         <div className="landing-section-head">
           <h2 id="flow-heading">One pipeline. HTML in, PDF out.</h2>
-          <p>Every conversion runs the same in-repo path. No external browser, no wrapper process.</p>
+          <p>Native conversions run the same in-repo path. The optional browser route runs it in a Web Worker.</p>
         </div>
         <ol className="flow-grid">
           <li className="flow-card">
@@ -168,8 +169,8 @@ export default function LandingPage() {
           <span>Single purpose, stable output. Same HTML, settings and fonts give same layout.</span>
         </div>
         <div className="proof-minimal-item">
-          <strong>Static binary</strong>
-          <span>CGO_ENABLED=0. No browser to install, no wrapper daemon.</span>
+          <strong>Native static binary</strong>
+          <span>CGO_ENABLED=0. No browser process to install, no wrapper daemon.</span>
         </div>
         <div className="proof-minimal-item">
           <strong>Two surfaces</strong>

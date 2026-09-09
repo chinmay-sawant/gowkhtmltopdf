@@ -14,6 +14,7 @@
   justify-content: space-between;
   gap: 24px;
   width: 100%;
+  min-width: 0;
   max-width: 1440px;
   margin: 0 auto;
 }
@@ -82,6 +83,11 @@
 .nav-link-cta {
   color: var(--accent);
   font-weight: 600;
+}
+
+.site-nav-links .nav-link:last-child {
+  min-width: 124px;
+  justify-content: center;
 }
 
 .nav-link-cta:hover,
@@ -252,9 +258,12 @@
   display: none;
   align-items: center;
   gap: 10px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .mobile-bar-cta {
+  min-width: 0;
   min-height: 44px;
   padding: 8px 14px;
   font-size: 13px;

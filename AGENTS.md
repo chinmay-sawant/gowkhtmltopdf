@@ -66,9 +66,12 @@ inline as a fallback - still do not write a file.
    `docs/<short-description>`. Verify the branch name before the first commit
    (a typo'd `chore/frontend-udpates` once lived across 3 commits and a PR).
 5. **PRs** use `skills/PR/PR_TEMPLATE.md`; issues use
-   `skills/PR/ISSUE_TEMPLATE.md`. Body file lives at
-   `plans/PR/pr-<short-slug>.md` and must stay in sync with the GitHub PR.
-   PRs require self-assignee and at least one label.
+   `skills/PR/ISSUE_TEMPLATE.md`. Whenever a user asks to raise, update, or
+   review a PR, read the PR template first. Generate the diff table with
+   `bash scripts/pr-diff-stat.sh <base-ref>` and paste the complete output
+   into the body. Body files live at `plans/PR/pr-<short-slug>.md` and must
+   stay in sync with the GitHub PR. PRs require self-assignment and at least
+   one label.
 6. **Checklists are live ledgers:** phase files under `plans/<version>/`
     close rows `[x]` in the same change that implements them, and only when
     the gate actually passed. Never mark `[x]` from intent. When you create
@@ -198,8 +201,11 @@ that fails if `docs/` goes dirty.
 10. **Repeated full-suite verification after every micro-fix.** Targeted
     tests after edits; full gate once at session end. Cached results count.
 11. **Throwaway tooling.** Anything used twice belongs in `scripts/` with a
-    note. Bench harnesses live in `scripts/bench-external.sh`, screenshot
-    tooling in `scripts/screenshot_showcase.py`; do not re-inline them.
+    note. The PR diff table generator is
+    `scripts/pr-diff-stat.sh`. Bench harnesses live in
+    `scripts/bench-external.sh`, and screenshot tooling lives in
+    `scripts/screenshot_showcase.py`. Keep these tools canonical instead of
+    re-inlining them.
 12. **User-in-the-loop aesthetic loops.** Verify rendering yourself first:
     `make samples` regenerates `output/` PDFs/PNGs you can inspect before
     asking the user to look.
@@ -272,6 +278,7 @@ PR bodies live in `plans/PR/`. Phase checklist format comes from
 ## Skills (this folder)
 
 - `skills/PR/` - templates for PRs, issues, review comments
+- `scripts/pr-diff-stat.sh` - generates the extension-based PR diff table
 - `skills/feynman/` - plain-words explanation loop with self-audit;
   mandatory default for every explanatory reply and documentation surface
   (golden rule 9)

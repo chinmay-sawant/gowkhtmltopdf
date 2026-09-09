@@ -1,0 +1,74 @@
+{
+  "samples": [
+    {
+      "id": "audit-dashboard",
+      "title": "CSS audit dashboard",
+      "description": "A three-page property audit with cards, a fixed table, counters, and a rotated callout.",
+      "html": "wasm/samples/audit-dashboard.html",
+      "css": "wasm/samples/audit-dashboard.css",
+      "htmlNeedle": "IMPLEMENTED CSS AUDIT",
+      "cssNeedle": "@page { size: A4; margin: 12mm; }",
+      "pdfNeedles": [
+        "IMPLEMENTED CSS AUDIT",
+        "Layout and paint review",
+        "Print-ready conclusion"
+      ]
+    },
+    {
+      "id": "operations-brief",
+      "title": "Operations brief",
+      "description": "A three-page status brief showing a masthead, service table, timeline, and action plan.",
+      "html": "wasm/samples/operations-brief.html",
+      "css": "wasm/samples/operations-brief.css",
+      "htmlNeedle": "OPERATIONS BRIEF",
+      "cssNeedle": "@page { size: A4; margin: 12mm; }",
+      "pdfNeedles": [
+        "OPERATIONS BRIEF",
+        "Service health",
+        "Action plan"
+      ]
+    },
+    {
+      "id": "observatory-fieldbook",
+      "title": "Observatory fieldbook",
+      "description": "A two-page editorial fieldbook with observation cards, a measurement table, and notes.",
+      "html": "wasm/samples/observatory-fieldbook.html",
+      "css": "wasm/samples/observatory-fieldbook.css",
+      "htmlNeedle": "OBSERVATORY FIELD BOOK",
+      "cssNeedle": "@page { size: A4; margin: 12mm; }",
+      "pdfNeedles": [
+        "OBSERVATORY FIELD BOOK",
+        "Night watch",
+        "Field notes"
+      ]
+    },
+    {
+      "id": "contract-review",
+      "title": "Contract review",
+      "description": "A three-page review packet with party cards, obligations, clauses, and sign-off blocks.",
+      "html": "wasm/samples/contract-review.html",
+      "css": "wasm/samples/contract-review.css",
+      "htmlNeedle": "CONTRACT REVIEW",
+      "cssNeedle": "@page { size: A4; margin: 12mm; }",
+      "pdfNeedles": [
+        "CONTRACT REVIEW",
+        "Commercial terms",
+        "Sign-off"
+      ]
+    },
+    {
+      "id": "api-catalog",
+      "title": "API catalog",
+      "description": "A two-page endpoint catalog that demonstrates compact cards, code blocks, and a property matrix.",
+      "html": "wasm/samples/api-catalog.html",
+      "css": "wasm/samples/api-catalog.css",
+      "htmlNeedle": "API CATALOG",
+      "cssNeedle": "@page { size: A4; margin: 12mm; }",
+      "pdfNeedles": [
+        "API CATALOG",
+        "Conversion endpoint",
+        "Response contract"
+      ]
+    }
+  ]
+}

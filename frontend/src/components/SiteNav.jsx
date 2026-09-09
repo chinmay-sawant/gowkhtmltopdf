@@ -12,6 +12,7 @@ const LINKS = [
   { to: '/dossier', label: 'Issue Dossier' },
   { to: '/showcase', label: 'Showcase' },
   { to: '/benchmarks', label: 'Benchmarks' },
+  { to: '/wasm', label: 'Try Live Demo' },
 ]
 
 export default function SiteNav() {
@@ -240,5 +241,3 @@ export default function SiteNav() {
     </nav>
   )
 }
-
-

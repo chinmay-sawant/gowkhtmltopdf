@@ -17,6 +17,7 @@ func TestRenderOptionsValidate(t *testing.T) {
 	}{
 		{name: "negative width", opts: RenderOptions{Width: -1}},
 		{name: "negative height", opts: RenderOptions{Height: -10}},
+		{name: "negative padding", opts: RenderOptions{Padding: -1}},
 		{name: "negative crop offset", opts: RenderOptions{Crop: image.Rect(-5, 0, 100, 100)}},
 		{
 			name: "negative crop width",
@@ -44,6 +45,7 @@ func TestRenderOptionsValidateAcceptsDefaults(t *testing.T) {
 	opts := []RenderOptions{
 		{},
 		{Width: 100, Height: 50, Media: "print"},
+		{Width: 100, Height: 50, Padding: 12},
 		{Media: "screen"},
 		{Crop: image.Rect(10, 10, 50, 50)},
 	}
