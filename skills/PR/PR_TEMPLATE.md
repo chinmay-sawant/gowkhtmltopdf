@@ -1,6 +1,6 @@
-# goslop - Pull Request Template
+# gowkhtmltopdf - Pull Request Template
 
-Use this document as the base when authoring GitHub pull requests for [chinmay-sawant/goslop](https://github.com/chinmay-sawant/goslop). Copy the sections below into the PR description and fill in each section. Delete guidance comments before submitting.
+Use this document when authoring GitHub pull requests for [chinmay-sawant/gowkhtmltopdf](https://github.com/chinmay-sawant/gowkhtmltopdf). Copy the sections below into the PR description and fill in each section. Delete guidance comments before submitting.
 
 ---
 
@@ -9,7 +9,7 @@ Use this document as the base when authoring GitHub pull requests for [chinmay-s
 1. **Pick a title** using the convention in [PR title](#pr-title).
 2. **Write a 1-3 sentence summary** - what changed and why (not a file list).
 3. **Fill in each section** - keep `Summary`, `Changes`, `Test plan`, and `Related issues`.
-4. **Generate the diff-stat-by-extension table** with the [generator](#diff-stat-by-extension-generator) and paste it at the bottom.
+4. **Generate the diff-stat-by-extension table** with `bash scripts/pr-diff-stat.sh <base-ref>` and paste the output at the bottom.
 5. **Link related tickets** in the body **and** in `gh pr create` metadata.
 6. **Choose labels** and **self-assign**.
 7. Save a filled copy under `plans/PR/pr-<short-slug>.md` **before** opening the PR when process-gated.
@@ -19,15 +19,13 @@ Use this document as the base when authoring GitHub pull requests for [chinmay-s
 
 ## Diff stat by extension (generator)
 
-From the feature branch, against the base branch. Generates the table for the bottom of the PR body on the fly, with real line counts (`--numstat`, rename-aware, binaries marked):
+Run the generator from the feature branch. Pass the exact base ref used by `gh pr create`.
 
 ```sh
-BASE=main  # or master, match --base
-git diff "$BASE"...HEAD --numstat | awk -F'\t' '{p=$3; sub(/.* => /,"",p); sub(/}$/,"",p); n=split(p,a,"."); ext=(n>1?"."a[n]:"(no ext)"); f[ext]++; if ($1=="-") b[ext]++; else {a[ext]+=$1; d[ext]+=$2}} END {for (e in f) {if (b[e]>0) printf "| `%s` | %d | - | - | %d binary |\n", e, f[e], b[e]; else printf "| `%s` | %d | %d | %d | |\n", e, f[e], a[e], d[e]}}' | sort -t'|' -k3 -rn
-git diff "$BASE"...HEAD --shortstat  # Total row
+bash scripts/pr-diff-stat.sh master
 ```
 
-Fill the Note column yourself on the fly: one short reason per row naming the work that drove that extension's count (example: `.go` inflated by review remediation plus lint cleanup).
+The script reads `git diff <base-ref>...HEAD --numstat`, groups files by their final extension, handles renamed files, marks binary files, and adds the total row. Paste its complete output into the PR body. Do not hand-count the table.
 
 ---
 
@@ -36,7 +34,7 @@ Fill the Note column yourself on the fly: one short reason per row naming the wo
 ```sh
 # From the feature branch (already pushed):
 gh pr create \
-  --base main \
+  --base master \
   --head "$(git branch --show-current)" \
   --title "<type>(<scope>): <short imperative description>" \
   --body-file plans/PR/pr-<short-slug>.md \
@@ -51,7 +49,7 @@ gh pr create \
 | `--label …` | **Required.** At least one label. |
 | `--body-file …` | **Required.** Full template body with **Related issues** filled. |
 | `--title` | Must match [PR title](#pr-title) convention. |
-| `--base main` | Default integration branch is **`main`** (not `master`). |
+| `--base master` | Default integration branch is **`master`**. |
 
 If the PR already exists without metadata:
 
@@ -64,15 +62,15 @@ gh pr edit <NUMBER> --add-label documentation --add-label enhancement
 
 ## Multi-workstream / epic integration (parallel agents)
 
-When **multiple issue-sized branches** are developed in parallel, also ship a **single integration branch** targeting `main`.
+When **multiple issue-sized branches** are developed in parallel, also ship a **single integration branch** targeting `master`.
 
 ```sh
-git fetch origin main
-git checkout -b chore/epic-N-integration origin/main
-# merge child heads, validate, push, open PR to main
+git fetch origin master
+git checkout -b chore/epic-N-integration origin/master
+# merge child heads, validate, push, open PR to master
 ```
 
-Prefer **merging only the integration PR** into `main` when an epic stack exists.
+Prefer **merging only the integration PR** into `master` when an epic stack exists.
 
 ---
 
@@ -171,7 +169,7 @@ Copy everything below this line into the GitHub PR body (and into `plans/PR/pr-<
 
 - [ ] `make test`
 - [ ] `make lint` / `go vet`
-- [ ] `CGO_ENABLED=0 go build -o bin/goslop ./cmd/goslop` (when pure-Go is required)
+- [ ] `make build` (when binary output is part of the change)
 - [ ] `make run` wall time vs baseline (hard &lt; 400ms; soft ±50ms of reference)
 - [ ] `make reference-metrics` / gopdfsuit hard metrics if detector surface changed
 
@@ -229,31 +227,31 @@ make run
 
 ## Diff stat by extension
 
-<!-- Generated on the fly with the template generator. Real line counts per extension, base...HEAD. Write your own one-line reason per row. -->
+<!-- Generate this table with bash scripts/pr-diff-stat.sh <base-ref>. Keep the generated rows and total together. -->
 
-| Extension | Files | + | - | Note |
-|-----------|-------|---|---|------|
-| `.go` | | | | |
-| **Total** | | | | |
+| Extension | Files | Insertions | Deletions |
+|-----------|-------|------------|-----------|
+| `.go` | | | |
+| **Total** | | | |
 
 ---
 
-## Example titles (goslop)
+## Example titles (gowkhtmltopdf)
 
 ```
-feat(engine): replace tree-sitter with go/ast pure-Go parse
-fix: respect --skip when GoScan bundle runs
-perf(engine): parallel file scan without CGO
-docs: align README with §12.4 parity baseline
-chore: drop tree-sitter CGO dependencies
+feat(wasm): add browser conversion support
+fix(layout): preserve mixed-border geometry
+perf(imageout): reuse raster buffers
+docs: document image padding
+chore: refresh generated site assets
 ```
 
 ## Example `gh pr create` (full)
 
 ```sh
 gh pr create \
-  --base main \
-  --title "feat(engine): replace tree-sitter/CGO with go/ast" \
+  --base master \
+  --title "feat(wasm): add browser conversion support" \
   --body-file plans/PR/pr-go-ast-no-cgo.md \
   --assignee "@me" \
   --label documentation \

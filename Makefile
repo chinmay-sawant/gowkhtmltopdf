@@ -104,6 +104,7 @@ wasm-test:
 	bash scripts/check-wasm-contract.sh
 	$(MAKE) wasm
 	@test -d frontend/node_modules || npm ci --prefix frontend
+	@test -d scripts/puppeteer/node_modules/puppeteer-core || npm ci --prefix scripts/puppeteer
 	npm --prefix frontend run lint
 	npm --prefix frontend run build
 	npm --prefix frontend test
