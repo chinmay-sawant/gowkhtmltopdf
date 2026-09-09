@@ -354,7 +354,9 @@ type pixBuffer struct {
 var supersamplePixPool sync.Pool
 
 //nolint:cyclop,funlen,mnd // supersampled rasterization pipeline
-func rasterizeContext(ctx context.Context, res *layout.Result, height float64, transparent bool, padding int) (*image.NRGBA, error) {
+func rasterizeContext(
+	ctx context.Context, res *layout.Result, height float64, transparent bool, padding int,
+) (*image.NRGBA, error) {
 	pxPerPt := ptToPx * float64(rasterSS)
 	paddingPt := float64(padding) * cssPxToPt
 	paddingPx := paddingPt * pxPerPt
@@ -440,12 +442,13 @@ func rasterizeContext(ctx context.Context, res *layout.Result, height float64, t
 // offsetPaintOp moves layout output into the padded canvas. Transformed ops
 // need the same translation in their matrix so their visual position changes
 // without changing the transform around the operation itself.
-func offsetPaintOp(op *layout.Op, paddingPt float64) {
-	op.X += paddingPt
-	op.Y += paddingPt
-	if op.XformSet {
-		op.Xform.E += paddingPt
-		op.Xform.F += paddingPt
+func offsetPaintOp(paintOp *layout.Op, paddingPt float64) {
+	paintOp.X += paddingPt
+	paintOp.Y += paddingPt
+
+	if paintOp.XformSet {
+		paintOp.Xform.E += paddingPt
+		paintOp.Xform.F += paddingPt
 	}
 }
 

@@ -84,6 +84,7 @@ func (d *ImageDocument) Validate() error {
 	if err := validateImageDimensions(d.Width, d.Height); err != nil {
 		return err
 	}
+
 	if d.Padding < 0 {
 		return fmt.Errorf("%w: image padding must be non-negative", ErrInvalidDimensions)
 	}
