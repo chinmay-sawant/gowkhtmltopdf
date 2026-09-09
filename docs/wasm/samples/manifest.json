@@ -8,7 +8,11 @@
       "css": "wasm/samples/audit-dashboard.css",
       "htmlNeedle": "IMPLEMENTED CSS AUDIT",
       "cssNeedle": "@page { size: A4; margin: 12mm; }",
-      "pdfNeedles": ["IMPLEMENTED CSS AUDIT", "Layout and paint review", "Print-ready conclusion"]
+      "pdfNeedles": [
+        "IMPLEMENTED CSS AUDIT",
+        "Layout and paint review",
+        "Print-ready conclusion"
+      ]
     },
     {
       "id": "operations-brief",
@@ -18,7 +22,11 @@
       "css": "wasm/samples/operations-brief.css",
       "htmlNeedle": "OPERATIONS BRIEF",
       "cssNeedle": "@page { size: A4; margin: 12mm; }",
-      "pdfNeedles": ["OPERATIONS BRIEF", "Service health", "Action plan"]
+      "pdfNeedles": [
+        "OPERATIONS BRIEF",
+        "Service health",
+        "Action plan"
+      ]
     },
     {
       "id": "observatory-fieldbook",
@@ -28,7 +36,11 @@
       "css": "wasm/samples/observatory-fieldbook.css",
       "htmlNeedle": "OBSERVATORY FIELD BOOK",
       "cssNeedle": "@page { size: A4; margin: 12mm; }",
-      "pdfNeedles": ["OBSERVATORY FIELD BOOK", "Night watch", "Field notes"]
+      "pdfNeedles": [
+        "OBSERVATORY FIELD BOOK",
+        "Night watch",
+        "Field notes"
+      ]
     },
     {
       "id": "contract-review",
@@ -38,7 +50,11 @@
       "css": "wasm/samples/contract-review.css",
       "htmlNeedle": "CONTRACT REVIEW",
       "cssNeedle": "@page { size: A4; margin: 12mm; }",
-      "pdfNeedles": ["CONTRACT REVIEW", "Commercial terms", "Sign-off"]
+      "pdfNeedles": [
+        "CONTRACT REVIEW",
+        "Commercial terms",
+        "Sign-off"
+      ]
     },
     {
       "id": "api-catalog",
@@ -48,7 +64,11 @@
       "css": "wasm/samples/api-catalog.css",
       "htmlNeedle": "API CATALOG",
       "cssNeedle": "@page { size: A4; margin: 12mm; }",
-      "pdfNeedles": ["API CATALOG", "Conversion endpoint", "Response contract"]
+      "pdfNeedles": [
+        "API CATALOG",
+        "Conversion endpoint",
+        "Response contract"
+      ]
     }
   ]
 }

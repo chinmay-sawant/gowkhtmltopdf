@@ -582,6 +582,7 @@ func DefaultLoadPage() LoadPage {
 type ImageGlobal struct {
 	Width       int
 	Height      int
+	Padding     int
 	Quality     int
 	SmartWidth  bool
 	Crop        CropSettings

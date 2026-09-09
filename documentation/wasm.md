@@ -34,6 +34,11 @@ npm --prefix frontend run build
 Vite copies the public files into `docs/`. Do not edit the generated `docs/`
 tree by hand.
 
+Run `make wasm` again whenever the Go request contract changes. The site loads
+`frontend/public/wasm/gowkhtmltopdf.wasm`. If that file is older than the Go
+source, the browser can reject a field such as `padding` even when the current
+request type accepts it.
+
 Run the complete adapter and browser checks with:
 
 ```sh
@@ -103,7 +108,24 @@ The request uses these fields:
 | `orientation` | Optional `Portrait` or `Landscape` | Not allowed |
 | `width` | Not allowed | Optional pixel width |
 | `height` | Not allowed | Optional pixel height |
+| `padding` | Not allowed | Optional non-negative whole-pixel inset added to all four image edges |
 | `quality` | Not allowed | Optional JPEG quality from 0 to 100 |
+
+For example, this request adds 12 pixels of transparent padding around PNG
+output:
+
+```js
+JSON.stringify({
+  html: '<h1>Badge</h1>',
+  mode: 'png',
+  padding: 12,
+})
+```
+
+The adapter rejects `padding` in PDF mode. It also rejects negative, fractional,
+or oversized padding values. The frontend shows the padding field only for PNG
+and JPEG output. It defaults the field to 20 pixels, and Reset restores that
+20-pixel default.
 
 The adapter rejects unknown JSON fields, empty HTML, unsupported modes, and
 options that belong to another output mode. HTML input is limited to 4 MiB.
@@ -115,11 +137,18 @@ These limits are defined in `bindings/wasm/contract.go` and
 ## Preview PDF and images
 
 The `/wasm` page in the generated site provides an HTML editor, a sample
-loader, a reset action, output selection, progress, cancellation, and a
-download link. PDF output appears in an `iframe` backed by an
-`application/pdf` Blob URL. PNG and JPEG output appears in an image element
-backed by the selected image MIME type. The page revokes the previous Blob URL
-when a result is replaced or the page unmounts.
+loader, a reset action, output selection, image padding, and download and open
+actions. Image padding uses output pixels and expands the PNG or JPEG canvas by
+the same amount on every side. PNG keeps transparent pixels. JPEG composites
+transparent pixels onto white. For PNG and JPEG, the browser first gets the
+paginated PDF from the local Go engine, then rasterizes every PDF page into its
+selected image format. The preview shows every image page in a scrollable
+panel. A multi-page result provides a ZIP containing one image per page and an
+Open all pages action that opens a standalone gallery. Single-page results keep
+the direct image download and open actions. PDF output uses the bundled PDF.js
+viewer in `frontend/src/components/PdfViewer.jsx`. It renders each page into a
+canvas inside a fixed-height, vertically scrollable viewport. The page revokes
+the previous Blob URLs when a result is replaced or the page unmounts.
 
 The shared fixture in `testdata/wasm/` exercises a two-page PDF, a data-URL
 image, a table, inline print CSS, and both image formats. Native tests read the

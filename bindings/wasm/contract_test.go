@@ -51,6 +51,7 @@ func TestDecodeRequestRejectsInvalidBoundary(t *testing.T) {
 		{name: "unsupported mode", raw: `{"html":"x","mode":"webp"}`, want: errUnsupportedMode},
 		{name: "large html", raw: mustJSON(Request{HTML: largeHTML}), want: errInputTooLarge},
 		{name: "pdf image option", raw: `{"html":"x","mode":"pdf","width":10}`, want: errInvalidRequest},
+		{name: "pdf padding option", raw: `{"html":"x","mode":"pdf","padding":10}`, want: errInvalidRequest},
 		{name: "large image", raw: `{"html":"x","mode":"png","width":4097}`, want: errImageTooLarge},
 		{name: "bad quality", raw: `{"html":"x","mode":"jpeg","quality":101}`, want: errInvalidRequest},
 	}
@@ -60,6 +61,26 @@ func TestDecodeRequestRejectsInvalidBoundary(t *testing.T) {
 			_, err := DecodeRequest(test.raw)
 			if !errors.Is(err, test.want) {
 				t.Fatalf("error = %v, want errors.Is(..., %v)", err, test.want)
+			}
+		})
+	}
+}
+
+func TestConvertImagePaddingExpandsOutput(t *testing.T) {
+	for _, mode := range []string{"png", "jpeg"} {
+		t.Run(mode, func(t *testing.T) {
+			result, err := Convert(t.Context(), Request{
+				HTML:    `<html><body style="margin:0"><div style="background-color:#176b3a;width:40px;height:20px"></div></body></html>`,
+				Mode:    mode,
+				Width:   100,
+				Height:  50,
+				Padding: 12,
+			}, nil)
+			if err != nil {
+				t.Fatalf("Convert() error = %v", err)
+			}
+			if result.Width != 124 || result.Height != 74 {
+				t.Fatalf("dimensions = %dx%d, want 124x74", result.Width, result.Height)
 			}
 		})
 	}
@@ -174,6 +195,10 @@ func TestBrowserDocumentsUseInlineOnlyDefaults(t *testing.T) {
 	}
 	if imageDocument.Network == nil || len(imageDocument.Network.AllowedSchemes) != 0 {
 		t.Fatalf("image browser network policy = %#v, want no allowed schemes", imageDocument.Network)
+	}
+	request.Padding = 12
+	if got := browserImageDocument(request, nil).Padding; got != 12 {
+		t.Fatalf("image padding = %d, want 12", got)
 	}
 }
 

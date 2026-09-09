@@ -234,6 +234,35 @@ func TestRenderCrop(t *testing.T) {
 	}
 }
 
+func TestRenderPaddingExpandsCanvasAndOffsetsPaint(t *testing.T) {
+	t.Parallel()
+
+	src := `<html><body style="margin:0"><div style="background-color:#0000ff;width:40px;height:20px"></div></body></html>`
+	full, err := renderHTMLOpts(src, RenderOptions{
+		Width: 100, Height: 50, Transparent: true,
+	})
+	if err != nil {
+		t.Fatalf("Render without padding: %v", err)
+	}
+
+	padded, err := renderHTMLOpts(src, RenderOptions{
+		Width: 100, Height: 50, Padding: 12, Transparent: true,
+	})
+	if err != nil {
+		t.Fatalf("Render with padding: %v", err)
+	}
+
+	if got := padded.Bounds(); got.Dx() != 124 || got.Dy() != 74 {
+		t.Fatalf("padded canvas = %v, want 124x74", got)
+	}
+	if got := asNRGBA(padded.At(0, 0)); got.A != 0 {
+		t.Fatalf("padded corner = %v, want transparent", got)
+	}
+	if got, want := asNRGBA(padded.At(12, 12)), asNRGBA(full.At(0, 0)); got != want {
+		t.Fatalf("padded content origin = %v, want %v", got, want)
+	}
+}
+
 // TestRenderText checks that a bold text run paints non-background pixels.
 func TestRenderText(t *testing.T) {
 	t.Parallel()

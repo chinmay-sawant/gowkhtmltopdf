@@ -39,6 +39,7 @@ type Request struct {
 	Orientation string `json:"orientation"`
 	Width       int    `json:"width"`
 	Height      int    `json:"height"`
+	Padding     int    `json:"padding"`
 	Quality     int    `json:"quality"`
 }
 
@@ -101,14 +102,14 @@ func (r *Request) validate() error {
 
 	switch r.Mode {
 	case "pdf":
-		if r.Width != 0 || r.Height != 0 || r.Quality != 0 {
+		if r.Width != 0 || r.Height != 0 || r.Padding != 0 || r.Quality != 0 {
 			return fmt.Errorf("%w: image options require png or jpeg mode", errInvalidRequest)
 		}
 	case "png", "jpeg":
 		if r.PageSize != "" || r.Orientation != "" {
 			return fmt.Errorf("%w: PDF options require pdf mode", errInvalidRequest)
 		}
-		if r.Width < 0 || r.Height < 0 || r.Width > maxImageDimension || r.Height > maxImageDimension {
+		if r.Width < 0 || r.Height < 0 || r.Padding < 0 || r.Width > maxImageDimension || r.Height > maxImageDimension {
 			return fmt.Errorf("%w: %w", errInvalidRequest, errImageTooLarge)
 		}
 		if r.Quality < 0 || r.Quality > 100 {
@@ -194,6 +195,7 @@ func browserImageDocument(request Request, onProgress func(string, int)) *gowkht
 		Source:      gowkhtmltopdf.HTML([]byte(request.HTML)),
 		Width:       request.Width,
 		Height:      request.Height,
+		Padding:     request.Padding,
 		Format:      request.Mode,
 		Quality:     request.Quality,
 		Transparent: true,

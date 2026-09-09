@@ -929,6 +929,10 @@ func registerImageKeys(keys keyTable[ImageGlobal]) {
 		func(dst *ImageGlobal, raw string) error { return setInt(&dst.Height)(raw) },
 		func(dst *ImageGlobal) (string, bool) { return fmtInt(dst.Height), true },
 	)
+	regImage("padding",
+		func(dst *ImageGlobal, raw string) error { return setInt(&dst.Padding)(raw) },
+		func(dst *ImageGlobal) (string, bool) { return fmtInt(dst.Padding), true },
+	)
 	regImage("quality",
 		func(dst *ImageGlobal, raw string) error {
 			return setIntRange(&dst.Quality, minQuality, maxQuality)(raw)

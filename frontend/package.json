@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "vite build && node scripts/copy-to-docs.mjs",
     "test": "node scripts/smoke-test.mjs",
+    "test:interactions": "node scripts/interaction-test.mjs",
     "test:wasm": "node scripts/wasm-browser-test.mjs",
     "preview": "vite preview",
     "lint": "eslint . && node scripts/lint-data.mjs"
@@ -24,6 +25,7 @@
     "vite": "^6.0.7"
   },
   "dependencies": {
+    "pdfjs-dist": "^4.10.38",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.30.4"

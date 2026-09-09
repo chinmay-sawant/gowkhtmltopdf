@@ -252,6 +252,7 @@ type ImageDocument struct {
     Source      Content
     Width       int
     Height      int
+    Padding     int
     Format      string // "png" or "jpg"
     Quality     int
     SmartWidth  *bool
