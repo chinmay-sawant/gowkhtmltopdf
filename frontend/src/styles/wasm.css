@@ -25,13 +25,19 @@
 .wasm-workspace { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 18px; align-items: stretch; }
 .wasm-panel { min-width: 0; padding: 24px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
 .wasm-editor-panel, .wasm-preview-panel { display: flex; flex-direction: column; }
-.wasm-panel-heading, .wasm-submit-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.wasm-panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .wasm-panel-heading { margin-bottom: 20px; }
 .wasm-panel h2 { margin: 4px 0 0; font-family: var(--serif); font-size: 28px; font-weight: 500; }
 .wasm-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .wasm-label, .wasm-output-options legend { margin-bottom: 8px; color: var(--muted); font-family: var(--mono); font-size: 12px; }
-.wasm-editor { width: 100%; min-height: 390px; flex: 1; resize: vertical; padding: 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--code-bg); color: var(--code-ink); font-family: var(--mono); font-size: 13px; line-height: 1.6; }
-.wasm-editor:focus-visible, .wasm-output-option:has(input:focus-visible), .wasm-actions .button:focus-visible, .wasm-submit-row .button:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.wasm-sample-picker { margin-bottom: 18px; }
+.wasm-sample-picker select { width: 100%; padding: 11px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); color: var(--ink); font: inherit; }
+.wasm-sample-picker select:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.wasm-sample-description { margin: 8px 0 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+.wasm-source-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr); gap: 12px; flex: 1; }
+.wasm-source-field { display: flex; min-width: 0; flex-direction: column; }
+.wasm-editor { width: 100%; min-height: 320px; flex: 1; resize: vertical; padding: 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--code-bg); color: var(--code-ink); font-family: var(--mono); font-size: 13px; line-height: 1.6; }
+.wasm-editor:focus-visible, .wasm-output-option:has(input:focus-visible), .wasm-actions .button:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
 .wasm-output-options { margin: 20px 0; padding: 0; border: 0; }
 .wasm-output-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .wasm-output-option { display: flex; align-items: flex-start; gap: 8px; min-height: 72px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; transition: border-color 0.18s ease, background 0.18s ease; }
@@ -40,18 +46,35 @@
 .wasm-output-option strong, .wasm-output-option small { display: block; }
 .wasm-output-option strong { font-size: 13px; }
 .wasm-output-option small { margin-top: 5px; color: var(--muted); font-size: 11px; line-height: 1.4; }
-.wasm-submit-row { justify-content: flex-start; flex-wrap: wrap; }
 .wasm-status, .wasm-meta { color: var(--muted); font-family: var(--mono); font-size: 12px; }
 .wasm-error { margin: 16px 0 0; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--bad-ink) 35%, transparent); border-radius: 8px; background: var(--bad-bg); color: var(--bad-ink); font-size: 14px; }
 .wasm-preview-panel { min-height: 640px; }
-.wasm-preview { display: grid; place-items: center; min-height: 0; flex: 1; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); }
+.wasm-preview { position: relative; display: grid; place-items: center; min-height: 0; flex: 1; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); }
+.wasm-preview-clickable { cursor: zoom-in; }
+.wasm-preview-clickable:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.wasm-preview-clickable .wasm-pdf-preview { pointer-events: none; }
+.wasm-preview-hint { position: absolute; top: 12px; right: 12px; z-index: 1; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); padding: 7px 10px; color: var(--ink); font-family: var(--mono); font-size: 11px; opacity: 0; transition: opacity 0.18s ease; }
+.wasm-preview-clickable:hover .wasm-preview-hint, .wasm-preview-clickable:focus-visible .wasm-preview-hint { opacity: 1; }
+.wasm-transparent-preview { background-color: #edf1ef; }
 .wasm-empty { padding: 32px; color: var(--muted); text-align: center; }
 .wasm-pdf-preview { width: 100%; min-height: 590px; align-self: stretch; border: 0; background: white; }
 .wasm-image-preview { display: block; max-width: 100%; max-height: 590px; object-fit: contain; }
 .wasm-meta { margin: 12px 0 0; }
+.wasm-lightbox { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 24px; background: rgb(19 29 26 / 72%); }
+.wasm-lightbox-card { display: flex; width: min(1120px, 100%); height: min(88vh, 900px); flex-direction: column; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); box-shadow: 0 24px 70px rgb(0 0 0 / 24%); }
+.wasm-lightbox-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 22px 16px; border-bottom: 1px solid var(--line); }
+.wasm-lightbox-heading h2 { margin: 4px 0 0; font-family: var(--serif); font-size: 26px; font-weight: 500; }
+.wasm-lightbox-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 12px 22px; border-bottom: 1px solid var(--line); }
+.wasm-lightbox-toolbar output { min-width: 58px; color: var(--ink); font-family: var(--mono); font-size: 12px; text-align: center; }
+.wasm-lightbox-help { margin-left: auto; color: var(--muted); font-family: var(--mono); font-size: 11px; }
+.wasm-lightbox-viewport { min-height: 0; flex: 1; overflow: auto; padding: 24px; background-color: var(--surface-2); }
+.wasm-lightbox-canvas { min-width: 100%; min-height: 100%; }
+.wasm-lightbox-pdf { display: block; width: 100%; height: 100%; min-height: 620px; border: 0; background: white; pointer-events: none; }
+.wasm-lightbox-image { display: block; width: 100%; height: auto; }
 
 @media (max-width: 900px) {
   .wasm-workspace { grid-template-columns: 1fr; }
+  .wasm-source-grid { grid-template-columns: 1fr; }
   .wasm-preview-panel { min-height: 480px; }
   .wasm-pdf-preview { min-height: 430px; }
 }
@@ -61,8 +84,13 @@
   .wasm-panel { padding: 18px; }
   .wasm-panel-heading { align-items: flex-start; flex-direction: column; }
   .wasm-output-grid { grid-template-columns: 1fr; }
+  .wasm-lightbox { padding: 10px; }
+  .wasm-lightbox-card { height: min(94vh, 900px); }
+  .wasm-lightbox-heading, .wasm-lightbox-toolbar { padding-right: 14px; padding-left: 14px; }
+  .wasm-lightbox-viewport { padding: 14px; }
+  .wasm-lightbox-help { width: 100%; margin-left: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .wasm-output-option { transition: none; }
+  .wasm-output-option, .wasm-preview-hint { transition: none; }
 }

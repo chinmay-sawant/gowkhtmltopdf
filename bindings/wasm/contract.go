@@ -191,14 +191,15 @@ func browserPDFDocument(request Request, onProgress func(string, int)) *gowkhtml
 func browserImageDocument(request Request, onProgress func(string, int)) *gowkhtmltopdf.ImageDocument {
 	onPhase, onValue := progressHooks(onProgress)
 	document := &gowkhtmltopdf.ImageDocument{
-		Source:     gowkhtmltopdf.HTML([]byte(request.HTML)),
-		Width:      request.Width,
-		Height:     request.Height,
-		Format:     request.Mode,
-		Quality:    request.Quality,
-		Network:    &gowkhtmltopdf.NetworkPolicy{},
-		OnPhase:    onPhase,
-		OnProgress: onValue,
+		Source:      gowkhtmltopdf.HTML([]byte(request.HTML)),
+		Width:       request.Width,
+		Height:      request.Height,
+		Format:      request.Mode,
+		Quality:     request.Quality,
+		Transparent: true,
+		Network:     &gowkhtmltopdf.NetworkPolicy{},
+		OnPhase:     onPhase,
+		OnProgress:  onValue,
 	}
 
 	return document

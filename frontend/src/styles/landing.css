@@ -586,7 +586,7 @@ html[data-theme='dark'] .sample-paper {
 }
 
 .button-primary {
-  background: var(--landing-accent);
+  background: var(--accent);
   color: #fff;
 }
 
@@ -676,5 +676,4 @@ html[data-theme='dark'] .sample-paper {
     width: 100%;
   }
 }
-
 

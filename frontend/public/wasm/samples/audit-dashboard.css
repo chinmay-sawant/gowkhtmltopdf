@@ -1,0 +1,48 @@
+@page { size: A4; margin: 12mm; }
+* { box-sizing: border-box; }
+body { margin: 0; color: #1a1f24; font-family: "Liberation Sans", sans-serif; font-size: 9.5pt; line-height: 1.35; }
+h1, h2, h3, p { margin-top: 0; }
+h1 { margin-bottom: 2px; color: #1f4b99; font-size: 16pt; }
+h2 { margin: 0 0 8px; color: #1f4b99; font-size: 14pt; }
+h3 { margin-bottom: 6px; color: #103a7a; font-size: 10.5pt; }
+.masthead { display: flex; align-items: center; gap: 12px; border-bottom: 3px solid #1f4b99; padding-bottom: 8px; margin-bottom: 12px; }
+.mark { display: grid; place-items: center; width: 36px; height: 36px; background: #1f4b99; color: #fff; font-family: "Liberation Mono", monospace; font-size: 13pt; }
+.titles { flex: 1; }
+.titles p, .section-heading p { margin: 0; color: #556; font-size: 8.5pt; }
+.needle { display: inline-block; margin: 8px 0 12px; border-radius: 3px; background: #1f4b99; color: #fff; padding: 2px 8px; letter-spacing: .04em; }
+.intro { margin-bottom: 14px; }
+.summary-grid, .two-column { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+.summary-card, .card { border: 1px solid #b8c0cc; border-radius: 4px; background: #f7f9fc; padding: 10px; }
+.summary-card strong, .summary-card span { display: block; }
+.summary-card strong { color: #1f4b99; font-family: "Liberation Mono", monospace; font-size: 18pt; }
+.summary-card span { color: #556; font-size: 8.5pt; }
+.audit, .checklist { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.audit th, .audit td, .checklist th, .checklist td { border: 1px solid #b8c0cc; padding: 6px 7px; text-align: left; vertical-align: top; }
+.audit th, .checklist th { background: #e8eef8; font-size: 8.5pt; }
+.audit tr:nth-child(even) td, .checklist tr:nth-child(even) td { background: #f7f9fc; }
+.idx { width: 34px; color: #667; text-align: right !important; }
+.status { display: inline-block; padding: 2px 5px; border-radius: 3px; font-family: "Liberation Mono", monospace; font-size: 7.5pt; }
+.good { background: #dcefe1; color: #176b3a; }
+.watch { background: #fff0c2; color: #855d00; }
+.note { margin-top: 14px; border-top: 1px solid #ccd; padding-top: 6px; color: #556; font-size: 8pt; }
+.page-break { page-break-before: always; }
+.section-heading { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 16px; border-bottom: 1px solid #b8c0cc; padding-bottom: 8px; }
+.section-number { color: #1f4b99; font-family: "Liberation Mono", monospace; font-size: 16pt; }
+.two-column { grid-template-columns: 1fr 1fr; }
+.card p { margin: 8px 0 0; color: #556; font-size: 8.5pt; }
+.alignment-demo { display: flex; align-items: center; justify-content: space-between; height: 52px; border: 1px solid #b8c0cc; padding: 6px; background: #fff; }
+.alignment-demo span { background: #cde; padding: 3px 6px; }
+.alignment-demo .middle { align-self: flex-end; background: #2563eb; color: #fff; }
+.decorated { border: 2px solid #1f4b99; border-radius: 8px; background: #e8eef8; padding: 12px 8px; text-align: center; }
+.subheading { margin-top: 18px; }
+.observations { counter-reset: finding; margin: 0; padding: 0; list-style: none; }
+.observations li { counter-increment: finding; display: grid; grid-template-columns: 105px 1fr; gap: 8px; border-bottom: 1px solid #d5dbe4; padding: 8px 0; }
+.observations li::before { content: counter(finding, decimal-leading-zero); color: #1f4b99; font-family: "Liberation Mono", monospace; }
+.observations strong { color: #103a7a; }
+.observations span { grid-column: 2; margin-top: -22px; }
+.rotated-callout { display: inline-block; transform: rotate(-2deg); margin-top: 22px; border: 1px solid #fd8; background: #fff5cc; padding: 7px 12px; color: #855d00; font-family: "Liberation Mono", monospace; }
+.conclusion-box { border-left: 4px solid #1f4b99; background: #f7f9fc; padding: 14px 16px; }
+.conclusion-box p { margin: 0; }
+.checklist { margin-top: 20px; }
+.good-text { color: #176b3a; font-weight: bold; }
+.signature { display: flex; justify-content: space-between; margin-top: 72px; border-top: 1px solid #667; padding-top: 6px; color: #556; font-size: 8pt; }

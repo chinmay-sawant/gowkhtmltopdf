@@ -107,6 +107,28 @@ func TestConvertProducesPDFPNGAndJPEG(t *testing.T) {
 	}
 }
 
+func TestBrowserPNGConversionPreservesTransparentCanvas(t *testing.T) {
+	result, err := Convert(t.Context(), Request{
+		HTML:   `<html><body style="margin:0"><span style="color:#176b3a">WASM</span></body></html>`,
+		Mode:   "png",
+		Width:  128,
+		Height: 64,
+	}, nil)
+	if err != nil {
+		t.Fatalf("Convert() error = %v", err)
+	}
+
+	decoded, _, err := image.Decode(bytes.NewReader(result.Bytes))
+	if err != nil {
+		t.Fatalf("image.Decode() error = %v", err)
+	}
+
+	_, _, _, alpha := decoded.At(result.Width-1, result.Height-1).RGBA()
+	if alpha != 0 {
+		t.Fatalf("blank PNG corner alpha = %d, want 0", alpha)
+	}
+}
+
 func TestErrorResponseUsesStableCodes(t *testing.T) {
 	if got := errorResponse(errInputTooLarge); got.Code != "resource_limit" {
 		t.Fatalf("code = %q, want resource_limit", got.Code)

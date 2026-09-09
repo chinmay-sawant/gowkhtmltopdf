@@ -8,11 +8,12 @@ import assert from 'node:assert/strict'
 const require = createRequire(import.meta.url)
 const puppeteer = require(join('..', '..', 'scripts', 'puppeteer', 'node_modules', 'puppeteer-core'))
 const frontendDir = join(import.meta.dirname, '..')
+const viteCLI = join(frontendDir, 'node_modules', 'vite', 'bin', 'vite.js')
 const port = 4173
 const origin = `http://127.0.0.1:${port}`
 const url = `${origin}/gowkhtmltopdf/#/wasm`
 
-const server = spawn('npm', ['run', 'preview', '--', '--host', '127.0.0.1', '--port', String(port)], {
+const server = spawn(process.execPath, [viteCLI, 'preview', '--host', '127.0.0.1', '--port', String(port)], {
   cwd: frontendDir,
   stdio: ['ignore', 'pipe', 'pipe'],
 })
@@ -45,12 +46,25 @@ try {
     page.on('request', (request) => {
       const requestURL = new URL(request.url())
       const localRequest = requestURL.origin === origin
-      const embeddedRequest = requestURL.protocol === 'data:' || requestURL.protocol === 'blob:' || requestURL.protocol === 'about:'
+      const embeddedRequest = requestURL.protocol === 'data:' || requestURL.protocol === 'blob:' || requestURL.protocol === 'about:' || requestURL.protocol === 'chrome-extension:'
       if (localRequest || embeddedRequest) request.continue()
       else request.abort()
     })
     await page.goto(url, { waitUntil: 'networkidle0' })
     await page.waitForSelector('#wasm-html')
+    const convertButton = await page.$eval('[data-testid="convert"]', (element) => {
+      const rect = element.getBoundingClientRect()
+      const style = getComputedStyle(element)
+      return {
+        top: rect.top,
+        bottom: rect.bottom,
+        inActionGroup: Boolean(element.closest('.wasm-actions')),
+        backgroundColor: style.backgroundColor,
+      }
+    })
+    assert.ok(convertButton.top < 900 && convertButton.bottom > 0, `Convert button should be visible in the initial viewport: ${JSON.stringify(convertButton)}`)
+    assert.equal(convertButton.inActionGroup, true, 'Convert button should share the visible input action group')
+    assert.notEqual(convertButton.backgroundColor, 'rgba(0, 0, 0, 0)', 'Convert button should have a visible background')
     await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }])
     assert.equal(await page.$eval('.wasm-output-option', (element) => getComputedStyle(element).transitionDuration), '0s', 'reduced motion should disable transitions')
     await page.click('.theme-toggle')
@@ -58,14 +72,44 @@ try {
     await page.click('.theme-toggle')
     await page.waitForFunction(() => document.documentElement.dataset.theme === 'light')
 
-    await page.click('[data-testid="load-sample"]')
-    await page.waitForFunction(() => document.querySelector('#wasm-html')?.value.includes('Browser WASM conversion'))
-    await page.click('#wasm-html')
-    assert.equal(await page.$eval('#wasm-html', (element) => document.activeElement === element), true, 'HTML editor should receive keyboard focus')
-    const manifest = await page.evaluate(async () => {
-      const response = await fetch(new URL('wasm/manifest.json', document.baseURI))
+    const sampleCatalog = await page.evaluate(async () => {
+      const response = await fetch(new URL('wasm/samples/manifest.json', document.baseURI))
       return response.json()
     })
+    assert.equal(sampleCatalog.samples.length, 5, 'sample catalog should expose five templates')
+    await page.waitForFunction(() => document.querySelectorAll('#wasm-sample option').length === 5)
+
+    await page.click('[data-testid="load-sample"]')
+    await page.waitForFunction((sample) => document.querySelector('#wasm-html')?.value.includes(sample.htmlNeedle) && document.querySelector('#wasm-css')?.value.includes(sample.cssNeedle), {}, sampleCatalog.samples[0])
+    await page.click('#wasm-html')
+    assert.equal(await page.$eval('#wasm-html', (element) => document.activeElement === element), true, 'HTML editor should receive keyboard focus')
+
+    for (const sample of sampleCatalog.samples) {
+      await page.select('#wasm-sample', sample.id)
+      await page.click('[data-testid="load-sample"]')
+      await page.waitForFunction((currentSample) => document.querySelector('#wasm-html')?.value.includes(currentSample.htmlNeedle) && document.querySelector('#wasm-css')?.value.includes(currentSample.cssNeedle), {}, sample)
+      await page.click('[data-testid="convert"]')
+      try {
+        await page.waitForFunction(() => document.querySelector('.wasm-status')?.textContent.includes('Conversion complete') || document.querySelector('.wasm-error'), { timeout: 30000 })
+      } catch (conversionWaitError) {
+        const state = await page.$eval('.wasm-panel', (element) => element.innerText)
+        throw new Error(`${sample.id} conversion timed out. Current panel state: ${state}`, { cause: conversionWaitError })
+      }
+      assert.equal(await page.$eval('.wasm-error', (element) => element.textContent, { timeout: 1000 }).catch(() => ''), '', `${sample.id} should convert without an error`)
+      const samplePDF = await page.evaluate(async () => {
+        const response = await fetch(document.querySelector('.wasm-pdf-preview').src)
+        const bytes = new Uint8Array(await response.arrayBuffer())
+        const text = new TextDecoder().decode(bytes)
+        return { bytes: bytes.length, text, pages: (text.match(/\/Type \/Page\b/g) || []).length }
+      })
+      assert.ok(samplePDF.bytes > 1000, `${sample.id} PDF should contain rendered bytes`)
+      assert.ok(samplePDF.pages >= 2 && samplePDF.pages <= 3, `${sample.id} should render two or three pages, got ${samplePDF.pages}`)
+      for (const needle of sample.pdfNeedles) assert.match(samplePDF.text, new RegExp(needle), `${sample.id} PDF text needle: ${needle}`)
+    }
+
+    await page.select('#wasm-sample', sampleCatalog.samples[0].id)
+    await page.click('[data-testid="load-sample"]')
+    await page.waitForFunction((sample) => document.querySelector('#wasm-html')?.value.includes(sample.htmlNeedle), {}, sampleCatalog.samples[0])
 
     await page.$eval('#wasm-html', (element) => {
       const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
@@ -103,7 +147,7 @@ try {
         assert.deepEqual(result.bytes.slice(0, 5), [37, 80, 68, 70, 45], 'PDF signature')
         assert.deepEqual(result.tail, [37, 69, 79, 70, 10], 'PDF trailer')
         assert.match(result.mime || '', /^application\/pdf/, 'PDF MIME type')
-        for (const needle of manifest.outputs.pdf.textNeedles) {
+        for (const needle of sampleCatalog.samples[0].pdfNeedles) {
           assert.match(result.text, new RegExp(needle), `PDF text needle: ${needle}`)
         }
       } else {
@@ -112,6 +156,52 @@ try {
         if (mode === 'jpeg') assert.deepEqual(result.bytes.slice(0, 3), [255, 216, 255], 'JPEG signature')
         assert.match(result.mime || '', new RegExp(`^image/${mode}`), `${mode} MIME type`)
       }
+
+      await page.click('.wasm-preview-clickable')
+      await page.waitForSelector('[data-testid="preview-close"]')
+      assert.equal(await page.$eval('[data-testid="preview-close"]', (element) => document.activeElement === element), true, 'expanded preview should focus its close button')
+      await page.click('[data-testid="zoom-in"]')
+      assert.equal(await page.$eval('.wasm-lightbox-toolbar output', (element) => element.textContent), '125%', 'preview zoom should increase')
+      const viewport = await page.$eval('[data-testid="preview-viewport"]', (element) => ({
+        scrollWidth: element.scrollWidth,
+        clientWidth: element.clientWidth,
+        scrollHeight: element.scrollHeight,
+        clientHeight: element.clientHeight,
+      }))
+      assert.ok(viewport.scrollWidth > viewport.clientWidth || viewport.scrollHeight > viewport.clientHeight, 'expanded preview should be scrollable after zooming')
+      const viewportBounds = await page.$eval('[data-testid="preview-viewport"]', (element) => {
+        const bounds = element.getBoundingClientRect()
+        return { left: bounds.left, top: bounds.top, width: bounds.width, height: bounds.height }
+      })
+      const scrollBeforeWheel = await page.$eval('[data-testid="preview-viewport"]', (element) => ({
+        top: element.scrollTop,
+        left: element.scrollLeft,
+      }))
+      await page.mouse.move(viewportBounds.left + viewportBounds.width / 2, viewportBounds.top + viewportBounds.height / 2)
+      await page.mouse.wheel({ deltaY: 240 })
+      await delay(100)
+      const scrollAfterWheel = await page.$eval('[data-testid="preview-viewport"]', (element) => ({
+        top: element.scrollTop,
+        left: element.scrollLeft,
+      }))
+      assert.ok(scrollAfterWheel.top > scrollBeforeWheel.top || scrollAfterWheel.left !== scrollBeforeWheel.left, `expanded preview should respond to mouse-wheel scrolling: ${JSON.stringify({ viewport, viewportBounds, scrollBeforeWheel, scrollAfterWheel })}`)
+
+      if (mode !== 'pdf') {
+        const corner = await page.evaluate(async () => {
+          const image = document.querySelector('.wasm-image-preview')
+          await image.decode()
+          const canvas = document.createElement('canvas')
+          canvas.width = image.naturalWidth
+          canvas.height = image.naturalHeight
+          canvas.getContext('2d').drawImage(image, 0, 0)
+          return [...canvas.getContext('2d').getImageData(image.naturalWidth - 1, image.naturalHeight - 1, 1, 1).data]
+        })
+        if (mode === 'png') assert.equal(corner[3], 0, 'PNG preview should preserve transparent canvas pixels')
+        if (mode === 'jpeg') assert.ok(corner.slice(0, 3).every((channel) => channel >= 250), `JPEG preview should composite transparent pixels onto white, got ${corner.slice(0, 3)}`)
+      }
+
+      await page.click('[data-testid="preview-close"]')
+      await page.waitForFunction(() => !document.querySelector('[data-testid="preview-close"]'))
 
       const currentPreviewURL = await page.$eval(
         mode === 'pdf' ? '.wasm-pdf-preview' : '.wasm-image-preview',

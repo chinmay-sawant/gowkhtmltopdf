@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Implemented CSS audit</title>
+</head>
+<body>
+  <header class="masthead">
+    <div class="mark">60</div>
+    <div class="titles">
+      <h1>IMPLEMENTED CSS AUDIT</h1>
+      <p>Fixture-inspired review packet · browser WASM sample</p>
+    </div>
+    <span class="needle">AUDIT-60</span>
+  </header>
+  <p class="intro">This sample turns a small implementation review into a print-ready report. It keeps the source readable while the stylesheet demonstrates the layout vocabulary used by the implemented-property fixtures.</p>
+  <section class="summary-grid">
+    <article class="summary-card"><strong>118</strong><span>properties reviewed</span></article>
+    <article class="summary-card"><strong>03</strong><span>rendering slices</span></article>
+    <article class="summary-card"><strong>100%</strong><span>local preview</span></article>
+  </section>
+  <h2>Review scope</h2>
+  <table class="audit">
+    <thead><tr><th class="idx">#</th><th>Area</th><th>Observed effect</th><th>Signal</th></tr></thead>
+    <tbody>
+      <tr><td class="idx">01</td><td>Box model</td><td>Border-box sizing keeps card widths predictable.</td><td><span class="status good">PASS</span></td></tr>
+      <tr><td class="idx">02</td><td>Fragmentation</td><td>Protected sections remain together across pages.</td><td><span class="status good">PASS</span></td></tr>
+      <tr><td class="idx">03</td><td>Tables</td><td>Fixed columns keep the review matrix stable.</td><td><span class="status good">PASS</span></td></tr>
+      <tr><td class="idx">04</td><td>Color</td><td>Blue accents identify headings and active signals.</td><td><span class="status good">PASS</span></td></tr>
+      <tr><td class="idx">05</td><td>Flow</td><td>Normal document flow carries content into page two.</td><td><span class="status watch">WATCH</span></td></tr>
+      <tr><td class="idx">06</td><td>Typography</td><td>Serif headings and mono labels create clear layers.</td><td><span class="status good">PASS</span></td></tr>
+    </tbody>
+  </table>
+  <footer class="note">Generated locally in the browser. No HTML or CSS is uploaded.</footer>
+
+  <section class="page-break">
+    <header class="section-heading"><span class="section-number">02</span><div><h2>Layout and paint review</h2><p>Small examples make each visual rule easy to inspect.</p></div></header>
+    <div class="two-column">
+      <article class="card"><h3>Flex alignment</h3><div class="alignment-demo"><span>top</span><span class="middle">center</span><span>baseline</span></div><p>Items share a row while the middle marker uses a different alignment.</p></article>
+      <article class="card"><h3>Box decoration</h3><div class="decorated">Protected content block</div><p>Padding and borders remain visible around a compact callout.</p></article>
+    </div>
+    <h3 class="subheading">Property observations</h3>
+    <ol class="observations">
+      <li><strong>Structure</strong><span>Grid and flex arrange the cards without absolute positioning.</span></li>
+      <li><strong>Separation</strong><span>Border and background changes distinguish each data group.</span></li>
+      <li><strong>Pagination</strong><span>The page break is intentional and keeps this review section together.</span></li>
+      <li><strong>Repetition</strong><span>Counter styles label the findings without hard-coded markers.</span></li>
+    </ol>
+    <div class="rotated-callout">PRINT CHECK</div>
+  </section>
+
+  <section class="page-break conclusion">
+    <header class="section-heading"><span class="section-number">03</span><div><h2>Print-ready conclusion</h2><p>A final page leaves room for a reviewer to sign off.</p></div></header>
+    <div class="conclusion-box"><h3>What this sample demonstrates</h3><p>Separate source files can still produce one complete document. The browser fetches the HTML and CSS independently, joins them only for conversion, and keeps the result local to the page.</p></div>
+    <table class="checklist">
+      <tr><th>Check</th><th>Result</th><th>Reviewer note</th></tr>
+      <tr><td>Source separation</td><td class="good-text">Ready</td><td>HTML and CSS remain independently editable.</td></tr>
+      <tr><td>Page structure</td><td class="good-text">Ready</td><td>Three deliberate pages are included.</td></tr>
+      <tr><td>Output modes</td><td class="good-text">Ready</td><td>PDF, PNG, and JPEG can use the same source.</td></tr>
+    </table>
+    <div class="signature"><span>Reviewed by</span><span>Date</span></div>
+  </section>
+</body>
+</html>
