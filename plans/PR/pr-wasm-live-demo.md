@@ -95,8 +95,18 @@ No related issue was provided for this branch.
 
 ## Diff stat
 
-| Metric | Value |
-| --- | ---: |
-| Files changed | 99 |
-| Insertions | 5,537 |
-| Deletions | 162 |
+| Extension | Files | Insertions | Deletions |
+| --- | ---: | ---: | ---: |
+| `.css` | 17 | 320 | 6 |
+| `.go` | 15 | 776 | 16 |
+| `.html` | 14 | 492 | 2 |
+| `.js` | 13 | 1,501 | 18 |
+| `.json` | 9 | 490 | 4 |
+| `.jsx` | 7 | 576 | 92 |
+| `.md` | 13 | 790 | 22 |
+| `.mjs` | 4 | 521 | 0 |
+| `.sh` | 1 | 15 | 0 |
+| `.wasm` | 2 | Binary | Binary |
+| `.yml` | 3 | 31 | 1 |
+| No extension | 1 | 25 | 1 |
+| **Total** | **99** | **5,537** | **162** |
