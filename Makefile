@@ -107,7 +107,7 @@ wasm-test:
 	npm --prefix frontend run lint
 	npm --prefix frontend run build
 	npm --prefix frontend test
-	npm --prefix frontend run test:wasm
+	npm --prefix frontend run test:live-demo
 
 # Scan live user-facing surfaces for stale product claims.
 claim-scan:

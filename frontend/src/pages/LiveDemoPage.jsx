@@ -135,8 +135,8 @@ export default function LiveDemoPage() {
         try {
           const goldenSamples = await fetchGoldenSamples()
           if (!cancelled) setSamples([...catalogSamples, ...goldenSamples])
-        } catch (goldenError) {
-          if (!cancelled) setError(goldenError.message)
+        } catch {
+          // GitHub fixtures are optional. Keep the curated samples usable when the catalog is unavailable.
         }
       } catch (catalogError) {
         if (!cancelled) setError(catalogError.message)
