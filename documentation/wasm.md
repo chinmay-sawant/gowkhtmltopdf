@@ -144,7 +144,7 @@ transparent pixels onto white. For PNG and JPEG, the browser first gets the
 paginated PDF from the local Go engine, then rasterizes every PDF page into its
 selected image format. The preview shows every image page in a scrollable
 panel. A multi-page result provides a ZIP containing one image per page and an
-Open all pages action that opens a standalone gallery. Single-page results keep
+Open action that opens a standalone image gallery. Single-page results keep
 the direct image download and open actions. PDF output uses the bundled PDF.js
 viewer in `frontend/src/components/PdfViewer.jsx`. It renders each page into a
 canvas inside a fixed-height, vertically scrollable viewport. The page revokes

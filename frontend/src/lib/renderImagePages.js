@@ -60,9 +60,11 @@ const zipImages = async (pages) => {
   const centralSize = files.reduce((size, file) => size + 46 + file.name.length, 0)
   const output = new Uint8Array(localSize + centralSize + 22)
   const centralOffset = localSize
+  const localOffsets = []
   let offset = 0
 
   for (const file of files) {
+    localOffsets.push(offset)
     const checksum = crc32(file.data)
     write32(output, offset, 0x04034b50)
     write16(output, offset + 4, 20)
@@ -81,7 +83,7 @@ const zipImages = async (pages) => {
   }
 
   let central = centralOffset
-  for (const file of files) {
+  for (const [index, file] of files.entries()) {
     const checksum = crc32(file.data)
     write32(output, central, 0x02014b50)
     write16(output, central + 4, 20)
@@ -99,7 +101,7 @@ const zipImages = async (pages) => {
     write16(output, central + 34, 0)
     write16(output, central + 36, 0)
     write32(output, central + 38, 0)
-    write32(output, central + 42, 0)
+    write32(output, central + 42, localOffsets[index])
     output.set(file.name, central + 46)
     central += 46 + file.name.length
   }
@@ -118,9 +120,9 @@ const zipImages = async (pages) => {
 
 const openGallery = async (pages, format) => {
   const images = await Promise.all(pages.map(async (page) => `
-    <figure><img src="${await blobDataURL(page.blob)}" alt="Generated ${format.toUpperCase()} page ${page.number}"><figcaption>Page ${page.number}</figcaption></figure>
+    <img src="${await blobDataURL(page.blob)}" alt="Generated ${format.toUpperCase()} page ${page.number}">
   `))
-  const markup = `<!doctype html><html><head><meta charset="utf-8"><title>Generated ${format.toUpperCase()} pages</title><style>body{margin:0;padding:32px;background:#18201d;color:#edf4f0;font:16px system-ui,sans-serif}main{display:grid;gap:28px;justify-items:center}figure{margin:0}img{display:block;max-width:100%;height:auto;background:white;box-shadow:0 10px 28px rgb(0 0 0 / 28%)}figcaption{margin-top:8px;color:#b9c9c1;text-align:center}</style></head><body><main>${images.join('')}</main></body></html>`
+  const markup = `<!doctype html><html><head><meta charset="utf-8"><title>Generated ${format.toUpperCase()} pages</title><style>body{margin:0;padding:32px;background:#18201d;color:#edf4f0;font:16px system-ui,sans-serif}main{display:grid;gap:28px;justify-items:center}img{display:block;max-width:100%;height:auto;background:white;box-shadow:0 10px 28px rgb(0 0 0 / 28%)}</style></head><body><main>${images.join('')}</main></body></html>`
   return URL.createObjectURL(new Blob([markup], { type: 'text/html' }))
 }
 

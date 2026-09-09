@@ -371,7 +371,7 @@ export default function WasmPage() {
                 <a className="button button-secondary" href={result.url} download={`gowkhtmltopdf.${result.mode}`}>Download</a>
               )}
               {result.pages?.length > 1 ? (
-                <a className="button button-secondary" data-testid="open-pages" href={result.openUrl} target="_blank" rel="noreferrer">Open all pages</a>
+                <a className="button button-secondary" data-testid="open-pages" href={result.openUrl} target="_blank" rel="noreferrer">Open</a>
               ) : (
                 <a className="button button-secondary" href={result.url} target="_blank" rel="noreferrer">Open</a>
               )}
@@ -383,10 +383,9 @@ export default function WasmPage() {
             {result && result.mode !== 'pdf' && (
               <div className="wasm-image-pages" data-testid="image-pages" aria-label={`${result.mode.toUpperCase()} output pages`}>
                 {result.pages.map((page) => (
-                  <figure className="wasm-image-page" data-testid="image-page" key={page.number}>
+                  <div className="wasm-image-page" data-testid="image-page" key={page.number}>
                     <img className="wasm-image-preview" src={page.url} alt={`Generated HTML ${result.mode.toUpperCase()} page ${page.number}`} />
-                    <figcaption>Page {page.number} of {result.pageCount}</figcaption>
-                  </figure>
+                  </div>
                 ))}
               </div>
             )}

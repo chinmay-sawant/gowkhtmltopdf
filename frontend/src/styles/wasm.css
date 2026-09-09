@@ -67,7 +67,6 @@
 .wasm-image-pages { display: grid; align-content: start; justify-items: center; gap: 18px; width: 100%; height: 100%; min-height: 0; overflow: auto; padding: 18px; }
 .wasm-image-page { display: grid; justify-items: center; gap: 8px; width: min(100%, 1024px); margin: 0; }
 .wasm-image-preview { display: block; max-width: 100%; height: auto; object-fit: contain; box-shadow: 0 10px 28px rgb(0 0 0 / 22%); }
-.wasm-image-page figcaption { color: var(--muted); font-family: var(--mono); font-size: 11px; }
 .wasm-meta { margin: 12px 0 0; }
 
 .pdf-viewer { display: flex; width: 100%; min-height: 0; flex: 1; flex-direction: column; overflow: hidden; background: #18201d; }

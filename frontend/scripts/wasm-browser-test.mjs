@@ -205,24 +205,52 @@ try {
         const imagePages = await page.$$('[data-testid="image-page"]')
         assert.ok(imagePages.length >= 2, `${mode} preview should display every rendered page, got ${imagePages.length}`)
         assert.ok(await page.$('[data-testid="download-zip"]'), `${mode} should offer a ZIP download for multiple pages`)
-        assert.ok(await page.$('[data-testid="open-pages"]'), `${mode} should offer an all-pages open action`)
+        assert.ok(await page.$('[data-testid="open-pages"]'), `${mode} should offer an Open action`)
+        assert.equal(await page.$eval('[data-testid="open-pages"]', (element) => element.textContent.trim()), 'Open', `${mode} should label the image gallery action Open`)
         const archive = await page.evaluate(async () => {
           const response = await fetch(document.querySelector('[data-testid="download-zip"]').href)
           const bytes = new Uint8Array(await response.arrayBuffer())
-          let centralEntries = 0
-          for (let index = 0; index + 3 < bytes.length; index += 1) {
-            if (bytes[index] === 80 && bytes[index + 1] === 75 && bytes[index + 2] === 1 && bytes[index + 3] === 2) centralEntries += 1
+          const read16 = (offset) => bytes[offset] | (bytes[offset + 1] << 8)
+          const read32 = (offset) => (bytes[offset] | (bytes[offset + 1] << 8) | (bytes[offset + 2] << 16) | (bytes[offset + 3] << 24)) >>> 0
+          const hash = (data) => data.reduce((value, byte) => ((value * 31) + byte) >>> 0, 7)
+          let endOfCentralDirectory = -1
+          for (let offset = bytes.length - 22; offset >= 0; offset -= 1) {
+            if (read32(offset) === 0x06054b50) {
+              endOfCentralDirectory = offset
+              break
+            }
           }
-          return { signature: Array.from(bytes.slice(0, 4)), centralEntries }
+          if (endOfCentralDirectory < 0) throw new Error('ZIP end-of-central-directory record is missing')
+          const centralEntries = read16(endOfCentralDirectory + 10)
+          const centralOffset = read32(endOfCentralDirectory + 16)
+          const entries = []
+          let central = centralOffset
+          for (let index = 0; index < centralEntries; index += 1) {
+            if (read32(central) !== 0x02014b50) throw new Error(`ZIP central entry ${index + 1} is missing`)
+            const nameLength = read16(central + 28)
+            const extraLength = read16(central + 30)
+            const commentLength = read16(central + 32)
+            const localOffset = read32(central + 42)
+            if (read32(localOffset) !== 0x04034b50) throw new Error(`ZIP entry ${index + 1} points to an invalid local header`)
+            const localNameLength = read16(localOffset + 26)
+            const localExtraLength = read16(localOffset + 28)
+            const dataLength = read32(localOffset + 18)
+            const dataStart = localOffset + 30 + localNameLength + localExtraLength
+            entries.push({ dataHash: hash(bytes.slice(dataStart, dataStart + dataLength)), localOffset })
+            central += 46 + nameLength + extraLength + commentLength
+          }
+          return { signature: Array.from(bytes.slice(0, 4)), centralEntries, entries }
         })
         assert.deepEqual(archive.signature, [80, 75, 3, 4], `${mode} ZIP should have a local-file header`)
         assert.equal(archive.centralEntries, imagePages.length, `${mode} ZIP should contain one file per rendered page`)
+        assert.equal(new Set(archive.entries.map((entry) => entry.localOffset)).size, imagePages.length, `${mode} ZIP should point each entry at a different local file`)
+        assert.equal(new Set(archive.entries.map((entry) => entry.dataHash)).size, imagePages.length, `${mode} ZIP should contain distinct rendered page data`)
         const galleryImageCount = await page.evaluate(async () => {
           const response = await fetch(document.querySelector('[data-testid="open-pages"]').href)
           const html = await response.text()
           return (html.match(/<img /g) || []).length
         })
-        assert.equal(galleryImageCount, imagePages.length, `${mode} all-pages view should contain one image per rendered page`)
+        assert.equal(galleryImageCount, imagePages.length, `${mode} Open view should contain one image per rendered page`)
         if (mode === 'png') assert.deepEqual(result.bytes, [137, 80, 78, 71, 13, 10, 26, 10], 'PNG signature')
         if (mode === 'jpeg') assert.deepEqual(result.bytes.slice(0, 3), [255, 216, 255], 'JPEG signature')
         assert.match(result.mime || '', new RegExp(`^image/${mode}`), `${mode} MIME type`)
