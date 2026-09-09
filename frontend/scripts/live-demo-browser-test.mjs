@@ -12,7 +12,10 @@ const viteCLI = join(frontendDir, 'node_modules', 'vite', 'bin', 'vite.js')
 const port = 4173
 const origin = `http://127.0.0.1:${port}`
 const url = `${origin}/gowkhtmltopdf/#/wasm`
-const conversionTimeout = 60000
+// Cold start downloads and instantiates ~29MB of Go WASM before the first
+// convert. CI runners often need well over a minute for that path alone.
+const conversionTimeout = 180000
+const catalogTimeout = 60000
 
 const server = spawn(process.execPath, [viteCLI, 'preview', '--host', '127.0.0.1', '--port', String(port)], {
   cwd: frontendDir,
@@ -42,17 +45,17 @@ try {
 
   try {
     const page = await browser.newPage()
+    page.setDefaultTimeout(conversionTimeout)
     await page.setViewport({ width: 1440, height: 900 })
-    await page.setRequestInterception(true)
-    page.on('request', (request) => {
-      const requestURL = new URL(request.url())
-      const localRequest = requestURL.origin === origin
-      const githubRequest = requestURL.origin === 'https://api.github.com' || requestURL.origin === 'https://raw.githubusercontent.com'
-      const embeddedRequest = requestURL.protocol === 'data:' || requestURL.protocol === 'blob:' || requestURL.protocol === 'about:' || requestURL.protocol === 'chrome-extension:'
-      if (localRequest || githubRequest || embeddedRequest) request.continue()
-      else request.abort()
+    // Block third-party fonts without Puppeteer request interception. Interception
+    // buffers every response through CDP and can stall the ~29MB WASM download
+    // on a cold CI cache for longer than the conversion timeout.
+    const cdp = await page.createCDPSession()
+    await cdp.send('Network.enable')
+    await cdp.send('Network.setBlockedURLs', {
+      urls: ['*://fonts.googleapis.com/*', '*://fonts.gstatic.com/*'],
     })
-    await page.goto(url, { waitUntil: 'networkidle0' })
+    await page.goto(url, { waitUntil: 'domcontentloaded' })
     await page.waitForSelector('#live-demo-html')
     const fontNotice = await page.$eval('.live-demo-font-notice', (element) => element.textContent)
     assert.match(fontNotice, /fonts and compliance/i, 'the live demo should label its font and compliance note')
@@ -148,7 +151,7 @@ try {
       assert.ok(samplePDF.pages >= 2 && samplePDF.pages <= 3, `${sample.id} should render two or three pages, got ${samplePDF.pages}`)
     }
 
-    const goldenOption = await page.waitForSelector('option[value="golden-fixture-60-implemented-props-a"]', { timeout: 15000 }).catch(() => null)
+    const goldenOption = await page.waitForSelector('option[value="golden-fixture-60-implemented-props-a"]', { timeout: catalogTimeout }).catch(() => null)
     if (goldenOption) {
       const goldenCount = await page.$$eval('#live-demo-sample option[value^="golden-"]', (options) => options.length)
       assert.ok(goldenCount >= 60, `sample catalog should expose the GitHub golden fixture corpus: ${goldenCount}`)
@@ -275,7 +278,7 @@ try {
             await page.waitForFunction((dimensions) => {
               const image = document.querySelector('.live-demo-image-preview')
               return image?.naturalWidth === dimensions.width - 16 && image?.naturalHeight === dimensions.height - 16
-            }, result)
+            }, { timeout: conversionTimeout }, result)
           } catch (paddingWaitError) {
             const state = await page.$eval('.live-demo-panel', (element) => element.innerText)
             const dimensions = await page.$eval('.live-demo-image-preview', (image) => ({ width: image.naturalWidth, height: image.naturalHeight })).catch(() => null)
