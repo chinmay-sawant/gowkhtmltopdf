@@ -16,6 +16,7 @@
 | [implemented-honesty-pass.md](implemented-honesty-pass.md) | 2026-08-28 audit of Implemented rows (152 kept / 14 demoted) |
 | [review/](review) | Post-ship architecture + ponytail ledger for commit `48e06dbc` |
 | [agy-review/](agy-review) | Go Design Patterns and Go Code Style review ledgers |
+| [86-canonical-0.2.6-wasm.md](86-canonical-0.2.6-wasm.md) | Browser WASM conversion, PDF preview, and image output ledger, phases 86-93 |
 
 Workflow: [`../../skills/phase-wise-checklist/SKILLS.md`](../../skills/phase-wise-checklist/SKILLS.md)
 
@@ -25,7 +26,7 @@ WOFF2 sidecar: KB cites `plans/0.2.6/woff2-metric-aliases/` as complete 2026-08-
 
 ## Scope in one line
 
-Catalog-driven CSS coverage: map the WebRef property list onto the engine, finish Partials (phases 57-67, done), then reopen Ignored for browser-level print (phases 68-78).
+Catalog-driven CSS coverage: map the WebRef property list onto the engine, finish Partials (phases 57-67, done), then reopen Ignored for browser-level print (phases 68-78). The browser WASM extension, including PDF, PNG, and JPEG output, is tracked in phases 86-93 of the canonical ledger.
 
 ## Verification
 
