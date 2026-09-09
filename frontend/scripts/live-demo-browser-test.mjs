@@ -53,14 +53,17 @@ try {
       else request.abort()
     })
     await page.goto(url, { waitUntil: 'networkidle0' })
-    await page.waitForSelector('#wasm-html')
+    await page.waitForSelector('#live-demo-html')
+    const fontNotice = await page.$eval('.live-demo-font-notice', (element) => element.textContent)
+    assert.match(fontNotice, /fonts and compliance/i, 'the live demo should label its font and compliance note')
+    assert.match(fontNotice, /compliance validation/i, 'the live demo should explain its compliance limitation')
     const convertButton = await page.$eval('[data-testid="convert"]', (element) => {
       const rect = element.getBoundingClientRect()
       const style = getComputedStyle(element)
       return {
         top: rect.top,
         bottom: rect.bottom,
-        inActionGroup: Boolean(element.closest('.wasm-actions')),
+        inActionGroup: Boolean(element.closest('.live-demo-actions')),
         backgroundColor: style.backgroundColor,
       }
     })
@@ -68,23 +71,23 @@ try {
     assert.equal(convertButton.inActionGroup, true, 'Convert button should share the visible input action group')
     assert.notEqual(convertButton.backgroundColor, 'rgba(0, 0, 0, 0)', 'Convert button should have a visible background')
     const layout = await page.evaluate(() => ({
-      pageWidth: document.querySelector('.wasm-page').getBoundingClientRect().width,
+      pageWidth: document.querySelector('.live-demo-page').getBoundingClientRect().width,
       viewportWidth: window.innerWidth,
       navLabel: document.querySelector('.site-nav-desktop .site-nav-links a:last-child')?.textContent.trim(),
       navWidth: document.querySelector('.site-nav-desktop .site-nav-links a:last-child')?.getBoundingClientRect().width,
-      sourceWidths: [...document.querySelectorAll('.wasm-source-field')].map((element) => element.getBoundingClientRect().width),
+      sourceWidths: [...document.querySelectorAll('.live-demo-source-field')].map((element) => element.getBoundingClientRect().width),
     }))
-    assert.equal(layout.navLabel, 'Try Live Demo', 'the WASM navigation label should describe the live demo')
+    assert.equal(layout.navLabel, 'Try Live Demo', 'the navigation label should describe the live demo')
     assert.ok(layout.navWidth >= 124, `the live-demo navigation target should have a wider hit area: ${JSON.stringify(layout)}`)
-    assert.ok(layout.pageWidth >= layout.viewportWidth * 0.84 && layout.pageWidth <= layout.viewportWidth * 0.86, `the desktop WASM page should use an 85vw frame: ${JSON.stringify(layout)}`)
+    assert.ok(layout.pageWidth >= layout.viewportWidth * 0.84 && layout.pageWidth <= layout.viewportWidth * 0.86, `the desktop live demo page should use an 85vw frame: ${JSON.stringify(layout)}`)
     assert.ok(Math.abs(layout.sourceWidths[0] - layout.sourceWidths[1]) <= 2, `HTML and CSS editors should have equal widths: ${JSON.stringify(layout)}`)
-    assert.equal(await page.$eval('.wasm-output-options + .wasm-editor-actions', (element) => Boolean(element.querySelector('[data-testid="convert"]'))), true, 'conversion buttons should follow the output options')
-    assert.equal(await page.$eval('.wasm-editor-actions + .wasm-source-grid', () => true), true, 'conversion buttons should precede the source editors')
-    assert.equal(await page.$('.wasm-status'), null, 'the WASM page should not render a status label')
-    assert.equal(await page.$('[data-testid="cancel"]'), null, 'the WASM page should not render a cancel control')
-    assert.doesNotMatch(await page.$eval('.wasm-panel', (element) => element.innerText), /Conversion complete|Starting|Rendering|Cancel/, 'the WASM panel should not show conversion status copy')
+    assert.equal(await page.$eval('.live-demo-output-options + .live-demo-editor-actions', (element) => Boolean(element.querySelector('[data-testid="convert"]'))), true, 'conversion buttons should follow the output options')
+    assert.equal(await page.$eval('.live-demo-editor-actions + .live-demo-source-grid', () => true), true, 'conversion buttons should precede the source editors')
+    assert.equal(await page.$('.live-demo-status'), null, 'the live demo page should not render a status label')
+    assert.equal(await page.$('[data-testid="cancel"]'), null, 'the live demo page should not render a cancel control')
+    assert.doesNotMatch(await page.$eval('.live-demo-panel', (element) => element.innerText), /Conversion complete|Starting|Rendering|Cancel/, 'the live demo panel should not show conversion status copy')
     await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }])
-    assert.equal(await page.$eval('.wasm-output-option', (element) => getComputedStyle(element).transitionDuration), '0s', 'reduced motion should disable transitions')
+    assert.equal(await page.$eval('.live-demo-output-option', (element) => getComputedStyle(element).transitionDuration), '0s', 'reduced motion should disable transitions')
     await page.click('.theme-toggle')
     await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark')
     await page.click('.theme-toggle')
@@ -97,47 +100,47 @@ try {
     const curatedSamples = sampleCatalog.samples
     assert.equal(curatedSamples.length, 5, 'sample catalog should preserve five curated templates')
     await page.waitForSelector('option[value="golden-fixture-60-implemented-props-a"]', { timeout: conversionTimeout })
-    const goldenCount = await page.$$eval('#wasm-sample option[value^="golden-"]', (options) => options.length)
+    const goldenCount = await page.$$eval('#live-demo-sample option[value^="golden-"]', (options) => options.length)
     assert.ok(goldenCount >= 60, `sample catalog should expose the GitHub golden fixture corpus: ${goldenCount}`)
 
     const defaultSample = curatedSamples[0]
-    await page.waitForFunction((sample) => document.querySelector('#wasm-html')?.value.includes(sample.htmlNeedle) && document.querySelector('#wasm-css')?.value.includes(sample.cssNeedle), {}, defaultSample)
+    await page.waitForFunction((sample) => document.querySelector('#live-demo-html')?.value.includes(sample.htmlNeedle) && document.querySelector('#live-demo-css')?.value.includes(sample.cssNeedle), {}, defaultSample)
     try {
-      await page.waitForFunction(() => document.querySelector('.pdf-viewer') || document.querySelector('.wasm-error'), { timeout: conversionTimeout })
+      await page.waitForFunction(() => document.querySelector('.pdf-viewer') || document.querySelector('.live-demo-error'), { timeout: conversionTimeout })
     } catch (conversionWaitError) {
-      const state = await page.$eval('.wasm-panel', (element) => element.innerText)
+      const state = await page.$eval('.live-demo-panel', (element) => element.innerText)
       throw new Error(`default sample conversion timed out. Current panel state: ${state}`, { cause: conversionWaitError })
     }
-    assert.equal(await page.$eval('.wasm-error', (element) => element.textContent, { timeout: 1000 }).catch(() => ''), '', 'the default sample should convert without an error')
-    assert.equal(await page.$eval('input[name="wasm-output"][value="pdf"]', (element) => element.checked), true, 'the default sample should select PDF output')
+    assert.equal(await page.$eval('.live-demo-error', (element) => element.textContent, { timeout: 1000 }).catch(() => ''), '', 'the default sample should convert without an error')
+    assert.equal(await page.$eval('input[name="live-demo-output"][value="pdf"]', (element) => element.checked), true, 'the default sample should select PDF output')
     assert.ok(await page.$('.pdf-viewer'), 'the default sample should render a PDF preview')
 
     const autoSample = curatedSamples[1]
-    await page.select('#wasm-sample', autoSample.id)
-    await page.waitForFunction((sample) => document.querySelector('#wasm-html')?.value.includes(sample.htmlNeedle) && document.querySelector('#wasm-css')?.value.includes(sample.cssNeedle), {}, autoSample)
+    await page.select('#live-demo-sample', autoSample.id)
+    await page.waitForFunction((sample) => document.querySelector('#live-demo-html')?.value.includes(sample.htmlNeedle) && document.querySelector('#live-demo-css')?.value.includes(sample.cssNeedle), {}, autoSample)
     try {
-      await page.waitForFunction(() => document.querySelector('.pdf-viewer') || document.querySelector('.wasm-error'), { timeout: conversionTimeout })
+      await page.waitForFunction(() => document.querySelector('.pdf-viewer') || document.querySelector('.live-demo-error'), { timeout: conversionTimeout })
     } catch (conversionWaitError) {
-      const state = await page.$eval('.wasm-panel', (element) => element.innerText)
+      const state = await page.$eval('.live-demo-panel', (element) => element.innerText)
       throw new Error(`automatic ${autoSample.id} conversion timed out. Current panel state: ${state}`, { cause: conversionWaitError })
     }
-    assert.equal(await page.$eval('.wasm-error', (element) => element.textContent, { timeout: 1000 }).catch(() => ''), '', `${autoSample.id} should convert without an error`)
-    assert.equal(await page.$eval('input[name="wasm-output"][value="pdf"]', (element) => element.checked), true, 'selecting a sample should keep PDF as the default output')
-    await page.click('#wasm-html')
-    assert.equal(await page.$eval('#wasm-html', (element) => document.activeElement === element), true, 'HTML editor should receive keyboard focus')
+    assert.equal(await page.$eval('.live-demo-error', (element) => element.textContent, { timeout: 1000 }).catch(() => ''), '', `${autoSample.id} should convert without an error`)
+    assert.equal(await page.$eval('input[name="live-demo-output"][value="pdf"]', (element) => element.checked), true, 'selecting a sample should keep PDF as the default output')
+    await page.click('#live-demo-html')
+    assert.equal(await page.$eval('#live-demo-html', (element) => document.activeElement === element), true, 'HTML editor should receive keyboard focus')
 
     for (const sample of curatedSamples) {
-      await page.select('#wasm-sample', sample.id)
-      await page.waitForFunction((currentSample) => document.querySelector('#wasm-html')?.value.includes(currentSample.htmlNeedle) && document.querySelector('#wasm-css')?.value.includes(currentSample.cssNeedle), {}, sample)
-      await page.waitForFunction(() => document.querySelector('.pdf-viewer') || document.querySelector('.wasm-error'), { timeout: conversionTimeout })
+      await page.select('#live-demo-sample', sample.id)
+      await page.waitForFunction((currentSample) => document.querySelector('#live-demo-html')?.value.includes(currentSample.htmlNeedle) && document.querySelector('#live-demo-css')?.value.includes(currentSample.cssNeedle), {}, sample)
+      await page.waitForFunction(() => document.querySelector('.pdf-viewer') || document.querySelector('.live-demo-error'), { timeout: conversionTimeout })
       await page.click('[data-testid="convert"]')
       try {
-        await page.waitForFunction(() => document.querySelector('.pdf-viewer') || document.querySelector('.wasm-error'), { timeout: conversionTimeout })
+        await page.waitForFunction(() => document.querySelector('.pdf-viewer') || document.querySelector('.live-demo-error'), { timeout: conversionTimeout })
       } catch (conversionWaitError) {
-        const state = await page.$eval('.wasm-panel', (element) => element.innerText)
+        const state = await page.$eval('.live-demo-panel', (element) => element.innerText)
         throw new Error(`${sample.id} conversion timed out. Current panel state: ${state}`, { cause: conversionWaitError })
       }
-      assert.equal(await page.$eval('.wasm-error', (element) => element.textContent, { timeout: 1000 }).catch(() => ''), '', `${sample.id} should convert without an error`)
+      assert.equal(await page.$eval('.live-demo-error', (element) => element.textContent, { timeout: 1000 }).catch(() => ''), '', `${sample.id} should convert without an error`)
       const samplePDF = await page.evaluate(async () => {
         const response = await fetch(document.querySelector('.pdf-viewer').dataset.src)
         const bytes = new Uint8Array(await response.arrayBuffer())
@@ -149,39 +152,39 @@ try {
     }
 
     const goldenSample = { id: 'golden-fixture-60-implemented-props-a', htmlNeedle: 'fixture-60-implemented-props-a' }
-    await page.select('#wasm-sample', goldenSample.id)
-    await page.waitForFunction((sample) => document.querySelector('#wasm-html')?.value.includes(sample.htmlNeedle) && document.querySelector('#wasm-css')?.value.includes('@page'), {}, goldenSample)
-    assert.doesNotMatch(await page.$eval('#wasm-html', (element) => element.value), /<style\b/i, 'golden fixture CSS should be extracted from the HTML editor')
-    await page.waitForFunction(() => document.querySelector('.pdf-viewer') || document.querySelector('.wasm-error'), { timeout: conversionTimeout })
-    assert.equal(await page.$eval('.wasm-error', (element) => element.textContent, { timeout: 1000 }).catch(() => ''), '', 'a golden fixture should convert without an error')
+    await page.select('#live-demo-sample', goldenSample.id)
+    await page.waitForFunction((sample) => document.querySelector('#live-demo-html')?.value.includes(sample.htmlNeedle) && document.querySelector('#live-demo-css')?.value.includes('@page'), {}, goldenSample)
+    assert.doesNotMatch(await page.$eval('#live-demo-html', (element) => element.value), /<style\b/i, 'golden fixture CSS should be extracted from the HTML editor')
+    await page.waitForFunction(() => document.querySelector('.pdf-viewer') || document.querySelector('.live-demo-error'), { timeout: conversionTimeout })
+    assert.equal(await page.$eval('.live-demo-error', (element) => element.textContent, { timeout: 1000 }).catch(() => ''), '', 'a golden fixture should convert without an error')
 
-    await page.select('#wasm-sample', curatedSamples[0].id)
-    await page.waitForFunction((sample) => document.querySelector('#wasm-html')?.value.includes(sample.htmlNeedle), {}, curatedSamples[0])
-    await page.waitForFunction(() => document.querySelector('.pdf-viewer') || document.querySelector('.wasm-error'), { timeout: conversionTimeout })
+    await page.select('#live-demo-sample', curatedSamples[0].id)
+    await page.waitForFunction((sample) => document.querySelector('#live-demo-html')?.value.includes(sample.htmlNeedle), {}, curatedSamples[0])
+    await page.waitForFunction(() => document.querySelector('.pdf-viewer') || document.querySelector('.live-demo-error'), { timeout: conversionTimeout })
     await page.click('[data-testid="load-sample"]')
 
     try {
-      await page.waitForFunction((sample) => document.querySelector('#wasm-html')?.value.includes(sample.htmlNeedle), {}, curatedSamples[0])
+      await page.waitForFunction((sample) => document.querySelector('#live-demo-html')?.value.includes(sample.htmlNeedle), {}, curatedSamples[0])
     } catch (sampleWaitError) {
-      const state = await page.$eval('.wasm-panel', (element) => element.innerText)
+      const state = await page.$eval('.live-demo-panel', (element) => element.innerText)
       throw new Error(`manual sample load timed out. Current panel state: ${state}`, { cause: sampleWaitError })
     }
 
     let previousPreviewURL = null
     for (const mode of ['pdf', 'png', 'jpeg']) {
       if (mode === 'pdf') await page.click('[data-testid="convert"]')
-      else await page.click(`input[name="wasm-output"][value="${mode}"]`)
-      const previewSelector = mode === 'pdf' ? '.pdf-viewer' : '.wasm-image-preview'
+      else await page.click(`input[name="live-demo-output"][value="${mode}"]`)
+      const previewSelector = mode === 'pdf' ? '.pdf-viewer' : '.live-demo-image-preview'
       try {
         await page.waitForSelector(previewSelector, { timeout: conversionTimeout })
       } catch (conversionWaitError) {
-        const state = await page.$eval('.wasm-panel', (element) => element.innerText)
+        const state = await page.$eval('.live-demo-panel', (element) => element.innerText)
         throw new Error(`${mode} conversion timed out. Current panel state: ${state}`, { cause: conversionWaitError })
       }
-      assert.equal(await page.$eval('.wasm-error', (element) => element.textContent, { timeout: 1000 }).catch(() => ''), '', `${mode} should convert without an error`)
+      assert.equal(await page.$eval('.live-demo-error', (element) => element.textContent, { timeout: 1000 }).catch(() => ''), '', `${mode} should convert without an error`)
 
       const result = await page.evaluate(async (currentMode) => {
-        const target = currentMode === 'pdf' ? document.querySelector('.pdf-viewer') : document.querySelector('.wasm-image-preview')
+        const target = currentMode === 'pdf' ? document.querySelector('.pdf-viewer') : document.querySelector('.live-demo-image-preview')
         const response = await fetch(currentMode === 'pdf' ? target.dataset.src : target.src)
         const bytes = new Uint8Array(await response.arrayBuffer())
         return {
@@ -254,10 +257,10 @@ try {
         if (mode === 'png') assert.deepEqual(result.bytes, [137, 80, 78, 71, 13, 10, 26, 10], 'PNG signature')
         if (mode === 'jpeg') assert.deepEqual(result.bytes.slice(0, 3), [255, 216, 255], 'JPEG signature')
         assert.match(result.mime || '', new RegExp(`^image/${mode}`), `${mode} MIME type`)
-        if (mode === 'png') assert.equal(await page.$eval('#wasm-padding', (input) => input.value), '20', 'image padding should default to 20 pixels')
+        if (mode === 'png') assert.equal(await page.$eval('#live-demo-padding', (input) => input.value), '20', 'image padding should default to 20 pixels')
 
         if (mode === 'png') {
-          await page.click('#wasm-padding')
+          await page.click('#live-demo-padding')
           await page.keyboard.down('Control')
           await page.keyboard.press('A')
           await page.keyboard.up('Control')
@@ -265,20 +268,20 @@ try {
           await page.click('[data-testid="convert"]')
           try {
             await page.waitForFunction((dimensions) => {
-              const image = document.querySelector('.wasm-image-preview')
+              const image = document.querySelector('.live-demo-image-preview')
               return image?.naturalWidth === dimensions.width - 16 && image?.naturalHeight === dimensions.height - 16
             }, result)
           } catch (paddingWaitError) {
-            const state = await page.$eval('.wasm-panel', (element) => element.innerText)
-            const dimensions = await page.$eval('.wasm-image-preview', (image) => ({ width: image.naturalWidth, height: image.naturalHeight })).catch(() => null)
-            const value = await page.$eval('#wasm-padding', (input) => input.value).catch(() => '')
+            const state = await page.$eval('.live-demo-panel', (element) => element.innerText)
+            const dimensions = await page.$eval('.live-demo-image-preview', (image) => ({ width: image.naturalWidth, height: image.naturalHeight })).catch(() => null)
+            const value = await page.$eval('#live-demo-padding', (input) => input.value).catch(() => '')
             throw new Error(`padded PNG conversion timed out. input=${value} dimensions=${JSON.stringify(dimensions)} state=${state}`, { cause: paddingWaitError })
           }
-          const padded = await page.$eval('.wasm-image-preview', (image) => ({ width: image.naturalWidth, height: image.naturalHeight }))
+          const padded = await page.$eval('.live-demo-image-preview', (image) => ({ width: image.naturalWidth, height: image.naturalHeight }))
           assert.equal(padded.width, result.width - 16, 'changing padding from 20px to 12px should remove 8 pixels from both horizontal edges')
           assert.equal(padded.height, result.height - 16, 'changing padding from 20px to 12px should remove 8 pixels from both vertical edges')
 
-          await page.click('#wasm-padding')
+          await page.click('#live-demo-padding')
           await page.keyboard.down('Control')
           await page.keyboard.press('A')
           await page.keyboard.up('Control')
@@ -287,14 +290,14 @@ try {
       }
 
       assert.equal(await page.$('[data-testid="open-preview"]'), null, 'the duplicate full-preview trigger should be removed')
-      const openLink = await page.$eval('.wasm-actions a[target="_blank"]', (element) => ({
+      const openLink = await page.$eval('.live-demo-actions a[target="_blank"]', (element) => ({
         href: element.href,
         target: element.target,
       }))
       assert.equal(openLink.target, '_blank', `${mode} Open action should use a new tab`)
       assert.match(openLink.href, /^blob:/, `${mode} Open action should point to the generated Blob URL`)
 
-      const viewportSelector = mode === 'pdf' ? '[data-testid="pdf-viewport"]' : '.wasm-preview'
+      const viewportSelector = mode === 'pdf' ? '[data-testid="pdf-viewport"]' : '.live-demo-preview'
       if (mode === 'pdf') {
         await page.waitForFunction(() => document.querySelector('.pdf-viewer-page canvas')?.width > 0)
       }
@@ -326,13 +329,13 @@ try {
       if (mode === 'pdf') assert.ok(scrollAfterWheel.top > scrollBeforeWheel.top || scrollAfterWheel.left !== scrollBeforeWheel.left, `inline PDF preview should respond to mouse-wheel scrolling: ${JSON.stringify({ viewport, viewportBounds, scrollBeforeWheel, scrollAfterWheel })}`)
 
       if (mode !== 'pdf') {
-        await page.click('.wasm-image-preview')
-        assert.equal(await page.$('.wasm-lightbox'), null, `${mode} click should not open a second preview layer`)
+        await page.click('.live-demo-image-preview')
+        assert.equal(await page.$('.live-demo-lightbox'), null, `${mode} click should not open a second preview layer`)
         if (mode === 'png') {
-          assert.match(await page.$eval('.wasm-preview', (element) => getComputedStyle(element).backgroundImage), /linear-gradient/, 'PNG preview should show a transparency checkerboard')
+          assert.match(await page.$eval('.live-demo-preview', (element) => getComputedStyle(element).backgroundImage), /linear-gradient/, 'PNG preview should show a transparency checkerboard')
         }
         const corner = await page.evaluate(async () => {
-          const image = document.querySelector('.wasm-image-preview')
+          const image = document.querySelector('.live-demo-image-preview')
           await image.decode()
           const canvas = document.createElement('canvas')
           canvas.width = image.naturalWidth
@@ -345,7 +348,7 @@ try {
       }
 
       const currentPreviewURL = await page.$eval(
-        mode === 'pdf' ? '.pdf-viewer' : '.wasm-image-preview',
+        mode === 'pdf' ? '.pdf-viewer' : '.live-demo-image-preview',
         (element, isPDF) => isPDF ? element.dataset.src : element.src,
         mode === 'pdf',
       )
@@ -355,16 +358,16 @@ try {
       previousPreviewURL = currentPreviewURL
     }
 
-    await page.screenshot({ path: '/tmp/gowkhtmltopdf-wasm.png', fullPage: true })
+    await page.screenshot({ path: '/tmp/gowkhtmltopdf-live-demo.png', fullPage: true })
 
-    await page.click('#wasm-html')
+    await page.click('#live-demo-html')
     await page.keyboard.down('Control')
     await page.keyboard.press('A')
     await page.keyboard.up('Control')
     await page.keyboard.press('Backspace')
     await page.click('[data-testid="convert"]')
-    await page.waitForSelector('.wasm-error')
-    assert.match(await page.$eval('.wasm-error', (element) => element.textContent), /Enter some HTML/)
+    await page.waitForSelector('.live-demo-error')
+    assert.match(await page.$eval('.live-demo-error', (element) => element.textContent), /Enter some HTML/)
 
     await page.setViewport({ width: 375, height: 800 })
     const overflow = await page.evaluate(() => ({
@@ -376,7 +379,7 @@ try {
         .map((element) => ({ tag: element.tagName, className: element.className, right: element.getBoundingClientRect().right })),
     }))
     assert.equal(overflow.scrollWidth <= overflow.innerWidth, true, `mobile layout should not overflow horizontally: ${JSON.stringify(overflow)}`)
-    console.log('WASM browser smoke passed for PDF, PNG, JPEG, validation, and mobile layout.')
+    console.log('Live demo browser smoke passed for PDF, PNG, JPEG, validation, and mobile layout.')
   } finally {
     await browser.close()
   }

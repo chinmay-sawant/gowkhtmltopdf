@@ -4,8 +4,8 @@
  "content": [
   {
    "type": "hero",
-   "title": "Pure-Go HTML to PDF, plus browser WASM preview",
-   "lede": "A clean-room, no-cgo PDF engine based on HTML templates, without any wrappers, and a wkhtmltopdf CLI work-alike that turns authored HTML into multi-page PDFs (or PNG/JPEG) entirely in-process. An opt-in browser route runs the same pipeline through WebAssembly for inline HTML previews."
+   "title": "Pure-Go HTML to PDF, plus a browser live demo",
+   "lede": "A clean-room, no-cgo PDF engine based on HTML templates, without any wrappers, and a wkhtmltopdf CLI work-alike that turns authored HTML into multi-page PDFs (or PNG/JPEG) entirely in-process. An opt-in browser live demo runs the same pipeline through WebAssembly for inline HTML previews."
   },
   {
    "type": "bullets",

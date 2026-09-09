@@ -11,7 +11,7 @@ const OUTPUTS = [
 
 const MAX_IMAGE_PADDING = 256
 
-const INITIAL_HTML = '<!DOCTYPE html>\n<html>\n<body>\n  <h1>Hello from WASM</h1>\n</body>\n</html>'
+const INITIAL_HTML = '<!DOCTYPE html>\n<html>\n<body>\n  <h1>Hello from the live demo</h1>\n</body>\n</html>'
 const INITIAL_CSS = `@page { size: A4; margin: 18mm; }
 body { color: #20242b; font-family: sans-serif; font-size: 12pt; }
 h1 { color: #1f4b99; }`
@@ -95,7 +95,7 @@ const revokeResultURLs = (value) => {
   for (const url of new Set(urls.filter(Boolean))) URL.revokeObjectURL(url)
 }
 
-export default function WasmPage() {
+export default function LiveDemoPage() {
   const [html, setHTML] = useState(INITIAL_HTML)
   const [css, setCSS] = useState(INITIAL_CSS)
   const [samples, setSamples] = useState([])
@@ -271,25 +271,28 @@ export default function WasmPage() {
   }
 
   return (
-    <div className="wasm-page">
-      <section className="wasm-hero" aria-labelledby="wasm-title">
-        <p className="wasm-kicker">Browser tool</p>
-        <h1 id="wasm-title">Convert HTML in your browser.</h1>
+    <div className="live-demo-page">
+      <section className="live-demo-hero" aria-labelledby="live-demo-title">
+        <h1 id="live-demo-title">Convert HTML in your browser.</h1>
         <p className="lede">The Go engine runs locally through WebAssembly. Choose a document or image output, then preview the result without uploading your HTML.</p>
+        <aside className="live-demo-font-notice" role="note">
+          <strong>Fonts and compliance</strong>
+          <span>The browser demo cannot access fonts installed on your computer. For system fonts or compliance validation, run the binary locally, or embed the Go or Python library in your application.</span>
+        </aside>
       </section>
 
-      <form className="wasm-workspace" onSubmit={convert} aria-busy={status === 'loading'}>
-        <section className="wasm-panel wasm-editor-panel" aria-labelledby="editor-title">
-          <div className="wasm-panel-heading">
+      <form className="live-demo-workspace" onSubmit={convert} aria-busy={status === 'loading'}>
+        <section className="live-demo-panel live-demo-editor-panel" aria-labelledby="editor-title">
+          <div className="live-demo-panel-heading">
             <div>
-              <p className="wasm-kicker">01 / Input</p>
+              <p className="live-demo-kicker">01 / Input</p>
               <h2 id="editor-title">HTML source</h2>
             </div>
           </div>
 
-          <div className="wasm-sample-picker">
-            <label className="wasm-label" htmlFor="wasm-sample">Sample template</label>
-            <select id="wasm-sample" value={selectedSample} onChange={(event) => selectSample(event.target.value)} disabled={!samples.length || status === 'loading'}>
+          <div className="live-demo-sample-picker">
+            <label className="live-demo-label" htmlFor="live-demo-sample">Sample template</label>
+            <select id="live-demo-sample" value={selectedSample} onChange={(event) => selectSample(event.target.value)} disabled={!samples.length || status === 'loading'}>
               {!samples.length && <option value="">Loading samples...</option>}
               {[
                 { label: 'Curated templates', entries: samples.filter((sample) => sample.source !== 'golden') },
@@ -300,15 +303,15 @@ export default function WasmPage() {
                 </optgroup>
               ))}
             </select>
-            {samples.find((sample) => sample.id === selectedSample)?.description && <p className="wasm-sample-description">{samples.find((sample) => sample.id === selectedSample).description}</p>}
+            {samples.find((sample) => sample.id === selectedSample)?.description && <p className="live-demo-sample-description">{samples.find((sample) => sample.id === selectedSample).description}</p>}
           </div>
 
-          <fieldset className="wasm-output-options">
+          <fieldset className="live-demo-output-options">
             <legend>Output format</legend>
-            <div className="wasm-output-grid">
+            <div className="live-demo-output-grid">
               {OUTPUTS.map((output) => (
-                <label className={`wasm-output-option${mode === output.value ? ' selected' : ''}`} key={output.value}>
-                  <input type="radio" name="wasm-output" value={output.value} checked={mode === output.value} onChange={() => selectOutput(output.value)} disabled={status === 'loading'} />
+                <label className={`live-demo-output-option${mode === output.value ? ' selected' : ''}`} key={output.value}>
+                  <input type="radio" name="live-demo-output" value={output.value} checked={mode === output.value} onChange={() => selectOutput(output.value)} disabled={status === 'loading'} />
                   <span>
                     <strong>{output.label}</strong>
                     <small>{output.hint}</small>
@@ -319,12 +322,12 @@ export default function WasmPage() {
           </fieldset>
 
           {mode !== 'pdf' && (
-            <div className="wasm-image-options">
-              <label className="wasm-label" htmlFor="wasm-padding">Image padding (px)</label>
+            <div className="live-demo-image-options">
+              <label className="live-demo-label" htmlFor="live-demo-padding">Image padding (px)</label>
               <input
-                id="wasm-padding"
+                id="live-demo-padding"
                 data-testid="image-padding"
-                className="wasm-number-input"
+                className="live-demo-number-input"
                 type="number"
                 min="0"
                 max={MAX_IMAGE_PADDING}
@@ -332,39 +335,39 @@ export default function WasmPage() {
                 value={padding}
                 onChange={(event) => setPadding(event.target.value)}
                 disabled={status === 'loading'}
-                aria-describedby="wasm-padding-help"
+                aria-describedby="live-demo-padding-help"
               />
-              <p id="wasm-padding-help" className="wasm-field-help">Adds the same transparent or white space to all four edges of PNG and JPEG output.</p>
+              <p id="live-demo-padding-help" className="live-demo-field-help">Adds the same transparent or white space to all four edges of PNG and JPEG output.</p>
             </div>
           )}
 
-          <div className="wasm-actions wasm-editor-actions">
+          <div className="live-demo-actions live-demo-editor-actions">
             <button type="submit" className="button button-primary" data-testid="convert" disabled={status === 'loading'}>Convert locally</button>
             <button type="button" className="button button-secondary" data-testid="load-sample" onClick={() => loadSample()} disabled={!selectedSample || status === 'loading'}>Load sample</button>
             <button type="button" className="button button-secondary" data-testid="reset" onClick={reset}>Reset</button>
           </div>
 
-          <div className="wasm-source-grid">
-            <div className="wasm-source-field">
-              <label className="wasm-label" htmlFor="wasm-html">HTML to convert</label>
-              <textarea id="wasm-html" className="wasm-editor" value={html} onChange={(event) => setHTML(event.target.value)} spellCheck="false" />
+          <div className="live-demo-source-grid">
+            <div className="live-demo-source-field">
+              <label className="live-demo-label" htmlFor="live-demo-html">HTML to convert</label>
+              <textarea id="live-demo-html" className="live-demo-editor" value={html} onChange={(event) => setHTML(event.target.value)} spellCheck="false" />
             </div>
-            <div className="wasm-source-field">
-              <label className="wasm-label" htmlFor="wasm-css">CSS to convert</label>
-              <textarea id="wasm-css" className="wasm-editor" value={css} onChange={(event) => setCSS(event.target.value)} spellCheck="false" />
+            <div className="live-demo-source-field">
+              <label className="live-demo-label" htmlFor="live-demo-css">CSS to convert</label>
+              <textarea id="live-demo-css" className="live-demo-editor" value={css} onChange={(event) => setCSS(event.target.value)} spellCheck="false" />
             </div>
           </div>
 
-          {error && <p className="wasm-error" role="alert">{error}</p>}
+          {error && <p className="live-demo-error" role="alert">{error}</p>}
         </section>
 
-        <section className="wasm-panel wasm-preview-panel" aria-labelledby="preview-title">
-          <div className="wasm-panel-heading">
+        <section className="live-demo-panel live-demo-preview-panel" aria-labelledby="preview-title">
+          <div className="live-demo-panel-heading">
             <div>
-              <p className="wasm-kicker">02 / Preview</p>
+              <p className="live-demo-kicker">02 / Preview</p>
               <h2 id="preview-title">Rendered output</h2>
             </div>
-            {result && <div className="wasm-actions">
+            {result && <div className="live-demo-actions">
               {result.pages?.length > 1 ? (
                 <a className="button button-secondary" data-testid="download-zip" href={result.zipUrl} download="gowkhtmltopdf-pages.zip">Download ZIP</a>
               ) : (
@@ -377,20 +380,20 @@ export default function WasmPage() {
               )}
             </div>}
           </div>
-          <div className={`wasm-preview${result?.mode === 'png' ? ' wasm-transparent-preview' : ''}`} aria-live="polite">
-            {!result && <p className="wasm-empty">Your preview will appear here.</p>}
+          <div className={`live-demo-preview${result?.mode === 'png' ? ' live-demo-transparent-preview' : ''}`} aria-live="polite">
+            {!result && <p className="live-demo-empty">Your preview will appear here.</p>}
             {result?.mode === 'pdf' && <PdfViewer src={result.url} title="Generated PDF" compact />}
             {result && result.mode !== 'pdf' && (
-              <div className="wasm-image-pages" data-testid="image-pages" aria-label={`${result.mode.toUpperCase()} output pages`}>
+              <div className="live-demo-image-pages" data-testid="image-pages" aria-label={`${result.mode.toUpperCase()} output pages`}>
                 {result.pages.map((page) => (
-                  <div className="wasm-image-page" data-testid="image-page" key={page.number}>
-                    <img className="wasm-image-preview" src={page.url} alt={`Generated HTML ${result.mode.toUpperCase()} page ${page.number}`} />
+                  <div className="live-demo-image-page" data-testid="image-page" key={page.number}>
+                    <img className="live-demo-image-preview" src={page.url} alt={`Generated HTML ${result.mode.toUpperCase()} page ${page.number}`} />
                   </div>
                 ))}
               </div>
             )}
           </div>
-          {result && result.mode !== 'pdf' && <p className="wasm-meta">{result.pageCount} {result.pageCount === 1 ? 'page' : 'pages'} · {result.width} × {result.height}px · {result.mime}</p>}
+          {result && result.mode !== 'pdf' && <p className="live-demo-meta">{result.pageCount} {result.pageCount === 1 ? 'page' : 'pages'} · {result.width} × {result.height}px · {result.mime}</p>}
         </section>
       </form>
     </div>

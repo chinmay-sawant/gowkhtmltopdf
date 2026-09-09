@@ -9,7 +9,7 @@
     "build": "vite build && node scripts/copy-to-docs.mjs",
     "test": "node scripts/smoke-test.mjs",
     "test:interactions": "node scripts/interaction-test.mjs",
-    "test:wasm": "node scripts/wasm-browser-test.mjs",
+    "test:live-demo": "node scripts/live-demo-browser-test.mjs",
     "preview": "vite preview",
     "lint": "eslint . && node scripts/lint-data.mjs"
   },

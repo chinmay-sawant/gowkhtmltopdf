@@ -5,7 +5,7 @@ import useTheme from '../hooks/useTheme'
 
 const DOC_ITEMS = [
   {
-    id: 'doc-wasm',
+    id: 'doc-live-demo',
     title: 'Live browser converter',
     desc: 'Convert inline HTML to PDF, PNG, or JPEG locally in a web worker',
     category: 'Documentation',

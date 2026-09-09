@@ -1,0 +1,109 @@
+.live-demo-page {
+  width: min(85vw, 1500px);
+  max-width: none;
+  margin: 0 auto;
+  padding: 72px 0 96px;
+}
+
+.live-demo-hero { max-width: none; margin-bottom: 40px; }
+.live-demo-hero h1 {
+  max-width: 680px;
+  margin: 8px 0 18px;
+  font-family: var(--serif);
+  font-size: clamp(42px, 6vw, 76px);
+  font-weight: 500;
+  letter-spacing: -0.045em;
+  line-height: 0.98;
+}
+.live-demo-kicker {
+  margin: 0;
+  color: var(--accent-strong);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.live-demo-font-notice { display: grid; gap: 4px; width: 100%; margin-top: 20px; padding: 14px 16px; border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 8px; background: var(--accent-soft); color: var(--ink-2); font-size: 14px; line-height: 1.5; }
+.live-demo-font-notice strong { color: var(--accent-strong); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; }
+.live-demo-workspace { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr); gap: 18px; align-items: stretch; }
+.live-demo-panel { min-width: 0; padding: 24px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.live-demo-editor-panel, .live-demo-preview-panel { display: flex; flex-direction: column; }
+.live-demo-panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.live-demo-panel-heading { margin-bottom: 20px; }
+.live-demo-editor-actions { margin-bottom: 20px; }
+.live-demo-panel h2 { margin: 4px 0 0; font-family: var(--serif); font-size: 28px; font-weight: 500; }
+.live-demo-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.live-demo-label, .live-demo-output-options legend { margin-bottom: 8px; color: var(--muted); font-family: var(--mono); font-size: 12px; }
+.live-demo-sample-picker { margin-bottom: 18px; }
+.live-demo-sample-picker select { width: 100%; padding: 11px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); color: var(--ink); font: inherit; }
+.live-demo-sample-picker select:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.live-demo-sample-description { margin: 8px 0 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+.live-demo-source-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; flex: 1; }
+.live-demo-source-field { display: flex; min-width: 0; flex-direction: column; }
+.live-demo-editor { width: 100%; min-height: 320px; flex: 1; resize: vertical; padding: 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--code-bg); color: var(--code-ink); font-family: var(--mono); font-size: 13px; line-height: 1.6; }
+.live-demo-editor:focus-visible, .live-demo-output-option:has(input:focus-visible), .live-demo-actions .button:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.live-demo-output-options { margin: 20px 0; padding: 0; border: 0; }
+.live-demo-output-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.live-demo-output-option { display: flex; align-items: flex-start; gap: 8px; min-height: 72px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; transition: border-color 0.18s ease, background 0.18s ease; }
+.live-demo-output-option:hover, .live-demo-output-option.selected { border-color: var(--accent); background: var(--accent-soft); }
+.live-demo-output-option input { margin-top: 3px; accent-color: var(--accent); }
+.live-demo-output-option strong, .live-demo-output-option small { display: block; }
+.live-demo-output-option strong { font-size: 13px; }
+.live-demo-output-option small { margin-top: 5px; color: var(--muted); font-size: 11px; line-height: 1.4; }
+.live-demo-image-options { margin: 0 0 20px; }
+.live-demo-number-input { width: 100%; padding: 11px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); color: var(--ink); font: inherit; }
+.live-demo-number-input:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.live-demo-field-help { margin: 8px 0 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+.live-demo-meta { color: var(--muted); font-family: var(--mono); font-size: 12px; }
+.live-demo-error { margin: 16px 0 0; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--bad-ink) 35%, transparent); border-radius: 8px; background: var(--bad-bg); color: var(--bad-ink); font-size: 14px; }
+.live-demo-preview-panel { align-self: start; height: 640px; min-height: 0; }
+.live-demo-preview { position: relative; display: grid; place-items: center; min-height: 0; flex: 1; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); }
+.live-demo-preview > .pdf-viewer { align-self: stretch; justify-self: stretch; }
+.live-demo-transparent-preview {
+  background-color: #f5f7f6;
+  background-image: linear-gradient(45deg, rgb(19 29 26 / 9%) 25%, transparent 25%, transparent 75%, rgb(19 29 26 / 9%) 75%), linear-gradient(45deg, rgb(19 29 26 / 9%) 25%, transparent 25%, transparent 75%, rgb(19 29 26 / 9%) 75%);
+  background-position: 0 0, 8px 8px;
+  background-size: 16px 16px;
+}
+.live-demo-empty { padding: 32px; color: var(--muted); text-align: center; }
+.live-demo-image-pages { display: grid; align-content: start; justify-items: center; gap: 18px; width: 100%; height: 100%; min-height: 0; overflow: auto; padding: 18px; }
+.live-demo-image-page { display: grid; justify-items: center; gap: 8px; width: min(100%, 1024px); margin: 0; }
+.live-demo-image-preview { display: block; max-width: 100%; height: auto; object-fit: contain; box-shadow: 0 10px 28px rgb(0 0 0 / 22%); }
+.live-demo-meta { margin: 12px 0 0; }
+
+.pdf-viewer { display: flex; width: 100%; min-height: 0; flex: 1; flex-direction: column; overflow: hidden; background: #18201d; }
+.pdf-viewer-compact { height: 100%; }
+.pdf-viewer-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-height: 54px; padding: 9px 14px; background: #18201d; color: #edf4f0; font-family: var(--mono); font-size: 11px; }
+.pdf-viewer-label { margin-right: auto; color: #b9c9c1; letter-spacing: 0.04em; text-transform: uppercase; }
+.pdf-viewer-toolbar output { min-width: 52px; text-align: center; }
+.pdf-viewer-control, .pdf-viewer-reset { min-width: 40px; min-height: 36px; border: 1px solid #496057; border-radius: 6px; background: #22302a; color: #edf4f0; font: inherit; cursor: pointer; }
+.pdf-viewer-control:hover:not(:disabled), .pdf-viewer-reset:hover { border-color: #9ae7cc; background: #2d4038; }
+.pdf-viewer-control:disabled { cursor: not-allowed; opacity: 0.42; }
+.pdf-viewer-control:focus-visible, .pdf-viewer-reset:focus-visible { outline: 3px solid #9ae7cc; outline-offset: 2px; }
+.pdf-viewer-pages { margin-left: 8px; color: #b9c9c1; }
+.pdf-viewer-viewport { min-height: 0; flex: 1; overflow: auto; overscroll-behavior: contain; padding: 22px; background: #0e1412; }
+.pdf-viewer-compact .pdf-viewer-viewport { padding: 14px; }
+.pdf-viewer-pages { display: grid; gap: 18px; justify-items: center; min-width: max-content; }
+.pdf-viewer-page { background: #fff; box-shadow: 0 10px 28px rgb(0 0 0 / 28%); }
+.pdf-viewer-page canvas { display: block; }
+.pdf-viewer-state { margin: auto; color: #b9c9c1; font-family: var(--mono); font-size: 12px; }
+.pdf-viewer-error { color: #ffb4a9; }
+
+@media (max-width: 900px) {
+  .live-demo-page { width: min(92vw, 1360px); }
+  .live-demo-workspace { grid-template-columns: 1fr; }
+  .live-demo-source-grid { grid-template-columns: 1fr; }
+  .live-demo-preview-panel { height: 480px; }
+  .pdf-viewer-compact .pdf-viewer-viewport { padding: 10px; }
+}
+
+@media (max-width: 560px) {
+  .live-demo-page { padding-top: 44px; }
+  .live-demo-panel { padding: 18px; }
+  .live-demo-panel-heading { align-items: flex-start; flex-direction: column; }
+  .live-demo-output-grid { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-demo-output-option, .pdf-viewer-control, .pdf-viewer-reset { transition: none; }
+}

@@ -11,7 +11,7 @@ const DocumentationPage = lazy(() => import('./pages/DocumentationPage'))
 const DossierPage = lazy(() => import('./pages/DossierPage'))
 const ShowcasePage = lazy(() => import('./pages/ShowcasePage'))
 const BenchmarksPage = lazy(() => import('./pages/BenchmarksPage'))
-const WasmPage = lazy(() => import('./pages/WasmPage'))
+const LiveDemoPage = lazy(() => import('./pages/LiveDemoPage'))
 
 const DOC_REDIRECTS = [
   ['cli', 'cli'],
@@ -72,7 +72,7 @@ export default function App() {
             <Route path="/dossier" element={<DossierPage />} />
             <Route path="/showcase" element={<ShowcasePage />} />
             <Route path="/benchmarks" element={<BenchmarksPage />} />
-            <Route path="/wasm" element={<WasmPage />} />
+            <Route path="/wasm" element={<LiveDemoPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>
           <Route path="/documentation" element={<Navigate to="/documentation/cli" replace />} />
