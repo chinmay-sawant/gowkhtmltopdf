@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "vite build && node scripts/copy-to-docs.mjs",
     "test": "node scripts/smoke-test.mjs",
+    "test:wasm": "node scripts/wasm-browser-test.mjs",
     "preview": "vite preview",
     "lint": "eslint . && node scripts/lint-data.mjs"
   },

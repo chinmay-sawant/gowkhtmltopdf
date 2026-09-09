@@ -5,6 +5,15 @@ import useTheme from '../hooks/useTheme'
 
 const DOC_ITEMS = [
   {
+    id: 'doc-wasm',
+    title: 'Browser WASM Converter',
+    desc: 'Convert inline HTML to PDF, PNG, or JPEG locally in a web worker',
+    category: 'Documentation',
+    url: '/wasm',
+    keywords: 'wasm webassembly browser pdf png jpeg image worker local preview converter demo',
+    icon: 'api',
+  },
+  {
     id: 'doc-cli',
     title: 'CLI Reference',
     desc: 'Multi-object command grammar, global vs page-scoped flags, cover & TOC objects',

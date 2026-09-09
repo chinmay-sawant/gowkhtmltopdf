@@ -9,10 +9,11 @@ storybooks, posters, statements, tables, and multi-page documents with headers,
 footers, tables of contents, and PDF outlines — without any wrappers.
 
 It is a clean-room work-alike of the [wkhtmltopdf](https://wkhtmltopdf.org/)
-CLI surface. There is **no browser**, **no cgo**, and no native converter
-process. Two static binaries (`gowkhtmltopdf`, `gowkhtmltoimage`) and a Go
-library run an in-repo pipeline (load → parse → style → layout → paginate →
-paint → write). Direct modules are allowlisted:
+CLI surface. Native builds use **no browser process**, **no cgo**, and no
+native converter process. Two static binaries (`gowkhtmltopdf`,
+`gowkhtmltoimage`) and a Go library run an in-repo pipeline (load → parse →
+style → layout → paginate → paint → write). An opt-in browser build runs the
+same pipeline through WebAssembly for inline HTML previews. Direct modules are allowlisted:
 [`go-text/typesetting`](https://github.com/go-text/typesetting) (OpenType
 shaping) and [`tdewolff/canvas`](https://github.com/tdewolff/canvas) (SVG
 rasterization). The product is HTML templates and documents, not Chrome visual parity.
@@ -33,7 +34,8 @@ PDF/UA profiles. **License:** [MIT](LICENSE).
 | PDF 1.4 / PDF 1.7 / PDF 2.0 output | Default PDF 1.4. Opt-in 1.7 / 2.0 via `--pdf-version`. Version alone is **not** a PDF/A or PDF/UA claim |
 | PDF/A-3a & PDF/UA-1 compliance | Opt-in via `--pdf-profile a3a-ua1` / `WithPDFProfile` (implies PDF 1.7) |
 | PDF/A-4 & PDF/UA-2 compliance | Opt-in via `--pdf-profile a4-ua2` / `WithPDFProfile` (implies PDF 2.0) |
-| Offline static binaries; no browser / no cgo | Yes |
+| Offline native static binaries; no browser process / no cgo | Yes |
+| Browser preview for inline HTML | Yes, through the opt-in [WASM adapter](documentation/wasm.md) |
 | Full CSS, JavaScript, or Chrome parity | No — print CSS subset; no JS |
 | CJK / complex Unicode | Partial — Type0/CID + `--font-path`; see [fonts.md](documentation/fonts.md) |
 
@@ -51,6 +53,7 @@ Committed samples live in [output/](output/) (`make samples`).
 Python API samples land under [output/python/](output/python/)
 (`make samples-python`; needs `CGO_ENABLED=1`).
 Install, flags, and HTTP URLs: [getting-started.md](documentation/getting-started.md).
+Browser build and preview: [wasm.md](documentation/wasm.md).
 
 ## Documentation
 
@@ -61,6 +64,7 @@ Install, flags, and HTTP URLs: [getting-started.md](documentation/getting-starte
 | [documentation/getting-started.md](documentation/getting-started.md) | Install and first conversion |
 | [documentation/cli.md](documentation/cli.md) | CLI grammar and flags |
 | [documentation/library-api.md](documentation/library-api.md) | Go library API |
+| [documentation/wasm.md](documentation/wasm.md) | Browser WASM conversion and previews |
 | [documentation/python.md](documentation/python.md) | Python bindings: in-process `pip install gowkhtmltopdf` |
 | [documentation/MIGRATION-0.2.4.md](documentation/MIGRATION-0.2.4.md) | 0.2.3 library/CLI to the 0.2.4 Document API |
 | [documentation/architecture.md](documentation/architecture.md) | Package map and pipeline |

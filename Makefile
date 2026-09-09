@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-quick test-serial test-race lint lint-frontend build fmt golden golden-update samples samples-python screenshots weasyprint clean claim-scan bench bench-engine bench-lib bench-inprocess bench-cli-compare c-shared bindings-clean check-versions python-binding-test python-benchmarks python-api
+.PHONY: test test-unit test-quick test-serial test-race lint lint-frontend build wasm wasm-test fmt golden golden-update samples samples-python screenshots weasyprint clean claim-scan bench bench-engine bench-lib bench-inprocess bench-cli-compare c-shared bindings-clean check-versions python-binding-test python-benchmarks python-api
 # Pure-Go runtime: the standard library plus the allowlisted direct modules
 # below. No cgo, browser, or native converter process is required.
 # Direct third-party requires must stay ⊆ {
@@ -79,11 +79,35 @@ CLI_VERSION_LDFLAGS := -X github.com/chinmay-sawant/gowkhtmltopdf/internal/cli.V
 # from CLI_VERSION_LDFLAGS so the opt-in cgo build never touches the pure-Go
 # default targets. bindings/c is package main, so X must target main.libVersion.
 BINDINGS_VERSION_LDFLAGS := -X main.libVersion=$(shell cat VERSION)
+WASM_VERSION_LDFLAGS := -X main.wasmVersion=$(shell cat VERSION)
+WASM_DIR := frontend/public/wasm
+WASM_EXEC := $(shell go env GOROOT)/lib/wasm/wasm_exec.js
+WASM_ARTIFACT := $(WASM_DIR)/gowkhtmltopdf.wasm
 
 build:
 	mkdir -p bin
 	go build -ldflags "$(CLI_VERSION_LDFLAGS)" -o bin/gowkhtmltopdf ./cmd/gowkhtmltopdf
 	go build -ldflags "$(CLI_VERSION_LDFLAGS)" -o bin/gowkhtmltoimage ./cmd/gowkhtmltoimage
+
+# Browser artifact for the inline HTML WASM adapter. The runtime script comes
+# from the same Go toolchain used for the build; the fixture is copied from its
+# canonical testdata source so frontend and native tests share one sample.
+wasm:
+	@test -f "$(WASM_EXEC)" || { echo "missing Go WASM runtime: $(WASM_EXEC)" >&2; exit 1; }
+	mkdir -p "$(WASM_DIR)"
+	GOOS=js GOARCH=wasm go build -ldflags "$(WASM_VERSION_LDFLAGS)" -o "$(WASM_ARTIFACT)" ./bindings/wasm
+	cp "$(WASM_EXEC)" "$(WASM_DIR)/wasm_exec.js"
+	cp testdata/wasm/sample.html "$(WASM_DIR)/sample.html"
+	cp testdata/wasm/manifest.json "$(WASM_DIR)/manifest.json"
+
+wasm-test:
+	bash scripts/check-wasm-contract.sh
+	$(MAKE) wasm
+	@test -d frontend/node_modules || npm ci --prefix frontend
+	npm --prefix frontend run lint
+	npm --prefix frontend run build
+	npm --prefix frontend test
+	npm --prefix frontend run test:wasm
 
 # Scan live user-facing surfaces for stale product claims.
 claim-scan:

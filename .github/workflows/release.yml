@@ -87,10 +87,18 @@ jobs:
               out="dist/${cmd}_${VERSION}_${goos}_${goarch}${ext}"
               echo "→ ${out}"
               CGO_ENABLED=0 GOOS="${goos}" GOARCH="${goarch}" \
-                go build -trimpath -ldflags "${ldflags}" \
+              go build -trimpath -ldflags "${ldflags}" \
                 -o "${out}" "./cmd/${cmd}"
             done
           done
+          wasm_out="dist/gowkhtmltopdf_${VERSION}_wasm.wasm"
+          wasm_ldflags="-s -w -X main.wasmVersion=${VERSION}"
+          GOOS=js GOARCH=wasm go build -trimpath -ldflags "${wasm_ldflags}" \
+            -o "${wasm_out}" ./bindings/wasm
+          cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" \
+            "dist/wasm_exec_${VERSION}.js"
+          cp testdata/wasm/sample.html "dist/wasm_sample_${VERSION}.html"
+          cp testdata/wasm/manifest.json "dist/wasm_manifest_${VERSION}.json"
           (
             cd dist
             sha256sum * > SHA256SUMS

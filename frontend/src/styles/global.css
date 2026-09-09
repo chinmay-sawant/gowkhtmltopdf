@@ -28,9 +28,11 @@
 /* Benchmarks matrices, KPIs, and comparison charts */
 @import './benchmarks.css';
 
+/* Browser WASM conversion page */
+@import './wasm.css';
+
 /* 404 / Unknown route page */
 @import './not-found.css';
 
 /* Global Command Palette */
 @import './command-palette.css';
-

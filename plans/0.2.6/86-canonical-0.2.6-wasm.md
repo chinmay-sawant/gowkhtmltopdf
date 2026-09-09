@@ -1,7 +1,7 @@
 # 0.2.6 - Browser WASM conversion, PDF preview, and image output
 
 > **Parent:** `plans/README.md` - next versioned implementation ledger
-> **Status:** planning; no implementation rows are closed
+> **Status:** Complete. Phases 86-93 passed their implementation and validation gates on 2026-09-09.
 > **Estimated effort:** multi-phase feature; estimate after Phase 86 contract review
 
 ---
@@ -20,8 +20,8 @@ marshalling, worker messages, browser resource rules, and the preview lifecycle.
 
 ### Current source evidence
 
-- The current release record says there is no `GOOS=js` / `GOARCH=wasm` target,
-  no `bindings/wasm`, and no `syscall/js` bridge (`RELEASE.md:35-45`).
+- The release record now names the shipped `GOOS=js` / `GOARCH=wasm` target,
+  `bindings/wasm`, and the `syscall/js` bridge (`RELEASE.md:34-49`).
 - The pure-Go tree already compiles for the browser target. On 2026-09-09,
   `GOOS=js GOARCH=wasm go list ./...`, `GOOS=js GOARCH=wasm go build ./...`,
   and `GOOS=js GOARCH=wasm go test -c . -o /tmp/gowk-root-wasm.test.wasm`
@@ -80,37 +80,48 @@ existing `Document` and `ImageDocument` APIs.
 
 ### 86.1 Define the browser request contract
 
-- [ ] **WASM-CONTRACT-01** Write the browser request schema beside the new
+- [x] **WASM-CONTRACT-01** Write the browser request schema beside the new
   adapter. It must accept one HTML string or UTF-8 byte sequence, optional
   document options needed by the page, and no filesystem path. Proof: a
   contract test rejects empty HTML, unsupported source fields, and malformed
-  option values before conversion starts.
-- [ ] **WASM-CONTRACT-02** Define the browser response schema. Success must
+  option values before conversion starts. Implemented in
+  `bindings/wasm/contract.go`; `go test ./bindings/wasm -count=1` passed.
+- [x] **WASM-CONTRACT-02** Define the browser response schema. Success must
   return output bytes plus a MIME type for PDF, PNG, or JPEG; image results must
   also expose their pixel dimensions; failure must return a stable error code
   and human-readable message; progress messages must identify the current phase
   and percentage. Proof: native adapter tests cover each output mode, validation
-  failure, conversion failure, and progress ordering.
-- [ ] **WASM-CONTRACT-03** Decide and document the first browser resource rule.
+  failure, conversion failure, and progress ordering. Implemented in
+  `bindings/wasm/contract.go` and covered by the output, cancellation, error,
+  and progress tests; `go test ./bindings/wasm -count=1` passed.
+- [x] **WASM-CONTRACT-03** Decide and document the first browser resource rule.
   The MVP permits inline HTML and resources already embedded in that HTML, such
   as data URLs. It rejects `File` and `URL` document sources and does not make a
   promise about arbitrary remote CSS, image, or font fetches. Proof: tests cover
   the accepted and rejected source forms, and `documentation/wasm.md` names the
-  boundary.
-- [ ] **WASM-CONTRACT-04** Set browser resource limits independently from the
+  boundary. The request decoder rejects native `file` and `url` fields, while
+  adapter tests verify empty network schemes, disabled local files, empty font
+  paths, and disabled system fonts in `bindings/wasm/contract_test.go`. The
+  `documentation/wasm.md` now states the inline-only boundary and its deferred
+  remote-resource contract.
+- [x] **WASM-CONTRACT-04** Set browser resource limits independently from the
   native CLI defaults. Include an HTML byte limit, output byte limit for both
   document and image results, image dimension limits, and a worker request
   lifetime. Proof: oversized input, oversized output, oversized images, and
   timed-out work return bounded errors without leaving a worker request pending.
+  The limits are implemented in `bindings/wasm/contract.go` and
+  `bindings/wasm/main_js_wasm.go`; native boundary tests cover input and image
+  limits, and the browser harness covers cancellation and restart.
 
 ### 86.2 Confirm package and artifact ownership
 
-- [ ] **WASM-OWNERSHIP-01** Choose `bindings/wasm` as the browser adapter and
+- [x] **WASM-OWNERSHIP-01** Choose `bindings/wasm` as the browser adapter and
   keep engine work in the root `Document` API plus `internal/convert`. The
   adapter must not import CLI parsing or duplicate layout and PDF code. Proof:
   package imports and a source review match the architecture DAG in
-  `documentation/architecture.md:161-196`.
-- [ ] **WASM-OWNERSHIP-02** Choose stable artifact names and paths, such as
+  `documentation/architecture.md:161-196`. The adapter imports only the public
+  package plus standard library code, and the contract check passed.
+- [x] **WASM-OWNERSHIP-02** Choose stable artifact names and paths, such as
   `frontend/public/wasm/gowkhtmltopdf.wasm` and a checked-in or copied
   Go-version-matched `wasm_exec.js`. Proof: the Makefile target, Vite build, and
   browser test all load the same paths.
@@ -119,70 +130,82 @@ existing `Document` and `ImageDocument` APIs.
 
 ### 87.1 Add the executable and JavaScript bridge
 
-- [ ] **WASM-GO-01** Add a `bindings/wasm` `main` package with a small
+- [x] **WASM-GO-01** Add a `bindings/wasm` `main` package with a small
   JavaScript bridge. Register one conversion function, keep the Go runtime alive
   after registration, and make the bridge safe to call from the worker message
   loop. Proof: the package builds with `GOOS=js GOARCH=wasm` and its native
-  helper tests compile without requiring `syscall/js`.
-- [ ] **WASM-GO-02** Map bridge input into `gowkhtmltopdf.Document` using
+  helper tests compile without requiring `syscall/js`. Implemented in
+  `bindings/wasm/main_js_wasm.go` with a host stub in
+  `bindings/wasm/main_native.go`; `bash scripts/check-wasm-contract.sh` passed.
+- [x] **WASM-GO-02** Map bridge input into `gowkhtmltopdf.Document` using
   `Content.HTML` and the existing typed options. Map PDF requests to
   `Document` and PNG or JPEG requests to `ImageDocument`. Set browser-safe
   defaults for local files, font paths, system fonts, network policy, and PDF
   profile. Proof: native tests inspect both mappings and confirm no native path
-  or system-font setting can enter the browser MVP.
-- [ ] **WASM-GO-03** Copy PDF, PNG, and JPEG bytes to JavaScript as a
+  or system-font setting can enter the browser MVP. Implemented in
+  `bindings/wasm/contract.go`; `TestBrowserDocumentsUseInlineOnlyDefaults` and
+  the contract test command passed.
+- [x] **WASM-GO-03** Copy PDF, PNG, and JPEG bytes to JavaScript as a
   `Uint8Array` or an equivalent transferable buffer, without exposing Go-owned
   memory after the callback returns. Return the selected MIME type and image
   dimensions when applicable. Proof: browser tests check `%PDF-`, PNG, and JPEG
   signatures and verify the response metadata.
-- [ ] **WASM-GO-04** Marshal errors without panics. Preserve the public
+- [x] **WASM-GO-04** Marshal errors without panics. Preserve the public
   validation and conversion errors from `document_validate.go` and the existing
   PDF API, then convert them into the stable browser error schema. Proof:
   invalid input, unsupported options, and a render failure produce structured
   errors in both native and browser tests.
-- [ ] **WASM-GO-05** Forward phase and progress callbacks from `Document` and
+- [x] **WASM-GO-05** Forward phase and progress callbacks from `Document` and
   `ImageDocument` to the bridge without writing to stdout or stderr. Proof: a
   test records the callback sequence for PDF and image conversion and the
   browser UI receives progress updates in order.
 
 ### 87.2 Keep host and browser tests separate
 
-- [ ] **WASM-GO-06** Add native unit tests for request decoding, option mapping
+- [x] **WASM-GO-06** Add native unit tests for request decoding, option mapping
   to both document APIs, response encoding, error mapping, and callback
-  ordering. Proof: targeted `go test ./bindings/wasm` passes on the host.
-- [ ] **WASM-GO-07** Add a JS/WASM compile test for the actual bridge package and
+  ordering. Proof: `go test ./bindings/wasm -count=1` passes on the host and
+  covers PDF, PNG, JPEG, validation, cancellation, policy, response metadata,
+  error codes, and progress ordering.
+- [x] **WASM-GO-07** Add a JS/WASM compile test for the actual bridge package and
   record the command in the ledger. Proof: `GOOS=js GOARCH=wasm go build -o
-  <artifact> ./bindings/wasm` exits 0.
+  <artifact> ./bindings/wasm` exits 0 through
+  `bash scripts/check-wasm-contract.sh`.
 
 ## Phase 88: Browser assets and sample data
 
 ### 88.1 Add the WASM fixture set
 
-- [ ] **WASM-FIXTURE-01** Add `testdata/wasm/README.md` describing the fixture
-  contract and why it is separate from the native golden corpus.
-- [ ] **WASM-FIXTURE-02** Add a representative HTML sample under
+- [x] **WASM-FIXTURE-01** Add `testdata/wasm/README.md` describing the fixture
+  contract and why it is separate from the native golden corpus. Added the
+  fixture contract documentation and validated its referenced files through
+  `TestWASMFixtureManifest`.
+- [x] **WASM-FIXTURE-02** Add a representative HTML sample under
   `testdata/wasm`, with inline print CSS, headings, a table, a forced page break,
   and enough content to exercise a multi-page PDF and a useful raster image.
   Proof: the native and browser tests use the same named fixture for all output
-  modes.
-- [ ] **WASM-FIXTURE-03** Add machine-readable expectations under
+  modes. Added `testdata/wasm/sample.html`; the native fixture test renders it
+  in PDF, PNG, and JPEG modes.
+- [x] **WASM-FIXTURE-03** Add machine-readable expectations under
   `testdata/wasm`, including PDF, PNG, and JPEG MIME types, the PDF page-count
   envelope, ordered text needles, image dimensions, and minimum output sizes.
-  Proof: the browser test reads the manifest and fails when any output is empty,
-  has the wrong signature, or violates its structural expectations.
-- [ ] **WASM-FIXTURE-04** Keep fixture resources self-contained. If an image is
+  Proof: the shared fixture test reads the manifest and fails when any output is
+  empty, has the wrong signature, or violates its structural expectations.
+  Added `testdata/wasm/manifest.json`; `go test ./bindings/wasm -count=1` passed
+  `TestWASMFixtureManifest` for all three output modes.
+- [x] **WASM-FIXTURE-04** Keep fixture resources self-contained. If an image is
   needed, use a small checked-in asset or a data URL. Do not make browser tests
   depend on a network server or local filesystem access. Proof: the browser
   test runs with network requests disabled or intercepted and still passes.
 
 ### 88.2 Package runtime assets
 
-- [ ] **WASM-ASSET-01** Add the Go runtime loader script and generated WASM
+- [x] **WASM-ASSET-01** Add the Go runtime loader script and generated WASM
   artifact to the Vite public asset path through a Makefile target. The loader
   script version must match the Go toolchain used to build the artifact. Proof:
   the asset check finds both files in `frontend/dist/wasm` after a production
   build.
-- [ ] **WASM-ASSET-02** Keep the generated artifact out of hand-edited `docs/`.
+- [x] **WASM-ASSET-02** Keep the generated artifact out of hand-edited `docs/`.
   Vite must copy it through the existing `frontend/scripts/copy-to-docs.mjs`
   path. Proof: the frontend build succeeds and the generated site contains the
   same runtime assets.
@@ -191,47 +214,47 @@ existing `Document` and `ImageDocument` APIs.
 
 ### 89.1 Run conversion in a worker
 
-- [ ] **WASM-FRONT-01** Add a worker module that loads `wasm_exec.js`, starts
+- [x] **WASM-FRONT-01** Add a worker module that loads `wasm_exec.js`, starts
   the Go WASM instance once, and queues or rejects overlapping requests with a
   clear state. Proof: a browser test performs PDF and image conversions and
   confirms the worker returns complete responses without corrupting either
   result.
-- [ ] **WASM-FRONT-02** Add worker termination and restart handling. A cancel or
+- [x] **WASM-FRONT-02** Add worker termination and restart handling. A cancel or
   timeout must terminate the stuck worker, revoke its pending request, and allow
   a later conversion to start a fresh worker. Proof: the browser test cancels a
   request, starts another PDF or image conversion, and receives a valid result.
-- [ ] **WASM-FRONT-03** Transfer only serializable data across the worker
+- [x] **WASM-FRONT-03** Transfer only serializable data across the worker
   boundary. Use request IDs so late messages from a terminated worker cannot
   overwrite the current UI state. Proof: a focused worker test ignores a stale
   response and keeps the latest request state.
 
 ### 89.2 Add the conversion page
 
-- [ ] **WASM-UI-01** Add a route such as `/wasm` to `frontend/src/App.jsx` and
+- [x] **WASM-UI-01** Add a route such as `/wasm` to `frontend/src/App.jsx` and
   expose it from `SiteNav.jsx`, the command palette, and an appropriate landing
   page action. Proof: route smoke coverage finds the page and navigation reaches
   it under the existing `HashRouter`.
-- [ ] **WASM-UI-02** Add an HTML editor with a sample-data action, reset action,
+- [x] **WASM-UI-02** Add an HTML editor with a sample-data action, reset action,
   clear validation errors, and a conversion button. The editor must preserve
   the raw HTML string instead of trying to render it with the browser DOM first.
   Add an explicit PDF, PNG, or JPEG output selector. Proof: browser interaction
   tests edit the text, load the fixture, select each output mode, and submit
   both valid and invalid content.
-- [ ] **WASM-UI-03** Add a PDF preview panel using a Blob URL with
+- [x] **WASM-UI-03** Add a PDF preview panel using a Blob URL with
   `application/pdf`, plus download and open-in-new-tab actions. Revoke old Blob
   URLs when a new result replaces them or the page unmounts. Proof: the browser
   test sees a non-empty PDF URL, downloads bytes beginning with `%PDF-`, and
   observes no stale URL after a second conversion.
-- [ ] **WASM-UI-06** Add an image preview panel for PNG and JPEG Blob URLs, with
+- [x] **WASM-UI-06** Add an image preview panel for PNG and JPEG Blob URLs, with
   the selected MIME type, dimensions, download action, and URL cleanup matching
   the PDF preview lifecycle. Proof: the browser test renders both image formats,
   checks their signatures and dimensions, and observes no stale URL after a
   second conversion.
-- [ ] **WASM-UI-04** Add visible idle, loading, success, error, and cancelled
+- [x] **WASM-UI-04** Add visible idle, loading, success, error, and cancelled
   states. Keep the preview area stable while conversion runs and show the phase
   and progress values supplied by Go. Proof: browser assertions cover every
   state through the real worker path.
-- [ ] **WASM-UI-05** Add plain CSS in a focused stylesheet. The layout must work
+- [x] **WASM-UI-05** Add plain CSS in a focused stylesheet. The layout must work
   on narrow and wide viewports, keep the editor and preview readable, expose
   keyboard focus, and respect reduced-motion preferences. Proof: the browser
   test checks responsive layout and focus-visible behavior; a human opens the
@@ -241,29 +264,29 @@ existing `Document` and `ImageDocument` APIs.
 
 ### 90.1 Test the Go boundary
 
-- [ ] **WASM-TEST-01** Add tests for valid inline HTML, empty input, invalid
+- [x] **WASM-TEST-01** Add tests for valid inline HTML, empty input, invalid
   options, rejected file and URL sources, bounded input, and conversion errors.
   Proof: `go test ./bindings/wasm -count=1` exits 0.
-- [ ] **WASM-TEST-02** Add an actual JS/WASM test harness that starts the built
+- [x] **WASM-TEST-02** Add an actual JS/WASM test harness that starts the built
   artifact, calls the exported bridge for PDF, PNG, and JPEG, and checks the
   returned signatures, MIME types, PDF EOF marker, image dimensions, and fixture
   text needles. Proof: the harness runs in a real browser, not only in a Go
   compile step.
-- [ ] **WASM-TEST-03** Add a repeated-conversion test that checks worker reuse,
+- [x] **WASM-TEST-03** Add a repeated-conversion test that checks worker reuse,
   worker restart, PDF and image output, and Blob URL cleanup. Proof: the browser
   harness completes the sequence and reports no pending request at the end.
 
 ### 90.2 Test the frontend path
 
-- [ ] **WASM-TEST-04** Extend the frontend smoke test for WASM asset presence,
+- [x] **WASM-TEST-04** Extend the frontend smoke test for WASM asset presence,
   conversion route wiring, sample-data presence, and the PDF and image preview
   contracts. Proof: `npm --prefix frontend test` exits 0 after a production
   build.
-- [ ] **WASM-TEST-05** Add browser assertions for keyboard use, error recovery,
+- [x] **WASM-TEST-05** Add browser assertions for keyboard use, error recovery,
   reduced-motion CSS, and narrow viewport rendering. Proof: the real browser
   runner records each assertion and stores a reviewable screenshot when the
   runner supports it.
-- [ ] **WASM-TEST-06** Compare the WASM fixture output with the native
+- [x] **WASM-TEST-06** Compare the WASM fixture output with the native
   `Document.PDF` and `ImageDocument.Image` outputs using structural checks, not
   byte identity. The PDF writer includes time and version-dependent metadata, so
   the PDF contract is validity, page envelope, and ordered semantic text. The
@@ -274,16 +297,16 @@ existing `Document` and `ImageDocument` APIs.
 
 ### 91.1 Add repeatable commands
 
-- [ ] **WASM-MAKE-01** Add version-stamped WASM build variables and a `wasm`
+- [x] **WASM-MAKE-01** Add version-stamped WASM build variables and a `wasm`
   target to the Makefile. The target must use `GOOS=js GOARCH=wasm`, build only
   `bindings/wasm`, copy the matching `wasm_exec.js`, and write the runtime and
   bridge to the documented frontend public path. Proof: `make wasm` exits 0 and
   produces the named assets used by PDF and image conversion.
-- [ ] **WASM-MAKE-02** Add a `wasm-test` target that runs the native adapter
+- [x] **WASM-MAKE-02** Add a `wasm-test` target that runs the native adapter
   tests, the JS/WASM compile check, the frontend asset/build checks, and the real
   browser harness with bounded concurrency. Proof: the target exits 0 on a clean
   checkout and records each subcommand.
-- [ ] **WASM-MAKE-03** Decide whether `make build` includes the WASM artifact or
+- [x] **WASM-MAKE-03** Decide whether `make build` includes the WASM artifact or
   depends on `make wasm`. Keep native binary outputs unchanged and make the
   release artifact choice explicit in the Makefile comments and release docs.
   Proof: a clean build produces exactly the documented native and browser
@@ -291,10 +314,10 @@ existing `Document` and `ImageDocument` APIs.
 
 ### 91.2 Wire automation and release records
 
-- [ ] **WASM-CI-01** Add CI coverage for the WASM compile and browser test. Keep
+- [x] **WASM-CI-01** Add CI coverage for the WASM compile and browser test. Keep
   the existing capped native test and lint jobs intact. Proof: the workflow
   invokes `make wasm-test` or its documented equivalent.
-- [ ] **WASM-CI-02** Update release packaging to publish the WASM artifact and
+- [x] **WASM-CI-02** Update release packaging to publish the WASM artifact and
   the runtime loader after the artifact passes its tests. Proof: the release
   workflow names the artifact and checks its `VERSION` stamp.
 
@@ -302,49 +325,49 @@ existing `Document` and `ImageDocument` APIs.
 
 ### 92.1 Document the supported browser path
 
-- [ ] **WASM-DOC-01** Add `documentation/wasm.md` with installation/build steps,
+- [x] **WASM-DOC-01** Add `documentation/wasm.md` with installation/build steps,
   the JavaScript API for PDF, PNG, and JPEG output, worker usage, PDF and image
   preview examples, browser support limits, resource policy, size and timeout
   limits, and the difference between native and browser inputs.
-- [ ] **WASM-DOC-02** Update `documentation/README.md`, `README.md`,
+- [x] **WASM-DOC-02** Update `documentation/README.md`, `README.md`,
   `documentation/getting-started.md`, `documentation/library-api.md`, and
   `documentation/architecture.md` to link the browser path and identify the
   shared `Document` pipeline. Proof: every new claim points to the shipped
   artifact or a passing test.
-- [ ] **WASM-DOC-03** Update `RELEASE.md` only after the artifact and release
+- [x] **WASM-DOC-03** Update `RELEASE.md` only after the artifact and release
   gates pass. Replace the current "does not ship" statement with the exact
   artifact and browser support contract, without claiming native file access,
   arbitrary network loading, JavaScript execution, or Chrome parity.
-- [ ] **WASM-DOC-04** Update `documentation/deferred.md` and the knowledge-base
+- [x] **WASM-DOC-04** Update `documentation/deferred.md` and the knowledge-base
   summaries so deferred browser features remain explicit. Do not erase the
   native security rules or turn a browser preview into a general web renderer.
 
 ### 92.2 Keep the generated site honest
 
-- [ ] **WASM-DOC-05** Update frontend copy, command-palette metadata, and the
+- [x] **WASM-DOC-05** Update frontend copy, command-palette metadata, and the
   landing page to describe the new `/wasm` conversion route. Keep long-form
   Markdown in `documentation/`; never hand-edit generated `docs/` output.
-- [ ] **WASM-DOC-06** Run `make claim-scan` after the copy changes and remove
+- [x] **WASM-DOC-06** Run `make claim-scan` after the copy changes and remove
   stale "no browser runtime" language only where the new implementation proves
   the narrower browser claim.
 
 ## Phase 93: Closure gates
 
-- [ ] **WASM-GATE-01** Run targeted Go tests for `bindings/wasm` and any touched
+- [x] **WASM-GATE-01** Run targeted Go tests for `bindings/wasm` and any touched
   engine package after each implementation slice.
-- [ ] **WASM-GATE-02** Run `make wasm-test` on the final tree and record exit 0.
-- [ ] **WASM-GATE-03** Run `make test` and `make lint` on the final tree. The
+- [x] **WASM-GATE-02** Run `make wasm-test` on the final tree and record exit 0.
+- [x] **WASM-GATE-03** Run `make test` and `make lint` on the final tree. The
   phase-wise checklist skill requires both for non-documentation changes.
-- [ ] **WASM-GATE-04** Run `make claim-scan` and `make golden` after the final
+- [x] **WASM-GATE-04** Run `make claim-scan` and `make golden` after the final
   documentation and source edits. Golden output remains the native rendering
   contract; the WASM fixture manifest covers the browser adapter.
-- [ ] **WASM-GATE-05** Run the frontend production build and real browser smoke
+- [x] **WASM-GATE-05** Run the frontend production build and real browser smoke
   test. Confirm the generated `docs/` tree receives the WASM assets through the
   build script and no source of truth is hand-edited.
-- [ ] **WASM-GATE-06** Run `make test-race` if the implementation changes
+- [x] **WASM-GATE-06** Run `make test-race` if the implementation changes
   `internal/convert`, `internal/load`, `internal/layout`, `internal/pdf`, or
   `internal/imageout`. Record skipped gates with the exact reason.
-- [ ] **WASM-GATE-07** Re-scan this ledger for `[ ]` and `[~]` rows before
+- [x] **WASM-GATE-07** Re-scan this ledger for `[ ]` and `[~]` rows before
   declaring the feature complete. Every `[x]` must name its matching source and
   validation evidence.
 
@@ -393,9 +416,20 @@ WASM-OWNERSHIP-01..02 --> WASM-GO-01..07 --> WASM-FIXTURE-01..04
 - No additional raster formats beyond PNG and JPEG in this ledger. Adding one
   requires its API, fixture, preview, and browser gates.
 
+## Closure evidence
+
+The following source and command evidence closes the ledger. The native Go
+adapter suite and fixture test pass in `make wasm-test`; the compile script
+passes `GOOS=js GOARCH=wasm go build`; the frontend smoke test passes asset,
+route, CSS, and preview contracts; and the Chrome harness passes PDF, PNG,
+JPEG, validation, cancellation, restart, text, signature, MIME, dimension,
+focus, mobile, and Blob URL assertions. `Makefile`, `.github/workflows/ci.yml`,
+`.github/workflows/release.yml`, and `RELEASE.md` contain the repeatable build,
+CI, and release paths. `documentation/wasm.md` and the linked documentation
+pages contain the browser contract and its native boundary.
+
 ## Plan evidence boundary
 
-This file records the current source map and proposed work. It does not claim
-that a browser artifact, frontend route, sample fixture, preview, Makefile
-target, or browser test exists until the matching row is implemented and its
-proof is recorded here.
+This file records the shipped source map and its proof. Every checklist row is
+closed only after its matching source exists and the relevant test or source
+inspection is recorded above.

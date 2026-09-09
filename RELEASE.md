@@ -32,17 +32,22 @@ plus `__init__.py`, `CHANGELOG.md`. Then run `make check-versions`.
   `make python-binding-test`, published to PyPI on `v*` tags via
   `publish-pypi.yml`.
 
-## What does not ship
+## Browser artifact for 0.2.6
 
-- WASM / browser runtime. There is no `GOOS=js` / `GOARCH=wasm` target,
-  no `bindings/wasm`, no `syscall/js` bridge. The engine runs as native
-  binaries, a Go library, or the Python-loaded shared library only.
-  A future WASM port that runs in the browser is possible but not
-  planned and not claimed anywhere. Do not list it as supported in
-  release notes, `README.md`, `documentation/`, or frontend content
-  (`make claim-scan` polices these surfaces). Once a WASM implementation
-  lands, it becomes a release artifact too: build it, version-stamp it
-  from `VERSION`, cover it with tests, and ship it with every release.
+- The browser WASM adapter converts inline HTML to PDF, PNG, and JPEG
+  previews. The release workflow publishes the version-stamped
+  `gowkhtmltopdf_<VERSION>_wasm.wasm` artifact and matching
+  `wasm_exec_<VERSION>.js` loader. The browser contract keeps local files,
+  arbitrary remote resources, and document JavaScript disabled.
+
+## What does not ship in the browser adapter
+
+- Native filesystem access, arbitrary cross-origin resource loading, document
+  JavaScript execution, and Chrome or WebKit print parity.
+
+Build and test the browser artifact with `make wasm-test`. The target builds
+the local Vite asset path. The release workflow publishes the standalone WASM
+artifact and Go runtime loader after the browser contract passes.
 
 ## Hard gates (all must pass)
 
@@ -54,6 +59,7 @@ make test
 make golden
 make claim-scan
 make lint
+make wasm-test
 ```
 
 Then the static build plus version-stamp assertion (mirrors CI):
@@ -79,6 +85,10 @@ npm ci --prefix frontend
 npm --prefix frontend run build
 git status --porcelain -- docs frontend/dist
 ```
+
+When the release includes the browser adapter, `make wasm-test` is required.
+It covers the version-stamped compile, the fixture manifest, the frontend
+build, and the real browser smoke test.
 
 Race job (`make test-race`) runs in CI on hot packages
 (`internal/convert`, `internal/layout`, `internal/pdf`,

@@ -121,6 +121,25 @@ jobs:
             exit 1
           fi
 
+  wasm:
+    name: WASM adapter and browser smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend deps
+        run: npm ci --prefix frontend
+      - name: Run WASM contract, build, and browser tests
+        run: make wasm-test
+
   # --- Phases 40.5 / 44.4: opt-in cgo CI. These jobs never feed back into
   # the pure-Go default targets above; CGO_ENABLED=1 is set per step only.
   build-shared:

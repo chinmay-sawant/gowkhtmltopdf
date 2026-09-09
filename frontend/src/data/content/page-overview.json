@@ -4,8 +4,8 @@
  "content": [
   {
    "type": "hero",
-   "title": "Pure-Go HTML to PDF, no browser",
-   "lede": "A clean-room, no-cgo PDF engine based on HTML templates — without any wrappers — and a wkhtmltopdf CLI work-alike that turns authored HTML into multi-page PDFs (or PNG/JPEG) entirely in-process. Current release v0.2.4 adds the native Document API, explicit CLI sources, and frozen external benchmark paths."
+   "title": "Pure-Go HTML to PDF, plus browser WASM preview",
+   "lede": "A clean-room, no-cgo PDF engine based on HTML templates, without any wrappers, and a wkhtmltopdf CLI work-alike that turns authored HTML into multi-page PDFs (or PNG/JPEG) entirely in-process. An opt-in browser route runs the same pipeline through WebAssembly for inline HTML previews."
   },
   {
    "type": "bullets",
@@ -13,7 +13,7 @@
    "items": [
     "From scratch: the whole pipeline, load to PDF write, lives in this repository. No binding to wkhtmltopdf, Qt, or WebKit, and no third-party PDF/HTML/CSS API or SaaS service.",
     "Stdlib by default: runtime deps are the Go standard library plus two allowlisted modules, github.com/go-text/typesetting for OpenType shaping and github.com/tdewolff/canvas for SVG rasterization.",
-    "No browser, no cgo: no Chrome or WebKit process is spawned, and CGO_ENABLED=0 builds produce statically linked binaries with no runtime library requirements.",
+    "Native builds use no Chrome or WebKit process and CGO_ENABLED=0 produces statically linked binaries. The opt-in browser route runs the same Go pipeline through WebAssembly.",
     "Repeatable layout: the same HTML, settings, and fonts produce the same layout. Default CLI PDF bytes are not hash-stable because CreationDate and [date]/[time] use the wall clock unless you inject Now.",
     "Template-oriented scope: an allowlisted HTML model and a documented print CSS subset, with the compatibility matrix as the normative per-property contract.",
     "Two surfaces: the gowkhtmltopdf and gowkhtmltoimage CLI binaries, plus an idiomatic Go library API in the root gowkhtmltopdf package (Document, ImageDocument)."

@@ -1,0 +1,24 @@
+{
+  "fixture": "sample.html",
+  "outputs": {
+    "pdf": {
+      "mime": "application/pdf",
+      "pageMin": 2,
+      "pageMax": 2,
+      "minBytes": 1000,
+      "textNeedles": ["Browser WASM conversion", "Second page"]
+    },
+    "png": {
+      "mime": "image/png",
+      "width": 640,
+      "height": 480,
+      "minBytes": 100
+    },
+    "jpeg": {
+      "mime": "image/jpeg",
+      "width": 640,
+      "height": 480,
+      "minBytes": 100
+    }
+  }
+}

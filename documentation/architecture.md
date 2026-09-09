@@ -1,10 +1,10 @@
 # Architecture
 
 **gowkhtmltopdf** is a no-cgo HTML→PDF and HTML→image template engine. Three
-entry points (the PDF CLI, the image CLI, and the root library) translate
-settings into a request and then share one pipeline: load → parse → style →
-layout → paginate → paint → write. There is no browser process and no remote
-conversion service.
+entry points (the PDF CLI, the image CLI, the root library, and the browser
+WASM adapter) translate settings into a request and then share one pipeline:
+load → parse → style → layout → paginate → paint → write. Native entry points
+use no browser process and no remote conversion service.
 
 The package graph is a DAG. `internal/convert` is the orchestration hub.
 Deep-dives with `file:line` references live under
@@ -17,6 +17,7 @@ Deep-dives with `file:line` references live under
 | `gowkhtmltopdf` (root `document.go`) | Public library: `Document` / `ImageDocument`, explicit `Content`, validation, writer-first conversion |
 | `cmd/gowkhtmltopdf` | PDF CLI (`internal/app` + `internal/cli` only) |
 | `cmd/gowkhtmltoimage` | Image CLI |
+| `bindings/wasm` | Browser adapter: inline HTML request, browser-safe policy, JavaScript bridge |
 | `internal/app` | Command → engine adapter: sinks, TOC dump, `RunPDF` / `RunImage` |
 | `internal/cli` | Document-shaped argv parse (`-o`, `--html`, `--url`, `--cover`, `--toc`), help, exit codes |
 | `internal/settings` | wkhtmltopdf-style dotted settings, `UnitReal`, page sizes, Policy-A ignored keys |

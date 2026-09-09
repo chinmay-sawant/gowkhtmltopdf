@@ -76,4 +76,20 @@ for (const p of [2, 10, 100, 500]) {
 }
 console.log('  ✓ Benchmarks dataset verified.')
 
+// 7. Check the browser WASM converter surface
+console.log('\n7. Checking browser WASM converter assets and route...')
+assert.ok(existsSync(join(dist, 'wasm', 'gowkhtmltopdf.wasm')), 'dist/wasm/gowkhtmltopdf.wasm should exist')
+assert.ok(existsSync(join(dist, 'wasm', 'wasm_exec.js')), 'dist/wasm/wasm_exec.js should exist')
+assert.ok(existsSync(join(dist, 'wasm', 'sample.html')), 'dist/wasm/sample.html should exist')
+assert.ok(existsSync(join(dist, 'wasm', 'manifest.json')), 'dist/wasm/manifest.json should exist')
+const appSource = readFileSync(join(root, 'src', 'App.jsx'), 'utf8')
+const wasmPageSource = readFileSync(join(root, 'src', 'pages', 'WasmPage.jsx'), 'utf8')
+const wasmStyles = readFileSync(join(root, 'src', 'styles', 'wasm.css'), 'utf8')
+assert.match(appSource, /path=['"]\/wasm['"]/, 'App should register the WASM route')
+assert.match(wasmPageSource, /value:\s*['"]png['"]/, 'WASM page should expose PNG output')
+assert.match(wasmPageSource, /value:\s*['"]jpeg['"]/, 'WASM page should expose JPEG output')
+assert.match(wasmStyles, /:focus-visible/, 'WASM styles should define keyboard focus')
+assert.match(wasmStyles, /prefers-reduced-motion/, 'WASM styles should define reduced-motion behavior')
+console.log('  ✓ Browser WASM assets, route, and image output options verified.')
+
 console.log('\n🎉 All frontend smoke tests passed successfully!\n')

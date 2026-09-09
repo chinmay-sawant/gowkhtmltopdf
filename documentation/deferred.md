@@ -58,6 +58,11 @@ String input via the library is the first-class path for (1). CLI stdin
 HTML (`-` as the page input) is **not** implemented today - see the table.
 Do not treat a public SPA URL as the acceptance bar for report work.
 
+The opt-in browser adapter is narrower than a browser renderer. It accepts
+inline HTML, runs the existing engine in a Web Worker, and returns PDF, PNG,
+or JPEG bytes. It does not execute document JavaScript or provide native file,
+arbitrary network, or Chrome-parity behavior. See [wasm.md](wasm.md).
+
 ---
 
 ## Deferred inventory
@@ -79,6 +84,7 @@ Do not treat a public SPA URL as the acceptance bar for report work.
 | PDF/A-4 / PDF/UA-2 (PDF 2.0 conformance profiles) | **Shipped in 0.2.2** (#33, [#46](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/46)/[#47](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/47)): opt-in via `--pdf-profile a4-ua2` / `Document.PDFProfile` (also `a4`, `ua2`). Implies PDF 2.0. Emits claiming XMP (`pdfaid:part=4`, `pdfuaid:part=2`), OutputIntent, structure namespaces, and full tagging. | #33 done |
 | PDF encryption / AcroForm / signatures | Out of scope; no writer support (rejected on every version, incl. 2.0). | Not planned |
 | C ABI (`gowkhtmltopdf_*` c-shared exports) | **Shipped in 0.2.5**: opt-in c-shared exports under `bindings/c` (`-buildmode=c-shared`) power the Python bindings; see [python.md](python.md). Default Go builds stay `CGO_ENABLED=0`; cgo lives only in the isolated shared-library target. | Python bindings track, `plans/0.2.5/` |
+| Browser WASM preview | **Shipped in 0.2.6**: opt-in `make wasm` build and `/wasm` frontend route for inline HTML PDF, PNG, and JPEG output. The adapter runs in a worker with bounded input, output, image dimensions, and request lifetime. | Future resource bridge with explicit origin, CORS, size, timeout, and cancellation rules |
 | `--read-args-from-stdin` | **Not implemented.** The flag is not a working batch loop (rejected / unused). | Not planned |
 | Stdin HTML input (`-`) | **Not implemented.** CLI parse stores `Page: "-"`, but `load.GuessURL("-")` falls through to **`http://-`**. Library callers should pass inline HTML; do not document CLI `-` as stdin. | Document honestly; not a hidden feature |
 | WOFF2 / `data:` `@font-face` | Skipped (WOFF2 needs Brotli, not allowlisted; `data:` src rejected). Local TTF/OTF/WOFF1 under ACL works. | No Brotli module |

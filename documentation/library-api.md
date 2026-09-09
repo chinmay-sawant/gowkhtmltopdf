@@ -17,6 +17,10 @@ Content source(s) → Page tree → Document / ImageDocument → WritePDF / Writ
 There is no public `Set("dotted.key", value)` escape hatch in the v0.2.4 API.
 Engine settings remain an internal implementation detail.
 
+For a browser-hosted inline HTML conversion that returns PDF, PNG, or JPEG
+bytes, use the separate [Browser WASM adapter](wasm.md). It reuses these root
+document APIs but does not accept native file or URL sources.
+
 ## PDF quick start
 
 The v0.2.4 API uses `Content` to make the source kind explicit. A document may
