@@ -11,7 +11,7 @@ const frontendDir = join(import.meta.dirname, '..')
 const viteCLI = join(frontendDir, 'node_modules', 'vite', 'bin', 'vite.js')
 const port = 4173
 const origin = `http://127.0.0.1:${port}`
-const url = `${origin}/gowkhtmltopdf/#/wasm`
+const url = `${origin}/gowkhtmltopdf/#/live-demo`
 // Cold start downloads and instantiates ~29MB of Go WASM before the first
 // convert. CI runners often need well over a minute for that path alone.
 const conversionTimeout = 180000
