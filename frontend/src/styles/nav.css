@@ -85,6 +85,11 @@
   font-weight: 600;
 }
 
+.site-nav-links .nav-link:last-child {
+  min-width: 124px;
+  justify-content: center;
+}
+
 .nav-link-cta:hover,
 .nav-link-cta.active {
   color: var(--accent-strong);

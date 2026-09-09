@@ -25,17 +25,20 @@ export default function WasmPage() {
   const [selectedSample, setSelectedSample] = useState('')
   const [mode, setMode] = useState('pdf')
   const [status, setStatus] = useState('idle')
-  const [progress, setProgress] = useState({ phase: '', percent: 0 })
   const [error, setError] = useState('')
   const [result, setResult] = useState(null)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [previewZoom, setPreviewZoom] = useState(1)
   const clientRef = useRef(null)
   const requestRef = useRef(0)
+  const loadSampleRef = useRef(null)
   const previewCloseRef = useRef(null)
   const previewTriggerRef = useRef(null)
 
-  useEffect(() => () => clientRef.current?.cancel(), [])
+  useEffect(() => () => {
+    clientRef.current?.cancel()
+    clientRef.current = null
+  }, [])
 
   useEffect(() => () => {
     if (result?.url) URL.revokeObjectURL(result.url)
@@ -74,8 +77,10 @@ export default function WasmPage() {
         if (!response.ok) throw new Error(`Sample catalog failed to load (${response.status})`)
         const catalog = await response.json()
         if (cancelled) return
-        setSamples(catalog.samples || [])
-        setSelectedSample(catalog.samples?.[0]?.id || '')
+        const catalogSamples = catalog.samples || []
+        setSamples(catalogSamples)
+        setSelectedSample(catalogSamples[0]?.id || '')
+        if (catalogSamples[0]) void loadSampleRef.current?.(catalogSamples[0].id, true, catalogSamples)
       } catch (catalogError) {
         if (!cancelled) setError(catalogError.message)
       }
@@ -85,51 +90,8 @@ export default function WasmPage() {
     return () => { cancelled = true }
   }, [])
 
-  const loadSample = async () => {
-    const sample = samples.find((entry) => entry.id === selectedSample)
-    if (!sample) return
-
-    try {
-      const baseURL = new URL(import.meta.env.BASE_URL, window.location.origin)
-      const responses = await Promise.all([
-        fetch(new URL(sample.html, baseURL)),
-        fetch(new URL(sample.css, baseURL)),
-      ])
-      for (const response of responses) {
-        if (!response.ok) throw new Error(`Sample asset failed to load (${response.status})`)
-      }
-      const [nextHTML, nextCSS] = await Promise.all(responses.map((response) => response.text()))
-      setHTML(nextHTML)
-      setCSS(nextCSS)
-      setPreviewOpen(false)
-      setResult(null)
-      setStatus('idle')
-      setProgress({ phase: '', percent: 0 })
-      setError('')
-    } catch (sampleError) {
-      setError(sampleError.message)
-      setStatus('error')
-    }
-  }
-
-  const reset = () => {
-    requestRef.current += 1
-    clientRef.current?.cancel()
-    clientRef.current = null
-    setHTML(INITIAL_HTML)
-    setCSS(INITIAL_CSS)
-    setSelectedSample(samples[0]?.id || '')
-    setPreviewOpen(false)
-    setMode('pdf')
-    setStatus('idle')
-    setProgress({ phase: '', percent: 0 })
-    setError('')
-    setResult(null)
-  }
-
-  const convert = async (event) => {
-    event.preventDefault()
-    if (!html.trim()) {
+  const convertDocument = async (sourceHTML, sourceCSS, outputMode) => {
+    if (!sourceHTML.trim()) {
       setStatus('error')
       setError('Enter some HTML before converting.')
       return
@@ -143,12 +105,9 @@ export default function WasmPage() {
     setError('')
     setPreviewOpen(false)
     setResult(null)
-    setProgress({ phase: 'Starting', percent: 0 })
 
     try {
-      const response = await client.convert({ html: composeDocument(html, css), mode }, (phase, percent) => {
-        if (requestRef.current === requestID) setProgress({ phase: phase || 'Converting', percent })
-      })
+      const response = await client.convert({ html: composeDocument(sourceHTML, sourceCSS), mode: outputMode })
       if (requestRef.current !== requestID) return
       const bytes = new Uint8Array(response.bytes)
       const url = URL.createObjectURL(new Blob([bytes], { type: response.mime }))
@@ -165,11 +124,68 @@ export default function WasmPage() {
     }
   }
 
-  const cancel = () => {
+  const loadSample = async (sampleID = selectedSample, autoConvert = false, sampleList = samples) => {
+    const sample = sampleList.find((entry) => entry.id === sampleID)
+    if (!sample) return
+
+    try {
+      const baseURL = new URL(import.meta.env.BASE_URL, window.location.origin)
+      const responses = await Promise.all([
+        fetch(new URL(sample.html, baseURL)),
+        fetch(new URL(sample.css, baseURL)),
+      ])
+      for (const response of responses) {
+        if (!response.ok) throw new Error(`Sample asset failed to load (${response.status})`)
+      }
+      const [nextHTML, nextCSS] = await Promise.all(responses.map((response) => response.text()))
+      setSelectedSample(sampleID)
+      setHTML(nextHTML)
+      setCSS(nextCSS)
+      setMode('pdf')
+      setPreviewOpen(false)
+      setResult(null)
+      setStatus('idle')
+      setError('')
+      if (autoConvert) await convertDocument(nextHTML, nextCSS, 'pdf')
+    } catch (sampleError) {
+      setError(sampleError.message)
+      setStatus('error')
+    }
+  }
+
+  loadSampleRef.current = loadSample
+
+  const selectSample = (sampleID) => {
+    setSelectedSample(sampleID)
+    setStatus('loading')
+    setError('')
+    setPreviewOpen(false)
+    setResult(null)
+    void loadSample(sampleID, true)
+  }
+
+  const reset = () => {
     requestRef.current += 1
     clientRef.current?.cancel()
     clientRef.current = null
-    setStatus('cancelled')
+    setHTML(INITIAL_HTML)
+    setCSS(INITIAL_CSS)
+    setSelectedSample(samples[0]?.id || '')
+    setPreviewOpen(false)
+    setMode('pdf')
+    setStatus('idle')
+    setError('')
+    setResult(null)
+  }
+
+  const convert = (event) => {
+    event.preventDefault()
+    void convertDocument(html, css, mode)
+  }
+
+  const selectOutput = (outputMode) => {
+    setMode(outputMode)
+    void convertDocument(html, css, outputMode)
   }
 
   const openPreview = () => {
@@ -190,7 +206,7 @@ export default function WasmPage() {
         <p className="lede">The Go engine runs locally through WebAssembly. Choose a document or image output, then preview the result without uploading your HTML.</p>
       </section>
 
-      <form className="wasm-workspace" onSubmit={convert}>
+      <form className="wasm-workspace" onSubmit={convert} aria-busy={status === 'loading'}>
         <section className="wasm-panel wasm-editor-panel" aria-labelledby="editor-title">
           <div className="wasm-panel-heading">
             <div>
@@ -198,21 +214,15 @@ export default function WasmPage() {
               <h2 id="editor-title">HTML source</h2>
             </div>
             <div className="wasm-actions">
-              <button type="submit" className="button button-primary" data-testid="convert" disabled={status === 'loading'}>{status === 'loading' ? 'Converting...' : 'Convert locally'}</button>
-              {status === 'loading' && <button type="button" className="button button-secondary" data-testid="cancel" onClick={cancel}>Cancel</button>}
-              <button type="button" className="button button-secondary" data-testid="load-sample" onClick={loadSample} disabled={!selectedSample || status === 'loading'}>Load sample</button>
+              <button type="submit" className="button button-primary" data-testid="convert" disabled={status === 'loading'}>Convert locally</button>
+              <button type="button" className="button button-secondary" data-testid="load-sample" onClick={() => loadSample()} disabled={!selectedSample || status === 'loading'}>Load sample</button>
               <button type="button" className="button button-secondary" data-testid="reset" onClick={reset}>Reset</button>
-              <span className="wasm-status" role="status" aria-live="polite">
-                {status === 'loading' && `${progress.phase} ${progress.percent}%`}
-                {status === 'success' && 'Conversion complete'}
-                {status === 'cancelled' && 'Conversion cancelled'}
-              </span>
             </div>
           </div>
 
           <div className="wasm-sample-picker">
             <label className="wasm-label" htmlFor="wasm-sample">Sample template</label>
-            <select id="wasm-sample" value={selectedSample} onChange={(event) => setSelectedSample(event.target.value)} disabled={!samples.length || status === 'loading'}>
+            <select id="wasm-sample" value={selectedSample} onChange={(event) => selectSample(event.target.value)} disabled={!samples.length || status === 'loading'}>
               {!samples.length && <option value="">Loading samples...</option>}
               {samples.map((sample) => <option value={sample.id} key={sample.id}>{sample.title}</option>)}
             </select>
@@ -235,7 +245,7 @@ export default function WasmPage() {
             <div className="wasm-output-grid">
               {OUTPUTS.map((output) => (
                 <label className={`wasm-output-option${mode === output.value ? ' selected' : ''}`} key={output.value}>
-                  <input type="radio" name="wasm-output" value={output.value} checked={mode === output.value} onChange={() => setMode(output.value)} />
+                  <input type="radio" name="wasm-output" value={output.value} checked={mode === output.value} onChange={() => selectOutput(output.value)} disabled={status === 'loading'} />
                   <span>
                     <strong>{output.label}</strong>
                     <small>{output.hint}</small>
@@ -272,8 +282,7 @@ export default function WasmPage() {
               }
             } : undefined}
           >
-            {!result && status !== 'loading' && <p className="wasm-empty">Your preview will appear here.</p>}
-            {status === 'loading' && <p className="wasm-empty">Rendering {mode.toUpperCase()} locally...</p>}
+            {!result && <p className="wasm-empty">Your preview will appear here.</p>}
             {result?.mode === 'pdf' && <iframe className="wasm-pdf-preview" src={result.url} title="Generated PDF preview" />}
             {result && result.mode !== 'pdf' && <img className="wasm-image-preview" src={result.url} alt="Generated HTML image preview" />}
             {result && <span className="wasm-preview-hint">Click to open full preview</span>}

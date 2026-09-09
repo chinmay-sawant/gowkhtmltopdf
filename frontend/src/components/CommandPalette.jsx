@@ -6,11 +6,11 @@ import useTheme from '../hooks/useTheme'
 const DOC_ITEMS = [
   {
     id: 'doc-wasm',
-    title: 'Browser WASM Converter',
+    title: 'Live browser converter',
     desc: 'Convert inline HTML to PDF, PNG, or JPEG locally in a web worker',
     category: 'Documentation',
     url: '/wasm',
-    keywords: 'wasm webassembly browser pdf png jpeg image worker local preview converter demo',
+    keywords: 'wasm webassembly browser pdf png jpeg image worker local preview converter live demo',
     icon: 'api',
   },
   {
