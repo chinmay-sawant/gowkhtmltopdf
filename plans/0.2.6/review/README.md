@@ -9,6 +9,7 @@ Review ledger folder for the leftover print CSS in commit `48e06dbc` (`feat(css)
 | [golang-design-patterns-2026-09-08.md](golang-design-patterns-2026-09-08.md) | Whole-tree Go design-patterns review (2026-09-08, 12 agents, skill v1.2.1, audit-only, all rows [ ]) |
 | [architecture-deepening-2026-09-10.md](architecture-deepening-2026-09-10.md) | Whole-tree architecture-deepening review (2026-09-10, 6 read-only agents, 31 raw findings, 22 active `ARC-24..45` rows: 2 P0 + 7 P1 + 12 P2 + 1 P3; audit-only, 2 risk rows `[~]`) |
 | [architecture-deepening-2026-09-10.html](architecture-deepening-2026-09-10.html) | HTML rendering of the same wave (Tailwind + Mermaid via CDN, rating, top recommendation, 22 candidate cards with before/after diagrams; derived from the ledger) |
+| [memory-profiling-2026-09-10.md](memory-profiling-2026-09-10.md) | Golden-corpus heap/stack profiling plus generation benchmarks (2026-09-10, new opt-in harness in `internal/profiling/`, 65 templates, PDF + PNG + JPEG; 13 `IMPROV-*` proposals, none implemented; profiles written to gitignored `output/profiles/`) |
 
 Parent: [`../48-canonical-0.2.6-css-coverage.md`](../48-canonical-0.2.6-css-coverage.md).
 

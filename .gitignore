@@ -12,6 +12,10 @@ cmd/gowkhtmltoimage/gowkhtmltoimage
 /coverage.html
 testdata/golden/out/
 
+# profiling harness output: heap/stack pprof files, benchmark text dumps, and
+# per-mode summaries. Reports derived from these live under plans/.
+output/profiles/
+
 # c-shared / python binding build artifacts (Phase 40.4). The committed
 # vendored header include/gowkhtmltopdf.h stays trackable: no include/*.h
 # rule is added here.
