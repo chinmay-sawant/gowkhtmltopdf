@@ -413,9 +413,7 @@ func (m *cellMeasure) walkBlockChildren(nodeN *html.Node, childCS ResolvedStyle,
 		childStyle := childCS
 
 		if child.Type == html.ElementNode {
-			if resolved := m.engine.styles[child]; resolved != nil {
-				childStyle = *resolved
-			}
+			childStyle = *m.engine.stylePtr(child)
 		}
 
 		m.walk(child, childStyle, childNowrap || childStyle.WhiteSpace == cssWhiteSpaceNowrap ||
@@ -737,7 +735,7 @@ func (e *engine) layoutCell(n *html.Node, sty ResolvedStyle, width float64) floa
 
 	e.popBFCFloats(enclose)
 
-	return curY + e.scalePt(sty.PaddingBottom) + e.scalePt(sty.BorderBottom.Width)
+	return e.borderBoxBottom(sty, curY)
 }
 
 func colSpan(n *html.Node) int {

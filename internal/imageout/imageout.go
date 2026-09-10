@@ -37,8 +37,6 @@ const (
 	boxFilterHalf      = 4
 	boxFilterArea      = 4 // 2x2 block of pixels (boxFilterFactor2 squared)
 	pixelCenter        = 0.5
-	defaultViewportW   = 768.0
-	defaultViewportH   = 576.0
 	qualityMaxPercent  = 100
 	opaqueAlpha        = 255
 	formatPNG          = "png"
@@ -76,6 +74,9 @@ var (
 	// errInvalidMediaType reports a media value other than print, screen,
 	// or empty (which applies only "all" rules).
 	errInvalidMediaType = errors.New("imageout: media must be print, screen, or empty")
+	// errInvalidZoom reports a zoom other than 0 or a finite positive value,
+	// matching layout.Options' zoom contract.
+	errInvalidZoom = errors.New("imageout: zoom must be zero or a finite positive value")
 )
 
 // ptToPx maps layout canvas points to output pixels. The layout engine works
@@ -120,19 +121,26 @@ type RenderOptions struct {
 	SmartWidth  bool // grow the viewport until content fits (default on)
 	// PrintLinkUnderline mirrors --print-link-underline (opt-in).
 	PrintLinkUnderline bool
+	// Zoom scales style lengths in layout; 0 keeps the layout default of 1,
+	// matching layout.Options.Zoom. Values must be 0 or finite positive.
+	Zoom float64
 }
 
 // Validate rejects caller mistakes before any layout or rasterization
 // work: negative Width/Height (0 keeps the documented defaults), a crop
 // with negative offsets or dimensions (which would silently no-op through
-// applyCrop), and media values other than print, screen, or empty.
+// applyCrop), a zoom other than 0 or finite positive, and media values other
+// than print, screen, or empty. The dimension and crop halves share
+// validateCanvasGeometry with Request.Validate so the app preflight covers
+// the same numbers before opening the output.
 func (o RenderOptions) Validate() error {
-	if o.Width < 0 || o.Height < 0 || o.Padding < 0 {
-		return fmt.Errorf("%w: got %dx%d with %dpx padding", errNegativeDimension, o.Width, o.Height, o.Padding)
+	if err := validateCanvasGeometry(o.Width, o.Height, o.Padding,
+		[4]int{o.Crop.Min.X, o.Crop.Min.Y, o.Crop.Dx(), o.Crop.Dy()}, 0); err != nil {
+		return err
 	}
 
-	if o.Crop.Min.X < 0 || o.Crop.Min.Y < 0 || o.Crop.Dx() < 0 || o.Crop.Dy() < 0 {
-		return fmt.Errorf("%w: got %v", errInvalidCropRect, o.Crop)
+	if o.Zoom != 0 && !finitePositive(o.Zoom) {
+		return fmt.Errorf("%w: got %g", errInvalidZoom, o.Zoom)
 	}
 
 	switch strings.ToLower(strings.TrimSpace(o.Media)) {
@@ -141,6 +149,31 @@ func (o RenderOptions) Validate() error {
 	default:
 		return fmt.Errorf("%w: got %q", errInvalidMediaType, o.Media)
 	}
+}
+
+// validateCanvasGeometry rejects the negative canvas numbers shared by
+// Request.Validate and RenderOptions.Validate. cropFloor is the lowest crop
+// value the caller's layer accepts: -1 keeps CropSettings' "unset" sentinel,
+// 0 requires an already-resolved crop rectangle.
+func validateCanvasGeometry(width, height, padding int, crop [4]int, cropFloor int) error {
+	if width < 0 || height < 0 || padding < 0 {
+		return fmt.Errorf("%w: got %dx%d with %dpx padding", errNegativeDimension, width, height, padding)
+	}
+
+	for _, value := range crop {
+		if value < cropFloor {
+			return fmt.Errorf("%w: got left=%d top=%d width=%d height=%d",
+				errInvalidCropRect, crop[0], crop[1], crop[2], crop[3])
+		}
+	}
+
+	return nil
+}
+
+// finitePositive reports whether value is finite and greater than zero,
+// mirroring internal/layout's zoom and viewport predicate.
+func finitePositive(value float64) bool {
+	return !math.IsNaN(value) && !math.IsInf(value, 0) && value > 0
 }
 
 // Render lays out root and rasterizes the result. The canvas is the viewport
@@ -265,6 +298,49 @@ func layoutOptions(opts RenderOptions, font *pdf.Font, viewportPx float64) layou
 		Images:             opts.Images,
 		Background:         opts.Background,
 		PrintLinkUnderline: opts.PrintLinkUnderline,
+		Zoom:               opts.Zoom,
+	}
+}
+
+// imageViewport is one resolved image-mode layout viewport in the two units
+// the pipeline needs: CSS pixels for the raster context (RenderOptions) and
+// points for prepare.BuildOptions plus media matching. HeightPt falls back to
+// WidthPt when the caller left Height unset, mirroring layoutOptions, so
+// linked and imported sheet media queries evaluate against the geometry
+// layout will actually use.
+type imageViewport struct {
+	WidthPx  float64
+	HeightPx float64 // 0 keeps content height for the raster canvas
+	WidthPt  float64
+	HeightPt float64
+}
+
+// resolveImageViewport resolves image Width/Height settings into the layout
+// viewport. WidthPx defaults to screenWidthDefault, matching RenderOptions'
+// 0-width fallback, and HeightPt defaults to WidthPt when Height is 0.
+func resolveImageViewport(width, height int) imageViewport {
+	widthPx := float64(width)
+	if widthPx <= 0 {
+		widthPx = screenWidthDefault
+	}
+
+	heightPx := float64(height)
+	if heightPx < 0 {
+		heightPx = 0
+	}
+
+	widthPt := widthPx * cssPxToPt
+
+	heightPt := heightPx * cssPxToPt
+	if heightPt <= 0 {
+		heightPt = widthPt
+	}
+
+	return imageViewport{
+		WidthPx:  widthPx,
+		HeightPx: heightPx,
+		WidthPt:  widthPt,
+		HeightPt: heightPt,
 	}
 }
 
@@ -1231,41 +1307,16 @@ func pointSegmentDistance(x, y float64, start, end rasterPoint) float64 {
 	return math.Hypot(x-(start.X+t*dx), y-(start.Y+t*dy))
 }
 
-func scaledRadii(paintOp *layout.Op, pxPerPt float64) [4]float64 {
-	radii := [4]float64{paintOp.RadiusTopLeft, paintOp.RadiusTopRight, paintOp.RadiusBottomRight, paintOp.RadiusBottomLeft}
-	if radii == [4]float64{} {
-		radii = [4]float64{paintOp.Radius, paintOp.Radius, paintOp.Radius, paintOp.Radius}
-	}
-
-	for i := range radii {
-		radii[i] *= pxPerPt
-	}
-
-	return radii
-}
-
+// scaledRadiiXY resolves the op's corner radii through layout.OpRadiiXY, the
+// one owner of the shorthand, corner-longhand, and Y fallback rules, then
+// converts them from layout points to raster pixels. The resolver stays in
+// layout so a radii change lands in one package; this wrapper only scales.
 func scaledRadiiXY(paintOp *layout.Op, pxPerPt float64) ([4]float64, [4]float64) {
-	radiusX := scaledRadii(paintOp, pxPerPt)
-	radiusY := [4]float64{
-		paintOp.RadiusTopLeftY, paintOp.RadiusTopRightY,
-		paintOp.RadiusBottomRightY, paintOp.RadiusBottomLeftY,
-	}
+	radiusX, radiusY := layout.OpRadiiXY(paintOp)
 
-	if radiusY == [4]float64{} {
-		if paintOp.RadiusY > 0 {
-			radiusY = [4]float64{paintOp.RadiusY, paintOp.RadiusY, paintOp.RadiusY, paintOp.RadiusY}
-		} else {
-			return radiusX, radiusX
-		}
-	}
-
-	for idx := range radiusY {
+	for idx := range radiusX {
+		radiusX[idx] *= pxPerPt
 		radiusY[idx] *= pxPerPt
-		if radiusX[idx] <= 0 {
-			radiusY[idx] = 0
-		} else if radiusY[idx] <= 0 {
-			radiusY[idx] = radiusX[idx]
-		}
 	}
 
 	return radiusX, radiusY
@@ -1720,8 +1771,11 @@ func (p *imagePipeline) RenderObjects(ctx context.Context) error {
 	sheets := prep.Sheets
 	p.registry = prep.Registry
 
+	viewport := resolveImageViewport(imgSet.Width, imgSet.Height)
+	imagesEnabled := settings.ResolveImages(p.req.Global.Web, imgSet, p.obj)
+
 	cache := map[string][]byte{}
-	imagesFn := makeImageFetcher(ctx, imgSet, prep, cache)
+	imagesFn := makeImageFetcher(ctx, imagesEnabled, prep, cache)
 	printLinkUnderline := imgSet.Web.PrintLinkUnderline ||
 		p.req.Global.Web.PrintLinkUnderline ||
 		p.obj.Web.PrintLinkUnderline
@@ -1729,8 +1783,8 @@ func (p *imagePipeline) RenderObjects(ctx context.Context) error {
 	// Policy A: Quiet is Global.Quiet; body paint background is Global.Background
 	// only (single field for PDF + image; CLI --background / library Set).
 	img, err := RenderContext(ctx, root, RenderOptions{
-		Width:              imgSet.Width,
-		Height:             imgSet.Height,
+		Width:              int(viewport.WidthPx),
+		Height:             int(viewport.HeightPx),
 		Font:               p.font,
 		Registry:           p.registry,
 		Sheets:             sheets,
@@ -1742,6 +1796,7 @@ func (p *imagePipeline) RenderObjects(ctx context.Context) error {
 		SmartWidth:         imgSet.SmartWidth,
 		Padding:            imgSet.Padding,
 		PrintLinkUnderline: printLinkUnderline,
+		Zoom:               p.obj.Load.ZoomFactor,
 	})
 	if err != nil {
 		return err
@@ -1831,15 +1886,9 @@ func prepareImageDocument(
 
 	media := mediaFor(global, imageSet, obj)
 
-	viewportW := defaultViewportW
-	if imageSet.Width > 0 {
-		viewportW = float64(imageSet.Width)
-	}
-
-	viewportH := defaultViewportH
-	if imageSet.Height > 0 {
-		viewportH = float64(imageSet.Height)
-	}
+	// prepare/media matching is in points; imageSet.Width/Height are CSS
+	// pixels, so both call sites go through the same resolved viewport.
+	viewport := resolveImageViewport(imageSet.Width, imageSet.Height)
 
 	prep, err := prepare.Document(
 		ctx,
@@ -1848,8 +1897,8 @@ func prepareImageDocument(
 		obj.Load,
 		registry,
 		prepare.BuildOptions(
-			viewportW,
-			viewportH,
+			viewport.WidthPt,
+			viewport.HeightPt,
 			media,
 			1,
 			global.Web,
@@ -1870,17 +1919,19 @@ func prepareImageDocument(
 }
 
 // makeImageFetcher wraps prep.Resources.Fetch with a per-run byte cache and
-// the --no-images gate.
+// the resolved web.images gate. imagesEnabled must come from
+// settings.ResolveImages so global, image, and object layers all reach the
+// gate.
 func makeImageFetcher(
 	ctx context.Context,
-	imgSet *settings.ImageGlobal,
+	imagesEnabled bool,
 	prep *prepare.Prepared,
 	cache map[string][]byte,
 ) func(string) ([]byte, error) {
 	var cacheBytes int
 
 	return func(src string) ([]byte, error) {
-		if !imgSet.Web.Images {
+		if !imagesEnabled {
 			return nil, errImagesDisabled
 		}
 

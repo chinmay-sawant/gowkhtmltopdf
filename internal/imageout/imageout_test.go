@@ -98,10 +98,12 @@ func countPixels(img image.Image, b image.Rectangle, want color.NRGBA) int {
 	return count
 }
 
-func redPNG(t *testing.T, w, h int) []byte {
+func redPNG(t *testing.T) []byte {
 	t.Helper()
 
-	img := image.NewNRGBA(image.Rect(0, 0, w, h))
+	const size = 16
+
+	img := image.NewNRGBA(image.Rect(0, 0, size, size))
 	drawSolid(img, color.NRGBA{R: 255, A: 255})
 
 	var buf bytes.Buffer
@@ -296,7 +298,7 @@ func TestRenderText(t *testing.T) {
 // TestRenderImageDataURI checks an <img> with a data: PNG appears in output.
 func TestRenderImageDataURI(t *testing.T) {
 	t.Parallel()
-	raw := redPNG(t, 16, 16)
+	raw := redPNG(t)
 	src := `<html><body><img src="data:image/png;base64,` +
 		base64.StdEncoding.EncodeToString(raw) + `"></body></html>`
 

@@ -285,7 +285,7 @@ func shiftNearestOwnedChrome(res *Result, opIndex int, oldY, deltaY float64) {
 		moved := false
 		for idx := boxNode.opStart; idx <= boxNode.opEnd && idx < len(res.Ops); idx++ {
 			chromeOp := &res.Ops[idx]
-			if idx == opIndex || !isOwnBoxChrome(*chromeOp, boxNode, boxNode.y+boxNode.height) ||
+			if idx == opIndex || !opOwnedBy(chromeOp, boxNode, opOwnerChrome) ||
 				chromeOp.Y >= oldY-layoutCoordEpsilon ||
 				(oldY-chromeOp.Y > rowChromeBandTolerance && chromeOp.Kind != OpLine) {
 				continue

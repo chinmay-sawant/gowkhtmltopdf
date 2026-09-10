@@ -160,7 +160,7 @@ func multicolKids(n *html.Node, e *engine) []*html.Node {
 			Attrs: map[string]string{"data-gowk-anon": "multicol"},
 		}
 		anonStyle := anonymousMulticolItemStyle(parentStyle)
-		e.styles[anonymous] = &anonStyle
+		e.setSyntheticStyle(anonymous, &anonStyle)
 		kids = append(kids, anonymous)
 	}
 
@@ -225,7 +225,11 @@ func (e *engine) flowMulticolSpanner(boxNode *box, nodes []*html.Node, contentW,
 // both floors and caps the used height so oversized column strips cannot blow
 // up table-row pagination into blank pages.
 func clampMulticolHeight(curY float64, style ResolvedStyle, eng *engine) float64 {
-	curY += eng.scalePt(style.PaddingBottom)
+	// The shared resolver adds bottom padding and border. A definite height
+	// caps here (unlike block flow) so an oversized column strip cannot blow
+	// up table-row pagination into blank pages.
+	curY = eng.borderBoxBottom(style, curY)
+
 	if h, ok := resolveUsedHeight(boxModelStyleOf(&style), -1, eng); ok {
 		curY = h
 	}
@@ -335,7 +339,11 @@ func (e *engine) flowMulticolSegment(
 	}
 
 	pageH := e.opts.Height
-	if pageH <= 0 {
+	if pageH > 0 {
+		// Record the boundary multicol snapped against so Paint can verify
+		// that its own content height owns the same page geometry.
+		e.pageSnapHeight = pageH
+	} else {
 		pageH = 1e12
 	}
 

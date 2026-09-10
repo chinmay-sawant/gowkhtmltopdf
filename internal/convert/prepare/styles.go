@@ -28,6 +28,11 @@ type SheetOptions struct {
 	ViewportW, ViewportH float64
 	MediaType            string
 	ObjectIndex          int
+	// PageBoxViewport, when set, replaces the gating viewport after inline
+	// <style> sheets are parsed. Callers use it to apply inline @page geometry
+	// before linked and imported media queries are gated, so size features
+	// see the final page box the cascade will use. nil keeps ViewportW/H.
+	PageBoxViewport func(inline []*css.Stylesheet) (width, height float64)
 }
 
 // CollectSheets gathers inline and linked stylesheets in document order.
@@ -46,6 +51,10 @@ type sheetCollector struct {
 	rules     int
 	visits    uint32
 	err       error
+	// inlineSheets / inlineByNode cache the <style> parses from the gating
+	// pre-pass so the main walk does not parse inline styles twice.
+	inlineSheets []*css.Stylesheet
+	inlineByNode map[*html.Node]*css.Stylesheet
 }
 
 //nolint:wsl,lll // stylesheet collection flow
@@ -54,6 +63,14 @@ func collectSheets(ctx context.Context, resources load.ResourceContext, root *ht
 		resources: resources, opts: opts, log: log, seen: make(map[string]struct{}),
 	}
 	if root != nil {
+		if collector.opts.PageBoxViewport != nil {
+			collector.preparseInlineStyles(ctx, root)
+
+			if collector.err == nil {
+				collector.opts.ViewportW, collector.opts.ViewportH = collector.opts.PageBoxViewport(collector.inlineSheets)
+			}
+		}
+
 		root.Walk(func(node *html.Node) { collector.visit(ctx, node) })
 	}
 
@@ -91,17 +108,60 @@ func (collector *sheetCollector) visit(ctx context.Context, node *html.Node) {
 	}
 }
 
-//nolint:wsl,nlreturn // collector traversal flow
+// preparseInlineStyles parses inline <style> sheets once so the caller can
+// derive the stylesheet-gating viewport from inline @page geometry before any
+// link or @import media query is evaluated. Invalid sheets are skipped here
+// and reported once by the main walk.
+func (collector *sheetCollector) preparseInlineStyles(ctx context.Context, root *html.Node) {
+	if root == nil {
+		return
+	}
+
+	collector.inlineByNode = make(map[*html.Node]*css.Stylesheet)
+
+	var visits uint32
+
+	root.Walk(func(node *html.Node) {
+		if collector.err != nil || node == nil || node.Type != html.ElementNode || node.Name != "style" {
+			return
+		}
+
+		visits++
+		if visits&63 == 0 {
+			if err := ctx.Err(); err != nil {
+				collector.err = err
+
+				return
+			}
+		}
+
+		sheet, err := css.Parse(styleText(node))
+		if err != nil {
+			return
+		}
+
+		collector.inlineByNode[node] = sheet
+		collector.inlineSheets = append(collector.inlineSheets, sheet)
+	})
+}
+
+//nolint:nlreturn // collector traversal flow
 func (collector *sheetCollector) collectStyle(ctx context.Context, node *html.Node) {
 	if collector.err != nil {
 		return
 	}
 
-	sheet, err := css.Parse(styleText(node))
-	if err != nil {
-		collector.warn("skipping <style>: %v", err)
-		return
+	sheet := collector.inlineByNode[node]
+	if sheet == nil {
+		parsed, err := css.Parse(styleText(node))
+		if err != nil {
+			collector.warn("skipping <style>: %v", err)
+			return
+		}
+
+		sheet = parsed
 	}
+
 	collector.addWithImports(ctx, sheet, collector.resources.Base(), 0)
 }
 

@@ -3,6 +3,8 @@ package layout
 
 import (
 	"testing"
+
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
 )
 
 func TestOutlineStroke(t *testing.T) {
@@ -113,6 +115,61 @@ func testOutlinePrependChrome(t *testing.T) {
 	ops := eng.deferredChrome[0].ops
 	inflate := outlineInflate(10, 4)
 	assertOutlineOnInflatedRect(t, ops, -inflate, -inflate, 100+2*inflate, 50+2*inflate, 10)
+}
+
+// TestOutlineDoesNotStretchOwnedChrome: chrome repair must classify outline
+// ops as box-owned chrome. Before opOwnedBy, an outline counted as content
+// ink, so stretchPaginatedChrome grew the border box and stretched the
+// background and side rails down to the outline edge.
+func TestOutlineDoesNotStretchOwnedChrome(t *testing.T) {
+	t.Parallel()
+
+	s := sheet(t, `
+body { margin: 0 }
+.box {
+  width: 120pt; padding: 6pt; border: 2pt solid #123456; background: #eeeeee;
+  outline: 6pt solid #ff0000; outline-offset: 4pt; font-size: 10pt; line-height: 1
+}
+`)
+	res := layoutHTML(t, `<html><body><div class="box">x</div></body></html>`, s)
+	boxNode := findBoxByClass(t, res, "box")
+	heightBefore := boxNode.height
+
+	fillBefore := backgroundFillOf(t, res, boxNode)
+
+	if err := Paint(pdf.NewDocument(), res, paintOpts()); err != nil {
+		t.Fatal(err)
+	}
+
+	if !near(boxNode.height, heightBefore) {
+		t.Fatalf("outline stretched box height: before %.3f after %.3f", heightBefore, boxNode.height)
+	}
+
+	fillAfter := backgroundFillOf(t, res, boxNode)
+	if !near(fillAfter.H, heightBefore) || !near(fillAfter.H, fillBefore.H) {
+		t.Fatalf("background fill stretched by outline: before H=%.3f after H=%.3f, box H=%.3f",
+			fillBefore.H, fillAfter.H, boxNode.height)
+	}
+}
+
+// backgroundFillOf returns the box's background fill op (X/W match the border
+// box, light grey).
+func backgroundFillOf(t *testing.T, res *Result, boxNode *box) Op {
+	t.Helper()
+
+	for _, op := range res.Ops {
+		if op.Kind != OpFillRect || op.R < 0.85 || op.G < 0.85 || op.B < 0.85 {
+			continue
+		}
+
+		if near(op.X, boxNode.x) && near(op.W, boxNode.w) {
+			return op
+		}
+	}
+
+	t.Fatal("box background fill not found")
+
+	return Op{}
 }
 
 func assertOutlineOnInflatedRect(t *testing.T, ops []Op, x, y, w, h, width float64) {

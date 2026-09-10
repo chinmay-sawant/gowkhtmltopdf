@@ -259,46 +259,11 @@ func ensureFlowIndex(res *Result, pageSize float64) {
 	ensureFlowBoxIndex(res, boxes)
 }
 
-// buildFlowOpIndex buckets non-fixed ops by their canvas page.
+// buildFlowOpIndex buckets non-fixed ops by their canvas page. It uses the
+// same edge bias as pageBuckets so the flow index and painted page ownership
+// cannot disagree at a page boundary.
 func buildFlowOpIndex(ops []Op, pageSize float64) ([][]int, []int, []int, bool) {
-	// Page numbers are dense from 0..maxP, so counts index directly instead
-	// of a per-page map (page buckets below are exact-capacity, no growth).
-	// Fixed ops leave pageOf/pos at their zero values; every reader guards
-	// Fixed before use, so no explicit fill is needed.
-	maxPage := 0
-	pageOf := make([]int, len(ops))
-
-	for idx := range ops {
-		if ops[idx].Fixed {
-			continue
-		}
-
-		page, ok := checkedFlowPageOfY(ops[idx].Y, pageSize)
-		if !ok {
-			return nil, nil, nil, false
-		}
-
-		pageOf[idx] = page
-
-		if page > maxPage {
-			maxPage = page
-		}
-	}
-
-	pages := make([][]int, maxPage+1)
-	pos := make([]int, len(ops))
-
-	for idx := range ops {
-		if ops[idx].Fixed {
-			continue
-		}
-
-		page := pageOf[idx]
-		pos[idx] = len(pages[page])
-		pages[page] = append(pages[page], idx)
-	}
-
-	return pages, pageOf, pos, true
+	return bucketOpsByPage(ops, pageSize, layoutEpsilon)
 }
 
 func ensureFlowBoxIndex(res *Result, boxes []*box) {
@@ -344,7 +309,7 @@ func shiftIndexedOp(res *Result, index int, deltaY float64) {
 	oldPage := res.flowPageOf[index]
 	res.Ops[index].Y += deltaY
 
-	newPage, ok := checkedFlowPageOfY(res.Ops[index].Y, res.flowPageSize)
+	newPage, ok := flowPageOfY(res.Ops[index].Y, res.flowPageSize, layoutEpsilon)
 	if !ok {
 		invalidateFlowIndex(res)
 
@@ -381,6 +346,13 @@ func shiftIndexedBox(res *Result, index int, deltaY float64) {
 
 	removeFromFlowBucket(&res.flowBoxes, res.flowBoxPos, oldPage, index)
 	appendToFlowBucket(&res.flowBoxes, &res.flowBoxPage, &res.flowBoxPos, index, newPage)
+}
+
+// flowPageOfY is the one page-ownership mapping. edgeBias nudges a y that
+// sits a hair below a page top onto the page it starts (rect fragments split
+// at the boundary); pass zero for raw truncation.
+func flowPageOfY(yCoord, pageSize, edgeBias float64) (int, bool) {
+	return checkedFlowPageOfY(yCoord+edgeBias, pageSize)
 }
 
 // checkedFlowPageOfY maps a canvas Y to its page index and reports whether the

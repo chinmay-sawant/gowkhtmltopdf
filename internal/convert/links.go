@@ -17,6 +17,10 @@ import (
 // above or below the location entry for the same anchor.
 const idMatchSlopPt = 20
 
+// minLinkRectSide is the floor applied to degenerate link rectangles so the
+// annotation stays visible and clickable.
+const minLinkRectSide = 10
+
 // bodyLinkIntent is the information from a same-document link operation that
 // later needs document-wide destinations. It deliberately omits the display
 // operation and any source DOM pointer.
@@ -200,14 +204,7 @@ func applyTOCLinks(ctx context.Context, doc *pdf.Document, tocs []*objectState, 
 
 	var headingMap map[*outline.Heading]*pdf.StructElem
 	if doc != nil && doc.IsUA() {
-		allHeadings := flatHeadings(bodies)
-		headingElems := doc.HeadingStructElems()
-		headingMap = make(map[*outline.Heading]*pdf.StructElem, len(allHeadings))
-		for i, h := range allHeadings {
-			if i < len(headingElems) {
-				headingMap[h] = headingElems[i]
-			}
-		}
+		headingMap = headingStructIdentity(doc, bodies, tocTotal)
 	}
 
 	for _, trVal := range tocs {
@@ -244,9 +241,9 @@ func applyTOCLinks(ctx context.Context, doc *pdf.Document, tocs []*objectState, 
 			if trVal.toc.ForwardLinks {
 				// TOC entry → heading
 				destX, destY := headingDest(hVal, bodies)
-				annotRef := srcPage.AddLinkDest(trVal.geom.pdfRect(eloc), tocTotal+docPage, destX, destY)
+				annotRef := srcPage.AddLinkDest(trVal.geom.pdfRect(eloc), doc.PageAt(tocTotal+docPage), destX, destY)
 				attachLinkStructElem(doc, srcPage, nil, annotRef)
-				if headingMap != nil {
+				if annotRef != 0 && headingMap != nil {
 					if targetElem := headingMap[hVal]; targetElem != nil {
 						srcPage.SetLinkDestStruct(targetElem)
 					}
@@ -264,7 +261,7 @@ func applyTOCLinks(ctx context.Context, doc *pdf.Document, tocs []*objectState, 
 						hLoc := layout.ElementLocation{ //nolint:exhaustruct // intentional zero-value fields
 							Page: locPage, X: hVal.X, Y: hVal.Y, W: hVal.W, H: hVal.H,
 						}
-						annotRef := page.AddLinkDest(stVal.geom.pdfRect(hLoc), destPage, destX, destY)
+						annotRef := page.AddLinkDest(stVal.geom.pdfRect(hLoc), doc.PageAt(destPage), destX, destY)
 						attachLinkStructElem(doc, page, nil, annotRef)
 					} else if warn != nil {
 						warn("object %d: toc back link target page %d missing; link skipped", trVal.idx+1, tocTotal+docPage)
@@ -408,20 +405,16 @@ func applyBodyLink(
 	srcLoc := link.loc
 	srcLoc.Page = int(link.loc.Y / state.geom.contentH)
 
-	if srcLoc.H <= 0 {
-		srcLoc.H = 10
-	}
-
-	if srcLoc.W <= 0 {
-		srcLoc.W = 10
-	}
+	// Degenerate boxes would be invisible and unclickable; clamp to a floor.
+	srcLoc.H = max(srcLoc.H, minLinkRectSide)
+	srcLoc.W = max(srcLoc.W, minLinkRectSide)
 
 	destPage := logicalDestPage(dest, tocTotal)
 	dx, dy := dest.st.geom.pdfXY(dest.loc)
-	annotRef := srcPage.AddLinkDest(state.geom.pdfRect(srcLoc), destPage, dx, dy)
+	annotRef := srcPage.AddLinkDest(state.geom.pdfRect(srcLoc), doc.PageAt(destPage), dx, dy)
 	attachLinkStructElem(doc, srcPage, link.elem, annotRef)
 
-	if dest.elem != nil {
+	if annotRef != 0 && dest.elem != nil {
 		srcPage.SetLinkDestStruct(dest.elem)
 	}
 }

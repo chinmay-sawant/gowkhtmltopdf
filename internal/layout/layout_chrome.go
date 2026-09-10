@@ -287,7 +287,7 @@ func (e *engine) collapsedThumbCaption(caption *box) (*ResolvedStyle, bool) {
 		return nil, false
 	}
 
-	parentStyle := e.styles[parent]
+	parentStyle := e.stylePtr(parent)
 	if !isCollapsedThumbPair(parent, parentStyle, caption.style) {
 		return nil, false
 	}
@@ -310,7 +310,7 @@ func (e *engine) thumbImageInsideFigure(node *html.Node) bool {
 
 		for _, child := range parent.Children {
 			if child != nil && child.Name == "figcaption" {
-				captionBox := &box{node: child, style: e.styles[child]} //nolint:exhaustruct // style probe only
+				captionBox := &box{node: child, style: e.stylePtr(child)} //nolint:exhaustruct // style probe only
 				_, ok := e.collapsedThumbCaption(captionBox)
 
 				return ok
@@ -402,6 +402,10 @@ func (e *engine) prependChrome(insertAt int, boxNode *box, sty ResolvedStyle, po
 		default:
 			chrome = append(chrome, e.collapsedOrFullBorderOps(boxNode, sty, posX, posY, width, height)...)
 		}
+	}
+	if boxNode != nil && outlinePaints(&sty) {
+		effW, _ := effectiveOutline(&sty)
+		boxNode.outlineInflate = e.scalePt(outlineInflate(effW, sty.OutlineOffset))
 	}
 	chrome = append(chrome, e.outlineOps(&sty, posX, posY, width, height)...)
 	stampOpRadiiY(chrome, radiiY)

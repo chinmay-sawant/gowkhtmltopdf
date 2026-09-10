@@ -18,6 +18,9 @@ var errNilContext = errs.ErrNilContext
 var (
 	errInvalidPaintPage   = errors.New("layout: paint page must be finite and greater than zero")
 	errInvalidPaintMargin = errors.New("layout: paint margin")
+	// errPageSnapMismatch rejects painting a multicol result at a content
+	// height other than the one its columns snapped against.
+	errPageSnapMismatch = errors.New("layout: paint content height does not match the layout page height")
 )
 
 // Page-break keyword constants shared by the pagination passes.
@@ -154,6 +157,11 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 		contentH = opts.PageHeight
 	}
 
+	if res.pageSnapHeight > 0 && math.Abs(contentH-res.pageSnapHeight) > layoutCoordEpsilon {
+		return fmt.Errorf("%w: multicol snapped to %gpt, paint content height is %gpt",
+			errPageSnapMismatch, res.pageSnapHeight, contentH)
+	}
+
 	if err := validatePaintPageIndices(res.Ops, contentH); err != nil {
 		return err
 	}
@@ -282,51 +290,62 @@ func validatePaintPageIndices(ops []Op, contentH float64) error {
 	return nil
 }
 
-// pageBuckets maps every op to its canvas page in one pass, with per-page
-// non-fixed op counts for exact-capacity buckets. Fixed ops leave pageOf at
-// its zero value; callers decide whether their fill pass includes them.
-//
-// The Y+layoutEpsilon bump matches appendOpFragments: a rect fragment ends
-// exactly at the next page top (Y = k*contentH), and float division of that
-// exact product can round just below k (e.g. (21*785.197)/785.197 =
-// 20.9999…). Without the bump the fragment is bucketed to the previous page,
-// which then paints two background bands while the intended page paints
-// none. The epsilon keeps a boundary-aligned op on the page it starts.
-func pageBuckets(ops []Op, contentH float64) ([]int, []int) {
-	// Page numbers are dense from 0..maxP, so counts index directly instead
-	// of a per-page map (page buckets below are exact-capacity, no growth).
+// bucketOpsByPage maps every non-fixed op to its canvas page and builds the
+// exact-capacity page buckets. edgeBias selects the boundary policy: page
+// ownership uses layoutEpsilon so a rect fragment that starts exactly at a
+// page top (Y = k*contentH, whose float division can round just below k,
+// e.g. (21*785.197)/785.197 = 20.9999...) stays on the page it starts.
+// Raw maintenance paths pass zero. Fixed ops leave pageOf/pos at their zero
+// values; every reader guards Fixed before use.
+func bucketOpsByPage(ops []Op, contentH, edgeBias float64) ([][]int, []int, []int, bool) {
 	maxPage := 0
+	pageOf := make([]int, len(ops))
 
 	for idx := range ops {
 		if ops[idx].Fixed {
 			continue
 		}
 
-		pageVal, ok := checkedFlowPageOfY(ops[idx].Y+layoutEpsilon, contentH)
+		page, ok := flowPageOfY(ops[idx].Y, contentH, edgeBias)
 		if !ok {
-			return nil, nil
+			return nil, nil, nil, false
 		}
 
-		if pageVal > maxPage {
-			maxPage = pageVal
+		pageOf[idx] = page
+
+		if page > maxPage {
+			maxPage = page
 		}
 	}
 
-	pageOf := make([]int, len(ops))
-	counts := make([]int, maxPage+1)
+	pages := make([][]int, maxPage+1)
+	pos := make([]int, len(ops))
 
 	for idx := range ops {
 		if ops[idx].Fixed {
 			continue
 		}
 
-		pageVal, ok := checkedFlowPageOfY(ops[idx].Y+layoutEpsilon, contentH)
-		if !ok {
-			return nil, nil
-		}
+		page := pageOf[idx]
+		pos[idx] = len(pages[page])
+		pages[page] = append(pages[page], idx)
+	}
 
-		pageOf[idx] = pageVal
-		counts[pageVal]++
+	return pages, pageOf, pos, true
+}
+
+// pageBuckets maps every op to its canvas page, with per-page non-fixed op
+// counts for exact-capacity buckets. It is the single owner of the page
+// ownership bias used to fill Result.Pages.
+func pageBuckets(ops []Op, contentH float64) ([]int, []int) {
+	pages, pageOf, _, ok := bucketOpsByPage(ops, contentH, layoutEpsilon)
+	if !ok {
+		return nil, nil
+	}
+
+	counts := make([]int, len(pages))
+	for page := range pages {
+		counts[page] = len(pages[page])
 	}
 
 	return pageOf, counts
@@ -883,7 +902,7 @@ func drawFill(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintO
 	ps := StyleOf(op)
 	c.SetFillColor(ps.FillR, ps.FillG, ps.FillB)
 	if op.Radius > 0 || opHasRoundedCorners(op) {
-		rx, ry := opRadiiXY(op)
+		rx, ry := OpRadiiXY(op)
 		roundedRectPathCorners(c, x, y, op.W, op.H, rx, ry)
 	} else {
 		c.Rect(x, y, op.W, op.H)
@@ -893,7 +912,7 @@ func drawFill(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintO
 
 //nolint:varnamelen,wsl // PDF path helpers use compact graphics-state names
 func drawMaskedStroke(c *pdf.Content, op *Op, x, y, width float64) {
-	rx, ry := opRadiiXY(op)
+	rx, ry := OpRadiiXY(op)
 	if op.StrokeMask&StrokeMaskTop != 0 {
 		roundedTopPath(c, x, y, op.W, op.H, width, rx, ry)
 		c.Stroke()
@@ -928,7 +947,7 @@ func drawStroke(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts Pain
 		return
 	}
 	if op.Radius > 0 || opHasRoundedCorners(op) {
-		rx, ry := opRadiiXY(op)
+		rx, ry := OpRadiiXY(op)
 		roundedRectPathCorners(c, x, y, op.W, op.H, rx, ry)
 	} else {
 		c.Rect(x, y, op.W, op.H)

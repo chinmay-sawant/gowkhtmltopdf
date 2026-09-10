@@ -11,9 +11,7 @@ func calculateChromeInkBottom(res *Result, boxNode *box, oldBottom float64) (flo
 
 	for idx := boxNode.opStart; idx <= boxNode.opEnd; idx++ {
 		operation := res.Ops[idx]
-		if isOwnBoxChrome(operation, boxNode, oldBottom) ||
-			isOwnBoxChromeFragment(operation, boxNode, oldBottom) ||
-			operation.Positioned {
+		if opOwnedBy(&operation, boxNode, opOwnerChrome) || operation.Positioned {
 			continue
 		}
 
@@ -339,64 +337,6 @@ func opInkBottom(operation Op) float64 {
 	}
 
 	return operation.Y
-}
-
-//nolint:cyclop // classify box-owned paint
-func isOwnBoxChrome(operation Op, boxNode *box, oldBottom float64) bool {
-	if boxNode == nil {
-		return false
-	}
-
-	if (operation.Kind == OpFillRect || operation.Kind == OpStrokeRect) &&
-		nearLayout(operation.X, boxNode.x) && nearLayout(operation.Y, boxNode.y) &&
-		nearLayout(operation.W, boxNode.w) && nearLayout(operation.H, boxNode.height) {
-		return true
-	}
-
-	if operation.Kind != OpLine {
-		return false
-	}
-
-	style, ok := paintChromeStyleOf(boxNode)
-	if !ok {
-		return false
-	}
-
-	vertical := isVerticalChromeForBox(operation, boxNode,
-		style.borderLeft.Width > 0 && style.borderLeft.Style != cssDisplayNone,
-		style.borderRight.Width > 0 && style.borderRight.Style != cssDisplayNone)
-	horizontal := isHorizontalChromeForBox(operation, boxNode, oldBottom)
-
-	return vertical || horizontal
-}
-
-func isOwnBoxRectFragment(operation Op, boxNode *box, oldBottom float64) bool {
-	isRectKind := operation.Kind == OpFillRect || operation.Kind == OpStrokeRect
-	if !isRectKind || !nearLayout(operation.X, boxNode.x) || !nearLayout(operation.W, boxNode.w) {
-		return false
-	}
-
-	return operation.Y >= boxNode.y-1e-6 && operation.Y+operation.H <= oldBottom+1
-}
-
-// isOwnBoxChromeFragment reports page-split fill/stroke/rail pieces of the
-// box's own frame. After openStrokeFragment these no longer match the full
-// border-box height, so isOwnBoxChrome alone would treat them as content ink
-// and re-add padding-bottom on every stretch pass.
-func isOwnBoxChromeFragment(operation Op, boxNode *box, oldBottom float64) bool {
-	style, ok := paintChromeStyleOf(boxNode)
-	if !ok {
-		return false
-	}
-
-	if isOwnBoxRectFragment(operation, boxNode, oldBottom) || isHorizontalChromeForBox(operation, boxNode, oldBottom) {
-		return true
-	}
-
-	hasLeft := style.borderLeft.Width > 0 && style.borderLeft.Style != cssDisplayNone
-	hasRight := style.borderRight.Width > 0 && style.borderRight.Style != cssDisplayNone
-
-	return isVerticalChromeForBox(operation, boxNode, hasLeft, hasRight)
 }
 
 const boxBottomMatchSlack = 1.5

@@ -26,6 +26,10 @@ const (
 	fontWeightNormalValue = 400
 	fontWeightBoldValue   = 700
 
+	cssFontStyleItalic  = "italic"
+	cssFontStyleOblique = "oblique"
+	cssFontWeightBold   = "bold"
+
 	boxShorthandTwoSides   = 2
 	boxShorthandThreeSides = 3
 )
@@ -559,6 +563,14 @@ func applyCascadeDeclaration(
 	ids, classes, types, order int,
 	important bool,
 ) {
+	if expanded, ok := expandFontDeclaration(prop, value); ok {
+		for _, item := range expanded {
+			applyCascadeWin(wins, item.prop, item.val, ids, classes, types, order, important)
+		}
+
+		return
+	}
+
 	if expanded, ok := expandListStyleDeclaration(prop, value); ok {
 		for _, item := range expanded {
 			applyCascadeWin(wins, item.prop, item.val, ids, classes, types, order, important)
@@ -633,6 +645,105 @@ func expandListStyleDeclaration(prop, value string) ([]logicalPropDecl, bool) {
 	}
 
 	return out, true
+}
+
+// expandFontDeclaration expands the font shorthand into its size,
+// line-height, style, weight, and family longhands so each component joins
+// the cascade with the shorthand's own origin, specificity, and source
+// order. The shorthand used to be applied after every longhand, so an
+// earlier `font` beat a later `font-size` regardless of order. Values the
+// expansion cannot read (var() references, system fonts) keep the raw key
+// and fall back to parseFontShorthand after resolveRawVars.
+func expandFontDeclaration(prop, value string) ([]logicalPropDecl, bool) {
+	if prop != "font" {
+		return nil, false
+	}
+
+	parts := strings.Fields(value)
+	out := make([]logicalPropDecl, 0, len(parts))
+
+	for idx := range parts {
+		tok := parts[idx]
+
+		// font-size with an attached line-height, e.g. 12pt/1.4.
+		if strings.Contains(tok, "/") {
+			return expandFontSizeToken(out, parts, idx), true
+		}
+
+		lower := strings.ToLower(tok)
+
+		if decl, handled := fontPrefixDecl(lower); handled {
+			// Style, variant, weight, or stretch keyword positions. normal is
+			// the initial value; variant and stretch have no readers.
+			if decl.prop != "" {
+				out = append(out, decl)
+			}
+
+			continue
+		}
+
+		if isFontWeightNumber(tok) {
+			out = append(out, logicalPropDecl{prop: "font-weight", val: tok})
+
+			continue
+		}
+
+		// First token that is not a prefix component starts the required size.
+		out = append(out, logicalPropDecl{prop: "font-size", val: tok})
+
+		return appendFontFamilyTail(out, parts, idx), true
+	}
+
+	// A valid font shorthand requires a size. Missing or unreadable values
+	// stay intact for the post-cascade fallback.
+	return nil, false
+}
+
+// expandFontSizeToken expands one size token that carries a line-height, e.g.
+// 12pt/1.4, plus the family tokens that follow it, onto out.
+func expandFontSizeToken(out []logicalPropDecl, parts []string, idx int) []logicalPropDecl {
+	size, line, _ := strings.Cut(parts[idx], "/")
+	out = append(out, logicalPropDecl{prop: "font-size", val: size})
+
+	if line != "" {
+		out = append(out, logicalPropDecl{prop: "line-height", val: line})
+	}
+
+	return appendFontFamilyTail(out, parts, idx)
+}
+
+// fontPrefixDecl returns the longhand a font shorthand prefix keyword sets.
+// handled reports whether lower is a prefix keyword at all; keywords whose
+// declaration is empty (normal, variant, and stretch positions) are handled
+// but contribute no longhand.
+func fontPrefixDecl(lower string) (logicalPropDecl, bool) {
+	switch lower {
+	case cssFontStyleItalic, cssFontStyleOblique:
+		return logicalPropDecl{prop: "font-style", val: lower}, true
+	case cssFontWeightBold, "bolder", "lighter":
+		return logicalPropDecl{prop: "font-weight", val: lower}, true
+	case contentNormal, "small-caps", "condensed", "expanded",
+		"semi-condensed", "semi-expanded", "ultra-condensed", "ultra-expanded":
+		return logicalPropDecl{}, true //nolint:exhaustruct // intentional empty keyword position
+	}
+
+	return logicalPropDecl{}, false //nolint:exhaustruct // intentional empty keyword position
+}
+
+// isFontWeightNumber reports whether tok is a numeric font weight 100..900.
+func isFontWeightNumber(tok string) bool {
+	n, ok := css.ParseNumber(tok)
+
+	return ok && n >= 100 && n <= 900
+}
+
+// appendFontFamilyTail appends the tokens after idx as font-family, if any.
+func appendFontFamilyTail(out []logicalPropDecl, parts []string, idx int) []logicalPropDecl {
+	if idx+1 < len(parts) {
+		out = append(out, logicalPropDecl{prop: "font-family", val: strings.Join(parts[idx+1:], " ")})
+	}
+
+	return out
 }
 
 // expandLogicalBoxDeclaration expands logical margin/padding/inset/border
@@ -972,7 +1083,7 @@ func applyFontWeightValue(style *ResolvedStyle, raw map[string]string) {
 func applyFontStyleValue(style *ResolvedStyle, raw map[string]string) {
 	val, found := raw["font-style"]
 	if found {
-		style.FontItalic = val == "italic" || val == "oblique"
+		style.FontItalic = val == cssFontStyleItalic || val == cssFontStyleOblique
 	}
 }
 
@@ -981,7 +1092,7 @@ func resolveFontWeight(current int, val string) int {
 	switch val {
 	case contentNormal:
 		return fontWeightNormalValue
-	case "bold":
+	case cssFontWeightBold:
 		return fontWeightBoldValue
 	case "bolder":
 		return current + fontWeightStep
@@ -1011,6 +1122,19 @@ var restShorthandProps = [...]string{ //nolint:gochecknoglobals // static apply 
 	cssPropBorderBlockColor, cssPropBorderInlineWidth, cssPropBorderInlineStyle, cssPropBorderInlineColor,
 }
 
+// restShorthandSet is derived from restShorthandProps so the longhand pass
+// exclusion cannot drift from the ordered shorthand pass (display used to be
+// missing from the hand-written switch and was applied twice).
+var restShorthandSet = func() map[string]struct{} { //nolint:gochecknoglobals // derived from the apply table
+	set := make(map[string]struct{}, len(restShorthandProps))
+
+	for _, prop := range restShorthandProps {
+		set[prop] = struct{}{}
+	}
+
+	return set
+}()
+
 // applyRestProps resolves every non-font property once the font size is known.
 // Shorthands run first in a fixed order; remaining longhands run in any order
 // (longhands do not clobber each other via shorthand expansion). This avoids
@@ -1039,20 +1163,11 @@ func applyRestProps(
 	keys := make([]string, 0, len(raw))
 
 	for key := range raw {
-		switch key {
-		case marginProperty, paddingProperty, borderProperty, borderTopProperty,
-			borderRightProperty, borderBottomProperty, borderLeftProperty,
-			borderWidthKeyword, borderStyleKeyword,
-			borderColorKeyword, gapKeyword, flexKeyword, containerKeyword,
-			cssPropMarginInline, cssPropMarginBlock, cssPropPaddingInline, cssPropPaddingBlock,
-			insetKeyword, cssPropInsetBlock, cssPropInsetInline, "column-rule",
-			cssPropBorderBlock, cssPropBorderInline, cssPropBorderBlockStart, cssPropBorderBlockEnd,
-			cssPropBorderInlineStart, cssPropBorderInlineEnd, cssPropBorderBlockWidth, cssPropBorderBlockStyle,
-			cssPropBorderBlockColor, cssPropBorderInlineWidth, cssPropBorderInlineStyle, cssPropBorderInlineColor:
+		if _, shorthand := restShorthandSet[key]; shorthand {
 			continue
-		default:
-			keys = append(keys, key)
 		}
+
+		keys = append(keys, key)
 	}
 
 	sort.Strings(keys)

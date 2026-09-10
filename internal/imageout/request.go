@@ -59,6 +59,16 @@ func (r *Request) Validate() error {
 		return fmt.Errorf("%w: got %d", ErrMultipleInputs, len(r.Objects))
 	}
 
+	// Dimensions, padding, and crop are validated here so the app preflight
+	// rejects them before cmd.OpenOutput truncates an existing file. The
+	// same helper backs RenderOptions.Validate; CropSettings' -1 "unset"
+	// sentinel is the accepted crop floor for this layer.
+	crop := r.Image.Crop
+	if err := validateCanvasGeometry(r.Image.Width, r.Image.Height, r.Image.Padding,
+		[4]int{crop.Left, crop.Top, crop.Width, crop.Height}, -1); err != nil {
+		return fmt.Errorf("imageout: %w", err)
+	}
+
 	if err := settings.ValidateRenderableObjects(r.Objects); err != nil {
 		return fmt.Errorf("imageout: %w", err)
 	}

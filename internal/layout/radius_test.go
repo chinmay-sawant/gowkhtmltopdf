@@ -128,6 +128,64 @@ body { margin: 0 }
 	}
 }
 
+// TestOpRadiiXYParity pins the exported op-radius resolver that imageout
+// consumes: uniform shorthand, per-corner longhands, a uniform Y-only radius,
+// and a stale corner Y with no matching X.
+func TestOpRadiiXYParity(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		op           Op
+		wantX, wantY [4]float64
+	}{
+		{
+			name:  "uniform shorthand copies X to Y",
+			op:    Op{Radius: 8},
+			wantX: [4]float64{8, 8, 8, 8},
+			wantY: [4]float64{8, 8, 8, 8},
+		},
+		{
+			name: "corner longhands keep both axes",
+			op: Op{
+				RadiusTopLeft: 10, RadiusTopLeftY: 5,
+				RadiusTopRight: 10, RadiusTopRightY: 5,
+				RadiusBottomRight: 10, RadiusBottomRightY: 5,
+				RadiusBottomLeft: 10, RadiusBottomLeftY: 5,
+			},
+			wantX: [4]float64{10, 10, 10, 10},
+			wantY: [4]float64{5, 5, 5, 5},
+		},
+		{
+			name:  "uniform Y only pairs with X",
+			op:    Op{Radius: 8, RadiusY: 4},
+			wantX: [4]float64{8, 8, 8, 8},
+			wantY: [4]float64{4, 4, 4, 4},
+		},
+		{
+			name:  "stale corner Y without X resolves to zero",
+			op:    Op{RadiusTopLeftY: 5},
+			wantX: [4]float64{},
+			wantY: [4]float64{},
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			gotX, gotY := OpRadiiXY(&testCase.op)
+
+			for corner := range testCase.wantX {
+				if !near(gotX[corner], testCase.wantX[corner]) || !near(gotY[corner], testCase.wantY[corner]) {
+					t.Fatalf("corner %d radii = %.3f/%.3f, want %.3f/%.3f",
+						corner, gotX[corner], gotY[corner], testCase.wantX[corner], testCase.wantY[corner])
+				}
+			}
+		})
+	}
+}
+
 func assertCornerRadiusXY(t *testing.T, radiusX, radiusY, wantX, wantY float64, label string) {
 	t.Helper()
 

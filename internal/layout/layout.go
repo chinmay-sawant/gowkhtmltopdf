@@ -18,6 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -168,6 +169,13 @@ type Result struct {
 	flowBoxes    [][]int
 	flowBoxPage  []int
 	flowBoxPos   []int
+
+	// pageSnapHeight records the page content height that multicol column
+	// snapping used during Layout (Options.Height). Paint compares it with
+	// its own content height so columns cannot snap to one boundary while
+	// paint splits at another. Zero means no page-height-dependent snapping
+	// ran, so any paint height is acceptable.
+	pageSnapHeight float64
 
 	// Pages maps page index → indices into Ops of the ops painted on that
 	// page. Filled by Paint using its pagination semantics (an op goes to
@@ -512,19 +520,21 @@ type engine struct {
 	faces    *pdf.FaceSet
 	registry *pdf.Registry
 	// styles holds immutable resolved styles per node (from resolveStylesCtx).
-	// Transient layout sizes use styleOverrides; callers use stylePtr for
-	// shared *ResolvedStyle without a second copy.
-	styles         map[*html.Node]*ResolvedStyle
-	styleOverrides []styleOverride
-	ops            []Op
-	noEmit         bool // measurement mode: compute geometry without emitting ops
-	height         float64
-	scale          float64 // zoom factor applied to style lengths (>= 1)
-	zIndex         int
-	zIndexSet      bool
-	positioned     bool
-	blendMode      string
-	stickySeq      int // monotonically increasing sticky box IDs (for Op.StickyID)
+	// Transient layout sizes use styleOverrides and engine-generated anonymous
+	// nodes use syntheticStyles; callers use stylePtr for shared
+	// *ResolvedStyle without a second copy.
+	styles          map[*html.Node]*ResolvedStyle
+	syntheticStyles map[*html.Node]*ResolvedStyle
+	styleOverrides  []styleOverride
+	ops             []Op
+	noEmit          bool // measurement mode: compute geometry without emitting ops
+	height          float64
+	scale           float64 // zoom factor applied to style lengths (>= 1)
+	zIndex          int
+	zIndexSet       bool
+	positioned      bool
+	blendMode       string
+	stickySeq       int // monotonically increasing sticky box IDs (for Op.StickyID)
 	// transformCBDepth counts ancestors with transform≠none; fixed→absolute CB.
 	transformCBDepth int
 	// imgMaxW > 0 clamps replaced <img> boxes to this containing-block width
@@ -570,6 +580,11 @@ type engine struct {
 	// needsXformStamp is set when any built box has transform≠none or
 	// opacity<1 so stampBoxTransforms can skip the full tree walk.
 	needsXformStamp bool
+	// pageSnapHeight records the finite Options.Height that multicol column
+	// snapping used (0 when no multicol page-height snapping ran). Paint
+	// rejects a mismatch instead of splitting ops at a boundary the layout
+	// never snapped to.
+	pageSnapHeight float64
 }
 
 // styleOverride temporarily substitutes one node's resolved style while that
@@ -1028,11 +1043,12 @@ func finalizeResult(eng *engine, root *html.Node, opts Options) (*Result, error)
 	flattenBoxes(boxNode, &boxes)
 
 	res := &Result{ //nolint:exhaustruct // intentional zero fields
-		Ops:    eng.ops,
-		Width:  opts.Width,
-		Height: opts.Height,
-		root:   boxNode,
-		boxes:  boxes,
+		Ops:            eng.ops,
+		Width:          opts.Width,
+		Height:         opts.Height,
+		pageSnapHeight: eng.pageSnapHeight,
+		root:           boxNode,
+		boxes:          boxes,
 	}
 	if boxNode != nil {
 		res.Height = boxNode.y + boxNode.height
@@ -1122,19 +1138,40 @@ func sameSizeContainers(a, b map[*html.Node]sizeContainer) bool {
 }
 
 func (e *engine) stylePtr(node *html.Node) *ResolvedStyle {
-	for idx := len(e.styleOverrides) - 1; idx >= 0; idx-- {
-		override := e.styleOverrides[idx]
+	for _, override := range slices.Backward(e.styleOverrides) {
 		if override.node == node {
 			return override.style
 		}
 	}
 
-	if p := e.styles[node]; p != nil {
+	if p := e.syntheticStyles[node]; p != nil {
+		return p
+	}
+
+	styles := e.styles
+	if p := styles[node]; p != nil {
 		return p
 	}
 
 	// Missing node (should not happen for walked trees): stable empty style.
 	return &zeroResolvedStyle
+}
+
+// hasStyle reports whether node has a resolved, overridden, or synthetic
+// style. stylePtr returns the shared zero style when it does not.
+func (e *engine) hasStyle(node *html.Node) bool {
+	return e.stylePtr(node) != &zeroResolvedStyle
+}
+
+// setSyntheticStyle records the used style of an engine-generated anonymous
+// node (flex/multicol item wrappers). Synthetic styles live beside the
+// immutable cascade map so every reader observes them through stylePtr.
+func (e *engine) setSyntheticStyle(node *html.Node, style *ResolvedStyle) {
+	if e.syntheticStyles == nil {
+		e.syntheticStyles = make(map[*html.Node]*ResolvedStyle)
+	}
+
+	e.syntheticStyles[node] = style
 }
 
 // styleVal returns a by-value ResolvedStyle for APIs that still take values.
@@ -1253,7 +1290,12 @@ type box struct {
 	style     *ResolvedStyle
 	x, y      float64 // border-box top-left
 	w, height float64 // border-box size
-	kind      boxKind
+	// outlineInflate is the scaled distance from the border box to the
+	// outline stroke centerline (0 when no outline paints). Stamped where
+	// outline ops are emitted so paint-time ownership checks need no engine
+	// scale (opOwnedBy).
+	outlineInflate float64
+	kind           boxKind
 	// packed flags — keep together to avoid padding.
 	paginationShifted bool // row was moved by a table pagination fixpoint
 	hasInk            bool // cell has non-whitespace ink (see nodeHasTableInk)
@@ -1482,12 +1524,6 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 	}
 
 	e.popBFCFloats(enclose)
-	// padding-bottom is inside the border box (space above border-bottom /
-	// letterhead rules — fixture-07/16).
-	curY += e.scalePt(boxStyle.paddingBottom)
-	if boxStyle.borderImageSource != "" && boxStyle.height < 0 && boxStyle.heightPercent < 0 {
-		curY += e.scalePt(borderLayoutWidth(boxStyle, boxStyle.borderBottom))
-	}
 
 	if isVerticalWritingMode(style.WritingMode) {
 		curY = e.verticalWritingHeight(contentStart, curY, style)
@@ -1498,7 +1534,11 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 		e.emitListMarker(node, style, contentX, boxNode.firstBaseline)
 	}
 
-	boxNode.height = e.applyHeightConstraints(style, curY)
+	// Bottom padding and border are inside the border box (space above the
+	// bottom border / letterhead rules - fixture-07/16). The shared resolver
+	// adds them once for every formatting context and then applies
+	// height/min-height/max-height.
+	boxNode.height = e.resolveBorderBoxHeight(style, curY)
 	e.paintWidgetControl(node, style, boxNode, widget, chkWidget, posY)
 
 	e.paintPositionedPseudo(node, style, boxNode, pseudoBefore)
@@ -1844,6 +1884,27 @@ func (e *engine) clampBlockMinHeight(style boxModelStyle, curY, cbH, vChrome flo
 	}
 
 	return curY
+}
+
+// borderBoxBottom adds a box's auto bottom chrome (padding-bottom and
+// border-bottom) to a content-flow bottom. Every formatting context calls it
+// so an auto-height bordered box is the same height whether it is a block,
+// flex container, multicol container, grid, table, or measured cell. The
+// border-image device width is used when the border paints as an image.
+func (e *engine) borderBoxBottom(style ResolvedStyle, contentBottom float64) float64 {
+	boxStyle := boxModelStyleOf(&style)
+	contentBottom += e.scalePt(boxStyle.paddingBottom)
+	contentBottom += e.scalePt(borderLayoutWidth(boxStyle, boxStyle.borderBottom))
+
+	return contentBottom
+}
+
+// resolveBorderBoxHeight is the used border-box height resolver: bottom
+// chrome, then height/min-height/max-height. A definite height floors the
+// content height instead of capping it, so CSS overflow keeps taller content
+// visible.
+func (e *engine) resolveBorderBoxHeight(style ResolvedStyle, contentBottom float64) float64 {
+	return e.applyHeightConstraints(style, e.borderBoxBottom(style, contentBottom))
 }
 
 // applyHeightConstraintsWithCB is the definite-CB form for min/max percent.

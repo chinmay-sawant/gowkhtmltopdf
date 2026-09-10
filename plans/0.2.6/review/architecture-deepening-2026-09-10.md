@@ -1,8 +1,8 @@
 # 0.2.6 review - architecture deepening (2026-09-10)
 
 > **Parent:** `plans/0.2.6/48-canonical-0.2.6-css-coverage.md` - v0.2.6 CSS coverage ledger
-> **Status:** audit-only. Every active row is `[ ]` or `[~]`; no source changed in this wave.
-> **Estimated effort:** 8-12 focused engineering days for P0 + P1; P2 rows are independent small slices.
+> **Status:** implementation complete. All 22 rows are `[x]`; `make test`, `make golden`, `make claim-scan`, and `make lint` exited 0 on the final tree.
+> **Estimated effort:** completed in one review and two implementation waves on 2026-09-10.
 > **Date:** 2026-09-10
 > **Lens:** `skills/improve-codebase/architecture-deepening/SKILL.md` (deep modules, seams, ownership, locality)
 > **Snapshot:** HEAD `30bd3d6bdcdf9b61a635485ef5dde708583a70`, branch `master`, clean tree
@@ -17,6 +17,10 @@ architecture-deepening rubric (deletion test, one-vs-two adapters, interface is 
 locality, ownership, sentinel identity). The lead re-read every P0 and P1 row against current source
 before promoting it. No agent ran `make`, `go test`, or `go build`; no file was edited.
 
+Implementation followed on `chore/review-026` in two waves on the same day: css/load, layout, and
+imageout/app/settings/root first; convert/pdf and imageout/cli/docs second; then a scoped lint-fix
+wave. The lead ran the full gate set once at the end and recorded evidence below.
+
 | # | Slice | Score | Scope |
 |---|-------|------:|-------|
 | 1 | Layout core (style, flow, measure) | 6/10 | `style*.go`, `layout*.go`, `inline*.go` |
@@ -27,7 +31,8 @@ before promoting it. No agent ran `make`, `go test`, or `go build`; no file was 
 | 6 | Root API + app + cli + settings + errs | 7.5/10 | root `*.go`, `internal/app/**`, `internal/cli/**`, `internal/settings/**`, `internal/errs/**` |
 
 Counts: about **31 raw findings** in, **22 active rows** out (2 P0, 7 P1, 12 P2, 1 P3),
-**7 parked**, **10 refused** lookalikes. Cap is 25 active rows.
+**7 parked**, **10 refused** lookalikes. Cap is 25 active rows. All 22 rows now carry passing
+proof tests.
 
 ## Rating: 6.5 out of 10
 
@@ -87,7 +92,7 @@ Fix first. One row is one behavior defect with a current-source location.
 
 ### 1.1 Wrong output and unbounded retention
 
-- [ ] **ARC-24 · P0 · defect - Body and TOC link destinations are positional and re-aim after copies**
+- [x] **ARC-24 · P0 · defect - Body and TOC link destinations are positional and re-aim after copies**
       `internal/pdf/pdf.go:471`, `:424`, `:1191-1207`; `internal/convert/links.go:419-421`;
       `internal/convert/pdf_pipeline.go:50-58`, `:179`.
       `AddLinkDest(rect, page int, ...)` stores a page index (`pdf.go:471`). `DuplicatePage` copies
@@ -103,7 +108,7 @@ Fix first. One row is one behavior defect with a current-source location.
       plus writer-level `TestLinkDestSurvivesReorder` in `internal/pdf`.
       Depends-on: none. Not: a mutex on `Document`, a global page index, or a paint-sink interface.
 
-- [ ] **ARC-25 · P0 · defect - `internal/css` retains every parsed document in a process-global cache**
+- [x] **ARC-25 · P0 · defect - `internal/css` retains every parsed document in a process-global cache**
       `internal/css/match.go:32-63`.
       `sibCache = make(map[*html.Node]*parentSibCache)` is package level and guarded by `sibMu`.
       `getParentCache` inserts and never deletes; no `delete`, `clear`, or reset exists. Keys are
@@ -119,7 +124,7 @@ Fix first. One row is one behavior defect with a current-source location.
 
 ### 1.2 Image mode drops advertised inputs
 
-- [ ] **ARC-26 · P1 · defect - Image mode silently ignores `--zoom`**
+- [x] **ARC-26 · P1 · defect - Image mode silently ignores `--zoom`**
       `internal/cli/flags.go:325`; `document.go:533`; `internal/imageout/imageout.go:251-269`;
       `internal/layout/layout.go:113`.
       The flag is registered `ModeBoth` (`flags.go:325`), `ImageDocument.Zoom` is public
@@ -131,7 +136,7 @@ Fix first. One row is one behavior defect with a current-source location.
       finite-positive rule. Proof: `TestRenderZoom` asserts a text op is twice as wide at zoom 2.
       Depends-on: none. Not: an `ImageGlobal.Zoom` field or copying smart-shrink into imageout.
 
-- [ ] **ARC-27 · P1 · defect - Image prepare viewport is in pixels where the media matcher expects points**
+- [x] **ARC-27 · P1 · defect - Image prepare viewport is in pixels where the media matcher expects points**
       `internal/imageout/imageout.go:1834-1860`; `internal/css/media.go:11-12`, `:153`;
       `internal/convert/convert.go:533-540`.
       Image mode passes `imageSet.Width` (CSS pixels, default 1024) straight into
@@ -149,7 +154,7 @@ Fix first. One row is one behavior defect with a current-source location.
       `(max-width: 1100px)` collected, `(min-width: 1100px)` skipped). Depends-on: none.
       Not: a second media matcher; the point contract is right, the caller is wrong.
 
-- [ ] **ARC-28 · P1 · defect - App image preflight misses dimensions, so a bad request truncates output first**
+- [x] **ARC-28 · P1 · defect - App image preflight misses dimensions, so a bad request truncates output first**
       `internal/app/image.go:38-61`; `internal/imageout/request.go:49-66`;
       `internal/imageout/imageout.go:129-136`; `internal/cli/cli.go:83-95`.
       `Request.Validate` checks sink, object count, and renderable sources only.
@@ -164,7 +169,7 @@ Fix first. One row is one behavior defect with a current-source location.
       `TestRunImageRejectsNegativeWidthBeforeOpeningOutput` with an existing output file and a
       content assertion. Depends-on: none. Not: a third copy of the check in `app` or `cli`.
 
-- [ ] **ARC-32 · P1 · defect - `web.images` is registered on three layers but gated on one each**
+- [x] **ARC-32 · P1 · defect - `web.images` is registered on three layers but gated on one each**
       `internal/settings/reflect.go:811-840`; `internal/convert/convert.go:559-560`, `:584`;
       `internal/imageout/imageout.go:1882-1884`.
       `registerWebKeys` registers `web.images` on the global, object, and `ImageGlobal` tables.
@@ -181,7 +186,7 @@ Fix first. One row is one behavior defect with a current-source location.
 
 ### 1.3 Pagination and parse ownership
 
-- [ ] **ARC-29 · P1 · defect - Multicol paginates against `Options.Height` while Paint paginates against page content height**
+- [x] **ARC-29 · P1 · defect - Multicol paginates against `Options.Height` while Paint paginates against page content height**
       `internal/layout/multicol.go:337`, `:552-566`; `internal/layout/paint.go:152`, `:170`;
       `internal/layout/layout.go:97-99`.
       `flowMulticolSegment` reads `pageH := e.opts.Height`, documented as "viewport height in points
@@ -197,7 +202,7 @@ Fix first. One row is one behavior defect with a current-source location.
       page-top hint that `paginateOps` consumes. Proof: `TestMulticolPageHeightMustMatchPaint`.
       Depends-on: none. Not: moving column balancing into Paint.
 
-- [~] **ARC-30 · P1 · risk - Three op-to-page bucketers and fourteen raw `int(Y/contentH)` copies disagree at boundaries**
+- [x] **ARC-30 · P1 · risk - Three op-to-page bucketers and fourteen raw `int(Y/contentH)` copies disagree at boundaries**
       `internal/layout/paint.go:305` (adds `layoutEpsilon`); `internal/layout/paint_flow_index.go:276`
       (no epsilon, read by every shift pass); `internal/layout/paint_pagination_seal.go:554`, `:559-561`.
       Raw `int(Y/contentH)` remains at `paint_flow_breaks.go:150-151,548,558,726,786,877,889`,
@@ -212,7 +217,7 @@ Fix first. One row is one behavior defect with a current-source location.
       boundary table test plus one golden with a split fill starting on a boundary, to pin the bias.
       Depends-on: none. Not: changing `checkedFlowPageOfY`'s `maxFlowPageIndex` guard.
 
-- [~] **ARC-31 · P1 · risk - CSS recursive parse/match has no depth bound and rescans nested functional pseudos quadratically**
+- [x] **ARC-31 · P1 · risk - CSS recursive parse/match has no depth bound and rescans nested functional pseudos quadratically**
       `internal/css/has.go:68-88`; `internal/css/selector_parser.go:397-410`, `:141-146`, `:317-327`;
       `internal/css/container.go:288-394`; `internal/css/css.go:613-705`.
       `parseSelectorListStrict` calls `parseSelectorCtx`, which reaches `appendNotPseudo` /
@@ -228,7 +233,7 @@ Fix first. One row is one behavior defect with a current-source location.
       `TestParseNestedFunctionalPseudoDepth` with a bounded timeout. Depends-on: none.
       Not: a tokenizer rewrite or a byte-size check inside `css`; size belongs to load/prepare.
 
-- [ ] **ARC-33 · P2 · defect - The `inline:` loader branch bypasses the body size cap**
+- [x] **ARC-33 · P2 · defect - The `inline:` loader branch bypasses the body size cap**
       `internal/load/load.go:966-987` versus `:920-923`.
       The `InlineHTML` branch calls `checkBodyLimit`, and `data:` uses `decodeDataURLLimited`, but
       `strings.HasPrefix(target, "inline:")` builds a `Resource` with the caller's bytes and no cap.
@@ -242,7 +247,7 @@ Fix first. One row is one behavior defect with a current-source location.
 
 One owner per rule. Behavior already works on the happy path.
 
-- [ ] **ARC-34 · P2 · defect - `font` shorthand bypasses cascade precedence and the apply tables already disagree**
+- [x] **ARC-34 · P2 · defect - `font` shorthand bypasses cascade precedence and the apply tables already disagree**
       `internal/layout/style_cascade.go:551-588` (expansions), `:915-930` (`font` always applied
       last), `:1002-1012` and `:1042-1052` (two hand-maintained lists);
       `internal/layout/style_values.go:47-77` (`parseFontShorthand` overwrites longhands).
@@ -257,7 +262,7 @@ One owner per rule. Behavior already works on the happy path.
       following the shape of `TestCascadeShorthandRespectsSourceOrder`. Depends-on: none.
       Not: a visitor or registry framework for CSS properties.
 
-- [ ] **ARC-35 · P2 · defect - Pseudo-element styles skip custom property resolution**
+- [x] **ARC-35 · P2 · defect - Pseudo-element styles skip custom property resolution**
       `internal/layout/pseudo_content.go:96-116`; `internal/layout/style.go:742-743`;
       `internal/layout/style_cascade.go:543-548`.
       The element path does `sty.CustomProps = mergeCustomProps(...)` and
@@ -270,7 +275,7 @@ One owner per rule. Behavior already works on the happy path.
       shared by element and pseudo paths. Proof: `TestPseudoElementResolvesCustomProperties`.
       Depends-on: none. Not: a plugin for generated content.
 
-- [ ] **ARC-36 · P2 · defect - Link and `@import` media gate against pre-`@page` geometry while rule media uses post-`@page` geometry**
+- [x] **ARC-36 · P2 · defect - Link and `@import` media gate against pre-`@page` geometry while rule media uses post-`@page` geometry**
       `internal/convert/convert.go:527-557`; `internal/convert/prepare/styles.go:119`, `:200-205`,
       `:362-371`; `internal/layout/style_cascade.go:359`; `internal/convert/hf.go:356`.
       Prepare gates linked and imported sheets with the viewport captured before
@@ -284,7 +289,7 @@ One owner per rule. Behavior already works on the happy path.
       feature queries. Proof: `TestLinkMediaGateUsesFinalPageBox`. Depends-on: none.
       Not: deleting link gating (it saves fetches) or moving `@page` handling into `css`.
 
-- [ ] **ARC-37 · P2 · defect - Auto-height bottom chrome has five homes and they already disagree**
+- [x] **ARC-37 · P2 · defect - Auto-height bottom chrome has five homes and they already disagree**
       `internal/layout/layout.go:1487-1501`; `internal/layout/flex.go:95-97`;
       `internal/layout/multicol.go:227-231`; `internal/layout/grid.go:684-710`;
       `internal/layout/layout_tables.go:97`; `internal/layout/layout_measure.go:740`.
@@ -297,7 +302,7 @@ One owner per rule. Behavior already works on the happy path.
       Proof: `TestAutoHeightIncludesBottomBorder` comparing block and grid and checking the next
       sibling's top. Depends-on: none. Not: a new formatting-context abstraction or `layout/flex`.
 
-- [ ] **ARC-38 · P2 · defect - "Op owned by this box" is derived three ways; chrome repair does not know outline shapes**
+- [x] **ARC-38 · P2 · defect - "Op owned by this box" is derived three ways; chrome repair does not know outline shapes**
       `internal/layout/paint_pagination_chrome.go:345-353`;
       `internal/layout/overflow_clip.go:226-272`;
       `internal/layout/paint_pagination_seal.go:1237-1255`;
@@ -311,7 +316,7 @@ One owner per rule. Behavior already works on the happy path.
       and shadow shapes, called by all three passes. Proof: `TestOutlineDoesNotStretchOwnedChrome`.
       Depends-on: none. Not: a `chromeKind` bitfield on every op or a paint-sink interface.
 
-- [ ] **ARC-40 · P2 · defect - Op-radius resolution has a second, unscaled home in imageout**
+- [x] **ARC-40 · P2 · defect - Op-radius resolution has a second, unscaled home in imageout**
       `internal/imageout/imageout.go:1234-1272`; `internal/layout/paint.go:1114-1120`;
       `internal/layout/border_radius.go:340-372`.
       Layout owns `opRadii`, `opRadiiY`, and `opRadiiXY`; imageout reimplements shorthand and XY
@@ -323,7 +328,7 @@ One owner per rule. Behavior already works on the happy path.
       shorthand, corner longhand, and Y-only ops. Depends-on: none.
       Not: moving raster paint into layout or a paint-sink interface.
 
-- [ ] **ARC-43 · P2 · friction - Two ways to substitute a node's style, and six readers bypass the documented one**
+- [x] **ARC-43 · P2 · friction - Two ways to substitute a node's style, and six readers bypass the documented one**
       `internal/layout/layout.go:1124-1138` (`stylePtr`, `styleOverrides`), `:514-518`;
       `internal/layout/flex.go:136-141`, `:140`, `:1139`, `:1528`;
       `internal/layout/multicol.go:163`; `internal/layout/layout_measure.go:413-419`;
@@ -338,7 +343,7 @@ One owner per rule. Behavior already works on the happy path.
 
 ## Phase 3: Contracts and locality
 
-- [ ] **ARC-39 · P2 · defect - Heading-to-`StructElem` identity is rebuilt by callers with two index schemes**
+- [x] **ARC-39 · P2 · defect - Heading-to-`StructElem` identity is rebuilt by callers with two index schemes**
       `internal/pdf/structure.go:221`; `internal/convert/links.go:204-208`;
       `internal/convert/outline.go:226-244`.
       `HeadingStructElems` returns a flat document-order slice. `links.go` zips it with headings and
@@ -353,7 +358,7 @@ One owner per rule. Behavior already works on the happy path.
       Proof: `TestTOCLinkStructDestIdentity` under UA-2 with a cover h1 and TOC forward links.
       Depends-on: none. Not: a structure-tree visitor framework.
 
-- [ ] **ARC-41 · P2 · defect - `SetInfo("Producer", ...)` is documented but finalize overwrites it**
+- [x] **ARC-41 · P2 · defect - `SetInfo("Producer", ...)` is documented but finalize overwrites it**
       `internal/pdf/pdf.go:267`, `:1014-1020`; `internal/convert/pdf_pipeline.go:198`.
       `SetInfo` accepts any key; `infoDict` writes a fixed list plus `/Producer` from
       `policy.ProducerVersion()`. The only production `SetInfo` call besides Title sets Producer,
@@ -364,7 +369,7 @@ One owner per rule. Behavior already works on the happy path.
       the dead call. Proof: `TestSetInfoProducer` asserts `/Producer (x)` after `SetInfo`.
       Depends-on: none. Not: a second metadata subsystem or typed Info hierarchy.
 
-- [ ] **ARC-44 · P2 · defect - Finite setters admit NaN and Inf, so CLI values fail after the output is opened**
+- [x] **ARC-44 · P2 · defect - Finite setters admit NaN and Inf, so CLI values fail after the output is opened**
       `internal/settings/reflect.go:312-327`; `internal/settings/unitreal.go:51-56`;
       `document_validate.go:222-228`; `internal/layout/layout.go:127-133`;
       `internal/app/pdf.go:88-99`.
@@ -377,7 +382,7 @@ One owner per rule. Behavior already works on the happy path.
       `Set("load.zoomfactor","NaN")` and `Set("margin.top","Inf")` error.
       Depends-on: none. Not: patching every flag applier.
 
-- [ ] **ARC-45 · P2 · defect - Root Document margins reject the `-1` auto margin the engine and CLI honor**
+- [x] **ARC-45 · P2 · defect - Root Document margins reject the `-1` auto margin the engine and CLI honor**
       `document_validate.go:200-208`; `internal/convert/hf.go:686-710`;
       `internal/settings/reflect.go:442-472`; `document_test.go:223-224`; `samples.md:62`.
       `validateMargins` requires finite non-negative values, but `hf.effectiveMargins` treats
@@ -392,7 +397,7 @@ One owner per rule. Behavior already works on the happy path.
 
 ## Phase 4: Docs honesty
 
-- [ ] **ARC-42 · P3 · friction - Architecture docs contradict current source after the 0.2.6 splits**
+- [x] **ARC-42 · P3 · friction - Architecture docs contradict current source after the 0.2.6 splits**
       `documentation/architecture/09-pdf-writer.md:361-366` claims `internal/pdf` imports only
       stdlib, shaping, assets, and `pdfprofile`, but `internal/pdf/registry.go:11-12` imports
       `internal/settings` and `internal/line` (the `RegistryFromGlobal` exception that ARC-18 made
@@ -414,16 +419,15 @@ One owner per rule. Behavior already works on the happy path.
 This wave is documentation-only, so no lint or test row is checked here. The rows below activate
 when any named ID is implemented.
 
-- [ ] **GATE-01** Before closing any non-doc row, record `make lint` and `make test` exit 0 on the
-      final implementation. Leave the row unchecked if either fails.
+- [x] **GATE-01** `make lint` and `make test` exited 0 on the final implementation (2026-09-10).
+      golangci-lint v1.64.8 and the frontend ESLint both passed.
 
-- [ ] **GATE-02** Layout, paint, and pagination rows (ARC-29, ARC-30, ARC-37, ARC-38, ARC-43) also
-      pass `go test ./internal/layout/ -count=1` and
-      `go test ./internal/convert -run 'TestGoldenCorpus' -count=1`; run `make golden` when a
-      fixture or paint op changes.
+- [x] **GATE-02** Layout, paint, and pagination rows (ARC-29, ARC-30, ARC-37, ARC-38, ARC-43) also
+      passed `go test ./internal/layout/ -count=1` and `make golden` (all fixtures), including the
+      fixture-56 envelope update to 21 pages.
 
-- [ ] **GATE-03** Rows that add a golden fixture (none planned here) need a `fixturePageBounds` row
-      in `internal/convert/golden_test.go` or the walker fatals.
+- [x] **GATE-03** No new golden fixture was added. The existing fixture-56 `fixturePageBounds` row
+      was updated from 20 to 21 for the ARC-37 border-box change and the walker passes.
 
 ## Dependencies
 
@@ -446,8 +450,8 @@ ARC-41/42/44/45 (contracts) -- independent
 GATE-01..03                 -- after any implementation, before any [x]
 ```
 
-Suggested first slice: ARC-24, ARC-25, ARC-28, then the image input cluster (ARC-26, ARC-27,
-ARC-32). Close both P0s before any P2.
+First slice (completed 2026-09-10): ARC-24, ARC-25, ARC-28, then the image input cluster
+(ARC-26, ARC-27, ARC-32). Both P0s closed before any P2.
 
 ## Refused
 
@@ -504,12 +508,69 @@ Re-open only when a named ID touches the same file and the parked item blocks it
 - P2 rows were spot-checked where the fix shape depended on it: `font` apply order
   (`style_cascade.go:915-930`), pseudo custom properties (`pseudo_content.go:96-116`), style
   overrides versus direct map reads (`layout.go:1124-1138`, `flex.go:140`, `multicol.go:163`).
-- This is a documentation-only wave. Per `skills/phase-wise-checklist/SKILLS.md`, lint and test
-  were not run and GATE rows stay unchecked.
+- The review wave itself was documentation-only. The implementation wave that followed ran the
+  full gates on the final tree and the results are recorded below.
+
+## Wave execution record (2026-09-10)
+
+Implemented on `chore/review-026`. Each row below is one proof that was run and passed on the final
+tree. The full gate set follows the table.
+
+| Row | Proof run | Result |
+|-----|-----------|--------|
+| ARC-24 | `TestBodyLinkDestRemapCopiesNonCollate`, `TestTOCLinkDestRemapCopiesNonCollate` (convert); `TestLinkDestSurvivesReorder` (pdf) | pass |
+| ARC-25 | `TestSiblingCacheIsBounded` | pass |
+| ARC-26 | `TestRenderZoom`, `TestRenderOptionsValidateZoom` | pass |
+| ARC-27 | `TestResolveImageViewport`, `TestPrepareImageDocumentLinkMediaUsesLayoutViewport` | pass |
+| ARC-28 | `TestRunImageRejectsNegativeWidthBeforeOpeningOutput` | pass |
+| ARC-29 | `TestMulticolPageHeightMustMatchPaint` | pass |
+| ARC-30 | `TestPageBoundaryBucketersAgree` (failed before the fix: 20 vs 21 at near-boundary Y) | pass |
+| ARC-31 | `TestParseNestedFunctionalPseudoDepth`, `TestParseDepthGuardCoversContainerAndAtRules` (probe: 10s timeout before, 5ms after) | pass |
+| ARC-32 | `TestResolveImages` (settings), `TestRunRequestObjectWebImagesFalseDisablesFetch`, `TestRunRequestGlobalWebImagesGateControlsFetch` (imageout), `TestImagesFlagsReachResolvedGate` (cli), `TestRunPDFObjectWebImagesGate` (convert) | pass |
+| ARC-33 | `TestInlinePrefixHonorsBodyLimit` | pass |
+| ARC-34 | `TestFontLonghandAfterShorthandWins` | pass |
+| ARC-35 | `TestPseudoElementResolvesCustomProperties` | pass |
+| ARC-36 | `TestLinkMediaGateUsesFinalPageBox` | pass |
+| ARC-37 | `TestAutoHeightIncludesBottomBorder` | pass |
+| ARC-38 | `TestOutlineDoesNotStretchOwnedChrome` | pass |
+| ARC-39 | `TestTOCLinkStructDestIdentity` | pass |
+| ARC-40 | `TestOpRadiiXYParity` (layout), `TestScaledRadiiXYParity` (imageout) | pass |
+| ARC-41 | `TestSetInfoProducer` | pass |
+| ARC-42 | contradicted claims re-grepped against source; `make claim-scan` clean | pass |
+| ARC-43 | `TestStyleOverrideReachesFlexMeasurement`; production `rg '\.styles\['` returns only store writers | pass |
+| ARC-44 | `TestFiniteSetters` | pass |
+| ARC-45 | `TestDocumentAutoMargin`, `TestMarginSetterAutoAndSides` | pass |
+
+Final gates on the frozen tree:
+
+- `make test`: exit 0, all packages.
+- `make golden`: exit 0, all golden fixtures plus the three classic corpus cases.
+- `make claim-scan`: clean.
+- `make lint`: exit 0, golangci-lint v1.64.8 plus the frontend ESLint.
+
+Deviations and notes:
+
+- ARC-24 landed at the writer level: link annotations hold a destination page handle that
+  `DuplicatePage` and `ReorderPages` re-aim per copy, instead of threading `pagePlan.Remap` through
+  the link passes. Both the body and TOC copy tests pass.
+- ARC-32 added the `--images` / `--no-images` CLI pair (ModeBoth) and folded the object layer into
+  the PDF gate; image mode already folded global, image, and object layers.
+- ARC-36 resolves inline `@page` geometry before gating link and `@import` media, so size features
+  evaluate against the same viewport the cascade uses.
+- ARC-39 uses one shared page-identity rule in convert. Same-page cover and body headings remain
+  ambiguous because identity is not stamped in `internal/layout/tagging.go`; recorded as a known
+  limitation rather than claimed away.
+- ARC-41 makes a caller-set Producer win with the policy value as fallback. Info `/Producer` and XMP
+  `pdf:Producer` can now differ for converted PDFs; the XMP side still reports the version.
+- fixture-56 moved from 20 to 21 pages because auto-height flex containers now include a real
+  bottom border (ARC-37 border-box semantics). A bisect named `flex.go` as the cause, and an audit
+  of all 61 fixtures found 256 border additions across the corpus, none with `border-style: none`.
+  The `fixturePageBounds` row was updated to 21 with a comment.
 
 ## What this wave did not do
 
-- No implementation, no commits, no history changes.
+- The review wave itself changed no code. Implementation landed in the same branch as a separate
+  wave on 2026-09-10; this ledger records both.
 - Only the architecture-deepening lens ran. The pack's extension-seams and go-practices lenses,
   plus perf-review, ponytail, and critical-go-review, were not run in this wave.
 - No second status document beside this ledger and its README entry. The HTML report beside this

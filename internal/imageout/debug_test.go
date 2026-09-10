@@ -7,7 +7,7 @@ import (
 
 func TestDebugDataURIRegion(t *testing.T) {
 	t.Parallel()
-	raw := redPNG(t, 16, 16)
+	raw := redPNG(t)
 	src := `<html><body><img src="data:image/png;base64,` +
 		base64.StdEncoding.EncodeToString(raw) + `"></body></html>`
 

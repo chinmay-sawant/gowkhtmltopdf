@@ -138,7 +138,7 @@ resolution), `internal/layout/mnd_const.go:62` (`svgRasterMax = 1024`),
 | `RenderObjects` | `imageout.go:1162` | `prepareImageDocument` → fetch func → `RenderContext`; stores the `image.Image` |
 | `Finalize` / `writeEncodedOutput` | `imageout.go:1209/1215` | Resolve format, composite transparent canvas onto white for JPEG (`onWhite`), encode, write to `req.Output` |
 | `prepareImageDocument` | `imageout.go` | Resolves media + SimplifyDOM profile, runs `prepare.Document` with `defaultViewportW/H = 768×576` |
-| `makeImageFetcher` | `imageout.go` | Wraps `prep.Resources.Fetch` with the `--no-images` gate and a bounded byte cache (64 fetches / 32 MiB) |
+| `makeImageFetcher` | `imageout.go` | Wraps `prep.Resources.Fetch` with the `settings.ResolveImages` gate (`--images` / `--no-images` write global `web.images`) and a bounded byte cache (64 fetches / 32 MiB) |
 | `fontRegistry` | `imageout.go` | Builds `pdf.Registry` from global `FontPaths` + system dirs (`ScanFontDirs`); nil when nothing to scan |
 | `imageLoadGlobal` | `imageout.go` | ACL merge: `Image.Load` ⊕ `Global.Load.Allow` / `EnableLocalFileAccess` before `load.NewLoader` |
 | `imageout.Request` / `NewRequest` / `Validate` | `request.go` | Exactly one renderable object + non-nil `Output`; multiple objects are an error (`ErrMultipleInputs`), not “ignore extras” |
@@ -202,7 +202,7 @@ RenderObjects
  │           → *prepare.Prepared{Root, Sheets, Resources, Registry}
  │    (prep.Resource.Skip  →  error "load-error policy is skip; nothing to render")
  ├─ makeImageFetcher(ctx, imgSet, prep, cache)
- │    └─ --no-images gate (errImagesDisabled) → prep.Resources.Fetch (bounded cache)
+ │    └─ ResolveImages gate: global && image && object (errImagesDisabled) → prep.Resources.Fetch (bounded cache)
  ├─ printLinkUnderline = Image|Global|Object Web flag OR
  └─ RenderContext(ctx, prep.Root, RenderOptions{Width, Height, Font, Registry,
       Sheets, Media, Images, Background, Transparent, Crop, SmartWidth, ...})

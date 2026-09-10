@@ -92,7 +92,9 @@ func (e *engine) pseudoStyleContext() *styleContext {
 
 // pseudoStyle resolves the used style of generated content against the host
 // style. Generated content inherits from its host, then applies declarations
-// from the matching pseudo-element rules.
+// from the matching pseudo-element rules through the same raw-to-used
+// sequence as elements, so custom properties and var() references resolve
+// here too.
 func (e *engine) pseudoStyle(node *html.Node, pseudoEl string, host ResolvedStyle) *ResolvedStyle {
 	if e == nil || node == nil {
 		return &host
@@ -105,12 +107,9 @@ func (e *engine) pseudoStyle(node *html.Node, pseudoEl string, host ResolvedStyl
 		return e.stylePtr(node)
 	}
 
-	sty := initialStyle()
-	inheritProps(&sty, &host, raw)
-	applyFontProps(&sty, raw, host.FontSize, ctx)
-	applyRestProps(&sty, raw, ctx, &host)
-	inheritUnitlessLineHeight(&sty, &host, raw)
-	sty.famHash = hashFontFamily(sty.FontFamily)
+	var sty ResolvedStyle
+
+	applyRawToUsed(nil, ctx, &host, &sty, raw)
 
 	return &sty
 }

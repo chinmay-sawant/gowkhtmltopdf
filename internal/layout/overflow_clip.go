@@ -197,7 +197,7 @@ func (e *engine) clipOwnContentOps(ops []Op, boxNode *box, clip clipRect) {
 	}
 
 	for i := boxNode.opStart; i <= boxNode.opEnd && i < len(ops); i++ {
-		if opInChildRange(boxNode, i) || e.isOwnChromeOp(&ops[i], boxNode) {
+		if opInChildRange(boxNode, i) || opOwnedBy(&ops[i], boxNode, opOwnerClip) {
 			continue
 		}
 
@@ -221,54 +221,6 @@ func opInChildRange(boxNode *box, idx int) bool {
 	}
 
 	return false
-}
-
-func (e *engine) isOwnChromeOp(op *Op, boxNode *box) bool {
-	if op == nil || boxNode == nil {
-		return false
-	}
-
-	switch op.Kind {
-	case OpFillRect, OpStrokeRect:
-		return nearRectOp(op, boxNode.x, boxNode.y, boxNode.w, boxNode.height)
-	case OpLine:
-		if lineOnRectEdges(op, boxNode.x, boxNode.y, boxNode.w, boxNode.height) {
-			return true
-		}
-
-		return e.isOwnOutlineLine(op, boxNode)
-	case OpText, OpImage, OpLinkURI, OpBullet, OpUnknown, opKindNoop:
-		return false
-	default:
-		return false
-	}
-}
-
-func (e *engine) isOwnOutlineLine(op *Op, boxNode *box) bool {
-	if e == nil || op == nil || boxNode == nil || boxNode.style == nil || !outlinePaints(boxNode.style) {
-		return false
-	}
-
-	ow := e.scalePt(boxNode.style.OutlineWidth)
-	off := e.scalePt(boxNode.style.OutlineOffset)
-	inflate := outlineInflate(ow, off)
-
-	return lineOnRectEdges(
-		op,
-		boxNode.x-inflate, boxNode.y-inflate,
-		boxNode.w+2*inflate, boxNode.height+2*inflate,
-	)
-}
-
-func nearRectOp(op *Op, x, y, w, h float64) bool {
-	if op == nil {
-		return false
-	}
-
-	return math.Abs(op.X-x) <= clipPointTolerance &&
-		math.Abs(op.Y-y) <= clipPointTolerance &&
-		math.Abs(op.W-w) <= clipPointTolerance &&
-		math.Abs(op.H-h) <= clipPointTolerance
 }
 
 func lineOnRectEdges(op *Op, x, y, w, h float64) bool {

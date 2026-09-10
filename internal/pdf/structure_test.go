@@ -879,7 +879,7 @@ func TestAnnotationComplianceFlagsAndOBJR(t *testing.T) {
 	mcid1 := page.AllocMCID(linkElem1)
 
 	// Add dest annotation and attach via AddAnnot
-	ref2 := page.AddLinkDest([4]float64{50, 300, 200, 320}, 0, 50, 700)
+	ref2 := page.AddLinkDest([4]float64{50, 300, 200, 320}, page, 50, 700)
 	linkElem2 := docElem.NewChild(StructTypeLink)
 	linkElem2.AddAnnot(ref2, page)
 	mcid2 := page.AllocMCID(linkElem2)

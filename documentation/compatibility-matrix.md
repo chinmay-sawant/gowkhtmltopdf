@@ -608,7 +608,7 @@ They fail parse with `unknown option` (`TestStubFlagsRemoved`,
 |------|------|--------|
 | `--enable-javascript`, `--disable-javascript` | Both | **Rejected** (`unknown option`; no JS engine) |
 | `--allow-local-files`, `--no-allow-local-files` | Both | Supported (local-file ACL; security policy §6 + golden runner) |
-| `--allow` | PDF | Supported (ACL allow-prefix list). **Not registered** in image mode |
+| `--allow` | Both | Supported (ACL allow-prefix list; `flags.go` registers it `ModeBoth` and `ResolveEffectiveLoadGlobal` folds global prefixes into image mode) |
 | `--restrict-network` | Both | Supported (`RestrictedNetworkPolicy`: block private destinations and cross-host redirects) |
 | `--allow-host` | Both | Supported (exact or `*.example.com` host allowlist; exact entries may skip the private-IP check) |
 | `--background`, `--no-background` | Both | Supported (paint gate; golden runner sets it on) |

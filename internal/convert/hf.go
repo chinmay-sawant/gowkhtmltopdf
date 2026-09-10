@@ -357,6 +357,9 @@ func loadHTMLHF(ctx context.Context, loader *load.Loader, font *pdf.Font, state 
 		ViewportH:   state.geom.contentH,
 		MediaType:   media,
 		ObjectIndex: state.idx + 1,
+		// Header/footer geometry is already post-@page, so there is no inline
+		// sheet pre-pass that would re-resolve the page box.
+		PageBoxViewport: nil,
 	}, log)
 
 	reg := resources.MergeFontFaces(ctx, state.registry, sheets, state.idx+1, log)
@@ -622,7 +625,7 @@ func paintLayoutOps(ctx context.Context, page *pdf.Page, c *pdf.Content, ops []l
 			}
 
 			dx, dy := dest.st.geom.pdfXY(dest.loc)
-			_ = page.AddLinkDest(rect, destPage, dx, dy)
+			_ = page.AddLinkDest(rect, page.Doc().PageAt(destPage), dx, dy)
 
 			continue
 		}

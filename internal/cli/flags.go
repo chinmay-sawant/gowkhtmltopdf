@@ -279,7 +279,7 @@ func addLocalAccessFlags(add flagAdder) {
 }
 
 // addWebPageFlags registers the web engine flags (simplify-dom, link
-// underline, print media type) routed global+object.
+// underline, print media type, image fetching) and their settings routes.
 func addWebPageFlags(add flagAdder) {
 	// Opt-in chrome-strip for arbitrary websites (phase 21.4). Default off.
 	// Distinct from --print-media-type (PDF layout always uses Media:"print").
@@ -316,6 +316,15 @@ func addWebPageFlags(add flagAdder) {
 			func(o *settings.PdfObject, val string) error { return o.Set("load.mediatype", val) },
 			vals[0],
 		)
+	})
+	// Image fetch switch (wkhtmltopdf pair). Both engines gate fetches on the
+	// folded web.images layers via settings.ResolveImages, so one global write
+	// dominates a mixed set; negBool keeps --no-images=false meaningful.
+	add("images", ModeBoth, flagBool, func(c *Command, _ *objectCtx, vals []string) error {
+		return c.Global.Set("web.images", vals[0])
+	})
+	add("no-images", ModeBoth, flagBool, func(c *Command, _ *objectCtx, vals []string) error {
+		return c.Global.Set("web.images", negBool(vals[0]))
 	})
 }
 

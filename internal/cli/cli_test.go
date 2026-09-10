@@ -227,6 +227,37 @@ func TestBooleanAndShortFlagSyntax(t *testing.T) {
 	}
 }
 
+func TestImagesFlagsReachResolvedGate(t *testing.T) {
+	t.Parallel()
+
+	for _, mode := range []Mode{ModePDF, ModeImage} {
+		cmd, err := Parse([]string{"--no-images", "-o", outPDF, "input.html"}, mode)
+		if err != nil {
+			t.Fatalf("Parse mode %v: %v", mode, err)
+		}
+
+		if cmd.Global.Web.Images {
+			t.Errorf("mode %v: --no-images left Global.Web.Images true", mode)
+		}
+
+		// settings.ResolveImages is the layer fold the engine fetch gates
+		// call; one disabled layer must disable the gate.
+		if settings.ResolveImages(cmd.Global.Web, &cmd.Image, &cmd.Objects[0]) {
+			t.Errorf("mode %v: resolved images gate stayed enabled", mode)
+		}
+	}
+
+	cmd := parsePDF(t, "--no-images", "--images", "-o", outPDF, "input.html")
+	if !cmd.Global.Web.Images {
+		t.Error("--images after --no-images must re-enable images")
+	}
+
+	cmd = parsePDF(t, "--no-images=false", "-o", outPDF, "input.html")
+	if !cmd.Global.Web.Images {
+		t.Error("--no-images=false must re-enable images")
+	}
+}
+
 func TestHelpUsesDocumentGrammar(t *testing.T) {
 	t.Parallel()
 

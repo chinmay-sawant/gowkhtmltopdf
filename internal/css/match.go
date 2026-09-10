@@ -29,37 +29,91 @@ type parentSibCache struct {
 	total       int
 }
 
-var (
-	sibMu    sync.RWMutex                           //nolint:gochecknoglobals // guards the sibling cache below
-	sibCache = make(map[*html.Node]*parentSibCache) //nolint:gochecknoglobals // process-wide sibling index cache
-)
+// sibCacheCap bounds the process-global sibling index cache. Entries are a
+// rebuild-on-demand optimization, so the cap only guarantees a long-lived
+// process cannot retain node-keyed indexes from every document it ever matched.
+const sibCacheCap = 256
+
+// siblingCache is a small LRU of parent -> sibling index. A hit moves the
+// entry to the most-recent position; overflow evicts the least-recent one.
+type siblingCache struct {
+	mu      sync.Mutex
+	entries map[*html.Node]*parentSibCache
+	order   []*html.Node
+}
+
+func newSiblingCache() *siblingCache {
+	return &siblingCache{ //nolint:exhaustruct // zero-value mutex is intentional
+		entries: make(map[*html.Node]*parentSibCache, sibCacheCap),
+		order:   make([]*html.Node, 0, sibCacheCap),
+	}
+}
+
+func (c *siblingCache) get(parent *html.Node) *parentSibCache {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	cached, ok := c.entries[parent]
+	if !ok {
+		return nil
+	}
+
+	for i, key := range c.order {
+		if key == parent {
+			c.order = append(c.order[:i], c.order[i+1:]...)
+
+			break
+		}
+	}
+
+	c.order = append(c.order, parent)
+
+	return cached
+}
+
+// putIfAbsent stores cached for parent unless another builder already stored
+// an entry; the cache always keeps the first value stored for a key.
+func (c *siblingCache) putIfAbsent(parent *html.Node, cached *parentSibCache) *parentSibCache {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if existing, ok := c.entries[parent]; ok {
+		return existing
+	}
+
+	if len(c.order) >= sibCacheCap {
+		oldest := c.order[0]
+		c.order = c.order[1:]
+		delete(c.entries, oldest)
+	}
+
+	c.entries[parent] = cached
+	c.order = append(c.order, parent)
+
+	return cached
+}
+
+// size reports how many parent indexes the cache holds; tests assert the bound.
+func (c *siblingCache) size() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return len(c.entries)
+}
+
+//nolint:gochecknoglobals // process-wide sibling index cache
+var sibCache = newSiblingCache()
 
 func getParentCache(parent *html.Node) *parentSibCache {
 	if parent == nil {
 		return nil
 	}
 
-	sibMu.RLock()
-	cached := sibCache[parent]
-	sibMu.RUnlock()
-
-	if cached != nil {
+	if cached := sibCache.get(parent); cached != nil {
 		return cached
 	}
 
-	cached = buildParentCache(parent)
-
-	sibMu.Lock()
-	if existing := sibCache[parent]; existing != nil {
-		sibMu.Unlock()
-
-		return existing
-	}
-
-	sibCache[parent] = cached
-	sibMu.Unlock()
-
-	return cached
+	return sibCache.putIfAbsent(parent, buildParentCache(parent))
 }
 
 func buildParentCache(parent *html.Node) *parentSibCache {

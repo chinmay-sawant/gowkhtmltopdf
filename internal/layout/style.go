@@ -724,12 +724,18 @@ func (s *styleStore) append(style ResolvedStyle) *ResolvedStyle {
 // zeroResolvedStyle is the empty style for comment/doctype nodes (shared).
 var zeroResolvedStyle ResolvedStyle //nolint:gochecknoglobals // immutable zero sentinel
 
-// resolveElementStyle cascades one element: inheritance, custom properties,
-// fonts, the remaining properties, and the operator/blockify policies.
-func resolveElementStyle(
-	node *html.Node, ctx *styleContext, parent, sty *ResolvedStyle,
+// applyRawToUsed turns a cascade raw map into a used ResolvedStyle. Element
+// and pseudo-element resolution share this sequence so neither path can skip
+// custom-property inheritance or var() substitution: inheritProps copies
+// inherited properties, mergeCustomProps folds in the node's custom
+// properties, resolveRawVars substitutes var() references, then the font,
+// remaining, and unitless line-height passes run. node is nil for generated
+// content (no html rem-base update).
+//
+//nolint:wsl // the raw-to-used sequence mirrors CSS inheritance order.
+func applyRawToUsed(
+	node *html.Node, ctx *styleContext, parent *ResolvedStyle, sty *ResolvedStyle, raw map[string]string,
 ) {
-	raw := cascadeRaw(ctx, node)
 	*sty = initialStyle()
 
 	var parentProps map[string]string
@@ -749,15 +755,29 @@ func resolveElementStyle(
 
 	applyFontProps(sty, raw, parentSize, ctx)
 
-	if node.Name == "html" && sty.FontSize > 0 {
+	if node != nil && node.Name == "html" && sty.FontSize > 0 && ctx != nil {
 		ctx.remBase = sty.FontSize
 	}
 
 	applyRestProps(sty, raw, ctx, parent)
 	inheritUnitlessLineHeight(sty, parent, raw)
+	// FontFamily is final here (inherited, or parsed by applyFontProps /
+	// parseFontShorthand); fingerprint it once so inline text measurement
+	// does not re-hash the family list per run.
+	sty.famHash = hashFontFamily(sty.FontFamily)
+}
+
+// resolveElementStyle cascades one element: the shared raw-to-used sequence
+// plus the operator and blockify policies.
+func resolveElementStyle(
+	node *html.Node, ctx *styleContext, parent, sty *ResolvedStyle,
+) {
+	raw := cascadeRaw(ctx, node)
+	applyRawToUsed(node, ctx, parent, sty, raw)
+
 	// Opt-in operator policy (--print-link-underline): underline
-	// anchors with href after the cascade. Default off — author CSS
-	// (including text-decoration: inherit → parent) wins otherwise.
+	// anchors with href after the cascade. Default off so author CSS
+	// (including text-decoration: inherit from the parent) wins otherwise.
 	if ctx != nil && ctx.printLinkUnderline && node.Name == "a" && strings.TrimSpace(node.Attribute("href")) != "" {
 		sty.TextDecoration = cssTextDecorationUnderline
 	}
@@ -767,10 +787,6 @@ func resolveElementStyle(
 	if sty.Float != cssDisplayNone {
 		sty.Display = blockifyDisplayForFloat(sty.Display)
 	}
-	// FontFamily is final here (inherited, or parsed by applyFontProps /
-	// parseFontShorthand); fingerprint it once so inline text measurement
-	// does not re-hash the family list per run.
-	sty.famHash = hashFontFamily(sty.FontFamily)
 }
 
 // hasExplicitLineHeight reports whether a declaration sets line-height either

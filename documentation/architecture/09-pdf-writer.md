@@ -347,6 +347,11 @@ ensureFont(fnt, name, used)
 - **`internal/pdf/assets`** (embedded font bytes) and **`internal/pdfprofile`**
   (canonical profile tokens / aliases; `policy.go` re-exports). No new
   flavours live in the writer.
+- **`internal/line` and `internal/settings`, in `registry.go` only**: the one
+  deliberate exception. `RegistryFromGlobal` (`registry.go:364`) reads the
+  font-path policy from `settings.PdfGlobal`, and `LogFontRegistryScan`
+  (`registry.go:32`) emits the scan notice through `line.Emit`
+  (`registry.go:11-12`). No other file in the package imports either module.
 
 ### What depends on `internal/pdf`
 
@@ -362,13 +367,17 @@ Non-test importers:
 
 `internal/pdf` sits below `layout` / `convert` and imports only stdlib, the
 one allowlisted shaping module, `internal/pdf/assets`, and the
-`internal/pdfprofile` leaf. Nothing inside `internal/pdf` knows HTML, CSS,
-settings, or CLI. `Get("pdfprofile")` canonicalization lives in
-`internal/settings` (stores `pdfprofile.Parse` output). Any change to the
+`internal/pdfprofile` leaf. The single deliberate exception is
+`registry.go:11-12`, which imports `internal/line` and `internal/settings` for
+`RegistryFromGlobal` (`registry.go:364`) and `LogFontRegistryScan`
+(`registry.go:32`): font-path policy lives in `settings.PdfGlobal` and the
+scan notice is emitted through `internal/line`. No other file in the package
+knows HTML, CSS, settings, or CLI. `Get("pdfprofile")` canonicalization lives
+in `internal/settings` (stores `pdfprofile.Parse` output). Any change to the
 paint surface (`Content` API) ripples into `layout/paint.go` and, for fonts
 and shaping, into `imageout`. The unit-test files inside the package may
 also be imported by other packages' tests (e.g. layout golden tests construct
-`pdf.Document`s directly) — a sign the package is the shared writer/test
+`pdf.Document`s directly), a sign the package is the shared writer/test
 foundation.
 
 ## 6. Design decisions & trade-offs

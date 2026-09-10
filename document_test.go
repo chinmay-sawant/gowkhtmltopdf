@@ -220,13 +220,27 @@ func TestDocumentValidate(t *testing.T) {
 			want:     []error{ErrInvalidDimensions},
 		},
 		{
-			name:     "negative margin",
-			document: &Document{Pages: []Page{validPage}, Margin: Margin{Top: -1}},
+			name:     "negative left margin",
+			document: &Document{Pages: []Page{validPage}, Margin: Margin{Left: -1}},
 			want:     []error{ErrInvalidMargin},
+		},
+		{
+			name:     "negative right margin",
+			document: &Document{Pages: []Page{validPage}, Margin: Margin{Right: -1}},
+			want:     []error{ErrInvalidMargin},
+		},
+		{
+			name:     "auto top and bottom margins accepted",
+			document: &Document{Pages: []Page{validPage}, Margin: Margin{Top: -1, Bottom: -1}},
 		},
 		{
 			name:     "non-finite margin",
 			document: &Document{Pages: []Page{validPage}, Margin: Margin{Left: math.NaN()}},
+			want:     []error{ErrInvalidMargin},
+		},
+		{
+			name:     "non-finite auto margin",
+			document: &Document{Pages: []Page{validPage}, Margin: Margin{Top: math.Inf(-1)}},
 			want:     []error{ErrInvalidMargin},
 		},
 		{
@@ -427,6 +441,25 @@ func TestDocumentOrientationValidationAndMappingUseTrimmedValue(t *testing.T) {
 	}
 	if got := document.pdfGlobal(false).Orientation.String(); got != "Landscape" {
 		t.Fatalf("mapped orientation = %q, want Landscape", got)
+	}
+}
+
+func TestDocumentAutoMargin(t *testing.T) {
+	t.Parallel()
+
+	document := &Document{
+		Pages:  []Page{{Source: HTML([]byte("<p>body</p>"), "")}},
+		Margin: Margin{Top: -1, Bottom: -1, Left: 10, Right: 10},
+	}
+
+	if err := document.Validate(); err != nil {
+		t.Fatalf("Validate() error = %v, want nil for -1 auto top/bottom margins", err)
+	}
+
+	req := document.toPDFRequest(&bytes.Buffer{}, nil, false)
+	if req.Global.Margin.Top != -1 || req.Global.Margin.Bottom != -1 {
+		t.Fatalf("auto margins mapped = top %g bottom %g, want -1/-1",
+			req.Global.Margin.Top, req.Global.Margin.Bottom)
 	}
 }
 

@@ -31,7 +31,10 @@ paint/write.
 - `cmd` → `app` → `cli` → `settings`. `cli` never imports `cmd` or the root.
 - Root `api.go` never imports `cli`. `convert` never imports `cli`.
 - `prepare` / `render` / `islands` never import `convert`.
-- `layout` / `pdf` never import `settings` or `cli`.
+- `layout` never imports `settings` or `cli`. `pdf` never imports `cli` and
+  imports `settings` only in `registry.go` (`RegistryFromGlobal` /
+  `LogFontRegistryScan`, together with `internal/line`), a deliberate
+  exception; no other `pdf` file imports either.
 - Untrusted bytes enter only via `load.Loader.Load` and
   `load.ResourceContext.Fetch`.
 - Known live leak to inspect, not to treat as a new invention:

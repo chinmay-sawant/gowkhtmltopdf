@@ -51,6 +51,11 @@ func capTablePageBreaks(res *Result, contentH float64) {
 
 		return full
 	}
+	coverageBeforeEnd := func(y, minX, maxX, pageEnd float64) bool {
+		full, _, _, _ := hCoverageBounded(horizByY, y, minX, maxX, pageEnd)
+
+		return full
+	}
 
 	// (1) Classic page-top stubs.
 	sealPageTopStubs(vertStarts, coverage, seal, maxPage, contentH, eps)
@@ -63,7 +68,7 @@ func capTablePageBreaks(res *Result, contentH float64) {
 
 	// Row bottoms: seal when verticals end near a page bottom and no full
 	// horizontal closes the strip (next row's top moved to the following page).
-	sealPageBottomClusters(vertStarts, vertEnds, contentH, coverage, seal, eps)
+	sealPageBottomClusters(vertStarts, vertEnds, contentH, coverageBeforeEnd, seal, eps)
 }
 
 // sealBorderGap appends a horizontal rule at gVal spanning [minX, maxX] unless
@@ -141,7 +146,7 @@ func sealPageTopClusters(
 // when the next row+thead cannot fit, which sat outside the old 80pt band.
 func sealPageBottomClusters(
 	vertStarts, vertEnds map[int][]vseg, contentH float64,
-	coverage func(y, minX, maxX float64) bool,
+	coverage func(y, minX, maxX, pageEnd float64) bool,
 	seal func(gVal, minX, maxX, borderW, red, green, blue float64),
 	eps float64,
 ) {
@@ -164,7 +169,7 @@ func sealPageBottomClusters(
 			continue
 		}
 
-		if coverage(child.y, child.minX, child.maxX) {
+		if coverage(child.y, child.minX, child.maxX, pageBot) {
 			continue
 		}
 
@@ -389,6 +394,14 @@ func clusterVerticals(vertStarts, vertEnds map[int][]vseg, byStart bool) map[int
 
 // hCoverage reports whether horizontal segments near posY span [minX, maxX].
 func hCoverage(horizByY map[int][]hseg, posY, minX, maxX float64) (bool, float64, float64, bool) {
+	return hCoverageBounded(horizByY, posY, minX, maxX, math.Inf(1))
+}
+
+// hCoverageBounded is hCoverage that ignores horizontal segments at or below
+// pageEnd when the strip end sits above pageEnd. A next-page row border within
+// eps of the split row's rails must not close the strip: the rails then end
+// open (fixture-60 prop 31 after the auto-height bottom border shift).
+func hCoverageBounded(horizByY map[int][]hseg, posY, minX, maxX, pageEnd float64) (bool, float64, float64, bool) {
 	const eps = 2.0
 
 	var covMin, covMax float64
@@ -398,6 +411,10 @@ func hCoverage(horizByY map[int][]hseg, posY, minX, maxX float64) (bool, float64
 	key := roundY(posY)
 	for k := key - int(eps*yBucketScale) - 1; k <= key+int(eps*yBucketScale)+1; k++ {
 		for _, height := range horizByY[k] {
+			if posY < pageEnd-1e-9 && height.y >= pageEnd-1e-9 {
+				continue
+			}
+
 			covMin, covMax, has = mergeCoverageSeg(height, posY, minX, maxX, eps, covMin, covMax, has)
 		}
 	}
@@ -544,88 +561,15 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 	closePageLeadingSectionChromeWithTargets(res, contentH, stickyTargets)
 }
 
-// pageIndexedOps buckets non-fixed ops by their canvas page.
+// pageIndexedOps buckets non-fixed ops by their canvas page with the same
+// edge bias as pageBuckets and buildFlowOpIndex.
 func pageIndexedOps(res *Result, contentH float64) [][]int {
-	for idx := range res.Ops {
-		if res.Ops[idx].Fixed {
-			continue
-		}
-
-		if _, ok := checkedFlowPageOfY(res.Ops[idx].Y, contentH); !ok {
-			return nil
-		}
+	pages, _, _, ok := bucketOpsByPage(res.Ops, contentH, layoutEpsilon)
+	if !ok {
+		return nil
 	}
 
-	maxPage := maxNonFixedOpPage(res.Ops, contentH)
-
-	counts := pageOpCounts(res.Ops, contentH, maxPage)
-
-	pageOps := make([][]int, len(counts))
-
-	for p := range counts {
-		pageOps[p] = make([]int, 0, counts[p])
-	}
-
-	fillPageOpBuckets(pageOps, res.Ops, contentH)
-
-	return pageOps
-}
-
-func maxNonFixedOpPage(ops []Op, contentH float64) int {
-	maxPage := 0
-
-	for idx := range ops {
-		if ops[idx].Fixed {
-			continue
-		}
-
-		page, ok := checkedFlowPageOfY(ops[idx].Y, contentH)
-		if !ok {
-			continue
-		}
-
-		if page > maxPage {
-			maxPage = page
-		}
-	}
-
-	return maxPage
-}
-
-func pageOpCounts(ops []Op, contentH float64, maxPage int) []int {
-	counts := make([]int, maxPage+1)
-
-	for idx := range ops {
-		if ops[idx].Fixed {
-			continue
-		}
-
-		page, ok := checkedFlowPageOfY(ops[idx].Y, contentH)
-		if !ok {
-			continue
-		}
-
-		if page <= maxPage {
-			counts[page]++
-		}
-	}
-
-	return counts
-}
-
-func fillPageOpBuckets(pageOps [][]int, ops []Op, contentH float64) {
-	for idx := range ops {
-		if ops[idx].Fixed {
-			continue
-		}
-
-		page, ok := checkedFlowPageOfY(ops[idx].Y, contentH)
-		if !ok || page >= len(pageOps) {
-			continue
-		}
-
-		pageOps[page] = append(pageOps[page], idx)
-	}
+	return pages
 }
 
 // opInPageBand reports whether the op's top edge sits within [pageTop, pageBot).
@@ -966,6 +910,10 @@ func clipStickySectionChrome(
 // clipStickySectionChromeOp trims one sticky-section wash or side border to
 // the content bottom.
 func clipStickySectionChromeOp(paintOp *Op, target stickySectionChromeTarget, contentBot float64) {
+	if !opOwnedBy(paintOp, target.box, opOwnerSeal) {
+		return
+	}
+
 	switch paintOp.Kind {
 	case OpFillRect:
 		if target.hasBackground && sameRectFrame(paintOp, target) && sameRGB(paintOp, target.background) {
@@ -1109,17 +1057,23 @@ func clipSectionChromeOp(paintOp *Op, target stickySectionChromeTarget, closeY f
 // isSectionChromeWash reports a page-leading section background wash whose
 // bottom does not align with closeY.
 func isSectionChromeWash(paintOp *Op, target stickySectionChromeTarget, closeY float64) bool {
-	return target.hasBackground && paintOp.H > 40 && sameRectFrame(paintOp, target) &&
+	return target.hasBackground && paintOp.H > 40 && opOwnedBy(paintOp, target.box, opOwnerSeal) &&
+		sameRectFrame(paintOp, target) &&
 		sameRGB(paintOp, target.background) && !nearLayout(paintOp.Y+paintOp.H, closeY)
 }
 
 // isSectionChromeSideBorder reports a page-leading section side border whose
 // bottom does not align with closeY.
 func isSectionChromeSideBorder(paintOp *Op, target stickySectionChromeTarget, closeY float64) bool {
-	return paintOp.H > 40 && target.sideMatches(paintOp) && !nearLayout(paintOp.Y+paintOp.H, closeY)
+	return paintOp.H > 40 && opOwnedBy(paintOp, target.box, opOwnerSeal) &&
+		target.sideMatches(paintOp) && !nearLayout(paintOp.Y+paintOp.H, closeY)
 }
 
 type stickySectionChromeTarget struct {
+	// box is the section box whose chrome this target matches. opOwnedBy
+	// uses it to reject ops that only look like frame chrome (outline and
+	// shadow awareness lives in one place).
+	box               *box
 	x, y, w           float64
 	background        [3]float64
 	hasBackground     bool
@@ -1161,6 +1115,7 @@ func stickySectionChromeTargets(root *box) []stickySectionChromeTarget {
 func stickyTargetFor(parent *box) stickySectionChromeTarget {
 	sty := parent.style
 	target := stickySectionChromeTarget{ //nolint:exhaustruct // intentional zero fields
+		box:               parent,
 		x:                 parent.x,
 		y:                 parent.y,
 		w:                 parent.w,

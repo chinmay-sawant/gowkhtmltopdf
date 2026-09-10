@@ -162,6 +162,39 @@ func TestRunPDFWebImagesFalse(t *testing.T) {
 	}
 }
 
+// TestRunPDFObjectWebImagesGate proves the PDF fetch gate folds the object
+// web.images layer through settings.ResolveImages: an object-level false
+// disables embedding while the defaults keep it on. Mirrors the image-mode
+// gate test in internal/imageout/images_gate_test.go.
+func TestRunPDFObjectWebImagesGate(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		objectWeb settings.Web
+		wantImage bool
+	}{
+		{name: "object default enables", objectWeb: settings.Web{Images: true}, wantImage: true},
+		{name: "object disables", objectWeb: settings.Web{Images: false}, wantImage: false},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			pngB64 := pngDataURL(t, 12, 12)
+			html := `<html><body><p>gate</p><img src="` + pngB64 + `"></body></html>`
+			cmd, _ := newCommand(t, html, filepath.Join(t.TempDir(), "out.pdf"))
+			cmd.Objects[0].Web = testCase.objectWeb
+
+			data := runPDF(t, cmd)
+			if got := bytes.Contains(data, []byte("/Subtype /Image")); got != testCase.wantImage {
+				t.Errorf("image embedded = %v, want %v", got, testCase.wantImage)
+			}
+		})
+	}
+}
+
 func TestRunPDFLinkedStylesheet(t *testing.T) {
 	t.Parallel()
 
@@ -206,6 +239,71 @@ func TestRunPDFPrintLinkMediaFeatures(t *testing.T) {
 
 	var log bytes.Buffer
 	_ = runPDFWithLog(t, cmd, &log)
+}
+
+// TestLinkMediaGateUsesFinalPageBox proves link and @import media size
+// features are gated against the post-@page viewport. Default A4 content is
+// about 538.6pt wide; @page { margin: 0 } widens it past 560pt, so a
+// (min-width: 560pt) sheet loads only when the final page box matches. The
+// stylesheet hides a sentinel paragraph, so the parsed text owns the verdict.
+func TestLinkMediaGateUsesFinalPageBox(t *testing.T) {
+	t.Parallel()
+
+	const gated = "HIDDENBYGATE"
+
+	tests := []struct {
+		name       string
+		head       string
+		wantHidden bool
+	}{
+		{
+			name: "link matches final page box",
+			head: `<style>@page { margin: 0 }</style>` +
+				`<link rel="stylesheet" href="gate.css" media="(min-width: 560pt)">`,
+			wantHidden: true,
+		},
+		{
+			name:       "link misses default page box",
+			head:       `<link rel="stylesheet" href="gate.css" media="(min-width: 560pt)">`,
+			wantHidden: false,
+		},
+		{
+			name: "import matches final page box",
+			head: `<style>@page { margin: 0 }</style>` +
+				`<style>@import url("gate.css") (min-width: 560pt);</style>`,
+			wantHidden: true,
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			htmlDoc := `<html><head>` + testCase.head + `</head><body>
+<p class="gate">` + gated + `</p><p>ALWAYS</p></body></html>`
+
+			cmd, dir := newCommand(t, htmlDoc, filepath.Join(t.TempDir(), "out.pdf"))
+			if err := os.WriteFile(filepath.Join(dir, "gate.css"), []byte(".gate { display: none }"), 0o600); err != nil {
+				t.Fatalf("write gate.css: %v", err)
+			}
+
+			data := runPDF(t, cmd)
+
+			sem, err := pdf.ParseSemantic(data)
+			if err != nil {
+				t.Fatalf("ParseSemantic: %v", err)
+			}
+
+			text := sem.DocumentText()
+			if !strings.Contains(text, "ALWAYS") {
+				t.Fatalf("control text missing; page text = %q", text)
+			}
+
+			if hidden := !strings.Contains(text, gated); hidden != testCase.wantHidden {
+				t.Errorf("gated text hidden = %v, want %v (text %q)", hidden, testCase.wantHidden, text)
+			}
+		})
+	}
 }
 
 func TestLinkStylesheetMediaMatches(t *testing.T) {

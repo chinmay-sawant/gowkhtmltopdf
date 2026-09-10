@@ -11,6 +11,9 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
 // bodyWithTargetOnPage2 forces the #target heading onto page 2.
@@ -385,5 +388,155 @@ func TestRemapPageForCopies(t *testing.T) {
 
 	if got := remapPageForCopies(0, 1, true); got != 1 {
 		t.Errorf("copies=1 passthrough = %d, want 1", got)
+	}
+}
+
+// bodyWithLinkToPage2 is the source object of the cross-object copy test: it
+// carries a #target fragment link, and the target object is its own document.
+func bodyWithLinkToPage2() string {
+	return `<html><body><p><a href="#target">jump</a></p></body></html>`
+}
+
+// TestBodyLinkDestRemapCopiesNonCollate proves a body internal link on a
+// copied page targets the destination in its own copy group. Two one-page
+// objects under Copies=2, Collate=false order as [p1, p1', p2, p2'], so the
+// original link must target p2 and the copy must target p2'. Before the
+// identity fix every copy kept the same pre-copy page index.
+func TestBodyLinkDestRemapCopiesNonCollate(t *testing.T) {
+	t.Parallel()
+
+	cmd := newCommandMulti(t,
+		[]string{
+			bodyWithLinkToPage2(),
+			`<html><body><h2 id="target">Target Heading</h2></body></html>`,
+		},
+		filepath.Join(t.TempDir(), "out.pdf"))
+	cmd.Global.Copies = 2
+	cmd.Global.Collate = false
+	cmd.Global.Outline = false
+	cmd.Global.UseCompression = false
+
+	data := runPDF(t, cmd)
+
+	if pageCount(data) != 4 {
+		t.Fatalf("pages = %d, want 4", pageCount(data))
+	}
+
+	kids := pageKidsRefs(data)
+	if len(kids) != 4 {
+		t.Fatalf("Kids = %v, want 4 page refs", kids)
+	}
+
+	sem, err := pdf.ParseSemantic(data)
+	if err != nil {
+		t.Fatalf("ParseSemantic: %v", err)
+	}
+
+	if len(sem.Pages) != 4 {
+		t.Fatalf("parsed pages = %d, want 4", len(sem.Pages))
+	}
+
+	checks := []struct {
+		page int
+		dest int
+	}{
+		{page: 0, dest: kids[2]}, // original page 1 -> copy 0's page 2
+		{page: 1, dest: kids[3]}, // copied page 1 -> copy 1's page 2
+	}
+
+	for _, check := range checks {
+		annots := sem.Pages[check.page].Annots
+		if len(annots) != 1 {
+			t.Fatalf("page %d annots = %d, want 1 body link", check.page, len(annots))
+		}
+
+		if annots[0].DestPage != check.dest {
+			t.Errorf("page %d link /Dest = %d, want %d (kids=%v)", check.page, annots[0].DestPage, check.dest, kids)
+		}
+	}
+
+	for _, page := range []int{2, 3} {
+		if len(sem.Pages[page].Annots) != 0 {
+			t.Errorf("page %d annots = %d, want none", page, len(sem.Pages[page].Annots))
+		}
+	}
+}
+
+// TestTOCLinkDestRemapCopiesNonCollate covers the TOC link path under the
+// same copy rule: forward links on the original TOC page target copy 0's
+// chapters, and links on the copied TOC page target copy 1's chapters.
+func TestTOCLinkDestRemapCopiesNonCollate(t *testing.T) {
+	t.Parallel()
+
+	cmd := newCommandMulti(t,
+		[]string{
+			`<html><body><h1>Chapter One</h1><p>one</p></body></html>`,
+			`<html><body><h1>Chapter Two</h1><p>two</p></body></html>`,
+		},
+		filepath.Join(t.TempDir(), "out.pdf"))
+
+	toc := settings.DefaultPdfObject()
+	toc.IsTableOfContent = true
+	toc.UseOutline = false
+	cmd.Objects = append([]settings.PdfObject{toc}, cmd.Objects...)
+	cmd.Global.TOC.ForwardLinks = true
+	cmd.Global.Copies = 2
+	cmd.Global.Collate = false
+	cmd.Global.Outline = false
+	cmd.Global.UseCompression = false
+
+	data := runPDF(t, cmd)
+
+	if pageCount(data) != 6 {
+		t.Fatalf("pages = %d, want 6 (3 logical × 2 copies)", pageCount(data))
+	}
+
+	kids := pageKidsRefs(data)
+	if len(kids) != 6 {
+		t.Fatalf("Kids = %v, want 6 page refs", kids)
+	}
+
+	sem, err := pdf.ParseSemantic(data)
+	if err != nil {
+		t.Fatalf("ParseSemantic: %v", err)
+	}
+
+	// Non-collate order is [toc, toc', c1, c1', c2, c2'].
+	wantDests := map[int]map[int]int{
+		0: {kids[2]: 1, kids[4]: 1}, // TOC page -> copy 0 chapters
+		1: {kids[3]: 1, kids[5]: 1}, // copied TOC -> copy 1 chapters
+	}
+
+	for page := range 2 {
+		assertTOCLinkDests(t, sem.Pages[page].Annots, page, wantDests[page], kids)
+	}
+
+	for page := 2; page < 6; page++ {
+		if len(sem.Pages[page].Annots) != 0 {
+			t.Errorf("page %d annots = %d, want none", page, len(sem.Pages[page].Annots))
+		}
+	}
+}
+
+// assertTOCLinkDests checks that one TOC page carries exactly the expected
+// number of forward links to each destination page.
+func assertTOCLinkDests(t *testing.T, annots []pdf.SemanticAnnot, page int, want map[int]int, kids []int) {
+	t.Helper()
+
+	got := map[int]int{}
+
+	for _, annot := range annots {
+		got[annot.DestPage]++
+	}
+
+	for dest, count := range want {
+		if got[dest] != count {
+			t.Errorf("TOC page %d dest %d count = %d, want %d (all dests %v, kids=%v)",
+				page, dest, got[dest], count, got, kids)
+		}
+	}
+
+	if len(got) != len(want) {
+		t.Errorf("TOC page %d dests = %v, want %d distinct", page, got, len(want))
 	}
 }

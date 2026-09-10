@@ -524,20 +524,30 @@ func (run *runContext) renderObject(ctx context.Context, obj *settings.PdfObject
 
 	media := mediaFor(run.req.Global, obj)
 
+	prepOpts := prepare.BuildOptions(
+		geom.contentW,
+		geom.contentH,
+		media,
+		idx+1,
+		run.req.Global.Web,
+		obj.Web,
+	)
+	// Inline @page rules move the content box before layout. Resolve them for
+	// the stylesheet-gating viewport so <link media> and @import media size
+	// features see the same page box the cascade uses.
+	prepOpts.PageBoxViewport = func(inline []*css.Stylesheet) (float64, float64) {
+		resolved := applyCSSPageMargins(geom, inline)
+
+		return resolved.contentW, resolved.contentH
+	}
+
 	prep, err := prepare.Document(
 		ctx,
 		run.loader,
 		obj.Page,
 		obj.Load,
 		run.registry,
-		prepare.BuildOptions(
-			geom.contentW,
-			geom.contentH,
-			media,
-			idx+1,
-			run.req.Global.Web,
-			obj.Web,
-		),
+		prepOpts,
 		run.log,
 	)
 	if err != nil {
@@ -556,8 +566,12 @@ func (run *runContext) renderObject(ctx context.Context, obj *settings.PdfObject
 	sheets := prep.Sheets
 	geom = applyCSSPageMargins(geom, sheets)
 
+	// web.images is registered on the global, image, and object layers. PDF
+	// mode has no image-mode layer, so fold the global and object layers.
+	imagesEnabled := settings.ResolveImages(run.req.Global.Web, nil, obj)
+
 	imagesFn := func(src string) ([]byte, error) {
-		if !run.req.Global.Web.Images {
+		if !imagesEnabled {
 			return nil, errImagesDisabled
 		}
 
@@ -581,7 +595,7 @@ func (run *runContext) renderObject(ctx context.Context, obj *settings.PdfObject
 		lp:            obj.Load,
 		registry:      registry,
 		resources:     resources,
-		imagesEnabled: run.req.Global.Web.Images,
+		imagesEnabled: imagesEnabled,
 		media:         media,
 		geom:          geom,
 		imagesFn:      imagesFn,

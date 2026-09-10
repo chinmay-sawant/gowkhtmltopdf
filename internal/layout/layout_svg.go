@@ -155,10 +155,11 @@ func (e *engine) writeSVGNode(b *strings.Builder, node *html.Node) {
 }
 
 func (e *engine) writeSVGPresentationAttrs(b *strings.Builder, node *html.Node, written map[string]bool) {
-	st := e.styles[node]
-	if st == nil {
+	if !e.hasStyle(node) {
 		return
 	}
+
+	st := e.stylePtr(node)
 	if st.FillSet && !written["fill"] {
 		if st.FillOpacity == 0 && st.Fill == [3]float64{} {
 			b.WriteString(` fill="none"`)

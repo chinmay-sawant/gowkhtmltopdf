@@ -918,16 +918,9 @@ func (l *Loader) Load(ctx context.Context, input string, pageLoad settings.LoadP
 	pageLoad = cloneLoadPage(pageLoad)
 
 	if len(pageLoad.InlineHTML) > 0 {
-		if err := checkBodyLimit("inline HTML", len(pageLoad.InlineHTML), l.MaxBodySize); err != nil {
+		res, err := l.inlineResource(pageLoad.InlineHTML, pageLoad.InlineBase)
+		if err != nil {
 			return nil, err
-		}
-
-		res := &Resource{ //nolint:exhaustruct // intentional zero/partial fields
-			Kind:        KindInline,
-			URL:         "inline:",
-			Base:        pageLoad.InlineBase,
-			Body:        pageLoad.InlineHTML,
-			ContentType: "text/html",
 		}
 
 		return res, checkDocumentCharset(res)
@@ -954,6 +947,22 @@ func (l *Loader) Load(ctx context.Context, input string, pageLoad settings.LoadP
 	return res, nil
 }
 
+// inlineResource builds an inline HTML resource, always applying the body cap
+// so the InlineHTML and inline: entry points cannot diverge on the limit.
+func (l *Loader) inlineResource(body []byte, base string) (*Resource, error) {
+	if err := checkBodyLimit("inline HTML", len(body), l.MaxBodySize); err != nil {
+		return nil, err
+	}
+
+	return &Resource{ //nolint:exhaustruct // intentional zero/partial fields
+		Kind:        KindInline,
+		URL:         "inline:",
+		Base:        base,
+		Body:        body,
+		ContentType: "text/html",
+	}, nil
+}
+
 // loadByKind fetches a resolved (kind, target) pair; nil means the kind was
 // not handled by any loader branch.
 func (l *Loader) loadByKind(
@@ -965,13 +974,12 @@ func (l *Loader) loadByKind(
 	case KindInline:
 		switch {
 		case strings.HasPrefix(target, "inline:"):
-			body := []byte(target[len("inline:"):])
-			res = &Resource{ //nolint:exhaustruct // intentional zero/partial fields
-				Kind:        KindInline,
-				URL:         "inline:",
-				Body:        body,
-				ContentType: "text/html",
+			inlineRes, err := l.inlineResource([]byte(target[len("inline:"):]), "")
+			if err != nil {
+				return nil, err
 			}
+
+			res = inlineRes
 		case strings.HasPrefix(target, "data:"):
 			body, ctype, err := decodeDataURLLimited(target, l.MaxBodySize)
 			if err != nil {

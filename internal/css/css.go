@@ -412,7 +412,7 @@ func parseMediaRule(src string, str *Stylesheet, order *int) (string, error) {
 		return "", err
 	}
 
-	rules, err := parseRuleList(media, nil, block, order)
+	rules, err := parseRuleList(media, nil, block, order, 0)
 	if err != nil {
 		return "", err
 	}
@@ -440,7 +440,7 @@ func parseContainerRule(src string, str *Stylesheet, order *int) (string, error)
 		return rest, nil
 	}
 
-	rules, err := parseRuleList("all", &contQ, block, order)
+	rules, err := parseRuleList("all", &contQ, block, order, 0)
 	if err != nil {
 		return "", err
 	}
@@ -610,7 +610,14 @@ func FontFaceURLs(src string) []string {
 
 // parseRuleList parses the rules inside a @media or @container block body.
 // When contQ is non-nil, every produced rule inherits that container query.
-func parseRuleList(media string, contQ *ContainerQuery, block string, orderPtr *int) ([]Rule, error) {
+// depth is the block nesting level (0 for the outermost @media/@container
+// body); at maxParseDepth the block is skipped so hostile nesting cannot
+// recurse without bound.
+func parseRuleList(media string, contQ *ContainerQuery, block string, orderPtr *int, depth int) ([]Rule, error) {
+	if depth >= maxParseDepth {
+		return nil, nil
+	}
+
 	var rules []Rule
 
 	for block != "" {
@@ -620,7 +627,7 @@ func parseRuleList(media string, contQ *ContainerQuery, block string, orderPtr *
 		}
 		// Nested @container inside @media (or another @container): flatten.
 		if strings.HasPrefix(block, "@") {
-			rest, nested, err := parseNestedAtRule(block, media, orderPtr)
+			rest, nested, err := parseNestedAtRule(block, media, orderPtr, depth)
 			if err != nil {
 				return nil, err
 			}
@@ -633,12 +640,7 @@ func parseRuleList(media string, contQ *ContainerQuery, block string, orderPtr *
 
 		selEnd, err := findBlock(block)
 		if errors.Is(err, errNoBlock) {
-			// garbage prelude inside a media block: discard up to ';'
-			if end := strings.IndexByte(block, ';'); end >= 0 {
-				block = block[end+1:]
-			} else {
-				block = ""
-			}
+			block = skipGarbagePrelude(block)
 
 			continue
 		}
@@ -664,10 +666,20 @@ func parseRuleList(media string, contQ *ContainerQuery, block string, orderPtr *
 	return rules, nil
 }
 
+// skipGarbagePrelude discards a media-block fragment with no '{' before the
+// next ';' and returns the remaining source. Such a fragment carries no rules.
+func skipGarbagePrelude(block string) string {
+	if end := strings.IndexByte(block, ';'); end >= 0 {
+		return block[end+1:]
+	}
+
+	return ""
+}
+
 // parseNestedAtRule consumes an at-rule inside a @media/@container body.
 // Nested @container rules are flattened into the media context (the nested
 // query replaces, not combines, the outer query); other at-rules are skipped.
-func parseNestedAtRule(block, media string, orderPtr *int) (string, []Rule, error) {
+func parseNestedAtRule(block, media string, orderPtr *int, depth int) (string, []Rule, error) {
 	if !hasFoldPrefix(block, "@container") {
 		rest, err := skipAtRule(block)
 		if err != nil {
@@ -696,7 +708,7 @@ func parseNestedAtRule(block, media string, orderPtr *int) (string, []Rule, erro
 	// Nested @container replaces (does not combine) the query.
 	use := &innerCQ
 
-	nested, err := parseRuleList(media, use, innerBlock, orderPtr)
+	nested, err := parseRuleList(media, use, innerBlock, orderPtr, depth+1)
 	if err != nil {
 		return "", nil, err
 	}
@@ -788,6 +800,44 @@ func decDepth(depth int) int {
 	}
 
 	return depth
+}
+
+// maxParseDepth bounds recursive parse nesting: functional pseudos, container
+// conditions, and nested at-rules. Without a bound, hostile input such as 200k
+// nested :not( makes every level rescan to its matching paren, which is
+// quadratic in the input size. Real style sheets nest far shallower.
+const maxParseDepth = 128
+
+// parenDepthExceedsMax reports whether src nests parentheses deeper than
+// maxParseDepth, skipping quoted strings and backslash escapes. Each recursion
+// level of the selector parser consumes exactly one parenthesis pair
+// (:not/:is/:where/:has arguments), so this pre-scan bounds selector parse
+// depth without threading a counter through the parser.
+func parenDepthExceedsMax(src string) bool {
+	depth := 0
+
+	for idx := 0; idx < len(src); {
+		switch src[idx] {
+		case '"', '\'':
+			idx = skipQuoted(src, idx, src[idx])
+		case '\\':
+			idx += 2
+		case '(':
+			depth++
+			if depth > maxParseDepth {
+				return true
+			}
+
+			idx++
+		case ')':
+			depth = decDepth(depth)
+			idx++
+		default:
+			idx++
+		}
+	}
+
+	return false
 }
 
 // takeBlock consumes the braced block whose '{' sits at open and returns the

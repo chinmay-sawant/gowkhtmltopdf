@@ -300,6 +300,7 @@ func (d *Document) setStream(r objRef, raw []byte) {
 type Page struct {
 	doc              *Document
 	ref              objRef
+	index            int // current position in Document.pages; updated by ReorderPages
 	width            float64
 	height           float64
 	content          *Content
@@ -314,7 +315,7 @@ type Page struct {
 type annotation struct {
 	rect            [4]float64 // x1,y1,x2,y2 in PDF coords
 	uri             string     // external link
-	destPage        int        // internal link target (0-based page index)
+	destPage        *Page      // internal link target identity, resolved to an index at write time
 	destX           float64
 	destY           float64
 	hasDest         bool
@@ -326,7 +327,12 @@ type annotation struct {
 
 // AddPage appends a page with the given size in points.
 func (d *Document) AddPage(width, height float64) *Page {
-	page := &Page{doc: d, width: width, height: height} //nolint:exhaustruct // intentional zero-value fields
+	page := &Page{ //nolint:exhaustruct // intentional zero-value fields
+		doc:    d,
+		index:  len(d.pages),
+		width:  width,
+		height: height,
+	}
 	page.ref = d.newObject()
 	contentRef := d.newObject()
 	page.contentRef = contentRef
@@ -399,6 +405,10 @@ func (d *Document) ReorderPages(order []int) error {
 
 	d.pages = next
 
+	for i, page := range d.pages {
+		page.index = i
+	}
+
 	return nil
 }
 
@@ -457,7 +467,7 @@ func (p *Page) AddLinkURI(rect [4]float64, uri string) ObjRef {
 	p.annots = append(p.annots, annotation{ //nolint:exhaustruct // intentional zero-value fields
 		rect:     rect,
 		uri:      uri,
-		destPage: 0,
+		destPage: nil,
 		destX:    0,
 		destY:    0,
 		hasDest:  false,
@@ -467,8 +477,15 @@ func (p *Page) AddLinkURI(rect [4]float64, uri string) ObjRef {
 	return ref
 }
 
-// AddLinkDest adds an internal GoTo annotation to a page (0-based index).
-func (p *Page) AddLinkDest(rect [4]float64, page int, destX, destY float64) ObjRef {
+// AddLinkDest adds an internal GoTo annotation targeting a page handle. The
+// target page is resolved to its current /Kids index at write time, so link
+// destinations survive ReorderPages and page copies. A nil target adds no
+// annotation and returns 0.
+func (p *Page) AddLinkDest(rect [4]float64, page *Page, destX, destY float64) ObjRef {
+	if page == nil {
+		return 0
+	}
+
 	ref := p.doc.newObject()
 	p.annots = append(p.annots, annotation{ //nolint:exhaustruct // intentional zero-value fields
 		rect:     rect,
@@ -481,6 +498,39 @@ func (p *Page) AddLinkDest(rect [4]float64, page int, destX, destY float64) ObjR
 	})
 
 	return ref
+}
+
+// RemapLinkDests rewrites every internal link destination on this page with
+// translate. Copy materialization uses it to re-aim a duplicated page's links
+// at the same copy of each destination page. A nil translate is a no-op.
+func (p *Page) RemapLinkDests(translate func(dest *Page) *Page) {
+	if p == nil || translate == nil {
+		return
+	}
+
+	for idx := range p.annots {
+		if !p.annots[idx].hasDest || p.annots[idx].destPage == nil {
+			continue
+		}
+
+		if next := translate(p.annots[idx].destPage); next != nil {
+			p.annots[idx].destPage = next
+		}
+	}
+}
+
+// pageIndexOf returns the current page-order index of target, or -1 when
+// target is nil or no longer belongs to d.pages.
+func (d *Document) pageIndexOf(target *Page) int {
+	if target == nil || target.doc != d {
+		return -1
+	}
+
+	if target.index < 0 || target.index >= len(d.pages) || d.pages[target.index] != target {
+		return -1
+	}
+
+	return target.index
 }
 
 // SetLinkDestStruct associates a structure element with the most recently
@@ -1004,6 +1054,8 @@ func (d *Document) serializeNamedDests() objRef {
 }
 
 // infoDict builds the /Info dictionary with the (injectable) timestamps.
+// Each key has one writer: caller-set values from SetInfo win, and Producer
+// falls back to the writer policy when the caller did not set it.
 func (d *Document) infoDict() string {
 	now := d.creationTime
 	if now.IsZero() {
@@ -1017,7 +1069,12 @@ func (d *Document) infoDict() string {
 		}
 	}
 
-	return info.add("/Producer", d.encodeTextString(d.policy.ProducerVersion())).
+	producer := d.policy.ProducerVersion()
+	if v, ok := d.info["Producer"]; ok && v != "" {
+		producer = v
+	}
+
+	return info.add("/Producer", d.encodeTextString(producer)).
 		add("/CreationDate", pdfString(pdfDate(now))).
 		add("/ModDate", pdfString(pdfDate(now))).
 		String()
@@ -1142,13 +1199,15 @@ func buildPageResources(content *Content, iccRef, grayIccRef objRef, version PDF
 	return res.String(), nil
 }
 
-func annotDescription(arg *annotation) string {
+func annotDescription(doc *Document, arg *annotation) string {
 	if arg.uri != "" {
 		return arg.uri
 	}
 
 	if arg.hasDest {
-		return fmt.Sprintf("Link to page %d", arg.destPage+1)
+		if idx := doc.pageIndexOf(arg.destPage); idx >= 0 {
+			return fmt.Sprintf("Link to page %d", idx+1)
+		}
 	}
 
 	return "Link"
@@ -1167,11 +1226,16 @@ func structureDestElem(arg *annotation, doc *Document) *StructElem {
 		return arg.destStruct
 	}
 
-	if doc == nil || !arg.hasDest || arg.destPage < 0 || arg.destPage >= len(doc.pages) {
+	if doc == nil || !arg.hasDest {
 		return nil
 	}
 
-	return firstPageStructElem(doc.pages[arg.destPage])
+	idx := doc.pageIndexOf(arg.destPage)
+	if idx < 0 {
+		return nil
+	}
+
+	return firstPageStructElem(doc.pages[idx])
 }
 
 func firstPageStructElem(page *Page) *StructElem {
@@ -1189,11 +1253,12 @@ func firstPageStructElem(page *Page) *StructElem {
 }
 
 func writeAnnotDest(buf *strings.Builder, doc *Document, arg *annotation) {
-	if arg.destPage < 0 || arg.destPage >= len(doc.pages) {
+	idx := doc.pageIndexOf(arg.destPage)
+	if idx < 0 {
 		return
 	}
 
-	pageRef := doc.pages[arg.destPage].ref
+	pageRef := doc.pages[idx].ref
 	// PDF/UA-2: dual named dest — /D page (Arlington/PDF/A) + /SD struct (UA-2 8.8).
 	if doc.policy.IsPDFUA2() {
 		name := doc.registerDualDest(pageRef, arg.destX, arg.destY, structureDestElem(arg, doc))
@@ -1221,7 +1286,7 @@ func (d *Document) buildAnnots(page *Page) {
 			num(r[0]), num(r[1]), num(r[2]), num(r[3]))
 
 		if d.policy.IsPDFUA1() || d.policy.IsPDFUA2() {
-			fmt.Fprintf(&buf, " /Contents %s", d.encodeTextString(annotDescription(arg)))
+			fmt.Fprintf(&buf, " /Contents %s", d.encodeTextString(annotDescription(d, arg)))
 
 			if arg.hasStructParent {
 				fmt.Fprintf(&buf, " /StructParent %d", arg.structParent)

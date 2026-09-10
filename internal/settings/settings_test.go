@@ -271,6 +271,59 @@ func TestLoadTimeoutZoomSetterRange(t *testing.T) {
 	}
 }
 
+func TestFiniteSetters(t *testing.T) {
+	t.Parallel()
+
+	obj := DefaultPdfObject()
+	if err := obj.Set("load.zoomfactor", "NaN"); err == nil {
+		t.Error("load.zoomfactor=NaN must be rejected at Set")
+	}
+
+	if err := obj.Set("load.zoomfactor", "Inf"); err == nil {
+		t.Error("load.zoomfactor=Inf must be rejected at Set")
+	}
+
+	if err := obj.Set("load.zoomfactor", "2"); err != nil || obj.Load.ZoomFactor != 2 {
+		t.Errorf("load.zoomfactor=2 = %v, err %v", obj.Load.ZoomFactor, err)
+	}
+
+	global := DefaultPdfGlobal()
+	if err := global.Set("margin.top", "Inf"); err == nil {
+		t.Error("margin.top=Inf must be rejected at Set")
+	}
+
+	if err := global.Set("margin.top", "NaN"); err == nil {
+		t.Error("margin.top=NaN must be rejected at Set")
+	}
+
+	if _, err := ParseUnitReal("nan", "mm"); err == nil {
+		t.Error("ParseUnitReal(nan) must error")
+	}
+}
+
+func TestMarginSetterAutoAndSides(t *testing.T) {
+	t.Parallel()
+
+	global := DefaultPdfGlobal()
+	if err := global.Set("margin.top", "-1"); err != nil || math.Abs(global.Margin.Top-(-1)) > 1e-9 {
+		t.Errorf("margin.top=-1 = %v, err %v; want -1 auto sentinel", global.Margin.Top, err)
+	}
+
+	if err := global.Set("margin.bottom", "-2"); err != nil || math.Abs(global.Margin.Bottom-(-2)) > 1e-9 {
+		t.Errorf("margin.bottom=-2 = %v, err %v; want -2 auto sentinel", global.Margin.Bottom, err)
+	}
+
+	before := global.Margin.Left
+
+	if err := global.Set("margin.left", "-1"); err == nil {
+		t.Error("margin.left=-1 must be rejected")
+	}
+
+	if global.Margin.Left != before {
+		t.Errorf("rejected margin.left mutated value to %v, want %v", global.Margin.Left, before)
+	}
+}
+
 func TestImageQualitySetterRange(t *testing.T) {
 	t.Parallel()
 
@@ -744,6 +797,54 @@ func TestResolveMedia(t *testing.T) {
 	// print-media-type override wins over media-type.
 	if got := ResolveMedia(base, screen, &pmt); got != sPrint {
 		t.Errorf("pmt over media-type screen = %q", got)
+	}
+}
+
+func TestResolveImages(t *testing.T) {
+	t.Parallel()
+
+	web := func(images bool) Web { return Web{Images: images} }
+	image := func(images bool) *ImageGlobal {
+		return &ImageGlobal{Web: Web{Images: images}}
+	}
+	object := func(images bool) *PdfObject {
+		return &PdfObject{Web: Web{Images: images}}
+	}
+
+	defaultImage := DefaultImageGlobal()
+	defaultObject := DefaultPdfObject()
+
+	tests := []struct {
+		name   string
+		global Web
+		image  *ImageGlobal
+		obj    *PdfObject
+		want   bool
+	}{
+		{name: "global only enabled", global: web(true), want: true},
+		{name: "global only disabled", global: web(false), want: false},
+		{name: "image layer disables", global: web(true), image: image(false), want: false},
+		{name: "image layer enables after global disables", global: web(false), image: image(true), want: false},
+		{name: "object layer disables", global: web(true), image: image(true), obj: object(false), want: false},
+		{name: "object layer with no image layer disables", global: web(true), obj: object(false), want: false},
+		{name: "all layers enabled", global: web(true), image: image(true), obj: object(true), want: true},
+		{
+			name:   "canonical defaults stay enabled",
+			global: DefaultPdfGlobal().Web,
+			image:  &defaultImage,
+			obj:    &defaultObject,
+			want:   true,
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := ResolveImages(testCase.global, testCase.image, testCase.obj); got != testCase.want {
+				t.Errorf("ResolveImages() = %v, want %v", got, testCase.want)
+			}
+		})
 	}
 }
 

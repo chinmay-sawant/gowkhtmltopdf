@@ -40,6 +40,7 @@
           <span class="px-3 py-1 rounded-full bg-amber-100 text-amber-800 font-semibold">7 P1</span>
           <span class="px-3 py-1 rounded-full bg-slate-200 text-slate-700 font-semibold">12 P2</span>
           <span class="px-3 py-1 rounded-full bg-slate-100 text-slate-600 font-semibold">1 P3</span>
+          <span class="px-3 py-1 rounded-full bg-emerald-600 text-white font-semibold">Implemented 2026-09-10</span>
           <span class="px-3 py-1 rounded-full bg-slate-100 text-slate-600">22 candidates</span>
         </div>
         <div class="flex flex-wrap gap-x-6 gap-y-2 text-xs text-slate-500 pt-1">
@@ -50,7 +51,8 @@
         </div>
         <p class="text-xs text-slate-500">
           Canonical ledger: <a class="underline decoration-slate-300 hover:decoration-slate-800" href="architecture-deepening-2026-09-10.md">architecture-deepening-2026-09-10.md</a>.
-          This page renders the same findings; the ledger is the source of truth.
+          This page renders the same findings; the ledger is the source of truth. All 22 candidates
+          were implemented on 2026-09-10 and the full gate set passed.
         </p>
       </header>
 
@@ -1075,7 +1077,7 @@ flowchart LR
 
       <footer class="border-t border-slate-200 pt-6 text-xs text-slate-500 space-y-2">
         <p>Method: six read-only explore agents, one slice each, at frozen HEAD 30bd3d6; the lead re-read every P0 and P1 in current source. Audit only, no code changed.</p>
-        <p>Canonical ledger: <a class="underline decoration-slate-300 hover:decoration-slate-800" href="architecture-deepening-2026-09-10.md">plans/0.2.6/review/architecture-deepening-2026-09-10.md</a>. Gate rows in the ledger activate when any candidate is implemented.</p>
+        <p>Canonical ledger: <a class="underline decoration-slate-300 hover:decoration-slate-800" href="architecture-deepening-2026-09-10.md">plans/0.2.6/review/architecture-deepening-2026-09-10.md</a>. All 22 rows and the gate rows are closed on 2026-09-10; `make test`, `make golden`, `make claim-scan`, and `make lint` passed.</p>
       </footer>
     </main>
   </body>

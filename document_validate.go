@@ -30,7 +30,9 @@ var (
 	ErrInvalidCrop = errors.New("gowkhtmltopdf: crop dimensions and offsets must be non-negative")
 	// ErrInvalidDimensions reports incomplete, negative, or non-finite page or image dimensions.
 	ErrInvalidDimensions = errors.New("gowkhtmltopdf: invalid dimensions")
-	// ErrInvalidMargin reports negative or non-finite page margins.
+	// ErrInvalidMargin reports non-finite margins or a negative left/right
+	// margin. Negative top/bottom are the engine's auto header/footer
+	// sentinel and pass validation.
 	ErrInvalidMargin = errors.New("gowkhtmltopdf: invalid margin")
 	// ErrInvalidZoom reports a negative or non-finite zoom factor.
 	ErrInvalidZoom = errors.New("gowkhtmltopdf: invalid zoom")
@@ -198,10 +200,16 @@ func validateImageDimensions(width, height int) error {
 }
 
 func validateMargins(m Margin) error {
-	for _, value := range []float64{m.Top, m.Right, m.Bottom, m.Left} {
-		if !finiteNonNegative(value) {
-			return fmt.Errorf("%w: margins must be finite and non-negative", ErrInvalidMargin)
-		}
+	if !settings.ValidMargins(settings.Margin{
+		Top:    m.Top,
+		Right:  m.Right,
+		Bottom: m.Bottom,
+		Left:   m.Left,
+	}) {
+		return fmt.Errorf(
+			"%w: margins must be finite and left/right non-negative; negative top/bottom mean auto header/footer",
+			ErrInvalidMargin,
+		)
 	}
 
 	return nil
@@ -221,10 +229,6 @@ func validateZoom(zoom float64) error {
 
 func finitePositive(value float64) bool {
 	return !math.IsNaN(value) && !math.IsInf(value, 0) && value > 0
-}
-
-func finiteNonNegative(value float64) bool {
-	return !math.IsNaN(value) && !math.IsInf(value, 0) && value >= 0
 }
 
 //nolint:cyclop,wsl // exact-one-source validation has one branch per source kind.

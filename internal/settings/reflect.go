@@ -308,11 +308,13 @@ func setIntRange(target *int, low, high int) setter {
 	}
 }
 
-// setFloatMin parses raw as a float and rejects values below minimum.
+// setFloatMin parses raw as a float and rejects non-finite values or values
+// below minimum. NaN and infinities fail here so Set matches the root API
+// predicates instead of storing a value layout later rejects.
 func setFloatMin(target *float64, minimum float64) setter {
 	return func(raw string) error {
 		value, err := strconv.ParseFloat(raw, 64)
-		if err != nil {
+		if err != nil || !finite(value) {
 			return errParse("number", raw)
 		}
 
@@ -459,8 +461,14 @@ func setUnitMm(target *float64, ctx string) setter {
 
 var errUnknownMarginEdge = errors.New("unknown margin edge")
 
+// errNegativeSideMargin reports a negative left or right margin. Top and
+// bottom accept the engine's negative auto sentinel; side margins do not.
+var errNegativeSideMargin = errors.New("settings: side margins must be non-negative")
+
 // marginSetter writes one edge of a Margin, storing millimetres. An unknown
-// edge is rejected rather than silently targeting the right margin.
+// edge is rejected rather than silently targeting the right margin, and the
+// result must satisfy ValidMargins so CLI input obeys the same contract the
+// root API validates.
 func marginSetter(margin *Margin, edge string) setter {
 	target, ok := marginEdgePtr(margin, edge)
 	if !ok {
@@ -469,7 +477,22 @@ func marginSetter(margin *Margin, edge string) setter {
 		}
 	}
 
-	return setUnitMm(target, "margin "+edge)
+	return func(raw string) error {
+		previous := *target
+
+		if err := setUnitMm(target, "margin "+edge)(raw); err != nil {
+			return err
+		}
+
+		if !ValidMargins(*margin) {
+			value := *target
+			*target = previous
+
+			return fmt.Errorf("%w: margin %s = %g", errNegativeSideMargin, edge, value)
+		}
+
+		return nil
+	}
 }
 
 func appendString(dst *[]string) setter {

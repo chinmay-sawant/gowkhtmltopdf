@@ -94,7 +94,7 @@ func (e *engine) layoutTableGrid(
 	}
 
 	tableBox.rows = cellData
-	tableHeight := curY + e.scalePt(style.PaddingBottom) + e.scalePt(style.BorderBottom.Width)
+	tableHeight := e.borderBoxBottom(style, curY)
 	tableBox.height = tableY + tableHeight - tableBox.y
 
 	if style.BGColor[3] > 0 && e.opts.Background {

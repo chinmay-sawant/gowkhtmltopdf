@@ -682,7 +682,7 @@ func gridStretchBuildHeight(align string, cellH float64, cstate ResolvedStyle) f
 // resolveGridUsedHeight bumps the used height to the definite height and the
 // min border-box floor.
 func resolveGridUsedHeight(eng *engine, sty ResolvedStyle, usedH, contentH float64) float64 {
-	usedH += eng.scalePt(sty.PaddingBottom)
+	usedH = eng.borderBoxBottom(sty, usedH)
 
 	if sty.Height >= 0 {
 		height := eng.scalePt(sty.Height)
