@@ -3,6 +3,7 @@ package profiling
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -28,6 +29,8 @@ const (
 	topFixtures = 15
 )
 
+var errUnknownMode = errors.New("unknown mode")
+
 // TestProfileGoldenCorpus converts every golden template through the public
 // PDF and image entry points and writes heap, allocs, and goroutine profiles
 // plus a per-fixture memory summary. It only runs when GOWK_PROFILE_DIR is
@@ -43,6 +46,7 @@ func TestProfileGoldenCorpus(t *testing.T) { //nolint:paralleltest // single-pro
 	}
 
 	fixtureDir := resolveFixtureDir(t)
+
 	fixtures := discoverFixtures(t, fixtureDir)
 	if len(fixtures) < minFixtures {
 		t.Fatalf("found %d fixtures in %s, want at least %d", len(fixtures), fixtureDir, minFixtures)
@@ -60,41 +64,41 @@ func TestProfileGoldenCorpus(t *testing.T) { //nolint:paralleltest // single-pro
 
 type fixtureStat struct {
 	Fixture           string  `json:"fixture"`
-	DurationMS        float64 `json:"duration_ms"`
-	TotalAllocBytes   uint64  `json:"total_alloc_bytes"`
+	DurationMS        float64 `json:"durationMs"`
+	TotalAllocBytes   uint64  `json:"totalAllocBytes"`
 	Mallocs           uint64  `json:"mallocs"`
 	Frees             uint64  `json:"frees"`
-	RetainedBytes     int64   `json:"retained_bytes"`
-	HeapAllocAfterRun uint64  `json:"heap_alloc_after_run_bytes"`
-	HeapAllocAfterGC  uint64  `json:"heap_alloc_after_gc_bytes"`
-	StackInuseAfter   uint64  `json:"stack_inuse_after_bytes"`
-	NumGC             uint32  `json:"num_gc"`
+	RetainedBytes     int64   `json:"retainedBytes"`
+	HeapAllocAfterRun uint64  `json:"heapAllocAfterRunBytes"`
+	HeapAllocAfterGC  uint64  `json:"heapAllocAfterGcBytes"`
+	StackInuseAfter   uint64  `json:"stackInuseAfterBytes"`
+	NumGC             uint32  `json:"numGc"`
 	Skipped           bool    `json:"skipped,omitempty"`
 	Error             string  `json:"error,omitempty"`
 }
 
 type runSummary struct {
 	Mode             string        `json:"mode"`
-	GoVersion        string        `json:"go_version"`
-	NumCPU           int           `json:"num_cpu"`
+	GoVersion        string        `json:"goVersion"`
+	NumCPU           int           `json:"numCpu"`
 	GOMAXPROCS       int           `json:"gomaxprocs"`
-	MemProfileRate   int           `json:"mem_profile_rate"`
-	FixtureCount     int           `json:"fixture_count"`
+	MemProfileRate   int           `json:"memProfileRate"`
+	FixtureCount     int           `json:"fixtureCount"`
 	Failures         int           `json:"failures"`
 	Skipped          int           `json:"skipped"`
-	TotalAllocBytes  uint64        `json:"total_alloc_bytes"`
-	TotalMallocs     uint64        `json:"total_mallocs"`
-	TotalFrees       uint64        `json:"total_frees"`
-	PeakHeapAlloc    uint64        `json:"peak_heap_alloc_bytes"`
-	FinalHeapAlloc   uint64        `json:"final_heap_alloc_bytes"`
-	FinalHeapInuse   uint64        `json:"final_heap_inuse_bytes"`
-	FinalStackInuse  uint64        `json:"final_stack_inuse_bytes"`
-	FinalStackSys    uint64        `json:"final_stack_sys_bytes"`
-	FinalHeapObjects uint64        `json:"final_heap_objects"`
-	NumGC            uint32        `json:"num_gc"`
-	GoroutinesBefore int           `json:"goroutines_before"`
-	GoroutinesAfter  int           `json:"goroutines_after"`
-	WallMillis       float64       `json:"wall_millis"`
+	TotalAllocBytes  uint64        `json:"totalAllocBytes"`
+	TotalMallocs     uint64        `json:"totalMallocs"`
+	TotalFrees       uint64        `json:"totalFrees"`
+	PeakHeapAlloc    uint64        `json:"peakHeapAllocBytes"`
+	FinalHeapAlloc   uint64        `json:"finalHeapAllocBytes"`
+	FinalHeapInuse   uint64        `json:"finalHeapInuseBytes"`
+	FinalStackInuse  uint64        `json:"finalStackInuseBytes"`
+	FinalStackSys    uint64        `json:"finalStackSysBytes"`
+	FinalHeapObjects uint64        `json:"finalHeapObjects"`
+	NumGC            uint32        `json:"numGc"`
+	GoroutinesBefore int           `json:"goroutinesBefore"`
+	GoroutinesAfter  int           `json:"goroutinesAfter"`
+	WallMillis       float64       `json:"wallMillis"`
 	Fixtures         []fixtureStat `json:"fixtures"`
 }
 
@@ -109,7 +113,7 @@ func runProfile(t *testing.T, mode, outDir, fixtureDir string, fixtures []string
 	summary.GOMAXPROCS = runtime.GOMAXPROCS(0)
 	summary.MemProfileRate = runtime.MemProfileRate
 
-	ctx := context.Background()
+	ctx := t.Context()
 	wallStart := time.Now()
 
 	runtime.GC()
@@ -302,9 +306,13 @@ func summaryMarkdown(summary *runSummary) string {
 			break
 		}
 
+		if stat.RetainedBytes < 0 {
+			stat.RetainedBytes = 0
+		}
+
 		fmt.Fprintf(&builder, "| %s | %.1f | %s | %s | %d |\n",
 			stat.Fixture, stat.DurationMS, humanBytes(stat.TotalAllocBytes),
-			humanBytes(uint64(max(stat.RetainedBytes, 0))), stat.Mallocs)
+			humanBytes(uint64(stat.RetainedBytes)), stat.Mallocs)
 	}
 
 	return builder.String()
@@ -312,7 +320,8 @@ func summaryMarkdown(summary *runSummary) string {
 
 func logSummary(t *testing.T, summary *runSummary) {
 	t.Helper()
-	t.Logf("mode=%s fixtures=%d skipped=%d failures=%d wall=%.1fms total_alloc=%s peak_heap=%s stack_in_use=%s goroutines=%d->%d",
+	t.Logf("mode=%s fixtures=%d skipped=%d failures=%d wall=%.1fms "+
+		"total_alloc=%s peak_heap=%s stack_in_use=%s goroutines=%d->%d",
 		summary.Mode, summary.FixtureCount, summary.Skipped, summary.Failures, summary.WallMillis,
 		humanBytes(summary.TotalAllocBytes), humanBytes(summary.PeakHeapAlloc),
 		humanBytes(summary.FinalStackInuse), summary.GoroutinesBefore, summary.GoroutinesAfter)
@@ -337,23 +346,31 @@ func selectedModes() ([]string, error) {
 	case modePDF, modePNG, modeJPEG:
 		return []string{mode}, nil
 	default:
-		return nil, fmt.Errorf("unknown GOWK_PROFILE_MODE %q (want pdf, image-png, image-jpeg, or all)", mode)
+		return nil, fmt.Errorf("%w: GOWK_PROFILE_MODE=%q (want pdf, image-png, image-jpeg, or all)", errUnknownMode, mode)
 	}
 }
 
 func runFixture(ctx context.Context, mode, path, fixtureDir string) error {
 	switch mode {
 	case modePDF:
-		return buildPDFDocument(path, fixtureDir).WritePDF(ctx, io.Discard)
+		if err := buildPDFDocument(path, fixtureDir).WritePDF(ctx, io.Discard); err != nil {
+			return fmt.Errorf("pdf: %w", err)
+		}
+
+		return nil
 	case modePNG, modeJPEG:
 		format := "png"
 		if mode == modeJPEG {
 			format = "jpeg"
 		}
 
-		return buildImageDocument(path, fixtureDir, format).WriteImage(ctx, io.Discard)
+		if err := buildImageDocument(path, fixtureDir, format).WriteImage(ctx, io.Discard); err != nil {
+			return fmt.Errorf("image: %w", err)
+		}
+
+		return nil
 	default:
-		return fmt.Errorf("unknown mode %q", mode)
+		return fmt.Errorf("%w: %q", errUnknownMode, mode)
 	}
 }
 
@@ -398,7 +415,7 @@ func discoverFixtures(tb testing.TB, dir string) []string {
 		tb.Fatalf("read fixtures: %v", err)
 	}
 
-	var fixtures []string
+	fixtures := make([]string, 0, len(entries))
 
 	for _, entry := range entries {
 		name := entry.Name()

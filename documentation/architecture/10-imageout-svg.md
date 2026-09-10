@@ -120,7 +120,7 @@ resolution), `internal/layout/mnd_const.go:62` (`svgRasterMax = 1024`),
 | Symbol | Location | Purpose |
 |--------|----------|---------|
 | `rasterizeContext` | `imageout.go:328` | Allocates a `rasterSS`× supersampled NRGBA canvas (white or transparent), paints ops in `layout.PaintOrder`, box-filters down to final size |
-| `rasterDimension` / `validateRasterSize` | `imageout.go:401/422` | Dimension guards: width/height ≤ 16,384; ≤ 64M pixels; ≤ 256 MiB backing bytes |
+| `rasterDimension` / `validateRasterSize` | `imageout.go:521/542` | Dimension guards on the supersampled canvas (`rasterSS = 2`): width/height ≤ 16,384 px (8,192 CSS px per side); ≤ 64M pixels (67,108,864; 16M CSS pixels); ≤ 256 MiB backing bytes |
 | `supersamplePixPool` | `imageout.go:321` | `sync.Pool` recycling of the large supersample pixel buffer across renders |
 | `paint` (dispatch) | `imageout.go:755` | Switch over `layout.OpKind`: `OpFillRect`/`OpStrokeRect`/`OpLine`/`OpText`/`OpBullet`/`OpImage`; `OpLinkURI` paints nothing |
 | `paintText` | `imageout.go:846` | Fractional-baseline text draw + fake-bold second pass (Latin-only gate in `layout.FakeBoldFor`) |
@@ -447,6 +447,20 @@ contract (the P1-1 engine-seam goal).
   edges are softer than hinted/system renderers. Documented as a fidelity
   tier-1 success ("image mode not blocky 5×7 text") but not a hinting claim
   (`documentation/fidelity.md`).
+- **Raster budget envelope:** image mode caps the final canvas at 8,192 CSS
+  px per side and 16,777,216 CSS px (16M) in total. Painting runs at
+  `rasterSS = 2`, so the internal supersampled canvas is capped at 16,384 px
+  per side, 67,108,864 px (64M), and 256 MiB of NRGBA backing bytes
+  (`imageout.go:43-46`, `:92`, `:542-560`). A document that crosses the
+  envelope fails with a wrapped `errRasterTooLarge` (`imageout: raster
+  exceeds resource budget`) instead of being tiled or auto-scaled. Four
+  golden templates cross it at 1x (complex-css, font-examples, and
+  fixture-56 on the per-side cap; fixture-60 on the pixel cap), so the
+  image profiling harness records them as skipped. The remedy is manual:
+  lower `--zoom` (library `ImageDocument.Zoom`) below the fitting bound,
+  such as `--zoom 0.73` or lower for complex-css, about 11,208 CSS px tall;
+  or lower `--width` when the width is what overflows. PDF mode is not
+  subject to this cap.
 - **Nearest-neighbour `<img>` scaling** — large photo downscaling is blocky
   (accepted; Go 1.26 removed stdlib scalers). Natural-size logos/grids are
   exact. An analytic/filtered scaler is a possible future improvement.

@@ -1,6 +1,7 @@
 package layout
 
 import (
+	"image"
 	"strconv"
 	"strings"
 
@@ -65,6 +66,10 @@ type imageRef struct {
 	data   []byte
 	w, h   int
 	isJPEG bool
+	// crops caches encoded border-image slice PNGs keyed by source rect so one
+	// element's slices are encoded once per Layout run instead of once per
+	// consumer. The ref is engine-local and layout runs single-goroutine.
+	crops map[image.Rectangle][]byte
 }
 
 // resolveImage fetches (once) and decodes (once) src; nil on any failure.

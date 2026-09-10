@@ -366,36 +366,16 @@ func RegistryFromGlobal(global settings.PdfGlobal) *Registry {
 }
 
 // scanFontFile parses a font file into the registry, skipping anything that
-// is not a TTF/OTF or fails to parse.
+// is not a TTF/OTF or fails to parse. Parses are memoized across conversions
+// by loadFontFile (see font_file_cache.go).
 func scanFontFile(out *Registry, path string, entry os.DirEntry) {
 	low := strings.ToLower(entry.Name())
 	if !strings.HasSuffix(low, ".ttf") && !strings.HasSuffix(low, ".otf") {
 		return
 	}
 
-	if info, err := entry.Info(); err == nil && info.Size() > maxFontBytes {
-		return
+	fnt := loadFontFile(path, entry)
+	if fnt != nil {
+		out.AddFont(fnt)
 	}
-
-	file, err := os.Open(path)
-	if err != nil {
-		return
-	}
-	defer file.Close()
-
-	data, err := io.ReadAll(io.LimitReader(file, int64(maxFontBytes)+1))
-	if err != nil || len(data) > maxFontBytes {
-		return
-	}
-
-	fnt, err := ParseTTF(data)
-	if err != nil {
-		return
-	}
-
-	if fnt.PostScriptName == "" {
-		fnt.PostScriptName = strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
-	}
-
-	out.AddFont(fnt)
 }

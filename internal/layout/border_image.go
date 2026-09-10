@@ -471,12 +471,33 @@ func appendBorderImagePart(
 	src image.Rectangle,
 	x, y, w, h float64,
 ) []Op {
-	data, err := cropBorderImage(ref.data, src)
+	data, err := borderImageSliceBytes(ref, src)
 	if err != nil {
 		return dst
 	}
 
 	return append(dst, newBorderImageOp(x, y, w, h, data, src.Dx(), src.Dy(), false))
+}
+
+// borderImageSliceBytes returns the encoded PNG for one source slice of ref,
+// encoding each distinct source rect once per ref. Bytes are reused as-is.
+func borderImageSliceBytes(ref *imageRef, src image.Rectangle) ([]byte, error) {
+	if data, ok := ref.crops[src]; ok {
+		return data, nil
+	}
+
+	data, err := cropBorderImage(ref.data, src)
+	if err != nil {
+		return nil, err
+	}
+
+	if ref.crops == nil {
+		ref.crops = map[image.Rectangle][]byte{}
+	}
+
+	ref.crops[src] = data
+
+	return data, nil
 }
 
 func cropBorderImage(data []byte, src image.Rectangle) ([]byte, error) {

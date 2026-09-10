@@ -1,7 +1,6 @@
 package profiling
 
 import (
-	"context"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -45,7 +44,7 @@ func benchmarkCorpus(b *testing.B, mode string) {
 
 	fixtureDir := resolveFixtureDir(b)
 	fixtures := discoverFixtures(b, fixtureDir)
-	ctx := context.Background()
+	ctx := b.Context()
 	supported := make([]string, 0, len(fixtures))
 
 	for _, path := range fixtures {
@@ -75,13 +74,14 @@ func benchmarkFixtures(b *testing.B, mode string) {
 
 	fixtureDir := resolveFixtureDir(b)
 	fixtures := discoverFixtures(b, fixtureDir)
-	ctx := context.Background()
+	ctx := b.Context()
 
 	for _, path := range fixtures {
 		name := strings.TrimSuffix(filepath.Base(path), ".html")
 
 		if err := runFixture(ctx, mode, path, fixtureDir); err != nil {
 			runErr := err
+
 			b.Run(name, func(b *testing.B) {
 				b.Skipf("unsupported: %v", runErr)
 			})

@@ -1,8 +1,8 @@
 # 0.2.6 review - golden corpus memory profiling and benchmarks (2026-09-10)
 
 > **Parent:** `plans/0.2.6/review/architecture-deepening-2026-09-10.md` - companion performance evidence
-> **Status:** harness built, benchmarks and heap/stack profiles captured. All measurement rows are `[x]`. Phase 6 adds 13 `IMPROV` proposals; they are `[ ]` and none are implemented.
-> **Estimated effort:** one profiling wave (harness plus three modes). Phase 6 is a suggestion list, not implementation work.
+> **Status:** harness built, benchmarks and heap/stack profiles captured, and all 13 `IMPROV` rows implemented and measured on 2026-09-10. `make test`, `make golden`, `make claim-scan`, and `make lint` all exit 0.
+> **Estimated effort:** one profiling wave plus two implementation waves (A/B/C).
 > **Date:** 2026-09-10
 > **Toolchain:** go1.26.4 linux/amd64, 24 vCPU (i7-13700HX)
 > **Harness:** `internal/profiling/` (new, opt-in; never runs in `make test`)
@@ -53,9 +53,9 @@ retained memory. PDF's top allocator is input reading (`io.ReadAll`, 858 MB, 39.
 dominated by rasterization buffers (`rasterizeContext`, 28% flat and 60% cumulative of 5.2 GiB).
 JPEG allocates 105.6M objects, about 12x PNG, from its encoder.
 
-The profiles also yield 13 ranked improvement proposals in Phase 6, led by a cross-conversion font
-cache (about -38% PDF B/op warm) and a YCbCr fast path for `jpeg.Encode` (allocs/op from 105.6M to
-an estimated 10-13M). None are implemented.
+The 13 proposals in Phase 6 are now implemented and measured (Phase 7). Whole-corpus allocation
+traffic fell 52% for PDF, 41% for PNG, and 43% for JPEG; allocs/op fell 94.5%, 93.4%, and 99.5%.
+The estimated wins were met or exceeded.
 
 ## Phase 1: Harness
 
@@ -230,11 +230,10 @@ before/after benchmark plan.
   fixture-56 (19228 px), and fixture-60 (100M pixels) exceed the image budget. This is a documented
   feature limit; a zoomed-down profile variant would be needed to cover them.
 
-## Phase 6: Suggested improvements (IMPROV)
+## Phase 6: Improvements (IMPROV)
 
-Ranked proposals from the Phase 3 hotspots. None are implemented; every row starts `[ ]` and each
-needs its own before/after benchmark before code lands. Expected wins are estimates from the
-captured profiles, not measured results.
+Ranked proposals from the Phase 3 hotspots. All 13 are implemented and measured (Phase 7); rows are
+`[x]`. Expected wins in the table are the original estimates, not the final measurements.
 
 | Row | Area | Expected win | Risk |
 |-----|------|--------------|------|
@@ -252,7 +251,7 @@ captured profiles, not measured results.
 | IMPROV-12 | JPEG | about -55 MB | bounded pooled buffer retention |
 | IMPROV-13 | Image | none, actionable budget errors and docs | none |
 
-- [ ] **IMPROV-01 · PDF** Cache parsed font files across conversions.
+- [x] **IMPROV-01 · PDF** Cache parsed font files across conversions.
       `internal/pdf/registry.go:370` (`scanFontFile`). `go tool pprof -peek=io.ReadAll` attributes
       747.8 MB (87%) of the PDF profile to `scanFontFile`; all 65 conversions rescan the same
       10 TTF files (cum 838.5 MB). Change: bounded, mutex-guarded cache keyed on absolute path +
@@ -263,7 +262,7 @@ captured profiles, not measured results.
       leave the top rows, and a warm-vs-cold output hash. Not: caching a whole `*Registry`
       (font-face leakage) or raw bytes (the parse cost remains).
 
-- [ ] **IMPROV-02 · JPEG** Hand `jpeg.Encode` a `*image.YCbCr` instead of `*image.NRGBA`.
+- [x] **IMPROV-02 · JPEG** Hand `jpeg.Encode` a `*image.YCbCr` instead of `*image.NRGBA`.
       `internal/imageout/imageout.go:2028` (`jpeg.Encode`). The stdlib has direct `Pix` paths for
       RGBA and YCbCr; NRGBA goes through `toYCbCr`, which boxes a color per pixel (`NRGBA.At`
       370.5 MB, the 97M allocs/op gap versus PNG). Change: one `nrgbaToYCbCr420` conversion matching
@@ -273,7 +272,7 @@ captured profiles, not measured results.
       Not: alpha flattening only (still NRGBA) or a `*image.RGBA` conversion (4 bytes per pixel
       instead of 1.5 and still runs RGBToYCbCr in the encoder).
 
-- [ ] **IMPROV-03 · Image** Byte-budgeted, GC-proof supersample canvas cache.
+- [x] **IMPROV-03 · Image** Byte-budgeted, GC-proof supersample canvas cache.
       `internal/imageout/imageout.go:425-474`. `rasterizeContext` spends 1.44 GB flat on canvas
       makes; 48 sub-32 MiB canvases (446 MB) re-make per fixture because `sync.Pool` is emptied by
       the harness GCs and buffers above the 32 MiB cap are never retained. Change: mutex-guarded
@@ -283,7 +282,7 @@ captured profiles, not measured results.
       the final-heap-after-GC check. Not: `sync.Pool` size classes (GC still clears them) or
       silently raising retention.
 
-- [ ] **IMPROV-04 · Image** Reuse glyph edge and active-row scratch.
+- [x] **IMPROV-04 · Image** Reuse glyph edge and active-row scratch.
       `internal/imageout/ttfraster.go:294-303`, `:389-394`. `rasterGlyphAlpha` allocates a fresh
       active-row slice per glyph (270.4 MB flat) and `makeGlyphEdgeList`/`makeGlyphEdges` add
       127 MB cum. Change: one `glyphScratch` in a `sync.Pool` (edges plus active rows) reset per
@@ -291,7 +290,7 @@ captured profiles, not measured results.
       benchmarks plus `go test ./internal/imageout`; profile flat at `ttfraster.go:302` and `:394`.
       Not: a cross-render glyph bitmap cache; the atlas is deliberately per run.
 
-- [ ] **IMPROV-05 · Layout** Cache border-image slice crops on the resolved image ref.
+- [x] **IMPROV-05 · Layout** Cache border-image slice crops on the resolved image ref.
       `internal/layout/border_image.go:468`, `:482`, `internal/layout/layout_flow.go:63`.
       `cropBorderImage` is 109-287 MB per profile (660 MB across all three) because each of
       fixture-60's 8 border-image elements re-encodes the same 24 source rects; `resolveImage`
@@ -300,7 +299,7 @@ captured profiles, not measured results.
       with identical bytes. Proof: benchmarks for all modes, `go test ./internal/layout`, and
       `make golden`. Not: a package-global cache or decode caching.
 
-- [ ] **IMPROV-06 · Layout** Size the dashed-border op slice once per box.
+- [x] **IMPROV-06 · Layout** Size the dashed-border op slice once per box.
       `internal/layout/layout_chrome.go:57`, `:137`. Four-sided dashed boxes allocate n + 2n + 3n +
       4n op slots for 4n ops; the site is 131-137 MB in image modes. Change: compute the per-side
       segment upper bound, sum the active sides, and allocate once; keep the existing growth
@@ -308,7 +307,7 @@ captured profiles, not measured results.
       benchmarks plus layout tests plus `make golden`. Not: `slices.Grow` or append growth, which
       over-allocates.
 
-- [ ] **IMPROV-07 · PDF** Read concrete pixel types in `renderImagePixels`.
+- [x] **IMPROV-07 · PDF** Read concrete pixel types in `renderImagePixels`.
       `internal/pdf/images.go:419-454`. `img.At(...)` boxes a color per pixel, 77.5 MB. Change:
       type switch once for `*image.RGBA` and `*image.NRGBA` using the concrete accessors with the
       same RGBA math, generic `At` fallback. Expected: about -78 MB (3.6%) per PDF run. Proof: PDF
@@ -316,14 +315,14 @@ captured profiles, not measured results.
       bit-exact comparison against the generic path. Not: caching decoded PNGs (retains 230 MB) or
       hand-rolled premultiplication (differs from stdlib rounding).
 
-- [ ] **IMPROV-08 · PNG** Bound the blend scratch to the op rectangle.
+- [x] **IMPROV-08 · PNG** Bound the blend scratch to the op rectangle.
       `internal/imageout/blend.go:18`. `paintBlended` copies the whole canvas for one
       `mix-blend-mode` element (210.6 MB, 4% of the PNG profile). Change: extract the conservative
       bounds helper already used by `paintTransformedOp` and allocate the scratch at the op rect.
       Expected: about -210 MB. Proof: fixture-62 PNG benchmark before/after plus decoded pixel
       parity and `make golden`. Not: a reused full-canvas scratch (peak RSS unchanged).
 
-- [ ] **IMPROV-09 · Layout** Merge deferred chrome in place from the op buffer's spare capacity.
+- [x] **IMPROV-09 · Layout** Merge deferred chrome in place from the op buffer's spare capacity.
       `internal/layout/layout_chrome.go:674`, allocation at `:702`. The merge allocates a second
       display list (23-113 MB per profile) although `e.ops` has near-final capacity. Change: when
       spare capacity fits, fill backwards in place; otherwise one exact copy. Expected: the site
@@ -331,7 +330,7 @@ captured profiles, not measured results.
       and a profile recheck. Not: a second workspace buffer (the main path does not use
       `Workspace`).
 
-- [ ] **IMPROV-10 · Image** Remove per-pixel color boxing in `scaleNearestGeneric`.
+- [x] **IMPROV-10 · Image** Remove per-pixel color boxing in `scaleNearestGeneric`.
       `internal/imageout/imageout.go:1639-1676`. `color.NRGBAModel.Convert(src.At(...))` boxes the
       source and converted colors; `image.(*YCbCr).At` is 26.5 MB plus 1.7M sampled objects, and the
       PNG profile shows the same at the NRGBA model. Change: fast paths for `*image.YCbCr`,
@@ -339,7 +338,7 @@ captured profiles, not measured results.
       about -26 to -53 MB in both image modes. Proof: PNG and JPEG benchmarks. Not: an
       `x/image/draw` dependency, which the allowlist forbids.
 
-- [ ] **IMPROV-11 · PDF** Read stat-sized font files in `scanFontFile`.
+- [x] **IMPROV-11 · PDF** Read stat-sized font files in `scanFontFile`.
       `internal/pdf/registry.go:386`. `io.ReadAll` allocates 11.5 MB to hold 5.2 MB of fonts
       (482 MB in intermediate chunks plus 375 MB in the final copy). Change: allocate from the
       already-known `info.Size()` and use `io.ReadFull`, keeping the
@@ -348,14 +347,14 @@ captured profiles, not measured results.
       CLI. Proof: a cold-corpus benchmark or a `BenchmarkScanFontFile` micro-benchmark. Not:
       `os.ReadFile` (reopens the path and drops the 32 MiB cap).
 
-- [ ] **IMPROV-12 · JPEG** Stop the encode buffer growing from zero and skip the bufio layer.
+- [x] **IMPROV-12 · JPEG** Stop the encode buffer growing from zero and skip the bufio layer.
       `internal/imageout/imageout.go:2011-2054`, `:1850-1866`. `bytes.Buffer` growth is 54.4 MB and
       `jpeg.Encode` wraps a `bufio.Writer` because `limitedImageBuffer` has no `Flush`. Change: add
       `Flush() error { return nil }` and pool or presize the buffer, bounded by `maxImageEncoded`.
       Expected: about -55 MB, same bytes. Proof: JPEG benchmark B/op. Not: streaming straight into
       `req.Output` (breaks the no-partial-output guarantee).
 
-- [ ] **IMPROV-13 · Image** Make the raster budget failure actionable and document the envelope.
+- [x] **IMPROV-13 · Image** Make the raster budget failure actionable and document the envelope.
       `internal/imageout/imageout.go:531-570`, `:44-49`. The four skips report supersampled
       dimensions with no unit, limit, or remedy; the CSS heights are actually 11208, 26259, and
       9614 px. Change: include the CSS px size, the limit, and the maximum fitting zoom (for
@@ -364,6 +363,57 @@ captured profiles, not measured results.
       Expected: no allocation change; the four skips become actionable. Proof:
       `go test ./internal/imageout -run TestRaster -count=1` and `make test`. Not: an automatic
       zoomed fallback or tiled render (changes output geometry or just moves the buffer).
+
+## Phase 7: Measured outcomes (2026-09-10)
+
+All 13 rows were implemented in three waves and measured with the same harness. The waves are
+cumulative, so per-row attribution is grouped by wave rather than isolated.
+
+Whole-corpus benchmark, 3 passes, `-benchmem`:
+
+| Mode | Metric | Baseline | Final | Delta |
+|------|--------|---------:|------:|------:|
+| PDF | ns/op | 4.953 s | 3.961 s | -20.0% |
+| PDF | B/op | 2.262 GB | 1.089 GB | -51.9% |
+| PDF | allocs/op | 21.72M | 1.194M | -94.5% |
+| PNG | ns/op | 11.144 s | 9.794 s | -12.1% |
+| PNG | B/op | 4.362 GB | 2.575 GB | -41.0% |
+| PNG | allocs/op | 8.578M | 0.567M | -93.4% |
+| JPEG | ns/op | 9.618 s | 8.261 s | -14.1% |
+| JPEG | B/op | 4.677 GB | 2.648 GB | -43.4% |
+| JPEG | allocs/op | 105.586M | 0.566M | -99.5% |
+
+Wave deltas and the rows each wave carried:
+
+- **Wave A** (`IMPROV-01`, `-07`, `-11` in pdf; `-05`, `-06`, `-09` in layout): PDF B/op 2.262 GB
+  to 1.094 GB (-51.7%) and allocs 21.72M to 1.19M (-94.5%); PNG B/op 4.362 GB to 3.379 GB
+  (-22.5%). Layout-sensitive PDF fixtures in single-shot per-template runs: fixture-60 232.5 MB to
+  138.2 MB (-40.6%), fixture-61 94.6 MB to 69.9 MB (-26.1%), fixture-62 94.6 MB to 71.1 MB
+  (-24.9%).
+- **Wave B** (`IMPROV-02`, `-03`, `-04`): JPEG allocs 105.37M to 8.28M (-92.1%) and B/op 3.733 GB
+  to 2.906 GB (-22.2%); PNG B/op 3.379 GB to 2.827 GB (-16.3%).
+- **Wave C** (`IMPROV-08`, `-10`, `-12`, `-13`): PNG allocs 8.28M to 0.567M (-93.1%) and B/op
+  2.827 GB to 2.575 GB (-8.9%); JPEG allocs 8.28M to 0.566M and B/op 2.906 GB to 2.648 GB (-8.9%).
+
+Per-row proof:
+
+- `IMPROV-01`/`-07`/`-11`: font cache, pixel parity, and stat-sized read tests pass; the PDF wave A
+  deltas are the measured outcome.
+- `IMPROV-02`: six input shapes encode byte-for-byte equal to the stdlib NRGBA path; JPEG allocation
+  count collapses in wave B.
+- `IMPROV-03`/`-04`: buffer-cache and glyph-scratch tests pass; PNG raster bytes fall 16.3%.
+- `IMPROV-05`/`-06`/`-09`: crop-cache probe, dashed-capacity, and randomized in-place merge
+  equivalence checks; fixture deltas above; `make golden` passes.
+- `IMPROV-08`/`-10`: blend parity against a full-canvas reference and scale parity across source
+  types; the PNG and JPEG allocation collapse in wave C.
+- `IMPROV-12`: failed-encode test; JPEG bytes fall with the pooled buffer.
+- `IMPROV-13`: budget tests assert the CSS pixel size and the `--zoom` bound; the two docs describe
+  the envelope.
+
+Gates on the final tree: `make test`, `make golden`, `make claim-scan`, and `make lint` all exit 0.
+Artifacts: `output/profiles/2026-09-10/` holds the baseline, and
+`output/profiles/2026-09-10-improve/` holds the wave A/B/C runs and lint captures. Both are
+gitignored.
 
 ## Dependencies
 
@@ -399,8 +449,10 @@ go tool pprof -top -nodecount=14 -alloc_space \
 
 ## What this wave did not do
 
-- No source changes and no fixes to any hotspot. Phase 6 lists 13 ranked improvement proposals;
-  each has its own before/after benchmark plan and none are implemented.
+- The profiling wave changed no source. The follow-up implementation wave (Phase 7) changed
+  `internal/pdf`, `internal/layout`, `internal/imageout`, and two documentation files. No git
+  command was run in either wave, so the implementation changes remain uncommitted in the working
+  tree.
 - No CPU or block profiling; this wave covers heap and stack only, as requested.
 - No changes to existing benchmarks, Makefile bench targets, or `scripts/bench-external.sh`.
 - No commits, pushes, or any git command. The harness is new code under `internal/profiling/`,
