@@ -161,6 +161,7 @@ type Document struct {
 	namedDests        []namedDestEntry // dual page+/SD destinations for PDF/UA-2
 	lang              string           // document language (default "en-US")
 	finalized         bool
+	finalizeErr       error // sticky first mutating finalize error; see failFinalize
 }
 
 // namedDestEntry is one PDF 2.0 named destination with a classic page
@@ -806,12 +807,21 @@ func (d *Document) embedMetadata() objRef {
 }
 
 // finalize builds catalog, pages tree, fonts, images, annots, outlines and
-// page objects once.
+// page objects once. Input validation failures (policy, no pages, missing UA
+// title) happen before any mutation and stay retryable. Once finalize starts
+// mutating the object graph, the first failure becomes sticky through
+// failFinalize: finalizePage releases each page's raw content buffer after its
+// stream is materialized, so a later retry could otherwise serialize empty
+// page streams from a document that looks fixed.
 //
 //nolint:cyclop,funlen // finalize coordinates entire document serialization pipeline
 func (d *Document) finalize() error {
 	if d.finalized {
 		return nil
+	}
+
+	if d.finalizeErr != nil {
+		return d.finalizeErr
 	}
 
 	if err := d.policy.Validate(); err != nil {
@@ -855,20 +865,20 @@ func (d *Document) finalize() error {
 	// Structure tree must be finalized before outlines/annots so StructElem
 	// refs are available for PDF/UA-2 structure destinations (/SD).
 	if err := d.finalizeStructure(); err != nil {
-		return err
+		return d.failFinalize(err)
 	}
 
 	// Outlines and page annots register dual named destinations under UA-2
 	// before the catalog is written (catalog needs /Names /Dests).
 	if d.outlineRoot != nil {
 		if err := d.finalizeOutlines(d.outlineRoot); err != nil {
-			return err
+			return d.failFinalize(err)
 		}
 	}
 
 	for _, p := range d.pages {
 		if err := d.finalizePage(p, pagesRef); err != nil {
-			return err
+			return d.failFinalize(err)
 		}
 	}
 
@@ -885,6 +895,16 @@ func (d *Document) finalize() error {
 	d.finalized = true
 
 	return nil
+}
+
+// failFinalize records err as the document's terminal mutating finalize error
+// and returns it. A mutating failure leaves partially built objects behind and
+// may leave earlier pages with released content buffers, so every later Write
+// returns this same error instead of silently serializing empty page streams.
+func (d *Document) failFinalize(err error) error {
+	d.finalizeErr = err
+
+	return err
 }
 
 // unionFontRunes materializes the document-wide rune sets collected while
@@ -1095,6 +1115,15 @@ func (d *Document) finalizePage(page *Page, pagesRef objRef) error {
 	if err != nil {
 		return err
 	}
+
+	// The page's stream object now owns the serialized bytes: compression
+	// wrote a fresh Flate copy, or the object aliases the raw slice directly
+	// when compression is off. This is the last reader, so drop the builder's
+	// reference here to free the raw buffer at the peak point. After this,
+	// Page.Content() stays callable but Content.Bytes() returns an empty
+	// slice; finalize retries fail closed through Document.finalizeErr
+	// because the raw stream can no longer be rebuilt.
+	page.content.releaseBuffer()
 
 	parts := []string{
 		"<< /Type /Page",

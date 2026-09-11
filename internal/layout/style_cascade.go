@@ -1,6 +1,7 @@
 package layout
 
 import (
+	"maps"
 	"sort"
 	"strconv"
 	"strings"
@@ -19,6 +20,14 @@ const (
 	marginProperty  = "margin"
 	paddingProperty = "padding"
 
+	textEmphasisProperty         = "text-emphasis"
+	textEmphasisStyleProperty    = "text-emphasis-style"
+	textEmphasisColorProperty    = "text-emphasis-color"
+	textEmphasisPositionProperty = "text-emphasis-position"
+	textEmphasisSkipProperty     = "text-emphasis-skip"
+	textShadowProperty           = "text-shadow"
+	tabSizeProperty              = "tab-size"
+
 	inlineStylePriority = 1 << 30
 
 	defaultRootFontPx = 16
@@ -33,6 +42,24 @@ const (
 	boxShorthandTwoSides   = 2
 	boxShorthandThreeSides = 3
 )
+
+// internalCustomPropWriters reports whether raw declares a property whose
+// applier stores engine bookkeeping in CustomProps. An element that declares
+// no --* property inherits the parent's map; when one of these appliers runs,
+// mergeCustomProps must hand it a copy or the parent's stored style would be
+// mutated after insertion (styleStore interning shares records).
+func internalCustomPropWriters(raw map[string]string) bool {
+	for prop := range raw {
+		switch prop {
+		case textEmphasisProperty, textEmphasisStyleProperty, textEmphasisColorProperty,
+			textEmphasisPositionProperty, textEmphasisSkipProperty,
+			textShadowProperty, tabSizeProperty:
+			return true
+		}
+	}
+
+	return false
+}
 
 // mergeCustomProps inherits parent custom properties and overlays any --*
 // declarations from raw, resolving var() chains via css.ResolveCustomProps.
@@ -50,6 +77,10 @@ func mergeCustomProps(parentProps map[string]string, raw map[string]string) map[
 	}
 
 	if len(declared) == 0 {
+		if len(parentProps) > 0 && internalCustomPropWriters(raw) {
+			return maps.Clone(parentProps)
+		}
+
 		return parentProps
 	}
 
@@ -173,7 +204,7 @@ var inheritableProps = []inheritCopy{ //nolint:gochecknoglobals // static inheri
 	{[]string{"text-wrap"}, func(dst, src *ResolvedStyle) { dst.TextWrap = src.TextWrap }},
 	{[]string{"text-wrap-mode"}, func(dst, src *ResolvedStyle) { dst.TextWrapMode = src.TextWrapMode }},
 	{[]string{"text-wrap-style"}, func(dst, src *ResolvedStyle) { dst.TextWrapStyle = src.TextWrapStyle }},
-	{[]string{"tab-size"}, func(dst, src *ResolvedStyle) { dst.TabSize = src.TabSize }},
+	{[]string{tabSizeProperty}, func(dst, src *ResolvedStyle) { dst.TabSize = src.TabSize }},
 	{[]string{"hyphens"}, func(dst, src *ResolvedStyle) { dst.Hyphens = src.Hyphens }},
 	{[]string{"hyphenate-character"}, func(dst, src *ResolvedStyle) { dst.HyphenateCharacter = src.HyphenateCharacter }},
 	{[]string{"text-justify"}, func(dst, src *ResolvedStyle) { dst.TextJustify = src.TextJustify }},

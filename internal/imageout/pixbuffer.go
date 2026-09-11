@@ -96,6 +96,28 @@ func (c *pixBufferCache) put(pBuf *pixBuffer) {
 	c.total += size
 }
 
+// stats reports the retained buffer count, total retained bytes, and the
+// largest retained capacity. It takes the cache lock so callers can inspect
+// retention while concurrent Renders may be running.
+func (c *pixBufferCache) stats() (int, int, int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	total := 0
+	largest := 0
+
+	for _, pBuf := range c.buffers {
+		size := cap(pBuf.b)
+		total += size
+
+		if size > largest {
+			largest = size
+		}
+	}
+
+	return len(c.buffers), total, largest
+}
+
 // supersamplePixCache recycles supersample canvases between rasterizations.
 //
 //nolint:gochecknoglobals // supersample canvas recycling

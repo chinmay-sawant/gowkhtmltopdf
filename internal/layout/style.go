@@ -1,4 +1,5 @@
 //nolint:all
+//go:generate go run ../../scripts/gen-style-intern -dir . -out style_intern_gen.go
 package layout
 
 import (
@@ -705,20 +706,44 @@ const styleStoreChunkSize = 64
 
 // styleStore owns resolved styles for one resolution pass. It deliberately
 // does not cross Layout calls or @container re-cascade passes.
+//
+// Stored styles are immutable after insertion. append interns an exact
+// duplicate (styleInternFingerprint bucket plus styleInternEqual verification)
+// instead of storing another copy, so repeated table cells and inherited text
+// styles share one ~3.4 KiB record. The fingerprint is only a bucket key; the
+// equality check is the sharing decision.
 type styleStore struct {
 	candidate ResolvedStyle
 	chunks    [][]ResolvedStyle
+	// intern maps a candidate fingerprint to stored records. Buckets stay
+	// small because most documents repeat a few dozen distinct styles.
+	intern map[uint64][]*ResolvedStyle
 }
 
 func (s *styleStore) append(style ResolvedStyle) *ResolvedStyle {
+	fingerprint := styleInternFingerprint(&style)
+
+	for _, stored := range s.intern[fingerprint] {
+		if styleInternEqual(stored, &style) {
+			return stored
+		}
+	}
+
 	if len(s.chunks) == 0 || len(s.chunks[len(s.chunks)-1]) == styleStoreChunkSize {
 		s.chunks = append(s.chunks, make([]ResolvedStyle, 0, styleStoreChunkSize))
 	}
 
 	chunk := len(s.chunks) - 1
 	s.chunks[chunk] = append(s.chunks[chunk], style)
+	stored := &s.chunks[chunk][len(s.chunks[chunk])-1]
 
-	return &s.chunks[chunk][len(s.chunks[chunk])-1]
+	if s.intern == nil {
+		s.intern = make(map[uint64][]*ResolvedStyle)
+	}
+
+	s.intern[fingerprint] = append(s.intern[fingerprint], stored)
+
+	return stored
 }
 
 // zeroResolvedStyle is the empty style for comment/doctype nodes (shared).

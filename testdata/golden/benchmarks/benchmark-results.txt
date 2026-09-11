@@ -428,3 +428,97 @@ BenchmarkLibraryImage/250Tiles-24     	      10	  73062562 ns/op	   1.53 MB/s	20
 BenchmarkLibraryImage/500Tiles-24     	      10	 142592306 ns/op	   1.58 MB/s	51995067 B/op	   17607 allocs/op
 PASS
 ok  	github.com/chinmay-sawant/gowkhtmltopdf	28.288s
+
+# =====================================================================
+# Snapshot K: 2026-09-11 performance-recovery capture on the uncommitted
+# 0.2.6 recovery working tree. VERSION still reads 0.2.5, so this is a
+# working-tree measurement, not a released-version measurement.
+# Only the generic path was measured. The harness filters name the generic
+# sub-benchmarks; `grep -il certified` over all nine raw result files
+# matched none, so no certified-islands row leaked into this snapshot.
+# Method: one fresh process per invocation, one invocation per independent
+# sample, --benchtime=1x --count=1. sample1..sample3 are three independent
+# samples. The medians below are medians of the three raw values; B/op is
+# never averaged. B/op is cumulative allocation traffic, not peak RSS.
+# Commands (each exited 0; S is sample1, sample2, or sample3):
+#   ./scripts/bench-performance-recovery.sh --mode=internal-pdf --sizes=2,500 --benchtime=1x --count=1 --out="$S"
+#   ./scripts/bench-performance-recovery.sh --mode=public-pdf --sizes=2,500 --benchtime=1x --count=1 --out="$S"
+#   ./scripts/bench-performance-recovery.sh --mode=public-image --sizes=250,500 --benchtime=1x --count=1 --out="$S"
+# Toolchain/host: go1.26.4 linux/amd64, 24 CPUs, 13th Gen Intel Core
+# i7-13700HX, Linux 6.6.87.2-microsoft-standard-WSL2 x86_64, 7.6 GiB RAM.
+# Fixture: testdata/golden/benchmarks/templates/report.html.tmpl
+# sha256=e3b5387bed117844c3502915cd3def253738959feb894435720f3532746e6974
+# Raw samples: plans/0.2.6/perf-review/results/2026-09-11/valid/sample{1,2,3}/
+# Full method, CLI table, and external tables:
+# plans/0.2.6/perf-review/results/2026-09-11/valid-02-04.md
+# Code slices in the captured tree: exact style sharing (PDF-02), removed
+# discarded pagination page map (PDF-04), pagination-index release after
+# paint (PDF-05), per-page raw content buffer release (PDF-06), and the
+# direct final-resolution image branch above 2,097,152 pixels (IMG-02).
+
+# Snapshot K raw rows, sample 1:
+#   BenchmarkPDFPages/generic/2Pages-24 1 9429601 ns/op 3.63 MB/s 34209 output-bytes 2 pages 9583584 B/op 7012 allocs/op
+#   BenchmarkPDFPages/generic/500Pages-24 1 1225893148 ns/op 1.16 MB/s 1419234 output-bytes 500 pages 321350456 B/op 1281235 allocs/op
+#   BenchmarkLibraryPDF/2Pages-24 1 10884925 ns/op 3.14 MB/s 34209 output-bytes 2 pages 9589312 B/op 7017 allocs/op
+#   BenchmarkLibraryPDF/500Pages-24 1 1195985558 ns/op 1.19 MB/s 1419234 output-bytes 500 pages 322879024 B/op 1281243 allocs/op
+#   BenchmarkLibraryImage/250Tiles-24 1 55262809 ns/op 1.71 MB/s 2056 height 94352 output-bytes 250 tiles 1024 width 21507520 B/op 10031 allocs/op
+#   BenchmarkLibraryImage/500Tiles-24 1 94059139 ns/op 2.00 MB/s 4040 height 188268 output-bytes 500 tiles 1024 width 27206072 B/op 18023 allocs/op
+
+# Snapshot K raw rows, sample 2:
+#   BenchmarkPDFPages/generic/2Pages-24 1 11655941 ns/op 2.93 MB/s 34209 output-bytes 2 pages 9578008 B/op 7005 allocs/op
+#   BenchmarkPDFPages/generic/500Pages-24 1 1246049018 ns/op 1.14 MB/s 1419234 output-bytes 500 pages 321071280 B/op 1281204 allocs/op
+#   BenchmarkLibraryPDF/2Pages-24 1 10591980 ns/op 3.23 MB/s 34209 output-bytes 2 pages 9596168 B/op 7024 allocs/op
+#   BenchmarkLibraryPDF/500Pages-24 1 1272329332 ns/op 1.12 MB/s 1419234 output-bytes 500 pages 322890064 B/op 1281255 allocs/op
+#   BenchmarkLibraryImage/250Tiles-24 1 51507887 ns/op 1.83 MB/s 2056 height 94352 output-bytes 250 tiles 1024 width 21502072 B/op 10026 allocs/op
+#   BenchmarkLibraryImage/500Tiles-24 1 87796960 ns/op 2.14 MB/s 4040 height 188268 output-bytes 500 tiles 1024 width 27205880 B/op 18022 allocs/op
+
+# Snapshot K raw rows, sample 3:
+#   BenchmarkPDFPages/generic/2Pages-24 1 10058894 ns/op 3.40 MB/s 34209 output-bytes 2 pages 9578008 B/op 7005 allocs/op
+#   BenchmarkPDFPages/generic/500Pages-24 1 1303023920 ns/op 1.09 MB/s 1419234 output-bytes 500 pages 321104720 B/op 1281246 allocs/op
+#   BenchmarkLibraryPDF/2Pages-24 1 11597763 ns/op 2.95 MB/s 34209 output-bytes 2 pages 9596296 B/op 7025 allocs/op
+#   BenchmarkLibraryPDF/500Pages-24 1 1268557421 ns/op 1.12 MB/s 1419234 output-bytes 500 pages 323141136 B/op 1281248 allocs/op
+#   BenchmarkLibraryImage/250Tiles-24 1 54415475 ns/op 1.73 MB/s 2056 height 94352 output-bytes 250 tiles 1024 width 21502152 B/op 10026 allocs/op
+#   BenchmarkLibraryImage/500Tiles-24 1 89184025 ns/op 2.11 MB/s 4040 height 188268 output-bytes 500 tiles 1024 width 27205864 B/op 18022 allocs/op
+
+# Snapshot K median summary (median of the three raw samples; B/op is one of
+# the three raw values, never an average):
+#   internal generic PDF 2 pages:    10,058,894 ns/op (10.06 ms)    9,578,008 B/op    7,005 allocs/op
+#   internal generic PDF 500 pages: 1,246,049,018 ns/op (1,246.05 ms) 321,104,720 B/op 1,281,235 allocs/op
+#   public library PDF 2 pages:      10,884,925 ns/op (10.88 ms)    9,596,168 B/op    7,024 allocs/op
+#   public library PDF 500 pages:   1,268,557,421 ns/op (1,268.56 ms) 322,890,064 B/op 1,281,248 allocs/op
+#   public library image 250 tiles:    54,415,475 ns/op (54.42 ms)  21,502,152 B/op   10,026 allocs/op
+#   public library image 500 tiles:    89,184,025 ns/op (89.18 ms)  27,205,880 B/op   18,022 allocs/op
+# Image geometry and encoded size were identical in all three samples:
+# 250 tiles 1024x2056 / 94,352 output-bytes; 500 tiles 1024x4040 / 188,268.
+
+# Snapshot K CLI matrix: cli-compare.md and cli-compare-results.csv were
+# regenerated by `make bench-cli-compare` (exit 0), median of 3 timed runs
+# after 1 warmup, RSS is /usr/bin/time %M in KiB:
+#   CLI 500 pages: gowk 1.288 s / 240,960 KiB / 1,419,234 PDF bytes versus
+#                  wkhtmltopdf 1.753 s / 123,172 KiB / 2,036,776 PDF bytes.
+# Full 2..500 matrix is in cli-compare.md; RSS is process evidence and is
+# not comparable to the B/op rows above.
+# Snapshot K external matrices: weasyprint-compare.md and
+# puppeteer-compare.md were regenerated by ./scripts/bench-external.sh
+# (exit 0); full warmup and timed run lines are in
+# plans/0.2.6/perf-review/results/2026-09-11/valid/valid-04-bench-external-stdout.txt.
+
+# Snapshot K recovery verdict against the supplied 0.2.4 rows (copy in
+# plans/0.2.6/perf-review/phase-wise-checklist.md lines 19-29; those rows
+# were not re-measured in this capture):
+#   - public library image 500 tiles: 27,205,880 B/op beats the 52.00 MB row.
+#   - public library image 250 tiles: 21,502,152 B/op is about 4.1% above
+#     the 20.66 MB row.
+#   - internal generic PDF 500 pages: 321,104,720 B/op versus the 237.76 MB
+#     row and 1,246.05 ms versus the 1,010 ms row: the PDF target was not met.
+#   - public library PDF 500 pages: 322,890,064 B/op versus the 236.85 MB
+#     row: the PDF target was not met.
+#   - CLI 500 pages: 1.288 s / 240,960 KiB versus the 1,042 ms / 203.3 MB
+#     rows: the CLI target was not met.
+# The remaining 500-page allocation is dominated by the one-shot display-list
+# preallocation and pagination scratch; the 2026-09-11 PERF-04 profile
+# attributes 128.2 MB to box construction and display list (led by the
+# 95,600,640 B ops preallocation at internal/layout/layout.go:1003) and
+# 113.7 MB to pagination scratch. Style storage fell from a 228.3 MB profile
+# line to distinct-record storage after PDF-02. See
+# plans/0.2.6/perf-review/results/2026-09-11/perf-04-05.md and pdf-02-05.md.

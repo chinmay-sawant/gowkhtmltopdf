@@ -91,6 +91,24 @@ const ptToPx = 96.0 / 72.0
 // stabilises small-text baselines and edges (stdlib has no FreeType hinting).
 const rasterSS = 2
 
+// directRasterPixels is the final-canvas pixel area at or above which
+// rasterizeContext paints directly at final resolution instead of
+// supersampling. One final pixel costs 4 bytes and the supersampled canvas
+// costs rasterSS*rasterSS pixels per final pixel, so this is the largest final
+// canvas whose 2x buffer still fits maxPooledRasterBytes (32 MiB / (4*2*2) =
+// 2 Mi pixels). At or above the threshold the direct branch avoids the 2x
+// canvas entirely and never enters supersamplePixCache (IMG-04). The public
+// 250-tile canvas (1024x2056 = 2,105,344 px) and 500-tile canvas
+// (1024x4040 = 4,136,960 px) both select the direct branch.
+const directRasterPixels = maxPooledRasterBytes / (4 * rasterSS * rasterSS)
+
+// directRaster reports whether a final canvas of finalPixels pixels takes the
+// direct final-resolution branch. Keeping the rule a single pixel-area
+// comparison makes the threshold boundary testable and auditable.
+func directRaster(finalPixels int) bool {
+	return finalPixels >= directRasterPixels
+}
+
 // screenWidthDefault is the wkhtmltoimage default viewport width in pixels
 // (settings.ImageGlobal.Width default is already 1024; this guards against
 // 0-width RenderOptions).
@@ -415,27 +433,52 @@ func maxHeight(res *layout.Result, opts RenderOptions) float64 {
 	return h
 }
 
+// rasterPolicy selects the supersample strategy for one rasterization.
+// rasterPolicyAuto applies the documented directRasterPixels threshold; the
+// other values force one branch so tests and the IMG-03 comparison can hold
+// every other input constant.
+type rasterPolicy int
+
+const (
+	rasterPolicyAuto rasterPolicy = iota
+	rasterPolicyDirect
+	rasterPolicySupersample
+)
+
 // rasterizeContext paints the display list into an NRGBA canvas. The canvas is
 // white unless transparent is set, in which case it starts fully transparent
-// and only painted ops become visible. Painting uses rasterSS supersampling
-// then box-filters down to the final CSS-pixel size. Glyph bitmaps for this
-// run live on a per-rasterize atlas (P5-05) so concurrent Renders do not share
-// mutable cache state. zoom is the layout zoom in effect (0 means the default
-// of 1) and only feeds budget error messages.
-//
-//nolint:cyclop,funlen,mnd // supersampled rasterization pipeline
+// and only painted ops become visible. Canvases at or above directRasterPixels
+// paint directly at final resolution; smaller canvases use rasterSS
+// supersampling then box-filter down to the final CSS-pixel size. Glyph
+// bitmaps for this run live on a per-rasterize atlas (P5-05) so concurrent
+// Renders do not share mutable cache state. zoom is the layout zoom in effect
+// (0 means the default of 1) and only feeds budget error messages.
 func rasterizeContext(
 	ctx context.Context, res *layout.Result, height float64, transparent bool, padding int, zoom float64,
 ) (*image.NRGBA, error) {
-	pxPerPt := ptToPx * float64(rasterSS)
+	return rasterizeContextPolicy(ctx, res, height, transparent, padding, zoom, rasterPolicyAuto)
+}
+
+// rasterizeContextPolicy is rasterizeContext with an explicit raster policy.
+// The supersampled geometry and budgets are computed first so every branch
+// keeps the shipped dimension checks and error messages; the direct branch
+// then paints the smaller final-size canvas those checks already bound.
+//
+//nolint:cyclop,funlen,mnd // supersampled rasterization pipeline
+func rasterizeContextPolicy(
+	ctx context.Context, res *layout.Result, height float64, transparent bool, padding int, zoom float64,
+	policy rasterPolicy,
+) (*image.NRGBA, error) {
 	paddingPt := float64(padding) * cssPxToPt
-	paddingPx := paddingPt * pxPerPt
 
 	// The canvas width follows the fixed viewport, so a smaller zoom cannot
 	// shrink it; the height follows content and the pixel area follows the
 	// height, so those checks offer a fitting-zoom remedy.
+	ssPxPerPt := ptToPx * float64(rasterSS)
+	ssPaddingPx := paddingPt * ssPxPerPt
+
 	widthPx, err := rasterDimension(
-		res.Width*pxPerPt+paddingPx*2,
+		res.Width*ssPxPerPt+ssPaddingPx*2,
 		"maxRasterWidth",
 		rasterBudget{}, //nolint:exhaustruct // no zoom remedy for a viewport-fixed width
 	)
@@ -445,7 +488,7 @@ func rasterizeContext(
 
 	heightBudget := rasterBudget{zoom: zoom, remedy: true}
 	heightPx, err := rasterDimension(
-		height*pxPerPt+paddingPx*2, "maxRasterHeight", heightBudget,
+		height*ssPxPerPt+ssPaddingPx*2, "maxRasterHeight", heightBudget,
 	)
 
 	if err != nil {
@@ -456,36 +499,63 @@ func rasterizeContext(
 		return nil, err
 	}
 
-	neededBytes := widthPx * heightPx * 4
-	pBuf := supersamplePixCache.get(neededBytes)
+	// downscaleBox splits the supersampled canvas with floor division, so the
+	// direct branch paints the exact final dimensions the 2x path would
+	// return. rasterSS <= 1 folds into the direct branch: there is nothing to
+	// downscale and the supersample cache would otherwise recycle the
+	// returned canvas.
+	finalWidthPx := widthPx / rasterSS
+	finalHeightPx := heightPx / rasterSS
+	direct := rasterSS <= 1 || policy == rasterPolicyDirect ||
+		(policy == rasterPolicyAuto && directRaster(finalWidthPx*finalHeightPx))
 
-	switch {
-	case pBuf == nil:
-		pBuf = &pixBuffer{b: make([]byte, neededBytes)}
+	var img *image.NRGBA
 
-	case cap(pBuf.b) < neededBytes:
-		// get only returns fitting buffers; keep a replaced buffer recyclable
-		// so the retention policy stays in one place if that changes.
-		supersamplePixCache.put(pBuf)
-		pBuf = &pixBuffer{b: make([]byte, neededBytes)}
+	if direct {
+		// The returned canvas is the paint target: no 2x intermediate and no
+		// downscale copy. It deliberately bypasses supersamplePixCache so a
+		// large final canvas is never retained between conversions (IMG-04).
+		img, err = newRasterImage(finalWidthPx, finalHeightPx)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		neededBytes := widthPx * heightPx * 4
+		pBuf := supersamplePixCache.get(neededBytes)
 
-	default:
-		pBuf.b = pBuf.b[:neededBytes]
-		clear(pBuf.b)
-	}
+		switch {
+		case pBuf == nil:
+			pBuf = &pixBuffer{b: make([]byte, neededBytes)}
 
-	defer func() {
-		supersamplePixCache.put(pBuf)
-	}()
+		case cap(pBuf.b) < neededBytes:
+			// get only returns fitting buffers; keep a replaced buffer recyclable
+			// so the retention policy stays in one place if that changes.
+			supersamplePixCache.put(pBuf)
+			pBuf = &pixBuffer{b: make([]byte, neededBytes)}
 
-	img := &image.NRGBA{
-		Pix:    pBuf.b,
-		Stride: widthPx * 4,
-		Rect:   image.Rect(0, 0, widthPx, heightPx),
+		default:
+			pBuf.b = pBuf.b[:neededBytes]
+			clear(pBuf.b)
+		}
+
+		defer func() {
+			supersamplePixCache.put(pBuf)
+		}()
+
+		img = &image.NRGBA{
+			Pix:    pBuf.b,
+			Stride: widthPx * 4,
+			Rect:   image.Rect(0, 0, widthPx, heightPx),
+		}
 	}
 
 	if !transparent {
 		fillNRGBAOpaque(img, img.Bounds(), color.NRGBA{R: channelMax, G: channelMax, B: channelMax, A: opaqueAlpha})
+	}
+
+	paintPxPerPt := ptToPx * float64(rasterSS)
+	if direct {
+		paintPxPerPt = ptToPx
 	}
 
 	atlas := newGlyphAtlas()
@@ -498,14 +568,11 @@ func rasterizeContext(
 
 		op := res.Ops[opIndex]
 		offsetPaintOp(&op, paddingPt)
-		paint(img, &op, pxPerPt, atlas, imageCache)
+		paint(img, &op, paintPxPerPt, atlas, imageCache)
 	}
 
-	if rasterSS <= 1 {
-		outImg := image.NewNRGBA(image.Rect(0, 0, widthPx, heightPx))
-		copy(outImg.Pix, img.Pix)
-
-		return outImg, nil
+	if direct {
+		return img, nil
 	}
 
 	if err := ctx.Err(); err != nil {
@@ -1421,10 +1488,13 @@ func paintText(img *image.NRGBA, paintOp *layout.Op, pxPerPt float64, atlas *gly
 		img, baseX, baseY, paintOp.Text, paintOp.Size,
 		paintOp.LetterSpacing, paintOp.RotateDeg, face, col, pxPerPt, atlas,
 	)
-	// Latin-only fake-bold (CJK gate lives in layout.FakeBoldFor).
+	// Latin-only fake-bold (CJK gate lives in layout.FakeBoldFor). The offset
+	// is one final CSS pixel expressed in canvas pixels, so the direct branch
+	// (pxPerPt = ptToPx) shifts by one canvas pixel rather than by rasterSS.
 	if layout.FakeBoldFor(paintOp) {
+		boldOffset := pxPerPt / ptToPx
 		ttfDrawString(
-			img, baseX+float64(rasterSS), baseY, paintOp.Text, paintOp.Size,
+			img, baseX+boldOffset, baseY, paintOp.Text, paintOp.Size,
 			paintOp.LetterSpacing, paintOp.RotateDeg, face, col, pxPerPt, atlas,
 		)
 	}

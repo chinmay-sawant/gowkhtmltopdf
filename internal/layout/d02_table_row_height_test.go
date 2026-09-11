@@ -198,7 +198,7 @@ func TestD02SurfaceTableRowHeightsAfterPagination(t *testing.T) {
 	}
 
 	// Run the same pagination fixpoint Paint uses (without writing a PDF).
-	if _, err := paginateOps(t.Context(), res, contentH); err != nil {
+	if err := paginateOps(t.Context(), res, contentH); err != nil {
 		t.Fatal(err)
 	}
 

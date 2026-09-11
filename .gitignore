@@ -10,6 +10,7 @@ cmd/gowkhtmltoimage/gowkhtmltoimage
 # test artifacts
 /coverage.out
 /coverage.html
+*.test
 testdata/golden/out/
 
 # profiling harness output: heap/stack pprof files, benchmark text dumps, and
@@ -67,3 +68,6 @@ bindings/python/**/__pycache__/
 bindings/python/build/
 bindings/python/dist/
 pen/
+
+
+plans/0.2.6/perf-review/results/*

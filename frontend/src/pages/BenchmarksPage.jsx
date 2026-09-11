@@ -7,15 +7,19 @@ import {
   CLI_ROWS,
   externalSpeedup,
   HEADLINE,
+  HISTORY_DATE,
   LIBRARY_HEADLINE,
   LIBRARY_IMAGE,
+  LIBRARY_IMAGE_HISTORY,
   LIBRARY_PDF,
-  INPROC_SNAPSHOT_DATE,
-  INPROC_INLINE,
+  LIBRARY_PDF_HISTORY,
+  INPROC_INLINE_HISTORY,
   INPROC_PDF_GENERIC,
-  INPROC_TEMPLATE_GENERIC,
-  INPROC_WEB_FETCH,
+  INPROC_PDF_GENERIC_HISTORY,
+  INPROC_TEMPLATE_GENERIC_HISTORY,
+  INPROC_WEB_FETCH_HISTORY,
   PUPPETEER_ROWS,
+  RECOVERY_DATE,
   SNAPSHOT,
   WEASYPRINT_ROWS,
   formatKiB,
@@ -413,7 +417,7 @@ function HardwareSpecCard() {
             <div className="bench-spec-item">
               <span className="bench-spec-label">gowkhtmltopdf Engine</span>
               <span className="bench-spec-value">
-                <code>CGO_ENABLED=0</code> Pure-Go generic binary (v0.2.4, go1.26.4), zero native C bindings
+                <code>CGO_ENABLED=0</code> Pure-Go generic binary (VERSION 0.2.5, go1.26.4), zero native C bindings
               </span>
             </div>
             <div className="bench-spec-item">
@@ -486,7 +490,8 @@ export default function BenchmarksPage() {
             The current generic <code>gowkhtmltopdf</code> binary was timed against the installed
             wkhtmltopdf {SNAPSHOT.wkhtml.replace('wkhtmltopdf ', '')} on the same report fixture.
             It is faster at every tested size. The public Go library removes the process boundary
-            altogether: its 2-page result is about 70x faster than the wkhtmltopdf CLI baseline.
+            altogether: its 2-page result is about {LIBRARY_HEADLINE.displayMultiplier}x faster
+            than the wkhtmltopdf CLI baseline.
           </p>
         </div>
         <div className="bench-hero-stats" aria-label="Headline comparison">
@@ -644,10 +649,10 @@ export default function BenchmarksPage() {
         </div>
         <div className="callout-body">
           <span className="callout-kicker">How to read memory</span>
-          <h3 className="callout-title">Faster at every size. Lower RSS only through 100 pages.</h3>
+          <h3 className="callout-title">Faster at every size. Lower RSS only through 50 pages.</h3>
           <p>
-            On this generic CLI path, gowkhtmltopdf uses less peak RSS from 2 through 100 pages and
-            more RSS from 200 through 500 pages. The 500-page PDF is still smaller (1.40 MB vs 2.04
+            On this generic CLI path, gowkhtmltopdf uses less peak RSS from 2 through 50 pages and
+            more RSS from 100 through 500 pages. The 500-page PDF is still smaller (1.42 MB vs 2.04
             MB). Earlier island-era snapshots that claimed lower RSS at every size are historical
             and do not describe the current generic converter.
           </p>
@@ -656,43 +661,80 @@ export default function BenchmarksPage() {
 
       <section className="bench-section" aria-labelledby="bench-inproc-heading">
         <div className="section-heading-row">
-          <h2 id="bench-inproc-heading">In-process Go benchmarks ({INPROC_SNAPSHOT_DATE})</h2>
+          <h2 id="bench-inproc-heading">
+            In-process Go benchmarks ({RECOVERY_DATE} recovery capture)
+          </h2>
           <p className="section-aside">
-            <code>go test -bench</code> inside the test process. <code>B/op</code> is cumulative
-            allocation traffic, not peak RSS.
+            Three independent <code>1x</code> samples per workload, one fresh process per sample.
+            The median of the three raw values is shown and <code>B/op</code> is never averaged.{' '}
+            <code>B/op</code> is cumulative allocation traffic, not peak RSS.
           </p>
         </div>
-        <InprocTable heading="PDF pages (generic request)" rows={INPROC_PDF_GENERIC} unit="Pages" />
+        <InprocTable
+          heading="PDF pages (generic request, recovery capture)"
+          rows={INPROC_PDF_GENERIC}
+          unit="Pages"
+        />
         <RelativeTimingTable
-          heading="In-process PDF multiplier vs wkhtmltopdf CLI"
+          heading="In-process PDF multiplier vs wkhtmltopdf CLI (recovery capture)"
           rows={INPROC_PDF_GENERIC}
           pathLabel="in-process Go PDF"
         />
+        <p className="section-aside bench-explanation">
+          The 2-page rows are fresh-process samples and carry the one-time default-font load, so
+          they are not like-for-like with the historical multi-iteration matrix below. The internal
+          generic 500-page allocation did not reach the 0.2.4 target; the public image rows did
+          (500 tiles) or sit about 4% above it (250 tiles). Raw samples:{' '}
+          <code>plans/0.2.6/perf-review/results/2026-09-11/valid-02-04.md</code>.
+        </p>
+        <h3 className="table-block-heading">Historical full matrix ({HISTORY_DATE}, 0.2.4)</h3>
         <InprocTable
-          heading="Template + PDF pages (generic request)"
-          rows={INPROC_TEMPLATE_GENERIC}
+          heading="PDF pages (generic request, 2026-08-19)"
+          rows={INPROC_PDF_GENERIC_HISTORY}
           unit="Pages"
         />
-        <InprocTable heading="Web-fetch image tiles" rows={INPROC_WEB_FETCH} unit="Tiles" />
-        <InprocTable heading="Inline image tiles" rows={INPROC_INLINE} unit="Tiles" />
+        <InprocTable
+          heading="Template + PDF pages (generic request, 2026-08-19)"
+          rows={INPROC_TEMPLATE_GENERIC_HISTORY}
+          unit="Pages"
+        />
+        <InprocTable
+          heading="Web-fetch image tiles (2026-08-19)"
+          rows={INPROC_WEB_FETCH_HISTORY}
+          unit="Tiles"
+        />
+        <InprocTable
+          heading="Inline image tiles (2026-08-19)"
+          rows={INPROC_INLINE_HISTORY}
+          unit="Tiles"
+        />
       </section>
 
       <section className="bench-section" aria-labelledby="bench-library-heading">
         <div className="section-heading-row">
-          <h2 id="bench-library-heading">Public Go library benchmarks ({INPROC_SNAPSHOT_DATE})</h2>
+          <h2 id="bench-library-heading">
+            Public Go library benchmarks ({RECOVERY_DATE} recovery capture)
+          </h2>
           <p className="section-aside">
             <code>make bench-lib</code> calls <code>Document.WritePDF</code> and{' '}
             <code>ImageDocument.WriteImage</code> directly, without starting the CLI or reading
             HTML from disk.
           </p>
         </div>
-        <InprocTable heading="Public PDF pages" rows={LIBRARY_PDF} unit="Pages" />
+        <InprocTable heading="Public PDF pages (recovery capture)" rows={LIBRARY_PDF} unit="Pages" />
         <RelativeTimingTable
-          heading="Public library PDF multiplier vs wkhtmltopdf CLI"
+          heading="Public library PDF multiplier vs wkhtmltopdf CLI (recovery capture)"
           rows={LIBRARY_PDF}
           pathLabel="public Go library PDF"
         />
-        <InprocTable heading="Public image tiles" rows={LIBRARY_IMAGE} unit="Tiles" />
+        <InprocTable heading="Public image tiles (recovery capture)" rows={LIBRARY_IMAGE} unit="Tiles" />
+        <h3 className="table-block-heading">Historical full matrix ({HISTORY_DATE}, 0.2.4)</h3>
+        <InprocTable heading="Public PDF pages (2026-08-19)" rows={LIBRARY_PDF_HISTORY} unit="Pages" />
+        <InprocTable
+          heading="Public image tiles (2026-08-19)"
+          rows={LIBRARY_IMAGE_HISTORY}
+          unit="Tiles"
+        />
       </section>
 
       <section className="bench-section bench-method" aria-labelledby="bench-method-heading">

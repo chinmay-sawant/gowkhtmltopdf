@@ -424,7 +424,7 @@ func BenchmarkPDFPages(b *testing.B) {
 				b.Run(fmt.Sprintf("%dPages", pages), func(b *testing.B) {
 					var output bytes.Buffer
 					req := benchmarkPDFRequest(sources[pages], &output, mode)
-					b.ReportMetric(float64(pages), "pages")
+
 					b.ResetTimer()
 
 					for range b.N {
@@ -441,6 +441,11 @@ func BenchmarkPDFPages(b *testing.B) {
 						b.Fatalf("rendered pages = %d, want %d", got, pages)
 					}
 
+					// ResetTimer deletes metrics reported before it, so the
+					// page count and output bytes are reported after the
+					// timed loop.
+					b.ReportMetric(float64(pages), "pages")
+					b.ReportMetric(float64(output.Len()), "output-bytes")
 					b.SetBytes(int64(output.Len()))
 				})
 			}

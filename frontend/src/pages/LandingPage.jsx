@@ -178,7 +178,7 @@ export default function LandingPage() {
         </div>
         <div className="proof-minimal-item proof-minimal-note">
           <strong>Measured</strong>
-          <span>2-page invoice: 17 ms CLI vs 259 ms wkhtmltopdf 0.12.6.1 on the reference host. Full numbers on <Link to="/benchmarks">benchmarks</Link>.</span>
+          <span>2-page invoice: 17 ms CLI vs 258 ms wkhtmltopdf 0.12.6.1 on the reference host. Full numbers on <Link to="/benchmarks">benchmarks</Link>.</span>
         </div>
       </section>
 

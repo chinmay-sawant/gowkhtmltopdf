@@ -1291,7 +1291,7 @@ func applyBorderGroup(
 	switch prop {
 	case "border":
 		return applyBorderAllSides(style, value, fsize)
-	case "border-top", "border-right", "border-bottom", "border-left":
+	case borderTopProperty, borderRightProperty, borderBottomProperty, borderLeftProperty:
 		return applyBorderOneSide(style, prop, value, fsize)
 	case borderWidthKeyword, "border-top-width", "border-right-width", "border-bottom-width", "border-left-width":
 		return applyBorderWidthProps(style, prop, value, fsize)
@@ -1660,13 +1660,13 @@ func applyTextGroup(
 	parent *ResolvedStyle, hasParent bool,
 ) bool {
 	switch prop {
-	case "text-align-last", "text-align-all", "tab-size", "text-wrap", "text-wrap-mode", "text-wrap-style",
+	case "text-align-last", "text-align-all", tabSizeProperty, "text-wrap", "text-wrap-mode", "text-wrap-style",
 		"white-space-collapse", "white-space-trim", "hyphens", "hyphenate-character",
 		"text-justify", "line-break", "text-decoration-line", "text-decoration-color",
 		"text-decoration-style", "text-decoration-thickness", "text-decoration-inset",
-		"text-underline-offset", "text-underline-position", "text-shadow",
-		"text-emphasis", "text-emphasis-style", "text-emphasis-color",
-		"text-emphasis-position", "text-emphasis-skip":
+		"text-underline-offset", "text-underline-position", textShadowProperty,
+		textEmphasisProperty, textEmphasisStyleProperty, textEmphasisColorProperty,
+		textEmphasisPositionProperty, textEmphasisSkipProperty:
 		return applyTextPropsWave3(style, prop, value, fsize, parent, hasParent)
 	}
 

@@ -175,7 +175,7 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 
 	applyNamedPageBreaks(res)
 
-	if _, err := paginateOps(ctx, res, contentH); err != nil {
+	if err := paginateOps(ctx, res, contentH); err != nil {
 		return err
 	}
 
@@ -226,7 +226,19 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 	// continuation pages (fixture-62 #65 / #104-106 Effect cells).
 	restampBoxTransforms(res.root, res.Ops)
 
-	return paintPages(ctx, doc, res, opts, contentH, fixedIdx)
+	if err := paintPages(ctx, doc, res, opts, contentH, fixedIdx); err != nil {
+		return err
+	}
+
+	// Every flow reader has run: pagination, splitting, sticky, locations,
+	// page names, and paint. Drop the pagination-only indexes so headers and
+	// icons are not retained through PDF finalization. A later paint or
+	// pagination pass rebuilds them through ensureFlowIndex. Ops, Pages,
+	// Locations, boxes, and root stay: conversion reads them after Paint for
+	// page names, headings, and navigation.
+	invalidateFlowIndex(res)
+
+	return nil
 }
 
 // fixedOpIndices collects the indices of viewport-fixed ops, which are

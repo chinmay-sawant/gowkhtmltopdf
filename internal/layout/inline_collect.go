@@ -1020,7 +1020,13 @@ func (e *engine) coalesceTextItems(line []inlineItem) []inlineItem {
 	return line[:writeIdx]
 }
 
-func sameInlineStyle(acc, boxN *ResolvedStyle) bool { //nolint:cyclop
+// sameInlineStyle compares only the fields inline collection merges on. The
+// generated styleInternEqual covers the full ResolvedStyle for interning, so a
+// change here must not be folded into that generated function: a stricter
+// comparison would split inline runs that paint identically.
+//
+//nolint:cyclop,dupl // intentionally a subset of the generated comparison
+func sameInlineStyle(acc, boxN *ResolvedStyle) bool {
 	if acc == nil || boxN == nil {
 		return acc == boxN
 	}

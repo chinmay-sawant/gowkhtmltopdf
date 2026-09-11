@@ -15,6 +15,7 @@
 | [HONESTY-GATES.md](HONESTY-GATES.md) | Anti catalog-only close rules + flip packet |
 | [implemented-honesty-pass.md](implemented-honesty-pass.md) | 2026-08-28 audit of Implemented rows (152 kept / 14 demoted) |
 | [review/](review) | Post-ship architecture + ponytail ledger for commit `48e06dbc` |
+| [perf-review/phase-wise-checklist.md](perf-review/phase-wise-checklist.md) | Performance recovery plan for the supplied 0.2.4 versus current PDF and image regressions (executed and validated 2026-09-11; image target met, PDF target improved but not met; evidence in `perf-review/results/2026-09-11/`) |
 | [agy-review/](agy-review) | Go Design Patterns and Go Code Style review ledgers |
 | [86-canonical-0.2.6-wasm.md](86-canonical-0.2.6-wasm.md) | Browser WASM conversion, PDF preview, and image output ledger, phases 86-93 |
 

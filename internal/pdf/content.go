@@ -88,6 +88,15 @@ func (c *Content) Doc() *Document { return c.doc }
 // reallocate geometrically while a dense op list is painted.
 func (c *Content) Grow(n int) { c.buf.Grow(n) }
 
+// releaseBuffer drops the raw content-stream buffer after the page's PDF
+// stream object has been materialized. Replacing the whole bytes.Buffer value
+// releases the backing array; it does not zero or reuse the array, so a page
+// object that aliases the raw slice (compression off) keeps its bytes. After
+// release, Bytes returns an empty slice. The content was already serialized,
+// so it must not be painted again; a finalize retry is refused through
+// Document.finalizeErr instead of silently writing an empty stream.
+func (c *Content) releaseBuffer() { c.buf = bytes.Buffer{} }
+
 func appendPDFNum(dst []byte, val float64) []byte {
 	if val == float64(int(val)) {
 		return strconv.AppendInt(dst, int64(int(val)), pdfNumBase)

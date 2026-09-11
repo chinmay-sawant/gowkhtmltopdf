@@ -1,6 +1,9 @@
 package layout
 
-import "testing"
+import (
+	"context"
+	"testing"
+)
 
 // TestPageBoundaryBucketersAgree pins the op-to-page mapping at page
 // boundaries. A rect fragment split at a page top lands exactly on
@@ -86,4 +89,72 @@ func pageIndexOfOp(result *Result, contentH float64) int {
 	}
 
 	return got
+}
+
+// paginateOpsForTest runs paginateOps and returns the settled pre-split
+// op-to-page assignment. Production PaintContext does not keep this map:
+// buildPagesAfterSplits rebuilds page buckets after rect splitting and sticky
+// shifts, so the pre-split slice would be stale as well as discarded. Tests
+// that assert the settled assignment use this helper.
+func paginateOpsForTest(ctx context.Context, res *Result, contentH float64) ([]int, error) {
+	if err := paginateOps(ctx, res, contentH); err != nil {
+		return nil, err
+	}
+
+	opPage := make([]int, len(res.Ops))
+
+	for opIdx := range res.Ops {
+		page, ok := checkedFlowPageOfY(res.Ops[opIdx].Y, contentH)
+		if !ok {
+			opPage[opIdx] = -1
+		} else {
+			opPage[opIdx] = page
+		}
+	}
+
+	return opPage, nil
+}
+
+// TestPaginateOpsDoesNotBuildDiscardedPageMap pins the PDF-04 removal. The
+// production path must not allocate the pre-split op-to-page slice that Paint
+// discarded; paginateOpsForTest builds that slice, so its steady-state
+// allocation count must exceed the production call by at least one.
+//
+// This test is intentionally not parallel: AllocsPerRun reads process-wide
+// Mallocs, and the runner starts parallel tests only after sequential tests
+// finish, so this measurement sees a quiet process.
+//
+//nolint:paralleltest // AllocsPerRun reads process-wide counters; parallelism would pollute it.
+func TestPaginateOpsDoesNotBuildDiscardedPageMap(t *testing.T) {
+	const contentH = 700.0
+
+	fixture := `<html><body><p>alpha</p><p>beta</p></body></html>`
+	prodRes := layoutHTML(t, fixture)
+	testRes := layoutHTML(t, fixture)
+
+	ctx := t.Context()
+
+	prodAllocs := testing.AllocsPerRun(50, func() {
+		if err := paginateOps(ctx, prodRes, contentH); err != nil {
+			t.Fatalf("paginateOps: %v", err)
+		}
+	})
+	withMapAllocs := testing.AllocsPerRun(50, func() {
+		if _, err := paginateOpsForTest(ctx, testRes, contentH); err != nil {
+			t.Fatalf("paginateOpsForTest: %v", err)
+		}
+	})
+
+	t.Logf(
+		"paginateOps allocs/run = %.1f, paginateOpsForTest allocs/run = %.1f, ops = %d; "+
+			"the test helper builds one []int of len(ops)",
+		prodAllocs, withMapAllocs, len(prodRes.Ops),
+	)
+
+	if diff := withMapAllocs - prodAllocs; diff < 1 {
+		t.Fatalf(
+			"paginateOps allocs = %.1f, paginateOpsForTest allocs = %.1f; production must not build the discarded op-page map",
+			prodAllocs, withMapAllocs,
+		)
+	}
 }

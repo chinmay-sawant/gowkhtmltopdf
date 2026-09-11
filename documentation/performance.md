@@ -4,11 +4,14 @@ Numbers on this page are **labeled snapshots**, not a live SLA. Host, GOCACHE
 state, and whether a run used the **generic** convert path or the
 **benchmark-only page-island** path all change wall time and RSS.
 
-**Current snapshot: 2026-08-19.** Freshly built generic CLI versus installed
-wkhtmltopdf 0.12.6.1 (patched Qt) on Linux amd64, 13th Gen Intel Core
-i7-13700HX. Full matrices live in
+**Current snapshot: 2026-09-11 performance-recovery capture.** Three
+independent `1x` samples per recovery workload, plus three-run process
+medians, on the uncommitted 0.2.6 recovery working tree (`VERSION` still
+reads 0.2.5, so this is not a released build). The public image rows beat or
+sit near their 0.2.4 rows; the PDF and CLI rows did not meet the recovery
+target. Full matrices live in
 [`testdata/golden/benchmarks/README.md`](../testdata/golden/benchmarks/README.md).
-The tables further down keep older snapshots so reviews stay comparable.
+The 2026-08-19 and 2026-08-14 tables further down are dated history.
 
 Related:
 
@@ -28,10 +31,10 @@ Related:
 
 | Kind | What it measures | Where |
 |------|------------------|-------|
-| Direct CLI `/usr/bin/time` | Process elapsed time and peak RSS vs wkhtmltopdf | **Current 2026-08-19 table below** |
-| External engines | Process elapsed time and peak RSS vs WeasyPrint and Puppeteer/Chrome | **Current 2026-08-19 tables below** |
-| Internal engine `go test -bench` | Direct `internal/convert` wall time, `B/op`, `allocs/op` | Fresh requested 2026-08-19 samples below |
-| Public library `go test -bench` | `Document.WritePDF` / `ImageDocument.WriteImage` wall time, `B/op`, `allocs/op` | `make bench-lib` |
+| Direct CLI `/usr/bin/time` | Process elapsed time and peak RSS vs wkhtmltopdf | **Current 2026-09-11 table below** |
+| External engines | Process elapsed time and peak RSS vs WeasyPrint and Puppeteer/Chrome | **Current 2026-09-11 tables below** |
+| Internal engine `go test -bench` | Direct `internal/convert` wall time, `B/op`, `allocs/op` | **2026-09-11 recovery rows below; full 2026-08-19 matrix is historical** |
+| Public library `go test -bench` | `Document.WritePDF` / `ImageDocument.WriteImage` wall time, `B/op`, `allocs/op` | **2026-09-11 recovery rows below; full 2026-08-19 matrix is historical** |
 | Phase 9.3 gate | Two full-pipeline runs of a 10-section invoice fixture; CI budget only | Historical timings below; CI still asserts **< 5 s** per run |
 
 Page islands (`convert.NewBenchmarkPDFRequest`) are an **internal benchmark
@@ -41,7 +44,125 @@ or RSS guarantee.
 
 ---
 
-## Current CLI comparison vs wkhtmltopdf (2026-08-19)
+## Current recovery capture (2026-09-11)
+
+The current capture is a **0.2.6 performance-recovery working tree**
+measurement. `VERSION` still reads 0.2.5, so it is a working-tree snapshot,
+not a released build. Host: Linux amd64, 13th Gen Intel Core i7-13700HX
+(WSL2, 24 CPUs, 7.6 GiB RAM). Toolchain: go1.26.4. Only the generic paths
+were measured; certified page islands are not part of any row.
+
+In-process and public-library rows are **three independent `1x` samples per
+workload**, one fresh process per sample, captured with
+`scripts/bench-performance-recovery.sh`. The reported value is the median of
+the three raw samples and `B/op` is one of the raw values, never an average.
+CLI cells are medians of three timed process runs after one warmup. Raw
+samples, the method header, and the complete tables live in
+`plans/0.2.6/perf-review/results/2026-09-11/valid-02-04.md`.
+
+### Recovery rows
+
+| Row | 2 pages / 250 tiles | 500 pages / 500 tiles | 0.2.4 row | Result |
+|---|---:|---:|---:|---|
+| Internal generic PDF time | 10.06 ms | 1,246.05 ms | 1,010 ms | target not met |
+| Internal generic PDF B/op | 9,578,008 B (9.58 MB) | 321,104,720 B (321.10 MB) | 237.76 MB | target not met |
+| Internal generic PDF allocs/op | 7,005 | 1,281,235 | n/a | |
+| Public library PDF time | 10.88 ms | 1,268.56 ms | 1,104.51 ms | target not met |
+| Public library PDF B/op | 9,596,168 B (9.60 MB) | 322,890,064 B (322.89 MB) | 236.85 MB | target not met |
+| Public library image time | 54.42 ms | 89.18 ms | n/a | |
+| Public library image B/op | 21,502,152 B (21.50 MB) | 27,205,880 B (27.21 MB) | 20.66 MB / 52.00 MB | 250 about 4.1% above the row; 500 about 47.7% below |
+
+The 2-page B/op rows are one-iteration fresh-process samples, so the one-time
+default-font load (about 6.8 MB; see
+`plans/0.2.6/perf-review/results/2026-09-11/perf-04-05.md`) is charged to the
+single operation. They are not like-for-like with multi-iteration matrix rows.
+
+### Why the PDF rows missed and the image rows recovered
+
+Internal generic 500-page B/op is **321.10 MB / 1,246.05 ms** against the
+2026-08-14 Snapshot F row of **224.3 MB / 966 ms**: about **+43.2% B/op** and
+**+29.0% time**. The supplied 0.2.4 target was 237.76 MB / 1,010 ms and it
+was not met. Per the 2026-09-11 profiles, the remaining 500-page allocation
+is dominated by the **one-shot display-list preallocation** (the `ops`
+capacity estimate at `internal/layout/layout.go:1003`, 95,600,640 B) inside a
+128.2 MB box-construction phase, plus **113.7 MB of pagination scratch**.
+Exact style sharing removed the former 228.3 MB style-storage line from that
+profile. Sources:
+`plans/0.2.6/perf-review/results/2026-09-11/perf-04-05.md` and
+`plans/0.2.6/perf-review/results/2026-09-11/pdf-02-05.md`.
+
+The public image rows recovered because the direct final-resolution branch
+paints canvases at 2,097,152 pixels and above without the 2x intermediate;
+the 250-tile row is still about 4.1% above its 0.2.4 row, and the 500-tile row
+is about 47.7% below it. Source:
+`plans/0.2.6/perf-review/results/2026-09-11/img-02-04.md`.
+
+### Direct CLI vs wkhtmltopdf (2026-09-11)
+
+Generic `gowkhtmltopdf` working tree versus `wkhtmltopdf 0.12.6.1 (with
+patched qt)`. Same report fixture (20 invoice rows per requested page). Both
+binaries used `--quiet --allow-local-files -o OUTPUT INPUT`. Each cell is the
+median of three timed process runs after one warmup.
+
+```sh
+make bench-cli-compare
+```
+
+| Pages | Gowk time | wkhtmltopdf time | Speedup | Gowk RSS | wkhtmltopdf RSS |
+|------:|----------:|-----------------:|--------:|---------:|----------------:|
+| 2 | 17 ms | 258 ms | 14.95x | 24,576 KiB | 44,716 KiB |
+| 5 | 23 ms | 266 ms | 11.44x | 26,496 KiB | 45,068 KiB |
+| 10 | 34 ms | 286 ms | 8.29x | 28,608 KiB | 46,024 KiB |
+| 20 | 53 ms | 306 ms | 5.79x | 33,984 KiB | 47,772 KiB |
+| 50 | 122 ms | 394 ms | 3.23x | 47,616 KiB | 52,240 KiB |
+| 100 | 229 ms | 541 ms | 2.36x | 69,120 KiB | 59,380 KiB |
+| 200 | 468 ms | 830 ms | 1.77x | 113,280 KiB | 74,492 KiB |
+| 250 | 599 ms | 988 ms | 1.65x | 139,584 KiB | 81,884 KiB |
+| 500 | **1.288 s** | **1.753 s** | **1.36x** | **240,960 KiB** | **123,172 KiB** |
+
+gowkhtmltopdf is faster at every tested size. Peak RSS is lower through 50
+pages and higher from 100 pages on this generic path. Raw rows:
+[`cli-compare-results.csv`](../testdata/golden/benchmarks/cli-compare-results.csv).
+
+### External comparisons (2026-09-11)
+
+The external harness uses the same report fixture, with one warmup and three
+timed process runs. Its default matrix is 2, 10, 50, and 100 pages;
+Ghostscript checked the requested page count for every output.
+
+```sh
+./scripts/bench-external.sh --engines=weasyprint
+./scripts/bench-external.sh --engines=puppeteer
+```
+
+#### WeasyPrint (2026-09-11)
+
+| Pages | Gowk time | WeasyPrint time | Speedup | Gowk RSS | WeasyPrint RSS |
+|------:|----------:|----------------:|--------:|---------:|----------------:|
+| 2 | 21 ms | 653 ms | 31.13x | 25,152 KiB | 81,932 KiB |
+| 10 | 36 ms | 1.431 s | 39.80x | 28,416 KiB | 111,444 KiB |
+| 50 | 124 ms | 5.482 s | 44.07x | 48,000 KiB | 252,448 KiB |
+| 100 | 245 ms | 11.119 s | 45.29x | 65,856 KiB | 427,880 KiB |
+
+#### Puppeteer / Chrome (2026-09-11)
+
+| Pages | Gowk time | Puppeteer time | Speedup | Gowk RSS | Puppeteer RSS |
+|------:|----------:|----------------:|--------:|---------:|---------------:|
+| 2 | 21 ms | 1.470 s | 68.85x | 24,960 KiB | 973,260 KiB |
+| 10 | 37 ms | 1.550 s | 42.45x | 28,800 KiB | 1,021,160 KiB |
+| 50 | 120 ms | 1.815 s | 15.08x | 48,576 KiB | 1,114,380 KiB |
+| 100 | 249 ms | 2.179 s | 8.74x | 68,928 KiB | 1,241,476 KiB |
+
+WeasyPrint RSS is the measured process peak from `/usr/bin/time %M`.
+Puppeteer RSS is the peak process-tree RSS for the Node driver and headless
+Chrome descendants, so those RSS readings are not directly equivalent. Raw
+detail:
+[`weasyprint-compare.md`](../testdata/golden/benchmarks/weasyprint-compare.md),
+[`puppeteer-compare.md`](../testdata/golden/benchmarks/puppeteer-compare.md).
+
+---
+
+## Historical CLI comparison vs wkhtmltopdf (2026-08-19)
 
 Generic `gowkhtmltopdf` 0.2.4 versus `wkhtmltopdf 0.12.6.1 (with patched qt)`.
 Same report fixture (20 invoice rows per requested page). Both binaries used
@@ -76,7 +197,7 @@ this generic path. PDF output is smaller from 50 pages onward. The
 2026-08-09 island-era table later on this page is **not** a current
 memory claim.
 
-## Current external comparisons (2026-08-19)
+## Historical external comparisons (2026-08-19)
 
 The external harness uses the same generated report fixture, with one warmup
 and three timed process runs. Its default matrix is 2, 10, 50, and 100 pages;
@@ -113,7 +234,7 @@ Raw detail: [`weasyprint-compare.md`](../testdata/golden/benchmarks/weasyprint-c
 
 ---
 
-## Last recorded internal engine matrix (2026-08-14, generic)
+## Historical internal engine matrix (2026-08-14, generic)
 
 One iteration (`-benchtime=1x -count=1`). `B/op` is cumulative allocation
 traffic, not process RSS.
@@ -232,7 +353,7 @@ split fast path.
 
 ---
 
-## Fresh requested in-process and public API samples (2026-08-19)
+## Historical in-process and public API samples (2026-08-19)
 
 The requested `make bench-engine` and `make bench-inprocess` commands both
 completed. They invoke the same one-iteration internal matrix; the second
@@ -308,10 +429,10 @@ calls `Document.WritePDF` directly and does not launch the gowkhtmltopdf CLI.
 The **2026-08-09** table below is **historical pre-CR-02 / island-era CLI**.
 Ordinary CLI documents no longer take the page-island path.
 
-**Current documented process snapshot:**
-[`testdata/golden/benchmarks/README.md`](../testdata/golden/benchmarks/README.md)
-— Snapshot D generic 500-page process RSS **54,632 KiB / 960 ms** on that
-host. Treat later snapshots in that file as newer than this section.
+The current documented process snapshot is the 2026-09-11 capture above and
+in [`testdata/golden/benchmarks/README.md`](../testdata/golden/benchmarks/README.md).
+Snapshot D (54,632 KiB / 960 ms at 500 pages) below is older historical
+evidence.
 
 Historical 2026-08-09 process-level measurements used identical report
 fixtures, three runs per size, and `/usr/bin/time` for wall time and peak
@@ -369,6 +490,15 @@ make bench-cli-compare  # standalone wkhtmltopdf comparison
 make bench-engine
 make bench-inprocess    # compatibility alias for bench-engine
 make bench-lib
+```
+
+Recovery-capture commands (fresh process per sample; see the 2026-09-11
+section above):
+
+```sh
+./scripts/bench-performance-recovery.sh --mode=internal-pdf --sizes=2,500 --benchtime=1x --count=1
+./scripts/bench-performance-recovery.sh --mode=public-pdf --sizes=2,500 --benchtime=1x --count=1
+./scripts/bench-performance-recovery.sh --mode=public-image --sizes=250,500 --benchtime=1x --count=1
 ```
 
 Internal engine matrix:

@@ -16,7 +16,7 @@ func applyTextPropsWave3(
 	case "text-align-all":
 		setTextAlignValue(style, value)
 		setTextAlignLast(style, value)
-	case "tab-size":
+	case tabSizeProperty:
 		setTabSize(style, value, fsize)
 	case "text-wrap":
 		setTextWrap(style, value)
@@ -54,17 +54,17 @@ func applyTextPropsWave3(
 		}
 	case "text-underline-position":
 		style.TextUnderlinePosition = strings.ToLower(strings.TrimSpace(value))
-	case "text-shadow":
+	case textShadowProperty:
 		applyTextShadow(style, value, fsize)
-	case "text-emphasis":
+	case textEmphasisProperty:
 		setTextEmphasis(style, value)
-	case "text-emphasis-style":
+	case textEmphasisStyleProperty:
 		setTextEmphasisStyle(style, value)
-	case "text-emphasis-color":
+	case textEmphasisColorProperty:
 		setTextEmphasisColor(style, value)
-	case "text-emphasis-position":
+	case textEmphasisPositionProperty:
 		setTextEmphasisPosition(style, value)
-	case "text-emphasis-skip":
+	case textEmphasisSkipProperty:
 		ensureEmphasisMap(style)
 		style.CustomProps["__emph_skip"] = strings.ToLower(strings.TrimSpace(value))
 	case "text-decoration-inset":
