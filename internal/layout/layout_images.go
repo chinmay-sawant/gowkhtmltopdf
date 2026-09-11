@@ -272,18 +272,14 @@ func (e *engine) paintReplacedImage(
 		isJPEG = false
 	}
 
-	e.add(Op{ //nolint:exhaustruct // intentional zero fields
+	e.add((Op{ //nolint:exhaustruct // intentional zero fields
 		Kind:   OpImage,
 		X:      imgX,
 		Y:      imgY,
 		W:      imgW,
 		H:      imgH,
-		Image:  imgData,
-		ImgW:   boxNode.img.w,
-		ImgH:   boxNode.img.h,
 		IsJPEG: isJPEG,
-		Alt:    alt,
-	})
+	}).withImage(imgData, boxNode.img.w, boxNode.img.h, alt))
 
 	if thumbImg {
 		e.emitThumbImageBottomSeparator(sty, posX, posY, size.w, size.h)

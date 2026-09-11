@@ -1,0 +1,12 @@
+# PERF3-01 pre-change 500-page pin
+# Date: 2026-09-11
+# Command: go test ./internal/convert -run '^$' -bench '^BenchmarkPDFPages$/^generic$/^500Pages$' -benchtime=1x -count=1 -benchmem
+# Host: 13th Gen Intel Core i7-13700HX, go linux/amd64
+# Label: standalone cold-process 500 pages (first row of a fresh process).
+# output-bytes 1419234, pages 500.000
+#
+# BenchmarkPDFPages/generic/500Pages-24  1  671143702 ns/op  2.11 MB/s  1419234 output-bytes  500.0 pages  169955488 B/op  755255 allocs/op
+#
+# Snapshot M standalone median: 695.42 ms / 167,865,712 B
+# This pin: 671.14 ms / 169,955,488 B
+# B/op within ~1.2% of Snapshot M standalone; time within host noise of the faster window.

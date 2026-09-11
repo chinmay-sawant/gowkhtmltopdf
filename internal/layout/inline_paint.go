@@ -180,17 +180,15 @@ func (e *engine) emitInlineImage(
 			isJPEG = false
 		}
 
-		e.add(Op{ //nolint:exhaustruct // intentional zero fields
-			Kind: OpImage, X: imgX, Y: imgY, W: imgW, H: imgH,
-			Image: imgData, ImgW: item.imgRef.w, ImgH: item.imgRef.h, IsJPEG: isJPEG,
-			Alt: item.alt,
-		})
+		e.add((Op{ //nolint:exhaustruct // intentional zero fields
+			Kind: OpImage, X: imgX, Y: imgY, W: imgW, H: imgH, IsJPEG: isJPEG,
+		}).withImage(imgData, item.imgRef.w, item.imgRef.h, item.alt))
 	}
 
 	if item.href != "" {
-		e.add(Op{ //nolint:exhaustruct // intentional zero fields
-			Kind: OpLinkURI, X: leftX, Y: top, W: item.w, H: item.h, URI: item.href,
-		})
+		e.add((Op{ //nolint:exhaustruct // intentional zero fields
+			Kind: OpLinkURI, X: leftX, Y: top, W: item.w, H: item.h,
+		}).withURI(item.href))
 	}
 
 	leftX += item.w + item.marginR
@@ -454,22 +452,21 @@ func (e *engine) emitInlineTextRun(
 		e.emitTextShadowRuns(item, run, textX, baseline, textWidth, size, descent)
 	}
 
-	e.add(Op{ //nolint:exhaustruct // intentional zero fields
+	e.add((Op{ //nolint:exhaustruct // intentional zero fields
 		Kind: OpText, X: textX, Y: baseline, W: textWidth, H: item.h,
 		Text: run.text, Font: run.face, Size: size,
 		InkDescent:    descent,
 		LetterSpacing: item.style.LetterSpacing * e.scale,
-		TextTransform: item.style.TextTransform,
 		Bold:          item.style.FontWeight >= fontWeightBoldValue,
 		R:             child[0], G: child[1], B: child[2],
-		RotateDeg: writingModeRotate(item.style.WritingMode),
-	})
+		RotateDeg: float32(writingModeRotate(item.style.WritingMode)),
+	}).withTextTransform(item.style.TextTransform))
 
 	if item.href != "" {
-		e.add(Op{ //nolint:exhaustruct // intentional zero fields
+		e.add((Op{ //nolint:exhaustruct // intentional zero fields
 			Kind: OpLinkURI, X: textX, Y: baseline - ascent, W: textWidth,
-			H: ascent + descent, URI: item.href,
-		})
+			H: ascent + descent,
+		}).withURI(item.href))
 	}
 }
 
@@ -482,18 +479,17 @@ func (e *engine) emitTextShadowRuns(
 	for _, shadow := range shadows {
 		opacity := shadowOpacity(shadow.blur)
 
-		shadowOp := Op{ //nolint:exhaustruct // intentional zero fields
+		shadowOp := (Op{ //nolint:exhaustruct // intentional zero fields
 			Kind: OpText, X: textX + shadow.x, Y: baseline + shadow.y, W: textWidth, H: item.h,
 			Text: run.text, Font: run.face, Size: size,
 			InkDescent:    descent,
 			LetterSpacing: item.style.LetterSpacing * e.scale,
-			TextTransform: item.style.TextTransform,
 			Bold:          item.style.FontWeight >= fontWeightBoldValue,
 			R:             shadow.color[0], G: shadow.color[1], B: shadow.color[2],
-			RotateDeg: writingModeRotate(item.style.WritingMode),
-		}
+			RotateDeg: float32(writingModeRotate(item.style.WritingMode)),
+		}).withTextTransform(item.style.TextTransform)
 		if opacity > 0 && opacity < 1 {
-			shadowOp.PaintOpacity = opacity
+			shadowOp.setPaintOpacity(opacity)
 		}
 
 		e.add(shadowOp)
@@ -1497,7 +1493,7 @@ func (e *engine) splitTextByFace(cssSheet string, sty *ResolvedStyle) []faceRun 
 		}
 
 		current = face
-		width += face.AdvanceInPoints(runic, size)
+		width += e.glyphAdvance(face, size, runic)
 		runeCount++
 
 		if runic == ' ' {
@@ -1540,7 +1536,7 @@ func (e *engine) primaryFaceRun(cssSheet string, sty *ResolvedStyle) (faceRun, b
 	spaceCount := 0
 
 	for _, runic := range paintText {
-		width += primary.AdvanceInPoints(runic, size)
+		width += e.glyphAdvance(primary, size, runic)
 		runeCount++
 
 		if runic == ' ' {

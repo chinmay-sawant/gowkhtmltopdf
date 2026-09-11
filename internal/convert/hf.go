@@ -167,6 +167,31 @@ func headerHasContent(hf settings.HeaderFooter) bool {
 	return hf.Left != "" || hf.Center != "" || hf.Right != "" || hf.Line || hf.HTMLURL != ""
 }
 
+// headersFootersHaveContent reports whether any global or per-object header
+// or footer would draw. Object state already includes HeaderFor/FooterFor and
+// @page margin-box text, so an empty global is not enough to skip.
+func headersFootersHaveContent(req *Request, plan *pagePlan) bool {
+	if req != nil && (headerHasContent(req.Global.Header) || headerHasContent(req.Global.Footer)) {
+		return true
+	}
+
+	if plan == nil {
+		return false
+	}
+
+	for _, own := range plan.owners {
+		if own.st == nil {
+			continue
+		}
+
+		if headerHasContent(own.st.header) || headerHasContent(own.st.footer) {
+			return true
+		}
+	}
+
+	return false
+}
+
 //nolint:mnd // 400 is default normal font weight
 func resolveHFFont(name string, reg *pdf.Registry, fallback *pdf.Font) *pdf.Font {
 	if strings.TrimSpace(name) == "" || reg == nil {
@@ -736,6 +761,14 @@ func drawHeadersFooters(ctx context.Context, hf hfLoader, doc *pdf.Document, req
 // the current convert.Run signature.
 func drawHeadersFootersResult(ctx context.Context, loader hfLoader, doc *pdf.Document, req *Request, plan *pagePlan, headings []*outline.Heading) hfDrawResult { //nolint:gocognit,cyclop,funlen,lll // per-page draw dispatch with lazy HF load
 	var result hfDrawResult
+
+	if !headersFootersHaveContent(req, plan) {
+		if err := ctx.Err(); err != nil {
+			result.fatal = err
+		}
+
+		return result
+	}
 
 	total := doc.PageCount()
 	now := req.now()

@@ -21,8 +21,8 @@ func paintBlended(
 	}
 
 	source := image.NewNRGBA(scratch)
-	opCopy := *paintOp
-	opCopy.BlendMode = ""
+	opCopy := paintOp.Clone()
+	opCopy.SetBlendMode("")
 	paint(source, &opCopy, pxPerPt, atlas, imageCache)
 	compositeBlend(dst, source, paintOp.BlendMode)
 }

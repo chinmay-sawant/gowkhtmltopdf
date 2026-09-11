@@ -637,6 +637,15 @@ func (run *runContext) renderObject(ctx context.Context, obj *settings.PdfObject
 		}
 	}
 
+	layoutOpts := state.bodyLayoutOpts(objectRender)
+	if blocks, ok := layout.IndependentBlocksForOptions(ctx, root, layoutOpts); ok && len(blocks) > 1 {
+		if err := renderIndependentBlocks(ctx, run.doc, state, root, blocks, objectRender, run.log); err != nil {
+			return nil, fmt.Errorf("object %d (%s): independent blocks: %w", idx+1, obj.Page, err)
+		}
+
+		return state, nil
+	}
+
 	lres, objectRender, err := layoutBody(
 		ctx,
 		state,

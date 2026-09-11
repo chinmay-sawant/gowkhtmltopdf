@@ -83,53 +83,90 @@ func encodeFastPNG(writer io.Writer, src *image.NRGBA, opaque bool) error {
 		opaqueKnown = src.Opaque()
 	}
 
-	channels, colorType := pngColorPlan(opaqueKnown)
-
-	if _, err := io.WriteString(writer, pngSignature); err != nil {
-		return fmt.Errorf("png signature: %w", err)
-	}
-
-	if err := writePNGHeader(writer, width, height, colorType); err != nil {
+	encoder, err := startFastPNG(writer, width, height, opaqueKnown)
+	if err != nil {
 		return err
 	}
 
-	//nolint:exhaustruct // buf and n start at their zero values
-	idat := fastIDATWriter{w: writer}
-
-	deflater, err := zlib.NewWriterLevel(&idat, fastPNGDeflateLevel)
-	if err != nil {
-		return fmt.Errorf("png deflate writer: %w", err)
-	}
-
-	// One row buffer plus the filter byte; the previous row is not needed
-	// because filter None never looks back.
-	row := make([]byte, 1+width*channels)
-	row[0] = 0 // filter type None
-
 	for rowIndex := range height {
-		raw := row[1:]
 		offset := src.PixOffset(bounds.Min.X, bounds.Min.Y+rowIndex)
-
-		if opaqueKnown {
-			packOpaqueRGBRow(raw, src.Pix[offset:], width)
-		} else {
-			copy(raw, src.Pix[offset:offset+width*4])
-		}
-
-		if _, err := deflater.Write(row); err != nil {
+		if err := encoder.writeNRGBARow(src.Pix[offset:]); err != nil {
 			return fmt.Errorf("png deflate row %d: %w", rowIndex, err)
 		}
 	}
 
-	if err := deflater.Close(); err != nil {
+	return encoder.close()
+}
+
+// pngRowEncoder writes one PNG from sequential NRGBA rows. Strip raster and
+// the full-canvas fast path share this so filter None, the deflate level, and
+// IDAT framing stay one implementation.
+type pngRowEncoder struct {
+	idat     fastIDATWriter
+	deflater *zlib.Writer
+	row      []byte
+	width    int
+	opaque   bool
+}
+
+// startFastPNG writes the PNG signature and IHDR, then returns a row encoder.
+func startFastPNG(writer io.Writer, width, height int, opaque bool) (*pngRowEncoder, error) {
+	channels, colorType := pngColorPlan(opaque)
+
+	if _, err := io.WriteString(writer, pngSignature); err != nil {
+		return nil, fmt.Errorf("png signature: %w", err)
+	}
+
+	if err := writePNGHeader(writer, width, height, colorType); err != nil {
+		return nil, err
+	}
+
+	encoder := &pngRowEncoder{ //nolint:exhaustruct // idat and deflater are attached below
+		row:    make([]byte, 1+width*channels),
+		width:  width,
+		opaque: opaque,
+	}
+	encoder.row[0] = 0 // filter type None
+	encoder.idat.w = writer
+
+	deflater, err := zlib.NewWriterLevel(&encoder.idat, fastPNGDeflateLevel)
+	if err != nil {
+		return nil, fmt.Errorf("png deflate writer: %w", err)
+	}
+
+	encoder.deflater = deflater
+
+	return encoder, nil
+}
+
+// writeNRGBARow appends one packed NRGBA row to the deflate stream. pix must
+// hold at least width*4 bytes of tightly packed NRGBA.
+func (e *pngRowEncoder) writeNRGBARow(pix []byte) error {
+	raw := e.row[1:]
+
+	if e.opaque {
+		packOpaqueRGBRow(raw, pix, e.width)
+	} else {
+		copy(raw, pix[:e.width*4])
+	}
+
+	if _, err := e.deflater.Write(e.row); err != nil {
+		return fmt.Errorf("png deflate row: %w", err)
+	}
+
+	return nil
+}
+
+func (e *pngRowEncoder) close() error {
+	if err := e.deflater.Close(); err != nil {
 		return fmt.Errorf("png deflate close: %w", err)
 	}
 
-	if err := idat.flush(); err != nil {
+	if err := e.idat.flush(); err != nil {
 		return err
 	}
 
-	return writePNGChunk(writer, "IEND", nil)
+	return writePNGChunk(e.idat.w, "IEND", nil)
 }
 
 // pngColorPlan returns the PNG channel count and color type for an opaque or

@@ -185,7 +185,7 @@ func (e *engine) addGridRun(segs []GridSeg) {
 		blend = ""
 	}
 
-	e.ops = append(e.ops, Op{ //nolint:exhaustruct // intentional zero fields
+	gridOp := (Op{ //nolint:exhaustruct // intentional zero fields
 		ID: e.nextOpID, Kind: OpGridRun,
 		X: minX, Y: minY, W: maxX - minX, H: maxY - minY,
 		R: segs[0].R, G: segs[0].G, B: segs[0].B, Width: segs[0].Width,
@@ -193,8 +193,9 @@ func (e *engine) addGridRun(segs []GridSeg) {
 		ZIndex:     e.zIndex,
 		ZIndexSet:  e.zIndexSet,
 		Positioned: e.positioned,
-		BlendMode:  blend,
-	})
+	}).withBlendMode(blend)
+	gridOp.bindEmptyExtra()
+	e.ops = append(e.ops, gridOp)
 }
 
 // shiftGridRunY moves every segment of a run down the canvas, mirroring the

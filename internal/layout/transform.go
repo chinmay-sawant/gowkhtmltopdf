@@ -998,13 +998,14 @@ func restampBoxTransforms(boxNode *box, ops []Op) {
 		}
 
 		needsStamp = true
-		ops[idx].Xform = IdentityMatrix()
+
+		ops[idx].setXform(IdentityMatrix())
 		ops[idx].XformSet = false
 	}
 
 	if needsStamp {
 		for idx := range ops {
-			ops[idx].PaintOpacity = 0
+			ops[idx].setPaintOpacity(0)
 		}
 
 		stampBoxTransforms(boxNode, IdentityMatrix(), ops)
@@ -1110,7 +1111,7 @@ func stampExclusiveTransformOps(boxNode *box, accum Matrix2D, ops []Op, covered 
 			continue
 		}
 
-		ops[idx].Xform = accum
+		ops[idx].setXform(accum)
 		ops[idx].XformSet = true
 	}
 }
@@ -1138,7 +1139,7 @@ func stampExclusiveOpacityOps(boxNode *box, ops []Op, covered []bool) {
 			opacity *= ops[idx].PaintOpacity
 		}
 
-		ops[idx].PaintOpacity = opacity
+		ops[idx].setPaintOpacity(opacity)
 	}
 }
 
@@ -1162,9 +1163,9 @@ func stampCoveredOpacityOps(boxNode *box, ops []Op, covered []bool) {
 		}
 
 		if ops[idx].PaintOpacity > 0 && ops[idx].PaintOpacity < 1 {
-			ops[idx].PaintOpacity = opacityBase * ops[idx].PaintOpacity
+			ops[idx].setPaintOpacity(opacityBase * ops[idx].PaintOpacity)
 		} else {
-			ops[idx].PaintOpacity = opacityBase
+			ops[idx].setPaintOpacity(opacityBase)
 		}
 	}
 }

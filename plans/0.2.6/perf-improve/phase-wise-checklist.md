@@ -2,6 +2,7 @@
 
 > **Parent:** `plans/0.2.6/perf-review/phase-wise-checklist.md` - the recovery plan that landed the style interning, PDF lifetime, and image direct-raster fixes.
 > **Status:** complete 2026-09-11. All 32 rows closed on recorded proof.
+> **Successor:** `plans/0.2.6/perf-improve/wave-2-50pct/phase-wise-checklist.md` is the live ledger for the next cut of remaining ns/op and B/op. This file stays the Snapshot L record. Do not reopen its rows.
 > **Estimated effort:** six implementation phases plus closure, each measured before the next.
 > **Date:** 2026-09-11
 > **Evidence boundary:** current source, the 2026-09-11 profiling captures under `profiles/`, the 2026-09-11 perf-review captures, and the committed 2026-08-19 Snapshot I. No Git command ran while writing this plan.

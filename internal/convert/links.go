@@ -45,52 +45,57 @@ type bodyNavigation struct {
 // matching the historical scan of Result.Locations. The copied locations have
 // nil Node pointers so they do not keep the parsed document alive.
 //
-//nolint:cyclop,varnamelen // element location and structure element collection
+// Layout-produced results set MaxContentX > 0. When Paint also left HasIDs
+// and HasFragmentLinks false, the report-shaped path returns without the
+// two maps or the struct-op index. Hand-built Result values keep MaxContentX
+// at 0 and still scan; maps are allocated only on the first id.
+//
+//nolint:cyclop,varnamelen,funlen // element location and structure element collection
 func collectBodyNavigation(res *layout.Result) bodyNavigation {
 	if res == nil {
 		return bodyNavigation{} //nolint:exhaustruct // intentional zero-value projection
 	}
 
-	nav := bodyNavigation{ //nolint:exhaustruct // intentional zero-value projection
-		ids:     make(map[string]layout.ElementLocation),
-		idElems: make(map[string]*pdf.StructElem),
+	if res.MaxContentX > 0 && !res.HasIDs && !res.HasFragmentLinks {
+		return bodyNavigation{} //nolint:exhaustruct // intentional zero-value projection
 	}
 
-	// structOps indexes the ops that carry a PDF/UA structure element once,
-	// ordered by Y (stable: op order breaks ties), so id locations binary-search
-	// instead of rescanning the whole op list per id.
-	type structOpEntry struct {
-		y    float64
-		elem *pdf.StructElem
-	}
-
-	structOps := make([]structOpEntry, 0)
-
-	for i := range res.Ops {
-		if res.Ops[i].StructElem != nil {
-			structOps = append(structOps, structOpEntry{y: res.Ops[i].Y, elem: res.Ops[i].StructElem})
-		}
-	}
-
-	sort.SliceStable(structOps, func(a, b int) bool { return structOps[a].y < structOps[b].y })
+	var (
+		nav         bodyNavigation
+		structOps   []structOpEntry
+		structReady bool
+	)
 
 	for _, loc := range res.Locations {
 		if loc.Node == nil {
 			continue
 		}
 
-		if id := loc.Node.Attribute("id"); id != "" {
-			loc.Node = nil
-			nav.ids[id] = loc
+		id := loc.Node.Attribute("id")
+		if id == "" {
+			continue
+		}
 
-			lo, hi := loc.Y, loc.Y+loc.H+idMatchSlopPt
+		if nav.ids == nil {
+			nav.ids = make(map[string]layout.ElementLocation)
+			nav.idElems = make(map[string]*pdf.StructElem)
+		}
 
-			first := sort.Search(len(structOps), func(i int) bool { return structOps[i].y >= lo })
-			for first < len(structOps) && structOps[first].y <= hi {
-				nav.idElems[id] = structOps[first].elem
+		if !structReady {
+			structOps = indexStructOps(res.Ops)
+			structReady = true
+		}
 
-				break
-			}
+		loc.Node = nil
+		nav.ids[id] = loc
+
+		lo, hi := loc.Y, loc.Y+loc.H+idMatchSlopPt
+
+		first := sort.Search(len(structOps), func(i int) bool { return structOps[i].y >= lo })
+		for first < len(structOps) && structOps[first].y <= hi {
+			nav.idElems[id] = structOps[first].elem
+
+			break
 		}
 	}
 
@@ -113,6 +118,25 @@ func collectBodyNavigation(res *layout.Result) bodyNavigation {
 	}
 
 	return nav
+}
+
+type structOpEntry struct {
+	y    float64
+	elem *pdf.StructElem
+}
+
+func indexStructOps(ops []layout.Op) []structOpEntry {
+	structOps := make([]structOpEntry, 0)
+
+	for i := range ops {
+		if ops[i].StructElem != nil {
+			structOps = append(structOps, structOpEntry{y: ops[i].Y, elem: ops[i].StructElem})
+		}
+	}
+
+	sort.SliceStable(structOps, func(a, b int) bool { return structOps[a].y < structOps[b].y })
+
+	return structOps
 }
 
 // stripLinkURIs neutralizes external (http/https/mailto) link ops in place.

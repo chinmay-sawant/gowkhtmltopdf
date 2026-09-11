@@ -58,22 +58,20 @@ func (e *engine) appendBackgroundImage(
 				sty.BackgroundPosX, sty.BackgroundPosY, originX, originY, originW, originH, destW, destH,
 			)
 			if pngData, imgW, imgH, ok := renderGradientPNG(layer, destW, destH, sty.Color); ok {
-				baseOp := Op{ //nolint:exhaustruct // intentional zero fields
+				baseOp := (Op{ //nolint:exhaustruct // intentional zero fields
 					Kind:         OpImage,
 					X:            destX,
 					Y:            destY,
 					W:            destW,
 					H:            destH,
-					Image:        pngData,
-					ImgW:         imgW,
-					ImgH:         imgH,
 					IsJPEG:       false,
 					IsBackground: true,
-					BlendMode:    backgroundBlendModeForLayer(sty.BackgroundBlendMode, i),
-				}
+				}).withImage(pngData, imgW, imgH, "").withBlendMode(
+					backgroundBlendModeForLayer(sty.BackgroundBlendMode, i),
+				)
 				if sty.Filter != "" {
 					filters := parseFilterList(sty.Filter, sty.Color, sty.FontSize)
-					baseOp.Image = applyImageFilterToImage(baseOp.Image, filters)
+					baseOp.setImage(applyImageFilterToImage(baseOp.Image, filters), imgW, imgH, "")
 				}
 				dst = tileBackgroundRepeat(
 					dst, baseOp, repeatX, repeatY, clip, destX, destY, destW, destH,
@@ -115,22 +113,20 @@ func (e *engine) appendBackgroundImage(
 			sty.BackgroundPosX, sty.BackgroundPosY, originX, originY, originW, originH, destW, destH,
 		)
 
-		baseOp := Op{ //nolint:exhaustruct // intentional zero fields
+		baseOp := (Op{ //nolint:exhaustruct // intentional zero fields
 			Kind:         OpImage,
 			X:            destX,
 			Y:            destY,
 			W:            destW,
 			H:            destH,
-			Image:        ref.data,
-			ImgW:         ref.w,
-			ImgH:         ref.h,
 			IsJPEG:       ref.isJPEG,
 			IsBackground: true,
-			BlendMode:    backgroundBlendModeForLayer(sty.BackgroundBlendMode, i),
-		}
+		}).withImage(ref.data, ref.w, ref.h, "").withBlendMode(
+			backgroundBlendModeForLayer(sty.BackgroundBlendMode, i),
+		)
 		if sty.Filter != "" {
 			filters := parseFilterList(sty.Filter, sty.Color, sty.FontSize)
-			baseOp.Image = applyImageFilterToImage(baseOp.Image, filters)
+			baseOp.setImage(applyImageFilterToImage(baseOp.Image, filters), ref.w, ref.h, "")
 		}
 
 		dst = tileBackgroundRepeat(

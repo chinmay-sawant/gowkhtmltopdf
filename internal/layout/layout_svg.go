@@ -45,10 +45,9 @@ func (e *engine) buildInlineSVG(node *html.Node, sty ResolvedStyle, posX, posY f
 		imgX := posX + borderL + padL
 		imgY := posY + borderT + padT
 		opStart := len(e.ops)
-		e.add(Op{ //nolint:exhaustruct // intentional zero fields
+		e.add((Op{ //nolint:exhaustruct // intentional zero fields
 			Kind: OpImage, X: imgX, Y: imgY, W: size.w, H: size.h,
-			Image: ref.data, ImgW: ref.w, ImgH: ref.h,
-		})
+		}).withImage(ref.data, ref.w, ref.h, ""))
 		e.prependChrome(opStart, boxNode, sty, posX, posY, boxNode.w, boxNode.height)
 	}
 

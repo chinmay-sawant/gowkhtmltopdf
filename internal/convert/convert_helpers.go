@@ -251,6 +251,10 @@ func tryApplyPageMargin(geom hfGeom, rawMargin string) (hfGeom, bool) {
 // boxes show up only as op extents). Text and link ops never force a page
 // wider, so they are ignored; rects and images are what push content out.
 func measuredWidth(res *layout.Result) float64 {
+	if width, ok := measuredWidthFast(res); ok {
+		return width
+	}
+
 	width := res.Width
 
 	for _, op := range res.Ops {
@@ -266,6 +270,20 @@ func measuredWidth(res *layout.Result) float64 {
 	}
 
 	return width
+}
+
+// measuredWidthFast uses layout's MaxContentX census when it is known
+// (greater than zero). Zero means a hand-built Result, so the caller walks.
+func measuredWidthFast(res *layout.Result) (float64, bool) {
+	if res == nil || res.MaxContentX <= 0 {
+		return 0, false
+	}
+
+	if res.MaxContentX > res.Width {
+		return res.MaxContentX, true
+	}
+
+	return res.Width, true
 }
 
 // pageGeometry resolves the page size in points from the single size model:
@@ -332,7 +350,7 @@ func resolveRelativeLinkURIs(ops []layout.Op, base string) {
 
 	for idx := range ops {
 		if newURI, ok := resolveRelativeLinkURI(ops[idx], bufU); ok {
-			ops[idx].URI = newURI
+			ops[idx].SetURI(newURI)
 		}
 	}
 }

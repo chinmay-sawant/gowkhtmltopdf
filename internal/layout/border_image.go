@@ -347,18 +347,15 @@ func isTiledBorderImageRepeat(repeat string) bool {
 }
 
 func newBorderImageOp(x, y, w, h float64, data []byte, imgW, imgH int, isJPEG bool) Op {
-	return Op{ //nolint:exhaustruct // intentional zero fields
+	return (Op{ //nolint:exhaustruct // intentional zero fields
 		Kind:         OpImage,
 		X:            x,
 		Y:            y,
 		W:            w,
 		H:            h,
-		Image:        data,
-		ImgW:         imgW,
-		ImgH:         imgH,
 		IsJPEG:       isJPEG,
 		IsBackground: true,
-	}
+	}).withImage(data, imgW, imgH, "")
 }
 
 // appendBorderImageStretched paints the 3x3 slice grid with each source slice

@@ -770,7 +770,7 @@ func (e *engine) emitListMarker(node *html.Node, style ResolvedStyle, contentX, 
 
 	if face != nil {
 		for _, r := range text {
-			minW += face.AdvanceInPoints(r, size)
+			minW += e.glyphAdvance(face, size, r)
 		}
 	}
 
@@ -819,17 +819,14 @@ func (e *engine) emitListStyleImageMarker(
 
 	posX := listMarkerX(style.ListStylePosition, contentX, size, imgW)
 
-	e.add(Op{ //nolint:exhaustruct // intentional zero fields
+	e.add((Op{ //nolint:exhaustruct // intentional zero fields
 		Kind:   OpImage,
 		X:      posX,
 		Y:      baseline - imgH,
 		W:      imgW,
 		H:      imgH,
-		Image:  ref.data,
-		ImgW:   ref.w,
-		ImgH:   ref.h,
 		IsJPEG: ref.isJPEG,
-	})
+	}).withImage(ref.data, ref.w, ref.h, ""))
 
 	return true
 }

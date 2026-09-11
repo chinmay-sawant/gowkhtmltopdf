@@ -458,19 +458,17 @@ func TestTransformedOpsLandAtExpectedCanvasPositions(t *testing.T) {
 	}{
 		{
 			name: "scale-1.5",
-			op: layout.Op{
+			op: xformedOp(layout.Op{
 				Kind: layout.OpFillRect, X: 15, Y: 15, W: 15, H: 15, R: 1, Alpha: 1,
-				Xform: layout.Scale(1.5, 1.5), XformSet: true,
-			},
+			}, layout.Scale(1.5, 1.5)),
 			inside:  image.Point{X: 45, Y: 45}, // scaled box spans 30..60 px
 			outside: image.Point{X: 25, Y: 25}, // only the untransformed box covers this
 		},
 		{
 			name: "rotate-90-about-center",
-			op: layout.Op{
+			op: xformedOp(layout.Op{
 				Kind: layout.OpFillRect, X: 30, Y: 30, W: 20, H: 10, R: 1, Alpha: 1,
-				Xform: layout.BakeOrigin(layout.RotateDeg(90), 40, 35), XformSet: true,
-			},
+			}, layout.BakeOrigin(layout.RotateDeg(90), 40, 35)),
 			inside:  image.Point{X: 53, Y: 47}, // rotated bar spans 46.7..60 x 33.3..60 px
 			outside: image.Point{X: 63, Y: 42}, // only the unrotated bar covers this
 		},
@@ -496,6 +494,12 @@ func TestTransformedOpsLandAtExpectedCanvasPositions(t *testing.T) {
 			}
 		})
 	}
+}
+
+func xformedOp(op layout.Op, matrix layout.Matrix2D) layout.Op {
+	op.SetXform(matrix)
+
+	return op
 }
 
 // TestTransparentRasterKeepsUnpaintedAlphaZeroThroughPNG checks the

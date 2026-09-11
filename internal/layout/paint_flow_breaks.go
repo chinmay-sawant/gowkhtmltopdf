@@ -496,7 +496,13 @@ func collectBeforeAlwaysTargets(root *box, boxes []*box, opCount int) []beforeAl
 // processed by ascending opStart. Forced-break dys are recorded on a difference
 // array and applied to ops in one O(n) pass (plus O(boxes) live box updates per
 // break). Flow indexes are rebuilt once at the end.
+//
+//nolint:cyclop // skip flag plus the existing target/batch dispatch
 func beforeAlways(res *Result, contentH float64) bool {
+	if res != nil && res.skipInitialBeforeAlways {
+		return false
+	}
+
 	if res == nil || res.root == nil || contentH <= 0 {
 		return false
 	}

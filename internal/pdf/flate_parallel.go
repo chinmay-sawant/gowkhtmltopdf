@@ -82,9 +82,11 @@ func (p *pageFlatePool) compress(raws [][]byte) [][]byte {
 }
 
 // finalizePages materializes every page stream and page object. With
-// compression on, all page streams are flated first (in parallel through the
-// retained worker set); the resource pass stays serial because it mutates the
-// shared object table and font cache.
+// compression on, pages are flated in windows of at most maxPageFlateWorkers
+// then each window is finalized in input-index order before the next window
+// starts. Peak live compressed copies equal the window, not the page count.
+// The resource pass stays serial because it mutates the shared object table
+// and font cache.
 func (d *Document) finalizePages(pagesRef objRef) error {
 	if !d.useCompression {
 		for _, page := range d.pages {
@@ -96,15 +98,11 @@ func (d *Document) finalizePages(pagesRef objRef) error {
 		return nil
 	}
 
-	streams := d.compressPageStreams()
-
-	for index, page := range d.pages {
-		if err := d.finalizePage(page, pagesRef, streams[index]); err != nil {
-			return err
-		}
+	if !flatePagesInParallel(len(d.pages)) {
+		return d.finalizePagesSerialFlate(pagesRef)
 	}
 
-	return nil
+	return d.finalizePagesWindowed(pagesRef)
 }
 
 // flatePagesInParallel reports whether a document with pageCount page streams
@@ -114,26 +112,59 @@ func flatePagesInParallel(pageCount int) bool {
 	return pageCount > 1 && runtime.GOMAXPROCS(0) > 1
 }
 
-// compressPageStreams flates every page content buffer and returns the
-// compressed streams in page order. Single-page documents (and single-CPU
-// runs) take the serial flateBytes path, so the worker set is never started
-// for them. Raw buffers are only borrowed while compression runs; the
-// returned slice holds no reference to them, so each raw buffer becomes
-// collectable as soon as its page releases it (PDF-06).
-func (d *Document) compressPageStreams() [][]byte {
-	raws := make([][]byte, len(d.pages))
-	for index, page := range d.pages {
+// finalizePagesSerialFlate flates then finalizes one page at a time so a
+// single-page document (or a single-CPU run) never starts the retained
+// workers and never holds a second compressed copy.
+func (d *Document) finalizePagesSerialFlate(pagesRef objRef) error {
+	for _, page := range d.pages {
+		stream := flateBytes(page.content.Bytes())
+		if err := d.finalizePage(page, pagesRef, stream); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// finalizePagesWindowed flates at most maxPageFlateWorkers pages on the
+// retained worker set, finalizes that window in index order, then compresses
+// the next window. Output order is the input index, never worker completion
+// order. finalizePage still drops each raw buffer (PDF-06).
+func (d *Document) finalizePagesWindowed(pagesRef objRef) error {
+	for start := 0; start < len(d.pages); start += maxPageFlateWorkers {
+		end := min(start+maxPageFlateWorkers, len(d.pages))
+		if err := d.finalizeCompressedWindow(pagesRef, d.pages[start:end]); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// finalizeCompressedWindow flates one window through the retained workers
+// then finalizes in slice order. The window slice is the only extra live
+// compressed copies; each slot is cleared after finalizePage so the extra
+// reference dies before the next page is retained.
+func (d *Document) finalizeCompressedWindow(pagesRef objRef, pages []*Page) error {
+	raws := make([][]byte, len(pages))
+	for index, page := range pages {
 		raws[index] = page.content.Bytes()
 	}
 
-	if !flatePagesInParallel(len(raws)) {
-		streams := make([][]byte, len(raws))
-		for index := range raws {
-			streams[index] = flateBytes(raws[index])
+	streams := retainedPageFlate.compress(raws)
+
+	for index, page := range pages {
+		if err := d.finalizePage(page, pagesRef, streams[index]); err != nil {
+			return err
 		}
 
-		return streams
+		// finalizePage already dropped the builder's ref (PDF-06). Clear the
+		// window aliases so neither the raw backing array nor the extra
+		// compressed pointer stays live while later slots in this window
+		// finalize.
+		raws[index] = nil
+		streams[index] = nil
 	}
 
-	return retainedPageFlate.compress(raws)
+	return nil
 }

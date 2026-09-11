@@ -26,6 +26,8 @@ const (
 // contributes its transformed corner extent. Callers intersect the result
 // with the target canvas; an empty intersection means the op cannot paint.
 func paintOpBounds(paintOp *layout.Op, pxPerPt float64) image.Rectangle {
+	paintOp.BindEmptyExtra()
+
 	minX, minY, maxX, maxY := opRectBounds(paintOp)
 
 	if paintOp.XformSet && !paintOp.Xform.IsIdentity() {

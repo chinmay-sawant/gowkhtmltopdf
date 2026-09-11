@@ -347,6 +347,110 @@ Allocation improved at every size. Time improved clearly at 50 pages and moved
 inside the noise band at 2, 10, and 250 pages. The 2-page byte gain is small
 because the one-time font load dominates that row.
 
+## Fresh head-to-head vs tag v0.2.4 (capture 2026-09-11T19:33Z to 19:38Z UTC)
+
+The earlier 0.2.4 columns in this file are supplied or historical rows from a
+different window. This capture rebuilds v0.2.4 itself: tag
+`v0.2.4` = `80cbb47` extracted with `git archive` to
+`/tmp/opencode/gowk-v0.2.4`, then the canonical harness runs on both trees
+with rounds alternating so host drift hits both sides.
+
+- Command:
+  `scripts/bench-performance-recovery.sh --mode=<mode> --sizes=2,5,10,20,50,100,200,250,500 --benchtime=1x --count=1`
+- Three independent process rounds per mode per tree; every cell is the median
+- CLI rows pool the nine timed runs per size (warmup excluded)
+- Same fixture hash in both trees (`report.html.tmpl`, sha256 `e3b5387b...`)
+- Current tree: HEAD `ca761bb` plus the uncommitted work, which at this
+  capture includes the in-progress wave 2
+  (`plans/0.2.6/perf-improve/wave-2-50pct/`), so its rows sit below Snapshot M
+  (733 ms / 163.02 MB at 500 pages) on the same tree
+- Raw captures and the full comparison, including the 2/5/10 page cold and
+  warm probes and the standalone 500 page rows:
+  `plans/0.2.6/perf-time/results/vs-0.2.4/` (local, gitignored)
+
+### Internal generic PDF, warm matrix
+
+| Pages | v0.2.4 | current | Δ time | v0.2.4 B/op | current B/op | Δ B/op |
+|---:|---:|---:|---:|---:|---:|---:|
+| 2 | 9.80 ms | 5.95 ms | -39.3% | 9.20 MB | 4.11 MB | -55.3% |
+| 5 | 8.19 ms | 7.94 ms | -3.1% | 3.61 MB | 6.89 MB | +90.8% |
+| 10 | 14.90 ms | 12.77 ms | -14.3% | 5.26 MB | 4.72 MB | -10.1% |
+| 20 | 30.54 ms | 23.16 ms | -24.2% | 10.73 MB | 6.20 MB | -42.2% |
+| 50 | 82.64 ms | 57.22 ms | -30.8% | 24.97 MB | 12.07 MB | -51.7% |
+| 100 | 166.2 ms | 113.1 ms | -32.0% | 48.73 MB | 24.12 MB | -50.5% |
+| 200 | 393.7 ms | 248.8 ms | -36.8% | 96.47 MB | 46.62 MB | -51.7% |
+| 250 | 493.9 ms | 292.3 ms | -40.8% | 119.35 MB | 58.82 MB | -50.7% |
+| 500 | 1,142 ms | 560.8 ms | -50.9% | 237.85 MB | 116.06 MB | -51.2% |
+
+### Public library PDF
+
+| Pages | v0.2.4 | current | Δ time | v0.2.4 B/op | current B/op | Δ B/op |
+|---:|---:|---:|---:|---:|---:|---:|
+| 2 | 10.31 ms | 6.10 ms | -40.8% | 9.21 MB | 4.13 MB | -55.2% |
+| 5 | 8.08 ms | 8.90 ms | +10.2% | 2.81 MB | 6.92 MB | +146.2% |
+| 10 | 17.03 ms | 12.70 ms | -25.5% | 6.12 MB | 4.76 MB | -22.2% |
+| 20 | 34.31 ms | 21.93 ms | -36.1% | 10.81 MB | 6.28 MB | -41.9% |
+| 50 | 83.35 ms | 57.08 ms | -31.5% | 25.14 MB | 13.02 MB | -48.2% |
+| 100 | 183.2 ms | 109.7 ms | -40.1% | 49.12 MB | 24.41 MB | -50.3% |
+| 200 | 377.3 ms | 219.6 ms | -41.8% | 97.03 MB | 47.20 MB | -51.4% |
+| 250 | 486.0 ms | 278.9 ms | -42.6% | 120.31 MB | 59.64 MB | -50.4% |
+| 500 | 1,055 ms | 563.5 ms | -46.6% | 239.39 MB | 117.71 MB | -50.8% |
+
+### Public library image
+
+| Tiles | v0.2.4 | current | Δ time | v0.2.4 B/op | current B/op | Δ B/op |
+|---:|---:|---:|---:|---:|---:|---:|
+| 2 | 20.86 ms | 14.60 ms | -30.0% | 18.73 MB | 11.91 MB | -36.4% |
+| 5 | 14.99 ms | 11.01 ms | -26.6% | 12.01 MB | 3.45 MB | -71.3% |
+| 10 | 15.11 ms | 13.69 ms | -9.4% | 12.69 MB | 3.68 MB | -71.0% |
+| 20 | 14.97 ms | 14.06 ms | -6.1% | 12.82 MB | 3.82 MB | -70.2% |
+| 50 | 23.39 ms | 19.82 ms | -15.2% | 13.22 MB | 4.20 MB | -68.2% |
+| 100 | 38.13 ms | 36.98 ms | -3.0% | 20.70 MB | 20.00 MB | -3.4% |
+| 200 | 66.37 ms | 62.29 ms | -6.2% | 37.87 MB | 37.09 MB | -2.1% |
+| 250 | 83.42 ms | 18.01 ms | -78.4% | 47.72 MB | 6.38 MB | -86.6% |
+| 500 | 167.9 ms | 35.97 ms | -78.6% | 91.92 MB | 10.08 MB | -89.0% |
+
+### CLI process (`cli-rss`)
+
+| Pages | v0.2.4 time | current time | Δ time | v0.2.4 RSS | current RSS | Δ RSS |
+|---:|---:|---:|---:|---:|---:|---:|
+| 2 | 10 ms | 10 ms | 0.0% | 23.4 MiB | 19.1 MiB | -18.4% |
+| 5 | 20 ms | 10 ms | -50.0% | 24.4 MiB | 21.6 MiB | -11.5% |
+| 10 | 30 ms | 20 ms | -33.3% | 27.0 MiB | 24.4 MiB | -9.7% |
+| 20 | 40 ms | 30 ms | -25.0% | 29.6 MiB | 25.7 MiB | -13.3% |
+| 50 | 100 ms | 70 ms | -30.0% | 42.0 MiB | 29.4 MiB | -29.9% |
+| 100 | 200 ms | 130 ms | -35.0% | 60.8 MiB | 35.1 MiB | -42.3% |
+| 200 | 440 ms | 240 ms | -45.5% | 96.0 MiB | 44.8 MiB | -53.3% |
+| 250 | 540 ms | 300 ms | -44.4% | 115.1 MiB | 50.1 MiB | -56.5% |
+| 500 | 1,280 ms | 610 ms | -52.3% | 204.8 MiB | 78.4 MiB | -61.7% |
+
+### Reading
+
+- From 10 pages up the current tree leads both PDF paths on time and
+  `B/op`. At 500 pages: internal -50.9% time / -51.2% B/op, public library
+  -46.6% / -50.8%.
+- Cold starts are much cheaper: 2 pages internal -39.3% time / -55.3% B/op,
+  public -40.8% / -55.2%.
+- Warm steady state at 2 pages is the one remaining gap: internal
+  3.70 ms / 2.21 MB (v0.2.4) against 5.53 ms / 3.76 MB (current); public
+  4.48 ms / 2.22 MB against 5.07 ms / 3.77 MB.
+- The 5-page `B/op` row of the warm matrix is a process-context artifact: the
+  one-time per-process structures are charged there. A fresh-process warm 5p
+  conversion allocates 4.01 MB against v0.2.4's 3.61 MB (+11%), and 5p time
+  is still faster in the current tree (6.61 ms against 8.44 ms).
+- Image tiles are the largest win: 250 and 500 tiles are 4.6x and 4.7x
+  faster with 87 to 89% less allocation traffic. The encoded PNG stays about
+  50% larger by design; decoded pixels are validated bit-identical by the
+  benchmark.
+- CLI 500 pages: -52.3% wall time and -61.7% peak RSS. RSS is lower at every
+  size. Wall time resolution is `/usr/bin/time %e` at 10 ms, so rows at 2 to
+  20 pages quantize.
+- 500-page PDF output is 1,420,537 bytes against v0.2.4's 1,390,014 (+2.2%).
+  Page counts and ordered text needles validate in both trees.
+- The historical Snapshot I 0.2.4 row (1,009.80 ms at 500 pages) reads faster
+  than this session's fresh v0.2.4 build (1,142 ms), which is the host-window
+  drift the interleaved method removes from the comparison.
+
 ## Evidence paths
 
 - Plan and row ledger: `plans/0.2.6/perf-review/phase-wise-checklist.md`
@@ -357,3 +461,8 @@ because the one-time font load dominates that row.
 - Committed publication: `documentation/performance.md`,
   `testdata/golden/benchmarks/benchmark-results.txt` Snapshot K,
   `testdata/golden/benchmarks/{cli,weasyprint,puppeteer}-compare.md`
+- Fresh v0.2.4 head-to-head (2026-09-11T19:33Z): raw captures and
+  `comparison.md` under `plans/0.2.6/perf-time/results/vs-0.2.4/` (local,
+  gitignored); this file carries the summary tables above
+- Wave 2 ledger for the current tree's extra rows:
+  `plans/0.2.6/perf-improve/wave-2-50pct/phase-wise-checklist.md`

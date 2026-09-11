@@ -23,13 +23,10 @@ func TestPaintBlendedFillUsesMultiply(t *testing.T) {
 		G:    0.5,
 		B:    0.5,
 	}, 1, atlas, cache)
-	paint(img, &layout.Op{
-		Kind:      layout.OpFillRect,
-		W:         1,
-		H:         1,
-		R:         1,
-		BlendMode: "multiply",
-	}, 1, atlas, cache)
+
+	multiply := layout.Op{Kind: layout.OpFillRect, W: 1, H: 1, R: 1}
+	multiply.SetBlendMode("multiply")
+	paint(img, &multiply, 1, atlas, cache)
 
 	got := img.NRGBAAt(0, 0)
 	if got.R != 127 || got.G != 0 || got.B != 0 || got.A != 255 {
@@ -42,8 +39,8 @@ func TestPaintBlendedFillUsesMultiply(t *testing.T) {
 // for the op-bounded scratch.
 func paintBlendedFullCanvas(dst *image.NRGBA, paintOp *layout.Op, pxPerPt float64) {
 	source := image.NewNRGBA(dst.Bounds())
-	opCopy := *paintOp
-	opCopy.BlendMode = ""
+	opCopy := paintOp.Clone()
+	opCopy.SetBlendMode("")
 	paint(source, &opCopy, pxPerPt, newGlyphAtlas(), newRasterImageCache())
 	compositeBlend(dst, source, paintOp.BlendMode)
 }
@@ -88,10 +85,8 @@ func TestPaintOpBoundsStaysConservative(t *testing.T) {
 		t.Fatalf("text bounds = %v, want the expanded font box %v", textBounds, image.Rect(18, 48, 62, 67))
 	}
 
-	rotated := layout.Op{
-		Kind: layout.OpFillRect, X: 50, Y: 40, W: 20, H: 6,
-		Xform: layout.RotateDeg(90), XformSet: true,
-	}
+	rotated := layout.Op{Kind: layout.OpFillRect, X: 50, Y: 40, W: 20, H: 6}
+	rotated.SetXform(layout.RotateDeg(90))
 	rotatedBounds := paintOpBounds(&rotated, 1)
 
 	if rotatedBounds != image.Rect(-48, 48, -38, 72) {
@@ -114,58 +109,60 @@ type blendParityCase struct {
 // interior fills, blobs straddling the canvas edges, a fully off-canvas op,
 // strokes, text, and a rotation.
 func blendParityCases() []blendParityCase {
+	rotated := layout.Op{
+		Kind: layout.OpFillRect, X: 24, Y: 14, W: 18, H: 10,
+		R: 0.4, G: 0.7, B: 0.1,
+	}
+	rotated.SetXform(layout.RotateDeg(30))
+
 	return []blendParityCase{
 		{
 			name: "fill interior",
-			op: layout.Op{
+			op: blendOp(layout.Op{
 				Kind: layout.OpFillRect, X: 12, Y: 10, W: 20, H: 14,
-				R: 0.9, G: 0.3, B: 0.2, Alpha: 0.6, BlendMode: "multiply",
-			},
+				R: 0.9, G: 0.3, B: 0.2, Alpha: 0.6,
+			}, "multiply"),
 		},
 		{
 			name: "blob at the left and top edges",
-			op: layout.Op{
+			op: blendOp(layout.Op{
 				Kind: layout.OpFillRect, X: -17, Y: -9, W: 30, H: 24,
-				R: 0.2, G: 0.8, B: 0.4, BlendMode: "screen",
-			},
+				R: 0.2, G: 0.8, B: 0.4,
+			}, "screen"),
 		},
 		{
 			name: "blob at the right and bottom edges",
-			op: layout.Op{
+			op: blendOp(layout.Op{
 				Kind: layout.OpFillRect, X: 55, Y: 34, W: 30, H: 18,
-				R: 0.7, G: 0.1, B: 0.9, Alpha: 0.45, BlendMode: "difference",
-			},
+				R: 0.7, G: 0.1, B: 0.9, Alpha: 0.45,
+			}, "difference"),
 		},
 		{
 			name: "fully outside the canvas",
-			op: layout.Op{
-				Kind: layout.OpFillRect, X: 200, Y: 200, W: 10, H: 10,
-				R: 1, BlendMode: "darken",
-			},
+			op:   blendOp(layout.Op{Kind: layout.OpFillRect, X: 200, Y: 200, W: 10, H: 10, R: 1}, "darken"),
 		},
 		{
 			name: "stroke rect",
-			op: layout.Op{
+			op: blendOp(layout.Op{
 				Kind: layout.OpStrokeRect, X: 8, Y: 6, W: 24, H: 18, Width: 3,
-				R: 1, G: 1, B: 0.2, Alpha: 0.7, BlendMode: "multiply",
-			},
+				R: 1, G: 1, B: 0.2, Alpha: 0.7,
+			}, "multiply"),
 		},
 		{
 			name: "text",
-			op: layout.Op{
-				Kind: layout.OpText, X: 6, Y: 34, Text: "Blend", Size: 12,
-				R: 1, BlendMode: "darken",
-			},
+			op:   blendOp(layout.Op{Kind: layout.OpText, X: 6, Y: 34, Text: "Blend", Size: 12, R: 1}, "darken"),
 		},
 		{
 			name: "rotated fill",
-			op: layout.Op{
-				Kind: layout.OpFillRect, X: 24, Y: 14, W: 18, H: 10,
-				R: 0.4, G: 0.7, B: 0.1, BlendMode: "difference",
-				Xform: layout.RotateDeg(30), XformSet: true,
-			},
+			op:   blendOp(rotated, "difference"),
 		},
 	}
+}
+
+func blendOp(op layout.Op, mode string) layout.Op {
+	op.SetBlendMode(mode)
+
+	return op
 }
 
 // TestPaintBlendedMatchesFullCanvasScratch compares the op-bounded scratch

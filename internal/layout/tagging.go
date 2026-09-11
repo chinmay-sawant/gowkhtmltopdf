@@ -62,7 +62,7 @@ func buildStructureTree(doc *pdf.Document, res *Result) error {
 // painted into another document. Paint rebuilds the tree for each destination.
 func clearStructureElements(ops []Op) {
 	for idx := range ops {
-		ops[idx].StructElem = nil
+		ops[idx].setStructElem(nil)
 	}
 }
 
@@ -101,7 +101,7 @@ func associateUnmappedLink(ops []Op, idx int, docElem, currentP *pdf.StructElem)
 
 	if oper.StructElem != nil && oper.StructElem.Tag == pdf.StructLink {
 		if idx > 0 && ops[idx-1].Kind == OpText && ops[idx-1].StructElem != oper.StructElem {
-			ops[idx-1].StructElem = oper.StructElem
+			ops[idx-1].setStructElem(oper.StructElem)
 		}
 
 		return
@@ -109,10 +109,10 @@ func associateUnmappedLink(ops []Op, idx int, docElem, currentP *pdf.StructElem)
 
 	if oper.StructElem != nil {
 		linkElem := newLinkChild(oper.StructElem)
-		oper.StructElem = linkElem
+		oper.setStructElem(linkElem)
 
 		if idx > 0 && ops[idx-1].Kind == OpText {
-			ops[idx-1].StructElem = linkElem
+			ops[idx-1].setStructElem(linkElem)
 		}
 
 		return
@@ -120,14 +120,14 @@ func associateUnmappedLink(ops []Op, idx int, docElem, currentP *pdf.StructElem)
 
 	if idx > 0 && ops[idx-1].Kind == OpText && ops[idx-1].StructElem != nil {
 		if ops[idx-1].StructElem.Tag == pdf.StructLink {
-			oper.StructElem = ops[idx-1].StructElem
+			oper.setStructElem(ops[idx-1].StructElem)
 
 			return
 		}
 
 		linkElem := newLinkChild(ops[idx-1].StructElem)
-		ops[idx-1].StructElem = linkElem
-		oper.StructElem = linkElem
+		ops[idx-1].setStructElem(linkElem)
+		oper.setStructElem(linkElem)
 
 		return
 	}
@@ -138,14 +138,14 @@ func associateUnmappedLink(ops []Op, idx int, docElem, currentP *pdf.StructElem)
 	}
 
 	linkElem := newLinkChild(parent)
-	oper.StructElem = linkElem
+	oper.setStructElem(linkElem)
 
 	if idx > 0 && ops[idx-1].Kind == OpText && ops[idx-1].StructElem == nil {
-		ops[idx-1].StructElem = linkElem
+		ops[idx-1].setStructElem(linkElem)
 	}
 
 	if idx+1 < len(ops) && ops[idx+1].Kind == OpText && ops[idx+1].StructElem == nil {
-		ops[idx+1].StructElem = linkElem
+		ops[idx+1].setStructElem(linkElem)
 	}
 }
 
@@ -165,7 +165,7 @@ func associateUnmappedImage(doc *pdf.Document, oper *Op, docElem, currentP *pdf.
 
 	figElem := parent.NewChild(pdf.StructFigure)
 	figElem.SetAlt(oper.Alt)
-	oper.StructElem = figElem
+	oper.setStructElem(figElem)
 
 	return nil
 }
@@ -176,7 +176,7 @@ func associateUnmappedText(oper *Op, docElem, currentP *pdf.StructElem) *pdf.Str
 			currentP = docElem.NewChild(pdf.StructP)
 		}
 
-		oper.StructElem = currentP
+		oper.setStructElem(currentP)
 
 		return currentP
 	}
@@ -366,7 +366,7 @@ func tagListItem(b *box, parent *pdf.StructElem, ops []Op, doc *pdf.Document, sc
 				if lblElem == nil {
 					lblElem = liElem.NewChild(pdf.StructLbl)
 				}
-				ops[i].StructElem = lblElem
+				ops[i].setStructElem(lblElem)
 			}
 		}
 	}
@@ -381,7 +381,7 @@ func tagListItem(b *box, parent *pdf.StructElem, ops []Op, doc *pdf.Document, sc
 
 			isBodyText := isSemanticOp(ops[i].Kind) && ops[i].Kind != OpBullet
 			if isBodyText || ops[i].Kind == OpLinkURI {
-				ops[i].StructElem = lbodyElem
+				ops[i].setStructElem(lbodyElem)
 			}
 		}
 	}
@@ -410,7 +410,7 @@ func mapSemanticOps(b *box, targetElem *pdf.StructElem, ops []Op) {
 	for i := b.opStart; i <= b.opEnd; i++ {
 		if i < len(ops) && (isSemanticOp(ops[i].Kind) || ops[i].Kind == OpLinkURI) {
 			if ops[i].StructElem == nil {
-				ops[i].StructElem = targetElem
+				ops[i].setStructElem(targetElem)
 			}
 		}
 	}

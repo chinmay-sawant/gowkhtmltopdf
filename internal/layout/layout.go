@@ -205,6 +205,19 @@ type Result struct {
 	// first op landed on and its canvas rect. Filled by Paint; boxes without
 	// ops use the page of their y position.
 	Locations []ElementLocation
+
+	// MaxContentX is the right edge of fill, stroke, and image ops. Layout
+	// sets it to at least Width so convert can skip a second op walk. Zero
+	// means unknown (hand-built Result values).
+	MaxContentX float64
+	// HasIDs is set during Paint when any location node has an id attribute.
+	HasIDs bool
+	// HasFragmentLinks is set during Layout when any OpLinkURI starts with '#'.
+	HasFragmentLinks bool
+	// skipInitialBeforeAlways is set for independently painted body blocks.
+	// Those results already start a new PDF page, so page-break-before:always
+	// on the block itself would insert a blank page.
+	skipInitialBeforeAlways bool
 }
 
 // CloneResult returns an independent pagination result. Display-list image
@@ -254,10 +267,7 @@ func cloneOps(src []Op) []Op {
 	dst := make([]Op, len(src))
 	for i := range src {
 		dst[i] = src[i]
-		dst[i].Image = append([]byte(nil), src[i].Image...)
-		// Structure elements belong to the document that was painted. A clone
-		// must let its destination document build its own structure tree.
-		dst[i].StructElem = nil
+		dst[i].opExtra = cloneOpExtra(src[i].opExtra)
 	}
 
 	return dst
@@ -327,7 +337,12 @@ func (w *Workspace) Release(res *Result) {
 		return
 	}
 
-	w.ops = res.Ops[:0]
+	ops := res.Ops
+	for i := range ops {
+		ops[i] = Op{} //nolint:exhaustruct // drop extra pointers so Release can GC rare payloads
+	}
+
+	w.ops = ops[:0]
 	res.Ops = nil
 	res.root = nil
 	res.boxes = nil
@@ -365,8 +380,9 @@ func (loc ElementLocation) Bounds() (float64, float64, float64, float64) {
 	return loc.X, loc.Y, loc.W, loc.H
 }
 
-// OpKind discriminates display-list operations.
-type OpKind int
+// OpKind discriminates display-list operations. uint8 keeps the hot Op
+// record packed; the enum is smaller than 256 values.
+type OpKind uint8
 
 const (
 	// OpUnknown is the zero value of OpKind. Layout never emits it; a zero
@@ -405,6 +421,13 @@ const (
 
 // Op is one display-list operation. Coordinates are in canvas points; for
 // OpText and OpBullet, Y is the baseline.
+//
+// Rare payloads (URI, Image, Xform, BlendMode, structure tags, text-transform)
+// live on the embedded *opExtra so the hot record is 256 bytes. Promoted
+// field names stay so readers (paint, convert, imageout, tests) keep op.URI
+// and op.Image. Writers must detachExtra before mutating those fields.
+//
+//nolint:recvcheck // paint readers take Op by value; extra writers need *Op
 type Op struct {
 	// ID is the stable logical identity of the operation. Pagination may split
 	// one operation into several fragments; fragments retain this ID so
@@ -412,53 +435,26 @@ type Op struct {
 	// a new document operation.
 	ID uint64
 
-	Kind    OpKind
 	X, Y    float64
 	W, H    float64
 	R, G, B float64 // 0..1
 	Alpha   float64
 	Width   float64 // stroke width for OpLine
 
-	Text string
-	Font *pdf.Font
 	Size float64
 	// LetterSpacing is the CSS letter-spacing value in points for text paint.
 	LetterSpacing float64
-	// TextTransform is applied when the text operation is painted.
-	TextTransform string
-
-	URI string
-
-	Image []byte // PNG or JPEG bytes
-	ImgW  int
-	ImgH  int
-	Alt   string // Alt text for Figure elements under PDF/UA-1
-
-	// StickyID links display-list ops to a position:sticky box after parent
-	// prependChrome shifts op indices (0 = not sticky).
-	StickyID int
-
-	// ZIndex paints later (higher) above earlier ops when non-zero or set.
-	ZIndex int
-
-	// RotateDeg rotates the glyph around its baseline origin (PDF text matrix).
-	// Independent of CSS transform CTM (which wraps the whole op via Xform).
-	RotateDeg float64
 	// InkDescent is the glyph descent below the baseline. H remains the line
 	// box height; pagination uses this narrower metric for generated text so a
 	// line is not moved merely because its leading crosses a page boundary.
 	InkDescent float64
 
-	// Xform is a baked canvas-space CSS 2D transform (identity if unset).
-	// Applied at paint via PDF cm (see pdfCTMFromCSS). Sibling flow unaffected.
-	Xform Matrix2D
+	Text string
+	Font *pdf.Font
+	// Grid holds the line segments of an OpGridRun. Nil for every other kind.
+	Grid *GridRun
+	*opExtra
 
-	// PaintOpacity is element opacity (CSS opacity / filter:opacity), 0..1.
-	// 0 or unset (≥1) means fully opaque. Nested opacities are multiplied.
-	PaintOpacity float64
-	// BlendMode is the CSS compositing mode for this display-list operation.
-	// Empty and normal both mean source-over.
-	BlendMode string
 	// Radius is the uniform border radius for rounded fill/stroke rectangles.
 	// RadiusY is the vertical radius when corners are elliptical; 0 means ry=rx.
 	Radius                                                                 float64
@@ -466,14 +462,16 @@ type Op struct {
 	RadiusY                                                                float64
 	RadiusTopLeftY, RadiusTopRightY, RadiusBottomRightY, RadiusBottomLeftY float64
 
-	// StructElem is the PDF/UA-1 logical structure element associated with this op.
-	StructElem *pdf.StructElem
+	// StickyID links display-list ops to a position:sticky box after parent
+	// prependChrome shifts op indices (0 = not sticky).
+	StickyID int
+	// ZIndex paints later (higher) above earlier ops when non-zero or set.
+	ZIndex int
+	// RotateDeg rotates the glyph around its baseline origin (PDF text matrix).
+	// Independent of CSS transform CTM (which wraps the whole op via Xform).
+	RotateDeg float32
 
-	// Grid holds the line segments of an OpGridRun. Nil for every other kind.
-	Grid *GridRun
-
-	// Single-byte fields are packed at the end so every 8-byte field above
-	// packs without alignment gaps (Op is 440 bytes instead of 472).
+	Kind OpKind
 	// StrokeMask selects sides for a rounded OpStrokeRect. Zero means the
 	// complete rounded rectangle; non-zero masks are used for mixed CSS
 	// borders whose accented side must retain its corner arcs.
@@ -623,6 +621,11 @@ type engine struct {
 	// rejects a mismatch instead of splitting ops at a boundary the layout
 	// never snapped to.
 	pageSnapHeight float64
+	// advanceCache memos AdvanceInPoints per (face, size bits, rune) for one
+	// Layout. Header cells repeat short strings; body text is unique so the
+	// cache is per glyph, not per row.
+	advanceCache map[advanceKey]float64
+	advanceHits  int
 }
 
 // styleOverride temporarily substitutes one node's resolved style while that
@@ -888,12 +891,13 @@ func (e *engine) add(paintOp Op) {
 	}
 
 	if !e.noEmit {
+		paintOp.bindEmptyExtra()
 		paintOp.ZIndex = e.zIndex
 		paintOp.ZIndexSet = e.zIndexSet
 		paintOp.Positioned = e.positioned
 
 		if paintOp.BlendMode == "" || paintOp.BlendMode == blendNormal {
-			paintOp.BlendMode = e.blendMode
+			paintOp.setBlendMode(e.blendMode)
 		}
 
 		e.ops = append(e.ops, paintOp)
@@ -1102,7 +1106,34 @@ func finalizeResult(eng *engine, root *html.Node, opts Options) (*Result, error)
 		stampBoxTransforms(boxNode, IdentityMatrix(), res.Ops)
 	}
 
+	res.MaxContentX, res.HasFragmentLinks = censusOps(res.Ops, opts.Width)
+
 	return res, nil
+}
+
+// censusOps records the right edge of fill/stroke/image ops and whether any
+// link URI is a same-document fragment. Width is the floor so MaxContentX is
+// never zero after a real Layout (zero stays the hand-built Result signal).
+func censusOps(ops []Op, width float64) (float64, bool) {
+	maxX := width
+	hasFrag := false
+
+	for idx := range ops {
+		switch ops[idx].Kind {
+		case OpFillRect, OpStrokeRect, OpImage:
+			if ext := ops[idx].X + ops[idx].W; ext > maxX {
+				maxX = ext
+			}
+		case OpLinkURI:
+			if !hasFrag && strings.HasPrefix(ops[idx].URI, "#") {
+				hasFrag = true
+			}
+		case OpLine, OpGridRun, OpText, OpBullet, OpUnknown, opKindNoop:
+			continue
+		}
+	}
+
+	return maxX, hasFrag
 }
 
 // resolveStylesForLayout runs the cascade, re-cascading once when @container

@@ -371,7 +371,7 @@ func TestRasterOpPolicyParity(t *testing.T) {
 		res := &layout.Result{
 			Width: 100, Height: 50,
 			Ops: []layout.Op{
-				{Kind: layout.OpText, X: 10, Y: 20, Text: "abc", Size: 12, TextTransform: "uppercase"},
+				textTransformedOp(layout.Op{Kind: layout.OpText, X: 10, Y: 20, Text: "abc", Size: 12}, "uppercase"),
 			},
 		}
 
@@ -404,7 +404,7 @@ func TestRasterOpPolicyParity(t *testing.T) {
 		resTrans := &layout.Result{
 			Width: 50, Height: 50,
 			Ops: []layout.Op{
-				{Kind: layout.OpFillRect, X: 10, Y: 10, W: 30, H: 30, R: 1, G: 0, B: 0, Alpha: 1, PaintOpacity: 0.5},
+				opacityOp(layout.Op{Kind: layout.OpFillRect, X: 10, Y: 10, W: 30, H: 30, R: 1, G: 0, B: 0, Alpha: 1}, 0.5),
 			},
 		}
 		imgTrans, err := rasterizeContext(t.Context(), resTrans, 50, false, 0, 0)
@@ -427,10 +427,9 @@ func TestRasterOpPolicyParity(t *testing.T) {
 		resRot := &layout.Result{
 			Width: 100, Height: 100,
 			Ops: []layout.Op{
-				{
+				xformedOp(layout.Op{
 					Kind: layout.OpFillRect, X: 40, Y: 40, W: 20, H: 20, R: 1, G: 0, B: 0, Alpha: 1,
-					Xform: layout.RotateDeg(45), XformSet: true,
-				},
+				}, layout.RotateDeg(45)),
 			},
 		}
 		imgRot, err := rasterizeContext(t.Context(), resRot, 100, false, 0, 0)
@@ -464,4 +463,16 @@ func TestRasterOpPolicyParity(t *testing.T) {
 			t.Fatal("no ink found for vertical text")
 		}
 	})
+}
+
+func textTransformedOp(op layout.Op, transform string) layout.Op {
+	op.SetTextTransform(transform)
+
+	return op
+}
+
+func opacityOp(op layout.Op, opacity float64) layout.Op {
+	op.SetPaintOpacity(opacity)
+
+	return op
 }

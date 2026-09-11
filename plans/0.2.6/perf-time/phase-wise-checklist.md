@@ -2,6 +2,7 @@
 
 > **Parent:** `plans/0.2.6/perf-improve/phase-wise-checklist.md` - the allocation and warm-path plan that reached 234.92 MB and 1,228.72 ms at 500 pages.
 > **Status:** complete 2026-09-11. All 35 rows closed on recorded proof.
+> **Successor:** `plans/0.2.6/perf-improve/wave-2-50pct/phase-wise-checklist.md` is the live ledger for the next cut of remaining Snapshot M ns/op and B/op. This file stays the Snapshot M record. Do not reopen its rows.
 > **Execution:** complete 2026-09-11; final capture published as Snapshot M; closure evidence under `results/phase-7/`.
 > **Estimated effort:** five measured phases plus a gated architectural phase and closure.
 > **Date:** 2026-09-11

@@ -81,6 +81,10 @@ func paginateOps(ctx context.Context, res *Result, contentH float64) error {
 // settleBeforeAlways runs forced section-start resolution to a fixpoint:
 // page-break-before shifts repeat until none move anything.
 func settleBeforeAlways(ctx context.Context, res *Result, contentH float64) error {
+	if res != nil && res.skipInitialBeforeAlways {
+		return nil
+	}
+
 	for range 10 {
 		if err := ctx.Err(); err != nil {
 			return fmt.Errorf("layout: paginate ops: %w", err)

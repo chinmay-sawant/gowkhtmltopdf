@@ -459,6 +459,8 @@ type pagePainter struct {
 
 //nolint:cyclop // marked content and opacity/transform wrapping for ops
 func (p *pagePainter) paintOp(paintOp *Op) {
+	paintOp.bindEmptyExtra()
+
 	if paintOp.Kind == opKindNoop {
 		return
 	}
@@ -601,7 +603,13 @@ func StyleOf(paintOp *Op) PaintStyle {
 }
 
 func hasBlendMode(paintOp *Op) bool {
-	return paintOp != nil && paintOp.BlendMode != "" && paintOp.BlendMode != blendNormal
+	if paintOp == nil {
+		return false
+	}
+
+	paintOp.bindEmptyExtra()
+
+	return paintOp.BlendMode != "" && paintOp.BlendMode != blendNormal
 }
 
 func pdfPaintOpacity(paintOp *Op, includeAlpha bool) float64 {
@@ -609,6 +617,8 @@ func pdfPaintOpacity(paintOp *Op, includeAlpha bool) float64 {
 	if paintOp == nil {
 		return opacity
 	}
+
+	paintOp.bindEmptyExtra()
 
 	if paintOp.PaintOpacity > 0 && paintOp.PaintOpacity < 1 {
 		opacity = paintOp.PaintOpacity
@@ -756,6 +766,8 @@ func paintBandOp(
 	chld *pdf.Content, page *pdf.Page, paintOp *Op, contentH, pageH float64,
 	margins PaintOptions, resName func(*pdf.Font) string, nextImg *int, firstErr *error,
 ) {
+	paintOp.bindEmptyExtra()
+
 	needBlend := paintOp.BlendMode != "" && paintOp.BlendMode != blendNormal
 	opacity := pdfPaintOpacity(paintOp, needBlend)
 	needGS := paintOp.XformSet || opacity < 1 || needBlend
@@ -824,8 +836,11 @@ func drawBandOp(
 	}
 }
 
+//nolint:cyclop,nestif // location walk plus id census is one pass
 func populateLocations(res *Result, contentH float64, opPage []int) {
 	res.Locations = nil
+	res.HasIDs = false
+
 	if res.root == nil {
 		return
 	}
@@ -855,6 +870,10 @@ func populateLocations(res *Result, contentH float64, opPage []int) {
 				if page < 0 {
 					page = 0
 				}
+			}
+
+			if !res.HasIDs && boxNode.node.Attribute("id") != "" {
+				res.HasIDs = true
 			}
 
 			res.Locations = append(res.Locations, ElementLocation{
@@ -1236,6 +1255,8 @@ func drawLine(chld *pdf.Content, paintOp *Op, pageIdx int, contentH float64, opt
 func drawText(
 	chld *pdf.Content, paintOp *Op, pageIdx int, contentH float64, opts PaintOptions, pageH float64, fontName string,
 ) {
+	paintOp.bindEmptyExtra()
+
 	posX, posY := canvasToPDF(paintOp.X, paintOp.Y, pageIdx, contentH, opts, pageH)
 	chld.SetFillColor(paintOp.R, paintOp.G, paintOp.B)
 
@@ -1282,6 +1303,8 @@ func drawImage(
 	_ *pdf.Page, chld *pdf.Content, paintOp *Op, pageIdx int, contentH float64,
 	opts PaintOptions, pageH float64, name string,
 ) error {
+	paintOp.bindEmptyExtra()
+
 	posX, posY := canvasToPDF(paintOp.X, paintOp.Y+paintOp.H, pageIdx, contentH, opts, pageH)
 
 	if name == "" {
@@ -1306,6 +1329,8 @@ func drawImage(
 // drawLinkXform places a URI annotation. Annotations are page-space (not under
 // content-stream CTM), so CSS transforms are applied to the canvas rect first.
 func drawLinkXform(page *pdf.Page, paintOp *Op, pageIdx int, contentH float64, opts PaintOptions) pdf.ObjRef {
+	paintOp.bindEmptyExtra()
+
 	if len(paintOp.URI) > 0 && paintOp.URI[0] == '#' {
 		return 0
 	}

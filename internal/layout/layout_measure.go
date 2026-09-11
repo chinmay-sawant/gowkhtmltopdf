@@ -1104,5 +1104,5 @@ func DeactivateOp(paintOp *Op) {
 	}
 
 	paintOp.Kind = opKindNoop
-	paintOp.URI = ""
+	paintOp.setURI("")
 }
