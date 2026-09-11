@@ -127,12 +127,12 @@ func selectContentDecl(ctx *styleContext, n *html.Node, pseudoEl string) *conten
 	var best *contentHit
 
 	for _, rowH := range ctx.matchedRules(n, pseudoEl) {
-		for _, d := range rowH.r.Decls {
+		for _, d := range rowH.rule.Decls {
 			if !strings.EqualFold(d.Prop, "content") {
 				continue
 			}
 
-			h := contentHit{value: d.Value, a: rowH.a, b: rowH.b, c: rowH.c, order: rowH.r.Order, important: d.Important}
+			h := contentHit{value: d.Value, a: rowH.a, b: rowH.b, c: rowH.c, order: rowH.rule.Order, important: d.Important}
 			if betterContentHit(h, best) {
 				hh := h
 				best = &hh

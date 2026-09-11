@@ -140,7 +140,79 @@ GOWKHTMLTOPDF_GENERATE_BENCHMARK_OUTPUTS=1 \
 This writes `live-movie-listing-010.pdf` and
 `live-movie-listing-010.png`.
 
-## Current snapshot (2026-09-11 perf-improve phase-7 capture)
+## Current snapshot (2026-09-11 perf-time phase-7 closure capture)
+
+Host: Linux amd64, 13th Gen Intel Core i7-13700HX (WSL2, 24 CPUs, 7.6 GiB
+RAM). Toolchain: go1.26.4. The capture ran on the uncommitted 0.2.6 warm-path
+working tree after the style, display-list, pagination, compression, and
+image-encode phases landed. `VERSION` still reads **0.2.5**, so this is a
+working-tree measurement, not a released build.
+
+The warm matrix ran as three independent fresh processes; the standalone
+internal, public-library PDF, and public-library image rows are three
+independent `1x` samples per workload, one fresh process per sample
+(`--benchtime=1x --count=1`), all captured with
+`scripts/bench-performance-recovery.sh`. Each reported time is the median of
+the three raw values; `B/op` is one of the raw values and is never averaged.
+The CLI row is this capture's `cli-rss` mode (gowkhtmltopdf only), the median
+of three timed runs after one warmup. `B/op` is cumulative allocation traffic,
+not peak RSS. Cold rows are the first conversion in a fresh process and are
+labeled where they appear.
+
+```sh
+./scripts/bench-performance-recovery.sh --mode=internal-pdf-warm --benchtime=1x --count=1 --out=plans/0.2.6/perf-time/results/phase-7/warm
+./scripts/bench-performance-recovery.sh --mode=internal-pdf-warm --benchtime=1x --count=1 --out=plans/0.2.6/perf-time/results/phase-7/warm2
+./scripts/bench-performance-recovery.sh --mode=internal-pdf-warm --benchtime=1x --count=1 --out=plans/0.2.6/perf-time/results/phase-7/warm3
+./scripts/bench-performance-recovery.sh --mode=internal-pdf --sizes=2,500 --benchtime=1x --count=1 --out=plans/0.2.6/perf-time/results/phase-7/sample1
+./scripts/bench-performance-recovery.sh --mode=public-pdf --sizes=2,500 --benchtime=1x --count=1 --out=plans/0.2.6/perf-time/results/phase-7/sample1
+./scripts/bench-performance-recovery.sh --mode=public-image --sizes=250,500 --benchtime=1x --count=1 --out=plans/0.2.6/perf-time/results/phase-7/sample1
+./scripts/bench-performance-recovery.sh --mode=cli-rss --sizes=2,100,500 --runs=3 --out=plans/0.2.6/perf-time/results/phase-7/cli
+```
+
+`sample1` is shown; `sample2` and `sample3` ran the same commands into their
+own directories. Every command exited 0.
+
+### Perf-time rows (generic paths only)
+
+| Row | 2 pages / 250 tiles | 500 pages / 500 tiles | Pre-time baseline row | Result |
+|---|---:|---:|---:|---|
+| Internal generic PDF time, warm matrix | 5.50 ms (cold) | 733.48 ms | 1,228.72 ms | 1.68x faster |
+| Internal generic PDF B/op, warm matrix | 4,031,472 B (4.03 MB, cold) | 163,021,712 B (163.02 MB) | 234.92 MB | 30.6% below |
+| Internal generic PDF time, standalone median | 6.08 ms (cold) | 695.42 ms | 1,297.98 ms | 1.87x faster |
+| Internal generic PDF B/op, standalone median | 4,031,712 B (4.03 MB, cold) | 167,865,712 B (167.87 MB) | 235.50 MB | 28.6% below |
+| Public library PDF time | 6.11 ms (cold) | 698.79 ms | 1,240.82 ms | 1.78x faster |
+| Public library PDF B/op | 4,048,000 B (4.05 MB, cold) | 169,650,976 B (169.65 MB) | 236.91 MB | 28.4% below |
+| Public library image time | 25.72 ms | 44.27 ms | 50.72 ms / 98.47 ms | 1.97x / 2.22x faster |
+| Public library image B/op | 14,296,096 B (14.30 MB) | 26,414,016 B (26.41 MB) | 14.45 MB / 26.73 MB | below both |
+| Public library image geometry | 1024x2056, 141,917 bytes | 1024x4040, 282,749 bytes | 94,352 / 188,268 bytes | lossless PNG about 50% larger |
+| CLI process time, cli-rss median | 0.01 s | 0.70 s | 1.32 s | 1.89x faster |
+| CLI process RSS, cli-rss median | 19,584 KiB | 147,264 KiB | 203,136 KiB | 27.5% below |
+
+The allocation targets all hold in this capture: every 500-page `B/op` row is
+28.4 to 30.6 percent below its pre-time baseline and far below the 234.92 MB
+ceiling. The image rows hold: both `B/op` values are under their ceilings and
+the 500-tile time is under 49 ms. The time rows did not reproduce the phase-6
+result in this host window: warm 500p is 733.48 ms against the 615 ms stretch
+and CLI 500p is 0.70 s against the 0.66 s line, while the plan's
+measured-lever floor (warm 500p <= 830 ms) holds. The phase-6 capture of the
+same production source measured 576.33 ms (2.13x against 1,228.72 ms) at
+21:09 local, 15 minutes before this capture; source hashes under
+`internal/layout` and `internal/pdf` match between the two except the unwired
+parallel prototype, and a no-prototype diagnostic binary measured the same
+band as the prototype binary. The 250-tile image time is 25.72 ms, 0.72 ms
+above its 25 ms line; the phase-5b raw samples measured 24.15 ms for the same
+code. Raw rows, drift controls, and the raw-to-published mapping:
+`plans/0.2.6/perf-time/results/phase-7/final-capture.md`. The rows are
+recorded as Snapshot M in [`benchmark-results.txt`](benchmark-results.txt).
+
+The image encoded size is an intended trade, not a regression: the
+filter-none level-2 streaming writer (`internal/imageout/pngfast.go`) replaced
+`image/png` adaptive filtering for canvases above the direct-raster threshold.
+PNG stays lossless and decoded pixels are bit-identical; only bytes on disk
+grow (94,352 to 141,917 at 250 tiles, 188,268 to 282,749 at 500 tiles, about
+50 percent), for the encode-time win that makes the 1.97x / 2.22x possible.
+
+## Historical snapshot (2026-09-11 perf-improve phase-7 capture)
 
 Host: Linux amd64, 13th Gen Intel Core i7-13700HX (WSL2, 24 CPUs, 7.6 GiB
 RAM). Toolchain: go1.26.4. The capture ran on the uncommitted 0.2.6 warm-path

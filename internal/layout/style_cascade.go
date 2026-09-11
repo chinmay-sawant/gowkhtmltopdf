@@ -2,7 +2,6 @@ package layout
 
 import (
 	"maps"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -317,35 +316,67 @@ var inheritableProps = []inheritCopy{ //nolint:gochecknoglobals // static inheri
 	{[]string{"empty-cells"}, func(dst, src *ResolvedStyle) { dst.EmptyCells = src.EmptyCells }},
 }
 
+// inheritablePropBits maps an inheritable property name to the bit set of its
+// inheritableProps entries. Names can be shared between entries (list-style
+// appears in the type and position entries), so bits are ORed. Built once from
+// the table so inheritProps can fold the element's declarations into one word
+// instead of testing every entry against the raw map (about 65 lookups per
+// element before this).
+//
+//nolint:gochecknoglobals // derived from the static inherit table
+var inheritablePropBits = func() map[string]uint64 {
+	bits := make(map[string]uint64, len(inheritableProps))
+
+	for i, entry := range inheritableProps {
+		for _, name := range entry.names {
+			bits[name] |= uint64(1) << i
+		}
+	}
+
+	return bits
+}()
+
+// declaredInheritableMask folds the raw declarations into one bit per
+// inheritableProps entry. Iterating the raw keys (about 10 per element)
+// replaces the per-entry raw map lookups.
+func declaredInheritableMask(raw map[string]string) uint64 {
+	var mask uint64
+
+	for prop := range raw {
+		if bit, ok := inheritablePropBits[prop]; ok {
+			mask |= bit
+		}
+	}
+
+	return mask
+}
+
 // inheritProps copies inheritable properties from the parent, unless the
-// element declares its own value (present in raw).
+// element declares its own value (present in raw). The declared-set mask is a
+// local word; it deliberately does not grow ResolvedStyle, whose byte size is
+// pinned by the interning and storage tests.
 func inheritProps(dst *ResolvedStyle, parent *ResolvedStyle, raw map[string]string) {
 	if parent == nil {
 		return
 	}
 
-	for _, entry := range inheritableProps {
-		declared := false
+	declared := declaredInheritableMask(raw)
 
-		if raw != nil {
-			for _, name := range entry.names {
-				if _, ok := raw[name]; ok {
-					declared = true
-
-					break
-				}
-			}
+	for i := range inheritableProps {
+		if declared&(uint64(1)<<i) != 0 {
+			continue
 		}
 
-		if !declared {
-			entry.copy(dst, parent)
-		}
+		inheritableProps[i].copy(dst, parent)
 	}
 }
 
-// ruleHit is one selector match from the shared cascade rule walk.
+// ruleHit is one selector match from the shared cascade rule walk. rule
+// points into its stylesheet, so pointer identity is the exact rule identity
+// the style memo keys on; ruleHit therefore stays comparable and comparable
+// field-for-field.
 type ruleHit struct {
-	r       css.Rule
+	rule    *css.Rule
 	a, b, c int
 }
 
@@ -378,8 +409,6 @@ func (ctx *styleContext) matchedRules(node *html.Node, pseudoElem string) []rule
 }
 
 // appendSheetRuleHits appends matches from one stylesheet into hits.
-//
-//nolint:wsl // cascade gates are intentionally evaluated in source order.
 func (ctx *styleContext) appendSheetRuleHits(
 	hits []ruleHit, sheet *css.Stylesheet, node *html.Node, pseudoElem string,
 ) []ruleHit {
@@ -387,10 +416,12 @@ func (ctx *styleContext) appendSheetRuleHits(
 		return hits
 	}
 
-	for _, rule := range sheet.Rules {
+	for idx := range sheet.Rules {
 		if ctx.pollContext() {
 			return hits
 		}
+
+		rule := &sheet.Rules[idx]
 		if !css.MediaMatches(rule.Media, ctx.media, ctx.viewportW, ctx.viewportH) {
 			continue
 		}
@@ -409,7 +440,7 @@ func (ctx *styleContext) appendSheetRuleHits(
 //
 //nolint:wsl // selector gates are intentionally evaluated in source order.
 func (ctx *styleContext) appendRuleSelectorHits(
-	hits []ruleHit, rule css.Rule, node *html.Node, pseudoElem string,
+	hits []ruleHit, rule *css.Rule, node *html.Node, pseudoElem string,
 ) []ruleHit {
 	for _, sel := range rule.Selectors {
 		if ctx.pollContext() {
@@ -420,7 +451,7 @@ func (ctx *styleContext) appendRuleSelectorHits(
 		}
 
 		a, b, c := css.Specificity(sel)
-		hits = append(hits, ruleHit{r: rule, a: a, b: b, c: c})
+		hits = append(hits, ruleHit{rule: rule, a: a, b: b, c: c})
 	}
 
 	return hits
@@ -438,7 +469,7 @@ func selectorMatches(sel css.Selector, node *html.Node, pe string) bool {
 
 // containerGateMatches checks the rule's @container query against the nearest
 // eligible size container (skipped on passes without container sizes).
-func (ctx *styleContext) containerGateMatches(node *html.Node, runic css.Rule) bool {
+func (ctx *styleContext) containerGateMatches(node *html.Node, runic *css.Rule) bool {
 	if runic.Container == nil {
 		return true
 	}
@@ -467,12 +498,14 @@ type cascadeWin struct {
 }
 
 // cascadeRaw returns the winning declaration per property for the element
-// across UA sheet, author sheets and the inline style attribute.
-// Uses one winner map (value+spec+order+important) instead of six maps.
+// across UA sheet, the already matched author rules and the inline style
+// attribute. Uses one winner map (value+spec+order+important) instead of six
+// maps. hits is the matched-rule list, passed in so the caller can reuse it as
+// the style memo key.
 //
 //nolint:cyclop // hot path; three fixed cascade tiers read clearer than one loop
 func cascadeRaw( //nolint:funlen // cascade tiers are deliberately visible in one hot-path function
-	ctx *styleContext, node *html.Node,
+	ctx *styleContext, node *html.Node, hits []ruleHit,
 ) map[string]string {
 	var wins map[string]cascadeWin
 	if ctx == nil {
@@ -493,16 +526,13 @@ func cascadeRaw( //nolint:funlen // cascade tiers are deliberately visible in on
 	}
 
 	// author sheets in source order (shared matchedRules walk)
-	if ctx != nil {
-		for _, hit := range ctx.matchedRules(node, "") {
-			rule := hit.r
-			for _, d := range rule.Decls {
-				if !supportedDeclaration(d.Value) {
-					continue
-				}
-
-				applyCascadeDeclaration(wins, d.Prop, d.Value, hit.a, hit.b, hit.c, rule.Order, d.Important)
+	for _, hit := range hits {
+		for _, d := range hit.rule.Decls {
+			if !supportedDeclaration(d.Value) {
+				continue
 			}
+
+			applyCascadeDeclaration(wins, d.Prop, d.Value, hit.a, hit.b, hit.c, hit.rule.Order, d.Important)
 		}
 	}
 
@@ -562,12 +592,12 @@ func cascadePseudoRaw(ctx *styleContext, node *html.Node, pseudoElem string) map
 	}
 
 	for _, hit := range ctx.matchedRules(node, pseudoElem) {
-		for _, d := range hit.r.Decls {
+		for _, d := range hit.rule.Decls {
 			if !supportedDeclaration(d.Value) {
 				continue
 			}
 
-			applyCascadeDeclaration(wins, d.Prop, d.Value, hit.a, hit.b, hit.c, hit.r.Order, d.Important)
+			applyCascadeDeclaration(wins, d.Prop, d.Value, hit.a, hit.b, hit.c, hit.rule.Order, d.Important)
 		}
 	}
 
@@ -625,8 +655,29 @@ func applyCascadeDeclaration(
 		return
 	}
 
-	for idx, side := range [...]string{"top", "right", "bottom", "left"} {
-		applyCascadeWin(wins, prop+"-"+side, values[idx], ids, classes, types, order, important)
+	// The longhand names are static per shorthand; concatenating them here
+	// used to allocate a fresh property string for every side of every
+	// shorthand declaration (6.4 MB per 500-page conversion in the profile).
+	for idx, longhand := range boxShorthandLonghands(prop) {
+		applyCascadeWin(wins, longhand, values[idx], ids, classes, types, order, important)
+	}
+}
+
+// boxShorthandLonghands returns the four physical longhand names for a box
+// shorthand, in top/right/bottom/left order, or the zero array for any other
+// property. Callers reach it only after expandBoxShorthand reported success
+// for margin, padding, or border. Literal returns keep the names static
+// without package globals.
+func boxShorthandLonghands(prop string) [4]string {
+	switch prop {
+	case marginProperty:
+		return [4]string{"margin-top", "margin-right", "margin-bottom", "margin-left"}
+	case paddingProperty:
+		return [4]string{"padding-top", "padding-right", "padding-bottom", "padding-left"}
+	case borderProperty:
+		return [4]string{"border-top", "border-right", "border-bottom", "border-left"}
+	default:
+		return [4]string{}
 	}
 }
 
@@ -1166,10 +1217,18 @@ var restShorthandSet = func() map[string]struct{} { //nolint:gochecknoglobals //
 	return set
 }()
 
+// restLonghandStack is the stack scratch for the remaining longhands. Most
+// elements declare far fewer than this many; larger declaration sets grow
+// the slice on the heap the way any append would.
+const restLonghandStack = 32
+
 // applyRestProps resolves every non-font property once the font size is known.
-// Shorthands run first in a fixed order; remaining longhands run in any order
-// (longhands do not clobber each other via shorthand expansion). This avoids
-// sorting and intermediate prop slices on every element.
+// Shorthands run first in a fixed order. Remaining longhands still run in
+// alphabetical order because longhands can overlap: overflow and overflow-x
+// both write OverflowX, so the alphabetically later name must apply last for
+// output to stay byte-identical. The order is reproduced with an insertion
+// sort over a stack buffer, so the pass allocates no per-element key slice
+// and does not call sort.Strings.
 func applyRestProps(
 	style *ResolvedStyle, raw map[string]string, ctx *styleContext,
 	parent *ResolvedStyle,
@@ -1190,22 +1249,43 @@ func applyRestProps(
 		applyStyleProp(style, prop, value, fsize, ctx, parent, hasParent)
 	}
 
-	// Deterministic iteration for remaining longhands (map iteration is random).
-	keys := make([]string, 0, len(raw))
+	var keys [restLonghandStack]string
+
+	rest := keys[:0]
 
 	for key := range raw {
 		if _, shorthand := restShorthandSet[key]; shorthand {
 			continue
 		}
 
-		keys = append(keys, key)
+		rest = append(rest, key)
 	}
 
-	sort.Strings(keys)
+	rest = sortRestLonghandProps(rest)
 
-	for _, prop := range keys {
+	for _, prop := range rest {
 		applyStyleProp(style, prop, raw[prop], fsize, ctx, parent, hasParent)
 	}
+}
+
+// sortRestLonghandProps insertion-sorts property names into the byte order
+// sort.Strings produced. A typical element has about ten remaining longhands,
+// so an in-place insertion sort is cheaper than the allocation the old
+// per-element slice plus stdlib sort needed.
+func sortRestLonghandProps(props []string) []string {
+	for i := 1; i < len(props); i++ {
+		prop := props[i]
+		prev := i - 1
+
+		for prev >= 0 && props[prev] > prop {
+			props[prev+1] = props[prev]
+			prev--
+		}
+
+		props[prev+1] = prop
+	}
+
+	return props
 }
 
 // styleGroupFn is one property-group handler in the applyStyleProp dispatch.

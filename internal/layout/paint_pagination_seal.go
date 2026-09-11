@@ -339,25 +339,24 @@ func collectBorderSegmentOps(ops []Op) ([]vseg, []hseg) {
 	verts := make([]vseg, 0, vertCount)
 	horiz := make([]hseg, 0, horizCount)
 
-	for i := range ops {
-		paintOp := &ops[i]
+	visitLineOps(ops, func(paintOp Op) {
 		if paintOp.Fixed || paintOp.Kind != OpLine {
-			continue
+			return
 		}
 
 		switch {
-		case isVerticalBorderSegment(paintOp):
+		case isVerticalBorderSegment(&paintOp):
 			verts = append(verts, vseg{
 				x: paintOp.X, y0: paintOp.Y, y1: paintOp.Y + paintOp.H,
 				w: paintOp.Width, r: paintOp.R, g: paintOp.G, b: paintOp.B,
 			})
-		case isHorizontalBorderSegment(paintOp):
+		case isHorizontalBorderSegment(&paintOp):
 			horiz = append(horiz, hseg{
 				x0: paintOp.X, x1: paintOp.X + paintOp.W, y: paintOp.Y,
 				w: paintOp.Width, r: paintOp.R, g: paintOp.G, b: paintOp.B,
 			})
 		}
-	}
+	})
 
 	return verts, horiz
 }
@@ -367,19 +366,18 @@ func collectBorderSegmentOps(ops []Op) ([]vseg, []hseg) {
 func countBorderSegmentOps(ops []Op) (int, int) {
 	vertCount, horizCount := 0, 0
 
-	for i := range ops {
-		paintOp := &ops[i]
+	visitLineOps(ops, func(paintOp Op) {
 		if paintOp.Fixed || paintOp.Kind != OpLine {
-			continue
+			return
 		}
 
 		switch {
-		case isVerticalBorderSegment(paintOp):
+		case isVerticalBorderSegment(&paintOp):
 			vertCount++
-		case isHorizontalBorderSegment(paintOp):
+		case isHorizontalBorderSegment(&paintOp):
 			horizCount++
 		}
-	}
+	})
 
 	return vertCount, horizCount
 }
@@ -671,7 +669,7 @@ func lastInkBottom(res *Result, idxs []int, pageTop, pageBot float64) (float64, 
 			bot = paintOp.Y + height
 		case OpImage:
 			bot = paintOp.Y + paintOp.H
-		case OpFillRect, OpStrokeRect, OpLine, OpLinkURI, OpUnknown, opKindNoop:
+		case OpFillRect, OpStrokeRect, OpLine, OpGridRun, OpLinkURI, OpUnknown, opKindNoop:
 			continue
 		}
 
@@ -706,8 +704,14 @@ func stripOrphanRows(res *Result, idxs []int, pageTop, pageBot, lastInkBot float
 
 // stripOrphanRowOp zeros one row-sized fill or horizontal rule that sits
 // below the last ink. Returns whether it was stripped.
+//
+//nolint:cyclop // grid runs are an explicit no-strip arm
 func stripOrphanRowOp(paintOp *Op, lastInkBot float64) bool {
 	switch paintOp.Kind {
+	case OpGridRun:
+		// Grid runs carry verticals and shared chrome; the orphan pass does
+		// not strip them op-atomically (capTablePageBreaks owns grid seals).
+		return false
 	case OpFillRect, OpStrokeRect:
 		// Multi-page frame fragments keep a StrokeMask (open top/bottom).
 		// Zeroing their height still leaves a masked top stroke that paints as
@@ -849,7 +853,7 @@ func clipTrailingBandOp(res *Result, paintOp *Op, pageTop, pageBot, contentBot f
 		} else if isTrailingContinuationRule(res, paintOp, pageBot, contentBot) {
 			paintOp.Y = contentBot
 		}
-	case OpStrokeRect, OpText, OpImage, OpLinkURI, OpBullet, OpUnknown, opKindNoop:
+	case OpStrokeRect, OpGridRun, OpText, OpImage, OpLinkURI, OpBullet, OpUnknown, opKindNoop:
 	}
 }
 
@@ -993,7 +997,7 @@ func clipStickySectionChromeOp(paintOp *Op, target stickySectionChromeTarget, co
 		if target.sideMatches(paintOp) {
 			paintOp.H = contentBot - paintOp.Y
 		}
-	case OpStrokeRect, OpText, OpImage, OpLinkURI, OpBullet, OpUnknown, opKindNoop:
+	case OpStrokeRect, OpGridRun, OpText, OpImage, OpLinkURI, OpBullet, OpUnknown, opKindNoop:
 	}
 }
 
@@ -1120,7 +1124,7 @@ func clipSectionChromeOp(paintOp *Op, target stickySectionChromeTarget, closeY f
 		if isSectionChromeSideBorder(paintOp, target, closeY) {
 			paintOp.H = closeY - paintOp.Y
 		}
-	case OpStrokeRect, OpText, OpImage, OpLinkURI, OpBullet, OpUnknown, opKindNoop:
+	case OpStrokeRect, OpGridRun, OpText, OpImage, OpLinkURI, OpBullet, OpUnknown, opKindNoop:
 	}
 }
 

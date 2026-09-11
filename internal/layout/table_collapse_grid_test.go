@@ -25,7 +25,7 @@ td, th { border: 1px solid #999; padding: 2pt; }
 
 	var hlines []float64
 
-	for _, op := range res.Ops {
+	for _, op := range resLineOps(res) {
 		if op.Kind == OpLine && op.H == 0 && op.W > 50 {
 			hlines = append(hlines, op.Y)
 		}
@@ -50,7 +50,7 @@ table { border-collapse: collapse; width: 200pt; }
 <tr><td>Widget A</td><td>2</td></tr></table>
 </body></html>`, cssSheet)
 
-	for _, op := range res.Ops {
+	for _, op := range resLineOps(res) {
 		if op.Kind == OpLine {
 			t.Fatalf("collapsed table without borders painted line: %#v", op)
 		}
@@ -75,7 +75,7 @@ td { border: none; border-bottom: 1px dotted #bbb; padding: 2pt; }
 
 	horizontal, vertical := 0, 0
 
-	for _, paintOp := range res.Ops {
+	for _, paintOp := range resLineOps(res) {
 		if paintOp.Kind != OpLine {
 			continue
 		}
@@ -113,7 +113,7 @@ table { border-collapse: collapse; width: 200pt; }
 
 	var vlines []Op
 
-	for _, op := range res.Ops {
+	for _, op := range resLineOps(res) {
 		if op.Kind == OpLine && op.W == 0 && op.H > 0 {
 			vlines = append(vlines, op)
 		}

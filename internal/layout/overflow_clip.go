@@ -224,7 +224,23 @@ func opInChildRange(boxNode *box, idx int) bool {
 }
 
 func lineOnRectEdges(op *Op, x, y, w, h float64) bool {
-	if op == nil || op.Kind != OpLine {
+	if op == nil {
+		return false
+	}
+
+	if op.Kind == OpGridRun {
+		onEdge := false
+
+		op.forEachLine(func(line Op) {
+			if !onEdge && lineOnRectEdges(&line, x, y, w, h) {
+				onEdge = true
+			}
+		})
+
+		return onEdge
+	}
+
+	if op.Kind != OpLine {
 		return false
 	}
 
@@ -279,10 +295,46 @@ func clipPaintOp(op *Op, clip clipRect) {
 		clipRectOp(op, clip)
 	case OpLine:
 		clipLineOp(op, clip)
+	case OpGridRun:
+		clipGridRunOp(op, clip)
 	case OpText, OpBullet:
 		clipTextOp(op, clip)
 	case OpUnknown, opKindNoop:
 	}
+}
+
+// clipGridRunOp clips every segment of a batched grid run, dropping segments
+// the clip removed entirely. The run is the union of its remaining segments.
+func clipGridRunOp(op *Op, clip clipRect) {
+	if op.Grid == nil {
+		DeactivateOp(op)
+
+		return
+	}
+
+	kept := op.Grid.Segs[:0]
+
+	for idx := range op.Grid.Segs {
+		line := op.Grid.asLine(op, idx)
+		clipLineOp(&line, clip)
+
+		if line.Kind == opKindNoop {
+			continue
+		}
+
+		seg := op.Grid.Segs[idx]
+		seg.X, seg.Y, seg.W, seg.H = line.X, line.Y, line.W, line.H
+		kept = append(kept, seg)
+	}
+
+	if len(kept) == 0 {
+		DeactivateOp(op)
+
+		return
+	}
+
+	op.Grid.Segs = kept
+	recomputeGridRunBounds(op)
 }
 
 func clipRectOp(op *Op, clip clipRect) {

@@ -643,3 +643,172 @@ ok  	github.com/chinmay-sawant/gowkhtmltopdf	28.288s
 #     `make claim-scan`, `make lint`, and `compliance/verify_pdfs.sh` all
 #     exited 0; see
 #     plans/0.2.6/perf-improve/results/phase-7/closure.md.
+
+# =====================================================================
+# Snapshot M: 2026-09-11 perf-time phase-7 closure capture on the
+# uncommitted 0.2.6 warm-path working tree. VERSION still reads 0.2.5, so
+# this is a working-tree measurement, not a released-version measurement.
+# This is the closure capture for
+# plans/0.2.6/perf-time/phase-wise-checklist.md (PERFT-28..31), taken after
+# the style, display-list, pagination, and compression phases landed. It is
+# a separate capture from Snapshot L above (the earlier perf-improve phase-7
+# capture on the same day); Snapshot L is unchanged and stays that plan's
+# record. Snapshot M is the later read on the shared working tree and adds
+# the page-raster (fast PNG) work that Snapshot L predates.
+# Only the generic path was measured. The harness filters name the generic
+# sub-benchmarks; no certified-islands row appears in any raw file.
+# Method: one fresh process per invocation, one invocation per independent
+# sample, --benchtime=1x --count=1. The warm matrix ran as three independent
+# processes; all three raw matrices appear below with their per-size
+# medians. Standalone internal and public samples are three independent
+# processes each: 2 pages first (cold), 500 pages second (warm). Image
+# samples run 250 tiles then 500 tiles. Reported times are medians of the
+# three raw values; B/op and allocs are one raw value and are never averaged.
+# B/op is cumulative allocation traffic, not peak RSS. Cold and warm rows are
+# never mixed.
+# Commands (each exited 0; S is sample1, sample2, or sample3):
+#   ./scripts/bench-performance-recovery.sh --mode=internal-pdf-warm --benchtime=1x --count=1 --out=plans/0.2.6/perf-time/results/phase-7/warm
+#   the same command into results/phase-7/warm2 and results/phase-7/warm3
+#   ./scripts/bench-performance-recovery.sh --mode=internal-pdf --sizes=2,500 --benchtime=1x --count=1 --out="plans/0.2.6/perf-time/results/phase-7/$S"
+#   ./scripts/bench-performance-recovery.sh --mode=public-pdf --sizes=2,500 --benchtime=1x --count=1 --out="plans/0.2.6/perf-time/results/phase-7/$S"
+#   ./scripts/bench-performance-recovery.sh --mode=public-image --sizes=250,500 --benchtime=1x --count=1 --out="plans/0.2.6/perf-time/results/phase-7/$S"
+#   ./scripts/bench-performance-recovery.sh --mode=cli-rss --sizes=2,100,500 --runs=3 --out=plans/0.2.6/perf-time/results/phase-7/cli
+# Toolchain/host: go1.26.4 linux/amd64, 24 CPUs, 13th Gen Intel Core
+# i7-13700HX, Linux 6.6.87.2-microsoft-standard-WSL2 x86_64, 7.6 GiB RAM.
+# Fixture: testdata/golden/benchmarks/templates/report.html.tmpl
+# sha256=e3b5387bed117844c3502915cd3def253738959feb894435720f3532746e6974
+# Raw samples: plans/0.2.6/perf-time/results/phase-7/{warm,warm2,warm3,sample1,sample2,sample3,cli}/
+# Extracted tables: results/phase-7/{raw-rows.tsv,cli-rows.tsv,median-summary.tsv}
+# Method, medians, acceptance verdict, host-drift controls, and the
+# raw-to-published mapping: plans/0.2.6/perf-time/results/phase-7/final-capture.md
+# Closure gate log: plans/0.2.6/perf-time/results/phase-7/closure.md
+# Code slices in the captured tree: memoized style resolution plus a
+# declared-property mask (internal/layout/style_cascade.go and friends),
+# batched grid border ops, compact Op payload, O(1) opInPaintRange and
+# census-skipped pagination walks, retained per-document parallel flate
+# (internal/pdf), the unwired parallel-layout prototype
+# (internal/layout/parallel.go, not called by production), and the fast
+# filter-none PNG writer (internal/imageout/pngfast.go).
+
+# Snapshot M warm matrix raw rows, one process per letter: A=warm,
+# B=warm2, C=warm3. Row 1 of each process is cold; rows 2 to 9 are warm.
+# Every row asserts its rendered page count and reports 34209/42791/57231/
+# 84654/167442/306144/583231/721739/1419234 output-bytes in size order.
+#   A 2Pages cold:     5,158,290 ns/op    4,031,472 B/op    4,450 allocs/op
+#   A 5Pages warm:     9,387,538 ns/op    7,114,320 B/op    8,916 allocs/op
+#   A 10Pages warm:   11,388,658 ns/op    5,425,632 B/op   16,307 allocs/op
+#   A 20Pages warm:   21,829,717 ns/op    7,035,312 B/op   31,165 allocs/op
+#   A 50Pages warm:   56,357,411 ns/op   17,675,408 B/op   76,325 allocs/op
+#   A 100Pages warm: 117,078,772 ns/op   33,861,296 B/op  151,558 allocs/op
+#   A 200Pages warm: 243,128,587 ns/op   66,506,264 B/op  302,366 allocs/op
+#   A 250Pages warm: 308,455,965 ns/op   81,853,424 B/op  377,815 allocs/op
+#   A 500Pages warm: 660,904,927 ns/op  163,004,808 B/op  754,870 allocs/op
+#   B 2Pages cold:     5,498,708 ns/op    4,031,472 B/op    4,450 allocs/op
+#   B 5Pages warm:    11,154,572 ns/op    7,935,616 B/op    8,937 allocs/op
+#   B 10Pages warm:   11,876,765 ns/op    5,425,504 B/op   16,305 allocs/op
+#   B 20Pages warm:   22,363,742 ns/op    7,857,600 B/op   31,197 allocs/op
+#   B 50Pages warm:   53,875,353 ns/op   17,643,864 B/op   76,328 allocs/op
+#   B 100Pages warm: 124,356,379 ns/op   33,861,408 B/op  151,560 allocs/op
+#   B 200Pages warm: 225,756,101 ns/op   66,593,816 B/op  302,383 allocs/op
+#   B 250Pages warm: 320,620,745 ns/op   82,247,280 B/op  377,827 allocs/op
+#   B 500Pages warm: 784,350,399 ns/op  163,272,640 B/op  754,884 allocs/op
+#   C 2Pages cold:     6,730,215 ns/op    4,031,584 B/op    4,449 allocs/op
+#   C 5Pages warm:    12,976,081 ns/op    7,113,616 B/op    8,910 allocs/op
+#   C 10Pages warm:   12,026,597 ns/op    5,425,632 B/op   16,306 allocs/op
+#   C 20Pages warm:   27,327,432 ns/op    7,857,456 B/op   31,195 allocs/op
+#   C 50Pages warm:   57,881,249 ns/op   17,712,208 B/op   76,327 allocs/op
+#   C 100Pages warm: 123,900,927 ns/op   33,972,640 B/op  151,571 allocs/op
+#   C 200Pages warm: 272,356,495 ns/op   66,592,440 B/op  302,388 allocs/op
+#   C 250Pages warm: 329,589,785 ns/op   81,841,280 B/op  377,796 allocs/op
+#   C 500Pages warm: 733,482,855 ns/op  163,021,712 B/op  754,893 allocs/op
+
+# Snapshot M warm matrix per-size medians (median of the three raw times;
+# B/op and allocs are the median-time sample's raw values, never averages):
+#   2Pages cold:     5,498,708 ns/op (5.50 ms)    4,031,472 B/op    4,450 allocs/op
+#   5Pages warm:    11,154,572 ns/op (11.15 ms)   7,935,616 B/op    8,937 allocs/op
+#   10Pages warm:   11,876,765 ns/op (11.88 ms)   5,425,504 B/op   16,305 allocs/op
+#   20Pages warm:   22,363,742 ns/op (22.36 ms)   7,857,600 B/op   31,197 allocs/op
+#   50Pages warm:   56,357,411 ns/op (56.36 ms)  17,675,408 B/op   76,325 allocs/op
+#   100Pages warm: 123,900,927 ns/op (123.90 ms) 33,972,640 B/op  151,571 allocs/op
+#   200Pages warm: 243,128,587 ns/op (243.13 ms) 66,506,264 B/op  302,366 allocs/op
+#   250Pages warm: 320,620,745 ns/op (320.62 ms) 82,247,280 B/op  377,827 allocs/op
+#   500Pages warm: 733,482,855 ns/op (733.48 ms) 163,021,712 B/op 754,893 allocs/op
+
+# Snapshot M standalone internal generic PDF raw rows (2 pages cold then
+# 500 pages warm in each fresh process):
+#   sample 1: 2Pages 6,076,271 ns/op 4,031,712 B/op 4,453 allocs/op
+#             500Pages 711,639,113 ns/op 167,728,920 B/op 755,079 allocs/op
+#   sample 2: 2Pages 5,668,120 ns/op 4,031,488 B/op 4,451 allocs/op
+#             500Pages 695,420,163 ns/op 167,865,712 B/op 755,091 allocs/op
+#   sample 3: 2Pages 6,604,660 ns/op 4,031,472 B/op 4,450 allocs/op
+#             500Pages 667,632,663 ns/op 167,848,616 B/op 755,066 allocs/op
+
+# Snapshot M public library PDF raw rows (Document.WritePDF):
+#   sample 1: 2Pages 6,265,940 ns/op 4,042,856 B/op 4,460 allocs/op
+#             500Pages 698,785,975 ns/op 169,650,976 B/op 755,100 allocs/op
+#   sample 2: 2Pages 5,450,199 ns/op 4,048,400 B/op 4,468 allocs/op
+#             500Pages 682,621,833 ns/op 170,033,168 B/op 755,096 allocs/op
+#   sample 3: 2Pages 6,112,604 ns/op 4,048,000 B/op 4,464 allocs/op
+#             500Pages 735,984,692 ns/op 169,519,840 B/op 755,096 allocs/op
+
+# Snapshot M public library image raw rows (ImageDocument.WriteImage):
+#   sample 1: 250Tiles 25,049,201 ns/op 14,290,392 B/op 7,196 allocs/op 2056 height 141917 output-bytes 1024 width
+#             500Tiles 45,296,592 ns/op 26,413,936 B/op 13,635 allocs/op 4040 height 282749 output-bytes 1024 width
+#   sample 2: 250Tiles 25,717,943 ns/op 14,296,096 B/op 7,204 allocs/op 2056 height 141917 output-bytes 1024 width
+#             500Tiles 44,267,447 ns/op 26,414,016 B/op 13,635 allocs/op 4040 height 282749 output-bytes 1024 width
+#   sample 3: 250Tiles 27,683,937 ns/op 14,290,504 B/op 7,197 allocs/op 2056 height 141917 output-bytes 1024 width
+#             500Tiles 43,656,106 ns/op 26,414,032 B/op 13,636 allocs/op 4040 height 282749 output-bytes 1024 width
+
+# Snapshot M median summary (median of the three raw times; the B/op and
+# allocs values are the median-time sample's raw values, never averages):
+#   internal generic PDF 2 pages:      6,076,271 ns/op (6.08 ms)    4,031,712 B/op    4,453 allocs/op
+#   internal generic PDF 500 pages:  695,420,163 ns/op (695.42 ms) 167,865,712 B/op  755,091 allocs/op
+#   public library PDF 2 pages:        6,112,604 ns/op (6.11 ms)    4,048,000 B/op    4,464 allocs/op
+#   public library PDF 500 pages:    698,785,975 ns/op (698.79 ms) 169,650,976 B/op  755,100 allocs/op
+#   public library image 250 tiles:     25,717,943 ns/op (25.72 ms)  14,296,096 B/op    7,204 allocs/op
+#   public library image 500 tiles:     44,267,447 ns/op (44.27 ms)  26,414,016 B/op   13,635 allocs/op
+# The fresh-process medians are separate from the warm matrix medians
+# above. The 500-page standalone B/op is about 4.8 MB above the warm matrix
+# value because the matrix warms shared caches with earlier sizes.
+# Image geometry was identical in all three samples: 250 tiles 1024x2056 /
+# 141,917 output-bytes; 500 tiles 1024x4040 / 282,749 output-bytes. The
+# encoded PNG is about 50 percent larger than the pre-change rows (94,352
+# and 188,268 bytes) because the filter-none level-2 streaming writer
+# replaced image/png adaptive filtering; it is a lossless, documented size
+# trade, and decoded pixels stay bit-identical.
+
+# Snapshot M CLI process rows (gowkhtmltopdf only; no wkhtmltopdf comparison
+# in this capture). One warmup plus three timed runs per size, medians of the
+# timed runs, RSS is /usr/bin/time %M in KiB and is not B/op:
+#   2 pages:   0.01 s / 19,584 KiB median (runs 19,392 / 19,584 / 19,584); 34,209 PDF bytes, 2 rendered pages
+#   100 pages: 0.13 s / 48,000 KiB median (runs 48,192 / 47,808 / 48,000); 306,144 PDF bytes, 100 rendered pages
+#   500 pages: 0.70 s / 147,264 KiB median (runs 147,840 / 146,688 / 147,264); 1,419,234 PDF bytes, 500 rendered pages
+
+# Snapshot M acceptance verdict:
+#   - Warm 500-page B/op at or below 234.92 MB: MET. Warm matrix
+#     163,021,712 B (163.02 MB), standalone median 167,865,712 B
+#     (167.87 MB), public library PDF median 169,650,976 B (169.65 MB).
+#     All rows fell 28.4 to 30.6 percent below the pre-time baseline.
+#   - Warm 500-page time at or below 615 ms: NOT REPRODUCED in this capture.
+#     Warm matrix median 733.48 ms (raw 660.90 / 784.35 / 733.48), standalone
+#     median 695.42 ms. The plan's measured-lever floor (<= 830 ms) holds.
+#   - Public library PDF 500 pages at or below 620 ms: not met in this
+#     capture (median 698.79 ms). CLI 500 pages at or below 0.66 s: not met
+#     in this capture (median 0.70 s). Image 250 tiles at or below 25 ms:
+#     25.72 ms, 0.72 ms above the line; image 500 tiles at or below 49 ms:
+#     met at 44.27 ms.
+#   - Host drift is the identified difference for the time rows. The same
+#     production source measured 576.33 ms at 500 pages in the phase-6
+#     capture (results/phase-6/perf-recovery-internal-pdf-warm-*.txt, date
+#     2026-09-11T15:39:13Z, a 2.13x speedup against the 1,228.72 ms
+#     baseline and below the 615 ms stretch target). Source hashes under
+#     internal/layout and internal/pdf match between the two captures except
+#     the unwired parallel prototype; a no-prototype binary measured the same
+#     band as the prototype binary, so the prototype is not a factor. See
+#     final-capture.md for the raw drift controls.
+#   - Output contracts held in every row: 500 pages, output-bytes 1,419,234,
+#     image dimensions and full opacity unchanged, PNG lossless. Closure
+#     gates (make test, fresh golden 65/65, make claim-scan, make lint,
+#     make test-race, veraPDF PDF/A-4 + PDF/UA-2, benchmark validators, and
+#     the post-publication frontend gates) exited 0; see
+#     plans/0.2.6/perf-time/results/phase-7/closure.md.

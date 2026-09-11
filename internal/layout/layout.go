@@ -179,6 +179,12 @@ type Result struct {
 	flowBoxStore flowIndexStorage
 	flowScratch  flowIndexStorage
 
+	// hasAvoidInside and hasAfterBreak are style-only census facts rebuilt at
+	// the top of each pagination pass. The fixpoint skips a policy walk when
+	// its fact is false.
+	hasAvoidInside bool
+	hasAfterBreak  bool
+
 	// hasStructElems records that buildStructureTree assigned structure
 	// elements. A later non-UA repaint must still clear them.
 	hasStructElems bool
@@ -374,6 +380,10 @@ const (
 	OpImage
 	OpLinkURI
 	OpBullet
+	// OpGridRun is one table row's collapsed border grid emitted as a single
+	// display-list entry. Grid holds the ordered line segments the row used to
+	// append as individual OpLine entries; painters replay them in order.
+	OpGridRun
 )
 
 // Stroke masks are used only by rounded border display-list operations.
@@ -416,7 +426,6 @@ type Op struct {
 	LetterSpacing float64
 	// TextTransform is applied when the text operation is painted.
 	TextTransform string
-	FontFeatures  string
 
 	URI string
 
@@ -459,6 +468,9 @@ type Op struct {
 
 	// StructElem is the PDF/UA-1 logical structure element associated with this op.
 	StructElem *pdf.StructElem
+
+	// Grid holds the line segments of an OpGridRun. Nil for every other kind.
+	Grid *GridRun
 
 	// Single-byte fields are packed at the end so every 8-byte field above
 	// packs without alignment gaps (Op is 440 bytes instead of 472).
@@ -552,7 +564,8 @@ type engine struct {
 	syntheticStyles map[*html.Node]*ResolvedStyle
 	styleOverrides  []styleOverride
 	ops             []Op
-	noEmit          bool // measurement mode: compute geometry without emitting ops
+	gridScratch     []GridSeg // reusable row-grid collector storage
+	noEmit          bool      // measurement mode: compute geometry without emitting ops
 	height          float64
 	scale           float64 // zoom factor applied to style lengths (>= 1)
 	zIndex          int
@@ -1263,11 +1276,23 @@ func estimateOpCapacity(root *html.Node) int {
 		return 0
 	}
 
-	nodes := 0
+	nodes, cells := 0, 0
 
-	root.Walk(func(*html.Node) { nodes++ })
+	root.Walk(func(node *html.Node) {
+		nodes++
 
-	capacity := nodes * three / two
+		if node.Type == html.ElementNode && (node.Name == "td" || node.Name == "th") {
+			cells++
+		}
+	})
+
+	// Collapsed table grids batch a row's border lines into one OpGridRun, so
+	// the old 3/2 ops-per-node bound over-reserved by about two entries per
+	// cell (the grid lines a cell used to contribute). Subtract that bound;
+	// append growth still covers documents that emit more than the estimate.
+	const gridLinesPerCell = 2
+
+	capacity := nodes*three/two - gridLinesPerCell*cells
 	if capacity < minOpCapacity {
 		capacity = minOpCapacity
 	}

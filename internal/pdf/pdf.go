@@ -876,10 +876,8 @@ func (d *Document) finalize() error {
 		}
 	}
 
-	for _, p := range d.pages {
-		if err := d.finalizePage(p, pagesRef); err != nil {
-			return d.failFinalize(err)
-		}
+	if err := d.finalizePages(pagesRef); err != nil {
+		return d.failFinalize(err)
 	}
 
 	namesRef := d.serializeNamedDests()
@@ -1102,10 +1100,11 @@ func (d *Document) infoDict() string {
 		String()
 }
 
-func (d *Document) finalizePage(page *Page, pagesRef objRef) error {
-	raw := page.content.Bytes()
+// finalizePage attaches the final stream bytes for one page and resolves its
+// resource dictionary. raw is already compressed when compression is on (see
+// finalizePages) and aliases the content builder when compression is off.
+func (d *Document) finalizePage(page *Page, pagesRef objRef, raw []byte) error {
 	if d.useCompression {
-		raw = flateBytes(raw)
 		d.setDict(page.contentRef, "<< /Length "+strconv.Itoa(len(raw))+" /Filter /FlateDecode >>")
 	} else {
 		d.setDict(page.contentRef, "<< /Length "+strconv.Itoa(len(raw))+" >>")
@@ -1629,6 +1628,20 @@ type flateState struct {
 	zw  *zlib.Writer
 }
 
+// compress resets the state, writes raw through the zlib writer and returns a
+// fresh copy that owns its bytes. Reset-then-write produces the same bytes as
+// a newly created writer at the same level (see TestFlateStateResetMatchesFreshWriter),
+// which is what keeps parallel page streams equal to the serial path.
+func (s *flateState) compress(raw []byte) []byte {
+	s.buf.Reset()
+	s.zw.Reset(&s.buf)
+
+	_, _ = s.zw.Write(raw)
+	_ = s.zw.Close()
+
+	return append([]byte(nil), s.buf.Bytes()...)
+}
+
 //nolint:gochecknoglobals // compressor reuse across page streams; not a mutable global
 var flatePool sync.Pool
 
@@ -1636,25 +1649,20 @@ var flatePool sync.Pool
 // require the zlib wrapper, not raw DEFLATE (RFC 1951); viewers reject the
 // latter and the page appears empty. The compressor is reused across page
 // streams; the returned copy owns its bytes before the state goes back to the
-// pool.
+// pool. Single-page documents and non-page streams (fonts, images, ICC) stay
+// on this serial path; multi-page documents use the retained worker set in
+// flate_parallel.go.
 const maxPooledFlateBufferSize = 16 * 1024 * 1024 // 16 MiB max retention
 func flateBytes(raw []byte) []byte {
 	state, _ := flatePool.Get().(*flateState)
 	if state == nil {
 		state = &flateState{} //nolint:exhaustruct // intentional zero-value fields
 		state.zw, _ = zlib.NewWriterLevel(&state.buf, zlib.DefaultCompression)
-	} else {
-		state.buf.Reset()
-		state.zw.Reset(&state.buf)
 	}
 
-	_, _ = state.zw.Write(raw)
-	_ = state.zw.Close()
+	res := state.compress(raw)
 
-	res := append([]byte(nil), state.buf.Bytes()...)
-	stateBufCap := state.buf.Cap()
-
-	if stateBufCap <= maxPooledFlateBufferSize {
+	if state.buf.Cap() <= maxPooledFlateBufferSize {
 		flatePool.Put(state)
 	}
 

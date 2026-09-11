@@ -3,6 +3,7 @@ package imageout
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"hash/fnv"
@@ -954,6 +955,9 @@ func paint(img *image.NRGBA, paintOp *layout.Op, pxPerPt float64, atlas *glyphAt
 	case layout.OpLine:
 		paintLine(img, &opCopy, paintStyle, pxPerPt)
 
+	case layout.OpGridRun:
+		paintGridRun(img, &opCopy, pxPerPt)
+
 	case layout.OpText, layout.OpBullet:
 		paintText(img, &opCopy, pxPerPt, atlas)
 
@@ -1456,6 +1460,25 @@ func paintLine(img *image.NRGBA, paintOp *layout.Op, paintStyle layout.PaintStyl
 	}
 }
 
+// paintGridRun replays one batched table-row grid as individual lines, in
+// emission order, so raster output matches the pre-batch op list.
+func paintGridRun(img *image.NRGBA, runOp *layout.Op, pxPerPt float64) {
+	if runOp.Grid == nil {
+		return
+	}
+
+	for idx := range runOp.Grid.Segs {
+		seg := &runOp.Grid.Segs[idx]
+		line := layout.Op{ //nolint:exhaustruct // intentional zero fields
+			ID: runOp.ID, Kind: layout.OpLine,
+			X: seg.X, Y: seg.Y, W: seg.W, H: seg.H,
+			Width: seg.Width, R: seg.R, G: seg.G, B: seg.B, LineInset: seg.LineInset,
+		}
+
+		paintLine(img, &line, layout.StyleOf(&line), pxPerPt)
+	}
+}
+
 // paintText draws the run (and fake-bold pass) at fractional baselines.
 func paintText(img *image.NRGBA, paintOp *layout.Op, pxPerPt float64, atlas *glyphAtlas) {
 	alpha := 1.0
@@ -1564,20 +1587,38 @@ func ptRectScale(x, y, w, h, pxPerPt float64) image.Rectangle {
 	)
 }
 
+//nolint:mnd // bit packing for one NRGBA pixel; alpha is always opaque here
 func fillNRGBAOpaque(dst *image.NRGBA, rect image.Rectangle, col color.NRGBA) {
 	if rect.Empty() {
 		return
 	}
 
+	// Pack one 4-byte NRGBA pixel; 64-bit stores fill two pixels per write so
+	// large canvas backgrounds and tile fills move at memory speed. A is
+	// always opaque here (every caller checks opaqueAlpha first).
+	pattern := uint32(col.R) | uint32(col.G)<<8 | uint32(col.B)<<16 | uint32(opaqueAlpha)<<24
+	word := uint64(pattern) | uint64(pattern)<<32
+	rowBytes := rect.Dx() * 4 //nolint:mnd // 4 bytes per NRGBA pixel
+
 	for y := rect.Min.Y; y < rect.Max.Y; y++ {
 		offset := dst.PixOffset(rect.Min.X, y)
+		row := dst.Pix[offset : offset+rowBytes]
 
-		for x := rect.Min.X; x < rect.Max.X; x++ {
-			dst.Pix[offset] = col.R
-			dst.Pix[offset+1] = col.G
-			dst.Pix[offset+2] = col.B
-			dst.Pix[offset+3] = 255
-			offset += 4
+		index := 0
+
+		for ; index+32 <= rowBytes; index += 32 {
+			binary.LittleEndian.PutUint64(row[index:], word)
+			binary.LittleEndian.PutUint64(row[index+8:], word)
+			binary.LittleEndian.PutUint64(row[index+16:], word)
+			binary.LittleEndian.PutUint64(row[index+24:], word)
+		}
+
+		for ; index+8 <= rowBytes; index += 8 {
+			binary.LittleEndian.PutUint64(row[index:], word)
+		}
+
+		if index < rowBytes {
+			binary.LittleEndian.PutUint32(row[index:], pattern)
 		}
 	}
 }
@@ -1762,8 +1803,13 @@ func writeEncodedOutput(ctx context.Context, req *Request, img image.Image, log 
 		img = onWhite(img)
 	}
 
-	data, err := encode(img, format, imgSet.Quality)
-	if err != nil {
+	// The pooled scratch is written to the sink before it returns to the pool,
+	// so the encoded bytes are never copied out and a failed encode still
+	// writes nothing.
+	buf := acquireEncodeBuffer()
+	defer releaseEncodeBuffer(buf)
+
+	if err := encodeInto(buf, img, format, imgSet.Quality, !imgSet.Transparent); err != nil {
 		return fmt.Errorf("encode %s: %w", format, err)
 	}
 
@@ -1771,12 +1817,12 @@ func writeEncodedOutput(ctx context.Context, req *Request, img image.Image, log 
 		return fmt.Errorf("imageout: context: %w", err)
 	}
 
-	count, err := req.Output.Write(data)
+	count, err := req.Output.Write(buf.Bytes())
 	if err != nil {
 		return fmt.Errorf("write output: %w", err)
 	}
 
-	if count != len(data) {
+	if count != buf.Len() {
 		return fmt.Errorf("write output: %w", io.ErrShortWrite)
 	}
 

@@ -164,14 +164,19 @@ func hasOwnVerticalChrome(ops []Op, boxNode *box) bool {
 		return false
 	}
 
-	for idx := boxNode.opStart; idx <= boxNode.opEnd && idx < len(ops); idx++ {
-		op := ops[idx]
-		if isVerticalChromeForBox(op, boxNode, leftBorder, rightBorder) {
-			return true
-		}
-	}
+	found := false
 
-	return false
+	forEachLineIndex(ops, boxNode.opStart, boxNode.opEnd, func(opIdx, segIdx int) {
+		if found {
+			return
+		}
+
+		if isVerticalChromeForBox(lineViewAt(ops, opIdx, segIdx), boxNode, leftBorder, rightBorder) {
+			found = true
+		}
+	})
+
+	return found
 }
 
 //nolint:cyclop,wsl // fragment collection deliberately mirrors paint ownership
@@ -183,16 +188,26 @@ func normalizeOwnVerticalChrome(ops []Op, boxNode *box) {
 
 	leftBorder := style.borderLeft.Width > 0 && style.borderLeft.Style != cssDisplayNone
 	rightBorder := style.borderRight.Width > 0 && style.borderRight.Style != cssDisplayNone
+
+	type lineRef struct{ opIdx, segIdx int }
+
 	minY := math.Inf(1)
-	verticalIndexes := make([]int, 0, 4) //nolint:mnd
-	for idx := boxNode.opStart; idx <= boxNode.opEnd && idx < len(ops); idx++ {
-		if isVerticalChromeForBox(ops[idx], boxNode, leftBorder, rightBorder) {
-			verticalIndexes = append(verticalIndexes, idx)
-			if ops[idx].Y < minY {
-				minY = ops[idx].Y
-			}
+
+	refs := make([]lineRef, 0, 4) //nolint:mnd
+
+	forEachLineIndex(ops, boxNode.opStart, boxNode.opEnd, func(opIdx, segIdx int) {
+		line := lineViewAt(ops, opIdx, segIdx)
+		if !isVerticalChromeForBox(line, boxNode, leftBorder, rightBorder) {
+			return
 		}
-	}
+
+		refs = append(refs, lineRef{opIdx: opIdx, segIdx: segIdx})
+
+		if line.Y < minY {
+			minY = line.Y
+		}
+	})
+
 	if math.IsInf(minY, 1) {
 		return
 	}
@@ -201,23 +216,21 @@ func normalizeOwnVerticalChrome(ops []Op, boxNode *box) {
 	if math.Abs(delta) <= 1e-6 {
 		return
 	}
-	for _, idx := range verticalIndexes {
-		ops[idx].Y += delta
+
+	for _, ref := range refs {
+		addLineAtY(ops, ref.opIdx, ref.segIdx, delta)
 	}
 
 	// Solid rails are one continuous OpLine: extend the last segment to the
 	// box bottom after a Y realign. Dashed/dotted sides are many short
 	// segments - growing the last one paints a solid stub past the dashes
 	// (fixture-40 abs-host, fixture-48 tracking).
-	last := verticalIndexes[len(verticalIndexes)-1]
-	if isDashLikeVerticalRail(ops[last], boxNode) {
+	last := refs[len(refs)-1]
+	if isDashLikeVerticalRail(lineViewAt(ops, last.opIdx, last.segIdx), boxNode) {
 		return
 	}
 
-	lastBottom := ops[last].Y + ops[last].H
-	if lastBottom < boxNode.y+boxNode.height {
-		ops[last].H += boxNode.y + boxNode.height - lastBottom
-	}
+	extendLineBottom(ops, last.opIdx, last.segIdx, boxNode.y+boxNode.height)
 }
 
 //nolint:cyclop // chrome classification keeps line and masked-side geometry explicit

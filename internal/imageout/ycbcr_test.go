@@ -101,7 +101,7 @@ func TestEncodeJPGUsesFastPathForNRGBA(t *testing.T) {
 		img := makeYCbCrProbeImage(image.Rect(0, 0, size.X, size.Y), true)
 		want := stdlibJPEGBytes(t, img, 80)
 
-		got, err := encode(img, formatJPG, 80)
+		got, err := encode(img, formatJPG, 80, false)
 		if err != nil {
 			t.Fatalf("encode: %v", err)
 		}
@@ -125,7 +125,7 @@ func TestNRGBAToYCbCr420RejectsOddOrigin(t *testing.T) {
 
 	want := stdlibJPEGBytes(t, img, 75)
 
-	got, err := encode(img, formatJPG, 75)
+	got, err := encode(img, formatJPG, 75, false)
 	if err != nil {
 		t.Fatalf("encode: %v", err)
 	}

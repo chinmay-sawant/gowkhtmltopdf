@@ -44,8 +44,6 @@ func findSizeContainer(n *html.Node, name string, containers map[*html.Node]size
 // inline sizes for elements with container-type: inline-size|size. Widths are
 // computed without children (size containment / as-if-empty for intrinsic
 // contribution), matching buildBlock's definite-width rules.
-//
-//nolint:unparam // production callers pass the viewport; tests use a fixed fixture viewport.
 func measureSizeContainers(
 	root *html.Node, styles map[*html.Node]*ResolvedStyle, viewportW float64,
 ) map[*html.Node]sizeContainer {

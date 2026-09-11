@@ -1,23 +1,27 @@
 // Benchmark snapshots for the Benchmarks page.
 //
-// Current engine snapshot: 2026-09-11 perf-improve phase-7 capture on the
-// uncommitted 0.2.6 warm-path working tree (VERSION 0.2.5). In-process and
-// library rows are three independent 1x samples per workload (median of the
-// three raw values, B/op is never averaged). Raw evidence:
-// plans/0.2.6/perf-improve/results/phase-7/final-capture.md and Snapshot L in
-// testdata/golden/benchmarks/benchmark-results.txt.
+// Current engine snapshot: 2026-09-11 perf-time phase-7 closure capture on the
+// uncommitted 0.2.6 warm-path working tree (VERSION 0.2.5). The warm matrix,
+// standalone, and library rows are three independent 1x samples per workload
+// (median of the three raw values, B/op is never averaged). The implementation
+// result on the same production source is the phase-6 capture 15 minutes
+// earlier: warm 500p 576.33 ms / 163.03 MB (2.13x). The closure window ran
+// slower on wall time with unchanged B/op; both are labeled below. Raw
+// evidence: plans/0.2.6/perf-time/results/phase-7/final-capture.md and
+// Snapshot M in testdata/golden/benchmarks/benchmark-results.txt.
 //
 // Current CLI comparison: the 2026-09-11 recovery capture, kept dated because
-// the phase-7 capture measured gowkhtmltopdf only (cli-rss mode).
+// the perf-time capture measured gowkhtmltopdf only (cli-rss mode).
 //
-// Historical snapshot: 2026-08-19 full 0.2.4 matrices, kept dated so no 0.2.4
-// number is relabeled as current.
+// Historical snapshots: the 2026-09-11 perf-improve phase-7 engine rows, the
+// 2026-09-11 recovery capture, and the 2026-08-19 full 0.2.4 matrices, all
+// kept dated so no older number is relabeled as current.
 
 export const SNAPSHOT = {
   date: '2026-09-11',
   host: 'Linux amd64, 13th Gen Intel Core i7-13700HX (WSL2, 24 CPUs)',
   go: 'go1.26.4',
-  gowk: 'gowkhtmltopdf 0.2.6 recovery working tree (VERSION 0.2.5), freshly built generic CLI',
+  gowk: 'gowkhtmltopdf 0.2.6 warm-path working tree (VERSION 0.2.5), freshly built generic CLI',
   wkhtml: 'wkhtmltopdf 0.12.6.1 (with patched qt)',
   flags: '--quiet --allow-local-files -o OUTPUT INPUT',
   method: 'median of 3 timed process runs after 1 warmup',
@@ -52,30 +56,61 @@ export const PUPPETEER_ROWS = [
 
 export const RECOVERY_DATE = '2026-09-11'
 export const HISTORY_DATE = '2026-08-19'
+
+export const PERF_TIME_CAPTURE = {
+  date: '2026-09-11',
+  label: 'perf-time phase-7 closure capture',
+  raw: 'plans/0.2.6/perf-time/results/phase-7/final-capture.md',
+  snapshot: 'Snapshot M',
+  warm500MatrixMs: 733.48,
+  phase6AnchorMs: 576.33,
+  phase6Raw: 'plans/0.2.6/perf-time/results/phase-6/perf-recovery-internal-pdf-warm-2-5-10-20-50-100-200-250-500.txt',
+}
+
 export const PERF_IMPROVE_CAPTURE = {
   date: '2026-09-11',
   label: 'perf-improve phase-7 capture',
   raw: 'plans/0.2.6/perf-improve/results/phase-7/final-capture.md',
 }
 
-// Current 2026-09-11 perf-improve capture: fresh-process 1x samples, median
-// of three. The 2-page PDF B/op rows carry the one-time default-font cost,
-// now about 2.7 MB, charged to the single operation, so they are not
-// like-for-like with the 2026-08-19 multi-iteration rows below. The warm
-// 500-page B/op now meets the 240 MB acceptance (235.50 MB standalone median;
-// 234.92 MB warm matrix); the 500-page warm time (1,297.98 ms standalone
-// median; 1,228.72 ms warm matrix) is still above the 1.010 s Snapshot I row.
+// Current 2026-09-11 perf-time closure capture: fresh-process 1x samples,
+// median of three. B/op is one raw value, never averaged, and is separate
+// from process RSS (the CLI/compare tables). The 500-page B/op rows are 28.4
+// to 30.6 percent below the pre-time baselines; the 500-page warm time
+// (733.48 ms matrix / 695.42 ms standalone) did not reproduce the phase-6
+// window's 576.33 ms (2.13x), which is kept as the labeled anchor in
+// PERF_TIME_CAPTURE. The 2-page rows are fresh-process samples, so the
+// one-time default-font work is charged to the single operation; they are
+// not like-for-like with the 2026-08-19 multi-iteration rows below.
 export const INPROC_PDF_GENERIC = [
+  { n: 2, ms: 6.08, mb: 4.03, allocs: '4.5K' },
+  { n: 500, ms: 695.42, mb: 167.87, allocs: '755.1K' },
+]
+
+export const LIBRARY_PDF = [
+  { n: 2, ms: 6.11, mb: 4.05, allocs: '4.5K' },
+  { n: 500, ms: 698.79, mb: 169.65, allocs: '755.1K' },
+]
+
+// Image rows carry the encode trade: time falls about 2x, lossless PNG size
+// grows about 50 percent (141,917 B at 250 tiles, 282,749 B at 500 tiles).
+export const LIBRARY_IMAGE = [
+  { n: 250, ms: 25.72, mb: 14.30, allocs: '7.2K' },
+  { n: 500, ms: 44.27, mb: 26.41, allocs: '13.6K' },
+]
+
+// Historical 2026-09-11 perf-improve phase-7 engine rows. Dated, not current.
+export const INPROC_PDF_GENERIC_IMPROVE_HISTORY = [
   { n: 2, ms: 6.11, mb: 2.67, allocs: '6.2K' },
   { n: 500, ms: 1297.98, mb: 235.5, allocs: '1.23M' },
 ]
 
-export const LIBRARY_PDF = [
+export const LIBRARY_PDF_IMPROVE_HISTORY = [
   { n: 2, ms: 7.14, mb: 2.68, allocs: '6.2K' },
   { n: 500, ms: 1240.82, mb: 236.91, allocs: '1.23M' },
 ]
 
-export const LIBRARY_IMAGE = [
+export const LIBRARY_IMAGE_IMPROVE_HISTORY = [
   { n: 250, ms: 50.72, mb: 14.45, allocs: '9.4K' },
   { n: 500, ms: 98.47, mb: 26.73, allocs: '18.0K' },
 ]
@@ -213,8 +248,8 @@ export const HEADLINE = {
 
 // Dated landing-claim anchor: the 2026-09-11 recovery capture public library
 // 2-page row (10.88 ms) against that capture's wkhtmltopdf CLI baseline
-// (258 ms). The phase-7 capture measured 7.14 ms on the same boundary; the
-// landing copy keeps the dated anchor until that claim is re-approved.
+// (258 ms). Later captures measured faster public 2-page rows; the landing
+// copy keeps the dated anchor until that claim is re-approved.
 export const RECOVERY_LIBRARY_2P_MS = 10.88
 
 export const LIBRARY_HEADLINE = {

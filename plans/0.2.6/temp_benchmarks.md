@@ -212,6 +212,90 @@ profiling agents loaded the host. The plan's dedicated phase-1 warm capture
 - Style storage (221,208 B) and 500p output bytes (1,419,234) are unchanged,
   and all 65 golden fixtures plus PDF/A-4 and PDF/UA-2 still pass.
 
+## Perf-time final (phase 7, 2026-09-11, published as Snapshot M)
+
+The perf-time plan ran after the perf-improve capture. It halves the warm
+times: warm 500p 1,228.72 -> 576.33 ms in the phase-6 same-source capture
+(2.13x), B/op 234.92 -> 163.02 MB (-30.6%), and the image rows are 2.10x /
+2.27x faster. Snapshot M records the phase-7 closure window, which ran hot;
+both numbers are shown.
+
+### Warm internal matrix
+
+Baseline is the perf-improve final capture. Snapshot M is the closure window
+(median of three independent processes). The phase-6 anchor is the same-source
+capture that crossed the 2x target.
+
+| Pages | Baseline time | Snapshot M time | Diff | Baseline B/op | Snapshot M B/op | Diff |
+|---:|---:|---:|---:|---:|---:|---:|
+| 2 cold | 6.69 ms | 5.50 ms | -17.8% | 2.67 MB | 4.03 MB | +51% |
+| 5 | 10.98 ms | 11.15 ms | +1.5% | 2.89 MB | 7.94 MB | +174% |
+| 10 | 20.05 ms | 11.88 ms | -40.7% | 5.23 MB | 5.43 MB | +3.8% |
+| 20 | 42.82 ms | 22.36 ms | -47.8% | 10.75 MB | 7.86 MB | -26.9% |
+| 50 | 102.59 ms | 56.36 ms | -45.1% | 24.82 MB | 17.68 MB | -28.8% |
+| 100 | 225.10 ms | 123.90 ms | -45.0% | 48.37 MB | 33.97 MB | -29.8% |
+| 200 | 487.72 ms | 243.13 ms | -50.1% | 95.42 MB | 66.51 MB | -30.3% |
+| 250 | 606.98 ms | 320.62 ms | -47.2% | 118.43 MB | 82.25 MB | -30.6% |
+| 500 | 1,228.72 ms | 733.48 ms | -40.3% | 234.92 MB | 163.02 MB | -30.6% |
+| 500 anchor, phase 6 | 1,228.72 ms | **576.33 ms** | **-53.1%** | 234.92 MB | **163.03 MB** | -30.6% |
+
+Small sizes carry new one-time per-process structures (the parallel flate pool
+start and the new caches), so 2 to 5 pages read higher than the baseline while
+every row from 20 pages up is 27 to 31 percent below it; the 500-page
+acceptance is met.
+
+### Image
+
+| Row | Baseline | Phase 5b | Closure window | Verdict |
+|---|---:|---:|---:|---|
+| 250 tiles time | 50.72 ms | **24.15 ms** | 25.72 ms | 2.10x, 0.72 ms over in the hot window |
+| 500 tiles time | 98.47 ms | **43.43 ms** | 44.27 ms | 2.27x, met |
+| B/op 250 / 500 | 14.45 / 26.73 MB | 14.29 / 26.41 MB | same | slightly down |
+| PNG bytes 250 / 500 | 94,352 / 188,268 | 141,917 / 282,749 | same | +50.4% / +50.2% intended trade |
+
+Decoded pixels are bit-identical, dimensions 1024x2056 / 1024x4040 and full
+opacity are unchanged, and IMG-01 plus IMG-03 stay green. The PNG size growth
+buys the encode speed with filter-none at deflate level 2.
+
+### CLI and public library
+
+| Row | Baseline | Now | Diff |
+|---|---:|---:|---:|
+| CLI 500p | 1.32 s / 203,136 KiB | 0.70 s / 147,264 KiB | time -47%, RSS -27.5% |
+| Standalone internal 500p | 1,297.98 ms / 235.50 MB | 695.42 ms / 167.87 MB | time -46% in window; phase-6 anchor 576 ms |
+| Public PDF 500p | 1,240.82 ms / 236.91 MB | 698.79 ms / 169.65 MB | time -44% in window; B/op -28.4% |
+
+### Structural changes
+
+| Item | Before | After |
+|---|---:|---:|
+| Style resolution | 444 ms | **30 ms** (memoized repeated structures) |
+| Display-list ops at 500p | 174,000 | **66,500** (OpGridRun batching) |
+| Paint-range checks | 87,000,000 span checks | **597,168 binary steps** |
+| Finalize plus compression | 100.5 ms | **22.1 ms** (retained parallel flate) |
+| Op size | 440 B | 432 B |
+| `validatePaintPageIndices` calls | 3 | 1 |
+| `afterBreaks` walk | 1 call | 0 (style census) |
+| Parallel layout prototype | none | identity-safe, 5.4% paired, rejected at a 15% floor |
+
+### Gates
+
+`make test`, `make golden` 65/65 fresh, `make claim-scan`, `make lint`,
+`make test-race`, compliance (PDF/A-4 109 rules / 14,386 checks PASS, PDF/UA-2
+1,727 rules / 33,392 checks PASS, structure tree PASS), the public validators,
+and the image quality suite (138 PASS) all exit 0.
+
+### Honest caveats
+
+- The Snapshot M window swung 626 to 1,036 ms on byte-identical source; the
+  2.13x anchor is phase 6's 576.33 ms capture.
+- CLI and public PDF time targets (0.66 s and 620 ms) were not reproduced in
+  the hot window; their B/op and RSS targets hold.
+- Two phase split metrics were missed while total times beat their targets,
+  the concurrency design was rejected on measurement, and the encoded PNG is
+  50 percent larger by design.
+- Raw captures live under `plans/0.2.6/perf-time/results/` (local by policy).
+
 ## What improved
 
 - Style interning removed the largest allocator (228 MB of 557 MB):

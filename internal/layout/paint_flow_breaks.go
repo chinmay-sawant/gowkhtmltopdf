@@ -322,7 +322,7 @@ func boxInkExtent(res *Result, boxNode *box) float64 {
 		switch paintOp.Kind {
 		case OpText, OpBullet:
 			outBox += opVisibleInkHeight(paintOp)
-		case OpFillRect, OpStrokeRect, OpLine, OpImage, OpLinkURI, OpUnknown, opKindNoop:
+		case OpFillRect, OpStrokeRect, OpLine, OpGridRun, OpImage, OpLinkURI, OpUnknown, opKindNoop:
 			if paintOp.H > 0 {
 				outBox += paintOp.H
 			}
@@ -467,7 +467,7 @@ func applySuffixDifferences(ops []Op, suffixDy []float64) {
 			continue
 		}
 
-		ops[idx].Y += cum
+		shiftOpY(&ops[idx], cum)
 	}
 }
 
@@ -1150,7 +1150,7 @@ func opInkEdges(paintOp Op) (float64, float64) {
 	case OpText, OpBullet:
 		yStart = paintOp.Y - paintOp.Size*textAscenderRatio
 		yEnd = paintOp.Y + paintOp.Size*textDescenderRatio
-	case OpLine:
+	case OpLine, OpGridRun:
 		if paintOp.H == 0 {
 			yEnd = paintOp.Y + math.Max(paintOp.Width, 1)
 		} else {
@@ -1274,7 +1274,7 @@ func shiftSamePageOps(res *Result, fromY float64, page int, contentH, deltaY flo
 			continue
 		}
 
-		res.Ops[idx].Y += deltaY
+		shiftOpY(&res.Ops[idx], deltaY)
 	}
 }
 
@@ -1328,13 +1328,18 @@ func hasRoundedOwnChrome(res *Result, boxNode *box) bool {
 	}
 
 	hasRail := false
-	for idx := boxNode.opStart; idx <= boxNode.opEnd; idx++ {
-		op := res.Ops[idx]
+
+	forEachLineIndex(res.Ops, boxNode.opStart, boxNode.opEnd, func(opIdx, segIdx int) {
+		if hasRail {
+			return
+		}
+
+		op := lineViewAt(res.Ops, opIdx, segIdx)
 		if op.Kind == OpLine && op.W == 0 && op.H > 0 &&
 			nearLayout(op.X, boxNode.x) && nearLayout(op.Y, boxNode.y) {
 			hasRail = true
 		}
-	}
+	})
 
 	return hasRail
 }

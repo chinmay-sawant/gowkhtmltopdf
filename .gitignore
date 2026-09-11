@@ -73,3 +73,5 @@ pen/
 plans/0.2.6/perf-review/results/*
 /plans/0.2.6/perf-improve/profiles/*
 /plans/0.2.6/perf-improve/results/*
+plans/0.2.6/perf-time/profiles/raw/*
+/plans/0.2.6/perf-time/results/*

@@ -58,6 +58,62 @@ func TestPageIndexScratchReusesStorage(t *testing.T) {
 	}
 }
 
+// beforeAlwaysForcedBreakHTML carries three forced breaks with enough content
+// between them that beforeAlways produces positive shifts.
+func beforeAlwaysForcedBreakHTML() string {
+	return `<html><body>
+		<p style="page-break-before: always">alpha alpha alpha</p>
+		<p style="page-break-before: always">beta beta beta</p>
+		<p style="page-break-before: always">gamma gamma gamma</p>
+		<p>delta</p>
+	</body></html>`
+}
+
+// requireFlowIndexConsistent asserts every non-fixed op's stored page matches
+// its current Y and every bucket position points back at its op.
+func requireFlowIndexConsistent(t *testing.T, res *Result) {
+	t.Helper()
+
+	for idx := range res.Ops {
+		if res.Ops[idx].Fixed {
+			continue
+		}
+
+		page, ok := flowPageOfY(res.Ops[idx].Y, res.flowPageSize, layoutEpsilon)
+		if !ok {
+			t.Fatalf("op %d Y=%.3f is not a bounded page coordinate", idx, res.Ops[idx].Y)
+		}
+
+		if page != res.flowPageOf[idx] {
+			t.Fatalf("op %d stored page %d, current Y maps to %d", idx, res.flowPageOf[idx], page)
+		}
+
+		pos := res.flowPos[idx]
+		if pos < 0 || pos >= len(res.flowPages[page]) || res.flowPages[page][pos] != idx {
+			t.Fatalf("op %d bucket position %d does not point back from page %d", idx, pos, page)
+		}
+	}
+}
+
+// TestBeforeAlwaysKeepsFlowIndexConsistent pins that the forced-break pass
+// rebuilds a flow index that agrees with every op's post-shift Y and bucket
+// position.
+func TestBeforeAlwaysKeepsFlowIndexConsistent(t *testing.T) {
+	t.Parallel()
+
+	const contentH = 120.0
+
+	res := layoutHTML(t, beforeAlwaysForcedBreakHTML())
+
+	ensureFlowIndex(res, contentH)
+
+	if !beforeAlways(res, contentH) {
+		t.Fatal("forced-break document produced no shift")
+	}
+
+	requireFlowIndexConsistent(t, res)
+}
+
 // TestPagesDoNotAliasPageIndex proves res.Pages keeps its paint-time buckets
 // when the scratch store or the live index is rebuilt afterwards.
 func TestPagesDoNotAliasPageIndex(t *testing.T) {

@@ -481,7 +481,7 @@ func shiftIndexedOp(res *Result, index int, deltaY float64) {
 	}
 
 	oldPage := res.flowPageOf[index]
-	res.Ops[index].Y += deltaY
+	shiftOpY(&res.Ops[index], deltaY)
 
 	newPage, ok := flowPageOfY(res.Ops[index].Y, res.flowPageSize, layoutEpsilon)
 	if !ok {

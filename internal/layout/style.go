@@ -502,6 +502,10 @@ type styleContext struct {
 	// are consumed before the next element is resolved.
 	cascadeWins  map[string]cascadeWin
 	cascadeProps map[string]string
+	// memo caches element resolutions for repeated declaration shapes. It is
+	// pass-local: every resolution pass builds a fresh styleContext, and
+	// container re-cascade passes do not use it.
+	memo styleResolutionMemo
 }
 
 // pollContext checks cancellation at bounded work intervals. Style matching is
@@ -618,8 +622,7 @@ func resolveStylesCtx(root *html.Node, ctx *styleContext) (map[*html.Node]*Resol
 
 		switch node.Type {
 		case html.ElementNode:
-			resolveElementStyle(node, ctx, parent, &store.candidate)
-			sty = store.append(store.candidate)
+			sty = resolveElementStyleMemo(node, ctx, parent, &store)
 		case html.TextNode:
 			sty = parent
 			if sty == nil {
@@ -797,7 +800,25 @@ func applyRawToUsed(
 func resolveElementStyle(
 	node *html.Node, ctx *styleContext, parent, sty *ResolvedStyle,
 ) {
-	raw := cascadeRaw(ctx, node)
+	resolveElementStyleWithHits(node, ctx, parent, sty, matchedElementHits(ctx, node))
+}
+
+// matchedElementHits returns the author-rule matches for node. Split out so
+// the memo path can build its key from the same list the cascade consumed.
+func matchedElementHits(ctx *styleContext, node *html.Node) []ruleHit {
+	if ctx == nil {
+		return nil
+	}
+
+	return ctx.matchedRules(node, "")
+}
+
+// resolveElementStyleWithHits is resolveElementStyle with the matched rules
+// already computed.
+func resolveElementStyleWithHits(
+	node *html.Node, ctx *styleContext, parent, sty *ResolvedStyle, hits []ruleHit,
+) {
+	raw := cascadeRaw(ctx, node, hits)
 	applyRawToUsed(node, ctx, parent, sty, raw)
 
 	// Opt-in operator policy (--print-link-underline): underline

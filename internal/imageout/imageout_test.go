@@ -387,12 +387,12 @@ func TestEncodeFormats(t *testing.T) {
 	img := image.NewNRGBA(image.Rect(0, 0, 64, 64))
 	drawSolid(img, color.NRGBA{R: 200, G: 30, B: 30, A: 255})
 
-	pngBytes, err := encode(img, "png", 94)
+	pngBytes, err := encode(img, "png", 94, true)
 	if err != nil {
 		t.Fatalf("png encode: %v", err)
 	}
 
-	jpgBytes, err := encode(img, "jpg", 94)
+	jpgBytes, err := encode(img, "jpg", 94, true)
 	if err != nil {
 		t.Fatalf("jpg encode: %v", err)
 	}
@@ -429,12 +429,12 @@ func TestEncodeJPEGQualityChangesSize(t *testing.T) {
 		}
 	}
 
-	q10, err := encode(noise, "jpg", 10)
+	q10, err := encode(noise, "jpg", 10, true)
 	if err != nil {
 		t.Fatalf("jpg q10: %v", err)
 	}
 
-	q100, err := encode(noise, "jpg", 100)
+	q100, err := encode(noise, "jpg", 100, true)
 	if err != nil {
 		t.Fatalf("jpg q100: %v", err)
 	}

@@ -37,6 +37,18 @@ func opOwnedBy(oper *Op, boxNode *box, phase opOwnerPhase) bool {
 		return false
 	}
 
+	if oper.Kind == OpGridRun {
+		owned := false
+
+		oper.forEachLine(func(line Op) {
+			if !owned && opOwnedBy(&line, boxNode, phase) {
+				owned = true
+			}
+		})
+
+		return owned
+	}
+
 	switch oper.Kind {
 	case OpFillRect, OpStrokeRect:
 		return opOwnsBoxPaint(oper, boxNode, phase)
@@ -46,7 +58,7 @@ func opOwnedBy(oper *Op, boxNode *box, phase opOwnerPhase) bool {
 		}
 
 		return opOwnsBoxOutline(oper, boxNode)
-	case OpUnknown, OpText, OpImage, OpLinkURI, OpBullet, opKindNoop:
+	case OpUnknown, OpGridRun, OpText, OpImage, OpLinkURI, OpBullet, opKindNoop:
 		return false
 	}
 

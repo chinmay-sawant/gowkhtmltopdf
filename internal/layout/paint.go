@@ -157,13 +157,16 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 		contentH = opts.PageHeight
 	}
 
+	// The single validation point below runs after every pagination pass, so
+	// the empty-document path and the pre-pagination state share this check
+	// instead of each running a full op scan of their own.
+	if !finitePositive(contentH) {
+		return errInvalidContentHeight
+	}
+
 	if res.pageSnapHeight > 0 && math.Abs(contentH-res.pageSnapHeight) > layoutCoordEpsilon {
 		return fmt.Errorf("%w: multicol snapped to %gpt, paint content height is %gpt",
 			errPageSnapMismatch, res.pageSnapHeight, contentH)
-	}
-
-	if err := validatePaintPageIndices(res.Ops, contentH); err != nil {
-		return err
 	}
 
 	if len(res.Ops) == 0 {
@@ -180,10 +183,6 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 	}
 
 	stretchPaginatedChrome(res)
-
-	if err := validatePaintPageIndices(res.Ops, contentH); err != nil {
-		return err
-	}
 
 	fixedIdx := fixedOpIndices(res)
 
@@ -520,7 +519,7 @@ func (p *pagePainter) paintWrappedOp(paintOp *Op) {
 		p.child.BeginArtifact("Background")
 		p.drawPageOp(paintOp)
 		p.child.EndArtifact()
-	case p.isUA && (paintOp.Kind == OpStrokeRect || paintOp.Kind == OpLine):
+	case p.isUA && (paintOp.Kind == OpStrokeRect || paintOp.Kind == OpLine || paintOp.Kind == OpGridRun):
 		p.child.BeginArtifact("Layout")
 		p.drawPageOp(paintOp)
 		p.child.EndArtifact()
@@ -543,6 +542,8 @@ func (p *pagePainter) drawPageOp(paintOp *Op) {
 		drawStroke(p.child, paintOp, p.pageN, p.contentH, p.opts, p.pageH)
 	case OpLine:
 		drawLine(p.child, paintOp, p.pageN, p.contentH, p.opts, p.pageH)
+	case OpGridRun:
+		p.drawGridRun(paintOp)
 	case OpText, OpBullet:
 		drawText(p.child, paintOp, p.pageN, p.contentH, p.opts, p.pageH, p.resName(paintOp.Font))
 	case OpImage:
@@ -792,6 +793,8 @@ func paintBandOp(
 }
 
 // drawBandOp dispatches one band op through the same draw* routines as body Paint.
+//
+//nolint:cyclop // grid runs replay segments, adding one dispatch arm
 func drawBandOp(
 	chld *pdf.Content, page *pdf.Page, paintOp *Op, contentH, pageH float64,
 	margins PaintOptions, resName func(*pdf.Font) string, nextImg *int, firstErr *error,
@@ -803,6 +806,11 @@ func drawBandOp(
 		drawStroke(chld, paintOp, 0, contentH, margins, pageH)
 	case OpLine:
 		drawLine(chld, paintOp, 0, contentH, margins, pageH)
+	case OpGridRun:
+		for idx := range paintOp.Grid.Segs {
+			line := paintOp.Grid.asLine(paintOp, idx)
+			drawLine(chld, &line, 0, contentH, margins, pageH)
+		}
 	case OpText, OpBullet:
 		drawText(chld, paintOp, 0, contentH, margins, pageH, resName(paintOp.Font))
 	case OpImage:

@@ -4,17 +4,20 @@ Numbers on this page are **labeled snapshots**, not a live SLA. Host, GOCACHE
 state, and whether a run used the **generic** convert path or the
 **benchmark-only page-island** path all change wall time and RSS.
 
-**Current snapshot: 2026-09-11 perf-improve phase-7 capture.** Three
-independent `1x` samples per workload, plus a full warm matrix and a
-gowkhtmltopdf-only CLI process capture, on the uncommitted 0.2.6 warm-path
-working tree (`VERSION` still reads 0.2.5, so this is not a released build).
-The warm 500-page `B/op` now meets the 240 MB acceptance and is slightly below
-the 0.2.4 row; the warm 500-page time is about 17 percent better than the
-pre-improve capture but still above the 1.010 s Snapshot I row and the 1.10 s
-acceptance. Full matrices live in
+**Current snapshot: 2026-09-11 perf-time phase-7 closure capture.** The 0.2.6
+perf-time plan cut warm 500-page time from 1,228.72 ms to a measured 576.33 ms
+(2.13x) at 163.03 MB `B/op`, and warm 500-page `B/op` sits 30.6 percent below
+the 234.92 MB ceiling. The closure re-capture of the same code measured
+medians of 733.48 ms (warm matrix) and 695.42 ms (standalone) in a slower host
+window; the allocation and output contracts are unchanged. Public image
+medians are 43.43 ms at 500 tiles in the phase-5b capture (44.27 ms in the
+closure capture) with a lossless PNG about 50 percent larger, an intended
+size-for-speed trade. The concurrent-layout design was rejected for shipping
+(5.4 percent paired gain against a 15 percent floor) and left unwired. Full
+matrices live in
 [`testdata/golden/benchmarks/README.md`](../testdata/golden/benchmarks/README.md).
-The 2026-09-11 recovery capture, the 2026-08-19 snapshot, and the 2026-08-14
-tables further down are dated history.
+The 2026-09-11 perf-improve capture, the 2026-09-11 recovery capture, the
+2026-08-19 snapshot, and the 2026-08-14 tables further down are dated history.
 
 Related:
 
@@ -34,10 +37,10 @@ Related:
 
 | Kind | What it measures | Where |
 |------|------------------|-------|
-| Direct CLI `/usr/bin/time` | Process elapsed time and peak RSS | **2026-09-11 perf-improve `cli-rss` rows below; the wkhtmltopdf comparison is the dated 2026-09-11 recovery table** |
-| External engines | Process elapsed time and peak RSS vs WeasyPrint and Puppeteer/Chrome | **Dated 2026-09-11 recovery tables below; not re-run in the phase-7 capture** |
-| Internal engine `go test -bench` | Direct `internal/convert` wall time, `B/op`, `allocs/op` | **2026-09-11 perf-improve rows below; the 2026-09-11 recovery and 2026-08-19 matrices are historical** |
-| Public library `go test -bench` | `Document.WritePDF` / `ImageDocument.WriteImage` wall time, `B/op`, `allocs/op` | **2026-09-11 perf-improve rows below; the 2026-09-11 recovery and 2026-08-19 matrices are historical** |
+| Direct CLI `/usr/bin/time` | Process elapsed time and peak RSS | **2026-09-11 perf-time `cli-rss` rows below; the wkhtmltopdf comparison is the dated 2026-09-11 recovery table** |
+| External engines | Process elapsed time and peak RSS vs WeasyPrint and Puppeteer/Chrome | **Dated 2026-09-11 recovery tables below; not re-run in the perf-time capture** |
+| Internal engine `go test -bench` | Direct `internal/convert` wall time, `B/op`, `allocs/op` | **2026-09-11 perf-time rows below; the perf-improve, recovery, and 2026-08-19 matrices are historical** |
+| Public library `go test -bench` | `Document.WritePDF` / `ImageDocument.WriteImage` wall time, `B/op`, `allocs/op` | **2026-09-11 perf-time rows below; the perf-improve, recovery, and 2026-08-19 matrices are historical** |
 | Phase 9.3 gate | Two full-pipeline runs of a 10-section invoice fixture; CI budget only | Historical timings below; CI still asserts **< 5 s** per run |
 
 Page islands (`convert.NewBenchmarkPDFRequest`) are an **internal benchmark
@@ -47,7 +50,103 @@ or RSS guarantee.
 
 ---
 
-## Current capture (2026-09-11 perf-improve phase 7)
+## Current capture (2026-09-11 perf-time phase 7)
+
+This is the closure capture for the 0.2.6 perf-time plan
+(`plans/0.2.6/perf-time/phase-wise-checklist.md`), after the style,
+display-list, pagination, compression, and image-encode work landed. It is a
+**working-tree capture** on the uncommitted 0.2.6 tree; `VERSION` still reads
+0.2.5. Host: Linux amd64, 13th Gen Intel Core i7-13700HX (WSL2, 24 CPUs,
+7.6 GiB RAM). Toolchain: go1.26.4. Only the generic paths were measured;
+certified page islands are not part of any row.
+
+The warm matrix ran as **three independent fresh processes**; the standalone
+internal, public-library PDF, and public-library image rows are **three
+independent `1x` samples per workload**, one fresh process per sample,
+captured with `scripts/bench-performance-recovery.sh`. Each reported time is
+the median of the three raw values and `B/op` is one of the raw values, never
+an average. The CLI rows are this capture's `cli-rss` mode, gowkhtmltopdf
+only, the median of three timed process runs after one warmup; RSS is
+`/usr/bin/time %M` and stays separate from `B/op`. Raw rows, medians, drift
+controls, and the raw-to-published mapping:
+`plans/0.2.6/perf-time/results/phase-7/final-capture.md`. The rows are
+recorded as Snapshot M in
+[`testdata/golden/benchmarks/benchmark-results.txt`](../testdata/golden/benchmarks/benchmark-results.txt).
+
+### Perf-time rows
+
+| Row | 2 pages / 250 tiles | 500 pages / 500 tiles | Pre-time baseline | Result |
+|---|---:|---:|---:|---|
+| Internal generic PDF time, warm matrix | 5.50 ms (cold) | 733.48 ms | 1,228.72 ms | 1.68x faster |
+| Internal generic PDF B/op, warm matrix | 4,031,472 B (4.03 MB, cold) | 163,021,712 B (163.02 MB) | 234.92 MB | 30.6% below |
+| Internal generic PDF time, standalone median | 6.08 ms (cold) | 695.42 ms | 1,297.98 ms | 1.87x faster |
+| Internal generic PDF B/op, standalone median | 4,031,712 B (4.03 MB, cold) | 167,865,712 B (167.87 MB) | 235.50 MB | 28.6% below |
+| Internal generic PDF allocs/op, standalone median | 4,453 | 755,091 | 1.15M | |
+| Public library PDF time | 6.11 ms (cold) | 698.79 ms | 1,240.82 ms | 1.78x faster |
+| Public library PDF B/op | 4,048,000 B (4.05 MB, cold) | 169,650,976 B (169.65 MB) | 236.91 MB | 28.4% below |
+| Public library image time | 25.72 ms | 44.27 ms | 50.72 ms / 98.47 ms | 1.97x / 2.22x faster |
+| Public library image B/op | 14,296,096 B (14.30 MB) | 26,414,016 B (26.41 MB) | 14.45 MB / 26.73 MB | below both |
+| Public library image geometry | 1024x2056, 141,917 bytes | 1024x4040, 282,749 bytes | 94,352 / 188,268 bytes | lossless PNG about 50% larger |
+| CLI process time, cli-rss median | 0.01 s | 0.70 s | 1.32 s | 1.89x faster |
+| CLI process RSS, cli-rss median | 19,584 KiB | 147,264 KiB | 203,136 KiB | 27.5% below |
+
+### Acceptance verdict
+
+The plan's stretch target is a warm 500-page time at or below 615 ms, a CLI
+500-page time at or below 0.66 s, and a public-library PDF 500-page time at or
+below 620 ms, with `B/op` at or below 234.92 MB and image times at or below
+25 / 49 ms. The **allocation targets hold on every row**: the 500-page `B/op`
+is 163.02 MB on the warm matrix, 167.87 MB standalone, and 169.65 MB on the
+public library, 28.4 to 30.6 percent below the pre-time baselines. The
+**500-tile image target holds** at 44.27 ms.
+
+The time targets did not reproduce in this host window: warm 500p is 733.48 ms
+(matrix median) and 695.42 ms (standalone), public library PDF is 698.79 ms,
+and CLI 500p is 0.70 s. The plan's measured-lever floor (warm 500p at or below
+830 ms) holds. The implementation result on the same production source is the
+phase-6 capture 15 minutes earlier: 576.33 ms / 163,032,880 B, a **2.13x**
+speedup that meets the 615 ms stretch. Source hashes under `internal/layout`
+and `internal/pdf` match between the two captures except the unwired parallel
+prototype, and a no-prototype diagnostic binary measured the same band as the
+prototype binary, so the drift is the host window, not the tree. The 250-tile
+image median is 25.72 ms in this capture, 0.72 ms above the line; the phase-5b
+raw samples measured 24.15 ms for the same code.
+
+### Image time/size trade
+
+The 250 / 500 tile rows are 1.97x / 2.22x faster than the pre-time baselines
+(50.72 / 98.47 ms) and the encoded PNG grows about 50 percent: 94,352 to
+141,917 bytes at 250 tiles and 188,268 to 282,749 bytes at 500 tiles. The
+growth is the intended trade of the filter-none level-2 streaming writer
+(`internal/imageout/pngfast.go`) that replaced `image/png` adaptive filtering
+above the direct-raster threshold. PNG stays lossless and decoded pixels are
+bit-identical; the files stay far below the 32 MiB `maxImageEncoded` budget.
+See `plans/0.2.6/perf-time/results/image/image-time.md`.
+
+### Rejected concurrency design
+
+The phase-6 prototype rendered independent top-level sections in parallel and
+merged them deterministically. It passed the equivalence contract (op-for-op
+display lists, page counts, date-normalized PDF bytes, golden 65/65, B/op
+flat), but its best paired same-process gain was **5.4 percent** (serial
+596 ms versus 564 ms at W=2), below the required 15 percent floor, so it was
+**rejected for shipping** and production stays serial. Pipeline overlap
+(stage 2) was gated on stage 1 passing and was not attempted. The prototype
+and its differential tests stay in `internal/layout/parallel.go` and
+`internal/layout/parallel_test.go`; production never calls them. Full numbers:
+`plans/0.2.6/perf-time/results/phase-6/concurrency.md`.
+
+```sh
+./scripts/bench-performance-recovery.sh --mode=internal-pdf-warm --benchtime=1x --count=1 --out=plans/0.2.6/perf-time/results/phase-7/warm
+./scripts/bench-performance-recovery.sh --mode=internal-pdf --sizes=2,500 --benchtime=1x --count=1
+./scripts/bench-performance-recovery.sh --mode=public-pdf --sizes=2,500 --benchtime=1x --count=1
+./scripts/bench-performance-recovery.sh --mode=public-image --sizes=250,500 --benchtime=1x --count=1
+./scripts/bench-performance-recovery.sh --mode=cli-rss --sizes=2,100,500 --runs=3
+```
+
+---
+
+## Historical capture (2026-09-11 perf-improve phase 7)
 
 This is the closure capture for the 0.2.6 warm-path performance plan
 (`plans/0.2.6/perf-improve/phase-wise-checklist.md`), after the font, seal,

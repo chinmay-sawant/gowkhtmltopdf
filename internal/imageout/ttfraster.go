@@ -182,39 +182,55 @@ func drawGlyphAA(
 	originX := int(math.Round(basex + ent.originX))
 	originY := int(math.Round(basey + ent.originY))
 
+	// Clip the glyph rectangle against the canvas once instead of testing
+	// every pixel, then walk source and destination offsets incrementally.
 	bounds := ent.img.Bounds()
-	for row := bounds.Min.Y; row < bounds.Max.Y; row++ {
-		for pixelX := bounds.Min.X; pixelX < bounds.Max.X; pixelX++ {
-			alpha := ent.img.AlphaAt(pixelX, row).A
-			if alpha == 0 {
-				continue
-			}
+	clip := image.Rect(
+		originX+bounds.Min.X, originY+bounds.Min.Y,
+		originX+bounds.Max.X, originY+bounds.Max.Y,
+	).Intersect(dst.Bounds())
 
-			dstX, dstY := originX+pixelX, originY+row
-			if !image.Pt(dstX, dstY).In(dst.Bounds()) {
-				continue
-			}
+	if clip.Empty() {
+		return
+	}
 
-			srcA := uint32(alpha) * uint32(col.A) / channelMax
-			if srcA == 0 {
-				continue
-			}
+	for dstY := clip.Min.Y; dstY < clip.Max.Y; dstY++ {
+		srcOffset := ent.img.PixOffset(bounds.Min.X+clip.Min.X-originX, dstY-originY)
+		dstOffset := dst.PixOffset(clip.Min.X, dstY)
 
-			pixOff := dst.PixOffset(dstX, dstY)
-			dstR := uint32(dst.Pix[pixOff+0])
-			dstG := uint32(dst.Pix[pixOff+1])
-			dstB := uint32(dst.Pix[pixOff+2])
-			dstA := uint32(dst.Pix[pixOff+3])
-			invA := channelMax - srcA
-			//nolint:gosec // Over blend of byte channels stays in uint8 range
-			dst.Pix[pixOff+0] = uint8((uint32(col.R)*srcA + dstR*invA) / channelMax)
-			//nolint:gosec // Over blend of byte channels stays in uint8 range
-			dst.Pix[pixOff+1] = uint8((uint32(col.G)*srcA + dstG*invA) / channelMax)
-			//nolint:gosec // Over blend of byte channels stays in uint8 range
-			dst.Pix[pixOff+2] = uint8((uint32(col.B)*srcA + dstB*invA) / channelMax)
-			//nolint:gosec // Over blend of byte channels stays in uint8 range
-			dst.Pix[pixOff+3] = uint8(srcA + dstA*invA/channelMax)
+		blendGlyphRow(dst, dstOffset, ent.img.Pix[srcOffset:], col, clip.Dx())
+	}
+}
+
+// blendGlyphRow composites count alpha samples into consecutive NRGBA pixels
+// starting at dstOffset. The arithmetic is the original inline Over blend,
+// hoisted per row so the hot loop reads the run color once.
+func blendGlyphRow(dst *image.NRGBA, dstOffset int, alphaSamples []byte, col color.NRGBA, count int) {
+	colR, colG, colB, colA := uint32(col.R), uint32(col.G), uint32(col.B), uint32(col.A)
+
+	for index := range count {
+		alpha := alphaSamples[index]
+
+		if alpha != 0 {
+			srcA := uint32(alpha) * colA / channelMax
+			if srcA != 0 {
+				dstR := uint32(dst.Pix[dstOffset+0])
+				dstG := uint32(dst.Pix[dstOffset+1])
+				dstB := uint32(dst.Pix[dstOffset+2])
+				dstA := uint32(dst.Pix[dstOffset+3])
+				invA := channelMax - srcA
+				//nolint:gosec // Over blend of byte channels stays in uint8 range
+				dst.Pix[dstOffset+0] = uint8((colR*srcA + dstR*invA) / channelMax)
+				//nolint:gosec // Over blend of byte channels stays in uint8 range
+				dst.Pix[dstOffset+1] = uint8((colG*srcA + dstG*invA) / channelMax)
+				//nolint:gosec // Over blend of byte channels stays in uint8 range
+				dst.Pix[dstOffset+2] = uint8((colB*srcA + dstB*invA) / channelMax)
+				//nolint:gosec // Over blend of byte channels stays in uint8 range
+				dst.Pix[dstOffset+3] = uint8(srcA + dstA*invA/channelMax)
+			}
 		}
+
+		dstOffset += 4
 	}
 }
 

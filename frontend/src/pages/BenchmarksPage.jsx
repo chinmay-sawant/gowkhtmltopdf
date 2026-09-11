@@ -18,7 +18,7 @@ import {
   INPROC_PDF_GENERIC_HISTORY,
   INPROC_TEMPLATE_GENERIC_HISTORY,
   INPROC_WEB_FETCH_HISTORY,
-  PERF_IMPROVE_CAPTURE,
+  PERF_TIME_CAPTURE,
   PUPPETEER_ROWS,
   SNAPSHOT,
   WEASYPRINT_ROWS,
@@ -662,7 +662,7 @@ export default function BenchmarksPage() {
       <section className="bench-section" aria-labelledby="bench-inproc-heading">
         <div className="section-heading-row">
           <h2 id="bench-inproc-heading">
-            In-process Go benchmarks ({PERF_IMPROVE_CAPTURE.date} {PERF_IMPROVE_CAPTURE.label})
+            In-process Go benchmarks ({PERF_TIME_CAPTURE.date} {PERF_TIME_CAPTURE.label})
           </h2>
           <p className="section-aside">
             Three independent <code>1x</code> samples per workload, one fresh process per sample.
@@ -671,24 +671,25 @@ export default function BenchmarksPage() {
           </p>
         </div>
         <InprocTable
-          heading="PDF pages (generic request, perf-improve capture)"
+          heading="PDF pages (generic request, perf-time closure capture)"
           rows={INPROC_PDF_GENERIC}
           unit="Pages"
         />
         <RelativeTimingTable
-          heading="In-process PDF multiplier vs wkhtmltopdf CLI (phase-7 rows; 2026-09-11 CLI baseline)"
+          heading="In-process PDF multiplier vs wkhtmltopdf CLI (perf-time rows; 2026-09-11 CLI baseline)"
           rows={INPROC_PDF_GENERIC}
           pathLabel="in-process Go PDF"
         />
         <p className="section-aside bench-explanation">
           The 2-page rows are fresh-process samples and carry the one-time default-font work (about
-          2.7 MB for the internal path), so they are not like-for-like with the historical
-          multi-iteration matrix below. The warm 500-page internal <code>B/op</code> now meets the
-          240 MB acceptance (235.50 MB standalone median; 234.92 MB warm matrix) and sits below the
-          0.2.4 237.76 MB row; the 500-page warm time (1,297.98 ms standalone median; 1,228.72 ms
-          warm matrix) is still above the 1.010 s Snapshot I row and the 1.10 s acceptance. The
-          public image 250 and 500 tile rows are 30.1% and 48.6% below their 0.2.4 <code>B/op</code>{' '}
-          rows. Raw samples: <code>{PERF_IMPROVE_CAPTURE.raw}</code>.
+          4.0 MB for the internal path), so they are not like-for-like with the historical
+          multi-iteration matrix below. The 500-page internal <code>B/op</code> is 28.4% to 30.6%
+          below the pre-time baselines. The closure window ran slower on wall time than the phase-6
+          capture 15 minutes earlier (733.48 ms versus 576.33 ms at 500 pages) with identical
+          production source hashes and identical <code>B/op</code>; the phase-6 row is the 2.13x
+          result and met the 615 ms target, the plan floor of 830 ms holds in the closure rows. The
+          image rows trade about 50% more lossless PNG bytes for roughly 2x faster encoding. Raw
+          samples: <code>{PERF_TIME_CAPTURE.raw}</code>.
         </p>
         <h3 className="table-block-heading">Historical full matrix ({HISTORY_DATE}, 0.2.4)</h3>
         <InprocTable
@@ -716,7 +717,7 @@ export default function BenchmarksPage() {
       <section className="bench-section" aria-labelledby="bench-library-heading">
         <div className="section-heading-row">
           <h2 id="bench-library-heading">
-            Public Go library benchmarks ({PERF_IMPROVE_CAPTURE.date} {PERF_IMPROVE_CAPTURE.label})
+            Public Go library benchmarks ({PERF_TIME_CAPTURE.date} {PERF_TIME_CAPTURE.label})
           </h2>
           <p className="section-aside">
             <code>make bench-lib</code> calls <code>Document.WritePDF</code> and{' '}
@@ -724,13 +725,13 @@ export default function BenchmarksPage() {
             HTML from disk.
           </p>
         </div>
-        <InprocTable heading="Public PDF pages (perf-improve capture)" rows={LIBRARY_PDF} unit="Pages" />
+        <InprocTable heading="Public PDF pages (perf-time closure capture)" rows={LIBRARY_PDF} unit="Pages" />
         <RelativeTimingTable
-          heading="Public library PDF multiplier vs wkhtmltopdf CLI (phase-7 rows; 2026-09-11 CLI baseline)"
+          heading="Public library PDF multiplier vs wkhtmltopdf CLI (perf-time rows; 2026-09-11 CLI baseline)"
           rows={LIBRARY_PDF}
           pathLabel="public Go library PDF"
         />
-        <InprocTable heading="Public image tiles (perf-improve capture)" rows={LIBRARY_IMAGE} unit="Tiles" />
+        <InprocTable heading="Public image tiles (perf-time closure capture)" rows={LIBRARY_IMAGE} unit="Tiles" />
         <h3 className="table-block-heading">Historical full matrix ({HISTORY_DATE}, 0.2.4)</h3>
         <InprocTable heading="Public PDF pages (2026-08-19)" rows={LIBRARY_PDF_HISTORY} unit="Pages" />
         <InprocTable

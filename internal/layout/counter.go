@@ -388,7 +388,7 @@ func cascadedProp(ctx *styleContext, node *html.Node, prop string) string {
 
 func winningPropHit(best *contentHit, hits []ruleHit, prop string) *contentHit {
 	for _, rowH := range hits {
-		for _, decl := range rowH.r.Decls {
+		for _, decl := range rowH.rule.Decls {
 			if !strings.EqualFold(decl.Prop, prop) {
 				continue
 			}
@@ -398,7 +398,7 @@ func winningPropHit(best *contentHit, hits []ruleHit, prop string) *contentHit {
 				a:         rowH.a,
 				b:         rowH.b,
 				c:         rowH.c,
-				order:     rowH.r.Order,
+				order:     rowH.rule.Order,
 				important: decl.Important,
 			}
 			if betterContentHit(hit, best) {

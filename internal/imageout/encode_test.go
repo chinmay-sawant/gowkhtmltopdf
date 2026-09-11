@@ -85,7 +85,7 @@ func TestEncodeCopiesOutOfThePooledBuffer(t *testing.T) {
 
 	first := makeYCbCrProbeImage(image.Rect(0, 0, 32, 24), true)
 
-	firstBytes, err := encode(first, formatJPG, 80)
+	firstBytes, err := encode(first, formatJPG, 80, false)
 	if err != nil {
 		t.Fatalf("first encode: %v", err)
 	}
@@ -93,7 +93,7 @@ func TestEncodeCopiesOutOfThePooledBuffer(t *testing.T) {
 	snapshot := slices.Clone(firstBytes)
 
 	second := makeYCbCrProbeImage(image.Rect(0, 0, 32, 24), false)
-	if _, err := encode(second, formatJPG, 80); err != nil {
+	if _, err := encode(second, formatJPG, 80, false); err != nil {
 		t.Fatalf("second encode: %v", err)
 	}
 

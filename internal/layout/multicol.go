@@ -471,8 +471,8 @@ func (e *engine) placeMulticolAnonColumns(
 			continue
 		}
 		if col > 0 {
-			e.ops[k].X += float64(col) * (colW + gap)
-			e.ops[k].Y -= float64(col) * bandH
+			shiftOpX(&e.ops[k], float64(col)*(colW+gap))
+			shiftOpY(&e.ops[k], -float64(col)*bandH)
 		}
 		if (e.ops[k].Kind == OpText || e.ops[k].Kind == OpBullet) && e.ops[k].Y < colMinY[col] {
 			colMinY[col] = e.ops[k].Y
@@ -491,7 +491,7 @@ func (e *engine) placeMulticolAnonColumns(
 		if a.col < 1 || math.IsInf(colMinY[a.col], 1) {
 			continue
 		}
-		e.ops[a.idx].Y -= colMinY[a.col] - anchor
+		shiftOpY(&e.ops[a.idx], -(colMinY[a.col] - anchor))
 	}
 
 	used := bandH
@@ -512,7 +512,7 @@ func (e *engine) placeMulticolAnonColumns(
 	limit := top + used
 	for _, a := range assigns {
 		op := &e.ops[a.idx]
-		if op.Kind == OpLine || op.Kind == OpStrokeRect {
+		if op.Kind == OpLine || op.Kind == OpStrokeRect || op.Kind == OpGridRun {
 			continue
 		}
 		if a.col < 0 || op.Y >= limit-0.01 {

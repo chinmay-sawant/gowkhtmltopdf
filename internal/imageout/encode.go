@@ -5,42 +5,67 @@ import (
 	"fmt"
 	"image"
 	"image/jpeg"
-	"image/png"
 	"slices"
 	"sync"
 )
 
-// encode serializes img as PNG or JPEG. quality applies to JPEG only
-// (1..100); PNG is lossless and ignores it. The scratch buffer is pooled and
-// bounded by maxImageEncoded, and the encoded bytes are copied out before the
-// buffer returns to the pool, so callers own an independent slice and a
-// failed encode can never leak partial output.
-func encode(img image.Image, format string, quality int) ([]byte, error) {
-	buf := encodeBufferPool.Get().(*limitedImageBuffer) //nolint:forcetypeassert // the pool only stores this type
-	buf.Reset()
+// encode serializes img as PNG or JPEG and returns owned bytes. quality applies
+// to JPEG only (1..100); PNG is lossless and ignores it. opaque reports a
+// caller guarantee that every pixel alpha is 255; a false report makes the PNG
+// path scan the canvas, so the hint can only save the scan, never drop alpha.
+//
+// encodeBufferPool bounds the scratch at maxImageEncoded and encode copies the
+// result out before the buffer returns to the pool, so callers own an
+// independent slice and a failed encode can never leak partial output. Callers
+// that can write the bytes out before returning (writeEncodedOutput) use
+// encodeInto with acquireEncodeBuffer to skip that copy.
+func encode(img image.Image, format string, quality int, opaque bool) ([]byte, error) {
+	buf := acquireEncodeBuffer()
+	defer releaseEncodeBuffer(buf)
 
-	defer func() {
-		buf.Reset()
-
-		if cap(buf.Bytes()) <= maxImageEncoded {
-			encodeBufferPool.Put(buf)
-		}
-	}()
-
-	switch format {
-	case formatPNG:
-		if err := png.Encode(buf, img); err != nil {
-			return nil, fmt.Errorf("png encode: %w", err)
-		}
-	case formatJPG:
-		if err := jpeg.Encode(buf, ycbcr420FastPath(img), &jpeg.Options{Quality: clampJPEGQuality(quality)}); err != nil {
-			return nil, fmt.Errorf("jpeg encode: %w", err)
-		}
-	default:
-		return nil, fmt.Errorf("%w %q", errUnsupportedFmt, format)
+	if err := encodeInto(buf, img, format, quality, opaque); err != nil {
+		return nil, err
 	}
 
 	return slices.Clone(buf.Bytes()), nil
+}
+
+// encodeInto serializes img into buf. The buffer belongs to the caller, who
+// must release it through releaseEncodeBuffer after the bytes are no longer
+// needed; nothing here resets or returns it.
+func encodeInto(buf *limitedImageBuffer, img image.Image, format string, quality int, opaque bool) error {
+	switch format {
+	case formatPNG:
+		if err := encodePNG(buf, img, opaque); err != nil {
+			return fmt.Errorf("png encode: %w", err)
+		}
+	case formatJPG:
+		if err := jpeg.Encode(buf, ycbcr420FastPath(img), &jpeg.Options{Quality: clampJPEGQuality(quality)}); err != nil {
+			return fmt.Errorf("jpeg encode: %w", err)
+		}
+	default:
+		return fmt.Errorf("%w %q", errUnsupportedFmt, format)
+	}
+
+	return nil
+}
+
+// acquireEncodeBuffer takes one pooled scratch buffer, already reset.
+func acquireEncodeBuffer() *limitedImageBuffer {
+	buf := encodeBufferPool.Get().(*limitedImageBuffer) //nolint:forcetypeassert // the pool only stores this type
+	buf.Reset()
+
+	return buf
+}
+
+// releaseEncodeBuffer clears buf and returns it to the pool unless its capacity
+// outgrew maxImageEncoded, which would pin more memory than the cap allows.
+func releaseEncodeBuffer(buf *limitedImageBuffer) {
+	buf.Reset()
+
+	if cap(buf.Bytes()) <= maxImageEncoded {
+		encodeBufferPool.Put(buf)
+	}
 }
 
 // clampJPEGQuality bounds a requested JPEG quality to the 1..100 range. PNG
@@ -102,8 +127,9 @@ func newLimitedImageBuffer(limit int) *limitedImageBuffer {
 	return &limitedImageBuffer{Buffer: bytes.Buffer{}, limit: limit}
 }
 
-// encodeBufferPool recycles encode scratch across conversions. encode drops
-// buffers whose capacity outgrew maxImageEncoded instead of pinning them.
+// encodeBufferPool recycles encode scratch across conversions.
+// releaseEncodeBuffer drops buffers whose capacity outgrew maxImageEncoded
+// instead of pinning them.
 //
 //nolint:gochecknoglobals // bounded encode scratch recycling
 var encodeBufferPool = sync.Pool{

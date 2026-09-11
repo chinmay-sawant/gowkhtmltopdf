@@ -23,17 +23,40 @@ func (e *engine) markOpsFixed(start, end int) {
 func appendBorderLineOps(
 	dst []Op, posX, posY, boxW, boxH, width float64, style string, red, green, blue float64,
 ) []Op {
+	var buf [8]GridSeg
+
+	segs := appendBorderLineSegments(buf[:0], posX, posY, boxW, boxH, width, style, red, green, blue)
+	for idx := range segs {
+		dst = append(dst, gridSegOp(segs[idx]))
+	}
+
+	return dst
+}
+
+// appendBorderLineSegments appends one border edge as grid segments: one
+// segment for solid styles, the expanded dash/dot run otherwise.
+func appendBorderLineSegments(
+	dst []GridSeg, posX, posY, boxW, boxH, width float64, style string, red, green, blue float64,
+) []GridSeg {
 	if width <= 0 || style == cssDisplayNone || (boxW <= 0 && boxH <= 0) {
 		return dst
 	}
 
 	if style != borderStyleDashed && style != borderStyleDotted {
-		return append(dst, Op{ //nolint:exhaustruct // intentional zero fields
-			Kind: OpLine, X: posX, Y: posY, W: boxW, H: boxH, Width: width, R: red, G: green, B: blue,
-		})
+		return append(dst, GridSeg{X: posX, Y: posY, W: boxW, H: boxH, Width: width, R: red, G: green, B: blue})
 	}
 
-	return appendDashedLineSegments(dst, posX, posY, boxW, boxH, width, style == borderStyleDotted, red, green, blue)
+	return appendDashedLineGridSegments(
+		dst, posX, posY, boxW, boxH, width, style == borderStyleDotted, red, green, blue,
+	)
+}
+
+// gridSegOp converts one grid segment into the OpLine it stands for.
+func gridSegOp(seg GridSeg) Op {
+	return Op{ //nolint:exhaustruct // intentional zero fields
+		Kind: OpLine, X: seg.X, Y: seg.Y, W: seg.W, H: seg.H,
+		Width: seg.Width, R: seg.R, G: seg.G, B: seg.B, LineInset: seg.LineInset,
+	}
 }
 
 func appendBorderLineOpsForSide(
@@ -89,10 +112,11 @@ func borderSideOpCount(length, width float64, style string) int {
 	return segments
 }
 
-// appendDashedLineSegments expands a dashed/dotted border edge into segment ops.
-func appendDashedLineSegments(
-	dst []Op, posX, posY, boxW, boxH, width float64, dotted bool, red, green, blue float64,
-) []Op {
+// appendDashedLineGridSegments expands a dashed/dotted border edge into grid
+// segments.
+func appendDashedLineGridSegments(
+	dst []GridSeg, posX, posY, boxW, boxH, width float64, dotted bool, red, green, blue float64,
+) []GridSeg {
 	horizontal := boxW > 0
 	length := boxW
 
@@ -104,7 +128,7 @@ func appendDashedLineSegments(
 
 	if cap(dst)-len(dst) < n {
 		// Grow once for the expected segment count.
-		grown := make([]Op, len(dst), len(dst)+n)
+		grown := make([]GridSeg, len(dst), len(dst)+n)
 		copy(grown, dst)
 		dst = grown
 	}
@@ -120,8 +144,8 @@ func appendDashedLineSegments(
 			segX, segY, segW, segH = posX, posY+pos, 0.0, seg
 		}
 
-		dst = append(dst, Op{ //nolint:exhaustruct // intentional zero fields
-			Kind: OpLine, X: segX, Y: segY, W: segW, H: segH,
+		dst = append(dst, GridSeg{
+			X: segX, Y: segY, W: segW, H: segH,
 			Width: width, R: red, G: green, B: blue,
 		})
 	}
@@ -130,26 +154,13 @@ func appendDashedLineSegments(
 }
 
 // emitBorderLine appends one edge's border segments straight onto e.ops —
-// no intermediate []Op (hot path for collapsed table grids).
+// no intermediate []Op (hot path for box borders).
 func (e *engine) emitBorderLine(posX, posY, boxW, boxH, width float64, style string, red, green, blue float64) {
-	if width <= 0 || style == cssDisplayNone || (boxW <= 0 && boxH <= 0) {
-		return
-	}
+	var buf [8]GridSeg
 
-	if style != borderStyleDashed && style != borderStyleDotted {
-		e.add(Op{ //nolint:exhaustruct // intentional zero fields
-			Kind: OpLine, X: posX, Y: posY, W: boxW, H: boxH, Width: width, R: red, G: green, B: blue,
-		})
-
-		return
-	}
-
-	// Dashed/dotted: append into a tiny stack buffer then emit.
-	var buf [8]Op
-
-	segs := appendDashedLineSegments(buf[:0], posX, posY, boxW, boxH, width, style == borderStyleDotted, red, green, blue)
+	segs := appendBorderLineSegments(buf[:0], posX, posY, boxW, boxH, width, style, red, green, blue)
 	for i := range segs {
-		e.add(segs[i])
+		e.add(gridSegOp(segs[i]))
 	}
 }
 

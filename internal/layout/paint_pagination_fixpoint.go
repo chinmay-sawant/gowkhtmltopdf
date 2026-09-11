@@ -1,8 +1,10 @@
 package layout
 
 import (
+	"cmp"
 	"context"
 	"fmt"
+	"slices"
 )
 
 // paginateOps assigns every op a page. Crossing text/image/link ops snap to
@@ -25,6 +27,7 @@ func paginateOps(ctx context.Context, res *Result, contentH float64) error {
 	}
 
 	ensureFlowIndex(res, contentH)
+	res.buildPaginationCensus()
 	// Resolve forced section starts before snapping text to provisional page
 	// boundaries. Otherwise a row near the boundary of the unbroken flow can
 	// move its text alone; a later page-break-before shift then leaves the
@@ -95,19 +98,28 @@ func settleBeforeAlways(ctx context.Context, res *Result, contentH float64) erro
 // anything or the iteration cap is reached. ctx is checked once per
 // iteration: each iteration is a full display-list pass, so a check keeps
 // cancellation latency under one pass instead of ten.
+//
+//nolint:cyclop // policy gates add explicit branches to the fixpoint
 func paginationFixpoint(ctx context.Context, res *Result, contentH float64) error {
 	for range 10 {
 		if err := ctx.Err(); err != nil {
 			return fmt.Errorf("layout: pagination fixpoint: %w", err)
 		}
 
-		changed := avoidInside(res, contentH)
+		changed := false
+
+		if res.hasAvoidInside {
+			changed = avoidInside(res, contentH)
+		}
+
 		if beforeAlways(res, contentH) {
 			changed = true
 		}
 
-		if afterBreaks(res, contentH) {
-			changed = true
+		if res.hasAfterBreak {
+			if afterBreaks(res, contentH) {
+				changed = true
+			}
 		}
 
 		if rowsIntact(res, contentH) {
@@ -128,6 +140,54 @@ func paginationFixpoint(ctx context.Context, res *Result, contentH float64) erro
 	}
 
 	return nil
+}
+
+// buildPaginationCensus records the style-only facts the fixpoint policies
+// branch on, so a policy that cannot fire does not walk the whole box tree
+// every iteration. The facts are static: they read styles and structure, not
+// positions, so one walk per Paint is enough even when the fixpoint loops.
+//
+// hasAvoidInside mirrors avoidInside's guard exactly:
+// !boxInsideTable(b) && b.height > 0 && isAvoidInsideBreak(b.style).
+// hasAfterBreak is conservative: it is set whenever any box declares
+// page-break-after: always|avoid, which is the only way afterBreaks can move
+// anything.
+func (res *Result) buildPaginationCensus() {
+	if res == nil {
+		return
+	}
+
+	res.hasAvoidInside = false
+	res.hasAfterBreak = false
+
+	if res.root == nil {
+		return
+	}
+
+	for _, boxNode := range flowBoxList(res) {
+		res.censusBox(boxNode)
+
+		if res.hasAvoidInside && res.hasAfterBreak {
+			return
+		}
+	}
+}
+
+// censusBox folds one box into the census flags.
+func (res *Result) censusBox(boxNode *box) {
+	if boxNode.style == nil {
+		return
+	}
+
+	if !res.hasAvoidInside && boxNode.height > 0 &&
+		!boxInsideTable(boxNode) && isAvoidInsideBreak(boxNode.style) {
+		res.hasAvoidInside = true
+	}
+
+	switch boxNode.style.PageBreakAfter {
+	case pageBreakAlways, pageBreakAvoid:
+		res.hasAfterBreak = true
+	}
 }
 
 // snapCrossingTextOps moves text/image/link ops that cross a page boundary to
@@ -159,7 +219,7 @@ func snapCrossingTextOps(ctx context.Context, res *Result, contentH float64) err
 			if paintOp.Y+opH > boundary+1e-9 {
 				snapOpToBoundary(res, idx, paintOp, boundary)
 			}
-		case OpFillRect, OpStrokeRect, OpLine, OpUnknown, opKindNoop:
+		case OpFillRect, OpStrokeRect, OpLine, OpGridRun, OpUnknown, opKindNoop:
 		}
 	}
 
@@ -168,6 +228,13 @@ func snapCrossingTextOps(ctx context.Context, res *Result, contentH float64) err
 
 type paintRange struct{ first, last int }
 
+// tablePaintRanges returns the table op spans prepared for stabbing queries:
+// sorted by first index, with each last replaced by the prefix maximum. The
+// caller's membership test is then a binary search plus one comparison, so
+// 174,000 queries cost O(log tables) each instead of an 87M-check scan.
+//
+// The spans are nested or disjoint (a table's range contains its descendants),
+// so the prefix maximum over first-sorted spans equals the union membership.
 func tablePaintRanges(res *Result) []paintRange {
 	if res == nil || res.root == nil {
 		return nil
@@ -183,17 +250,34 @@ func tablePaintRanges(res *Result) []paintRange {
 		ranges = append(ranges, paintRange{first: boxNode.opStart, last: boxNode.opEnd})
 	}
 
+	slices.SortFunc(ranges, func(left, right paintRange) int {
+		return cmp.Compare(left.first, right.first)
+	})
+
+	for idx := 1; idx < len(ranges); idx++ {
+		if ranges[idx].last < ranges[idx-1].last {
+			ranges[idx].last = ranges[idx-1].last
+		}
+	}
+
 	return ranges
 }
 
 func opInPaintRange(index int, ranges []paintRange) bool {
-	for _, span := range ranges {
-		if index >= span.first && index <= span.last {
-			return true
+	low, high := 0, len(ranges)-1
+	candidate := -1
+
+	for low <= high {
+		mid := int(uint(low+high) >> 1) //nolint:gosec // bounded by the range slice length
+		if ranges[mid].first <= index {
+			candidate = mid
+			low = mid + 1
+		} else {
+			high = mid - 1
 		}
 	}
 
-	return false
+	return candidate >= 0 && ranges[candidate].last >= index
 }
 
 // snapAscenderRatio reserves ascender room above snapped text so snapped
@@ -244,7 +328,7 @@ func snapOpForward(res *Result, idx int, paintOp *Op, boundary float64) {
 	for _, j := range chrome {
 		o := &res.Ops[j]
 		if o.Y < oldY-layoutCoordEpsilon {
-			o.Y += deltaY
+			shiftOpY(o, deltaY)
 		}
 	}
 }
@@ -276,7 +360,7 @@ func shiftNearestOwnedChrome(res *Result, opIndex int, oldY, deltaY float64) {
 				continue
 			}
 
-			chromeOp.Y += deltaY
+			shiftOpY(chromeOp, deltaY)
 			moved = true
 		}
 		if moved {
