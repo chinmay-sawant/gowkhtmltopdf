@@ -199,3 +199,32 @@ Publication: Snapshot M in `testdata/golden/benchmarks/benchmark-results.txt`,
 `testdata/golden/benchmarks/README.md`, `documentation/performance.md`, the
 frontend data and pages with a rebuilt `docs/`, and the knowledge base
 synthesis `knowledge-base/wiki/syntheses/performance-time-0.2.6.md`.
+
+## post-publication defect and fix (2026-09-12)
+
+Fixture-29 (`testdata/golden/fixture-29-float-beside-table.html`) painted the
+floated infobox border grid at the left content edge while the table's text and
+fills sat at the right. Regression from PERFT-10: collapsed row grids became
+`OpGridRun` values with the painted coordinates in `Grid.Segs`, and
+`shiftBoxOps` (`internal/layout/layout_flow.go:1124`) still translated only
+`Op.X/Y`. A `float:right` table lays out at the content edge and is shifted
+after build by `placeFloat`, so its grid segments never moved. First bad commit:
+`ca761bb`. The committed sample PDF predates that commit, so the stale sample
+looked correct while HEAD code regressed; the golden corpus checks structure
+(page envelope, needles, fonts), not border geometry.
+
+- [x] Fix `shiftBoxOps` to translate ops through the existing `shiftOpX` and
+  `shiftOpY` helpers, which carry `Grid.Segs` with the bounding box. Regression
+  test `TestFloatRightCollapsedTableGridShiftsWithFloat`
+  (`internal/layout/float_table_test.go`) fails on the pre-fix code with
+  `grid line x=0.00 is left of floated table x=240.00` and passes after.
+  Proof: `go test ./internal/layout/ -count=1`, `make golden` 65/65,
+  `make test` all packages, `make claim-scan` clean. Rendered fixture geometry
+  moved from x 29.35..187.35 (left margin) to x 407.93..565.93 (float
+  position), matching the header fill and cell text.
+
+Residual risk, same shift shape but not reachable from `internal/convert`:
+`shiftStickyOps` (`internal/layout/sticky.go:158`) and `mergeParallelParts`
+(`internal/layout/parallel.go:424`) also translate `Op.X/Y` without
+`Grid.Segs`. `ParallelLayout` is opt-in and unwired; a sticky collapsed table
+has no repro test yet. Parked for a follow-up.

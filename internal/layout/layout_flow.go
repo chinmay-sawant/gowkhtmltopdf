@@ -1117,7 +1117,10 @@ func minY(a, b float64) float64 {
 
 // shiftBoxOps translates every op in b's op range by (dx, dy).
 // Deferred chrome owned by b's subtree is shifted too so finalizeChrome
-// places backgrounds/borders at the post-move geometry.
+// places backgrounds/borders at the post-move geometry. Grid-run ops shift
+// their segments with the bounding box (shiftOpX/shiftOpY), so collapsed
+// table borders move with a floated table instead of staying at the
+// build-time position.
 func (e *engine) shiftBoxOps(boxNode *box, deltaX, deltaY float64) {
 	if deltaX == 0 && deltaY == 0 || boxNode == nil {
 		return
@@ -1125,8 +1128,8 @@ func (e *engine) shiftBoxOps(boxNode *box, deltaX, deltaY float64) {
 
 	if boxNode.opEnd >= boxNode.opStart {
 		for k := boxNode.opStart; k <= boxNode.opEnd && k < len(e.ops); k++ {
-			e.ops[k].X += deltaX
-			e.ops[k].Y += deltaY
+			shiftOpX(&e.ops[k], deltaX)
+			shiftOpY(&e.ops[k], deltaY)
 		}
 	}
 
