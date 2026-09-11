@@ -944,6 +944,8 @@ func (d *Document) unionFontRunes() {
 			continue
 		}
 
+		fnt.ensureParsed()
+
 		type0 := needsType0(runes)
 		d.fontType0[name] = type0
 

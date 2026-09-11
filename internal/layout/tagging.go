@@ -51,6 +51,10 @@ func buildStructureTree(doc *pdf.Document, res *Result) error {
 		}
 	}
 
+	// The ops now carry document-owned structure elements. A later non-UA
+	// repaint must clear them before reuse.
+	res.hasStructElems = true
+
 	return associateUnmappedOps(doc, res.Ops, docElem)
 }
 

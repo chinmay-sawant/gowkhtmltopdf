@@ -140,7 +140,73 @@ GOWKHTMLTOPDF_GENERATE_BENCHMARK_OUTPUTS=1 \
 This writes `live-movie-listing-010.pdf` and
 `live-movie-listing-010.png`.
 
-## Current snapshot (2026-09-11 performance-recovery capture)
+## Current snapshot (2026-09-11 perf-improve phase-7 capture)
+
+Host: Linux amd64, 13th Gen Intel Core i7-13700HX (WSL2, 24 CPUs, 7.6 GiB
+RAM). Toolchain: go1.26.4. The capture ran on the uncommitted 0.2.6 warm-path
+working tree after phases 2 to 6 landed. `VERSION` still reads **0.2.5**, so
+this is a working-tree measurement, not a released build.
+
+The in-process and public-library rows are three independent `1x` samples per
+workload, one fresh process per sample (`--benchtime=1x --count=1`), captured
+with `scripts/bench-performance-recovery.sh`; the warm matrix runs the full
+ascending size list in one process. Each reported time is the median of the
+three raw samples; `B/op` is one of the raw values and is never averaged. The
+CLI row is this capture's `cli-rss` mode (gowkhtmltopdf only), the median of
+three timed runs after one warmup. `B/op` is cumulative allocation traffic,
+not peak RSS. Cold rows are the first conversion in a fresh process and are
+labeled where they appear.
+
+```sh
+./scripts/bench-performance-recovery.sh --mode=internal-pdf-warm --benchtime=1x --count=1 --out=plans/0.2.6/perf-improve/results/phase-7/warm
+./scripts/bench-performance-recovery.sh --mode=internal-pdf --sizes=2,500 --benchtime=1x --count=1 --out=plans/0.2.6/perf-improve/results/phase-7/sample1
+./scripts/bench-performance-recovery.sh --mode=public-pdf --sizes=2,500 --benchtime=1x --count=1 --out=plans/0.2.6/perf-improve/results/phase-7/sample1
+./scripts/bench-performance-recovery.sh --mode=public-image --sizes=250,500 --benchtime=1x --count=1 --out=plans/0.2.6/perf-improve/results/phase-7/sample1
+./scripts/bench-performance-recovery.sh --mode=cli-rss --sizes=2,100,500 --runs=3 --out=plans/0.2.6/perf-improve/results/phase-7/cli
+```
+
+`sample1` is shown; `sample2` and `sample3` ran the same commands into their
+own directories. Every command exited 0.
+
+### Perf-improve rows (generic paths only)
+
+| Row | 2 pages / 250 tiles | 500 pages / 500 tiles | Snapshot I / 0.2.4 row | Result |
+|---|---:|---:|---:|---|
+| Internal generic PDF time, warm matrix | 6.69 ms (cold) | 1,228.72 ms | 1,010 ms | above the row |
+| Internal generic PDF B/op, warm matrix | 2,665,064 B (2.67 MB, cold) | 234,923,560 B (234.92 MB) | 237.76 MB | 1.19% below |
+| Internal generic PDF time, standalone median | 6.11 ms (cold) | 1,297.98 ms | 1,010 ms | above the row |
+| Internal generic PDF B/op, standalone median | 2,665,080 B (2.67 MB, cold) | 235,496,640 B (235.50 MB) | 237.76 MB | 0.95% below |
+| Internal generic PDF allocs/op, standalone median | 6,170 | 1,225,356 | 1.15M | |
+| Public library PDF time | 7.14 ms (cold) | 1,240.82 ms | 1,104.51 ms | above the row |
+| Public library PDF B/op | 2,680,016 B (2.68 MB, cold) | 236,911,328 B (236.91 MB) | 236.85 MB | 0.03% above, parity |
+| Public library image time | 50.72 ms | 98.47 ms | n/a | |
+| Public library image B/op | 14,446,240 B (14.45 MB) | 26,730,968 B (26.73 MB) | 20.66 MB / 52.00 MB | 30.1% / 48.6% below |
+| Public library image geometry | 1024x2056, 94,352 bytes | 1024x4040, 188,268 bytes | unchanged | |
+| CLI process time, cli-rss median | 0.01 s | 1.32 s | 1,042 ms | above the row |
+| CLI process RSS, cli-rss median | 17,472 KiB | 203,136 KiB | 208,128 KiB | 2.4% below |
+
+The acceptance is a warm 500-page `B/op` at or below 240 MB and a warm
+500-page time at or below 1.10 s. The allocation target **is met**: 234.92 MB
+on the warm matrix, 235.50 MB on the standalone median, and 236.91 MB on the
+public library median. The internal rows are slightly below the 0.2.4
+237.76 MB row; the public library row is at parity with its 236.85 MB row. The
+time target **is not met**: the warm matrix is 1,228.72 ms and the standalone
+median is 1,297.98 ms, above both the 1.10 s line and the 1.010 s Snapshot I
+row. Against the pre-improve 2026-09-11 warm capture, warm 500-page matrix
+time improved by 17.5 percent (1,489.42 ms to 1,228.72 ms) and warm 500-page
+matrix `B/op` by 26.9 percent (321.31 MB to 234.92 MB). Raw rows, medians, and
+the full verdict: `plans/0.2.6/perf-improve/results/phase-7/final-capture.md`.
+The same rows are recorded as Snapshot L in
+[`benchmark-results.txt`](benchmark-results.txt).
+
+The CLI rows above are this capture's `cli-rss` mode, which runs
+gowkhtmltopdf only, so they are not the `make bench-cli-compare` boundary; the
+wkhtmltopdf comparison table remains in the historical 2026-09-11 recovery
+section below. The 2-page and 250-tile rows are fresh-process `1x` samples, so
+the one-time default-font work is charged to the single operation; they are
+cold rows and are not like-for-like with multi-iteration matrix rows.
+
+## Historical snapshot (2026-09-11 performance-recovery capture)
 
 Host: Linux amd64, 13th Gen Intel Core i7-13700HX (WSL2, 24 CPUs, 7.6 GiB
 RAM). Toolchain: go1.26.4. The capture ran on the uncommitted 0.2.6

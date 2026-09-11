@@ -18,8 +18,8 @@ import {
   INPROC_PDF_GENERIC_HISTORY,
   INPROC_TEMPLATE_GENERIC_HISTORY,
   INPROC_WEB_FETCH_HISTORY,
+  PERF_IMPROVE_CAPTURE,
   PUPPETEER_ROWS,
-  RECOVERY_DATE,
   SNAPSHOT,
   WEASYPRINT_ROWS,
   formatKiB,
@@ -662,7 +662,7 @@ export default function BenchmarksPage() {
       <section className="bench-section" aria-labelledby="bench-inproc-heading">
         <div className="section-heading-row">
           <h2 id="bench-inproc-heading">
-            In-process Go benchmarks ({RECOVERY_DATE} recovery capture)
+            In-process Go benchmarks ({PERF_IMPROVE_CAPTURE.date} {PERF_IMPROVE_CAPTURE.label})
           </h2>
           <p className="section-aside">
             Three independent <code>1x</code> samples per workload, one fresh process per sample.
@@ -671,21 +671,24 @@ export default function BenchmarksPage() {
           </p>
         </div>
         <InprocTable
-          heading="PDF pages (generic request, recovery capture)"
+          heading="PDF pages (generic request, perf-improve capture)"
           rows={INPROC_PDF_GENERIC}
           unit="Pages"
         />
         <RelativeTimingTable
-          heading="In-process PDF multiplier vs wkhtmltopdf CLI (recovery capture)"
+          heading="In-process PDF multiplier vs wkhtmltopdf CLI (phase-7 rows; 2026-09-11 CLI baseline)"
           rows={INPROC_PDF_GENERIC}
           pathLabel="in-process Go PDF"
         />
         <p className="section-aside bench-explanation">
-          The 2-page rows are fresh-process samples and carry the one-time default-font load, so
-          they are not like-for-like with the historical multi-iteration matrix below. The internal
-          generic 500-page allocation did not reach the 0.2.4 target; the public image rows did
-          (500 tiles) or sit about 4% above it (250 tiles). Raw samples:{' '}
-          <code>plans/0.2.6/perf-review/results/2026-09-11/valid-02-04.md</code>.
+          The 2-page rows are fresh-process samples and carry the one-time default-font work (about
+          2.7 MB for the internal path), so they are not like-for-like with the historical
+          multi-iteration matrix below. The warm 500-page internal <code>B/op</code> now meets the
+          240 MB acceptance (235.50 MB standalone median; 234.92 MB warm matrix) and sits below the
+          0.2.4 237.76 MB row; the 500-page warm time (1,297.98 ms standalone median; 1,228.72 ms
+          warm matrix) is still above the 1.010 s Snapshot I row and the 1.10 s acceptance. The
+          public image 250 and 500 tile rows are 30.1% and 48.6% below their 0.2.4 <code>B/op</code>{' '}
+          rows. Raw samples: <code>{PERF_IMPROVE_CAPTURE.raw}</code>.
         </p>
         <h3 className="table-block-heading">Historical full matrix ({HISTORY_DATE}, 0.2.4)</h3>
         <InprocTable
@@ -713,7 +716,7 @@ export default function BenchmarksPage() {
       <section className="bench-section" aria-labelledby="bench-library-heading">
         <div className="section-heading-row">
           <h2 id="bench-library-heading">
-            Public Go library benchmarks ({RECOVERY_DATE} recovery capture)
+            Public Go library benchmarks ({PERF_IMPROVE_CAPTURE.date} {PERF_IMPROVE_CAPTURE.label})
           </h2>
           <p className="section-aside">
             <code>make bench-lib</code> calls <code>Document.WritePDF</code> and{' '}
@@ -721,13 +724,13 @@ export default function BenchmarksPage() {
             HTML from disk.
           </p>
         </div>
-        <InprocTable heading="Public PDF pages (recovery capture)" rows={LIBRARY_PDF} unit="Pages" />
+        <InprocTable heading="Public PDF pages (perf-improve capture)" rows={LIBRARY_PDF} unit="Pages" />
         <RelativeTimingTable
-          heading="Public library PDF multiplier vs wkhtmltopdf CLI (recovery capture)"
+          heading="Public library PDF multiplier vs wkhtmltopdf CLI (phase-7 rows; 2026-09-11 CLI baseline)"
           rows={LIBRARY_PDF}
           pathLabel="public Go library PDF"
         />
-        <InprocTable heading="Public image tiles (recovery capture)" rows={LIBRARY_IMAGE} unit="Tiles" />
+        <InprocTable heading="Public image tiles (perf-improve capture)" rows={LIBRARY_IMAGE} unit="Tiles" />
         <h3 className="table-block-heading">Historical full matrix ({HISTORY_DATE}, 0.2.4)</h3>
         <InprocTable heading="Public PDF pages (2026-08-19)" rows={LIBRARY_PDF_HISTORY} unit="Pages" />
         <InprocTable

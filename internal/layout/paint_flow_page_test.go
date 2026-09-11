@@ -7,10 +7,11 @@ import (
 
 // TestPageBoundaryBucketersAgree pins the op-to-page mapping at page
 // boundaries. A rect fragment split at a page top lands exactly on
-// k*contentH, and float division can round a hair below k; pageBuckets
-// already biased its Y by layoutEpsilon so such an op stays on the page it
-// starts, but buildFlowOpIndex and pageIndexedOps did not. The three
-// bucketers must agree on which page owns a boundary-aligned op.
+// k*contentH, and float division can round a hair below k; the single page
+// index builder biases Y by layoutEpsilon so such an op stays on the page it
+// starts. The flow index (ensureFlowIndex), the painted buckets
+// (buildPagesAfterSplits) and the seal reader (pageIndexedOps) all read the
+// one builder.
 func TestPageBoundaryBucketersAgree(t *testing.T) {
 	t.Parallel()
 
@@ -40,8 +41,8 @@ func TestPageBoundaryBucketersAgree(t *testing.T) {
 	}
 }
 
-// checkPageBoundaryBucket proves the three bucketers agree on the page that
-// owns a boundary-aligned op at boundaryY.
+// checkPageBoundaryBucket proves the single page index builder maps a
+// boundary-aligned op to the page it starts on, through every reader.
 func checkPageBoundaryBucket(t *testing.T, boundaryY, contentH float64) {
 	t.Helper()
 
@@ -52,22 +53,20 @@ func checkPageBoundaryBucket(t *testing.T, boundaryY, contentH float64) {
 		t.Fatalf("checkedFlowPageOfY(y+epsilon) rejected y=%g", boundaryY)
 	}
 
-	pageOf, _ := pageBuckets(ops, contentH)
-	if len(pageOf) != 1 {
-		t.Fatalf("pageBuckets returned %d entries, want 1", len(pageOf))
+	result := &Result{Ops: ops}
+	ensureFlowIndex(result, contentH)
+
+	if len(result.flowPageOf) != 1 {
+		t.Fatalf("ensureFlowIndex returned %d entries, want 1", len(result.flowPageOf))
 	}
 
-	if pageOf[0] != want {
-		t.Errorf("pageBuckets page = %d, want %d", pageOf[0], want)
+	if result.flowPageOf[0] != want {
+		t.Errorf("ensureFlowIndex page = %d, want %d", result.flowPageOf[0], want)
 	}
 
-	_, flowPageOf, _, ok := buildFlowOpIndex(ops, contentH)
-	if !ok {
-		t.Fatal("buildFlowOpIndex rejected the probe op")
-	}
-
-	if flowPageOf[0] != want {
-		t.Errorf("buildFlowOpIndex page = %d, want %d", flowPageOf[0], want)
+	opPage := buildPagesAfterSplits(result, contentH, nil)
+	if len(opPage) != 1 || opPage[0] != want {
+		t.Errorf("buildPagesAfterSplits page = %v, want [%d]", opPage, want)
 	}
 
 	if got := pageIndexOfOp(&Result{Ops: ops}, contentH); got != want {

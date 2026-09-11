@@ -3,7 +3,40 @@ package pdf
 import (
 	"bytes"
 	"testing"
+
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf/assets"
 )
+
+// TestDefaultFaceDataCopiedOnce pins the cold-font ownership contract: each
+// asset accessor returns a fresh owned copy, and the lazy face adopts that
+// copy without cloning it a second time. The cold profile charged the
+// duplicate 3,145,728 B to the second clone.
+func TestDefaultFaceDataCopiedOnce(t *testing.T) {
+	t.Parallel()
+
+	first := assets.LiberationSansRegular()
+	second := assets.LiberationSansRegular()
+
+	if len(first) == 0 || len(second) == 0 {
+		t.Fatal("empty embedded asset")
+	}
+
+	if &first[0] == &second[0] {
+		t.Fatal("accessor returned a shared backing array; each call must own a copy")
+	}
+
+	owned := assets.LiberationSansRegular()
+	fnt := parseNamed("LiberationSans-Test", func() []byte { return owned })
+	fnt.ensureParsed()
+
+	if len(fnt.data) != len(owned) {
+		t.Fatalf("font data length = %d, want %d", len(fnt.data), len(owned))
+	}
+
+	if &fnt.data[0] != &owned[0] {
+		t.Fatal("lazy load cloned the accessor copy; want a single owned copy")
+	}
+}
 
 //nolint:cyclop // validates every bundled family in one table-free assertion
 func TestLoadDefaultFaces(t *testing.T) {

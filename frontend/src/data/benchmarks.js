@@ -1,12 +1,14 @@
 // Benchmark snapshots for the Benchmarks page.
 //
-// Current snapshot: 2026-09-11 performance-recovery capture on the uncommitted
-// 0.2.6 working tree (VERSION 0.2.5). In-process and library rows are three
-// independent 1x samples per workload (median of the three raw values, B/op is
-// never averaged); CLI and external rows are medians of three timed process
-// runs after one warmup. Raw evidence:
-// plans/0.2.6/perf-review/results/2026-09-11/valid-02-04.md and Snapshot K in
+// Current engine snapshot: 2026-09-11 perf-improve phase-7 capture on the
+// uncommitted 0.2.6 warm-path working tree (VERSION 0.2.5). In-process and
+// library rows are three independent 1x samples per workload (median of the
+// three raw values, B/op is never averaged). Raw evidence:
+// plans/0.2.6/perf-improve/results/phase-7/final-capture.md and Snapshot L in
 // testdata/golden/benchmarks/benchmark-results.txt.
+//
+// Current CLI comparison: the 2026-09-11 recovery capture, kept dated because
+// the phase-7 capture measured gowkhtmltopdf only (cli-rss mode).
 //
 // Historical snapshot: 2026-08-19 full 0.2.4 matrices, kept dated so no 0.2.4
 // number is relabeled as current.
@@ -50,24 +52,32 @@ export const PUPPETEER_ROWS = [
 
 export const RECOVERY_DATE = '2026-09-11'
 export const HISTORY_DATE = '2026-08-19'
+export const PERF_IMPROVE_CAPTURE = {
+  date: '2026-09-11',
+  label: 'perf-improve phase-7 capture',
+  raw: 'plans/0.2.6/perf-improve/results/phase-7/final-capture.md',
+}
 
-// Current 2026-09-11 recovery capture: fresh-process 1x samples, median of
-// three. The 2-page PDF B/op rows carry the one-time default-font load (about
-// 6.8 MB) charged to the single operation, so they are not like-for-like with
-// the 2026-08-19 multi-iteration rows below.
+// Current 2026-09-11 perf-improve capture: fresh-process 1x samples, median
+// of three. The 2-page PDF B/op rows carry the one-time default-font cost,
+// now about 2.7 MB, charged to the single operation, so they are not
+// like-for-like with the 2026-08-19 multi-iteration rows below. The warm
+// 500-page B/op now meets the 240 MB acceptance (235.50 MB standalone median;
+// 234.92 MB warm matrix); the 500-page warm time (1,297.98 ms standalone
+// median; 1,228.72 ms warm matrix) is still above the 1.010 s Snapshot I row.
 export const INPROC_PDF_GENERIC = [
-  { n: 2, ms: 10.06, mb: 9.58, allocs: '7.0K' },
-  { n: 500, ms: 1246.05, mb: 321.1, allocs: '1.28M' },
+  { n: 2, ms: 6.11, mb: 2.67, allocs: '6.2K' },
+  { n: 500, ms: 1297.98, mb: 235.5, allocs: '1.23M' },
 ]
 
 export const LIBRARY_PDF = [
-  { n: 2, ms: 10.88, mb: 9.6, allocs: '7.0K' },
-  { n: 500, ms: 1268.56, mb: 322.89, allocs: '1.28M' },
+  { n: 2, ms: 7.14, mb: 2.68, allocs: '6.2K' },
+  { n: 500, ms: 1240.82, mb: 236.91, allocs: '1.23M' },
 ]
 
 export const LIBRARY_IMAGE = [
-  { n: 250, ms: 54.42, mb: 21.5, allocs: '10.0K' },
-  { n: 500, ms: 89.18, mb: 27.21, allocs: '18.0K' },
+  { n: 250, ms: 50.72, mb: 14.45, allocs: '9.4K' },
+  { n: 500, ms: 98.47, mb: 26.73, allocs: '18.0K' },
 ]
 
 // Historical 2026-08-19 full 0.2.4 matrices. Kept dated; not current claims.
@@ -201,10 +211,16 @@ export const HEADLINE = {
   rssCrossover: 50,
 }
 
+// Dated landing-claim anchor: the 2026-09-11 recovery capture public library
+// 2-page row (10.88 ms) against that capture's wkhtmltopdf CLI baseline
+// (258 ms). The phase-7 capture measured 7.14 ms on the same boundary; the
+// landing copy keeps the dated anchor until that claim is re-approved.
+export const RECOVERY_LIBRARY_2P_MS = 10.88
+
 export const LIBRARY_HEADLINE = {
   pages: LIBRARY_PDF[0].n,
-  ms: LIBRARY_PDF[0].ms,
+  ms: RECOVERY_LIBRARY_2P_MS,
   wkMs: CLI_ROWS[0].wkMs,
-  multiplier: relativeMultiplier(LIBRARY_PDF[0]),
-  displayMultiplier: Math.round(relativeMultiplier(LIBRARY_PDF[0]) / 10) * 10,
+  multiplier: CLI_ROWS[0].wkMs / RECOVERY_LIBRARY_2P_MS,
+  displayMultiplier: Math.round(CLI_ROWS[0].wkMs / RECOVERY_LIBRARY_2P_MS / 10) * 10,
 }

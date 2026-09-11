@@ -11,12 +11,15 @@ import (
 func testFont(t *testing.T) *Font {
 	t.Helper()
 
-	f, err := DefaultFont()
+	fnt, err := DefaultFont()
 	if err != nil {
 		t.Fatalf("DefaultFont: %v", err)
 	}
 
-	return f
+	// Test faces are read directly (f.data, f.tables), so load them here.
+	fnt.ensureParsed()
+
+	return fnt
 }
 
 func TestParseDefaultFont(t *testing.T) {
@@ -299,12 +302,16 @@ func TestFontCacheSeparatesLoadedFacesWithSameDisplayName(t *testing.T) {
 	// A registry/display label is not a face identity. Deliberately give
 	// regular and bold the same label and ensure their embedded subsets remain
 	// separate.
+	faces.Regular.ensureParsed()
+
 	regular, err := ParseTTF(bytes.Clone(faces.Regular.data))
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	regular.PostScriptName = "SameFace"
+
+	faces.Bold.ensureParsed()
 
 	bold, err := ParseTTF(bytes.Clone(faces.Bold.data))
 	if err != nil {
@@ -444,6 +451,8 @@ func testFontWithStyle(t *testing.T, macStyle uint16) *Font {
 	if err != nil {
 		t.Fatalf("DefaultFont: %v", err)
 	}
+
+	fnt.ensureParsed()
 
 	fresh, err := ParseTTF(fnt.data)
 	if err != nil {

@@ -170,6 +170,19 @@ type Result struct {
 	flowBoxPage  []int
 	flowBoxPos   []int
 
+	// flowStore, flowBoxStore and flowScratch retain the flow-index backing
+	// arrays across rebuilds. The live flow* fields are cleared on
+	// invalidation (callers detect a missing index by length) while these
+	// stores keep the capacity for the next rebuild. releaseFlowIndex clears
+	// the stores at the PDF-05 release point.
+	flowStore    flowIndexStorage
+	flowBoxStore flowIndexStorage
+	flowScratch  flowIndexStorage
+
+	// hasStructElems records that buildStructureTree assigned structure
+	// elements. A later non-UA repaint must still clear them.
+	hasStructElems bool
+
 	// pageSnapHeight records the page content height that multicol column
 	// snapping used during Layout (Options.Height). Paint compares it with
 	// its own content height so columns cannot snap to one boundary while
@@ -207,6 +220,14 @@ func CloneResult(res *Result) *Result {
 	clone.flowBoxes = cloneIndexPages(res.flowBoxes)
 	clone.flowBoxPage = append([]int(nil), res.flowBoxPage...)
 	clone.flowBoxPos = append([]int(nil), res.flowBoxPos...)
+	// The retained stores are scratch capacity: a clone must not reset arrays
+	// the source still uses, so it starts with empty stores.
+	clone.flowStore.reset()
+	clone.flowBoxStore.reset()
+	clone.flowScratch.reset()
+	// cloneOps nils StructElem on every op, so the clone has no assigned
+	// structure elements even when the source did.
+	clone.hasStructElems = false
 
 	boxes := make(map[*box]*box, len(res.boxes))
 	clone.root = cloneBoxGraph(res.root, boxes)
@@ -310,6 +331,9 @@ func (w *Workspace) Release(res *Result) {
 	res.flowBoxes = nil
 	res.flowBoxPage = nil
 	res.flowBoxPos = nil
+	res.flowStore.reset()
+	res.flowBoxStore.reset()
+	res.flowScratch.reset()
 	res.Pages = nil
 	res.Locations = nil
 }
@@ -384,14 +408,6 @@ type Op struct {
 	R, G, B float64 // 0..1
 	Alpha   float64
 	Width   float64 // stroke width for OpLine
-	// StrokeMask selects sides for a rounded OpStrokeRect. Zero means the
-	// complete rounded rectangle; non-zero masks are used for mixed CSS
-	// borders whose accented side must retain its corner arcs.
-	StrokeMask uint8
-	// LineInset selects inward paint geometry for mixed-width straight borders.
-	// The logical OpLine coordinates remain on the border-box edge so
-	// pagination ownership checks keep using layout geometry.
-	LineInset uint8
 
 	Text string
 	Font *pdf.Font
@@ -400,42 +416,21 @@ type Op struct {
 	LetterSpacing float64
 	// TextTransform is applied when the text operation is painted.
 	TextTransform string
-	Bold          bool
-	NoFakeBold    bool
 	FontFeatures  string
 
 	URI string
 
-	Image  []byte // PNG or JPEG bytes
-	ImgW   int
-	ImgH   int
-	IsJPEG bool
-	Alt    string // Alt text for Figure elements under PDF/UA-1
-
-	// IsBackground marks background/border images that belong to the chrome layer.
-	IsBackground bool
-
-	// Fixed marks ops from position:fixed boxes; Paint stamps them on every
-	// page at viewport-relative coordinates.
-	Fixed bool
-
-	// Pinned keeps canvas Y stable under later index-suffix flow shifts
-	// (repeated thead clones appended after document ops). Unlike Fixed,
-	// pinned ops paint only on their natural page.
-	Pinned bool
+	Image []byte // PNG or JPEG bytes
+	ImgW  int
+	ImgH  int
+	Alt   string // Alt text for Figure elements under PDF/UA-1
 
 	// StickyID links display-list ops to a position:sticky box after parent
 	// prependChrome shifts op indices (0 = not sticky).
 	StickyID int
 
 	// ZIndex paints later (higher) above earlier ops when non-zero or set.
-	ZIndex    int
-	ZIndexSet bool
-
-	// Positioned marks operations emitted by an absolute/fixed subtree. Within
-	// the same z-index band, positioned descendants paint above in-flow text,
-	// while their own backgrounds remain below their own content.
-	Positioned bool
+	ZIndex int
 
 	// RotateDeg rotates the glyph around its baseline origin (PDF text matrix).
 	// Independent of CSS transform CTM (which wraps the whole op via Xform).
@@ -447,8 +442,7 @@ type Op struct {
 
 	// Xform is a baked canvas-space CSS 2D transform (identity if unset).
 	// Applied at paint via PDF cm (see pdfCTMFromCSS). Sibling flow unaffected.
-	Xform    Matrix2D
-	XformSet bool
+	Xform Matrix2D
 
 	// PaintOpacity is element opacity (CSS opacity / filter:opacity), 0..1.
 	// 0 or unset (≥1) means fully opaque. Nested opacities are multiplied.
@@ -465,6 +459,37 @@ type Op struct {
 
 	// StructElem is the PDF/UA-1 logical structure element associated with this op.
 	StructElem *pdf.StructElem
+
+	// Single-byte fields are packed at the end so every 8-byte field above
+	// packs without alignment gaps (Op is 440 bytes instead of 472).
+	// StrokeMask selects sides for a rounded OpStrokeRect. Zero means the
+	// complete rounded rectangle; non-zero masks are used for mixed CSS
+	// borders whose accented side must retain its corner arcs.
+	StrokeMask uint8
+	// LineInset selects inward paint geometry for mixed-width straight borders.
+	// The logical OpLine coordinates remain on the border-box edge so
+	// pagination ownership checks keep using layout geometry.
+	LineInset  uint8
+	Bold       bool
+	NoFakeBold bool
+	IsJPEG     bool
+	// IsBackground marks background/border images that belong to the chrome layer.
+	IsBackground bool
+	// Fixed marks ops from position:fixed boxes; Paint stamps them on every
+	// page at viewport-relative coordinates.
+	Fixed bool
+	// Pinned keeps canvas Y stable under later index-suffix flow shifts
+	// (repeated thead clones appended after document ops). Unlike Fixed,
+	// pinned ops paint only on their natural page.
+	Pinned bool
+	// ZIndexSet marks an explicitly assigned ZIndex (including zero).
+	ZIndexSet bool
+	// Positioned marks operations emitted by an absolute/fixed subtree. Within
+	// the same z-index band, positioned descendants paint above in-flow text,
+	// while their own backgrounds remain below their own content.
+	Positioned bool
+	// XformSet marks a baked Xform; identity matrices stay unset.
+	XformSet bool
 }
 
 // PaintLineGeometry returns the line geometry after applying mixed-border

@@ -4,14 +4,17 @@ Numbers on this page are **labeled snapshots**, not a live SLA. Host, GOCACHE
 state, and whether a run used the **generic** convert path or the
 **benchmark-only page-island** path all change wall time and RSS.
 
-**Current snapshot: 2026-09-11 performance-recovery capture.** Three
-independent `1x` samples per recovery workload, plus three-run process
-medians, on the uncommitted 0.2.6 recovery working tree (`VERSION` still
-reads 0.2.5, so this is not a released build). The public image rows beat or
-sit near their 0.2.4 rows; the PDF and CLI rows did not meet the recovery
-target. Full matrices live in
+**Current snapshot: 2026-09-11 perf-improve phase-7 capture.** Three
+independent `1x` samples per workload, plus a full warm matrix and a
+gowkhtmltopdf-only CLI process capture, on the uncommitted 0.2.6 warm-path
+working tree (`VERSION` still reads 0.2.5, so this is not a released build).
+The warm 500-page `B/op` now meets the 240 MB acceptance and is slightly below
+the 0.2.4 row; the warm 500-page time is about 17 percent better than the
+pre-improve capture but still above the 1.010 s Snapshot I row and the 1.10 s
+acceptance. Full matrices live in
 [`testdata/golden/benchmarks/README.md`](../testdata/golden/benchmarks/README.md).
-The 2026-08-19 and 2026-08-14 tables further down are dated history.
+The 2026-09-11 recovery capture, the 2026-08-19 snapshot, and the 2026-08-14
+tables further down are dated history.
 
 Related:
 
@@ -31,10 +34,10 @@ Related:
 
 | Kind | What it measures | Where |
 |------|------------------|-------|
-| Direct CLI `/usr/bin/time` | Process elapsed time and peak RSS vs wkhtmltopdf | **Current 2026-09-11 table below** |
-| External engines | Process elapsed time and peak RSS vs WeasyPrint and Puppeteer/Chrome | **Current 2026-09-11 tables below** |
-| Internal engine `go test -bench` | Direct `internal/convert` wall time, `B/op`, `allocs/op` | **2026-09-11 recovery rows below; full 2026-08-19 matrix is historical** |
-| Public library `go test -bench` | `Document.WritePDF` / `ImageDocument.WriteImage` wall time, `B/op`, `allocs/op` | **2026-09-11 recovery rows below; full 2026-08-19 matrix is historical** |
+| Direct CLI `/usr/bin/time` | Process elapsed time and peak RSS | **2026-09-11 perf-improve `cli-rss` rows below; the wkhtmltopdf comparison is the dated 2026-09-11 recovery table** |
+| External engines | Process elapsed time and peak RSS vs WeasyPrint and Puppeteer/Chrome | **Dated 2026-09-11 recovery tables below; not re-run in the phase-7 capture** |
+| Internal engine `go test -bench` | Direct `internal/convert` wall time, `B/op`, `allocs/op` | **2026-09-11 perf-improve rows below; the 2026-09-11 recovery and 2026-08-19 matrices are historical** |
+| Public library `go test -bench` | `Document.WritePDF` / `ImageDocument.WriteImage` wall time, `B/op`, `allocs/op` | **2026-09-11 perf-improve rows below; the 2026-09-11 recovery and 2026-08-19 matrices are historical** |
 | Phase 9.3 gate | Two full-pipeline runs of a 10-section invoice fixture; CI budget only | Historical timings below; CI still asserts **< 5 s** per run |
 
 Page islands (`convert.NewBenchmarkPDFRequest`) are an **internal benchmark
@@ -44,7 +47,84 @@ or RSS guarantee.
 
 ---
 
-## Current recovery capture (2026-09-11)
+## Current capture (2026-09-11 perf-improve phase 7)
+
+This is the closure capture for the 0.2.6 warm-path performance plan
+(`plans/0.2.6/perf-improve/phase-wise-checklist.md`), after the font, seal,
+forced-break, display-list, and page-bucketing phases landed. It is a
+**working-tree capture** on the uncommitted 0.2.6 tree; `VERSION` still reads
+0.2.5. Host: Linux amd64, 13th Gen Intel Core i7-13700HX (WSL2, 24 CPUs,
+7.6 GiB RAM). Toolchain: go1.26.4. Only the generic paths were measured;
+certified page islands are not part of any row.
+
+In-process and public-library rows are **three independent `1x` samples per
+workload**, one fresh process per sample, captured with
+`scripts/bench-performance-recovery.sh`. Each time is the median of the three
+raw values and `B/op` is one of the raw values, never an average. The warm
+matrix runs the ascending size list in one process; its 2-page row is cold
+(first conversion) and its 500-page row is warm. Standalone samples run 2
+pages first (cold) and 500 pages second (warm). The CLI rows are this
+capture's `cli-rss` mode, gowkhtmltopdf only, the median of three timed
+process runs after one warmup; RSS is `/usr/bin/time %M` and stays separate
+from `B/op`. Raw rows, medians, median sources, and the full verdict:
+`plans/0.2.6/perf-improve/results/phase-7/final-capture.md`.
+
+### Perf-improve rows
+
+| Row | 2 pages / 250 tiles | 500 pages / 500 tiles | 0.2.4 / Snapshot I row | Result |
+|---|---:|---:|---:|---|
+| Internal generic PDF time, warm matrix | 6.69 ms (cold) | 1,228.72 ms | 1,010 ms | above the row |
+| Internal generic PDF B/op, warm matrix | 2,665,064 B (2.67 MB, cold) | 234,923,560 B (234.92 MB) | 237.76 MB | 1.19% below |
+| Internal generic PDF time, standalone median | 6.11 ms (cold) | 1,297.98 ms | 1,010 ms | above the row |
+| Internal generic PDF B/op, standalone median | 2,665,080 B (2.67 MB, cold) | 235,496,640 B (235.50 MB) | 237.76 MB | 0.95% below |
+| Internal generic PDF allocs/op, standalone median | 6,170 | 1,225,356 | 1.15M | |
+| Public library PDF time | 7.14 ms (cold) | 1,240.82 ms | 1,104.51 ms | above the row |
+| Public library PDF B/op | 2,680,016 B (2.68 MB, cold) | 236,911,328 B (236.91 MB) | 236.85 MB | 0.03% above, parity |
+| Public library image time | 50.72 ms | 98.47 ms | n/a | |
+| Public library image B/op | 14,446,240 B (14.45 MB) | 26,730,968 B (26.73 MB) | 20.66 MB / 52.00 MB | 30.1% / 48.6% below |
+| Public library image geometry | 1024x2056 / 94,352 B | 1024x4040 / 188,268 B | unchanged | |
+| CLI process time, cli-rss median | 0.01 s | 1.32 s | 1,042 ms | above the row |
+| CLI process RSS, cli-rss median | 17,472 KiB | 203,136 KiB | 208,128 KiB | 2.4% below |
+
+### Acceptance verdict
+
+The plan's acceptance is a warm 500-page `B/op` at or below 240 MB and a warm
+500-page time at or below 1.10 s. The allocation target **is met**: 234.92 MB
+on the warm matrix, 235.50 MB on the standalone median, and 236.91 MB on the
+public library median, all below the 240 MB line. The internal numbers are
+slightly below the 0.2.4 237.76 MB row; the public library number is at parity
+with its 236.85 MB row (0.03 percent above). The time target **is not met**:
+the warm matrix is 1,228.72 ms and the standalone median is 1,297.98 ms,
+above both the 1.10 s line and the 1.010 s Snapshot I row. The fastest
+500-page row in the capture is 1,186.48 ms (public library PDF sample 2).
+
+### What improved against the pre-improve capture
+
+| Metric | Pre-improve 2026-09-11 | Phase-7 2026-09-11 | Change |
+|---|---:|---:|---:|
+| Warm 500-page matrix time | 1,489.42 ms | 1,228.72 ms | -17.5% |
+| Warm 500-page matrix B/op | 321,305,864 B (321.31 MB) | 234,923,560 B (234.92 MB) | -26.9% |
+| Cold 2-page B/op, fresh process | 9,578,040 B (9.58 MB) | 2,665,064 B (2.67 MB, matrix cold row) | -72.2% |
+
+The 2-page drop is the phase-2 single-copy plus lazy default-face load; the
+500-page allocation drop is the phase-3 seal indexing, phase-5 `Op` packing
+(472 to 440 bytes), and phase-6 page-index storage reuse. The remaining warm
+time gap has no single allocation site to blame: the phase-4 profile put
+`paginateOps` at 8.04 percent of samples after the forced-break batch, and
+phase 5 rejected tightening `estimateOpCapacity` because the corpus maximum
+is 15.16 ops per node against a 1.2887 ratio on the benchmark template.
+
+```sh
+./scripts/bench-performance-recovery.sh --mode=internal-pdf-warm --benchtime=1x --count=1
+./scripts/bench-performance-recovery.sh --mode=internal-pdf --sizes=2,500 --benchtime=1x --count=1
+./scripts/bench-performance-recovery.sh --mode=public-pdf --sizes=2,500 --benchtime=1x --count=1
+./scripts/bench-performance-recovery.sh --mode=public-image --sizes=250,500 --benchtime=1x --count=1
+./scripts/bench-performance-recovery.sh --mode=cli-rss --sizes=2,100,500 --runs=3
+```
+
+---
+
+## Historical recovery capture (2026-09-11)
 
 The current capture is a **0.2.6 performance-recovery working tree**
 measurement. `VERSION` still reads 0.2.5, so it is a working-tree snapshot,
@@ -482,7 +562,7 @@ fidelity review without saying so.
 
 ## How to measure
 
-Current snapshot commands:
+Standard benchmark targets:
 
 ```sh
 make bench
@@ -492,8 +572,19 @@ make bench-inprocess    # compatibility alias for bench-engine
 make bench-lib
 ```
 
-Recovery-capture commands (fresh process per sample; see the 2026-09-11
-section above):
+Current perf-improve capture commands (fresh process per sample; see the
+2026-09-11 perf-improve section above):
+
+```sh
+./scripts/bench-performance-recovery.sh --mode=internal-pdf-warm --benchtime=1x --count=1
+./scripts/bench-performance-recovery.sh --mode=internal-pdf --sizes=2,500 --benchtime=1x --count=1
+./scripts/bench-performance-recovery.sh --mode=public-pdf --sizes=2,500 --benchtime=1x --count=1
+./scripts/bench-performance-recovery.sh --mode=public-image --sizes=250,500 --benchtime=1x --count=1
+./scripts/bench-performance-recovery.sh --mode=cli-rss --sizes=2,100,500 --runs=3
+```
+
+Historical recovery-capture commands (see the 2026-09-11 recovery section
+above):
 
 ```sh
 ./scripts/bench-performance-recovery.sh --mode=internal-pdf --sizes=2,500 --benchtime=1x --count=1

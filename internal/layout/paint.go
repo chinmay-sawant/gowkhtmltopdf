@@ -213,7 +213,13 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 
 	populateLocations(res, contentH, opPage)
 
-	clearStructureElements(res.Ops)
+	// Structure elements are only assigned for PDF/UA documents; a non-UA
+	// repaint clears them only when an earlier paint into a UA document left
+	// some behind.
+	if doc.IsUA() || res.hasStructElems {
+		clearStructureElements(res.Ops)
+		res.hasStructElems = false
+	}
 
 	if err := buildStructureTree(doc, res); err != nil {
 		return err
@@ -236,15 +242,28 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 	// pagination pass rebuilds them through ensureFlowIndex. Ops, Pages,
 	// Locations, boxes, and root stay: conversion reads them after Paint for
 	// page names, headings, and navigation.
-	invalidateFlowIndex(res)
+	releaseFlowIndex(res)
 
 	return nil
 }
 
 // fixedOpIndices collects the indices of viewport-fixed ops, which are
-// stamped on every page at viewport-relative coords.
+// stamped on every page at viewport-relative coords. The count pass returns
+// nil for the common no-fixed-op document without reserving len(ops) slots.
 func fixedOpIndices(res *Result) []int {
-	fixedIdx := make([]int, 0, len(res.Ops))
+	count := 0
+
+	for i := range res.Ops {
+		if res.Ops[i].Fixed {
+			count++
+		}
+	}
+
+	if count == 0 {
+		return nil
+	}
+
+	fixedIdx := make([]int, 0, count)
 
 	for i := range res.Ops {
 		if res.Ops[i].Fixed {
@@ -256,22 +275,26 @@ func fixedOpIndices(res *Result) []int {
 }
 
 // buildPagesAfterSplits re-derives page buckets from the final op Y
-// positions after rect splits and sticky shifts added or moved ops.
+// positions after rect splits and sticky shifts added or moved ops. The
+// forced fresh build reuses the scratch store; the buckets are then handed to
+// res.Pages, so the scratch is cleared and a later rebuild allocates fresh
+// rather than resetting arrays res.Pages still holds.
 func buildPagesAfterSplits(res *Result, contentH float64, _ []int) []int {
-	opPage, counts := pageBuckets(res.Ops, contentH)
-	res.Pages = make([][]int, len(counts))
-
-	for p := range counts {
-		if counts[p] > 0 {
-			res.Pages[p] = make([]int, 0, counts[p])
-		}
+	if res == nil {
+		return nil
 	}
 
-	for idx, p := range opPage {
-		if p >= 0 && p < len(counts) {
-			res.Pages[p] = append(res.Pages[p], idx)
-		}
+	if !buildPageIndex(res.Ops, contentH, layoutEpsilon, &res.flowScratch) {
+		res.Pages = nil
+
+		return nil
 	}
+
+	res.Pages = make([][]int, len(res.flowScratch.pages))
+	copy(res.Pages, res.flowScratch.pages)
+
+	opPage := res.flowScratch.pageOf
+	res.flowScratch.reset()
 
 	return opPage
 }
@@ -300,67 +323,6 @@ func validatePaintPageIndices(ops []Op, contentH float64) error {
 	}
 
 	return nil
-}
-
-// bucketOpsByPage maps every non-fixed op to its canvas page and builds the
-// exact-capacity page buckets. edgeBias selects the boundary policy: page
-// ownership uses layoutEpsilon so a rect fragment that starts exactly at a
-// page top (Y = k*contentH, whose float division can round just below k,
-// e.g. (21*785.197)/785.197 = 20.9999...) stays on the page it starts.
-// Raw maintenance paths pass zero. Fixed ops leave pageOf/pos at their zero
-// values; every reader guards Fixed before use.
-func bucketOpsByPage(ops []Op, contentH, edgeBias float64) ([][]int, []int, []int, bool) {
-	maxPage := 0
-	pageOf := make([]int, len(ops))
-
-	for idx := range ops {
-		if ops[idx].Fixed {
-			continue
-		}
-
-		page, ok := flowPageOfY(ops[idx].Y, contentH, edgeBias)
-		if !ok {
-			return nil, nil, nil, false
-		}
-
-		pageOf[idx] = page
-
-		if page > maxPage {
-			maxPage = page
-		}
-	}
-
-	pages := make([][]int, maxPage+1)
-	pos := make([]int, len(ops))
-
-	for idx := range ops {
-		if ops[idx].Fixed {
-			continue
-		}
-
-		page := pageOf[idx]
-		pos[idx] = len(pages[page])
-		pages[page] = append(pages[page], idx)
-	}
-
-	return pages, pageOf, pos, true
-}
-
-// pageBuckets maps every op to its canvas page, with per-page non-fixed op
-// counts for exact-capacity buckets. It is the single owner of the page
-// ownership bias used to fill Result.Pages.
-func pageBuckets(ops []Op, contentH float64) ([]int, []int) {
-	pages, pageOf, _, ok := bucketOpsByPage(ops, contentH, layoutEpsilon)
-	if !ok {
-		return nil, nil
-	}
-
-	counts := make([]int, len(pages))
-	for page := range pages {
-		counts[page] = len(pages[page])
-	}
-
-	return pageOf, counts
 }
 
 // contentSizeHint estimates initial Content buffer size from display list ops.

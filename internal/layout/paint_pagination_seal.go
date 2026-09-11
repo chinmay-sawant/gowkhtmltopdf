@@ -42,39 +42,43 @@ func capTablePageBreaks(res *Result, contentH float64) {
 
 	const eps = 2.0
 
-	_, horiz, vertStarts, vertEnds, horizByY := collectTableBorderSegments(res)
+	verts, horiz, vertStarts, vertEnds, horizByY := collectTableBorderSegments(res)
 	seal := func(gVal, minX, maxX, borderW, red, green, blue float64) {
 		sealBorderGap(res, &horiz, horizByY, eps, gVal, minX, maxX, borderW, red, green, blue)
 	}
 	coverage := func(y, minX, maxX float64) bool {
-		full, _, _, _ := hCoverage(horizByY, y, minX, maxX)
+		full, _, _, _ := hCoverage(horiz, horizByY, y, minX, maxX)
 
 		return full
 	}
 	coverageBeforeEnd := func(y, minX, maxX, pageEnd float64) bool {
-		full, _, _, _ := hCoverageBounded(horizByY, y, minX, maxX, pageEnd)
+		full, _, _, _ := hCoverageBounded(horiz, horizByY, y, minX, maxX, pageEnd)
 
 		return full
 	}
 
+	// Seals only add horizontal rules, so the byStart vertical clusters are
+	// stable across the top and bottom checks and are built once.
+	starts := clusterVerticals(verts, vertStarts, vertEnds, true)
+
 	// (1) Classic page-top stubs.
-	sealPageTopStubs(vertStarts, coverage, seal, maxPage, contentH, eps)
+	sealPageTopStubs(verts, vertStarts, coverage, seal, maxPage, contentH, eps)
 
 	// (2) Seal incomplete tops of multi-column vertical clusters that start a
 	// continuation-page body band (under repeated thead or at page top).
 	// Mid-table rowspan holes keep skipped tops so continuous year cells stay
 	// unsplit; only the page-fragment open edge is closed.
-	sealPageTopClusters(vertStarts, vertEnds, contentH, coverage, seal)
+	sealPageTopClusters(starts, contentH, coverage, seal)
 
 	// Row bottoms: seal when verticals end near a page bottom and no full
 	// horizontal closes the strip (next row's top moved to the following page).
-	sealPageBottomClusters(vertStarts, vertEnds, contentH, coverageBeforeEnd, seal, eps)
+	sealPageBottomClusters(verts, vertStarts, vertEnds, starts, contentH, coverageBeforeEnd, seal, eps)
 }
 
 // sealBorderGap appends a horizontal rule at gVal spanning [minX, maxX] unless
 // a near-identical rule already exists.
 func sealBorderGap(
-	res *Result, horiz *[]hseg, horizByY map[int][]hseg, eps, gVal, minX, maxX, borderW, red, green, blue float64,
+	res *Result, horiz *[]hseg, horizByY borderSegIndex, eps, gVal, minX, maxX, borderW, red, green, blue float64,
 ) {
 	if maxX-minX < bandClusterMinSpan || borderW < 0 {
 		return
@@ -84,7 +88,8 @@ func sealBorderGap(
 		borderW = sealFallbackWidth
 	}
 	// Avoid exact duplicates.
-	for _, h := range *horiz {
+	for i := range *horiz {
+		h := &(*horiz)[i]
 		if math.Abs(h.y-gVal) <= 0.5 && math.Abs(h.x0-minX) <= eps && math.Abs(h.x1-maxX) <= eps {
 			return
 		}
@@ -99,19 +104,19 @@ func sealBorderGap(
 	// display list. Rebuild the index before any later movement consults it.
 	invalidateFlowIndex(res)
 
-	sealed := hseg{minX, maxX, gVal, borderW, red, green, blue}
-	*horiz = append(*horiz, sealed)
-	horizByY[roundY(gVal)] = append(horizByY[roundY(gVal)], sealed)
+	*horiz = append(*horiz, hseg{minX, maxX, gVal, borderW, red, green, blue})
+	key := roundY(gVal)
+	horizByY[key] = append(horizByY[key], segIdx(len(*horiz)-1))
 }
 
 // sealPageTopClusters closes vertical clusters that start near the top of a
 // continuation page's body band.
 func sealPageTopClusters(
-	vertStarts, vertEnds map[int][]vseg, contentH float64,
+	starts map[int]borderCluster, contentH float64,
 	coverage func(y, minX, maxX float64) bool,
 	seal func(gVal, minX, maxX, borderW, red, green, blue float64),
 ) {
-	for _, child := range clusterVerticals(vertStarts, vertEnds, true) {
+	for _, child := range starts {
 		if !isBandCluster(child) {
 			continue
 		}
@@ -145,14 +150,13 @@ func sealPageTopClusters(
 // enough: fixture-61 props 31/82 leave ~95pt of empty page below the last row
 // when the next row+thead cannot fit, which sat outside the old 80pt band.
 func sealPageBottomClusters(
-	vertStarts, vertEnds map[int][]vseg, contentH float64,
+	verts []vseg, vertStarts, vertEnds borderSegIndex, starts map[int]borderCluster,
+	contentH float64,
 	coverage func(y, minX, maxX, pageEnd float64) bool,
 	seal func(gVal, minX, maxX, borderW, red, green, blue float64),
 	eps float64,
 ) {
-	starts := clusterVerticals(vertStarts, vertEnds, true)
-
-	for _, child := range clusterVerticals(vertStarts, vertEnds, false) {
+	for _, child := range clusterVerticals(verts, vertStarts, vertEnds, false) {
 		if !isBandCluster(child) {
 			continue
 		}
@@ -289,36 +293,51 @@ func capTableMaxPage(res *Result, contentH float64) int {
 	return maxPage
 }
 
+// borderSegIndex maps a rounded Y bucket to positions in the segment slice the
+// index was built from. Storing indices keeps the three per-Y maps from
+// copying every 56-byte segment value into their own bucket slices.
+type borderSegIndex map[int][]int32
+
+// segIdx narrows a slice index for storage in a borderSegIndex. Segment
+// indices are bounded by the display-list length, which cannot approach
+// MaxInt32 before the ops slice allocation itself fails.
+func segIdx(i int) int32 {
+	return int32(i) //nolint:gosec // bounded by the ops slice length
+}
+
 // collectTableBorderSegments gathers non-fixed vertical/horizontal line ops
 // once and groups them by rounded Y.
-func collectTableBorderSegments(res *Result) ([]vseg, []hseg, map[int][]vseg, map[int][]vseg, map[int][]hseg) {
+func collectTableBorderSegments(res *Result) ([]vseg, []hseg, borderSegIndex, borderSegIndex, borderSegIndex) {
 	verts, horiz := collectBorderSegmentOps(res.Ops)
 
-	vertStarts := make(map[int][]vseg)
-	vertEnds := make(map[int][]vseg)
-	horizByY := make(map[int][]hseg)
+	vertStarts := make(borderSegIndex)
+	vertEnds := make(borderSegIndex)
+	horizByY := make(borderSegIndex)
 
 	for i := range verts {
-		v := verts[i]
+		v := &verts[i]
 		k0, k1 := roundY(v.y0), roundY(v.y1)
-		vertStarts[k0] = append(vertStarts[k0], v)
-		vertEnds[k1] = append(vertEnds[k1], v)
+		vertStarts[k0] = append(vertStarts[k0], segIdx(i))
+		vertEnds[k1] = append(vertEnds[k1], segIdx(i))
 	}
 
 	for i := range horiz {
-		h := horiz[i]
-		ky := roundY(h.y)
-		horizByY[ky] = append(horizByY[ky], h)
+		ky := roundY(horiz[i].y)
+		horizByY[ky] = append(horizByY[ky], segIdx(i))
 	}
 
 	return verts, horiz, vertStarts, vertEnds, horizByY
 }
 
 // collectBorderSegmentOps gathers non-fixed line ops as vertical or horizontal
-// border segments.
+// border segments. A counting pass runs first so both result slices are
+// allocated exactly once at their final size; append growth from zero was the
+// dominant allocation in this path (63,000 vertical segments per 500 pages).
 func collectBorderSegmentOps(ops []Op) ([]vseg, []hseg) {
-	verts := make([]vseg, 0)
-	horiz := make([]hseg, 0)
+	vertCount, horizCount := countBorderSegmentOps(ops)
+
+	verts := make([]vseg, 0, vertCount)
+	horiz := make([]hseg, 0, horizCount)
 
 	for i := range ops {
 		paintOp := &ops[i]
@@ -326,16 +345,13 @@ func collectBorderSegmentOps(ops []Op) ([]vseg, []hseg) {
 			continue
 		}
 
-		if paintOp.H > 2 && (paintOp.W < 1 || paintOp.W < paintOp.H*0.05) {
+		switch {
+		case isVerticalBorderSegment(paintOp):
 			verts = append(verts, vseg{
 				x: paintOp.X, y0: paintOp.Y, y1: paintOp.Y + paintOp.H,
 				w: paintOp.Width, r: paintOp.R, g: paintOp.G, b: paintOp.B,
 			})
-
-			continue
-		}
-
-		if paintOp.W > 2 && paintOp.H < 1 {
+		case isHorizontalBorderSegment(paintOp):
 			horiz = append(horiz, hseg{
 				x0: paintOp.X, x1: paintOp.X + paintOp.W, y: paintOp.Y,
 				w: paintOp.Width, r: paintOp.R, g: paintOp.G, b: paintOp.B,
@@ -346,12 +362,46 @@ func collectBorderSegmentOps(ops []Op) ([]vseg, []hseg) {
 	return verts, horiz
 }
 
+// countBorderSegmentOps counts the same segment classification
+// collectBorderSegmentOps fills, so the fill pass can preallocate exactly.
+func countBorderSegmentOps(ops []Op) (int, int) {
+	vertCount, horizCount := 0, 0
+
+	for i := range ops {
+		paintOp := &ops[i]
+		if paintOp.Fixed || paintOp.Kind != OpLine {
+			continue
+		}
+
+		switch {
+		case isVerticalBorderSegment(paintOp):
+			vertCount++
+		case isHorizontalBorderSegment(paintOp):
+			horizCount++
+		}
+	}
+
+	return vertCount, horizCount
+}
+
+// isVerticalBorderSegment reports a tall, narrow line op (a table rule).
+func isVerticalBorderSegment(paintOp *Op) bool {
+	return paintOp.H > 2 && (paintOp.W < 1 || paintOp.W < paintOp.H*0.05)
+}
+
+// isHorizontalBorderSegment reports a wide, flat line op (a table rule).
+func isHorizontalBorderSegment(paintOp *Op) bool {
+	return paintOp.W > 2 && paintOp.H < 1
+}
+
 // roundY bins a canvas Y into 0.5pt buckets.
 func roundY(y float64) int { return int(math.Round(y * yBucketScale)) }
 
 // clusterVerticals merges vertical segments sharing a start (byStart) or end
-// Y into clusters with the min/max x and dominant stroke.
-func clusterVerticals(vertStarts, vertEnds map[int][]vseg, byStart bool) map[int]borderCluster {
+// Y into clusters with the min/max x and dominant stroke. Every segment in one
+// bucket has the same rounded key by construction, so each bucket folds into
+// exactly one cluster.
+func clusterVerticals(verts []vseg, vertStarts, vertEnds borderSegIndex, byStart bool) map[int]borderCluster {
 	groups := vertStarts
 	if !byStart {
 		groups = vertEnds
@@ -359,23 +409,23 @@ func clusterVerticals(vertStarts, vertEnds map[int][]vseg, byStart bool) map[int
 
 	out := make(map[int]borderCluster, len(groups))
 
-	for _, group := range groups {
-		for _, val := range group {
-			keyY := val.y0
-			if !byStart {
-				keyY = val.y1
-			}
+	for bucket, group := range groups {
+		if len(group) == 0 {
+			continue
+		}
 
-			bucket := roundY(keyY)
+		first := verts[group[0]]
 
-			child, ok := out[bucket]
-			if !ok {
-				out[bucket] = borderCluster{y: keyY, minX: val.x, maxX: val.x, bw: val.w, r: val.r, g: val.g, b: val.b, n: 1}
+		child := borderCluster{
+			y: vsegKeyY(first, byStart), minX: first.x, maxX: first.x,
+			bw: first.w, r: first.r, g: first.g, b: first.b, n: 1,
+		}
 
-				continue
-			}
+		for _, idx := range group[1:] {
+			val := verts[idx]
 
 			child.n++
+
 			if val.x < child.minX {
 				child.minX = val.x
 			}
@@ -384,24 +434,37 @@ func clusterVerticals(vertStarts, vertEnds map[int][]vseg, byStart bool) map[int
 				child.maxX = val.x
 			}
 			// Prefer average y so we sit on the dominant edge.
-			child.y = (child.y*float64(child.n-1) + keyY) / float64(child.n)
-			out[bucket] = child
+			child.y = (child.y*float64(child.n-1) + vsegKeyY(val, byStart)) / float64(child.n)
 		}
+
+		out[bucket] = child
 	}
 
 	return out
 }
 
+// vsegKeyY returns the segment end used for clustering: the top when climbing
+// by start, the bottom otherwise.
+func vsegKeyY(v vseg, byStart bool) float64 {
+	if byStart {
+		return v.y0
+	}
+
+	return v.y1
+}
+
 // hCoverage reports whether horizontal segments near posY span [minX, maxX].
-func hCoverage(horizByY map[int][]hseg, posY, minX, maxX float64) (bool, float64, float64, bool) {
-	return hCoverageBounded(horizByY, posY, minX, maxX, math.Inf(1))
+func hCoverage(horiz []hseg, horizByY borderSegIndex, posY, minX, maxX float64) (bool, float64, float64, bool) {
+	return hCoverageBounded(horiz, horizByY, posY, minX, maxX, math.Inf(1))
 }
 
 // hCoverageBounded is hCoverage that ignores horizontal segments at or below
 // pageEnd when the strip end sits above pageEnd. A next-page row border within
 // eps of the split row's rails must not close the strip: the rails then end
 // open (fixture-60 prop 31 after the auto-height bottom border shift).
-func hCoverageBounded(horizByY map[int][]hseg, posY, minX, maxX, pageEnd float64) (bool, float64, float64, bool) {
+func hCoverageBounded(
+	horiz []hseg, horizByY borderSegIndex, posY, minX, maxX, pageEnd float64,
+) (bool, float64, float64, bool) {
 	const eps = 2.0
 
 	var covMin, covMax float64
@@ -410,12 +473,13 @@ func hCoverageBounded(horizByY map[int][]hseg, posY, minX, maxX, pageEnd float64
 
 	key := roundY(posY)
 	for k := key - int(eps*yBucketScale) - 1; k <= key+int(eps*yBucketScale)+1; k++ {
-		for _, height := range horizByY[k] {
+		for _, idx := range horizByY[k] {
+			height := &horiz[idx]
 			if posY < pageEnd-1e-9 && height.y >= pageEnd-1e-9 {
 				continue
 			}
 
-			covMin, covMax, has = mergeCoverageSeg(height, posY, minX, maxX, eps, covMin, covMax, has)
+			covMin, covMax, has = mergeCoverageSeg(*height, posY, minX, maxX, eps, covMin, covMax, has)
 		}
 	}
 
@@ -459,7 +523,7 @@ func mergeCoverageSeg(
 // sealPageTopStubs seals vertical stubs that start exactly at a page top with
 // no closing horizontal rule.
 func sealPageTopStubs(
-	vertStarts map[int][]vseg,
+	verts []vseg, vertStarts borderSegIndex,
 	coverage func(y, minX, maxX float64) bool,
 	seal func(gVal, minX, maxX, borderW, red, green, blue float64),
 	maxPage int, contentH, eps float64,
@@ -467,7 +531,7 @@ func sealPageTopStubs(
 	for p := 1; p <= maxPage; p++ {
 		pageTop := float64(p) * contentH
 
-		minX, maxX, borderW, redN, green, blueN, node := pageTopStubBounds(vertStarts, pageTop, eps)
+		minX, maxX, borderW, redN, green, blueN, node := pageTopStubBounds(verts, vertStarts, pageTop, eps)
 
 		if node < sealStubMinCount {
 			continue
@@ -484,7 +548,7 @@ func sealPageTopStubs(
 // pageTopStubBounds scans vertical segments at pageTop for the min/max x and
 // dominant stroke of the stub cluster, returning how many stubs matched.
 func pageTopStubBounds(
-	vertStarts map[int][]vseg, pageTop, eps float64,
+	verts []vseg, vertStarts borderSegIndex, pageTop, eps float64,
 ) (float64, float64, float64, float64, float64, float64, int) {
 	var minX, maxX, borderW, red, green, blue float64
 
@@ -492,7 +556,8 @@ func pageTopStubBounds(
 
 	key := roundY(pageTop)
 	for k := key - int(eps*yBucketScale) - 1; k <= key+int(eps*yBucketScale)+1; k++ {
-		for _, val := range vertStarts[k] {
+		for _, idx := range vertStarts[k] {
+			val := &verts[idx]
 			if val.y0 < pageTop-eps || val.y0 > pageTop+eps {
 				continue
 			}
@@ -561,15 +626,20 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 	closePageLeadingSectionChromeWithTargets(res, contentH, stickyTargets)
 }
 
-// pageIndexedOps buckets non-fixed ops by their canvas page with the same
-// edge bias as pageBuckets and buildFlowOpIndex.
+// pageIndexedOps buckets non-fixed ops by their canvas page with the shared
+// edge bias. It is a forced fresh build into the scratch store; the live flow
+// index is deliberately untouched because callers mutate ops while iterating
+// the returned snapshot.
 func pageIndexedOps(res *Result, contentH float64) [][]int {
-	pages, _, _, ok := bucketOpsByPage(res.Ops, contentH, layoutEpsilon)
-	if !ok {
+	if res == nil {
 		return nil
 	}
 
-	return pages
+	if !buildPageIndex(res.Ops, contentH, layoutEpsilon, &res.flowScratch) {
+		return nil
+	}
+
+	return res.flowScratch.pages
 }
 
 // opInPageBand reports whether the op's top edge sits within [pageTop, pageBot).

@@ -401,6 +401,8 @@ func (f *Font) hasGSUB() bool {
 		return false
 	}
 
+	f.ensureParsed()
+
 	_, ok := f.tables["GSUB"]
 
 	return ok
@@ -410,7 +412,13 @@ func (f *Font) hasGSUB() bool {
 // package-level sync.Map is gone so derived data lives on and dies with the
 // Font it derives from.
 func (f *Font) gotextFace() (*gtfont.Face, bool) {
-	if f == nil || len(f.data) == 0 {
+	if f == nil {
+		return nil, false
+	}
+
+	f.ensureParsed()
+
+	if len(f.data) == 0 {
 		return nil, false
 	}
 
@@ -427,6 +435,8 @@ func (f *Font) gotextFace() (*gtfont.Face, bool) {
 // The map is built once from f.cmap (immutable after parse) and cached on
 // the Font.
 func (f *Font) reverseCmap() map[uint16]rune {
+	f.ensureParsed()
+
 	f.revOnce.Do(func() {
 		out := make(map[uint16]rune, len(f.cmap))
 

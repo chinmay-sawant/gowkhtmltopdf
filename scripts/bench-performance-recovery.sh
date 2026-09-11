@@ -8,6 +8,12 @@
 #
 # Modes:
 #   internal-pdf   generic in-process PDF via BenchmarkPDFPages/generic
+#   internal-pdf-warm
+#                  the full ascending warm matrix (2,5,10,20,50,100,200,250,
+#                  500) in one process via BenchmarkPDFPages/generic; the
+#                  first row is cold and every later row is warm; certified
+#                  islands stay excluded. --sizes must be the full matrix or
+#                  omitted; use --mode=internal-pdf for a subset.
 #   public-pdf     public Document.WritePDF via BenchmarkLibraryPDF
 #   public-image   public ImageDocument.WriteImage via BenchmarkLibraryImage
 #   cli-rss        generic CLI process time and peak RSS via /usr/bin/time
@@ -17,8 +23,8 @@
 #   --mode=MODE       required; one of the modes above
 #   --sizes=LIST      comma-separated page counts, or tile counts for
 #                     public-image. Defaults: internal-pdf/public-pdf 2,500;
-#                     public-image 250,500; cli-rss 2,100,500;
-#                     external 2,10,50,100
+#                     internal-pdf-warm the full matrix; public-image 250,500;
+#                     cli-rss 2,100,500; external 2,10,50,100
 #   --benchtime=VALUE go test -benchtime for in-process modes (default 1x)
 #   --count=N         go test -count for in-process modes (default 1)
 #   --runs=N          timed CLI runs after one warmup (default 3)
@@ -40,6 +46,7 @@ TEMPLATE="$ROOT/testdata/golden/benchmarks/templates/report.html.tmpl"
 GOWK_BIN="$ROOT/bin/gowkhtmltopdf"
 
 MODE= SIZES= BENCHTIME=1x COUNT=1 RUNS=3 DRY_RUN=0 OUT_DIR= WORK_DIR=
+WARM_MATRIX_SIZES="2,5,10,20,50,100,200,250,500"
 
 usage() {
   sed -n '2,/^set -euo/p' "$0" | sed '/^set /d; s/^# \{0,1\}//'
@@ -86,17 +93,22 @@ done
 
 [ -n "$MODE" ] || die_usage "--mode is required"
 case "$MODE" in
-  internal-pdf | public-pdf | public-image | cli-rss | external) ;;
+  internal-pdf | internal-pdf-warm | public-pdf | public-image | cli-rss | external) ;;
   *) die_usage "unknown mode: $MODE" ;;
 esac
 
 if [ -z "$SIZES" ]; then
   case "$MODE" in
     internal-pdf | public-pdf) SIZES="2,500" ;;
+    internal-pdf-warm) SIZES="$WARM_MATRIX_SIZES" ;;
     public-image) SIZES="250,500" ;;
     cli-rss) SIZES="2,100,500" ;;
     external) SIZES="2,10,50,100" ;;
   esac
+fi
+
+if [ "$MODE" = "internal-pdf-warm" ] && [ "$SIZES" != "$WARM_MATRIX_SIZES" ]; then
+  die_usage "internal-pdf-warm always runs the full warm matrix: $WARM_MATRIX_SIZES (use --mode=internal-pdf for a subset)"
 fi
 
 IFS=',' read -r -a SIZE_LIST <<<"$SIZES"
@@ -120,6 +132,12 @@ source_files() {
   printf '%s\n' "scripts/bench-performance-recovery.sh"
   case "$MODE" in
     internal-pdf) printf '%s\n' "internal/convert/benchmarks_test.go" ;;
+    internal-pdf-warm)
+      printf '%s\n' "internal/convert/benchmarks_test.go"
+      # Sibling agents can edit production code between captures; hashing the
+      # two allocation-heavy packages records the exact source state measured.
+      find internal/layout internal/pdf -type f -name '*.go' | sort
+      ;;
     public-pdf | public-image) printf '%s\n' "document_bench_test.go" "document_bench_validate_test.go" ;;
     cli-rss) printf '%s\n' "document_bench_test.go" "document_bench_html_test.go" ;;
     external)
@@ -148,12 +166,24 @@ host_cache_state() {
 }
 
 write_header() {
-  local source
+  local source index=0 size
   {
     echo "# bench-performance-recovery result"
     echo "# date: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
     echo "# mode: $MODE"
     echo "# sizes: $SIZES$SIZE_UNIT"
+    if [ "$MODE" = "internal-pdf-warm" ]; then
+      echo "# warm-matrix: rows run in one process, ascending; row 1 cold, later rows warm"
+      echo "# warm-matrix: certified islands excluded; pattern is BenchmarkPDFPages/generic only"
+      for size in "${SIZE_LIST[@]}"; do
+        index=$((index + 1))
+        if [ "$index" -eq 1 ]; then
+          printf '# warm-matrix row %d: %sPages cold (first conversion in the process)\n' "$index" "$size"
+        else
+          printf '# warm-matrix row %d: %sPages warm (same process)\n' "$index" "$size"
+        fi
+      done
+    fi
     echo "# go: $(go version)"
     echo "# cpu: $(host_cpu) ($(nproc 2>/dev/null || printf '?') CPUs)"
     echo "# memory: $(host_memory)"
@@ -259,7 +289,7 @@ run_external() {
 
 dispatch_mode() {
   case "$MODE" in
-    internal-pdf) run_go_bench ./internal/convert 'BenchmarkPDFPages/generic/' Pages ;;
+    internal-pdf | internal-pdf-warm) run_go_bench ./internal/convert 'BenchmarkPDFPages/generic/' Pages ;;
     public-pdf) run_go_bench . 'BenchmarkLibraryPDF/' Pages ;;
     public-image) run_go_bench . 'BenchmarkLibraryImage/' Tiles ;;
     cli-rss) run_cli_rss ;;
