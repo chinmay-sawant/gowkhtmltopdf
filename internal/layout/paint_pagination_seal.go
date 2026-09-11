@@ -340,7 +340,7 @@ func collectBorderSegmentOps(ops []Op) ([]vseg, []hseg) {
 	horiz := make([]hseg, 0, horizCount)
 
 	visitLineOps(ops, func(paintOp Op) {
-		if paintOp.Fixed || paintOp.Kind != OpLine {
+		if !isSealableBorderLineOp(&paintOp) {
 			return
 		}
 
@@ -367,7 +367,7 @@ func countBorderSegmentOps(ops []Op) (int, int) {
 	vertCount, horizCount := 0, 0
 
 	visitLineOps(ops, func(paintOp Op) {
-		if paintOp.Fixed || paintOp.Kind != OpLine {
+		if !isSealableBorderLineOp(&paintOp) {
 			return
 		}
 
@@ -380,6 +380,16 @@ func countBorderSegmentOps(ops []Op) (int, int) {
 	})
 
 	return vertCount, horizCount
+}
+
+// isSealableBorderLineOp reports whether a line op can back a seal border
+// segment. Seals paint in raw canvas coordinates, so an op whose painted
+// geometry differs from X/Y/W/H (XformSet) is not usable as evidence: a rotated
+// chip's rails would otherwise merge with its parent's dashed border fragments
+// in one Y bucket and seal a solid full-span rule across the stage
+// (fixture-62 prop 63 `rotate:12deg`).
+func isSealableBorderLineOp(paintOp *Op) bool {
+	return !paintOp.Fixed && !paintOp.XformSet && paintOp.Kind == OpLine
 }
 
 // isVerticalBorderSegment reports a tall, narrow line op (a table rule).
