@@ -1,24 +1,23 @@
 import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import PageTitle from '../components/PageTitle'
-import Footer from '../components/Footer'
 import {
   CHART_PAGES,
   CLI_ROWS,
+  CURRENT_CAPTURE,
   externalSpeedup,
   HEADLINE,
   HISTORY_DATE,
-  LIBRARY_HEADLINE,
-  LIBRARY_IMAGE,
-  LIBRARY_IMAGE_HISTORY,
-  LIBRARY_PDF,
-  LIBRARY_PDF_HISTORY,
   INPROC_INLINE_HISTORY,
   INPROC_PDF_GENERIC,
   INPROC_PDF_GENERIC_HISTORY,
   INPROC_TEMPLATE_GENERIC_HISTORY,
   INPROC_WEB_FETCH_HISTORY,
-  PERF_TIME_CAPTURE,
+  LIBRARY_HEADLINE,
+  LIBRARY_IMAGE,
+  LIBRARY_IMAGE_HISTORY,
+  LIBRARY_PDF,
+  LIBRARY_PDF_HISTORY,
   PUPPETEER_ROWS,
   SNAPSHOT,
   WEASYPRINT_ROWS,
@@ -26,7 +25,6 @@ import {
   formatMs,
   formatRssDelta,
   formatSpeedup,
-  relativeMultiplier,
   rssDelta,
   speedup,
 } from '../data/benchmarks'
@@ -45,6 +43,8 @@ const METRIC_VIEWS = [
   { id: 'memory', label: 'Memory RSS (MB)', shortLabel: 'Memory (MB)', desc: 'Peak process memory footprint' },
 ]
 
+const ENGINE_SUMMARY_PAGES = [2, 10, 50, 100]
+
 function formatPdfSize(n) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)} MB`
   return `${(n / 1000).toFixed(1)} KB`
@@ -62,7 +62,18 @@ function formatMb(kib) {
 
 function CompareChart({ rows, metricView }) {
   const maxMs = useMemo(() => Math.max(...rows.map((r) => r.wkMs), 1), [rows])
-  const maxSpeedup = useMemo(() => Math.max(...rows.map((r) => speedup(r)), 1), [rows])
+  const maxSpeedup = useMemo(
+    () =>
+      Math.max(
+        ...rows.map((r) => speedup(r)),
+        ...rows.map((r) => {
+          const libraryRow = LIBRARY_PDF.find((item) => item.n === r.pages)
+          return libraryRow ? r.wkMs / libraryRow.ms : 0
+        }),
+        1,
+      ),
+    [rows],
+  )
   const maxRss = useMemo(() => Math.max(...rows.map((r) => Math.max(r.gowkRss, r.wkRss)), 1), [rows])
 
   return (
@@ -73,13 +84,17 @@ function CompareChart({ rows, metricView }) {
     >
       {rows.map((row) => {
         const speed = speedup(row)
+        const libraryRow = LIBRARY_PDF.find((item) => item.n === row.pages)
+        const librarySpeed = libraryRow ? row.wkMs / libraryRow.ms : null
         const gowkRssMb = row.gowkRss / 1024
         const wkRssMb = row.wkRss / 1024
 
         let gowkWidth = '0%'
         let wkWidth = '0%'
+        let libWidth = null
         let gowkLabel = ''
         let wkLabel = ''
+        let libLabel = ''
         let note = null
 
         if (metricView === 'time') {
@@ -87,15 +102,30 @@ function CompareChart({ rows, metricView }) {
           wkWidth = `${Math.max(4, (row.wkMs / maxMs) * 100)}%`
           gowkLabel = formatMs(row.gowkMs)
           wkLabel = formatMs(row.wkMs)
+          if (libraryRow) {
+            libWidth = `${Math.max(4, (libraryRow.ms / maxMs) * 100)}%`
+            libLabel = formatMs(libraryRow.ms)
+          }
           note = (
             <p className="bench-pair-note">
-              <strong>{formatSpeedup(speed)}</strong> faster
+              <strong>{formatSpeedup(speed)}</strong> faster CLI
+              {librarySpeed !== null && (
+                <>
+                  {' ·'}
+                  <br />
+                  <strong>{formatSpeedup(librarySpeed)}</strong> faster Go library
+                </>
+              )}
             </p>
           )
         } else if (metricView === 'speedup') {
           gowkWidth = `${Math.max(6, (speed / maxSpeedup) * 100)}%`
           wkWidth = `${Math.max(6, (1.0 / maxSpeedup) * 100)}%`
           gowkLabel = `${formatSpeedup(speed)}`
+          if (librarySpeed !== null) {
+            libWidth = `${Math.max(6, (librarySpeed / maxSpeedup) * 100)}%`
+            libLabel = formatSpeedup(librarySpeed)
+          }
           wkLabel = '1.00x baseline'
           note = (
             <p className="bench-pair-note">
@@ -123,13 +153,26 @@ function CompareChart({ rows, metricView }) {
               <span className="bench-pair-badge">{formatPdfSize(row.gowkBytes)} PDF</span>
             </div>
             <div className="bench-bars">
+              {libWidth !== null && (
+                <div className="bench-bar-row">
+                  <span className="bench-engine">gowk lib</span>
+                  <div className="bench-bar-track">
+                    <div
+                      className="bench-bar bench-bar-lib"
+                      style={{ width: libWidth }}
+                      title={`gowkhtmltopdf Go library: ${libLabel}`}
+                    />
+                  </div>
+                  <span className="bench-bar-time">{libLabel}</span>
+                </div>
+              )}
               <div className="bench-bar-row">
-                <span className="bench-engine">gowk</span>
+                <span className="bench-engine">gowk cli</span>
                 <div className="bench-bar-track">
                   <div
                     className="bench-bar bench-bar-gowk"
                     style={{ width: gowkWidth }}
-                    title={`gowkhtmltopdf: ${gowkLabel}`}
+                    title={`gowkhtmltopdf CLI: ${gowkLabel}`}
                   />
                 </div>
                 <span className="bench-bar-time">{gowkLabel}</span>
@@ -150,6 +193,92 @@ function CompareChart({ rows, metricView }) {
           </article>
         )
       })}
+    </div>
+  )
+}
+
+function SummaryCliTable({ activeFilter }) {
+  const rows = CLI_ROWS.filter((row) => CHART_PAGES.includes(row.pages))
+
+  return (
+    <div className="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Pages</th>
+            <th scope="col">gowk cli</th>
+            <th scope="col">gowk lib</th>
+            <th scope="col">wkhtml</th>
+            <th scope="col">Speedup</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => {
+            const isMatch = activeFilter === 'all' || activeFilter === String(row.pages)
+            const isDimmed = activeFilter !== 'all' && !isMatch
+            const libraryRow = LIBRARY_PDF.find((item) => item.n === row.pages)
+            return (
+              <tr
+                key={row.pages}
+                className={`${isDimmed ? 'bench-row-dimmed' : ''} ${
+                  isMatch && activeFilter !== 'all' ? 'bench-row-highlight' : ''
+                }`}
+              >
+                <td>{row.pages}</td>
+                <td>{formatMs(row.gowkMs)}</td>
+                <td>{libraryRow ? formatMs(libraryRow.ms) : '-'}</td>
+                <td>{formatMs(row.wkMs)}</td>
+                <td>
+                  <span className="bench-speedup">{formatSpeedup(speedup(row))}</span>
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function EngineSummaryTable() {
+  const engines = [
+    { name: 'WeasyPrint', rows: WEASYPRINT_ROWS },
+    { name: 'Puppeteer / Chrome', rows: PUPPETEER_ROWS },
+  ]
+
+  return (
+    <div className="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Engine</th>
+            {ENGINE_SUMMARY_PAGES.map((pages) => (
+              <th scope="col" key={pages}>
+                {pages} pages
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {engines.map((engine) => (
+            <tr key={engine.name}>
+              <th scope="row">{engine.name}</th>
+              {ENGINE_SUMMARY_PAGES.map((pages) => {
+                const row = engine.rows.find((item) => item.pages === pages)
+                return (
+                  <td key={pages}>
+                    {row ? (
+                      <span className="bench-speedup">{formatSpeedup(externalSpeedup(row))}</span>
+                    ) : (
+                      '-'
+                    )}
+                  </td>
+                )
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }
@@ -204,12 +333,14 @@ function CompareTable({ activeFilter }) {
                 <td>
                   <span className="bench-speedup">{formatSpeedup(speedup(row))}</span>
                 </td>
-                <td>{formatMb(row.gowkRss)} ({formatKiB(row.gowkRss)})</td>
-                <td>{formatMb(row.wkRss)} ({formatKiB(row.wkRss)})</td>
                 <td>
-                  <span className={`bench-rss bench-rss-${rssTone(row)}`}>
-                    {formatRssDelta(row)}
-                  </span>
+                  {formatMb(row.gowkRss)} ({formatKiB(row.gowkRss)})
+                </td>
+                <td>
+                  {formatMb(row.wkRss)} ({formatKiB(row.wkRss)})
+                </td>
+                <td>
+                  <span className={`bench-rss bench-rss-${rssTone(row)}`}>{formatRssDelta(row)}</span>
                 </td>
                 <td>{formatPdfSize(row.gowkBytes)}</td>
                 <td>{formatPdfSize(row.wkBytes)}</td>
@@ -219,47 +350,6 @@ function CompareTable({ activeFilter }) {
         </tbody>
       </table>
     </div>
-  )
-}
-
-function ExternalTable({ engine, rows, rssNote }) {
-  return (
-    <section className="table-block">
-      <h3 className="table-block-heading">gowkhtmltopdf vs {engine}</h3>
-      <div className="table-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th scope="col">Pages</th>
-              <th scope="col">gowk time</th>
-              <th scope="col">{engine} time</th>
-              <th scope="col">Speedup</th>
-              <th scope="col">gowk RSS</th>
-              <th scope="col">{engine} RSS</th>
-              <th scope="col">gowk PDF</th>
-              <th scope="col">{engine} PDF</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.pages}>
-                <th scope="row">{row.pages}</th>
-                <td>{formatMs(row.gowkMs)}</td>
-                <td>{formatMs(row.engineMs)}</td>
-                <td>
-                  <span className="bench-speedup">{formatSpeedup(externalSpeedup(row))}</span>
-                </td>
-                <td>{formatKiB(row.gowkRss)}</td>
-                <td>{formatKiB(row.engineRss)}</td>
-                <td>{formatPdfSize(row.gowkBytes)}</td>
-                <td>{formatPdfSize(row.engineBytes)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <p className="section-aside bench-explanation">{rssNote}</p>
-    </section>
   )
 }
 
@@ -303,159 +393,53 @@ function InprocTable({ heading, rows, unit }) {
   )
 }
 
-function RelativeTimingTable({ heading, rows, pathLabel }) {
+function HardwareGrid() {
   return (
-    <section className="table-block">
-      <h3 className="table-block-heading">{heading}</h3>
-      <p className="section-aside bench-explanation">
-        Indicative ratio: <code>wkhtmltopdf CLI time / {pathLabel} time</code>. The CLI includes
-        process startup and file handling; the Go path runs directly in the current process.
-      </p>
-      <div className="table-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th scope="col">Pages</th>
-              <th scope="col">wkhtmltopdf CLI</th>
-              <th scope="col">{pathLabel}</th>
-              <th scope="col">Indicative multiplier</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => {
-              const baseline = CLI_ROWS.find((item) => item.pages === row.n)
-              const multiplier = relativeMultiplier(row)
-
-              return (
-                <tr key={row.n}>
-                  <th scope="row">{row.n}</th>
-                  <td>{baseline ? formatMs(baseline.wkMs) : '—'}</td>
-                  <td>{formatMs(row.ms)}</td>
-                  <td>
-                    <span className="bench-speedup">
-                      {multiplier === null ? '—' : formatSpeedup(multiplier)}
-                    </span>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+    <div className="bench-spec-grid">
+      <div className="bench-spec-item">
+        <span className="bench-spec-label">Host Processor</span>
+        <span className="bench-spec-value">13th Gen Intel Core i7-13700HX (24 CPUs, WSL2)</span>
       </div>
-    </section>
-  )
-}
-
-function HardwareSpecCard() {
-  const [isOpen, setIsOpen] = useState(false)
-
-  return (
-    <div className="bench-spec-card">
-      <button
-        type="button"
-        className="bench-spec-header"
-        onClick={() => setIsOpen(!isOpen)}
-        aria-expanded={isOpen}
-        aria-controls="bench-spec-details"
-      >
-        <div className="bench-spec-header-main">
-          <div className="bench-spec-icon-badge">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <rect x="2" y="2" width="20" height="8" rx="2" ry="2" />
-              <rect x="2" y="14" width="20" height="8" rx="2" ry="2" />
-              <line x1="6" y1="6" x2="6.01" y2="6" />
-              <line x1="6" y1="18" x2="6.01" y2="18" />
-            </svg>
-          </div>
-          <div>
-            <div className="bench-spec-title">Hardware & Test Environment Specification</div>
-            <div className="bench-spec-subtitle">
-              13th Gen Intel Core i7-13700HX · Linux WSL2 · cgo=0 (Pure Go) vs Qt WebKit 0.12.6.1
-            </div>
-          </div>
-        </div>
-        <div className="bench-spec-toggle">
-          <span className="bench-spec-toggle-text">{isOpen ? 'Hide Specs' : 'View Specs'}</span>
-          <svg
-            className={`bench-spec-chevron ${isOpen ? 'open' : ''}`}
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-        </div>
-      </button>
-
-      {isOpen && (
-        <div className="bench-spec-content" id="bench-spec-details">
-          <div className="bench-spec-grid">
-            <div className="bench-spec-item">
-              <span className="bench-spec-label">Host Processor</span>
-              <span className="bench-spec-value">13th Gen Intel Core i7-13700HX (24 CPUs, WSL2)</span>
-            </div>
-            <div className="bench-spec-item">
-              <span className="bench-spec-label">Operating System</span>
-              <span className="bench-spec-value">Linux 6.x Kernel (WSL2 / Debian GNU/Linux 12, glibc 2.36)</span>
-            </div>
-            <div className="bench-spec-item">
-              <span className="bench-spec-label">gowkhtmltopdf Engine</span>
-              <span className="bench-spec-value">
-                <code>CGO_ENABLED=0</code> Pure-Go generic binary (VERSION 0.2.5, go1.26.4), zero native C bindings
-              </span>
-            </div>
-            <div className="bench-spec-item">
-              <span className="bench-spec-label">wkhtmltopdf Baseline</span>
-              <span className="bench-spec-value">
-                <code>wkhtmltopdf 0.12.6.1</code> (patched Qt 4.8.7 WebKit, fontconfig, freetype2)
-              </span>
-            </div>
-            <div className="bench-spec-item">
-              <span className="bench-spec-label">Execution Flags</span>
-              <span className="bench-spec-value">
-                <code>{SNAPSHOT.flags}</code>
-              </span>
-            </div>
-            <div className="bench-spec-item">
-              <span className="bench-spec-label">Measurement Method</span>
-              <span className="bench-spec-value">
-                1 discard warmup run + median of 3 measured iterations via <code>/usr/bin/time %M</code>
-              </span>
-            </div>
-            <div className="bench-spec-item">
-              <span className="bench-spec-label">Benchmark Fixture</span>
-              <span className="bench-spec-value">
-                <code>{SNAPSHOT.fixture}</code>
-              </span>
-            </div>
-            <div className="bench-spec-item">
-              <span className="bench-spec-label">Memory Baseline</span>
-              <span className="bench-spec-value">Peak Resident Set Size (RSS) from OS process supervisor</span>
-            </div>
-          </div>
-          <div className="bench-spec-footnote">
-            <span>Snapshot Tag: {SNAPSHOT.date}</span>
-            <span>·</span>
-            <span>Reproduce locally with <code>make bench</code></span>
-          </div>
-        </div>
-      )}
+      <div className="bench-spec-item">
+        <span className="bench-spec-label">Operating System</span>
+        <span className="bench-spec-value">Linux 6.x Kernel (WSL2 / Debian GNU/Linux 12, glibc 2.36)</span>
+      </div>
+      <div className="bench-spec-item">
+        <span className="bench-spec-label">gowkhtmltopdf Engine</span>
+        <span className="bench-spec-value">
+          <code>CGO_ENABLED=0</code> Pure-Go generic binary (VERSION 0.2.5, go1.26.4), zero native C
+          bindings
+        </span>
+      </div>
+      <div className="bench-spec-item">
+        <span className="bench-spec-label">wkhtmltopdf Baseline</span>
+        <span className="bench-spec-value">
+          <code>wkhtmltopdf 0.12.6.1</code> (patched Qt 4.8.7 WebKit, fontconfig, freetype2)
+        </span>
+      </div>
+      <div className="bench-spec-item">
+        <span className="bench-spec-label">Execution Flags</span>
+        <span className="bench-spec-value">
+          <code>{SNAPSHOT.flags}</code>
+        </span>
+      </div>
+      <div className="bench-spec-item">
+        <span className="bench-spec-label">Measurement Method</span>
+        <span className="bench-spec-value">
+          CLI: 1 discard warmup + median of 3 timed runs via <code>/usr/bin/time %M</code>.
+          In-process: median of three fresh <code>1x</code> processes.
+        </span>
+      </div>
+      <div className="bench-spec-item">
+        <span className="bench-spec-label">Benchmark Fixture</span>
+        <span className="bench-spec-value">
+          <code>{SNAPSHOT.fixture}</code>
+        </span>
+      </div>
+      <div className="bench-spec-item">
+        <span className="bench-spec-label">Memory Baseline</span>
+        <span className="bench-spec-value">Peak Resident Set Size (RSS) from OS process supervisor</span>
+      </div>
     </div>
   )
 }
@@ -489,9 +473,8 @@ export default function BenchmarksPage() {
           <p className="lede">
             The current generic <code>gowkhtmltopdf</code> binary was timed against the installed
             wkhtmltopdf {SNAPSHOT.wkhtml.replace('wkhtmltopdf ', '')} on the same report fixture.
-            It is faster at every tested size. The public Go library removes the process boundary
-            altogether: its 2-page result is about {LIBRARY_HEADLINE.displayMultiplier}x faster
-            than the wkhtmltopdf CLI baseline.
+            It was faster and used less peak RSS at every tested size, 2 through 500 pages. The
+            public Go library removes the process boundary altogether.
           </p>
         </div>
         <div className="bench-hero-stats" aria-label="Headline comparison">
@@ -508,62 +491,31 @@ export default function BenchmarksPage() {
             </span>
           </div>
           <div>
-            <strong>every size</strong>
-            <span>2 through 500 pages, gowk was the faster process</span>
-          </div>
-          <div>
             <strong>~{LIBRARY_HEADLINE.displayMultiplier}x</strong>
             <span>2 pages · public Go library vs wkhtmltopdf CLI</span>
           </div>
         </div>
       </section>
 
-      {/* Hardware & Test Environment Specification Card */}
-      <HardwareSpecCard />
-
-      <div className="statband">
-        <div className="statband-item">
-          <div className="statband-value">{formatMs(HEADLINE.smallGowk)}</div>
-          <div className="statband-label">2-page report, gowk CLI</div>
-        </div>
-        <div className="statband-item">
-          <div className="statband-value">{formatMs(HEADLINE.smallWk)}</div>
-          <div className="statband-label">same report, wkhtmltopdf</div>
-        </div>
-        <div className="statband-item">
-          <div className="statband-value">{formatMs(HEADLINE.largeGowk)}</div>
-          <div className="statband-label">500-page report, gowk CLI</div>
-        </div>
-        <div className="statband-item">
-          <div className="statband-value">{formatMs(HEADLINE.largeWk)}</div>
-          <div className="statband-label">500-page report, wkhtmltopdf</div>
-        </div>
-      </div>
-
-      {/* Direct Process Comparison Section with Interactive Controls */}
       <section className="bench-section" aria-labelledby="bench-chart-heading">
         <div className="section-heading-row">
           <div>
             <h2 id="bench-chart-heading">Direct process comparison</h2>
             <p className="section-aside bench-explanation">
               Same HTML, same flags (<code>{SNAPSHOT.flags}</code>), median of three timed runs after
-              one warmup. {activeMetricObj.desc}.
+              one warmup. {activeMetricObj.desc}. <code>gowk lib</code> is the {CURRENT_CAPTURE.date}
+              {' '}in-process capture (median of three fresh <code>1x</code> processes), not process
+              wall time.
             </p>
           </div>
         </div>
 
-        {/* Interactive Filter & Metric Control Toolbar */}
         <div className="bench-toolbar" role="toolbar" aria-label="Benchmark view controls">
-          {/* Workload Filter Tabs */}
           <div className="bench-control-group">
             <span className="bench-control-label" id="filter-workload-label">
               Workload Filter:
             </span>
-            <div
-              className="bench-tabs"
-              role="tablist"
-              aria-labelledby="filter-workload-label"
-            >
+            <div className="bench-tabs" role="tablist" aria-labelledby="filter-workload-label">
               {WORKLOAD_FILTERS.map((wf) => (
                 <button
                   key={wf.id}
@@ -579,7 +531,6 @@ export default function BenchmarksPage() {
             </div>
           </div>
 
-          {/* Metric View Switcher */}
           <div className="bench-control-group">
             <span className="bench-control-label" id="metric-view-label">
               Metric View:
@@ -606,168 +557,131 @@ export default function BenchmarksPage() {
         </div>
 
         <CompareChart rows={displayedChartRows} metricView={metricView} />
-      </section>
 
-      <section className="bench-section" aria-labelledby="bench-table-heading">
-        <div className="section-heading-row">
-          <div>
-            <h2 id="bench-table-heading">Full CLI matrix</h2>
-            <p className="lede">
-              Requested page counts match rendered page counts. PDF byte counts are the last timed
-              output. Memory is peak RSS, not Go <code>B/op</code>.
-            </p>
+        <section className="table-block">
+          <h3 className="table-block-heading">Exact numbers</h3>
+          <SummaryCliTable activeFilter={activeFilter} />
+        </section>
+
+        <details className="bench-details">
+          <summary>Full matrix: 2 to 500 pages with RSS and PDF sizes</summary>
+          <div className="bench-details-body">
+            <CompareTable activeFilter={activeFilter} />
           </div>
-        </div>
-        <CompareTable activeFilter={activeFilter} />
+        </details>
       </section>
 
       <section className="bench-section" aria-labelledby="bench-external-heading">
         <div className="section-heading-row">
           <div>
-            <h2 id="bench-external-heading">External renderer comparisons</h2>
+            <h2 id="bench-external-heading">Against other engines</h2>
             <p className="lede">
-              The same report fixture was printed through WeasyPrint and Puppeteer/Chrome. These
-              matrices use the external harness&apos;s 2, 10, 50, and 100 page sizes.
+              The same report fixture was printed through WeasyPrint and Puppeteer/Chrome. Cells are
+              the gowkhtmltopdf speedup at that page count.
             </p>
           </div>
         </div>
-        <ExternalTable
-          engine="WeasyPrint"
-          rows={WEASYPRINT_ROWS}
-          rssNote="WeasyPrint RSS is the measured process peak from /usr/bin/time %M."
-        />
-        <ExternalTable
-          engine="Puppeteer / Chrome"
-          rows={PUPPETEER_ROWS}
-          rssNote="Puppeteer RSS is the peak process-tree RSS for the Node driver and headless Chrome descendants; it is not directly equivalent to a single-process %M reading."
-        />
+        <section className="table-block">
+          <h3 className="table-block-heading">Speedup vs each engine</h3>
+          <EngineSummaryTable />
+        </section>
+        <p className="section-aside bench-explanation">
+          Puppeteer RSS is the peak process-tree reading for Node plus headless Chrome, not a
+          single-process <code>%M</code> value. Full time, RSS, and PDF rows for both engines live in
+          the performance notes.
+        </p>
       </section>
 
-      <aside className="callout callout-info" role="note">
+      <aside className="callout callout-info bench-callout" role="note">
         <div className="callout-marker" aria-hidden="true">
           i
         </div>
         <div className="callout-body">
           <span className="callout-kicker">How to read memory</span>
-          <h3 className="callout-title">Faster at every size. Lower RSS only through 50 pages.</h3>
+          <h3 className="callout-title">Faster and lighter at every size.</h3>
           <p>
-            On this generic CLI path, gowkhtmltopdf uses less peak RSS from 2 through 50 pages and
-            more RSS from 100 through 500 pages. The 500-page PDF is still smaller (1.42 MB vs 2.04
-            MB). Earlier island-era snapshots that claimed lower RSS at every size are historical
-            and do not describe the current generic converter.
+            On this generic CLI path, gowkhtmltopdf beats wkhtmltopdf on wall time and uses less
+            peak RSS at every tested size, including 500 pages (79,296 KiB vs 123,076 KiB). The
+            500-page PDF is also smaller (1.42 MB vs 2.04 MB). Earlier captures that showed higher
+            gowk RSS from 100 pages on are historical and do not describe the current converter.
           </p>
         </div>
       </aside>
 
-      <section className="bench-section" aria-labelledby="bench-inproc-heading">
-        <div className="section-heading-row">
-          <h2 id="bench-inproc-heading">
-            In-process Go benchmarks ({PERF_TIME_CAPTURE.date} {PERF_TIME_CAPTURE.label})
-          </h2>
-          <p className="section-aside">
-            Three independent <code>1x</code> samples per workload, one fresh process per sample.
-            The median of the three raw values is shown and <code>B/op</code> is never averaged.{' '}
-            <code>B/op</code> is cumulative allocation traffic, not peak RSS.
-          </p>
-        </div>
-        <InprocTable
-          heading="PDF pages (generic request, perf-time closure capture)"
-          rows={INPROC_PDF_GENERIC}
-          unit="Pages"
-        />
-        <RelativeTimingTable
-          heading="In-process PDF multiplier vs wkhtmltopdf CLI (perf-time rows; 2026-09-11 CLI baseline)"
-          rows={INPROC_PDF_GENERIC}
-          pathLabel="in-process Go PDF"
-        />
-        <p className="section-aside bench-explanation">
-          The 2-page rows are fresh-process samples and carry the one-time default-font work (about
-          4.0 MB for the internal path), so they are not like-for-like with the historical
-          multi-iteration matrix below. The 500-page internal <code>B/op</code> is 28.4% to 30.6%
-          below the pre-time baselines. The closure window ran slower on wall time than the phase-6
-          capture 15 minutes earlier (733.48 ms versus 576.33 ms at 500 pages) with identical
-          production source hashes and identical <code>B/op</code>; the phase-6 row is the 2.13x
-          result and met the 615 ms target, the plan floor of 830 ms holds in the closure rows. The
-          image rows trade about 50% more lossless PNG bytes for roughly 2x faster encoding. Raw
-          samples: <code>{PERF_TIME_CAPTURE.raw}</code>.
-        </p>
-        <h3 className="table-block-heading">Historical full matrix ({HISTORY_DATE}, 0.2.4)</h3>
-        <InprocTable
-          heading="PDF pages (generic request, 2026-08-19)"
-          rows={INPROC_PDF_GENERIC_HISTORY}
-          unit="Pages"
-        />
-        <InprocTable
-          heading="Template + PDF pages (generic request, 2026-08-19)"
-          rows={INPROC_TEMPLATE_GENERIC_HISTORY}
-          unit="Pages"
-        />
-        <InprocTable
-          heading="Web-fetch image tiles (2026-08-19)"
-          rows={INPROC_WEB_FETCH_HISTORY}
-          unit="Tiles"
-        />
-        <InprocTable
-          heading="Inline image tiles (2026-08-19)"
-          rows={INPROC_INLINE_HISTORY}
-          unit="Tiles"
-        />
-      </section>
-
-      <section className="bench-section" aria-labelledby="bench-library-heading">
-        <div className="section-heading-row">
-          <h2 id="bench-library-heading">
-            Public Go library benchmarks ({PERF_TIME_CAPTURE.date} {PERF_TIME_CAPTURE.label})
-          </h2>
-          <p className="section-aside">
-            <code>make bench-lib</code> calls <code>Document.WritePDF</code> and{' '}
-            <code>ImageDocument.WriteImage</code> directly, without starting the CLI or reading
-            HTML from disk.
-          </p>
-        </div>
-        <InprocTable heading="Public PDF pages (perf-time closure capture)" rows={LIBRARY_PDF} unit="Pages" />
-        <RelativeTimingTable
-          heading="Public library PDF multiplier vs wkhtmltopdf CLI (perf-time rows; 2026-09-11 CLI baseline)"
-          rows={LIBRARY_PDF}
-          pathLabel="public Go library PDF"
-        />
-        <InprocTable heading="Public image tiles (perf-time closure capture)" rows={LIBRARY_IMAGE} unit="Tiles" />
-        <h3 className="table-block-heading">Historical full matrix ({HISTORY_DATE}, 0.2.4)</h3>
-        <InprocTable heading="Public PDF pages (2026-08-19)" rows={LIBRARY_PDF_HISTORY} unit="Pages" />
-        <InprocTable
-          heading="Public image tiles (2026-08-19)"
-          rows={LIBRARY_IMAGE_HISTORY}
-          unit="Tiles"
-        />
-      </section>
-
       <section className="bench-section bench-method" aria-labelledby="bench-method-heading">
         <h2 id="bench-method-heading">How this was measured</h2>
-        <ul>
-          <li>
-            Host: {SNAPSHOT.host}. Toolchain: {SNAPSHOT.go}. Date: {SNAPSHOT.date}.
-          </li>
-          <li>
-            {SNAPSHOT.gowk} versus {SNAPSHOT.wkhtml} for the CLI matrix. WeasyPrint and Puppeteer
-            use the external print scripts documented in the benchmark README.
-          </li>
-          <li>
-            Fixture: {SNAPSHOT.fixture}. Method: {SNAPSHOT.method}.
-          </li>
-          <li>This is the generic convert path; the benchmark-only page-island opt-in was removed in the 0.2.6 cleanup.</li>
-          <li>Numbers are a labeled snapshot, not an SLA. Reproduce on your machine.</li>
-        </ul>
-        <pre>
-          <code>{`make bench
-make bench-engine
-make bench-inprocess  # compatibility alias
-make bench-lib`}</code>
-        </pre>
         <p>
-          Full tables, historical snapshots, and caveats live in the{' '}
-          <Link to="/documentation/performance">performance notes</Link>. The source of truth is{' '}
-          <code>testdata/golden/benchmarks/README.md</code> and{' '}
-          <code>documentation/performance.md</code>.
+          Snapshot {SNAPSHOT.date}: {SNAPSHOT.gowk} against {SNAPSHOT.wkhtml} on {SNAPSHOT.host}.
+          Fixture: <code>{SNAPSHOT.fixture}</code>. Method: {SNAPSHOT.method}. Numbers are a labeled
+          snapshot, not an SLA.
+        </p>
+
+        <details className="bench-details">
+          <summary>Environment details and reproduce commands</summary>
+          <div className="bench-details-body">
+            <HardwareGrid />
+            <pre>
+              <code>{`make bench
+make bench-engine
+make bench-lib`}</code>
+            </pre>
+          </div>
+        </details>
+
+        <details className="bench-details">
+          <summary>
+            In-process engine and Go library ({CURRENT_CAPTURE.date} capture) with B/op and
+            allocs/op
+          </summary>
+          <div className="bench-details-body">
+            <p className="section-aside">
+              Three independent <code>1x</code> samples per workload, one fresh process each; the
+              median is shown and <code>B/op</code> is never averaged. <code>B/op</code> is
+              cumulative allocation traffic, not peak RSS, and the 2-page rows include the one-time
+              default-font work.
+            </p>
+            <InprocTable heading="Internal engine PDF pages" rows={INPROC_PDF_GENERIC} unit="Pages" />
+            <InprocTable
+              heading="Public PDF pages (Document.WritePDF)"
+              rows={LIBRARY_PDF}
+              unit="Pages"
+            />
+            <InprocTable
+              heading="Public image tiles (ImageDocument.WriteImage)"
+              rows={LIBRARY_IMAGE}
+              unit="Tiles"
+            />
+            <p className="section-aside">
+              The image rows trade about 50 percent more lossless PNG bytes for roughly 2x faster
+              encoding. Raw samples: <code>{CURRENT_CAPTURE.raw}</code>.
+            </p>
+          </div>
+        </details>
+
+        <details className="bench-details">
+          <summary>Historical snapshots ({HISTORY_DATE}, 0.2.4)</summary>
+          <div className="bench-details-body">
+            <p className="section-aside">
+              Dated rows kept for comparison. They do not describe the current generic converter.
+            </p>
+            <InprocTable heading="Internal PDF pages" rows={INPROC_PDF_GENERIC_HISTORY} unit="Pages" />
+            <InprocTable
+              heading="Template + PDF pages"
+              rows={INPROC_TEMPLATE_GENERIC_HISTORY}
+              unit="Pages"
+            />
+            <InprocTable heading="Web-fetch image tiles" rows={INPROC_WEB_FETCH_HISTORY} unit="Tiles" />
+            <InprocTable heading="Inline image tiles" rows={INPROC_INLINE_HISTORY} unit="Tiles" />
+            <InprocTable heading="Public PDF pages" rows={LIBRARY_PDF_HISTORY} unit="Pages" />
+            <InprocTable heading="Public image tiles" rows={LIBRARY_IMAGE_HISTORY} unit="Tiles" />
+          </div>
+        </details>
+
+        <p>
+          Full tables, RSS details, and historical captures live in the{' '}
+          <Link to="/documentation/performance">performance notes</Link>. The consolidated current
+          capture is <code>documentation/benchmarks.md</code>; the machine-written artifacts are{' '}
+          <code>testdata/golden/benchmarks/*-compare.md</code>.
         </p>
       </section>
     </>

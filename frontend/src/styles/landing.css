@@ -366,10 +366,10 @@ html[data-theme='dark'] .fit-limit .fit-kicker {
   border-color: #3d3520;
 }
 
-.fit-links {
-  display: flex;
-  gap: 18px;
-  margin-top: 14px;
+.fit-card a {
+  color: var(--accent-strong);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 /* Proof strip: minimal */

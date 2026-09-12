@@ -133,7 +133,7 @@
     },
     {
      "heading": "The OSS story",
-     "body": "gowkhtmltopdf is MIT licensed under Chinmay Sawant and requires Go 1.26+. It is an independent clean-room reimplementation of the wkhtmltopdf CLI and behavior, so it shares none of wkhtmltopdf's LGPL obligations and does not ship Qt or WebKit. In the 2026-09-11 CLI comparison capture, the generic CLI was faster than wkhtmltopdf 0.12.6.1 at every tested size: 14.95x at 2 pages and 1.36x at 500 pages. Full rows, RSS, and method are on the Benchmarks page."
+     "body": "gowkhtmltopdf is MIT licensed under Chinmay Sawant and requires Go 1.26+. It is an independent clean-room reimplementation of the wkhtmltopdf CLI and behavior, so it shares none of wkhtmltopdf's LGPL obligations and does not ship Qt or WebKit. In the 2026-09-12 CLI comparison capture, the generic CLI was faster than wkhtmltopdf 0.12.6.1 at every tested size: 18.5x at 2 pages and 3.13x at 500 pages, with lower peak RSS at every size. Full rows, RSS, and method are on the Benchmarks page."
     }
    ]
   },

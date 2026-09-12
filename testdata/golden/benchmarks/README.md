@@ -3,8 +3,10 @@
 These templates are source fixtures for the Go benchmarks in
 `internal/convert/benchmarks_test.go`. They are kept below the golden corpus so
 benchmark inputs stay reviewable and reproducible without committing generated
-PDF or PNG output. The checked-in result snapshot is
-`benchmark-results.txt`.
+PDF or PNG output. The checked-in result snapshot is `benchmark-results.txt`;
+the consolidated keeper for current numbers is
+[`documentation/benchmarks.md`](../../../documentation/benchmarks.md), and this
+file carries the current snapshot plus the dated historical record.
 
 The benchmark matrix uses 2, 5, 10, 20, 50, 100, 200, 250, and 500 page-sized
 sections for PDF and template rendering. Image mode renders one raster canvas,
@@ -140,7 +142,163 @@ GOWKHTMLTOPDF_GENERATE_BENCHMARK_OUTPUTS=1 \
 This writes `live-movie-listing-010.pdf` and
 `live-movie-listing-010.png`.
 
-## Current snapshot (2026-09-11 perf-time phase-7 closure capture)
+## Current snapshot (2026-09-12 full capture)
+
+Host: Linux 6.6.87.2-microsoft-standard-WSL2 x86_64, 13th Gen Intel Core
+i7-13700HX (WSL2, 24 CPUs, 7.6 GiB RAM). Toolchain: go1.26.4. Engine: generic
+`bin/gowkhtmltopdf`, `VERSION` **0.2.5** on the 0.2.6 working tree
+(`chore/review-026`), built with `make build`. wkhtmltopdf **0.12.6.1 (with
+patched qt)** at `/usr/local/bin/wkhtmltopdf`.
+
+CLI and external rows are the median of three timed runs after one warmup:
+wall time from `/usr/bin/time`, peak RSS from `%M` (Puppeteer samples the
+process tree). In-process rows are `go test -benchmem -benchtime=1x -count=1`,
+one fresh process per round; each value is the median of three rounds, and
+`B/op` and `allocs/op` are the median-time sample's raw values, never averages.
+Reproduce with `make build`, `make bench-cli-compare`,
+`./scripts/bench-external.sh`, and
+`./scripts/bench-performance-recovery.sh --mode=<mode>`.
+
+The consolidated keeper for this capture is
+[`documentation/benchmarks.md`](../../../documentation/benchmarks.md). The
+machine-generated committed snapshots live in this directory:
+[`cli-compare.md`](cli-compare.md),
+[`weasyprint-compare.md`](weasyprint-compare.md),
+[`puppeteer-compare.md`](puppeteer-compare.md), and their CSV siblings; the
+gitignored raw capture is `plans/0.2.6/perf-review/results/2026-09-12/`.
+
+### Direct CLI vs wkhtmltopdf (2026-09-12)
+
+Same generated report fixture (`report.html.tmpl`, 20 invoice rows per
+requested page). gowkhtmltopdf uses `--quiet --allow-local-files -o OUTPUT
+INPUT`; wkhtmltopdf 0.12.6.1 (patched Qt) uses `--quiet
+--enable-local-file-access INPUT OUTPUT`. Each cell is the **median of three
+timed process runs after one warmup**. Wall time is Go `time.Since` around
+`/usr/bin/time`; peak RSS is `%M` in KiB. Requested page counts matched
+rendered page counts.
+
+```sh
+make bench-cli-compare
+```
+
+| Pages | Gowk time | wkhtmltopdf time | Speedup | Gowk RSS | wkhtmltopdf RSS | Gowk PDF bytes | wkhtmltopdf PDF bytes |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 2 | 14 ms | 260 ms | 18.50x | 19,200 KiB | 44,720 KiB | 34,210 | 18,486 |
+| 5 | 19 ms | 269 ms | 14.37x | 21,696 KiB | 45,168 KiB | 42,795 | 30,584 |
+| 10 | 26 ms | 286 ms | 11.18x | 25,152 KiB | 46,016 KiB | 57,239 | 50,994 |
+| 20 | 36 ms | 315 ms | 8.74x | 25,920 KiB | 47,620 KiB | 84,680 | 90,742 |
+| 50 | 69 ms | 403 ms | 5.85x | 29,760 KiB | 52,128 KiB | 167,525 | 210,678 |
+| 100 | 126 ms | 546 ms | 4.35x | 35,904 KiB | 59,460 KiB | 306,321 | 411,260 |
+| 200 | 234 ms | 852 ms | 3.64x | 44,928 KiB | 74,308 KiB | 583,670 | 816,285 |
+| 250 | 288 ms | 1.008 s | 3.50x | 51,264 KiB | 81,820 KiB | 722,322 | 1,019,315 |
+| 500 | 562 ms | 1.760 s | 3.13x | 79,296 KiB | 123,076 KiB | 1,420,537 | 2,036,776 |
+
+gowkhtmltopdf is faster and uses less peak RSS at every tested size, including
+500 pages. This supersedes the older claim that gowk RSS was higher from 100
+pages on. Raw rows: [`cli-compare-results.csv`](cli-compare-results.csv),
+[`cli-compare.md`](cli-compare.md).
+
+### External renderer comparisons (2026-09-12)
+
+The external harness uses the same report fixture and reports the median of
+three timed process runs after one warmup. Its default matrix is 2, 10, 50,
+and 100 pages. PDF page counts were checked with Ghostscript.
+
+| Pages | Gowk time | WeasyPrint time | Speedup | Gowk RSS | WeasyPrint RSS |
+|---:|---:|---:|---:|---:|---:|
+| 2 | 16 ms | 634 ms | 40.86x | 19,584 KiB | 81,648 KiB |
+| 10 | 27 ms | 1.434 s | 53.62x | 24,576 KiB | 111,104 KiB |
+| 50 | 71 ms | 5.441 s | 76.88x | 29,760 KiB | 252,412 KiB |
+| 100 | 124 ms | 11.072 s | 89.43x | 34,752 KiB | 427,468 KiB |
+
+| Pages | Gowk time | Puppeteer / Chrome time | Speedup | Gowk RSS | Puppeteer RSS |
+|---:|---:|---:|---:|---:|---:|
+| 2 | 16 ms | 1.445 s | 92.85x | 19,200 KiB | 940,600 KiB |
+| 10 | 26 ms | 1.488 s | 57.16x | 24,192 KiB | 1,019,952 KiB |
+| 50 | 72 ms | 1.801 s | 25.10x | 29,760 KiB | 1,119,360 KiB |
+| 100 | 127 ms | 2.178 s | 17.16x | 35,136 KiB | 1,240,920 KiB |
+
+WeasyPrint RSS is the measured process peak from `/usr/bin/time %M`.
+Puppeteer RSS is the peak process-tree RSS for the Node driver and headless
+Chrome descendants, so the two RSS columns are not directly equivalent.
+Raw rows: [`weasyprint-compare.md`](weasyprint-compare.md),
+[`puppeteer-compare.md`](puppeteer-compare.md), and their paired CSV files.
+
+### In-process engine matrix (generic, 2026-09-12)
+
+Full ascending warm matrix in one process per round; the 2-page row is the
+first conversion in its process and carries the one-time font load. Median of
+three rounds.
+
+| Pages | Time | B/op | allocs/op |
+|---:|---:|---:|---:|
+| 2 | 5.14 ms | 4.09 MB | 4,136 |
+| 5 | 7.75 ms | 6.84 MB | 8,165 |
+| 10 | 11.77 ms | 4.63 MB | 14,879 |
+| 20 | 21.24 ms | 6.02 MB | 28,411 |
+| 50 | 53.54 ms | 13.24 MB | 69,498 |
+| 100 | 106.56 ms | 23.26 MB | 137,955 |
+| 200 | 204.88 ms | 44.66 MB | 275,206 |
+| 250 | 259.06 ms | 56.50 MB | 344,017 |
+| 500 | 535.34 ms | 111.44 MB | 687,421 |
+
+### Public library PDF matrix (2026-09-12)
+
+`make bench-lib` calls the public API directly, without a CLI process or disk
+HTML. Median of three fresh 1x processes.
+
+| Pages | Time | B/op | allocs/op |
+|---:|---:|---:|---:|
+| 2 | 5.75 ms | 4.11 MB | 4,144 |
+| 5 | 8.83 ms | 6.87 MB | 8,179 |
+| 10 | 13.71 ms | 4.67 MB | 14,882 |
+| 20 | 21.13 ms | 6.09 MB | 28,417 |
+| 50 | 51.83 ms | 12.59 MB | 69,478 |
+| 100 | 107.16 ms | 23.45 MB | 137,942 |
+| 200 | 222.68 ms | 45.32 MB | 275,212 |
+| 250 | 266.55 ms | 57.32 MB | 344,020 |
+| 500 | 532.24 ms | 113.10 MB | 687,423 |
+
+### Public library image matrix (2026-09-12)
+
+Tile counts are the benchmark's requested output tiles, 1024 px wide. The PNG
+writer is lossless with filter-none level-2 compression; 250 tiles encode to
+141,917 B and 500 tiles to 282,749 B.
+
+| Tiles | Time | B/op | allocs/op |
+|---:|---:|---:|---:|
+| 2 | 14.12 ms | 11.91 MB | 490 |
+| 5 | 12.25 ms | 3.45 MB | 578 |
+| 10 | 13.75 ms | 3.68 MB | 872 |
+| 20 | 12.96 ms | 3.82 MB | 1,137 |
+| 50 | 17.39 ms | 4.20 MB | 1,917 |
+| 100 | 30.16 ms | 20.00 MB | 3,215 |
+| 200 | 55.80 ms | 37.09 MB | 5,793 |
+| 250 | 16.78 ms | 6.38 MB | 7,179 |
+| 500 | 34.02 ms | 10.40 MB | 13,705 |
+
+### CLI process, gowk only (cli-rss, 2026-09-12)
+
+`/usr/bin/time %e` at 10 ms resolution, so the small sizes quantize. The CLI
+comparison table above is the vs-wkhtmltopdf view; this is the gowk-only
+cross-check. Median of 3 timed runs after one warmup.
+
+| Pages | Time | Peak RSS |
+|---:|---:|---:|
+| 2 | 10 ms | 19,584 KiB |
+| 5 | 10 ms | 22,080 KiB |
+| 10 | 20 ms | 24,768 KiB |
+| 20 | 30 ms | 26,496 KiB |
+| 50 | 70 ms | 29,760 KiB |
+| 100 | 120 ms | 34,752 KiB |
+| 200 | 220 ms | 46,464 KiB |
+| 250 | 280 ms | 51,840 KiB |
+| 500 | 560 ms | 80,064 KiB |
+
+## Historical snapshot (2026-09-11 perf-time phase-7 closure capture)
+
+This capture is superseded by the 2026-09-12 full capture above and is kept as
+the dated perf-time phase-7 closure record.
 
 Host: Linux amd64, 13th Gen Intel Core i7-13700HX (WSL2, 24 CPUs, 7.6 GiB
 RAM). Toolchain: go1.26.4. The capture ran on the uncommitted 0.2.6 warm-path
@@ -273,8 +431,8 @@ The same rows are recorded as Snapshot L in
 
 The CLI rows above are this capture's `cli-rss` mode, which runs
 gowkhtmltopdf only, so they are not the `make bench-cli-compare` boundary; the
-wkhtmltopdf comparison table remains in the historical 2026-09-11 recovery
-section below. The 2-page and 250-tile rows are fresh-process `1x` samples, so
+2026-09-11 wkhtmltopdf comparison table remains in the historical 2026-09-11
+recovery section below. The 2-page and 250-tile rows are fresh-process `1x` samples, so
 the one-time default-font work is charged to the single operation; they are
 cold rows and are not like-for-like with multi-iteration matrix rows.
 
@@ -356,8 +514,10 @@ make bench-cli-compare
 | 250 | 599 ms | 988 ms | 1.65x | 139,584 KiB | 81,884 KiB | 721,739 | 1,019,315 |
 | 500 | **1.288 s** | **1.753 s** | **1.36x** | **240,960 KiB** | **123,172 KiB** | **1,419,234** | **2,036,776** |
 
-gowkhtmltopdf is faster at every tested size. Peak RSS is lower through 50
-pages and higher from 100 pages on this generic path. Raw rows:
+gowkhtmltopdf is faster at every tested size. Peak RSS was lower through 50
+pages and higher from 100 pages on this generic path in this capture; the
+2026-09-12 capture above shows less peak RSS at every size, including 500
+pages. Raw rows:
 [`cli-compare-results.csv`](cli-compare-results.csv),
 [`cli-compare.md`](cli-compare.md).
 
@@ -396,7 +556,7 @@ Toolchain: go1.26.4. Freshly built `gowkhtmltopdf` **0.2.4** on the
 
 This historical snapshot replaced the 2026-08-14 generic rows and the
 2026-08-09 island-era CLI-vs-wkhtml table when it was current. It is
-superseded by the 2026-09-11 capture above and is kept as the dated 0.2.4
+superseded by the 2026-09-12 capture above and is kept as the dated 0.2.4
 comparison. Older snapshots below stay for history.
 
 ### Direct CLI vs wkhtmltopdf
@@ -588,7 +748,7 @@ Request mode: **generic** (not certified-islands). Cache: warm GOCACHE.
 
 These are internal engine allocation numbers, not process RSS. Snapshot D
 CLI RSS (54,632 KiB / 960 ms at 500 pages) is historical vs CR-02 CLI
-island removal. The current generic-CLI process matrix is the 2026-08-19
+island removal. The current generic-CLI process matrix is the 2026-09-12
 table above.
 
 ## Stored 2026-08-12 Snapshot D benchmark
@@ -710,8 +870,8 @@ visual golden drift was observed in the existing image tests.
 
 The following are historical one-iteration internal-engine snapshots from Go 1.26.4
 on Linux/amd64 under WSL2 with 24 CPUs. They are retained for allocation and
-benchmark-history context; the current direct CLI comparison is documented in
-the section below. The report template contains 20 realistic rows per page,
+benchmark-history context; the current direct CLI comparison is the 2026-09-12
+snapshot at the top of this file. The report template contains 20 realistic rows per page,
 filling the available page without spilling into a second physical page.
 PDF and template rows are page counts; image rows are image tile counts because
 image mode renders one raster canvas.
@@ -726,8 +886,8 @@ landed. Image rows were re-run in the same session.
 | Web-fetch image tiles | 17.99ms | 16.97ms | 25.96ms | 25.16ms | 34.46ms | 54.84ms | 93.96ms | 117.38ms | 208.25ms |
 | Inline image tiles | 16.52ms | 14.47ms | 17.22ms | 20.52ms | 30.00ms | 49.48ms | 85.71ms | 99.72ms | 182.83ms |
 
-PDF / Template: certified workspace path (2026-08-09). The current 500-page
-PDF count-3 median is **0.500s / 157.6MB / 529.4K allocs**, versus the
+PDF / Template: certified workspace path (2026-08-09). The then-current
+500-page PDF count-3 median is **0.500s / 157.6MB / 529.4K allocs**, versus the
 published **2.10s / 1.48GB / 3.93M** bar. Generated PDF artifacts are local
 only and are not part of the benchmark snapshot commit.
 
@@ -756,7 +916,7 @@ snapshots.
 ### Historical direct CLI comparison: gowkhtmltopdf vs wkhtmltopdf (2026-08-09, island-era)
 
 This matrix is **historical pre-CR-02 / island-era CLI**. Ordinary CLI
-documents no longer take the page-island path. Use the 2026-08-19 table
+documents no longer take the page-island path. Use the 2026-09-12 table
 above for current generic-CLI claims.
 
 This matrix was re-measured on 2026-08-09 using the same generated report

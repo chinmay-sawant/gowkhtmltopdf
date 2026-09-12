@@ -14,7 +14,7 @@ Puppeteer RSS is the peak process-tree RSS (node driver + headless Chrome childr
 
 | Pages | Gowk time | Puppeteer time | Speedup | Gowk RSS | Puppeteer RSS | Gowk PDF bytes | Puppeteer PDF bytes |
 |---:|---:|---:|---:|---:|---:|---:|---:|
-| 2 | 21 ms | 1.470 s | 68.85x | 24,960 KiB | 973,260 KiB | 34,209 | 134,319 |
-| 10 | 37 ms | 1.550 s | 42.45x | 28,800 KiB | 1,021,160 KiB | 57,231 | 450,799 |
-| 50 | 120 ms | 1.815 s | 15.08x | 48,576 KiB | 1,114,380 KiB | 167,442 | 1,981,892 |
-| 100 | 249 ms | 2.179 s | 8.74x | 68,928 KiB | 1,241,476 KiB | 306,144 | 3,936,067 |
+| 2 | 16 ms | 1.445 s | 92.85x | 19,200 KiB | 940,600 KiB | 34,210 | 134,319 |
+| 10 | 26 ms | 1.488 s | 57.16x | 24,192 KiB | 1,019,952 KiB | 57,239 | 450,799 |
+| 50 | 72 ms | 1.801 s | 25.10x | 29,760 KiB | 1,119,360 KiB | 167,525 | 1,981,892 |
+| 100 | 127 ms | 2.178 s | 17.16x | 35,136 KiB | 1,240,920 KiB | 306,321 | 3,936,067 |

@@ -1,27 +1,21 @@
-// Benchmark snapshots for the Benchmarks page.
+// Benchmark data for the Benchmarks page.
 //
-// Current engine snapshot: 2026-09-11 perf-time phase-7 closure capture on the
-// uncommitted 0.2.6 warm-path working tree (VERSION 0.2.5). The warm matrix,
-// standalone, and library rows are three independent 1x samples per workload
-// (median of the three raw values, B/op is never averaged). The implementation
-// result on the same production source is the phase-6 capture 15 minutes
-// earlier: warm 500p 576.33 ms / 163.03 MB (2.13x). The closure window ran
-// slower on wall time with unchanged B/op; both are labeled below. Raw
-// evidence: plans/0.2.6/perf-time/results/phase-7/final-capture.md and
-// Snapshot M in testdata/golden/benchmarks/benchmark-results.txt.
+// Current capture: 2026-09-12 full-matrix capture on the 0.2.6 working tree
+// (VERSION 0.2.5). CLI and external rows: median of three timed runs after one
+// warmup. In-process rows: median of three fresh-process -benchtime=1x
+// -count=1 rounds; B/op and allocs/op are the median-time sample's raw values,
+// never averages. Consolidated record: documentation/benchmarks.md. Raw
+// results: plans/0.2.6/perf-review/results/2026-09-12/.
 //
-// Current CLI comparison: the 2026-09-11 recovery capture, kept dated because
-// the perf-time capture measured gowkhtmltopdf only (cli-rss mode).
-//
-// Historical snapshots: the 2026-09-11 perf-improve phase-7 engine rows, the
-// 2026-09-11 recovery capture, and the 2026-08-19 full 0.2.4 matrices, all
-// kept dated so no older number is relabeled as current.
+// Historical snapshots stay dated and are never relabeled: the 2026-09-11
+// perf-time closure capture, the 2026-09-11 recovery capture, and the
+// 2026-08-19 full 0.2.4 matrices below.
 
 export const SNAPSHOT = {
-  date: '2026-09-11',
+  date: '2026-09-12',
   host: 'Linux amd64, 13th Gen Intel Core i7-13700HX (WSL2, 24 CPUs)',
   go: 'go1.26.4',
-  gowk: 'gowkhtmltopdf 0.2.6 warm-path working tree (VERSION 0.2.5), freshly built generic CLI',
+  gowk: 'gowkhtmltopdf 0.2.5 generic CLI (0.2.6 working tree), freshly built',
   wkhtml: 'wkhtmltopdf 0.12.6.1 (with patched qt)',
   flags: '--quiet --allow-local-files -o OUTPUT INPUT',
   method: 'median of 3 timed process runs after 1 warmup',
@@ -29,74 +23,78 @@ export const SNAPSHOT = {
 }
 
 export const CLI_ROWS = [
-  { pages: 2, gowkMs: 17, wkMs: 258, speedup: 14.95, gowkRss: 24576, wkRss: 44716, gowkBytes: 34209, wkBytes: 18486 },
-  { pages: 5, gowkMs: 23, wkMs: 266, speedup: 11.44, gowkRss: 26496, wkRss: 45068, gowkBytes: 42791, wkBytes: 30584 },
-  { pages: 10, gowkMs: 34, wkMs: 286, speedup: 8.29, gowkRss: 28608, wkRss: 46024, gowkBytes: 57231, wkBytes: 50994 },
-  { pages: 20, gowkMs: 53, wkMs: 306, speedup: 5.79, gowkRss: 33984, wkRss: 47772, gowkBytes: 84654, wkBytes: 90742 },
-  { pages: 50, gowkMs: 122, wkMs: 394, speedup: 3.23, gowkRss: 47616, wkRss: 52240, gowkBytes: 167442, wkBytes: 210678 },
-  { pages: 100, gowkMs: 229, wkMs: 541, speedup: 2.36, gowkRss: 69120, wkRss: 59380, gowkBytes: 306144, wkBytes: 411260 },
-  { pages: 200, gowkMs: 468, wkMs: 830, speedup: 1.77, gowkRss: 113280, wkRss: 74492, gowkBytes: 583231, wkBytes: 816285 },
-  { pages: 250, gowkMs: 599, wkMs: 988, speedup: 1.65, gowkRss: 139584, wkRss: 81884, gowkBytes: 721739, wkBytes: 1019315 },
-  { pages: 500, gowkMs: 1288, wkMs: 1753, speedup: 1.36, gowkRss: 240960, wkRss: 123172, gowkBytes: 1419234, wkBytes: 2036776 },
+  { pages: 2, gowkMs: 14, wkMs: 260, speedup: 18.5, gowkRss: 19200, wkRss: 44720, gowkBytes: 34210, wkBytes: 18486 },
+  { pages: 5, gowkMs: 19, wkMs: 269, speedup: 14.37, gowkRss: 21696, wkRss: 45168, gowkBytes: 42795, wkBytes: 30584 },
+  { pages: 10, gowkMs: 26, wkMs: 286, speedup: 11.18, gowkRss: 25152, wkRss: 46016, gowkBytes: 57239, wkBytes: 50994 },
+  { pages: 20, gowkMs: 36, wkMs: 315, speedup: 8.74, gowkRss: 25920, wkRss: 47620, gowkBytes: 84680, wkBytes: 90742 },
+  { pages: 50, gowkMs: 69, wkMs: 403, speedup: 5.86, gowkRss: 29760, wkRss: 52128, gowkBytes: 167525, wkBytes: 210678 },
+  { pages: 100, gowkMs: 126, wkMs: 546, speedup: 4.35, gowkRss: 35904, wkRss: 59460, gowkBytes: 306321, wkBytes: 411260 },
+  { pages: 200, gowkMs: 234, wkMs: 852, speedup: 3.64, gowkRss: 44928, wkRss: 74308, gowkBytes: 583670, wkBytes: 816285 },
+  { pages: 250, gowkMs: 288, wkMs: 1008, speedup: 3.5, gowkRss: 51264, wkRss: 81820, gowkBytes: 722322, wkBytes: 1019315 },
+  { pages: 500, gowkMs: 562, wkMs: 1760, speedup: 3.13, gowkRss: 79296, wkRss: 123076, gowkBytes: 1420537, wkBytes: 2036776 },
 ]
 
 export const WEASYPRINT_ROWS = [
-  { pages: 2, gowkMs: 21, engineMs: 653, speedup: 31.13, gowkRss: 25152, engineRss: 81932, gowkBytes: 34209, engineBytes: 15586 },
-  { pages: 10, gowkMs: 36, engineMs: 1431, speedup: 39.80, gowkRss: 28416, engineRss: 111444, gowkBytes: 57231, engineBytes: 45172 },
-  { pages: 50, gowkMs: 124, engineMs: 5482, speedup: 44.07, gowkRss: 48000, engineRss: 252448, gowkBytes: 167442, engineBytes: 190545 },
-  { pages: 100, gowkMs: 245, engineMs: 11119, speedup: 45.29, gowkRss: 65856, engineRss: 427880, gowkBytes: 306144, engineBytes: 372867 },
+  { pages: 2, gowkMs: 16, engineMs: 634, speedup: 40.86, gowkRss: 19584, engineRss: 81648, gowkBytes: 34210, engineBytes: 15584 },
+  { pages: 10, gowkMs: 27, engineMs: 1434, speedup: 53.62, gowkRss: 24576, engineRss: 111104, gowkBytes: 57239, engineBytes: 45174 },
+  { pages: 50, gowkMs: 71, engineMs: 5441, speedup: 76.88, gowkRss: 29760, engineRss: 252412, gowkBytes: 167525, engineBytes: 190544 },
+  { pages: 100, gowkMs: 124, engineMs: 11072, speedup: 89.43, gowkRss: 34752, engineRss: 427468, gowkBytes: 306321, engineBytes: 372867 },
 ]
 
 export const PUPPETEER_ROWS = [
-  { pages: 2, gowkMs: 21, engineMs: 1470, speedup: 68.85, gowkRss: 24960, engineRss: 973260, gowkBytes: 34209, engineBytes: 134319 },
-  { pages: 10, gowkMs: 37, engineMs: 1550, speedup: 42.45, gowkRss: 28800, engineRss: 1021160, gowkBytes: 57231, engineBytes: 450799 },
-  { pages: 50, gowkMs: 120, engineMs: 1815, speedup: 15.08, gowkRss: 48576, engineRss: 1114380, gowkBytes: 167442, engineBytes: 1981892 },
-  { pages: 100, gowkMs: 249, engineMs: 2179, speedup: 8.74, gowkRss: 68928, engineRss: 1241476, gowkBytes: 306144, engineBytes: 3936067 },
+  { pages: 2, gowkMs: 16, engineMs: 1445, speedup: 92.85, gowkRss: 19200, engineRss: 940600, gowkBytes: 34210, engineBytes: 134319 },
+  { pages: 10, gowkMs: 26, engineMs: 1488, speedup: 57.16, gowkRss: 24192, engineRss: 1019952, gowkBytes: 57239, engineBytes: 450799 },
+  { pages: 50, gowkMs: 72, engineMs: 1801, speedup: 25.1, gowkRss: 29760, engineRss: 1119360, gowkBytes: 167525, engineBytes: 1981892 },
+  { pages: 100, gowkMs: 127, engineMs: 2178, speedup: 17.16, gowkRss: 35136, engineRss: 1240920, gowkBytes: 306321, engineBytes: 3936067 },
 ]
 
-export const RECOVERY_DATE = '2026-09-11'
 export const HISTORY_DATE = '2026-08-19'
 
-export const PERF_TIME_CAPTURE = {
-  date: '2026-09-11',
-  label: 'perf-time phase-7 closure capture',
-  raw: 'plans/0.2.6/perf-time/results/phase-7/final-capture.md',
-  snapshot: 'Snapshot M',
-  warm500MatrixMs: 733.48,
-  phase6AnchorMs: 576.33,
-  phase6Raw: 'plans/0.2.6/perf-time/results/phase-6/perf-recovery-internal-pdf-warm-2-5-10-20-50-100-200-250-500.txt',
+export const CURRENT_CAPTURE = {
+  date: '2026-09-12',
+  label: 'full-matrix capture',
+  raw: 'plans/0.2.6/perf-review/results/2026-09-12/',
 }
 
-export const PERF_IMPROVE_CAPTURE = {
-  date: '2026-09-11',
-  label: 'perf-improve phase-7 capture',
-  raw: 'plans/0.2.6/perf-improve/results/phase-7/final-capture.md',
-}
-
-// Current 2026-09-11 perf-time closure capture: fresh-process 1x samples,
-// median of three. B/op is one raw value, never averaged, and is separate
-// from process RSS (the CLI/compare tables). The 500-page B/op rows are 28.4
-// to 30.6 percent below the pre-time baselines; the 500-page warm time
-// (733.48 ms matrix / 695.42 ms standalone) did not reproduce the phase-6
-// window's 576.33 ms (2.13x), which is kept as the labeled anchor in
-// PERF_TIME_CAPTURE. The 2-page rows are fresh-process samples, so the
-// one-time default-font work is charged to the single operation; they are
-// not like-for-like with the 2026-08-19 multi-iteration rows below.
+// Current 2026-09-12 in-process internal matrix: full ascending warm matrix
+// in one process per round, median of three rounds. The 2-page row is the
+// first conversion in its process and includes the one-time font load.
 export const INPROC_PDF_GENERIC = [
-  { n: 2, ms: 6.08, mb: 4.03, allocs: '4.5K' },
-  { n: 500, ms: 695.42, mb: 167.87, allocs: '755.1K' },
+  { n: 2, ms: 5.14, mb: 4.09, allocs: '4.1K' },
+  { n: 5, ms: 7.75, mb: 6.84, allocs: '8.2K' },
+  { n: 10, ms: 11.77, mb: 4.63, allocs: '14.9K' },
+  { n: 20, ms: 21.24, mb: 6.02, allocs: '28.4K' },
+  { n: 50, ms: 53.54, mb: 13.24, allocs: '69.5K' },
+  { n: 100, ms: 106.56, mb: 23.26, allocs: '138.0K' },
+  { n: 200, ms: 204.88, mb: 44.66, allocs: '275.2K' },
+  { n: 250, ms: 259.06, mb: 56.5, allocs: '344.0K' },
+  { n: 500, ms: 535.34, mb: 111.44, allocs: '687.4K' },
 ]
 
 export const LIBRARY_PDF = [
-  { n: 2, ms: 6.11, mb: 4.05, allocs: '4.5K' },
-  { n: 500, ms: 698.79, mb: 169.65, allocs: '755.1K' },
+  { n: 2, ms: 5.75, mb: 4.11, allocs: '4.1K' },
+  { n: 5, ms: 8.83, mb: 6.87, allocs: '8.2K' },
+  { n: 10, ms: 13.71, mb: 4.67, allocs: '14.9K' },
+  { n: 20, ms: 21.13, mb: 6.09, allocs: '28.4K' },
+  { n: 50, ms: 51.83, mb: 12.59, allocs: '69.5K' },
+  { n: 100, ms: 107.16, mb: 23.45, allocs: '137.9K' },
+  { n: 200, ms: 222.68, mb: 45.32, allocs: '275.2K' },
+  { n: 250, ms: 266.55, mb: 57.32, allocs: '344.0K' },
+  { n: 500, ms: 532.24, mb: 113.1, allocs: '687.4K' },
 ]
 
-// Image rows carry the encode trade: time falls about 2x, lossless PNG size
-// grows about 50 percent (141,917 B at 250 tiles, 282,749 B at 500 tiles).
+// Current 2026-09-12 public image rows. Lossless PNG output stays at about
+// 141,917 B for 250 tiles and 282,749 B for 500 tiles.
 export const LIBRARY_IMAGE = [
-  { n: 250, ms: 25.72, mb: 14.30, allocs: '7.2K' },
-  { n: 500, ms: 44.27, mb: 26.41, allocs: '13.6K' },
+  { n: 2, ms: 14.12, mb: 11.91, allocs: '490' },
+  { n: 5, ms: 12.25, mb: 3.45, allocs: '578' },
+  { n: 10, ms: 13.75, mb: 3.68, allocs: '872' },
+  { n: 20, ms: 12.96, mb: 3.82, allocs: '1.1K' },
+  { n: 50, ms: 17.39, mb: 4.2, allocs: '1.9K' },
+  { n: 100, ms: 30.16, mb: 20.0, allocs: '3.2K' },
+  { n: 200, ms: 55.8, mb: 37.09, allocs: '5.8K' },
+  { n: 250, ms: 16.78, mb: 6.38, allocs: '7.2K' },
+  { n: 500, ms: 34.02, mb: 10.4, allocs: '13.7K' },
 ]
 
 // Historical 2026-09-11 perf-improve phase-7 engine rows. Dated, not current.
@@ -188,8 +186,6 @@ export const LIBRARY_IMAGE_HISTORY = [
   { n: 500, ms: 142.59, mb: 52.0, allocs: '17.6K' },
 ]
 
-export const INPROC_SNAPSHOT_DATE = HISTORY_DATE
-
 export const CHART_PAGES = [2, 10, 50, 100, 500]
 
 export function speedup(row) {
@@ -243,19 +239,16 @@ export const HEADLINE = {
   largeSpeedup: speedup(CLI_ROWS[CLI_ROWS.length - 1]),
   largeGowk: CLI_ROWS[CLI_ROWS.length - 1].gowkMs,
   largeWk: CLI_ROWS[CLI_ROWS.length - 1].wkMs,
-  rssCrossover: 50,
 }
 
-// Dated landing-claim anchor: the 2026-09-11 recovery capture public library
-// 2-page row (10.88 ms) against that capture's wkhtmltopdf CLI baseline
-// (258 ms). Later captures measured faster public 2-page rows; the landing
-// copy keeps the dated anchor until that claim is re-approved.
-export const RECOVERY_LIBRARY_2P_MS = 10.88
+// Public library 2-page row from the 2026-09-12 capture, used for the
+// landing-page multiplier against the same capture's wkhtmltopdf CLI baseline.
+export const LIBRARY_2P_MS = 5.75
 
 export const LIBRARY_HEADLINE = {
   pages: LIBRARY_PDF[0].n,
-  ms: RECOVERY_LIBRARY_2P_MS,
+  ms: LIBRARY_2P_MS,
   wkMs: CLI_ROWS[0].wkMs,
-  multiplier: CLI_ROWS[0].wkMs / RECOVERY_LIBRARY_2P_MS,
-  displayMultiplier: Math.round(CLI_ROWS[0].wkMs / RECOVERY_LIBRARY_2P_MS / 10) * 10,
+  multiplier: CLI_ROWS[0].wkMs / LIBRARY_2P_MS,
+  displayMultiplier: Math.round(CLI_ROWS[0].wkMs / LIBRARY_2P_MS / 10) * 10,
 }

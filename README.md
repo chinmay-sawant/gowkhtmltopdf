@@ -74,6 +74,7 @@ Browser build and preview: [wasm.md](documentation/wasm.md).
 | [documentation/fonts.md](documentation/fonts.md) | Bundled faces, `--font-path`, `@font-face` |
 | [documentation/samples.md](documentation/samples.md) | Golden fixtures and `output/` |
 | [documentation/performance.md](documentation/performance.md) | Benchmarks and how to measure |
+| [documentation/benchmarks.md](documentation/benchmarks.md) | Consolidated current benchmark capture (2026-09-12) |
 | [testdata/golden/benchmarks/README.md](testdata/golden/benchmarks/README.md) | Current CLI vs wkhtmltopdf snapshot |
 | [documentation/deferred.md](documentation/deferred.md) | Deferred features and next gates |
 | [documentation/THREAT-MODEL.md](documentation/THREAT-MODEL.md) | Security / ACL / network policy |
@@ -122,34 +123,36 @@ pdf_bytes = convert_html_to_pdf(
 
 ## Performance
 
-**Current snapshot (2026-08-19):** freshly built generic `gowkhtmltopdf`
-**0.2.4** versus installed **wkhtmltopdf 0.12.6.1 (patched Qt)** on Linux
-amd64, 13th Gen Intel Core i7-13700HX. Same report fixture (20 invoice rows
-per requested page), median of three process runs after one warmup.
+**Current snapshot (2026-09-12):** generic `bin/gowkhtmltopdf` (`VERSION`
+0.2.5 on the 0.2.6 working tree) versus installed **wkhtmltopdf 0.12.6.1
+(patched Qt)** on Linux amd64 (WSL2), 13th Gen Intel Core i7-13700HX. Same
+report fixture (20 invoice rows per requested page), median of three timed
+process runs after one warmup.
 
 | Pages | gowkhtmltopdf | wkhtmltopdf | Faster by |
 |------:|--------------:|------------:|----------:|
-| 2 | 17 ms | 259 ms | **15.5x** |
-| 10 | 30 ms | 276 ms | **9.2x** |
-| 100 | 184 ms | 526 ms | **2.9x** |
-| 500 | 1.042 s | 1.671 s | **1.6x** |
+| 2 | 14 ms | 260 ms | **18.50x** |
+| 10 | 26 ms | 286 ms | **11.18x** |
+| 100 | 126 ms | 546 ms | **4.35x** |
+| 500 | 562 ms | 1.760 s | **3.13x** |
 
-Faster at every tested size. Peak RSS is lower through 100 pages and
-higher from 200 pages on the generic path.
+Faster at every tested size. Gowk also used less peak RSS at every tested
+size in this capture, including 500 pages (79,296 KiB versus 123,076 KiB).
 
 Same host, same fixture family against other engines (default external
 matrix: 2 / 10 / 50 / 100 pages):
 
 | Pages | vs WeasyPrint | vs Puppeteer / Chrome |
 |------:|--------------:|----------------------:|
-| 2 | **32x** | **77x** |
-| 10 | **44x** | **48x** |
-| 50 | **52x** | **17x** |
-| 100 | **57x** | **11x** |
+| 2 | **40.86x** | **92.85x** |
+| 10 | **53.62x** | **57.16x** |
+| 50 | **76.88x** | **25.10x** |
+| 100 | **89.43x** | **17.16x** |
 
 Full matrices, RSS, PDF sizes, internal-engine and public-library
 `go test -bench` rows, and historical snapshots:
 
+- [documentation/benchmarks.md](documentation/benchmarks.md)
 - [documentation/performance.md](documentation/performance.md)
 - [testdata/golden/benchmarks/README.md](testdata/golden/benchmarks/README.md)
 - [cli-compare.md](testdata/golden/benchmarks/cli-compare.md)
@@ -159,7 +162,10 @@ Full matrices, RSS, PDF sizes, internal-engine and public-library
 Reproduce:
 
 ```sh
+make build
 make bench-cli-compare
+./scripts/bench-external.sh
+./scripts/bench-performance-recovery.sh --mode=<mode>
 make bench
 make bench-engine
 make bench-lib

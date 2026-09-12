@@ -154,12 +154,11 @@ export default function LandingPage() {
           <article className="fit-card fit-limit">
             <span className="fit-kicker">Not for</span>
             <h3>Any website as PDF</h3>
-            <p>Flex and grid are partial, floats are lite, and modern CSS is limited. The compatibility matrix is the contract.</p>
+            <p>
+              Flex and grid are partial, floats are lite, and modern CSS is limited. The{' '}
+              <Link to="/documentation/compatibility">compatibility matrix</Link> is the contract.
+            </p>
           </article>
-        </div>
-        <div className="fit-links">
-          <Link className="text-link" to="/documentation/compatibility">Compatibility matrix <span aria-hidden="true">-&gt;</span></Link>
-          <Link className="text-link" to="/documentation/security">Security notes <span aria-hidden="true">-&gt;</span></Link>
         </div>
       </section>
 
@@ -178,7 +177,7 @@ export default function LandingPage() {
         </div>
         <div className="proof-minimal-item proof-minimal-note">
           <strong>Measured</strong>
-          <span>2-page invoice: 17 ms CLI vs 258 ms wkhtmltopdf 0.12.6.1 on the reference host. Full numbers on <Link to="/benchmarks">benchmarks</Link>.</span>
+          <span>2-page invoice: 14 ms CLI vs 260 ms wkhtmltopdf 0.12.6.1 on the reference host. Full numbers on <Link to="/benchmarks">benchmarks</Link>.</span>
         </div>
       </section>
 
