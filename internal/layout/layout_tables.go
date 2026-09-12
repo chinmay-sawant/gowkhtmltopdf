@@ -97,7 +97,7 @@ func (e *engine) layoutTableGrid(
 	tableHeight := e.borderBoxBottom(style, curY)
 	tableBox.height = tableY + tableHeight - tableBox.y
 
-	if style.BGColor[3] > 0 && e.opts.Background {
+	if style.BGColor[3] > 0 && e.backgroundPaintEnabled(&style) {
 		e.add(Op{ //nolint:exhaustruct // intentional zero fields
 			Kind: OpFillRect, X: posX, Y: tableY, W: tableBox.w, H: tableHeight,
 			R: style.BGColor[0], G: style.BGColor[1], B: style.BGColor[2], Alpha: style.BGColor[3],
@@ -1273,7 +1273,7 @@ func (e *engine) emitCell(cell *box, skipBorders bool) {
 
 	hideEmpty := isEmptyCellHidden(e, cell, sty)
 
-	if e.opts.Background && !hideEmpty {
+	if e.backgroundPaintEnabled(&sty) && !hideEmpty {
 		if r, g, bl, a, ok := e.cellBG(cell); ok {
 			e.add(Op{ //nolint:exhaustruct // intentional zero fields
 				Kind: OpFillRect, X: cell.x, Y: cell.y, W: cell.w, H: cell.height,

@@ -351,6 +351,38 @@ type ResolvedStyle struct {
 	OverflowClipMarginRight  float64
 	OverflowClipMarginBottom float64
 	OverflowClipMarginLeft   float64
+	// Containment and content visibility (CSS Containment).
+	Contain                    string  // "none" or space-separated: size layout paint style content
+	ContainIntrinsicWidth      float64 // pt; -1 = auto/unset
+	ContainIntrinsicHeight     float64 // pt; -1 = auto/unset
+	ContainIntrinsicBlockSize  float64 // pt; -1 = auto/unset
+	ContainIntrinsicInlineSize float64 // pt; -1 = auto/unset
+	ContentVisibility          string  // "visible" | "hidden" | "auto"
+	// Print color adjustment family.
+	ColorAdjust       string // print-color-adjust/color-adjust: "economy" | "exact"
+	ForcedColorAdjust string // "auto" | "none"
+	ColorScheme       string // raw value: "normal" | "light" | "dark" | "light dark" | "only light"
+	DynamicRangeLimit string // raw value
+	// Font variation / shaping overrides.
+	FontLanguageOverride  string // "normal" or quoted string
+	FontOpticalSizing     string // "auto" | "none"
+	FontPalette           string // raw value
+	FontVariationSettings string // raw value
+	// Image adjustment.
+	ImageOrientation      string  // "from-image" | "none" | raw angle
+	ImageOrientationAngle float64 // degrees; 0 = unset
+	ImageResolution       string  // "from-image" | raw resolution token
+	ImageResolutionDPI    float64 // 0 = unset/from-image
+	ObjectViewBox         string  // raw value
+	// Advanced text support.
+	TextCombineUpright       string  // "none" | "all" | "digits N"
+	TextDecorationInset      float64 // pt
+	TextDecorationSkip       string  // raw shorthand value
+	TextDecorationSkipBox    string
+	TextDecorationSkipSelf   string
+	TextDecorationSkipSpaces string
+	TextOrientation          string // "mixed" | "upright" | "sideways"
+	UnicodeBidi              string // "normal" | "embed" | "isolate" | "bidi-override" | "isolate-override" | "plaintext"
 	// CustomProps holds resolved CSS custom properties (--*) for this element
 	// (inherited). Shared with the parent map when the element declares none.
 	CustomProps map[string]string
@@ -444,6 +476,32 @@ func initialStyle() ResolvedStyle { //nolint:funlen // complete CSS initial-valu
 		Opacity:             1,
 		FillOpacity:         1,
 		StrokeOpacity:       1,
+
+		// Re-added support properties (2026-09-12 demotions).
+		Contain:                    "none",
+		ContainIntrinsicWidth:      -1,
+		ContainIntrinsicHeight:     -1,
+		ContainIntrinsicBlockSize:  -1,
+		ContainIntrinsicInlineSize: -1,
+		ContentVisibility:          "visible",
+		ColorAdjust:                "economy",
+		ForcedColorAdjust:          "auto",
+		ColorScheme:                "normal",
+		DynamicRangeLimit:          "no-limit",
+		FontLanguageOverride:       "normal",
+		FontOpticalSizing:          "auto",
+		FontPalette:                "normal",
+		FontVariationSettings:      "normal",
+		ImageOrientation:           imageAdjustFromImage,
+		ImageResolution:            imageAdjustFromImage,
+		ObjectViewBox:              "none",
+		TextCombineUpright:         "none",
+		TextDecorationSkip:         "auto",
+		TextDecorationSkipBox:      "none",
+		TextDecorationSkipSelf:     "auto",
+		TextDecorationSkipSpaces:   "start end",
+		TextOrientation:            "mixed",
+		UnicodeBidi:                "normal",
 	}
 }
 

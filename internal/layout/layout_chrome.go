@@ -422,7 +422,7 @@ func (e *engine) prependChrome(insertAt int, boxNode *box, sty ResolvedStyle, po
 	// (CSS Backgrounds §7.1 / fixture-61 box-shadow-position), or the fill
 	// hides them.
 	chrome = e.appendBoxShadow(chrome, sty, posX, posY, width, height, radii, radiiY, false)
-	if sty.BGColor[3] > 0 && e.opts.Background {
+	if sty.BGColor[3] > 0 && e.backgroundPaintEnabled(&sty) {
 		bgOp := Op{ //nolint:exhaustruct // intentional zero fields
 			Kind: OpFillRect, X: posX, Y: posY, W: width, H: height,
 			R: sty.BGColor[0], G: sty.BGColor[1], B: sty.BGColor[2], Alpha: sty.BGColor[3], Radius: radius,

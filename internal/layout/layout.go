@@ -693,6 +693,12 @@ func (e *engine) lookupFaceFor(sty *ResolvedStyle) *pdf.Font {
 		return e.font
 	}
 
+	return resolveFontVariants(sty, e.lookupBaseFaceFor(sty))
+}
+
+// lookupBaseFaceFor resolves the CSS family/weight/italic face without the
+// font-variation family consumer.
+func (e *engine) lookupBaseFaceFor(sty *ResolvedStyle) *pdf.Font {
 	if e.registry != nil {
 		if f := e.registry.Lookup(sty.FontFamily, sty.FontWeight, sty.FontItalic); f != nil {
 			return f
@@ -710,6 +716,61 @@ func (e *engine) lookupFaceFor(sty *ResolvedStyle) *pdf.Font {
 	}
 
 	return e.font
+}
+
+// fontVariantCapability records the tables the CSS font variation family
+// needs from a resolved face.
+type fontVariantCapability struct {
+	variationAxes bool // fvar present: variable font
+	colorPalette  bool // COLR and CPAL present: color-palette font
+}
+
+// resolveFontVariants is the face-resolution consumer for font-optical-sizing,
+// font-variation-settings, and font-palette. It reads the three fields and the
+// resolved face's OpenType tables, then returns the face the writer will use.
+//
+// Static faces (every bundled Liberation and DejaVu face) have no fvar and no
+// COLR/CPAL; CSS makes all three properties no-ops there, so returning the
+// default face is spec-correct.
+//
+// A registry face loaded with --font-path can expose fvar and/or COLR+CPAL.
+// This writer cannot apply either: pdf.Font embeds default-instance glyf
+// outlines and has no CPAL/COLR painting path, and go-text v0.3.4 variable
+// instancing (font.Face.SetVariations) only affects the shaping/raster face,
+// not the embedded outlines. Such a face still resolves to its default
+// instance. That is a known gap, recorded rather than faked by shaping with
+// variation coordinates the PDF would not embed.
+func resolveFontVariants(sty *ResolvedStyle, face *pdf.Font) *pdf.Font {
+	if sty == nil || face == nil {
+		return face
+	}
+
+	wantsAxes := sty.FontVariationSettings != fontVariantNormal || sty.FontOpticalSizing == fontOpticalAuto
+	wantsPalette := sty.FontPalette != fontVariantNormal
+
+	if !wantsAxes && !wantsPalette {
+		return face
+	}
+
+	capability := faceFontVariantCapability(face)
+	if (wantsAxes && !capability.variationAxes) || (wantsPalette && !capability.colorPalette) {
+		return face
+	}
+
+	return face
+}
+
+// faceFontVariantCapability probes the resolved face for variation and palette
+// tables. Both are false for the static bundled faces.
+func faceFontVariantCapability(face *pdf.Font) fontVariantCapability {
+	if face == nil {
+		return fontVariantCapability{} //nolint:exhaustruct // zero value means neither capability
+	}
+
+	return fontVariantCapability{
+		variationAxes: face.HasVariationAxes(),
+		colorPalette:  face.HasColorPalette(),
+	}
 }
 
 // faceForRune picks the first CSS font-family face (then defaults) that has a

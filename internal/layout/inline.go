@@ -41,15 +41,19 @@ const (
 
 // inlineItem is one atomic piece of inline content.
 type inlineItem struct {
-	text       string
-	style      *ResolvedStyle
-	w, h       float64 // text: run width + line height; image: placed size
-	marginL    float64 // leading horizontal margin (e.g. span margin-left)
-	marginR    float64 // trailing horizontal margin
-	img        bool
-	thumbImg   bool // img inside a collapsed wiki figure; outer frame owns L/R/T
-	chrome     bool // text belongs to an inline element with its own decoration
-	noSplit    bool // vertical writing-mode run must remain one rotated line
+	text     string
+	style    *ResolvedStyle
+	w, h     float64 // text: run width + line height; image: placed size
+	marginL  float64 // leading horizontal margin (e.g. span margin-left)
+	marginR  float64 // trailing horizontal margin
+	img      bool
+	thumbImg bool // img inside a collapsed wiki figure; outer frame owns L/R/T
+	chrome   bool // text belongs to an inline element with its own decoration
+	noSplit  bool // vertical writing-mode run must remain one rotated line
+	// bidiScoped marks an item owned by a unicode-bidi scope (embed, isolate,
+	// override, plaintext). The run-order heuristic and reverseInlineRange
+	// leave scoped runs alone; the scope owner already ordered them.
+	bidiScoped bool
 	imgRef     *imageRef
 	alt        string
 	href       string
@@ -61,7 +65,9 @@ type inlineItem struct {
 	opEnd    int
 }
 
-func (e *engine) collectAndPrepareInlineItems(nodes []*html.Node, contentW float64) []inlineItem {
+func (e *engine) collectAndPrepareInlineItems(
+	nodes []*html.Node, contentW float64, blockStyle *ResolvedStyle,
+) []inlineItem {
 	items := e.acquireInlineItems()
 
 	oldMax := e.imgMaxW
@@ -72,7 +78,7 @@ func (e *engine) collectAndPrepareInlineItems(nodes []*html.Node, contentW float
 		e.inlineCBW = contentW
 	}
 
-	e.collectInline(nodes, &items)
+	e.collectInline(nodes, &items, blockStyle)
 	e.imgMaxW = oldMax
 	e.inlineCBW = oldCB
 
@@ -157,7 +163,12 @@ func (e *engine) layoutInlineFloats(
 	boxNode *box, nodes []*html.Node, contentW, contentX, lineY float64,
 	floats *floatState,
 ) float64 {
-	items := e.collectAndPrepareInlineItems(nodes, contentW)
+	var blockStyle *ResolvedStyle
+	if boxNode != nil {
+		blockStyle = boxNode.style
+	}
+
+	items := e.collectAndPrepareInlineItems(nodes, contentW, blockStyle)
 	defer e.releaseInlineItems(items)
 
 	items = e.injectBlockPseudos(boxNode, items)

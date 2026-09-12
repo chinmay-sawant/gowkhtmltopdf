@@ -9,6 +9,7 @@ import (
 	"github.com/go-text/typesetting/di"
 	gtfont "github.com/go-text/typesetting/font"
 	ot "github.com/go-text/typesetting/font/opentype"
+	"github.com/go-text/typesetting/language"
 	"github.com/go-text/typesetting/shaping"
 )
 
@@ -45,7 +46,13 @@ type ShapedRun struct {
 // ShapeRun shapes s and computes advances for the resulting run. The returned
 // slices are owned by the result and may be retained by the caller.
 func ShapeRun(s string, fnt *Font, size float64) ShapedRun {
-	text := ShapeTextFont(s, fnt)
+	return ShapeRunLanguage(s, fnt, size, "")
+}
+
+// ShapeRunLanguage is ShapeRun with a font-language-override tag so raster
+// output selects the same language-system glyphs as PDF emission.
+func ShapeRunLanguage(s string, fnt *Font, size float64, lang string) ShapedRun {
+	text := ShapeTextFontWithFeaturesLanguage(s, fnt, nil, lang)
 	runes := []rune(text)
 	advances := make([]float64, len(runes))
 
@@ -74,18 +81,28 @@ func ShapeTextFont(s string, f *Font) string {
 // ShapeTextFontWithFeatures is ShapeTextFont with explicit OpenType feature
 // tags. A nil/empty features slice still enables halt/palt for CJK text.
 func ShapeTextFontWithFeatures(text string, fnt *Font, features []shaping.FontFeature) string {
+	return ShapeTextFontWithFeaturesLanguage(text, fnt, features, "")
+}
+
+// ShapeTextFontWithFeaturesLanguage is ShapeTextFontWithFeatures with a CSS
+// font-language-override tag. lang is an OpenType language system tag such as
+// "TRK"; "" and "normal" keep default shaping. The tag is mapped to BCP47
+// before shaping.Input.Language (see shapingLanguageOverride), and a non-empty
+// override alone is enough to run the OpenType path.
+func ShapeTextFontWithFeaturesLanguage(text string, fnt *Font, features []shaping.FontFeature, lang string) string {
 	if text == "" {
 		return text
 	}
 
+	langOverride := shapingLanguageOverride(lang)
 	feats := mergeFontFeatures(text, features)
 
-	needShape := ShapeNeeded(text) || len(feats) > 0
+	needShape := ShapeNeeded(text) || len(feats) > 0 || langOverride != ""
 	if !needShape {
 		return text
 	}
 
-	if run, ok := tryShapeOpenType(text, fnt, feats); ok && run.text != "" {
+	if run, ok := tryShapeOpenType(text, fnt, feats, langOverride); ok && run.text != "" {
 		return run.text
 	}
 
@@ -96,12 +113,51 @@ func ShapeTextFontWithFeatures(text string, fnt *Font, features []shaping.FontFe
 	return text
 }
 
-func tryShapeOpenType(str string, fnt *Font, features []shaping.FontFeature) (shapedRun, bool) {
+// otLanguageTags maps OpenType language system tags to BCP47. go-text picks a
+// font's language system from BCP47 (harfbuzz/ot_language_table.go), and
+// several raw tags collide with unrelated BCP47 codes when simply lowercased:
+// "trk" is Turkic [collection] with no OpenType tag, "rom" is Romany, "csy"
+// is Siyin Chin, and "plk", "sky", "srb" are other languages. Mapping first
+// selects the intended language system; other tags still flow through
+// language.NewLanguage, which lowercases and strips invalid bytes.
+var otLanguageTags = map[string]string{ //nolint:gochecknoglobals // immutable tag table
+	"TRK": "tr", // Turkish
+	"SRB": "sr", // Serbian
+	"AZE": "az", // Azerbaijani
+	"ROM": "ro", // Romanian
+	"HUN": "hu", // Hungarian
+	"POL": "pl", // Polish (legacy tag; PLK is the current registry tag)
+	"PLK": "pl", // Polish
+	"CES": "cs", // Czech (legacy tag; CSY is the current registry tag)
+	"CSY": "cs", // Czech
+	"SLV": "sl", // Slovenian
+	"SKY": "sk", // Slovak
+}
+
+// shapingLanguageOverride converts a CSS font-language-override tag into the
+// BCP47 language go-text expects. "" and "normal" mean no override; known
+// OpenType tags map to their BCP47 language; anything else is canonicalized
+// by language.NewLanguage so unknown tags leave language-system selection at
+// the font default, matching CSS "unknown language tags have no effect".
+func shapingLanguageOverride(tag string) language.Language {
+	tag = strings.TrimSpace(tag)
+	if tag == "" || strings.EqualFold(tag, "normal") {
+		return ""
+	}
+
+	if bcp47, ok := otLanguageTags[strings.ToUpper(tag)]; ok {
+		return language.NewLanguage(bcp47)
+	}
+
+	return language.NewLanguage(tag)
+}
+
+func tryShapeOpenType(str string, fnt *Font, features []shaping.FontFeature, lang language.Language) (shapedRun, bool) {
 	if fnt == nil {
 		return shapedRun{}, false //nolint:exhaustruct // intentional zero-value fields
 	}
 	// GSUB covers Arabic ligation; halt/palt live in GPOS and are requested via
-	// FontFeatures — allow the OT path when either applies.
+	// FontFeatures, so allow the OT path when either applies.
 	if !fnt.hasGSUB() && len(features) == 0 {
 		return shapedRun{}, false //nolint:exhaustruct // intentional zero-value fields
 	}
@@ -131,14 +187,7 @@ func tryShapeOpenType(str string, fnt *Font, features []shaping.FontFeature) (sh
 	// Size left at zero so we do not import golang.org/x/image. Keep
 	// typesetting within the allowlisted direct modules. Glyph IDs are
 	// still correct; advances come from our Font hmtx below.
-	inputs := seg.Split(shaping.Input{ //nolint:exhaustruct // intentional zero-value fields
-		Text:         text,
-		RunStart:     0,
-		RunEnd:       len(text),
-		Direction:    di.DirectionLTR,
-		Face:         face,
-		FontFeatures: features,
-	}, singleFaceMap{face})
+	inputs := seg.Split(shapingInput(text, face, features, lang), singleFaceMap{face})
 
 	outRunes, ok := collectShapedRunes(shaper, inputs, face, features, rev)
 	if !ok {
@@ -146,6 +195,28 @@ func tryShapeOpenType(str string, fnt *Font, features []shaping.FontFeature) (sh
 	}
 
 	return shapedRun{text: string(outRunes)}, true
+}
+
+// shapingInput builds the segmenter input for one run. Language stays at its
+// zero value unless an override was requested, so default shaping is
+// unchanged. The segmenter resolves script-appropriate languages afterwards.
+func shapingInput(
+	text []rune, face *gtfont.Face, features []shaping.FontFeature, lang language.Language,
+) shaping.Input {
+	input := shaping.Input{ //nolint:exhaustruct // intentional zero-value fields
+		Text:         text,
+		RunStart:     0,
+		RunEnd:       len(text),
+		Direction:    di.DirectionLTR,
+		Face:         face,
+		FontFeatures: features,
+	}
+
+	if lang != "" {
+		input.Language = lang
+	}
+
+	return input
 }
 
 // collectShapedRunes shapes the inputs and maps the resulting glyphs back

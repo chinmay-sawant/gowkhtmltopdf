@@ -13,11 +13,18 @@ const (
 	defaultLineHeightRatio = 1.2
 )
 
-func (e *engine) collectInline(nodes []*html.Node, out *[]inlineItem) {
+func (e *engine) collectInline(nodes []*html.Node, out *[]inlineItem, blockStyle *ResolvedStyle) {
 	start := len(*out)
 
 	for _, n := range nodes {
 		e.collectInlineNode(n, out)
+	}
+
+	// Block-container unicode-bidi scope: a block's own value orders the
+	// items it directly contributes (nested inline elements with their own
+	// scope already ordered and marked themselves during collection).
+	if blockStyle != nil && isScopedBidi(blockStyle.UnicodeBidi) {
+		e.applyBidiScope(*blockStyle, *out, start)
 	}
 
 	// Lite RTL: only mirror when a run contains strong RTL letters (Arabic /
@@ -31,7 +38,7 @@ func (e *engine) collectInline(nodes []*html.Node, out *[]inlineItem) {
 
 func hasStrongRTLText(items []inlineItem, start int) bool {
 	for idx := start; idx < len(items); idx++ {
-		if items[idx].forceBreak || items[idx].blockBox != nil || items[idx].img {
+		if items[idx].forceBreak || items[idx].blockBox != nil || items[idx].img || items[idx].bidiScoped {
 			continue
 		}
 
@@ -71,15 +78,78 @@ func reverseInlineRange(items []inlineItem, start int) {
 		isBreak := !isEnd && items[idx].forceBreak
 
 		if isEnd || isBreak {
-			// reverse [segStart, idx) (exclusive of break)
-			for l, r := segStart, idx-1; l < r; l, r = l+1, r-1 {
-				items[l], items[r] = items[r], items[l]
-			}
+			reverseUnscopedSegment(items, segStart, idx)
 
 			if isBreak {
 				segStart = idx + 1
 			}
 		}
+	}
+}
+
+// reverseUnscopedSegment reverses maximal runs of items that no unicode-bidi
+// scope owns. Scoped runs keep the order their scope owner gave them.
+func reverseUnscopedSegment(items []inlineItem, start, end int) {
+	for idx := start; idx < end; {
+		for idx < end && items[idx].bidiScoped {
+			idx++
+		}
+
+		runEnd := idx
+		for runEnd < end && !items[runEnd].bidiScoped {
+			runEnd++
+		}
+
+		for lo, hi := idx, runEnd-1; lo < hi; lo, hi = lo+1, hi-1 {
+			items[lo], items[hi] = items[hi], items[lo]
+		}
+
+		idx = runEnd
+	}
+}
+
+// isScopedBidi reports whether a unicode-bidi value orders its own run scope
+// rather than participating in the document-level content heuristic.
+func isScopedBidi(mode string) bool {
+	switch mode {
+	case unicodeBidiEmbed, unicodeBidiIsolate, unicodeBidiOverride, unicodeBidiIsolateOverride, unicodeBidiPlaintext:
+		return true
+	default:
+		return false
+	}
+}
+
+// applyBidiScope orders and marks one unicode-bidi scope. bidi-override and
+// isolate-override reverse when the used direction is rtl. embed and isolate
+// reverse their own strong-RTL runs under direction:rtl; plaintext ignores
+// direction and uses the strong-RTL content heuristic (first-strong subset).
+// All scoped items are marked so the document heuristic leaves them alone.
+func (e *engine) applyBidiScope(sty ResolvedStyle, items []inlineItem, start int) {
+	if !isScopedBidi(sty.UnicodeBidi) || start >= len(items) {
+		return
+	}
+
+	if bidiScopeReverses(sty, items, start) {
+		reverseInlineRange(items, start)
+	}
+
+	for idx := start; idx < len(items); idx++ {
+		items[idx].bidiScoped = true
+	}
+}
+
+// bidiScopeReverses reports whether this engine's run-level model displays
+// the scope in reverse logical order.
+func bidiScopeReverses(sty ResolvedStyle, items []inlineItem, start int) bool {
+	switch sty.UnicodeBidi {
+	case unicodeBidiOverride, unicodeBidiIsolateOverride:
+		return sty.Direction == cssDirectionRTL
+	case unicodeBidiPlaintext:
+		return hasStrongRTLText(items, start)
+	case unicodeBidiEmbed, unicodeBidiIsolate:
+		return sty.Direction == cssDirectionRTL && hasStrongRTLText(items, start)
+	default:
+		return false
 	}
 }
 
@@ -549,6 +619,10 @@ func (e *engine) collectInlineSpan(node *html.Node, sty ResolvedStyle, out *[]in
 			(*out)[i].href = href
 		}
 	}
+
+	// The element's own unicode-bidi value orders the items it collected,
+	// including text in nested elements that declare no scope of their own.
+	e.applyBidiScope(sty, *out, before)
 }
 
 // appendPseudoItem appends the ::before/::after pseudo content of node: an
@@ -620,16 +694,8 @@ func (e *engine) inlineBlockAvail(nodeN *html.Node, sty ResolvedStyle, cbW float
 		return defaultCheckboxSize(e, sty) + e.scalePt(sty.MarginLeft) + e.scalePt(sty.MarginRight)
 	}
 
-	if isSizeContainer(sty) {
-		// Size containment: shrink-to-fit as-if-empty.
-		intr := e.scalePt(sty.PaddingLeft) + e.scalePt(sty.PaddingRight) +
-			e.scalePt(sty.BorderLeft.Width) + e.scalePt(sty.BorderRight.Width) +
-			e.scalePt(sty.MarginLeft) + e.scalePt(sty.MarginRight)
-		if intr < 1 {
-			intr = 1
-		}
-
-		return intr
+	if isSizeContainer(sty) || containsSize(sty) {
+		return e.containmentInlineBlockAvail(sty)
 	}
 
 	// measureCellContent already returns the max-content border-box width,
@@ -640,6 +706,19 @@ func (e *engine) inlineBlockAvail(nodeN *html.Node, sty ResolvedStyle, cbW float
 		e.scalePt(sty.MarginLeft) + e.scalePt(sty.MarginRight) +
 		e.nestedBlockHChrome(nodeN)
 
+	if intr < 1 {
+		intr = 1
+	}
+
+	return intr
+}
+
+// containmentInlineBlockAvail is the size-containment shrink-to-fit-as-if-empty
+// width for an inline-block: its own chrome plus outer margins, at least 1pt.
+func (e *engine) containmentInlineBlockAvail(sty ResolvedStyle) float64 {
+	intr := e.scalePt(sty.PaddingLeft) + e.scalePt(sty.PaddingRight) +
+		e.scalePt(sty.BorderLeft.Width) + e.scalePt(sty.BorderRight.Width) +
+		e.scalePt(sty.MarginLeft) + e.scalePt(sty.MarginRight)
 	if intr < 1 {
 		intr = 1
 	}
@@ -1025,7 +1104,13 @@ func (e *engine) coalesceTextItems(line []inlineItem) []inlineItem {
 // change here must not be folded into that generated function: a stricter
 // comparison would split inline runs that paint identically.
 //
-//nolint:cyclop,dupl // intentionally a subset of the generated comparison
+// The run rotation (writing mode, text-orientation, text-combine-upright) and
+// the decoration geometry (inset and the skip longhands) must stay in the
+// comparison: a coalesced run paints with the surviving item's style, so
+// merging items whose rotation or decoration differs would silently drop the
+// second item's value.
+//
+//nolint:cyclop,dupl,gocyclo // intentionally a subset of the generated comparison
 func sameInlineStyle(acc, boxN *ResolvedStyle) bool {
 	if acc == nil || boxN == nil {
 		return acc == boxN
@@ -1047,7 +1132,16 @@ func sameInlineStyle(acc, boxN *ResolvedStyle) bool {
 		acc.BorderTop == boxN.BorderTop && acc.BorderRight == boxN.BorderRight &&
 		acc.BorderBottom == boxN.BorderBottom && acc.BorderLeft == boxN.BorderLeft &&
 		acc.TextDecoration == boxN.TextDecoration &&
-		acc.WhiteSpace == boxN.WhiteSpace
+		acc.WhiteSpace == boxN.WhiteSpace &&
+		acc.WritingMode == boxN.WritingMode &&
+		acc.TextOrientation == boxN.TextOrientation &&
+		acc.TextCombineUpright == boxN.TextCombineUpright &&
+		acc.TextDecorationInset == boxN.TextDecorationInset &&
+		acc.TextDecorationSkip == boxN.TextDecorationSkip &&
+		acc.TextDecorationSkipBox == boxN.TextDecorationSkipBox &&
+		acc.TextDecorationSkipSelf == boxN.TextDecorationSkipSelf &&
+		acc.TextDecorationSkipSpaces == boxN.TextDecorationSkipSpaces &&
+		acc.TextDecorationSkipInk == boxN.TextDecorationSkipInk
 }
 
 func lineHeightOf(st *ResolvedStyle) float64 {

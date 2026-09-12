@@ -92,6 +92,28 @@ func (e *engine) measureCellContent(n *html.Node, st ResolvedStyle) float64 {
 // as min-content so adjacent cite markers stay on one horizontal line instead
 // of wrapping into a stacked, overlapping pair in a one-marker-wide column.
 func (e *engine) measureCellMinMax(node *html.Node, style ResolvedStyle) (float64, float64) {
+	// Size containment (and content-visibility: hidden) sizes intrinsic widths
+	// as if the descendants were absent: contain-intrinsic inline size (else
+	// 0) plus box chrome. A fixed intrinsic length contributes the same to
+	// min-content and max-content.
+	if containsSize(style) || style.ContentVisibility == contentVisibilityHidden {
+		intrinsicW := containmentIntrinsicWidth(style)
+		if intrinsicW < 0 {
+			intrinsicW = 0
+		}
+
+		chrome := e.scalePt(style.PaddingLeft) + e.scalePt(style.PaddingRight) +
+			e.scalePt(style.BorderLeft.Width) + e.scalePt(style.BorderRight.Width)
+		// Inline boxes measure their own chrome while walking text.
+		if style.Display == cssDisplayInline {
+			chrome = 0
+		}
+
+		width := e.scalePt(intrinsicW) + chrome
+
+		return width, width
+	}
+
 	cellMeas := &cellMeasure{ //nolint:exhaustruct // zero fields are the flushed-line state
 		engine: e,
 		em:     style.FontSize,

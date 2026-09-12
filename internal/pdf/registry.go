@@ -275,6 +275,42 @@ func pickFace(faces []*Font, weight int, italic bool) *Font {
 	return best
 }
 
+// HasVariationAxes reports whether the face carries an fvar table, that is,
+// whether it is a variable font. The bundled Liberation and DejaVu faces are
+// static, so this is false for every default face.
+//
+// The font-variation consumer in internal/layout uses the probe to tell a
+// spec-correct no-op (static face, CSS variations have no effect) from a known
+// gap (variable face the writer cannot instance).
+func (f *Font) HasVariationAxes() bool {
+	if f == nil {
+		return false
+	}
+
+	f.ensureParsed()
+
+	_, ok := f.tables["fvar"]
+
+	return ok
+}
+
+// HasColorPalette reports whether the face carries both COLR and CPAL, the
+// tables font-palette needs to select a color palette. The PDF writer embeds
+// glyf outlines only and has no CPAL/COLR painting path, so a true result
+// identifies a known gap rather than supported palette painting.
+func (f *Font) HasColorPalette() bool {
+	if f == nil {
+		return false
+	}
+
+	f.ensureParsed()
+
+	_, hasCOLR := f.tables["COLR"]
+	_, hasCPAL := f.tables["CPAL"]
+
+	return hasCOLR && hasCPAL
+}
+
 // DefaultSystemFontDirs returns common system font directories for the current OS.
 // Callers must opt in via --use-system-fonts; nothing is scanned by default.
 // Proprietary Windows/corefont trees are omitted — use Liberation (bundled)

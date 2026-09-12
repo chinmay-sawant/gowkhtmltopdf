@@ -20,6 +20,7 @@ type opExtra struct {
 	PaintOpacity  float64
 	StructElem    *pdf.StructElem
 	TextTransform string
+	TextLanguage  string
 }
 
 func (op *Op) detachExtra() *opExtra {
@@ -85,6 +86,20 @@ func (op *Op) SetXform(matrix Matrix2D) {
 // SetTextTransform writes the CSS text-transform, allocating a unique extra if needed.
 func (op *Op) SetTextTransform(value string) { op.setTextTransform(value) }
 
+// SetTextLanguage writes the CSS font-language-override tag, allocating a
+// unique extra if needed. Empty and "normal" mean no shaping override.
+func (op *Op) SetTextLanguage(value string) { op.setTextLanguage(value) }
+
+// TextLanguage returns the op's OpenType language override, or "" when the op
+// carries none. Ops that never bound an extra read as no override.
+func (op Op) TextLanguage() string {
+	if op.opExtra == nil {
+		return ""
+	}
+
+	return op.opExtra.TextLanguage
+}
+
 // SetPaintOpacity writes element opacity, allocating a unique extra if needed.
 func (op *Op) SetPaintOpacity(value float64) { op.setPaintOpacity(value) }
 
@@ -129,6 +144,24 @@ func (op *Op) setTextTransform(value string) {
 	}
 
 	op.detachExtra().TextTransform = value
+}
+
+func (op *Op) setTextLanguage(value string) {
+	if value == fontVariantNormal {
+		value = ""
+	}
+
+	if value == "" {
+		if op.opExtra == nil || op.opExtra == emptyExtra {
+			return
+		}
+
+		op.detachExtra().TextLanguage = ""
+
+		return
+	}
+
+	op.detachExtra().TextLanguage = value
 }
 
 func (op *Op) setPaintOpacity(value float64) {
@@ -205,6 +238,18 @@ func (op Op) withTextTransform(value string) Op {
 
 	extra := op.detachedExtraCopy()
 	extra.TextTransform = value
+	op.opExtra = extra
+
+	return op
+}
+
+func (op Op) withTextLanguage(value string) Op {
+	if value == "" || value == fontVariantNormal {
+		return op
+	}
+
+	extra := op.detachedExtraCopy()
+	extra.TextLanguage = value
 	op.opExtra = extra
 
 	return op

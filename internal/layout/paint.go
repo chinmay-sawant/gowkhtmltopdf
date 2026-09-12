@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/errs"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
@@ -73,6 +74,158 @@ type PaintOptions struct {
 	Named map[string]PageMargins `exhaustruct:"optional"`
 	// pageNames is filled at paint after pagination: page index -> page ident.
 	pageNames []string `exhaustruct:"optional"`
+	// colorAdjust carries the root element's resolved color-adjust family
+	// state (color-scheme, forced-color-adjust, dynamic-range-limit) into the
+	// shared draw* helpers. Unexported: PaintContext derives it from the
+	// document root; the zero value is light / auto / no-limit.
+	colorAdjust paintColorAdjust `exhaustruct:"optional"`
+}
+
+// Dark color-scheme defaults: canvas #121212, default text #e8e8e8.
+const (
+	darkSchemeCanvasChannel = 18.0 / 255.0
+	darkSchemeTextChannel   = 232.0 / 255.0
+)
+
+// paintColorAdjust is the root element's color-adjust state as paint consumes
+// it. color-scheme, forced-color-adjust, and dynamic-range-limit all inherit,
+// so the root's used values are the document defaults. darkCanvas is set only
+// when the used scheme is dark and the root declares no background color of
+// its own.
+type paintColorAdjust struct {
+	scheme            string
+	forcedColorAdjust string
+	rangeLimit        string
+	darkCanvas        bool
+}
+
+// rootColorAdjust resolves the paint-time color-adjust state once per Paint.
+// Missing root style data means light / auto / no-limit, which paints exactly
+// as the engine did before these properties existed.
+func rootColorAdjust(res *Result) paintColorAdjust {
+	style := rootElementStyle(res)
+	if style == nil {
+		return paintColorAdjust{} //nolint:exhaustruct // light/auto/no-limit defaults
+	}
+
+	scheme := usedColorScheme(style.ColorScheme)
+
+	return paintColorAdjust{
+		scheme:            scheme,
+		forcedColorAdjust: style.ForcedColorAdjust,
+		rangeLimit:        style.DynamicRangeLimit,
+		darkCanvas:        scheme == colorSchemeDark && style.BGColor[3] == 0,
+	}
+}
+
+// rootElementStyle returns the html element's style for a laid-out document,
+// falling back to the outermost box for fragment results (body blocks) and
+// hand-built Results. nil means no color-adjust data is available.
+func rootElementStyle(res *Result) *ResolvedStyle {
+	if res == nil {
+		return nil
+	}
+
+	if htmlBox := findRootElementBox(res.root); htmlBox != nil {
+		return htmlBox.style
+	}
+
+	if res.root != nil {
+		return res.root.style
+	}
+
+	return nil
+}
+
+// findRootElementBox returns the box for the document's html element, if the
+// tree has one. Parsed documents root at a #document box, so res.root.style is
+// not the html style.
+func findRootElementBox(boxNode *box) *box {
+	if boxNode == nil {
+		return nil
+	}
+
+	if boxNode.node != nil && boxNode.node.Name == htmlRootName {
+		return boxNode
+	}
+
+	for _, child := range boxNode.children {
+		if found := findRootElementBox(child); found != nil {
+			return found
+		}
+	}
+
+	return nil
+}
+
+// usedColorScheme picks the scheme a print render uses: the first listed
+// light/dark token wins (so "light dark" is light, "dark light" is dark),
+// "only light"/"only dark" force their token, and "normal" is light. Values
+// are normalized by the apply arm.
+func usedColorScheme(value string) string {
+	for _, token := range strings.Fields(strings.ToLower(value)) {
+		switch token {
+		case colorSchemeDark:
+			return colorSchemeDark
+		case colorSchemeLight:
+			return colorSchemeLight
+		}
+	}
+
+	return colorSchemeLight
+}
+
+// paintColorSchemeCanvas fills the page with the dark canvas default when the
+// root selected a dark scheme and declared no background color. Light schemes
+// leave the PDF page white, which is already the default canvas. Tagged PDF
+// treats the canvas as a background artifact like other chrome fills.
+func paintColorSchemeCanvas(content *pdf.Content, page *pdf.Page, cfg paintColorAdjust, isUA bool) {
+	if content == nil || page == nil || !cfg.darkCanvas {
+		return
+	}
+
+	if isUA {
+		content.BeginArtifact("Background")
+	}
+
+	content.SetFillColor(darkSchemeCanvasChannel, darkSchemeCanvasChannel, darkSchemeCanvasChannel)
+	content.Rect(0, 0, page.Width(), page.Height())
+	content.Fill()
+
+	if isUA {
+		content.EndArtifact()
+	}
+}
+
+// paintTextColor resolves the fill color for a text op. Dark scheme replaces
+// text still at the initial black, because that is how "no author color" and
+// "explicit color: black" both reach paint: ResolvedStyle has no ColorSet flag
+// to tell them apart (report: a ColorSet bool would make this exact). Author
+// colors other than black pass through. Print has no forced-colors mode, so
+// forced-color-adjust: none (keep author colors) opts out of this UA default
+// and auto defers to it.
+func paintTextColor(paintOp *Op, cfg paintColorAdjust) (float64, float64, float64) {
+	if cfg.scheme != colorSchemeDark || cfg.forcedColorAdjust == forcedColorAdjustNone {
+		return paintOp.R, paintOp.G, paintOp.B
+	}
+
+	if paintOp.R == 0 && paintOp.G == 0 && paintOp.B == 0 {
+		return darkSchemeTextChannel, darkSchemeTextChannel, darkSchemeTextChannel
+	}
+
+	return paintOp.R, paintOp.G, paintOp.B
+}
+
+// sRGBRangeLimit clamps channels to the sRGB range when dynamic-range-limit
+// asks for a limited output range. The PDF writer and the PNG/JPEG rasterizer
+// both emit sRGB, so standard and constrained-high clamp; high and no-limit
+// pass through (the writer cannot represent the extra range either way).
+func sRGBRangeLimit(r, g, b float64, limit string) (float64, float64, float64) {
+	if limit != dynamicRangeLimitStandard && limit != dynamicRangeLimitConstrainedHigh {
+		return r, g, b
+	}
+
+	return clamp01(r), clamp01(g), clamp01(b)
 }
 
 // validate rejects page geometry that would otherwise be silently reset:
@@ -169,8 +322,12 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 			errPageSnapMismatch, res.pageSnapHeight, contentH)
 	}
 
+	// Resolve the root color-adjust family once; every page shares it.
+	opts.colorAdjust = rootColorAdjust(res)
+
 	if len(res.Ops) == 0 {
-		doc.AddPage(opts.PageWidth, opts.PageHeight)
+		page := doc.AddPage(opts.PageWidth, opts.PageHeight)
+		paintColorSchemeCanvas(page.Content(), page, opts.colorAdjust, doc.IsUA())
 		populateLocations(res, contentH, nil)
 
 		return nil
@@ -403,6 +560,9 @@ func paintPages(
 		page = doc.AddPage(opts.PageWidth, opts.PageHeight)
 		child = page.Content()
 		child.Grow(contentSizeHint(res.Ops, idxs, fixedOrder))
+
+		// Canvas default paints before every op on the page.
+		paintColorSchemeCanvas(child, page, opts.colorAdjust, isUA)
 
 		pageOrder = append(pageOrder[:0], idxs...)
 		sortPaintIndices(res.Ops, pageOrder)
@@ -901,7 +1061,8 @@ func canvasToPDF(opX, opY float64, pageIdx int, contentH float64, opts PaintOpti
 func drawFill(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintOptions, pageH float64) {
 	x, y := canvasToPDF(op.X, op.Y+op.H, pageIdx, contentH, opts, pageH)
 	ps := StyleOf(op)
-	c.SetFillColor(ps.FillR, ps.FillG, ps.FillB)
+	fillR, fillG, fillB := sRGBRangeLimit(ps.FillR, ps.FillG, ps.FillB, opts.colorAdjust.rangeLimit)
+	c.SetFillColor(fillR, fillG, fillB)
 	if op.Radius > 0 || opHasRoundedCorners(op) {
 		rx, ry := OpRadiiXY(op)
 		roundedRectPathCorners(c, x, y, op.W, op.H, rx, ry)
@@ -935,7 +1096,8 @@ func drawMaskedStroke(c *pdf.Content, op *Op, x, y, width float64) {
 //nolint:varnamelen,wsl // PDF path helpers use compact graphics-state names
 func drawStroke(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintOptions, pageH float64) {
 	x, y := canvasToPDF(op.X, op.Y+op.H, pageIdx, contentH, opts, pageH)
-	c.SetStrokeColor(op.R, op.G, op.B)
+	strokeR, strokeG, strokeB := sRGBRangeLimit(op.R, op.G, op.B, opts.colorAdjust.rangeLimit)
+	c.SetStrokeColor(strokeR, strokeG, strokeB)
 	width := op.Width
 	if width <= 0 {
 		width = 1
@@ -1239,7 +1401,8 @@ func drawLine(chld *pdf.Content, paintOp *Op, pageIdx int, contentH float64, opt
 	xEnd, yEnd := canvasToPDF(x, y, pageIdx, contentH, opts, pageH)
 	xTwo, yTwo := canvasToPDF(x+w, y+h, pageIdx, contentH, opts, pageH)
 
-	chld.SetStrokeColor(paintOp.R, paintOp.G, paintOp.B)
+	strokeR, strokeG, strokeB := sRGBRangeLimit(paintOp.R, paintOp.G, paintOp.B, opts.colorAdjust.rangeLimit)
+	chld.SetStrokeColor(strokeR, strokeG, strokeB)
 	chld.SetLineWidth(width)
 	// Square caps project half the stroke past each endpoint so axis-aligned
 	// border sides meet at outer corners (butt caps leave a width/2 notch).
@@ -1258,7 +1421,9 @@ func drawText(
 	paintOp.bindEmptyExtra()
 
 	posX, posY := canvasToPDF(paintOp.X, paintOp.Y, pageIdx, contentH, opts, pageH)
-	chld.SetFillColor(paintOp.R, paintOp.G, paintOp.B)
+	fillR, fillG, fillB := paintTextColor(paintOp, opts.colorAdjust)
+	fillR, fillG, fillB = sRGBRangeLimit(fillR, fillG, fillB, opts.colorAdjust.rangeLimit)
+	chld.SetFillColor(fillR, fillG, fillB)
 
 	if fontName == "" {
 		fontName = "F0"
@@ -1285,12 +1450,12 @@ func drawText(
 	// Stroking CJK/Type0 outlines creates horizontal streak artifacts.
 	fakeBold := FakeBoldFor(paintOp)
 	if fakeBold {
-		chld.SetStrokeColor(paintOp.R, paintOp.G, paintOp.B)
+		chld.SetStrokeColor(fillR, fillG, fillB)
 		chld.SetLineWidth(paintOp.Size * fakeBoldStrokeRatio)
 		chld.TextRenderMode(pdfTextRenderFillStroke) // fill + stroke
 	}
 
-	chld.TextShow(transformInlineText(paintOp.Text, paintOp.TextTransform))
+	chld.TextShowLanguage(transformInlineText(paintOp.Text, paintOp.TextTransform), paintOp.TextLanguage())
 
 	if fakeBold {
 		chld.TextRenderMode(0)

@@ -4,15 +4,15 @@
     "all_properties": "https://www.w3.org/Style/CSS/all-properties.en.json",
     "mdn_units": "mdn/data css/units.json",
     "mdn_properties": "mdn/data css/properties.json (overlay for mdn_url/groups)",
-    "engine": "honesty pass plus standard compositing support; 2 compositing properties remain partial; 2026-09-12 ponytail audit PT26-LAY-04/05 demoted 27 parsed-and-stored no-op properties to unsupported",
+    "engine": "honesty pass plus standard compositing support; 2 compositing properties remain partial; 2026-09-12 ponytail audit PT26-LAY-04/05 demoted 27 parsed-and-stored no-op properties to unsupported; the same day 23 were re-implemented with real layout/paint consumers (4 CSS Fonts rows stay demoted)",
     "generated": "2026-09-12"
   },
   "summary": {
     "webref_properties": 818,
     "mapped_properties": 818,
     "properties_by_engine_status": {
-      "implemented": 328,
-      "unsupported": 488,
+      "implemented": 351,
+      "unsupported": 465,
       "ignored": 0,
       "partial": 2
     },
@@ -5546,9 +5546,9 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/color-adjust",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Legacy alias of `print-color-adjust`; parsed and stored but no paint path read it. Field and apply arm removed 2026-09-12 by ponytail audit PT26-LAY-04 (no layout, paint, or image reader); declaration is now dropped, catalog demoted implemented -> unsupported."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_color_adjust_props.go",
+      "notes": "Implemented subset: economy|exact. exact forces this element's background paint past the --no-background economy gate. Consumer internal/layout/background_image.go:30; call sites internal/layout/inline_paint.go:312, layout_chrome.go:425, layout_tables.go:100/1276. Re-implemented 2026-09-12 (PT26-LAY-04 reversal)."
     },
     {
       "property": "color-interpolation",
@@ -5613,9 +5613,9 @@
       "groups": [
         "CSS Color"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Preferred color scheme hint; parsed and stored but no consumer in the print pipeline. Field and apply arm removed 2026-09-12 by ponytail audit PT26-LAY-04 (no layout, paint, or image reader); declaration is now dropped, catalog demoted implemented -> unsupported."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_color_adjust_props.go",
+      "notes": "Implemented root-scoped: only the html element's used value is read; the first light/dark token picks the scheme, dark paints the #121212 canvas and light default text, custom idents are dropped. Consumer internal/layout/paint.go:111-117/165/183/207."
     },
     {
       "property": "column-count",
@@ -6172,9 +6172,9 @@
       "groups": [
         "CSS Containment"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Containment hint (`none` / `strict` / `content` / `size` / `layout` / `style` / `paint` / `inline-size`); parsed and stored but layout and paint never read it. Field and apply arm removed 2026-09-12 by ponytail audit PT26-LAY-04 (no layout, paint, or image reader); declaration is now dropped, catalog demoted implemented -> unsupported."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_containment_props.go",
+      "notes": "Implemented subset: size uses contain-intrinsic-* for the as-if-empty box, paint clips descendant paint to the padding box; layout and style parse with no print effect, inline-size is not implemented. Apply arm internal/layout/style_containment_props.go:45; consumers internal/layout/layout_flow.go:224/262 and the overflow-clip stamp."
     },
     {
       "property": "contain-intrinsic-block-size",
@@ -6195,9 +6195,9 @@
       "groups": [
         "CSS Box Sizing"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Size-containment placeholder block size; parsed and stored but layout never read it. Field and apply arm removed 2026-09-12 by ponytail audit PT26-LAY-04 (no layout, paint, or image reader); declaration is now dropped, catalog demoted implemented -> unsupported."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_containment_props.go",
+      "notes": "Implemented with contain:size: block axis maps to height in horizontal-tb (swaps in vertical writing modes). Consumer internal/layout/layout_flow.go:262."
     },
     {
       "property": "contain-intrinsic-height",
@@ -6218,9 +6218,9 @@
       "groups": [
         "CSS Box Sizing"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Size-containment placeholder height; parsed and stored but layout never read it. Field and apply arm removed 2026-09-12 by ponytail audit PT26-LAY-04 (no layout, paint, or image reader); declaration is now dropped, catalog demoted implemented -> unsupported."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_containment_props.go",
+      "notes": "Implemented with contain:size: physical height placeholder. Consumer internal/layout/layout_flow.go:262 (containmentIntrinsicHeight)."
     },
     {
       "property": "contain-intrinsic-inline-size",
@@ -6241,9 +6241,9 @@
       "groups": [
         "CSS Box Sizing"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Size-containment placeholder inline size; parsed and stored but layout never read it. Field and apply arm removed 2026-09-12 by ponytail audit PT26-LAY-04 (no layout, paint, or image reader); declaration is now dropped, catalog demoted implemented -> unsupported."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_containment_props.go",
+      "notes": "Implemented with contain:size: inline axis maps to width in horizontal-tb (swaps in vertical writing modes). Consumer internal/layout/layout_flow.go:758."
     },
     {
       "property": "contain-intrinsic-size",
@@ -6267,9 +6267,9 @@
       "groups": [
         "CSS Box Sizing"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Size-containment placeholder size; parsed and stored but layout never read it. Field and apply arm removed 2026-09-12 by ponytail audit PT26-LAY-04 (no layout, paint, or image reader); declaration is now dropped, catalog demoted implemented -> unsupported."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_containment_props.go",
+      "notes": "Implemented with contain:size: placeholder width and height; one value mirrors to both axes. Consumer internal/layout/layout_flow.go:262 (height) and :758 (width)."
     },
     {
       "property": "contain-intrinsic-width",
@@ -6290,9 +6290,9 @@
       "groups": [
         "CSS Box Sizing"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Size-containment placeholder width; parsed and stored but layout never read it. Field and apply arm removed 2026-09-12 by ponytail audit PT26-LAY-04 (no layout, paint, or image reader); declaration is now dropped, catalog demoted implemented -> unsupported."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_containment_props.go",
+      "notes": "Implemented with contain:size: physical width placeholder. Consumer internal/layout/layout_flow.go:758 (containmentIntrinsicWidth)."
     },
     {
       "property": "container",
@@ -6408,9 +6408,9 @@
       "groups": [
         "CSS Containment"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Browser render-skipping hint (`visible` / `auto` / `hidden`); parsed and stored but the print engine lays out all content, so nothing read it. Field and apply arm removed 2026-09-12 by ponytail audit PT26-LAY-04 (no layout, paint, or image reader); declaration is now dropped, catalog demoted implemented -> unsupported."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_containment_props.go",
+      "notes": "Implemented subset: hidden skips descendant layout and paint and keeps the intrinsic size (0 when unset); visible and auto are print no-ops. Consumer internal/layout/layout_flow.go:211/757."
     },
     {
       "property": "continue",
@@ -7598,9 +7598,9 @@
       "groups": [
         "CSS Color"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "HDR dynamic-range hint; parsed and stored but no raster or PDF consumer. Field and apply arm removed 2026-09-12 by ponytail audit PT26-LAY-04 (no layout, paint, or image reader); declaration is now dropped, catalog demoted implemented -> unsupported."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_color_adjust_props.go",
+      "notes": "Implemented as an sRGB clamp: standard and constrained-high clamp channels; high and no-limit pass through (the writer emits sRGB). Consumer internal/layout/paint.go:223 (sRGBRangeLimit), used at 1064/1099/1404/1425."
     },
     {
       "property": "empty-cells",
@@ -8455,9 +8455,9 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "OpenType language tag override; parsed and stored but text shaping never consumed it. Field and apply arm removed 2026-09-12 by ponytail audit PT26-LAY-05 (no layout, paint, or shaping reader); declaration is now dropped, catalog demoted implemented -> unsupported."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_font_variant_props.go",
+      "notes": "Implemented subset: OpenType language tags map to BCP47 (TRK->tr, SRB->sr, AZE->az, ROM->ro, HUN->hu, POL->pl, CES->cs, SLV->sl, SKY->sk; others lowercased). Consumer: OpText.TextLanguage (internal/layout/op_extra.go) feeds shaping.Input.Language via internal/pdf/shape_gotext.go:216 for PDF and PNG. Observable with DejaVu Sans SRB locl glyph substitution."
     },
     {
       "property": "font-optical-sizing",
@@ -9038,9 +9038,9 @@
       "groups": [
         "CSS Color"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "High-contrast force-color override (`auto` / `none`); parsed and stored but no layout or paint consumer. Field and apply arm removed 2026-09-12 by ponytail audit PT26-LAY-04 (no layout, paint, or image reader); declaration is now dropped, catalog demoted implemented -> unsupported."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_color_adjust_props.go",
+      "notes": "Implemented: print has no forced-colors mode; none keeps author colors by opting out of the dark-scheme text default (preserve-parent-color behaves like auto). Consumer internal/layout/paint.go:208, read at paint.go:115."
     },
     {
       "property": "frame-sizing",
@@ -9769,9 +9769,9 @@
       "groups": [
         "CSS Images"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "EXIF-based image rotation (`from-image` / `none`); parsed and stored but no image reader consulted it. Field and apply arm removed 2026-09-12 by ponytail audit PT26-LAY-04 (no layout, paint, or image reader); declaration is now dropped, catalog demoted implemented -> unsupported."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_image_adjust_props.go",
+      "notes": "Implemented subset: from-image (JPEG EXIF), none, or explicit <angle> [flip]; an explicit angle replaces EXIF. Consumer internal/layout/layout_images.go:219/237."
     },
     {
       "property": "image-rendering",
@@ -9815,9 +9815,9 @@
       "groups": [
         "CSS Images"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Intrinsic image resolution in dpi/dppx; parsed and stored but never read when sizing or rasterizing images. Field and apply arm removed 2026-09-12 by ponytail audit PT26-LAY-04 (no layout, paint, or image reader); declaration is now dropped, catalog demoted implemented -> unsupported."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_image_adjust_props.go",
+      "notes": "Implemented subset: from-image | <resolution> | from-image <resolution>; dpi/dpcm/dppx/x convert to DPI so 300dpi renders smaller than the 96dpi default. Consumer internal/layout/layout_images.go:250/256."
     },
     {
       "property": "initial-letter",
@@ -12015,9 +12015,9 @@
       "groups": [
         "CSS Images"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Embedded image crop rectangle; parsed raw and stored but no image paint path read it. Field and apply arm removed 2026-09-12 by ponytail audit PT26-LAY-04 (no layout, paint, or image reader); declaration is now dropped, catalog demoted implemented -> unsupported."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_image_adjust_props.go",
+      "notes": "Implemented rect subset: inset()/xywh()/rect() crop the source; circle()/ellipse()/polygon() parse and store but do not crop. Consumer internal/layout/layout_images.go:319."
     },
     {
       "property": "offset",
@@ -13764,9 +13764,9 @@
       "groups": [
         "CSS Color"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Print color-adjust policy (`economy` / `exact`); parsed and stored but no paint path read it. Field and apply arm removed 2026-09-12 by ponytail audit PT26-LAY-04 (no layout, paint, or image reader); declaration is now dropped, catalog demoted implemented -> unsupported."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_color_adjust_props.go",
+      "notes": "Implemented subset: economy|exact (initial economy). exact forces this element's background paint past the --no-background economy gate. Consumer internal/layout/background_image.go:30; call sites internal/layout/inline_paint.go:312, layout_chrome.go:425, layout_tables.go:100/1276."
     },
     {
       "property": "quotes",
@@ -16708,9 +16708,9 @@
       "groups": [
         "CSS Writing Modes"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Vertical-writing digit combination; parsed and stored but inline layout never read it. Field and apply arm removed 2026-09-12 by ponytail audit PT26-LAY-05 (no layout, paint, or shaping reader); declaration is now dropped, catalog demoted implemented -> unsupported."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_text_support_props.go",
+      "notes": "Implemented subset: all or digits N paints a vertical-writing run upright; no scaled combine cell, mixed digit/letter runs stay rotated. Consumer internal/layout/inline_paint.go:370/381."
     },
     {
       "property": "text-decoration",
@@ -16782,9 +16782,9 @@
       "groups": [
         "CSS Text Decoration"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Decoration inset lengths; parsed and stored but inline paint never read it. Field and apply arm removed 2026-09-12 by ponytail audit PT26-LAY-05 (no layout, paint, or shaping reader); declaration is now dropped, catalog demoted implemented -> unsupported."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_text_support_props.go",
+      "notes": "Implemented subset: auto or 1-2 lengths; the first endpoint is stored in points and trims the decoration endpoints (percentages rejected). Consumer internal/layout/inline_paint.go:887."
     },
     {
       "property": "text-decoration-line",
@@ -16833,9 +16833,9 @@
       "groups": [
         "CSS Text Decoration"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Decoration-skip shorthand; parsed and stored but inline paint never read it. Field and apply arm removed 2026-09-12 by ponytail audit PT26-LAY-05 (no layout, paint, or shaping reader); declaration is now dropped, catalog demoted implemented -> unsupported."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_text_support_props.go",
+      "notes": "Implemented subset: none|auto shorthand expands onto the skip-self/box/spaces/ink longhands. Consumer internal/layout/inline_paint.go:599/826."
     },
     {
       "property": "text-decoration-skip-box",
@@ -16854,9 +16854,9 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/text-decoration-skip-box",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Box-decoration skip; parsed and stored but inline paint never read it. Field and apply arm removed 2026-09-12 by ponytail audit PT26-LAY-05 (no layout, paint, or shaping reader); declaration is now dropped, catalog demoted implemented -> unsupported."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_text_support_props.go",
+      "notes": "Implemented subset: all breaks the stroke at an item with inline chrome; none draws across. Consumer internal/layout/inline_paint.go:599."
     },
     {
       "property": "text-decoration-skip-ink",
@@ -16898,9 +16898,9 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/text-decoration-skip-self",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Self-decoration skip; parsed and stored but inline paint never read it. Field and apply arm removed 2026-09-12 by ponytail audit PT26-LAY-05 (no layout, paint, or shaping reader); declaration is now dropped, catalog demoted implemented -> unsupported."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_text_support_props.go",
+      "notes": "Implemented subset: skip-all suppresses the item's own decoration (ancestor decorations are not propagated). Consumer internal/layout/inline_paint.go:599."
     },
     {
       "property": "text-decoration-skip-spaces",
@@ -16919,9 +16919,9 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/text-decoration-skip-spaces",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Space-decoration skip; parsed and stored but inline paint never read it. Field and apply arm removed 2026-09-12 by ponytail audit PT26-LAY-05 (no layout, paint, or shaping reader); declaration is now dropped, catalog demoted implemented -> unsupported."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_text_support_props.go",
+      "notes": "Implemented subset: none|all|[start||end] trim spacer runes from decoration spans. Consumer internal/layout/inline_paint.go:599/684."
     },
     {
       "property": "text-decoration-style",
@@ -17194,9 +17194,9 @@
       "groups": [
         "CSS Writing Modes"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Vertical-writing orientation (`mixed` / `upright` / `sideways`); parsed and stored but inline layout never read it. Field and apply arm removed 2026-09-12 by ponytail audit PT26-LAY-05 (no layout, paint, or shaping reader); declaration is now dropped, catalog demoted implemented -> unsupported."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_text_support_props.go",
+      "notes": "Implemented subset: upright paints vertical-writing runs at 0 degrees; sideways behaves like mixed (rotated). Consumer internal/layout/inline_paint.go:370/375."
     },
     {
       "property": "text-overflow",
@@ -18068,9 +18068,9 @@
       "groups": [
         "CSS Writing Modes"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Bidi embedding override; parsed and stored but inline layout never read it. Field and apply arm removed 2026-09-12 by ponytail audit PT26-LAY-05 (no layout, paint, or shaping reader); declaration is now dropped, catalog demoted implemented -> unsupported."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_text_support_props.go",
+      "notes": "Implemented run-level: bidi-override/isolate-override and the embed/isolate/plaintext scopes reorder runs under rtl (runs, not characters). Consumer internal/layout/inline_collect.go:127/143."
     },
     {
       "property": "user-select",

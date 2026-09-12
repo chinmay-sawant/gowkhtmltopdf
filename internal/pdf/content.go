@@ -424,16 +424,25 @@ type textRun struct {
 // through Type0; Latin that the face lacks (typical for CJK fallback fonts)
 // is drawn with an embedded Liberation fallback so ASCII does not become tofu.
 func (c *Content) TextShow(text string) {
+	c.TextShowLanguage(text, "")
+}
+
+// TextShowLanguage is TextShow with a font-language-override tag. lang is an
+// OpenType language system tag such as "TRK"; "" keeps default shaping.
+func (c *Content) TextShowLanguage(text, lang string) {
 	// Pure-ASCII text is untouched by shaping (no RTL/combining/CJK
 	// features) and never needs Type0, so skip the decision passes below
-	// and go straight to the simple emitter.
-	ascii := true
+	// and go straight to the simple emitter. A language override opts back
+	// in: language-specific GSUB/GPOS may rewrite even ASCII runs.
+	ascii := lang == ""
 
-	for i := range len(text) {
-		if text[i] > asciiMax {
-			ascii = false
+	if ascii {
+		for i := range len(text) {
+			if text[i] > asciiMax {
+				ascii = false
 
-			break
+				break
+			}
 		}
 	}
 
@@ -447,7 +456,7 @@ func (c *Content) TextShow(text string) {
 	// PDF emission needs the shaped text only. ShapeRun also computes per-rune
 	// advances for the raster adapter, which is unnecessary here and creates
 	// two slices for every text operator.
-	text = ShapeTextFont(text, fnt)
+	text = ShapeTextFontWithFeaturesLanguage(text, fnt, nil, lang)
 
 	if fnt == nil || !c.textNeedsType0(text) {
 		c.textShowSimple(text)

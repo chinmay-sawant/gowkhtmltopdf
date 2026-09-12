@@ -1,0 +1,163 @@
+//nolint:all // containment layout behavior tests
+package layout
+
+import (
+	"strings"
+	"testing"
+)
+
+// content-visibility: hidden must skip descendant layout and paint. The box
+// keeps its own chrome and has no content height when no intrinsic size is set.
+func TestContainmentContentVisibilityHidden(t *testing.T) {
+	t.Parallel()
+
+	s := sheet(t, `.hidden { content-visibility: hidden }`+
+		` .hidden p { margin: 0; font-size: 40pt; line-height: 1 }`)
+	res := layoutHTML(t, `<html><body><div class="hidden"><p>HIDDEN-TEXT</p></div></body></html>`, s)
+
+	b := findBox(t, res, "div")
+	if !near(b.height, 0) {
+		t.Fatalf("content-visibility: hidden div height = %v, want 0", b.height)
+	}
+
+	for _, op := range res.Ops {
+		if op.Kind == OpText && strings.Contains(op.Text, "HIDDEN-TEXT") {
+			t.Fatalf("content-visibility: hidden descendant painted: %+v", op)
+		}
+	}
+}
+
+// content-visibility: hidden still honors contain-intrinsic-size for its own
+// content height.
+func TestContainmentContentVisibilityHiddenIntrinsicSize(t *testing.T) {
+	t.Parallel()
+
+	s := sheet(t, `.hidden { content-visibility: hidden; contain-intrinsic-size: 30pt 18pt }`)
+	res := layoutHTML(t, `<html><body><div class="hidden"><p>HIDDEN-TEXT</p></div></body></html>`, s)
+
+	b := findBox(t, res, "div")
+	if !near(b.height, 18) {
+		t.Fatalf("hidden div height = %v, want contain-intrinsic height 18", b.height)
+	}
+}
+
+// A size-contained block uses contain-intrinsic-size (height axis) instead of
+// its real content height, while descendants still paint and may overflow.
+func TestContainmentIntrinsicSizeOverridesContentHeight(t *testing.T) {
+	t.Parallel()
+
+	s := sheet(t, `.sized { contain: size; contain-intrinsic-size: 10pt 20pt }`+
+		` .sized p { margin: 0; font-size: 40pt; line-height: 1.2 }`)
+	res := layoutHTML(t, `<html><body><div class="sized"><p>OVERFLOW</p></div></body></html>`, s)
+
+	b := findBox(t, res, "div")
+	if !near(b.height, 20) {
+		t.Fatalf("size-contained div height = %v, want 20 (contain-intrinsic-size height)", b.height)
+	}
+
+	if len(opsOfKind(res, OpText)) == 0 {
+		t.Fatal("contain: size must keep descendant paint, got no text ops")
+	}
+}
+
+// contain-intrinsic-block-size maps to height in horizontal-tb.
+func TestContainmentIntrinsicBlockSizeMapsToHeight(t *testing.T) {
+	t.Parallel()
+
+	s := sheet(t, `.sized { contain: size; contain-intrinsic-block-size: 24pt }`+
+		` .sized p { margin: 0; font-size: 30pt }`)
+	res := layoutHTML(t, `<html><body><div class="sized"><p>X</p></div></body></html>`, s)
+
+	b := findBox(t, res, "div")
+	if !near(b.height, 24) {
+		t.Fatalf("block-size contained div height = %v, want 24", b.height)
+	}
+}
+
+// contain-intrinsic-inline-size maps to width in horizontal-tb: a size-contained
+// float takes the intrinsic inline size, not the max-content of its text.
+func TestContainmentIntrinsicInlineSizeSizesFloat(t *testing.T) {
+	t.Parallel()
+
+	s := sheet(t, `.f { float: left; contain: size; contain-intrinsic-inline-size: 60pt }`)
+	res := layoutHTML(t, `<html><body><div class="f">hello</div></body></html>`, s)
+
+	b := findBox(t, res, "div")
+	if !near(b.w, 60) {
+		t.Fatalf("size-contained float width = %v, want intrinsic inline size 60", b.w)
+	}
+}
+
+// contain: paint clips descendant paint to the box, reusing the overflow:clip
+// pass (overflow_clip.go). An oversized descendant background must be cut down
+// to the containing box width.
+func TestContainmentPaintClipsDescendants(t *testing.T) {
+	t.Parallel()
+
+	s := sheet(t, `.clip { contain: paint; width: 40pt; height: 30pt }`+
+		` .clip p { margin: 0; width: 300pt; height: 10pt; background: #00ff00 }`)
+	res := layoutHTML(t, `<html><body><div class="clip"><p>WIDE</p></div></body></html>`, s)
+
+	if len(opsOfKind(res, OpFillRect)) == 0 {
+		t.Fatal("no fill ops emitted")
+	}
+
+	found := false
+
+	for _, op := range res.Ops {
+		if op.Kind != OpFillRect || op.Alpha <= 0 {
+			continue
+		}
+
+		if op.R > 0.1 || op.G < 0.9 || op.B > 0.1 {
+			continue
+		}
+
+		found = true
+
+		if op.W > 41 {
+			t.Fatalf("contain: paint descendant fill not clipped: W = %v, op = %+v", op.W, op)
+		}
+	}
+
+	if !found {
+		t.Fatal("contain: paint descendant green fill not found")
+	}
+}
+
+// contain: layout makes the box the containing block for absolute descendants
+// (padding box), so a child with left:0 anchors at the parent border box, not
+// inside the parent padding.
+func TestContainmentLayoutIsAbsoluteContainingBlock(t *testing.T) {
+	t.Parallel()
+
+	s := sheet(t, `.cb { contain: layout; padding: 10pt }`+
+		` .cb .abs { position: absolute; left: 0; top: 0 }`)
+	res := layoutHTML(t, `<html><body><div class="cb"><span class="abs">A</span></div></body></html>`, s)
+
+	texts := opsOfKind(res, OpText)
+	if len(texts) != 1 {
+		t.Fatalf("text ops = %+v, want 1", texts)
+	}
+
+	// Body UA margin 8px = 6pt. Without containment the absolute box anchors
+	// to the parent content box (6 + 10); layout containment uses the padding
+	// box (6).
+	if !near(texts[0].X, 6) {
+		t.Fatalf("absolute descendant X = %v, want 6 (contain:layout padding-box origin)", texts[0].X)
+	}
+}
+
+// contain: layout is an independent formatting context: descendant floats are
+// trapped and enclosed by its used height.
+func TestContainmentLayoutEnclosesFloats(t *testing.T) {
+	t.Parallel()
+
+	s := sheet(t, `.fc { contain: layout } .fc .fl { float: left; width: 20pt; height: 30pt }`)
+	res := layoutHTML(t, `<html><body><div class="fc"><div class="fl"></div></div></body></html>`, s)
+
+	b := findBox(t, res, "div")
+	if b.height < 29.99 {
+		t.Fatalf("layout containment did not enclose the float: height = %v, want >= 30", b.height)
+	}
+}

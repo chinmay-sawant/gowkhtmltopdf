@@ -285,6 +285,39 @@ var inheritableProps = []inheritCopy{ //nolint:gochecknoglobals // static inheri
 		dst.TextDecorationSkipInk = src.TextDecorationSkipInk
 	}},
 	{[]string{"empty-cells"}, func(dst, src *ResolvedStyle) { dst.EmptyCells = src.EmptyCells }},
+	// Re-added support properties (2026-09-12 demotions): inherited per
+	// plans/0.2.6/catalog/mapping.json. The text-decoration-skip entry also
+	// copies its inherited longhands because the uint64 declared mask caps the
+	// table at 64 entries.
+	{[]string{"color-adjust", "print-color-adjust"}, func(dst, src *ResolvedStyle) {
+		dst.ColorAdjust = src.ColorAdjust
+	}},
+	{[]string{"forced-color-adjust"}, func(dst, src *ResolvedStyle) { dst.ForcedColorAdjust = src.ForcedColorAdjust }},
+	{[]string{"color-scheme"}, func(dst, src *ResolvedStyle) { dst.ColorScheme = src.ColorScheme }},
+	{[]string{"dynamic-range-limit"}, func(dst, src *ResolvedStyle) { dst.DynamicRangeLimit = src.DynamicRangeLimit }},
+	{[]string{"font-language-override"}, func(dst, src *ResolvedStyle) {
+		dst.FontLanguageOverride = src.FontLanguageOverride
+	}},
+	{[]string{"font-optical-sizing"}, func(dst, src *ResolvedStyle) { dst.FontOpticalSizing = src.FontOpticalSizing }},
+	{[]string{"font-palette"}, func(dst, src *ResolvedStyle) { dst.FontPalette = src.FontPalette }},
+	{[]string{"font-variation-settings"}, func(dst, src *ResolvedStyle) {
+		dst.FontVariationSettings = src.FontVariationSettings
+	}},
+	{[]string{"image-orientation"}, func(dst, src *ResolvedStyle) {
+		dst.ImageOrientation = src.ImageOrientation
+		dst.ImageOrientationAngle = src.ImageOrientationAngle
+	}},
+	{[]string{"image-resolution"}, func(dst, src *ResolvedStyle) {
+		dst.ImageResolution = src.ImageResolution
+		dst.ImageResolutionDPI = src.ImageResolutionDPI
+	}},
+	{[]string{"text-combine-upright"}, func(dst, src *ResolvedStyle) { dst.TextCombineUpright = src.TextCombineUpright }},
+	{[]string{"text-decoration-skip"}, func(dst, src *ResolvedStyle) {
+		dst.TextDecorationSkip = src.TextDecorationSkip
+		dst.TextDecorationSkipBox = src.TextDecorationSkipBox
+		dst.TextDecorationSkipSpaces = src.TextDecorationSkipSpaces
+	}},
+	{[]string{"text-orientation"}, func(dst, src *ResolvedStyle) { dst.TextOrientation = src.TextOrientation }},
 }
 
 // inheritablePropBits maps an inheritable property name to the bit set of its
@@ -1267,7 +1300,7 @@ type styleGroupFn func(
 ) bool
 
 // styleGroups is the immutable dispatch order for applyStyleProp.
-// Package-level so applyStyleProp does not rebuild the 11-entry array on
+// Package-level so applyStyleProp does not rebuild the 16-entry array on
 // every cascaded property of every element.
 var styleGroups = [...]styleGroupFn{ //nolint:gochecknoglobals // static dispatch table
 	applyDisplayGroup,
@@ -1281,6 +1314,13 @@ var styleGroups = [...]styleGroupFn{ //nolint:gochecknoglobals // static dispatc
 	applyTextGroup,
 	applyTableBreakGroup,
 	applyTransformGroup,
+	// Re-added support groups (2026-09-12 demotions): stubs registered here,
+	// follow-up agents fill the bodies.
+	applyContainmentProps,
+	applyColorAdjustProps,
+	applyFontVariantProps,
+	applyImageAdjustProps,
+	applyTextSupportProps,
 }
 
 //nolint:cyclop,goconst,funlen // vendor prefix lookup map

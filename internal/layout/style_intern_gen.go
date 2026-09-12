@@ -329,6 +329,33 @@ func styleInternEqual(a, b *ResolvedStyle) bool {
 		a.OverflowClipMarginRight == b.OverflowClipMarginRight &&
 		a.OverflowClipMarginBottom == b.OverflowClipMarginBottom &&
 		a.OverflowClipMarginLeft == b.OverflowClipMarginLeft &&
+		a.Contain == b.Contain &&
+		a.ContainIntrinsicWidth == b.ContainIntrinsicWidth &&
+		a.ContainIntrinsicHeight == b.ContainIntrinsicHeight &&
+		a.ContainIntrinsicBlockSize == b.ContainIntrinsicBlockSize &&
+		a.ContainIntrinsicInlineSize == b.ContainIntrinsicInlineSize &&
+		a.ContentVisibility == b.ContentVisibility &&
+		a.ColorAdjust == b.ColorAdjust &&
+		a.ForcedColorAdjust == b.ForcedColorAdjust &&
+		a.ColorScheme == b.ColorScheme &&
+		a.DynamicRangeLimit == b.DynamicRangeLimit &&
+		a.FontLanguageOverride == b.FontLanguageOverride &&
+		a.FontOpticalSizing == b.FontOpticalSizing &&
+		a.FontPalette == b.FontPalette &&
+		a.FontVariationSettings == b.FontVariationSettings &&
+		a.ImageOrientation == b.ImageOrientation &&
+		a.ImageOrientationAngle == b.ImageOrientationAngle &&
+		a.ImageResolution == b.ImageResolution &&
+		a.ImageResolutionDPI == b.ImageResolutionDPI &&
+		a.ObjectViewBox == b.ObjectViewBox &&
+		a.TextCombineUpright == b.TextCombineUpright &&
+		a.TextDecorationInset == b.TextDecorationInset &&
+		a.TextDecorationSkip == b.TextDecorationSkip &&
+		a.TextDecorationSkipBox == b.TextDecorationSkipBox &&
+		a.TextDecorationSkipSelf == b.TextDecorationSkipSelf &&
+		a.TextDecorationSkipSpaces == b.TextDecorationSkipSpaces &&
+		a.TextOrientation == b.TextOrientation &&
+		a.UnicodeBidi == b.UnicodeBidi &&
 		maps.Equal(a.CustomProps, b.CustomProps)
 }
 
@@ -590,6 +617,33 @@ func styleInternFingerprint(s *ResolvedStyle) uint64 {
 	h = styleInternHashFloat64(h, s.OverflowClipMarginRight)
 	h = styleInternHashFloat64(h, s.OverflowClipMarginBottom)
 	h = styleInternHashFloat64(h, s.OverflowClipMarginLeft)
+	h = styleInternHashString(h, s.Contain)
+	h = styleInternHashFloat64(h, s.ContainIntrinsicWidth)
+	h = styleInternHashFloat64(h, s.ContainIntrinsicHeight)
+	h = styleInternHashFloat64(h, s.ContainIntrinsicBlockSize)
+	h = styleInternHashFloat64(h, s.ContainIntrinsicInlineSize)
+	h = styleInternHashString(h, s.ContentVisibility)
+	h = styleInternHashString(h, s.ColorAdjust)
+	h = styleInternHashString(h, s.ForcedColorAdjust)
+	h = styleInternHashString(h, s.ColorScheme)
+	h = styleInternHashString(h, s.DynamicRangeLimit)
+	h = styleInternHashString(h, s.FontLanguageOverride)
+	h = styleInternHashString(h, s.FontOpticalSizing)
+	h = styleInternHashString(h, s.FontPalette)
+	h = styleInternHashString(h, s.FontVariationSettings)
+	h = styleInternHashString(h, s.ImageOrientation)
+	h = styleInternHashFloat64(h, s.ImageOrientationAngle)
+	h = styleInternHashString(h, s.ImageResolution)
+	h = styleInternHashFloat64(h, s.ImageResolutionDPI)
+	h = styleInternHashString(h, s.ObjectViewBox)
+	h = styleInternHashString(h, s.TextCombineUpright)
+	h = styleInternHashFloat64(h, s.TextDecorationInset)
+	h = styleInternHashString(h, s.TextDecorationSkip)
+	h = styleInternHashString(h, s.TextDecorationSkipBox)
+	h = styleInternHashString(h, s.TextDecorationSkipSelf)
+	h = styleInternHashString(h, s.TextDecorationSkipSpaces)
+	h = styleInternHashString(h, s.TextOrientation)
+	h = styleInternHashString(h, s.UnicodeBidi)
 	h = styleInternHashStringMap(h, s.CustomProps)
 
 	return h
@@ -833,6 +887,33 @@ func styleInternFields() []string {
 		"OverflowClipMarginRight",
 		"OverflowClipMarginBottom",
 		"OverflowClipMarginLeft",
+		"Contain",
+		"ContainIntrinsicWidth",
+		"ContainIntrinsicHeight",
+		"ContainIntrinsicBlockSize",
+		"ContainIntrinsicInlineSize",
+		"ContentVisibility",
+		"ColorAdjust",
+		"ForcedColorAdjust",
+		"ColorScheme",
+		"DynamicRangeLimit",
+		"FontLanguageOverride",
+		"FontOpticalSizing",
+		"FontPalette",
+		"FontVariationSettings",
+		"ImageOrientation",
+		"ImageOrientationAngle",
+		"ImageResolution",
+		"ImageResolutionDPI",
+		"ObjectViewBox",
+		"TextCombineUpright",
+		"TextDecorationInset",
+		"TextDecorationSkip",
+		"TextDecorationSkipBox",
+		"TextDecorationSkipSelf",
+		"TextDecorationSkipSpaces",
+		"TextOrientation",
+		"UnicodeBidi",
 		"CustomProps",
 	}
 }

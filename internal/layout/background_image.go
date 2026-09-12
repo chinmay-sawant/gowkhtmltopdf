@@ -15,12 +15,29 @@ const (
 	maxBackgroundTiles  = 1024
 )
 
+// backgroundPaintEnabled reports whether one element's background color and
+// background-image layers may paint. Options.Background is the document-wide
+// print setting (economy mode: backgrounds stay off unless requested);
+// print-color-adjust: exact (or legacy color-adjust: exact) opts a single
+// element out of that economy and forces its own backgrounds to paint.
+//
+// The background-color gates in inline_paint.go, layout_chrome.go, and
+// layout_tables.go still read e.opts.Background directly and must call this
+// helper instead to honor exact for fills.
+func (e *engine) backgroundPaintEnabled(sty *ResolvedStyle) bool {
+	if e.opts.Background {
+		return true
+	}
+
+	return sty != nil && sty.ColorAdjust == colorAdjustExact
+}
+
 // appendBackgroundImage paints all background-image layers (gradients, images)
 // with position, size, repeat, origin, and clip.
 func (e *engine) appendBackgroundImage(
 	dst []Op, sty ResolvedStyle, posX, posY, width, height float64,
 ) []Op {
-	if !e.opts.Background || width <= 0 || height <= 0 || sty.BackgroundImage == "" {
+	if !e.backgroundPaintEnabled(&sty) || width <= 0 || height <= 0 || sty.BackgroundImage == "" {
 		return dst
 	}
 

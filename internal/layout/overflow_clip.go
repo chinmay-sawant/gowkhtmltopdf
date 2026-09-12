@@ -106,8 +106,8 @@ func (e *engine) computeBoxOverflowClip(boxNode *box, current *clipRect) *clipRe
 		return current
 	}
 
-	clipX := overflowClipsPaint(boxNode.style.OverflowX) || overflowClipsPaint(boxNode.style.Overflow)
-	clipY := overflowClipsPaint(boxNode.style.OverflowY) || overflowClipsPaint(boxNode.style.Overflow)
+	clipX := clipsPaintAxis(boxNode.style, boxNode.style.OverflowX)
+	clipY := clipsPaintAxis(boxNode.style, boxNode.style.OverflowY)
 
 	if !clipX && !clipY {
 		return current
@@ -131,6 +131,12 @@ func (e *engine) computeBoxOverflowClip(boxNode *box, current *clipRect) *clipRe
 	}
 
 	return &pb
+}
+
+// clipsPaintAxis reports whether one overflow axis clips paint: the axis
+// longhand, the overflow shorthand, or contain: paint.
+func clipsPaintAxis(style *ResolvedStyle, axis string) bool {
+	return overflowClipsPaint(axis) || overflowClipsPaint(style.Overflow) || containsPaint(*style)
 }
 
 func (e *engine) clipOverflowTree(boxNode *box, clip *clipRect) {
