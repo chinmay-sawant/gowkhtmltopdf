@@ -21,6 +21,7 @@
 | [perf-time/phase-wise-checklist.md](perf-time/phase-wise-checklist.md) | Warm-path time plan, complete 2026-09-11, Snapshot M. Do not reopen. |
 | [agy-review/](agy-review) | Go Design Patterns and Go Code Style review ledgers |
 | [86-canonical-0.2.6-wasm.md](86-canonical-0.2.6-wasm.md) | Browser WASM conversion, PDF preview, and image output ledger, phases 86-93 |
+| [ponytail/](ponytail/) | Current-tree deletion and simplification audit: 40 open, evidence-backed cleanup rows |
 
 Workflow: [`../../skills/phase-wise-checklist/SKILLS.md`](../../skills/phase-wise-checklist/SKILLS.md)
 
