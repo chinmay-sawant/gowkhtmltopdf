@@ -3,6 +3,8 @@ package layout
 import (
 	"math"
 	"slices"
+
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
 )
 
 // GridSeg is one line segment of an OpGridRun, in canvas coordinates.
@@ -195,6 +197,8 @@ func (e *engine) addGridRun(segs []GridSeg) {
 		Positioned: e.positioned,
 	}).withBlendMode(blend)
 	gridOp.bindEmptyExtra()
+	gridOp.setBlendGroup(e.blendGroup)
+
 	e.ops = append(e.ops, gridOp)
 }
 
@@ -233,13 +237,13 @@ func shiftOpX(paintOp *Op, deltaX float64) {
 // drawGridRun replays one row's grid segments as individual lines, in the
 // order they were emitted, so the PDF content stream matches the pre-batch
 // output exactly.
-func (p *pagePainter) drawGridRun(runOp *Op) {
+func (p *pagePainter) drawGridRun(runOp *Op, target *pdf.Content) {
 	if runOp.Grid == nil {
 		return
 	}
 
 	for idx := range runOp.Grid.Segs {
 		line := runOp.Grid.asLine(runOp, idx)
-		drawLine(p.child, &line, p.pageN, p.contentH, p.opts, p.pageH)
+		drawLine(target, &line, p.pageN, p.contentH, p.opts, p.pageH)
 	}
 }

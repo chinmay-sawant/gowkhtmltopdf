@@ -8,7 +8,47 @@ import (
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf/assets"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
+
+// TestDejaVuSansFamilyResolvesFallback proves font-family:'DejaVu Sans'
+// resolves the bundled fallback faces, both through the default registry
+// (convert and imageout build it from settings) and through the FaceSet when
+// no registry is supplied. Without this the language-override demo falls back
+// to Liberation and the Serbian SRB locl substitution cannot show.
+func TestDejaVuSansFamilyResolvesFallback(t *testing.T) {
+	t.Parallel()
+
+	faces, err := pdf.LoadDefaultFaces()
+	if err != nil {
+		t.Fatalf("LoadDefaultFaces: %v", err)
+	}
+
+	style := initialStyle()
+	style.FontFamily = []string{"DejaVu Sans"}
+	style.FontWeight = 700
+
+	withRegistry := &engine{
+		font:     faces.Regular,
+		faces:    faces,
+		registry: pdf.RegistryFromGlobal(settings.DefaultPdfGlobal()),
+		scale:    1,
+	}
+
+	if got := withRegistry.lookupFaceFor(&style); got != faces.UnicodeFallbackBold {
+		t.Fatalf("registry lookup = %p, want fallback bold %p", got, faces.UnicodeFallbackBold)
+	}
+
+	noRegistry := &engine{
+		font:  faces.Regular,
+		faces: faces,
+		scale: 1,
+	}
+
+	if got := noRegistry.lookupFaceFor(&style); got != faces.UnicodeFallbackBold {
+		t.Fatalf("faceset lookup = %p, want fallback bold %p", got, faces.UnicodeFallbackBold)
+	}
+}
 
 // TestResolveFontVariantsStaticBundledFaces pins the spec-correct no-op path.
 // Every bundled Liberation and DejaVu face is static: no fvar table and no

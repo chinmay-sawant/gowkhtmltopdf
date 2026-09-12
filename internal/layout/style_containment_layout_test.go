@@ -88,6 +88,57 @@ func TestContainmentIntrinsicInlineSizeSizesFloat(t *testing.T) {
 	}
 }
 
+// size-contained inline-blocks use contain-intrinsic-width,
+// contain-intrinsic-inline-size, and the contain-intrinsic-size x-axis as their
+// used content width. The property is an explicit intrinsic inner size, so the
+// used border-box width adds the horizontal chrome for every box-sizing value.
+// Without an intrinsic width the box stays at its chrome-only size.
+func TestContainmentIntrinsicWidthSizesInlineBlock(t *testing.T) {
+	t.Parallel()
+
+	s := sheet(t, `.ib { display: inline-block; contain: size; padding: 5pt; border: 2pt solid #000 }`+
+		` .width-intr { contain-intrinsic-width: 88px }`+
+		` .bordbox-intr { contain-intrinsic-width: 88px; box-sizing: border-box }`+
+		` .inline-intr { contain-intrinsic-inline-size: 70pt }`+
+		` .short-intr { contain-intrinsic-size: 80pt 30pt }`+
+		` .fixture-bordbox { contain-intrinsic-inline-size: 96px; box-sizing: border-box;`+
+		` padding: 2px; border: 1px solid #246 }`)
+	res := layoutHTML(t, `<html><body>`+
+		`<div class="ib width-intr">x</div>`+
+		`<div class="ib bordbox-intr">x</div>`+
+		`<div class="ib inline-intr">x</div>`+
+		`<div class="ib short-intr">x</div>`+
+		`<div class="ib chrome-only">x</div>`+
+		`<div class="ib fixture-bordbox">x</div>`+
+		`</body></html>`, s)
+
+	// contain-intrinsic-* is a content (inner) size, so the used border-box
+	// width adds padding+border for content-box and border-box alike.
+	const chrome = 5 + 5 + 2 + 2
+
+	cases := []struct {
+		class string
+		want  float64
+	}{
+		{"width-intr", pxToPt(88) + chrome},
+		{"bordbox-intr", pxToPt(88) + chrome},
+		{"inline-intr", 70 + chrome},
+		{"short-intr", 80 + chrome},
+		{"chrome-only", chrome},
+		// fixture-61 row 36 shape: 96px inner + 2px padding per side + 1px
+		// border per side. The engine clamps borders to a 1pt hairline, so
+		// the total is 77pt (102.67 CSS px), not the ideal 102.
+		{"fixture-bordbox", pxToPt(96) + 2*1.5 + 2*1},
+	}
+
+	for _, testCase := range cases {
+		b := findBoxByClass(t, res, testCase.class)
+		if !near(b.w, testCase.want) {
+			t.Fatalf("%s inline-block width = %v, want %v", testCase.class, b.w, testCase.want)
+		}
+	}
+}
+
 // contain: paint clips descendant paint to the box, reusing the overflow:clip
 // pass (overflow_clip.go). An oversized descendant background must be cut down
 // to the containing box width.

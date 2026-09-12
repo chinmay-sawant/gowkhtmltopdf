@@ -139,6 +139,7 @@ type Document struct {
 	creationTime      time.Time // zero value → deterministic fixed date
 	nextID            int
 	pages             []*Page
+	pendingForms      []pendingForm // transparency groups buffered until finalize (see finalizeForms)
 	outlineRoot       *Outline
 	fontCache         map[string]objRef // subset key -> font dict ref
 	fontRuneSet       map[string]map[rune]struct{}
@@ -852,6 +853,10 @@ func (d *Document) finalize() error {
 
 	d.unionFontRunes()
 
+	if err := d.finalizeForms(); err != nil {
+		return d.failFinalize(err)
+	}
+
 	pageRefs := make([]string, 0, len(d.pages))
 	for _, p := range d.pages {
 		pageRefs = append(pageRefs, p.ref.String())
@@ -960,6 +965,48 @@ func (d *Document) unionFontRunes() {
 		d.fontKeyFonts[name] = fnt
 		d.fontKeys[name] = fmt.Sprintf("v%d|%x|%s|%s", mode, fnt.fingerprint, baseName, runesKey(runes))
 	}
+}
+
+// finalizeForms materializes the transparency-group Form XObjects buffered by
+// Content.EndTransparencyGroup. Running after unionFontRunes means a form's
+// /Resources are built from the document-wide rune union, so the form embeds
+// the same font subsets pages do instead of a space-only placeholder. The
+// object references and Do operators were written during paint, so only the
+// dict and stream bytes are pending here. Forms appear in close order
+// (innermost first), which keeps nested resource assembly simple.
+func (d *Document) finalizeForms() error {
+	for idx := range d.pendingForms {
+		pending := &d.pendingForms[idx]
+		group := pending.content
+
+		resources, err := buildPageResources(group, d.iccRef, d.grayIccRef, d.policy.Version)
+		if err != nil {
+			return fmt.Errorf("pdf: transparency group resources: %w", err)
+		}
+
+		raw := group.buf.Bytes()
+		formDict := dict{}.add("/Type", "/XObject").
+			add("/Subtype", "/Form").
+			add("/FormType", "1").
+			add("/BBox", formBBox(pending.bbox)).
+			add("/Group", "<< /S /Transparency /I true /CS /DeviceRGB >>").
+			add("/Resources", resources)
+
+		if d.useCompression {
+			raw = flateBytes(raw)
+			formDict = formDict.add("/Filter", "/FlateDecode")
+		}
+
+		formDict = formDict.add("/Length", strconv.Itoa(len(raw)))
+
+		d.setDict(pending.ref, formDict.String())
+		d.setStream(pending.ref, raw)
+		group.releaseBuffer()
+	}
+
+	d.pendingForms = nil
+
+	return nil
 }
 
 func sortedStringKeys[V any](values map[string]V) []string {

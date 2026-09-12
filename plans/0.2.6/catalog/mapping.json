@@ -4,17 +4,17 @@
     "all_properties": "https://www.w3.org/Style/CSS/all-properties.en.json",
     "mdn_units": "mdn/data css/units.json",
     "mdn_properties": "mdn/data css/properties.json (overlay for mdn_url/groups)",
-    "engine": "honesty pass plus standard compositing support; 2 compositing properties remain partial; 2026-09-12 ponytail audit PT26-LAY-04/05 demoted 27 parsed-and-stored no-op properties to unsupported; the same day 23 were re-implemented with real layout/paint consumers (4 CSS Fonts rows stay demoted)",
+    "engine": "honesty pass plus standard compositing support; mix-blend-mode and isolation completed 2026-09-12 with element-level transparency groups in PDF and grouped raster composites in PNG; 2026-09-12 ponytail audit PT26-LAY-04/05 demoted 27 parsed-and-stored no-op properties to unsupported; the same day 24 were re-implemented with real layout/paint consumers (3 CSS Fonts rows stay demoted)",
     "generated": "2026-09-12"
   },
   "summary": {
     "webref_properties": 818,
     "mapped_properties": 818,
     "properties_by_engine_status": {
-      "implemented": 352,
+      "implemented": 354,
       "unsupported": 464,
       "ignored": 0,
-      "partial": 2
+      "partial": 0
     },
     "properties_print_relevant": 818,
     "properties_goal_implement": 818,
@@ -10267,9 +10267,9 @@
       "groups": [
         "Compositing and Blending"
       ],
-      "engine_status": "partial",
-      "code_path": "internal/layout/style_advanced_props.go; internal/layout/layout.go",
-      "notes": "Parsed into ResolvedStyle. isolate creates a stacking context and clears an inherited operation blend mode for its subtree; full isolated transparency groups are not available in the PDF writer."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
+      "notes": "Parsed into ResolvedStyle.Isolation. isolate creates a stacking context and an isolated element group even with an empty blend mode; PDF emits a Form XObject with /Group << /S /Transparency /I true /CS /DeviceRGB >> and no /BM entry, PNG composites the group from a transparent scratch backdrop. Consumers layout.go:1024 (group create) and :1075 (Isolate true); tests TestIsolationClearsInheritedOperationBlendScope and TestIsolationOnlyGroupUsesNoBlendExtGState. Subset: a group subtree split across pages composites as one isolated group per page fragment with nothing dropped; element opacity stays per descendant op and group composite alpha is 1, so CSS once-at-group opacity is not implemented; the group composites at its last member's position in the engine global paint order, not a full CSS stacking-context tree; Form /BBox is the page box (conservative, never clips); PDF/UA tagging inside forms was not validated by veraPDF in this session. Fixture 61 cell 99: the auto chip multiplies to dark green while the isolate chip stays blue."
     },
     {
       "property": "justify-content",
@@ -11862,9 +11862,9 @@
       "groups": [
         "Compositing and Blending"
       ],
-      "engine_status": "partial",
-      "code_path": "internal/layout/style_advanced_props.go; internal/layout/layout.go; internal/layout/paint.go; internal/imageout/blend.go; internal/pdf/content.go",
-      "notes": "Standard CSS blend modes are parsed and applied to emitted display-list operations in PDF and PNG. This is operation-level compositing; full element-group backdrop semantics are not available in the current flat display list and PDF writer. The newer plus-lighter value remains unsupported. Verified by TestMixBlendModeReachesDisplayList and TestPaintBlendedFillUsesMultiply."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
+      "notes": "Standard CSS blend modes parse into ResolvedStyle.MixBlendMode and paint as element-level transparency groups. Apply arm style_advanced_props.go:69; consumers layout.go:1024 (pushZ creates the element group) and :1058 (enterBlendIsolation writes BlendGroup.Mode); PDF content.go:377 EndTransparencyGroup emits the Form XObject with /Group << /S /Transparency /I true /CS /DeviceRGB >> and /BM via ExtGState; PNG imageout/groups.go compositeBlend at :163 composites each group buffer once; form fonts share the page subset (pdf.go:977 finalizeForms after unionFontRunes); sibling paint routes by each op's own group chain (paint_groups.go target/enter/closeReady); group alpha per distinct value via SetGroupOpacity. Tests TestBlendGroupMarkersNestAroundSubtree, TestBlendGroupEmitsTransparencyForm, TestSiblingBlendGroupsEmitSiblingForms, TestRasterizeSiblingOutsideBlendGroupKeepsPixels, TestBlendGroupKeepsPlainFlexSiblingOutOfForm, TestTransparencyGroupFontMatchesPageFont. Subset: a group subtree split across pages composites as one isolated group per page fragment with nothing dropped; element opacity stays per descendant op and group composite alpha is 1, so CSS once-at-group opacity is not implemented; the group composites at its last member's position in the engine global paint order, not a full CSS stacking-context tree; plus-lighter remains unsupported; Form /BBox is the page box (conservative, never clips); PDF/UA tagging inside forms was not validated by veraPDF in this session. Fixture 62 cell 16: the multiply chip renders dark green while the normal control keeps translucent blue."
     },
     {
       "property": "nav-down",

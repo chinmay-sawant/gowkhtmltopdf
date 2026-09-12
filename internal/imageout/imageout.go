@@ -523,14 +523,20 @@ func rasterizeContextPolicy(
 	atlas := newGlyphAtlas()
 	imageCache := newRasterImageCache()
 
-	for _, opIndex := range rasterPaintOrder(res.Ops) {
-		if err := ctx.Err(); err != nil {
-			return nil, fmt.Errorf("imageout: context: %w", err)
+	if hasElementGroups(res.Ops) {
+		if err := paintWithElementGroups(ctx, img, res.Ops, plan.paddingPt, paintPxPerPt, atlas, imageCache); err != nil {
+			return nil, err
 		}
+	} else {
+		for _, opIndex := range rasterPaintOrder(res.Ops) {
+			if err := ctx.Err(); err != nil {
+				return nil, fmt.Errorf("imageout: context: %w", err)
+			}
 
-		op := res.Ops[opIndex]
-		offsetPaintOp(&op, plan.paddingPt)
-		paint(img, &op, paintPxPerPt, atlas, imageCache)
+			op := res.Ops[opIndex]
+			offsetPaintOp(&op, plan.paddingPt)
+			paint(img, &op, paintPxPerPt, atlas, imageCache)
+		}
 	}
 
 	if plan.direct {

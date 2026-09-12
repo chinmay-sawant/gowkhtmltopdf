@@ -238,6 +238,10 @@ func paintDisplayList(
 ) error {
 	clip := img.Bounds()
 
+	if hasElementGroups(ops) {
+		return paintWithElementGroups(ctx, img, ops, 0, pxPerPt, atlas, imageCache)
+	}
+
 	for _, opIndex := range rasterPaintOrder(ops) {
 		if err := ctx.Err(); err != nil {
 			return fmt.Errorf("imageout: context: %w", err)

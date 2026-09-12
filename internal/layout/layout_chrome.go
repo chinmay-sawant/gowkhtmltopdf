@@ -473,7 +473,9 @@ func (e *engine) prependChrome(insertAt int, boxNode *box, sty ResolvedStyle, po
 		chrome[i].ZIndex = e.zIndex
 		chrome[i].ZIndexSet = e.zIndexSet
 		chrome[i].Positioned = e.positioned
-		if chrome[i].BlendMode == "" || chrome[i].BlendMode == blendNormal {
+		if e.blendGroup != nil {
+			chrome[i].setBlendGroup(e.blendGroup)
+		} else if chrome[i].BlendMode == "" || chrome[i].BlendMode == blendNormal {
 			chrome[i].setBlendMode(e.blendMode)
 		}
 	}

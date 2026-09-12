@@ -6,7 +6,9 @@ import (
 	"image/color"
 	"testing"
 
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/layout"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
 )
 
 func TestPaintBlendedFillUsesMultiply(t *testing.T) {
@@ -163,6 +165,255 @@ func blendOp(op layout.Op, mode string) layout.Op {
 	op.SetBlendMode(mode)
 
 	return op
+}
+
+// TestElementGroupBlendsOncePerGroup proves element-group semantics: two
+// overlapping opaque children inside one multiplied group composite with each
+// other first, then multiply once against the backdrop. Per-op blending
+// multiplies the second child into the already multiplied first child and
+// produces black in the overlap.
+func TestElementGroupBlendsOncePerGroup(t *testing.T) {
+	t.Parallel()
+
+	group := &layout.BlendGroup{ID: 1, Mode: "multiply", Isolate: true}
+
+	red := layout.Op{Kind: layout.OpFillRect, X: 10, Y: 10, W: 50, H: 50, R: 1}
+	red.SetBlendGroup(group)
+
+	blue := layout.Op{Kind: layout.OpFillRect, X: 40, Y: 40, W: 50, H: 50, B: 1}
+	blue.SetBlendGroup(group)
+
+	grouped := whiteRasterCanvas(100, 100)
+	if err := paintWithElementGroups(
+		t.Context(), grouped, []layout.Op{red, blue}, 0, 1,
+		newGlyphAtlas(), newRasterImageCache(),
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := grouped.NRGBAAt(45, 45); got != (color.NRGBA{R: 0, G: 0, B: 255, A: 255}) {
+		t.Fatalf("group overlap = %#v, want opaque blue (children composite before the backdrop)", got)
+	}
+
+	if got := grouped.NRGBAAt(20, 20); got != (color.NRGBA{R: 255, A: 255}) {
+		t.Fatalf("group red area = %#v, want opaque red", got)
+	}
+
+	if got := grouped.NRGBAAt(80, 80); got != (color.NRGBA{R: 0, G: 0, B: 255, A: 255}) {
+		t.Fatalf("group blue area = %#v, want opaque blue", got)
+	}
+
+	// Per-op reference: multiply blue against the already multiplied red.
+	perOp := whiteRasterCanvas(100, 100)
+	atlas := newGlyphAtlas()
+	cache := newRasterImageCache()
+	perOpOps := []layout.Op{
+		blendOp(layout.Op{Kind: layout.OpFillRect, X: 10, Y: 10, W: 50, H: 50, R: 1}, "multiply"),
+		blendOp(layout.Op{Kind: layout.OpFillRect, X: 40, Y: 40, W: 50, H: 50, B: 1}, "multiply"),
+	}
+
+	for i := range perOpOps {
+		paint(perOp, &perOpOps[i], 1, atlas, cache)
+	}
+
+	if got := perOp.NRGBAAt(45, 45); got != (color.NRGBA{A: 255}) {
+		t.Fatalf("per-op overlap = %#v, want black (the pre-group approximation)", got)
+	}
+
+	if grouped.NRGBAAt(45, 45) == perOp.NRGBAAt(45, 45) {
+		t.Fatal("grouped and per-op rasterization agree in the overlap; grouping had no effect")
+	}
+}
+
+// TestIsolatedGroupResetsBackdrop proves an isolated group starts on a
+// transparent backdrop: a multiply child inside it cannot see the red page
+// content beneath the group. Outside isolation the same child multiplies
+// against red and darkens.
+func TestIsolatedGroupResetsBackdrop(t *testing.T) {
+	t.Parallel()
+
+	group := &layout.BlendGroup{ID: 1, Mode: "", Isolate: true}
+	child := layout.Op{Kind: layout.OpFillRect, X: 20, Y: 20, W: 60, H: 60, R: 0.5, G: 0.5, B: 0.5}
+	child.SetBlendGroup(group)
+	child.SetBlendMode("multiply")
+
+	grouped := redRasterCanvas(100, 100)
+	if err := paintWithElementGroups(
+		t.Context(), grouped, []layout.Op{child}, 0, 1,
+		newGlyphAtlas(), newRasterImageCache(),
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := grouped.NRGBAAt(50, 50); got != (color.NRGBA{R: 127, G: 127, B: 127, A: 255}) {
+		t.Fatalf("isolated group pixel = %#v, want neutral gray (multiply against transparent)", got)
+	}
+}
+
+// TestRasterizeSiblingOutsideBlendGroupKeepsPixels pins fixture-62 cell 16 on
+// the raster path: the plain flex sibling sorts between the blended item's
+// backgrounds and its text in paint order. An innermost-frame scratch absorbed
+// that sibling into the multiply group, so its translucent blue multiplied
+// against the orange parent instead of alpha-compositing over it.
+//
+//nolint:cyclop // full-canvas pixel census and setup assertions
+func TestRasterizeSiblingOutsideBlendGroupKeepsPixels(t *testing.T) {
+	t.Parallel()
+
+	root, err := html.Parse(`<html><body style="margin:0;background:#f80;padding:6px;` +
+		`display:flex;gap:8px;font-size:7pt;color:#fff">` +
+		`<div style="mix-blend-mode:multiply;background:#08f;padding:3px 7px">multiply</div>` +
+		`<div style="background:rgba(0,136,255,0.55);padding:3px 7px">normal</div>` +
+		`</body></html>`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	font, err := pdf.DefaultFont()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := layout.Layout(root, layout.Options{
+		Width: 200, Height: 80, Font: font, Background: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !hasElementGroups(res.Ops) {
+		t.Fatal("layout produced no element-group ops for mix-blend-mode")
+	}
+
+	img, err := rasterizeContext(t.Context(), res, res.Height, false, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	multiplySeen, plainSeen := false, false
+
+	for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y++ {
+		for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x++ {
+			pixel := img.NRGBAAt(x, y)
+
+			// #08f multiply #f80 = rgb(0,72,0).
+			if pixel.R < 8 && pixel.G >= 66 && pixel.G <= 78 && pixel.B < 8 {
+				multiplySeen = true
+			}
+
+			// rgba(0,136,255,0.55) over #f80 = rgb(115,136,140).
+			if pixel.R >= 110 && pixel.R <= 120 && pixel.G >= 132 && pixel.G <= 140 &&
+				pixel.B >= 136 && pixel.B <= 144 {
+				plainSeen = true
+			}
+		}
+	}
+
+	if !multiplySeen {
+		t.Fatal("multiply chip pixel rgb(0,72,0) not found")
+	}
+
+	if !plainSeen {
+		t.Fatal("plain sibling pixel rgb(115,136,140) not found; it was multiplied into the group or flattened")
+	}
+}
+
+func whiteRasterCanvas(width, height int) *image.NRGBA {
+	img := image.NewNRGBA(image.Rect(0, 0, width, height))
+	fillNRGBAOpaque(img, img.Bounds(), color.NRGBA{R: 255, G: 255, B: 255, A: 255})
+
+	return img
+}
+
+func redRasterCanvas(width, height int) *image.NRGBA {
+	img := image.NewNRGBA(image.Rect(0, 0, width, height))
+	fillNRGBAOpaque(img, img.Bounds(), color.NRGBA{R: 255, A: 255})
+
+	return img
+}
+
+// TestTilePaintElementGroup drives the strip/tile paint loop, which shares
+// the group buffering with the full-canvas raster path.
+func TestTilePaintElementGroup(t *testing.T) {
+	t.Parallel()
+
+	group := &layout.BlendGroup{ID: 1, Mode: "multiply", Isolate: true}
+
+	red := layout.Op{Kind: layout.OpFillRect, X: 10, Y: 10, W: 50, H: 50, R: 1}
+	red.SetBlendGroup(group)
+
+	blue := layout.Op{Kind: layout.OpFillRect, X: 40, Y: 40, W: 50, H: 50, B: 1}
+	blue.SetBlendGroup(group)
+
+	img := whiteRasterCanvas(100, 100)
+	if err := paintDisplayList(
+		t.Context(), img, []layout.Op{red, blue}, 1, newGlyphAtlas(), newRasterImageCache(),
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := img.NRGBAAt(45, 45); got != (color.NRGBA{B: 255, A: 255}) {
+		t.Fatalf("tile group overlap = %#v, want opaque blue", got)
+	}
+}
+
+// TestRasterizeElementGroupFromLayout drives the layout -> raster path
+// instead of hand-built ops: the mix-blend-mode group from HTML must route
+// through group buffering, so the child overlap stays blue rather than the
+// per-op multiply result (black).
+//
+//nolint:cyclop,varnamelen // full-canvas pixel census uses x/y loop names
+func TestRasterizeElementGroupFromLayout(t *testing.T) {
+	t.Parallel()
+
+	root, err := html.Parse(`<html><body style="margin:0;background:#fff">` +
+		`<div style="mix-blend-mode:multiply;width:90px;height:80px;position:relative">` +
+		`<div style="position:absolute;left:0;top:0;width:60px;height:60px;background:#f00"></div>` +
+		`<div style="position:absolute;left:30px;top:30px;width:60px;height:60px;background:#00f"></div>` +
+		`</div></body></html>`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	font, err := pdf.DefaultFont()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := layout.Layout(root, layout.Options{
+		Width: 100, Height: 100, Font: font, Background: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !hasElementGroups(res.Ops) {
+		t.Fatal("layout produced no element-group ops for mix-blend-mode")
+	}
+
+	img, err := rasterizeContext(t.Context(), res, res.Height, false, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	foundBlue := false
+
+	for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y++ {
+		for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x++ {
+			pixel := img.NRGBAAt(x, y)
+			if pixel == (color.NRGBA{B: 255, A: 255}) {
+				foundBlue = true
+			}
+
+			if pixel == (color.NRGBA{A: 255}) {
+				t.Fatalf("pixel (%d,%d) is black; per-op blending leaked into the group", x, y)
+			}
+		}
+	}
+
+	if !foundBlue {
+		t.Fatal("rendered group has no blue child region")
+	}
 }
 
 // TestPaintBlendedMatchesFullCanvasScratch compares the op-bounded scratch

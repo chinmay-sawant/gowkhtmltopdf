@@ -222,7 +222,9 @@ func shiftOpsBucket(res *Result, page, from, toIdx int, fromY, beforeY, deltaY f
 		oldPage := res.flowPageOf[idx]
 		shiftIndexedOp(res, idx, deltaY)
 
-		if res.flowPageOf[idx] == oldPage {
+		// shiftIndexedOp may invalidate the flow index when the new Y leaves
+		// the representable page range; the live map is then empty.
+		if idx < len(res.flowPageOf) && res.flowPageOf[idx] == oldPage {
 			jdx++
 		}
 	}
@@ -245,6 +247,8 @@ func shiftFlowBoxes(res *Result, from, toIdx int, fromY, beforeY float64, startP
 
 // shiftBoxesBucket shifts the boxes of one page bucket whose top moved.
 // Re-reads res.flowBoxes[page] each step (same swap-remove hazard as ops).
+//
+//nolint:cyclop // stale-index guard adds one condition to the bucket walk
 func shiftBoxesBucket(res *Result, page, from, toIdx int, fromY, beforeY float64, startPage int, deltaY float64) {
 	if page < 0 || page >= len(res.flowBoxes) {
 		return
@@ -272,7 +276,9 @@ func shiftBoxesBucket(res *Result, page, from, toIdx int, fromY, beforeY float64
 		oldPage := res.flowBoxPage[boxIndex]
 		shiftIndexedBox(res, boxIndex, deltaY)
 
-		if res.flowBoxPage[boxIndex] == oldPage {
+		// shiftIndexedBox may invalidate the flow index when the new Y leaves
+		// the representable page range; the live map is then empty.
+		if boxIndex < len(res.flowBoxPage) && res.flowBoxPage[boxIndex] == oldPage {
 			jdx++
 		}
 	}

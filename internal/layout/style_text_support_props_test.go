@@ -155,8 +155,37 @@ func TestApplyTextSupportPropsTextDecorationSkipShorthand(t *testing.T) {
 			sty.TextDecorationSkipSpaces, sty.TextDecorationSkipInk)
 	}
 
-	sty, _ = applySupportProp("text-decoration-skip", "objects", 12)
-	if sty.TextDecorationSkip != "auto" {
+	// CSS Text Decoration 3 legacy keywords each set the longhand they name
+	// and reset the others to their initial values.
+	legacy := map[string]struct {
+		skipBox    string
+		skipSpaces string
+		skipInk    string
+	}{
+		"objects":        {columnSpanAll, textDecorationSkipStartEnd, overflowAuto},
+		"box-decoration": {columnSpanAll, textDecorationSkipStartEnd, overflowAuto},
+		"spaces":         {cssDisplayNone, columnSpanAll, overflowAuto},
+		"edges":          {cssDisplayNone, textDecorationSkipStartEnd, overflowAuto},
+		"ink":            {cssDisplayNone, textDecorationSkipStartEnd, overflowAuto},
+	}
+	for val, want := range legacy {
+		sty, handled := applySupportProp("text-decoration-skip", val, 12)
+		if !handled {
+			t.Fatalf("text-decoration-skip %q: handled = false", val)
+		}
+
+		if sty.TextDecorationSkip != val || sty.TextDecorationSkipSelf != overflowAuto ||
+			sty.TextDecorationSkipBox != want.skipBox ||
+			sty.TextDecorationSkipSpaces != want.skipSpaces ||
+			sty.TextDecorationSkipInk != want.skipInk {
+			t.Fatalf("skip %q expanded to self=%q box=%q spaces=%q ink=%q",
+				val, sty.TextDecorationSkipSelf, sty.TextDecorationSkipBox,
+				sty.TextDecorationSkipSpaces, sty.TextDecorationSkipInk)
+		}
+	}
+
+	sty, _ = applySupportProp("text-decoration-skip", "bogus", 12)
+	if sty.TextDecorationSkip != overflowAuto {
 		t.Fatalf("malformed shorthand changed value to %q, want initial auto", sty.TextDecorationSkip)
 	}
 }

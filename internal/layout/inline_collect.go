@@ -89,6 +89,16 @@ func reverseInlineRange(items []inlineItem, start int) {
 
 // reverseUnscopedSegment reverses maximal runs of items that no unicode-bidi
 // scope owns. Scoped runs keep the order their scope owner gave them.
+//
+// Word collection attaches a separator to the word it follows ("ABC 123"
+// collects as "ABC " + "123"). Reversing the items as-is moves that separator
+// behind the whole run, where trailing-space trimming drops it and the two
+// words collide ("123ABC"). When the run's last item carries no separator,
+// every item's separator is rotated to the front of its own word first, so the
+// reversed run reads word, space, word (or in reverse: "123", space, "ABC").
+// Runs that already end with a separator keep the old order: there the raw
+// reversal leaves every boundary separator in place, and rotating would
+// duplicate the trailing gap.
 func reverseUnscopedSegment(items []inlineItem, start, end int) {
 	for idx := start; idx < end; {
 		for idx < end && items[idx].bidiScoped {
@@ -100,12 +110,37 @@ func reverseUnscopedSegment(items []inlineItem, start, end int) {
 			runEnd++
 		}
 
+		if runEnd > idx && !hasTrailingWordSeparator(items[runEnd-1]) {
+			for pos := idx; pos < runEnd; pos++ {
+				rotateTrailingWhitespaceToFront(&items[pos])
+			}
+		}
+
 		for lo, hi := idx, runEnd-1; lo < hi; lo, hi = lo+1, hi-1 {
 			items[lo], items[hi] = items[hi], items[lo]
 		}
 
 		idx = runEnd
 	}
+}
+
+// hasTrailingWordSeparator reports whether an item ends with the run of spaces
+// or tabs that rotateTrailingWhitespaceToFront moves.
+func hasTrailingWordSeparator(item inlineItem) bool {
+	return strings.TrimRight(item.text, " \t") != item.text
+}
+
+// rotateTrailingWhitespaceToFront moves an item's trailing run of spaces and
+// tabs to the front of its text, so the separator stays between its word and
+// the neighbor on the other side after a reversal. Only rune order inside one
+// item changes, so the measured width stays valid.
+func rotateTrailingWhitespaceToFront(item *inlineItem) {
+	body := strings.TrimRight(item.text, " \t")
+	if body == item.text {
+		return
+	}
+
+	item.text = item.text[len(body):] + body
 }
 
 // isScopedBidi reports whether a unicode-bidi value orders its own run scope
@@ -713,12 +748,24 @@ func (e *engine) inlineBlockAvail(nodeN *html.Node, sty ResolvedStyle, cbW float
 	return intr
 }
 
-// containmentInlineBlockAvail is the size-containment shrink-to-fit-as-if-empty
-// width for an inline-block: its own chrome plus outer margins, at least 1pt.
+// containmentInlineBlockAvail is the size-containment width for an inline-block.
+// contain-intrinsic-width/inline-size is an explicit intrinsic inner (content)
+// size (CSS Sizing 4 section 5.2), so the used border-box width always adds the
+// horizontal chrome regardless of box-sizing. This matches the block-axis
+// consumer (flowChildren) and the float path (floatIntrinsicAvail), which both
+// add padding and border around the intrinsic content size. Without an
+// intrinsic width the box keeps its as-if-empty chrome-only size. Outer margins
+// and the 1pt floor apply in every case.
 func (e *engine) containmentInlineBlockAvail(sty ResolvedStyle) float64 {
-	intr := e.scalePt(sty.PaddingLeft) + e.scalePt(sty.PaddingRight) +
-		e.scalePt(sty.BorderLeft.Width) + e.scalePt(sty.BorderRight.Width) +
-		e.scalePt(sty.MarginLeft) + e.scalePt(sty.MarginRight)
+	chrome := e.scalePt(sty.PaddingLeft) + e.scalePt(sty.PaddingRight) +
+		e.scalePt(sty.BorderLeft.Width) + e.scalePt(sty.BorderRight.Width)
+	intr := chrome
+
+	if intrinsicW := containmentIntrinsicWidth(sty); intrinsicW >= 0 {
+		intr = e.scalePt(intrinsicW) + chrome
+	}
+
+	intr += e.scalePt(sty.MarginLeft) + e.scalePt(sty.MarginRight)
 	if intr < 1 {
 		intr = 1
 	}

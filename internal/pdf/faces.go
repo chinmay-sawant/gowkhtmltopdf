@@ -7,6 +7,11 @@ import (
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf/assets"
 )
 
+// dejaVuSansFamily is the lowercase CSS family key of the bundled DejaVu Sans
+// fallback faces. ResolveFamily lowercases its input before comparing, and the
+// registry normalizes aliases to the same key.
+const dejaVuSansFamily = "dejavu sans"
+
 // FaceSet holds the bundled Liberation CSS families and Unicode fallback faces.
 //
 // ponytail: Liberation faces bundled in-tree (assets/); system fonts opt-in only.
@@ -88,7 +93,10 @@ func (fs *FaceSet) ResolveFamily(families []string, weight int, italic bool) *Fo
 			return resolveFamilyFaces(fs.Mono, fs.MonoBold, fs.MonoItalic, fs.MonoBoldItalic, weight, italic)
 		case "sans-serif", "arial", "helvetica", "tahoma", "verdana", "calibri", "liberation sans":
 			return fs.Resolve(weight, italic)
-		case "system-ui":
+		case "system-ui", dejaVuSansFamily:
+			// The DejaVu faces are the Unicode fallback family; an explicit
+			// font-family:'DejaVu Sans' (the font-language-override demo)
+			// resolves them instead of falling through to Liberation.
 			return resolveFamilyFaces(fs.UnicodeFallback, fs.UnicodeFallbackBold, nil, fs.UnicodeFallbackBold, weight, italic)
 		}
 	}

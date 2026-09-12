@@ -1,6 +1,6 @@
 {
   "generated": "2026-09-12",
-  "scope": "Validate mapping engine_status=implemented against non-test Go under internal/layout; 4 CSS Fonts rows demoted to unsupported on 2026-09-12 keep DEMOTED entries for audit; 23 re-implemented rows carry consumer-read evidence.",
+  "scope": "Validate mapping engine_status=implemented against non-test Go under internal/layout; 3 CSS Fonts rows demoted to unsupported on 2026-09-12 keep DEMOTED entries for audit; 23 re-implemented rows carry consumer-read evidence.",
   "method": [
     "switch prop { case \"name\": } in style_properties/paint/advanced/leftovers/cascade",
     "case ConstIdent where const ConstIdent = \"name\"",
@@ -13,10 +13,10 @@
     "_test.go"
   ],
   "counts": {
-    "VERIFIED": 351,
-    "DEMOTED": 4
+    "VERIFIED": 354,
+    "DEMOTED": 3
   },
-  "implemented_total": 351,
+  "implemented_total": 354,
   "properties": [
     {
       "property": "-webkit-align-content",
@@ -2904,6 +2904,25 @@
       "claimed_code_path": "internal/layout/style_properties.go"
     },
     {
+      "property": "isolation",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "consumer-read",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 89,
+      "files": [
+        "internal/layout/style_advanced_props.go",
+        "internal/layout/layout.go",
+        "internal/layout/blend_group.go",
+        "internal/layout/paint_groups.go",
+        "internal/pdf/content.go",
+        "internal/pdf/pdf.go",
+        "internal/imageout/groups.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
       "property": "justify-content",
       "kind": "longhand",
       "legacy_of": null,
@@ -3351,6 +3370,25 @@
         "internal/layout/style_properties.go"
       ],
       "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "mix-blend-mode",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "consumer-read",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 69,
+      "files": [
+        "internal/layout/style_advanced_props.go",
+        "internal/layout/layout.go",
+        "internal/layout/blend_group.go",
+        "internal/layout/paint_groups.go",
+        "internal/pdf/content.go",
+        "internal/pdf/pdf.go",
+        "internal/imageout/groups.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
     },
     {
       "property": "object-view-box",

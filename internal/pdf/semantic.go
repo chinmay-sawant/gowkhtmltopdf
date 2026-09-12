@@ -16,9 +16,13 @@ var (
 	semanticRefRE          = regexp.MustCompile(`(\d+) 0 R`)
 	semanticResourceRE     = regexp.MustCompile(`/([A-Za-z][A-Za-z0-9_]*)\s+(\d+)\s+0\s+R`)
 	semanticNumberRE       = regexp.MustCompile(`[-+]?\d+(?:\.\d+)?`)
-	semanticLiteralRE      = regexp.MustCompile(`(?s)(\((?:\\.|[^\\)])*\))\s*Tj`)
-	semanticHexRE          = regexp.MustCompile(`(?s)<([0-9A-Fa-f]*)>\s*Tj`)
-	semanticDestRE         = regexp.MustCompile(`/Dest\s*\[\s*(\d+)\s+0\s+R`)
+	// semanticContentRE matches the content-stream tokens the semantic text
+	// extractor consumes in stream order: literal Tj, hex Tj, and Do (a Form
+	// XObject invocation whose text is extracted recursively).
+	semanticContentRE = regexp.MustCompile(
+		`(?s)(\((?:\\.|[^\\)])*\))\s*Tj|<([0-9A-Fa-f]*)>\s*Tj|/([A-Za-z][A-Za-z0-9_]*)\s+Do`,
+	)
+	semanticDestRE = regexp.MustCompile(`/Dest\s*\[\s*(\d+)\s+0\s+R`)
 )
 
 // SemanticDoc is a small, production-safe view of a PDF this package emits.
@@ -513,9 +517,11 @@ func parseSemanticPage(objects map[int]semanticObject, pageRef int) (semanticPag
 		return semanticPage{}, err
 	}
 
+	collectNestedImages(stream, resources, objects, images, map[int]bool{})
+
 	return semanticPage{
 		mediaBox: [4]float64{mediaBox[0], mediaBox[1], mediaBox[2], mediaBox[3]},
-		text:     extractSemanticText(stream),
+		text:     extractSemanticText(stream, resources, objects, map[int]bool{}),
 		fonts:    fonts,
 		images:   images,
 		annots:   annots,
@@ -546,18 +552,120 @@ func decodeSemanticStream(object semanticObject) ([]byte, error) {
 	return decoded, nil
 }
 
-func extractSemanticText(stream []byte) string {
+// extractSemanticText returns the text operators of stream in stream order.
+// A Do operator that invokes a Form XObject recurses into the form's stream at
+// its document position, so text painted inside a transparency group stays
+// visible to callers that assert authored content. visited guards reference
+// cycles along the current recursion path only.
+func extractSemanticText(stream []byte, resources string, objects map[int]semanticObject, visited map[int]bool) string {
 	var text strings.Builder
 
-	for _, match := range semanticLiteralRE.FindAllSubmatch(stream, -1) {
-		text.WriteString(decodePDFLiteral(string(match[1])))
-	}
-
-	for _, match := range semanticHexRE.FindAllSubmatch(stream, -1) {
-		text.WriteString(decodePDFHex(string(match[1])))
+	for _, match := range semanticContentRE.FindAllSubmatchIndex(stream, -1) {
+		switch {
+		case match[2] >= 0:
+			text.WriteString(decodePDFLiteral(string(stream[match[2]:match[3]])))
+		case match[4] >= 0:
+			text.WriteString(decodePDFHex(string(stream[match[4]:match[5]])))
+		case match[6] >= 0:
+			text.WriteString(formSemanticText(string(stream[match[6]:match[7]]), resources, objects, visited))
+		}
 	}
 
 	return text.String()
+}
+
+// formSemanticText extracts one /Name Do form XObject's text, or "" when the
+// name is not a form resource.
+func formSemanticText(name, resources string, objects map[int]semanticObject, visited map[int]bool) string {
+	ref, found := nestedXObjectRef(name, resources)
+	if !found || visited[ref] {
+		return ""
+	}
+
+	object, ok := objects[ref]
+	if !ok || !strings.Contains(object.dict, "/Subtype /Form") {
+		return ""
+	}
+
+	stream, err := decodeSemanticStream(object)
+	if err != nil {
+		return ""
+	}
+
+	childResources, err := requiredDictionary(object.dict, "/Resources")
+	if err != nil {
+		childResources = ""
+	}
+
+	visited[ref] = true
+	text := extractSemanticText(stream, childResources, objects, visited)
+	delete(visited, ref)
+
+	return text
+}
+
+// collectNestedImages adds image XObjects referenced inside Form XObjects to
+// the page's image map so HasImageXObject stays true for a grouped image. A
+// name already bound to the same reference is kept; a collision with a
+// different reference gets a ref-derived key.
+//
+//nolint:cyclop // image and form dispatch over one Do token stream
+func collectNestedImages(
+	stream []byte, resources string, objects map[int]semanticObject, images map[string]int, visited map[int]bool,
+) {
+	for _, match := range semanticContentRE.FindAllSubmatchIndex(stream, -1) {
+		if match[6] < 0 {
+			continue
+		}
+
+		name := string(stream[match[6]:match[7]])
+
+		ref, found := nestedXObjectRef(name, resources)
+		if !found || visited[ref] {
+			continue
+		}
+
+		object, found := objects[ref]
+		if !found {
+			continue
+		}
+
+		switch {
+		case strings.Contains(object.dict, "/Subtype /Image"):
+			if existing, exists := images[name]; exists && existing != ref {
+				name = name + "_x" + strconv.Itoa(ref)
+			}
+
+			images[name] = ref
+		case strings.Contains(object.dict, "/Subtype /Form"):
+			childStream, err := decodeSemanticStream(object)
+			if err != nil {
+				continue
+			}
+
+			childResources, err := requiredDictionary(object.dict, "/Resources")
+			if err != nil {
+				childResources = ""
+			}
+
+			visited[ref] = true
+			collectNestedImages(childStream, childResources, objects, images, visited)
+			delete(visited, ref)
+		}
+	}
+}
+
+// nestedXObjectRef resolves a /Name Do resource to its object reference using
+// the resource dictionary of the invoking content stream.
+func nestedXObjectRef(name, resources string) (int, bool) {
+	refs, err := resourceRefs(resources, "/XObject")
+	if err != nil {
+		return 0, false
+	}
+
+	ref, ok := refs[name]
+
+	return ref, ok
 }
 
 //nolint:cyclop // escape sequence decoding shares the literal bytes

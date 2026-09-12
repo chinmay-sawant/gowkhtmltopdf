@@ -21,6 +21,11 @@ type opExtra struct {
 	StructElem    *pdf.StructElem
 	TextTransform string
 	TextLanguage  string
+	// BlendGroup is the owning CSS element group (mix-blend-mode or
+	// isolation: isolate). GroupMark flags begin/end boundary markers that
+	// carry the group without painting.
+	BlendGroup *BlendGroup
+	GroupMark  uint8
 }
 
 func (op *Op) detachExtra() *opExtra {

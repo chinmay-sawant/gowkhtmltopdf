@@ -135,6 +135,91 @@ func TestUnicodeBidiOverrideReversesRunOrder(t *testing.T) {
 	}
 }
 
+// paintedText concatenates every text op in paint order.
+func paintedText(res *Result) string {
+	var out strings.Builder
+
+	for _, op := range res.Ops {
+		if op.Kind == OpText {
+			out.WriteString(op.Text)
+		}
+	}
+
+	return out.String()
+}
+
+// TestUnicodeBidiOverrideKeepsSpaces proves a bidi-override reversal keeps the
+// separator between two words. Word collection attaches the separator to the
+// word it follows ("ABC " + "123"), so a naive reversal reorders the words and
+// leaves the space trailing the run, where line trailing-space trimming drops
+// it. The visual order must be 123, space, ABC.
+func TestUnicodeBidiOverrideKeepsSpaces(t *testing.T) {
+	t.Parallel()
+
+	items := []inlineItem{
+		{text: "ABC "},
+		{text: "123"},
+	}
+	reverseInlineRange(items, 0)
+
+	if items[0].text != "123" || items[1].text != " ABC" {
+		t.Fatalf("reversed items = %q + %q, want 123 + space + ABC",
+			items[0].text, items[1].text)
+	}
+
+	// Three words keep one separator per boundary.
+	three := []inlineItem{
+		{text: "one "},
+		{text: "two "},
+		{text: "three"},
+	}
+	reverseInlineRange(three, 0)
+
+	var order strings.Builder
+
+	for i := range three {
+		order.WriteString(three[i].text)
+	}
+
+	if order.String() != "three two one" {
+		t.Fatalf("three-word reversal = %q, want %q", order.String(), "three two one")
+	}
+
+	// A trailing separator uses the raw reversal path: the run already ends in
+	// a space, and rotating would double the gap.
+	trailing := []inlineItem{
+		{text: "ABC "},
+		{text: "123 "},
+	}
+	reverseInlineRange(trailing, 0)
+
+	if trailing[0].text+trailing[1].text != "123 ABC " {
+		t.Fatalf("trailing-separator reversal = %q, want %q",
+			trailing[0].text+trailing[1].text, "123 ABC ")
+	}
+
+	// End to end: the painted run keeps the gap.
+	res := layoutHTML(t, `<html><body><p style="margin:0;font-size:12pt">`+
+		`<span style="direction:rtl;unicode-bidi:bidi-override">ABC 123</span>`+
+		`</p></body></html>`)
+
+	painted := paintedText(res)
+
+	if !strings.Contains(painted, "123 ABC") {
+		t.Fatalf("painted text %q missing %q", painted, "123 ABC")
+	}
+
+	// Trailing whitespace in the source must paint one gap, not two.
+	trailingRes := layoutHTML(t, `<html><body><p style="margin:0;font-size:12pt">`+
+		`<span style="direction:rtl;unicode-bidi:bidi-override">ABC 123 </span>`+
+		`</p></body></html>`)
+	trailingPainted := paintedText(trailingRes)
+
+	if !strings.Contains(trailingPainted, "123 ABC") || strings.Contains(trailingPainted, "123  ABC") {
+		t.Fatalf("trailing-whitespace painted text = %q, want one gap", trailingPainted)
+	}
+}
+
 // TestTextOrientationUprightVsMixedPaint proves text-orientation:upright
 // paints unrotated runs in a vertical writing mode while the mixed default
 // keeps the existing -90 degree run rotation.
@@ -230,6 +315,18 @@ func TestTextDecorationSkipSpacesSegments(t *testing.T) {
 	shorthand := underlineOps(layoutDecl("text-decoration-skip:none"))
 	if len(shorthand) != 1 {
 		t.Fatalf("shorthand none produced %d decoration lines, want 1 continuous", len(shorthand))
+	}
+
+	// The legacy spaces keyword maps onto skip-spaces:all, so the shorthand
+	// paints the same per-word strokes with an interior gap.
+	shorthandSpaces := underlineOps(layoutDecl("text-decoration-skip:spaces"))
+	if len(shorthandSpaces) != two {
+		t.Fatalf("shorthand spaces produced %d decoration lines, want 2 (one per word)", len(shorthandSpaces))
+	}
+
+	if shorthandSpaces[0].W >= none[0].W || shorthandSpaces[1].W >= none[0].W {
+		t.Fatalf("shorthand spaces strokes W=%.2f and %.2f should be narrower than the none span W=%.2f",
+			shorthandSpaces[0].W, shorthandSpaces[1].W, none[0].W)
 	}
 }
 

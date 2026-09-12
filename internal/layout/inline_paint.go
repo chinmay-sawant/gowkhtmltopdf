@@ -72,6 +72,7 @@ type undRun struct {
 	hasHref   bool
 	style     string
 	blendMode string
+	group     *BlendGroup
 }
 
 // flush emits the accumulated underline stroke, if any.
@@ -80,8 +81,8 @@ type undRun struct {
 func (u *undRun) flush(e *engine) {
 	if u.active && u.w > 0.01 {
 		col := [3]float64{u.r, u.g, u.b}
-		prevBlend := e.blendMode
-		e.blendMode = u.blendMode
+		prevBlend, prevGroup := e.blendMode, e.blendGroup
+		e.blendMode, e.blendGroup = u.blendMode, u.group
 		switch strings.ToLower(strings.TrimSpace(u.style)) {
 		case "dashed":
 			e.emitDashedLine(u.x, u.y, u.w, u.uw, col)
@@ -98,6 +99,7 @@ func (u *undRun) flush(e *engine) {
 			})
 		}
 		e.blendMode = prevBlend
+		e.blendGroup = prevGroup
 	}
 
 	*u = undRun{} //nolint:exhaustruct // intentional zero fields
@@ -1187,6 +1189,7 @@ func (e *engine) paintUnderline(
 	und.hasHref = item.href != ""
 	und.style = item.style.TextDecorationStyle
 	und.blendMode = e.blendMode
+	und.group = e.blendGroup
 }
 
 // startsActiveUnder reports that the item continues an active underline run:

@@ -1986,7 +1986,7 @@
           "group": "Compositing and Blending",
           "syntax": "<isolation-mode>",
           "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Partial `isolation` (Compositing and Blending). The effect cell exercises the stacking-context boundary; full PDF transparency-group isolation is deferred."
+          "description": "Implemented `isolation` (Compositing and Blending). `isolate` creates an isolated element group: PDF emits a Form XObject with `/Group /S /Transparency /I true /CS /DeviceRGB` and no `/BM`, PNG composites from a transparent scratch backdrop. Fixture 61 cell 99: the auto chip multiplies to dark green while the isolate chip stays blue. Subset: page-split group fragments composite per page; group composite alpha is 1; group order follows the last member in the engine global paint order."
         },
         {
           "property": "justify-content",
@@ -2307,7 +2307,7 @@
           "group": "Compositing and Blending",
           "syntax": "<blend-mode> | plus-lighter",
           "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Partial `mix-blend-mode` (Compositing and Blending). The effect cell exercises operation-level blending; full element-group backdrop semantics are deferred."
+          "description": "Implemented `mix-blend-mode` (Compositing and Blending). Element-level transparency groups in PDF (`/Group /S /Transparency` Form XObject plus `/BM` ExtGState) and one group-buffer composite per group in PNG. Fixture 62 cell 16: the multiply chip renders dark green while the normal control keeps translucent blue. Subset: `plus-lighter` remains unsupported; page-split group fragments composite per page; group composite alpha is 1."
         },
         {
           "property": "object-view-box",

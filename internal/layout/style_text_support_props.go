@@ -149,11 +149,13 @@ func parseTextDecorationInset(val string, fsize float64) (float64, bool) {
 	return first, true
 }
 
-// applyTextDecorationSkipShorthand expands the none | auto shorthand onto its
-// longhands. Per CSS Text Decoration 4, none turns every skip off (skip-self
-// has no none keyword, its off value is no-skip) and auto resets every
-// longhand to its initial value. TextDecorationSkipInk is written too so the
-// shorthand resets that longhand even though its apply arm lives in
+// applyTextDecorationSkipShorthand expands the shorthand onto its longhands:
+// none | auto plus the CSS Text Decoration 3 legacy keywords objects, spaces,
+// ink, edges, and box-decoration. Each legacy value sets the longhand it names
+// and resets the rest to their initial values. none turns every skip off
+// (skip-self has no none keyword, its off value is no-skip) and auto resets
+// every longhand to its initial value. TextDecorationSkipInk is written too so
+// the shorthand resets that longhand even though its apply arm lives in
 // applyAdvancedProps.
 func applyTextDecorationSkipShorthand(style *ResolvedStyle, val string) bool {
 	switch val {
@@ -164,16 +166,40 @@ func applyTextDecorationSkipShorthand(style *ResolvedStyle, val string) bool {
 		style.TextDecorationSkipSpaces = cssDisplayNone
 		style.TextDecorationSkipInk = cssDisplayNone
 	case overflowAuto:
+		setTextDecorationSkipInitial(style)
 		style.TextDecorationSkip = overflowAuto
-		style.TextDecorationSkipSelf = overflowAuto
-		style.TextDecorationSkipBox = cssDisplayNone
+	case "objects", "box-decoration":
+		setTextDecorationSkipInitial(style)
+		style.TextDecorationSkip = val
+		style.TextDecorationSkipBox = columnSpanAll
+	case "spaces":
+		setTextDecorationSkipInitial(style)
+		style.TextDecorationSkip = val
+		style.TextDecorationSkipSpaces = columnSpanAll
+	case "edges":
+		setTextDecorationSkipInitial(style)
+		style.TextDecorationSkip = val
 		style.TextDecorationSkipSpaces = textDecorationSkipStartEnd
+	case "ink":
+		setTextDecorationSkipInitial(style)
+		style.TextDecorationSkip = val
 		style.TextDecorationSkipInk = overflowAuto
 	default:
 		return false
 	}
 
 	return true
+}
+
+// setTextDecorationSkipInitial resets the four skip longhands to their CSS
+// Text Decoration initial values: skip-self auto, skip-box none, skip-spaces
+// start end, skip-ink auto. The raw TextDecorationSkip field is the caller's
+// to set.
+func setTextDecorationSkipInitial(style *ResolvedStyle) {
+	style.TextDecorationSkipSelf = overflowAuto
+	style.TextDecorationSkipBox = cssDisplayNone
+	style.TextDecorationSkipSpaces = textDecorationSkipStartEnd
+	style.TextDecorationSkipInk = overflowAuto
 }
 
 // parseTextDecorationSkipSelf accepts auto | skip-all | no-skip or any

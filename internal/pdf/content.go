@@ -2,12 +2,17 @@ package pdf
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"maps"
 	"sort"
 	"strconv"
 	"strings"
 )
+
+// errContentNoDocument rejects a transparency group on a Content that was
+// built without a Document: the form needs document-scoped object numbers.
+var errContentNoDocument = errors.New("pdf: content has no document")
 
 // fontState is the active-font tracking saved across a q/Q pair: Q restores
 // the PDF text state, so the tracked font must be restored with it or a
@@ -26,12 +31,14 @@ type Content struct {
 	curFont     string            // active font from last SetFont
 	curSize     float64           // active font size from last SetFont
 	fontStack   []fontState       // active font before each open Save
-	imageUses   map[string]string // resource name -> image object ref
+	imageUses   map[string]string // resource name -> image or form XObject ref
 	imageRefs   map[string]*imageResource
 	imageDedup  map[imageDedupKey]*imageResource
-	opacity     float64           // 0 disables
-	blendUses   map[string]string // resource name -> PDF blend mode name
-	markedDepth int               // tracks nesting of BDC/EMC blocks
+	opacity     float64            // 0 disables the shared /opacity state
+	alphaUses   map[string]float64 // group-buffer resource name -> /CA //ca value
+	blendUses   map[string]string  // resource name -> PDF blend mode name
+	markedDepth int                // tracks nesting of BDC/EMC blocks
+	formSeq     int                // next Fm form resource suffix
 	doc         *Document
 }
 
@@ -170,8 +177,10 @@ func cloneContent(cur *Content) *Content {
 		imageRefs:   imageRefs,
 		imageDedup:  cloneImageDedupMap(cur.imageDedup, imageRefs),
 		opacity:     cur.opacity,
+		alphaUses:   maps.Clone(cur.alphaUses),
 		blendUses:   cloneStringMap(cur.blendUses),
 		markedDepth: cur.markedDepth,
+		formSeq:     cur.formSeq,
 		doc:         cur.doc,
 	}
 	ncVal.buf.Write(cur.buf.Bytes())
@@ -308,6 +317,122 @@ func (c *Content) SetBlendMode(mode string) {
 	c.buf.WriteString("/")
 	c.buf.WriteString(resourceName)
 	c.buf.WriteString(" gs\n")
+}
+
+// SetGroupOpacity sets fill/stroke alpha for a transparency group buffer.
+// Unlike SetOpacity, every distinct value gets its own ExtGState resource:
+// one group stream paints many elements whose alphas differ, and a single
+// /opacity entry would make every reference use the last value written.
+func (c *Content) SetGroupOpacity(opacity float64) {
+	if opacity >= 1 || opacity <= 0 {
+		return
+	}
+
+	if c.alphaUses == nil {
+		c.alphaUses = map[string]float64{}
+	}
+
+	resourceName := "opa" + alphaResourceSuffix(opacity)
+	c.alphaUses[resourceName] = opacity
+	c.buf.WriteString("/")
+	c.buf.WriteString(resourceName)
+	c.buf.WriteString(" gs\n")
+}
+
+// alphaResourceSuffix turns an opacity into a stable resource-name suffix:
+// 0.5 becomes 0_5.
+func alphaResourceSuffix(opacity float64) string {
+	suffix := strings.ReplaceAll(num(opacity), ".", "_")
+
+	return strings.ReplaceAll(suffix, "-", "n")
+}
+
+// BeginTransparencyGroup starts an isolated CSS element group. Operators
+// written to the returned Content stay buffered until EndTransparencyGroup
+// registers the buffer as a Form XObject and paints it once into the receiver
+// (the form dict and stream are written at finalize; see pendingForm). Groups
+// nest: a child group's Content becomes a resource of its parent group, so
+// siblings in different groups never share a backdrop.
+func (c *Content) BeginTransparencyGroup() *Content {
+	child := NewContent()
+	child.doc = c.doc
+
+	return child
+}
+
+// EndTransparencyGroup finalizes group as an isolated transparency Form
+// XObject and paints it into c using blendMode ("" or "normal" composites
+// with source-over). bbox is the form bounding box in page points.
+//
+// The form's dict and stream are materialized later (Document.finalizeForms)
+// because its /Resources need the document-wide font subset union. Building
+// them here would embed a font from an empty rune set and render every glyph
+// inside the form as .notdef; deferring also lets a form reference the same
+// embedded font objects as the page.
+//
+// The form carries /Group /S /Transparency /I true because HTML stacking
+// contexts are isolated groups (CSS Compositing 3.2); its /Resources include
+// the fonts, images, nested forms, and ExtGStates the buffered operators
+// actually used.
+func (c *Content) EndTransparencyGroup(group *Content, blendMode string, bbox [4]float64) error {
+	if c == nil || group == nil {
+		return nil
+	}
+
+	if c.doc == nil {
+		return errContentNoDocument
+	}
+
+	ref := c.doc.newObject()
+	c.doc.pendingForms = append(c.doc.pendingForms, pendingForm{ref: ref, content: group, bbox: bbox})
+
+	name := c.uniqueFormName()
+	c.imageUses[name] = ref.String()
+
+	c.Save()
+
+	if pdfName, ok := pdfBlendModes[strings.ToLower(strings.TrimSpace(blendMode))]; ok && pdfName != "Normal" {
+		c.SetBlendMode(blendMode)
+	}
+
+	c.buf.WriteString("/")
+	c.buf.WriteString(name)
+	c.buf.WriteString(" Do\n")
+	c.Restore()
+
+	return nil
+}
+
+// pendingForm is one buffered transparency-group Form XObject. Its reference
+// and invoking Do operator are written during paint; its dict, stream, and
+// /Resources wait for Document.finalizeForms, which runs after the
+// document-wide font rune union exists.
+type pendingForm struct {
+	ref     objRef
+	content *Content
+	bbox    [4]float64
+}
+
+// formBBox renders a form XObject /BBox array.
+func formBBox(bbox [4]float64) string {
+	return "[" + num(bbox[0]) + " " + num(bbox[1]) + " " + num(bbox[2]) + " " + num(bbox[3]) + "]"
+}
+
+// uniqueFormName returns the next free Fm resource name on this content
+// stream. Forms share the /XObject namespace with images.
+func (c *Content) uniqueFormName() string {
+	if c.imageUses == nil {
+		c.imageUses = map[string]string{}
+	}
+
+	for {
+		name := "Fm" + strconv.Itoa(c.formSeq)
+		c.formSeq++
+
+		if _, exists := c.imageUses[name]; !exists {
+			return name
+		}
+	}
 }
 
 // paths
@@ -785,6 +910,17 @@ func (c *Content) extGState() string {
 	for _, resourceName := range resources {
 		entries = append(entries, fmt.Sprintf("/%s << /BM /%s >>", resourceName, c.blendUses[resourceName]))
 	}
+
+	alphaNames := make([]string, 0, len(c.alphaUses))
+	for resourceName := range c.alphaUses {
+		alphaNames = append(alphaNames, resourceName)
+	}
+	sort.Strings(alphaNames)
+	for _, resourceName := range alphaNames {
+		alpha := c.alphaUses[resourceName]
+		entries = append(entries, fmt.Sprintf("/%s << /CA %s /ca %s >>", resourceName, num(alpha), num(alpha)))
+	}
+
 	if len(entries) == 0 {
 		return ""
 	}

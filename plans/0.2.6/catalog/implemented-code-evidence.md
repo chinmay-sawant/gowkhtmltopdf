@@ -1,6 +1,6 @@
 # Implemented property code evidence (2026-09-02; demotion + re-implementation update 2026-09-12)
 
-Cross-check of the **351** current `engine_status: implemented` rows in `mapping.json` against **non-test** Go under `internal/layout`. The 4 CSS Fonts rows demoted by PT26-LAY-05 on 2026-09-12 stay in the machine-readable list with `validation: DEMOTED`; the 23 rows re-implemented the same day carry `evidence_kind: consumer-read` pointing at the layout/paint line that reads the field.
+Cross-check of the **354** current `engine_status: implemented` rows in `mapping.json` against **non-test** Go under `internal/layout`. The 3 CSS Fonts rows demoted by PT26-LAY-05 on 2026-09-12 stay in the machine-readable list with `validation: DEMOTED`; the 23 rows re-implemented the same day carry `evidence_kind: consumer-read` pointing at the layout/paint line that reads the field, and `isolation` plus `mix-blend-mode` completed 2026-09-12 with element-group consumers in layout, PDF, and imageout.
 
 Tests (`*_test.go`) were excluded.
 
@@ -8,10 +8,10 @@ Tests (`*_test.go`) were excluded.
 
 | Validation | Count | Meaning |
 |------------|------:|----------|
-| VERIFIED | 352 | apply arm (`case`, `raw["prop"]`, vendor alias, const case, or `prop ==`) plus a real consumer read for the 24 re-implemented rows |
+| VERIFIED | 354 | apply arm (`case`, `raw["prop"]`, vendor alias, const case, or `prop ==`) plus a real consumer for the 26 rows re-implemented or completed on 2026-09-12 (24 re-implemented plus `isolation` and `mix-blend-mode`) |
 | DEMOTED | 3 | parsed-and-stored no-op; field and apply arm removed 2026-09-12 (PT26-LAY-05) |
 | UNVERIFIED | 0 | no non-test layout evidence |
-| **Total** | **355** | |
+| **Total** | **357** | |
 
 Machine-readable list (every property + file + line): [`implemented-code-evidence.json`](implemented-code-evidence.json).
 
@@ -21,7 +21,7 @@ Machine-readable list (every property + file + line): [`implemented-code-evidenc
 |------|----------:|
 | `internal/layout/style_properties.go` | 166 |
 | `internal/layout/style_cascade.go` | 90 |
-| `internal/layout/style_advanced_props.go` | 29 |
+| `internal/layout/style_advanced_props.go` | 31 |
 | `internal/layout/style_paint_props.go` | 37 |
 | `internal/layout/style_leftovers.go` | 6 |
 | `internal/layout/style_text_support_props.go` | 8 (consumer-read) |
@@ -300,7 +300,9 @@ DEMOTED entries are not counted in this rollup.
 | `padding-inline-end` | case-string | 691 |
 | `padding-inline-start` | case-string | 689 |
 
-### `internal/layout/style_advanced_props.go` (29 verified, 3 demoted)
+### `internal/layout/style_advanced_props.go` (31 verified, 3 demoted)
+
+Consumer files for the two 2026-09-12 compositing rows: `layout.go` (`pushZ` group creation `:1024`, `enterBlendIsolation` `:1058`, `Isolate` `:1075`), `blend_group.go` (`BlendGroup`), `paint_groups.go` (`target`/`enter`/`closeReady` sibling routing), `pdf/content.go` (`EndTransparencyGroup` Form XObject `:377`), `pdf/pdf.go` (`finalizeForms` `:977`), `imageout/groups.go` (one group-buffer composite). Honest subset: page-split group fragments composite per page; group composite alpha is 1 (element opacity stays per descendant op, so once-at-group opacity is not implemented); group order follows the last member in the engine global paint order, not a full CSS stacking-context tree; `plus-lighter` stays unsupported; form `/BBox` is the page box; PDF/UA tagging inside forms was not veraPDF-validated.
 
 | Property | Evidence | Line |
 |----------|----------|-----:|
@@ -315,9 +317,11 @@ DEMOTED entries are not counted in this rollup.
 | `font-variation-settings` | case-string (parsed, no consumer; demoted 2026-09-12) | - |
 | `footnote-display` | case-string | 38 |
 | `footnote-policy` | case-string | 43 |
+| `isolation` | consumer-read | 89 |
 | `line-clamp` | case-string | 58 |
 | `margin-trim` | case-string | 76 |
 | `max-lines` | case-string | 67 |
+| `mix-blend-mode` | consumer-read | 69 |
 | `overflow-clip-margin-block` | case-string | 234 |
 | `overflow-clip-margin-block-end` | case-string | 234 |
 | `overflow-clip-margin-block-start` | case-string | 234 |
