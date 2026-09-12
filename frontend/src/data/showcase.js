@@ -37,7 +37,7 @@ export const SHOWCASE = [
   {
     name: 'fixture-56-architecture-diagram',
     file: 'fixture-56-architecture-diagram.pdf',
-    pages: 20,
+    pages: 21,
     title: 'Architecture diagram',
     desc: 'Pure HTML+CSS architecture diagram: pipeline strip, 10 domain sections, dependency DAG, PDF-vs-image, and security summary.',
     category: 'Architecture & API',
@@ -496,7 +496,7 @@ export const SHOWCASE_SPECIAL = [
   {
     name: 'wiki-ana-de-armas',
     file: 'wiki-ana-de-armas.pdf',
-    pages: 12,
+    pages: 11,
     title: 'Wikipedia live smoke',
     desc: 'Live Wikipedia raw conversion with system fonts (needs network).',
     category: 'Reports & tables',
