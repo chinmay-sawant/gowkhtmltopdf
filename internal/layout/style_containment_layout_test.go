@@ -212,3 +212,44 @@ func TestContainmentLayoutEnclosesFloats(t *testing.T) {
 		t.Fatalf("layout containment did not enclose the float: height = %v, want >= 30", b.height)
 	}
 }
+
+// Auto table layout must not let size-contained descendants widen the column:
+// contain: size / strict and content-visibility: hidden size the box from
+// contain-intrinsic-* as if its contents were absent (compatibility matrix
+// §2.2). Regression: the cellMeasure walk descended into the contained
+// content and used the long word's width for the column.
+func TestContainmentIntrinsicWidthSizesAutoTableCell(t *testing.T) {
+	t.Parallel()
+
+	const long = "supercalifragilisticexpialidocious-supercalifragilisticexpialidocious"
+
+	s := sheet(t, `
+body { margin: 0; font-size: 10pt; }
+table { table-layout: auto; border-collapse: collapse; border-spacing: 0; }
+td { padding: 0; }
+.hidden { content-visibility: hidden; }
+.sized { contain: size; contain-intrinsic-inline-size: 30pt; }
+`)
+
+	res := layoutHTML(t, `<html><body><table><tr>`+
+		`<td><div class="hidden">`+long+`</div></td>`+
+		`<td><div class="sized">`+long+`</div></td>`+
+		`<td>B</td>`+
+		`</tr></table></body></html>`, s)
+
+	tbl := findNamedBox(res.root, "table")
+	if tbl == nil || len(tbl.rows) == 0 || len(tbl.rows[0]) < 3 {
+		t.Fatal("missing table or first-row cells")
+	}
+
+	hiddenW := tbl.rows[0][0].w
+	sizedW := tbl.rows[0][1].w
+
+	if hiddenW > 5 {
+		t.Fatalf("content-visibility:hidden cell width = %v, want chrome-only (hidden text must not widen the auto column)", hiddenW)
+	}
+
+	if !near(sizedW, 30) {
+		t.Fatalf("contain:size cell width = %v, want contain-intrinsic-inline-size 30", sizedW)
+	}
+}

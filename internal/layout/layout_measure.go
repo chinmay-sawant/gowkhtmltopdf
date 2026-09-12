@@ -329,6 +329,16 @@ func (m *cellMeasure) measureElement(nodeN *html.Node, childCS ResolvedStyle, no
 		return
 	}
 
+	// Size containment (contain: size/strict, or content-visibility: hidden)
+	// replaces the descendant-derived intrinsic width with contain-intrinsic
+	// inline size (else 0) plus box chrome, exactly like the measureCellMinMax
+	// root guard. Descendant content must not contribute.
+	if containsSize(childCS) || childCS.ContentVisibility == contentVisibilityHidden {
+		m.measureSizeContained(childCS)
+
+		return
+	}
+
 	if nodeN.Name == "br" {
 		m.flushLine()
 
@@ -393,6 +403,39 @@ func (m *cellMeasure) measureSpecifiedInlineBlock(style ResolvedStyle) bool {
 	m.lineW += width
 
 	return true
+}
+
+// measureSizeContained folds a size-contained subtree into the current
+// measure as an atomic placeholder: its contain-intrinsic inline size (else 0)
+// plus box chrome, never its descendant content. Block-level boxes occupy
+// their own measured line.
+func (m *cellMeasure) measureSizeContained(style ResolvedStyle) {
+	intrinsicW := containmentIntrinsicWidth(style)
+	if intrinsicW < 0 {
+		intrinsicW = 0
+	}
+
+	chrome := m.engine.scalePt(style.PaddingLeft) + m.engine.scalePt(style.PaddingRight) +
+		m.engine.scalePt(style.BorderLeft.Width) + m.engine.scalePt(style.BorderRight.Width)
+	if style.Display == cssDisplayInline {
+		chrome = 0
+	}
+
+	width := m.engine.scalePt(intrinsicW) + chrome
+	blockish := isCellBlockish(style.Display)
+
+	if blockish {
+		m.flushLine()
+	}
+
+	m.noteWord(width)
+	m.lineOnlyNowrap = false
+	m.lineHasInk = true
+	m.lineW += width
+
+	if blockish {
+		m.flushLine()
+	}
 }
 
 func specifiedInlineBlockOuterWidth(eng *engine, style ResolvedStyle) float64 {
