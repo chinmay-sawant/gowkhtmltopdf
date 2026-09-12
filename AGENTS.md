@@ -145,7 +145,7 @@ The real gates, in order of cost:
 | Unit + integration | `make test` | Full suite green (`-p 2 -parallel 2` by default; see Makefile) |
 | Claims | `make claim-scan` | No forbidden claims (stdlib-only, Qt WebKit, byte-identical determinism, etc.) in doc.go, README, documentation/, frontend content, cli help |
 | Lint | `make lint` | golangci-lint (pinned v1.64.8) clean; chains `size-check` (file-size ledger) and `lint-frontend` (npm) |
-| Golden corpus | `make golden` | All 62 fixtures convert with correct structure, page-count envelopes, embedded fonts, ordered text needles |
+| Golden corpus | `make golden` | All 63 fixtures convert with correct structure, page-count envelopes, embedded fonts, ordered text needles |
 | Release | `RELEASE.md` checklist | Hard gates for any release: `make check-versions`, `make test`, `make golden`, `make claim-scan`, `make lint`, plus `make build` with version-stamp check; Python and frontend extras when touched |
 
 Release work always starts at `RELEASE.md`. It holds the version-source

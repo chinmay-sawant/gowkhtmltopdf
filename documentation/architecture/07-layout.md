@@ -461,12 +461,13 @@ golden fixtures in `internal/convert`.
 ### Golden fixtures
 
 `internal/convert/golden_test.go` (TestGoldenCorpus, TestGoldenCorpusAllFixtures)
-renders 62 fixtures in `testdata/golden/fixture-*.html` and asserts structural
+renders 63 fixtures in `testdata/golden/fixture-*.html` and asserts structural
 output properties plus PNG baselines under `testdata/golden/assets`. Layout
 subsystems are exercised by dedicated fixtures: floats (22/29/38), flex
 (25/28/32/33), grid (28/32/34/35), multicol (39), transforms (40), sticky
 (31), orphans/widows (30/37), thead repeat (23), position lite (26),
-typography (18), invoices (01/02/03/16/21), certificates (47), contracts (46).
+typography (18), invoices (01/02/03/16/21), certificates (47), contracts (46),
+page-level fragmentation and root color-scheme (63).
 
 ### Benchmarks
 

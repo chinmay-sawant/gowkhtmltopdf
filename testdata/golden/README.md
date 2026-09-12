@@ -16,7 +16,7 @@ testdata/golden/
   fixture-01-simple-invoice.html       # single page, minimal CSS
   fixture-02-table-heavy-invoice.html  # wide table, borders, many rows
   fixture-03-multi-page-invoice.html   # >1 page, page-break usage
-  fixture-04-*.html .. fixture-62-*.html   # phase-9.1+ corpus (skip *-header/footer companions)
+  fixture-04-*.html .. fixture-63-*.html   # phase-9.1+ corpus (skip *-header/footer companions)
   fixture-36-header.html / fixture-36-footer.html  # nested HF companions for fixture-36
   fixture-49-night-train-poster.html       # one-page illustrated poster
   fixture-50-letter-template.html           # one-page stationery template
