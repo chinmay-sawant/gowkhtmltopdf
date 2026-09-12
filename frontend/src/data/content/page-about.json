@@ -5,15 +5,15 @@
   {
    "type": "hero",
    "title": "A pure-Go HTML to PDF converter",
-   "lede": "gowkhtmltopdf is a clean-room, pure-Go work-alike for wkhtmltopdf that turns server-generated HTML and templates into multi-page PDFs and images. It is a PDF engine based on HTML templates — without any wrappers — for styled documents: invoices, receipts, certificates, storybooks, posters, tables, and multi-page documents with headers, footers, TOCs, and PDF outlines."
+   "lede": "gowkhtmltopdf is a clean-room, pure-Go work-alike for wkhtmltopdf that turns server-generated HTML and templates into multi-page PDFs and images. It is a PDF engine based on HTML templates, without any wrappers, for styled documents: invoices, receipts, certificates, storybooks, posters, tables, and multi-page documents with headers, footers, TOCs, and PDF outlines."
   },
   {
    "type": "cards",
    "heading": "Status at a glance",
    "items": [
     {
-     "title": "v0.2.4",
-     "body": "The current release (`VERSION`, stamped into the CLI). It includes the typed Document and ImageDocument APIs, explicit CLI source/output grammar, the established print CSS subset, and PNG/JPEG image mode. Default write is unclaimed PDF 1.4. Opt-in `--pdf-version` 1.7 / 2.0 and `--pdf-profile` (PDF/A-3a, PDF/A-4, PDF/UA-1, PDF/UA-2) remain available."
+     "title": "v0.2.5",
+     "body": "The current release (`VERSION`, stamped into the CLI). It ships the typed `Document` / `ImageDocument` APIs, the explicit CLI source/output grammar, the print CSS subset, and PNG/JPEG image mode. New in 0.2.5: in-process Python bindings on PyPI and the frozen C ABI v1 they run on (`bindings/c`, exported by an opt-in `make c-shared` build; native Go builds stay `CGO_ENABLED=0`). Default output is unclaimed PDF 1.4 with opt-in `--pdf-version` 1.7 / 2.0 and `--pdf-profile` (PDF/A-3a, PDF/A-4, PDF/UA-1, PDF/UA-2). The 0.2.6 CSS coverage program is in flight on this tree, not released: 818 webref properties cataloged at 354 Implemented / 464 Unsupported (2026-09-12 snapshot)."
     },
     {
      "title": "Repeatable layout",
@@ -59,8 +59,8 @@
      "Indic partial; Hangul needs a Hangul face"
     ],
     [
-     "AcroForm forms (`--enable-forms`)",
-     "No form model in the PDF writer",
+     "AcroForm forms (`--produce-forms`, `--enable-forms`)",
+     "No form model in the PDF writer; both flags are unknown options and are rejected",
      "Intermediate roadmap (forms)"
     ],
     [
@@ -70,17 +70,17 @@
     ],
     [
      "SVG / BMP image output (`--format svg`)",
-     "No stdlib SVG encoder; PNG/JPEG only",
+     "Image mode encodes PNG/JPEG only; no SVG or BMP encoder",
      "Not planned"
     ],
     [
      "SOCKS5 proxy",
-     "stdlib `net/http` has no SOCKS5; HTTP(S) proxy only",
+     "Proxy support accepts `http` / `https` only; no SOCKS5",
      "Not planned"
     ],
     [
      "PDF/A-3a, PDF/A-4, PDF/UA-1, PDF/UA-2, ICC OutputIntent",
-     "Shipped in 0.2.2 (`--pdf-profile` / `WithPDFProfile`; aliases `a3a-ua1`, `a3a`, `ua1`, `a4-ua2`, `a4`, `ua2`). Default remains unclaimed PDF 1.4; version alone is not a claim",
+     "Shipped in 0.2.2 (`--pdf-profile` / `Document.PDFProfile`; aliases `a3a-ua1`, `a3a`, `ua1`, `a4-ua2`, `a4`, `ua2`). Default remains unclaimed PDF 1.4; version alone is not a claim",
      "Shipped (0.2.2)"
     ],
     [
@@ -89,9 +89,9 @@
      "Not planned"
     ],
     [
-     "C ABI (`wkhtmltopdf_*` cgo exports)",
-     "Stdlib mandate forbids cgo",
-     "Only if consumer demand"
+     "C ABI (`gowkhtmltopdf_*` c-shared exports)",
+     "Shipped in 0.2.5: frozen ABI v1 in `bindings/c` (`make c-shared`, `CGO_ENABLED=1`), powering the Python bindings; default Go builds stay `CGO_ENABLED=0`",
+     "Shipped (0.2.5)"
     ],
     [
      "URL to decent print (Phase 21)",
@@ -100,8 +100,13 @@
     ],
     [
      "Tier 3 open-web competition (Phase 23)",
-     "Explicitly deferred",
-     "Amend the pure-stdlib constraint or accept an external engine"
+     "Explicitly deferred; not planned as a pure-Go HTML engine",
+     "Reopen only with different constraints or an external engine (`documentation/fidelity.md`, Tier 3)"
+    ],
+    [
+     "Browser WASM adapter (in flight, 0.2.6)",
+     "Opt-in `make wasm` build and `/live-demo` route: inline HTML to PDF/PNG/JPEG in a Web Worker with bounded input, output, and request lifetime. It does not ship in the static binaries, run document JavaScript, or read local files",
+     "Release workflow publishes the version-stamped `.wasm` artifact and loader after `make wasm-test`"
     ]
    ]
   },
@@ -123,12 +128,12 @@
      "bullets": [
       "Architecture & Planning: Comprehensive phase ledgers under `plans/`, API contracts, threat modeling, and scope boundaries were defined upfront to guide clean-room execution.",
       "Core Engine Implementation: Tolerant HTML parsing, print CSS cascade, layout tree pagination, font shaping, and Flate/zlib PDF object serialization were developed with extensive AI-assisted pair programming.",
-      "Quality & Verification: All subsystems are verified against rigorous golden fixture visual tests (`make samples`), upstream bug dossiers, and benchmark regression suites."
+      "Quality & Verification: Golden corpus (`make golden`), unit and integration tests (`make test`), regenerated samples (`make samples`), the upstream wkhtmltopdf issue dossier, and benchmark suites (`make bench`)."
      ]
     },
     {
      "heading": "The OSS story",
-     "body": "gowkhtmltopdf is MIT licensed under Chinmay Sawant and requires Go 1.26+. It is an independent clean-room reimplementation of the wkhtmltopdf CLI and behavior, so it shares none of wkhtmltopdf's LGPL obligations and does not ship Qt or WebKit. The current generic CLI (2026-08-19) is faster than wkhtmltopdf 0.12.6.1 at every tested size (15.5x at 2 pages, 1.6x at 500 pages). Peak RSS is lower through 100 pages and higher from 200 pages."
+     "body": "gowkhtmltopdf is MIT licensed under Chinmay Sawant and requires Go 1.26+. It is an independent clean-room reimplementation of the wkhtmltopdf CLI and behavior, so it shares none of wkhtmltopdf's LGPL obligations and does not ship Qt or WebKit. In the 2026-09-11 CLI comparison capture, the generic CLI was faster than wkhtmltopdf 0.12.6.1 at every tested size: 14.95x at 2 pages and 1.36x at 500 pages. Full rows, RSS, and method are on the Benchmarks page."
     }
    ]
   },

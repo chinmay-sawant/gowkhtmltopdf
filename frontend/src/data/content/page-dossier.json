@@ -19,7 +19,7 @@
    "sections": [
     {
      "heading": "A full scrape, fully classified",
-      "body": "The dossier starts from all 1,329 open issues scraped from the upstream wkhtmltopdf issue tracker, including title, body, labels, and dates. Every issue was read and classified against the gowkhtmltopdf codebase; there are no unassessed rows left. The first 100 were analyzed in depth with a full summary and category; the remaining 1,229 received a verdict plus evidence, with their raw metadata retained. Three validation sweeps have been run: the first re-checked the not-implemented rows (8 moved); a second sweep on 2026-08-15 re-audited verdicts against 0.2.1/0.2.2 (30 rows moved); and a third sweep the same day used five subagents on the live 0.2.1 tree plus 0.2.2 on master. That pass rewrote Codebase status notes that still used pre-Policy A language (Ignored vs Rejected), stale rowspan / stdlib-only / VERSION 0.1.0 claims, and local-only @font-face. 18 rows changed verdict — e.g. Qt OLE/segfault sidesteps and CSS grid support to implemented, combined text+HTML footers and inline SVG paths to not implemented."
+      "body": "The dossier starts from all 1,329 open issues scraped from the upstream wkhtmltopdf issue tracker, including title, body, labels, and dates. Every issue was read and classified against the gowkhtmltopdf codebase; there are no unassessed rows left. Every row has a category and a verdict with evidence. The first 100 were read in depth and carry a hand-written key-detail note, plus all 15 recorded workarounds; the remaining 1,229 carry their tracker metadata (labels, comment counts) alongside the same verdict and evidence fields. Three validation sweeps have been run: the first re-checked the not-implemented rows (8 moved); a second sweep on 2026-08-15 re-audited verdicts against 0.2.1/0.2.2 (30 rows moved); and a third sweep the same day used five subagents on the live 0.2.1 tree plus 0.2.2 on master. That pass rewrote Codebase status notes that still used pre-Policy A language (Ignored vs Rejected), stale rowspan / stdlib-only / VERSION 0.1.0 claims, and local-only @font-face. 18 rows changed verdict, e.g. Qt OLE/segfault sidesteps and CSS grid support to implemented, combined text+HTML footers and inline SVG paths to not implemented."
     },
     {
      "heading": "Every verdict cites evidence",
@@ -87,7 +87,7 @@
      "body": "Every JavaScript/interactive report is marked not implemented, because the capability requires a running JS engine. MathJax equations (#5240), mermaid.js diagrams (#5239), and CanvasJS charts (#5252) all fall in this class. Angular, React, and Vue pages come out blank because their DOM is built by scripts at runtime.",
      "bullets": [
       "JS-heavy issues are not silent regressions: each one was checked against the no-JS subset and the capability was marked absent with evidence",
-      "A JavaScript engine is on the roadmap, so this verdict class may shrink later"
+      "JavaScript support is staged and unshipped (deferred.md, Phase 22), so this verdict class holds today"
      ]
     },
     {

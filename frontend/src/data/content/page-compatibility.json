@@ -6,7 +6,7 @@
    "type": "hero",
    "id": "intro",
    "title": "HTML & CSS Compatibility",
-   "lede": "gowkhtmltopdf converts controlled, server-generated HTML and print templates to PDF and PNG: invoices, receipts, certificates, storybooks, posters, and multi-page tables with headers and footers. It is a PDF engine based on HTML templates — without any wrappers — not a browser, and the compatibility matrix is the normative contract."
+   "lede": "gowkhtmltopdf converts controlled, server-generated HTML and print templates to PDF and PNG: invoices, receipts, certificates, storybooks, posters, and multi-page tables with headers and footers. It is a PDF engine based on HTML templates without any wrappers, not a browser. The 2026-09-12 catalog snapshot tracks 818 W3C webref property names at 354 Implemented, 0 Partial, and 464 Unsupported; 0.2.6 CSS coverage is in flight on this VERSION 0.2.5 tree. `documentation/compatibility-matrix.md` is the normative per-property contract."
   },
   {
    "type": "bullets",
@@ -16,6 +16,9 @@
     "A feature is supported only when the matrix says so: \"Implemented\" means parsed and consumed by layout and paint, backed by a code path in `internal/layout` or `internal/css` and usually a test or golden fixture under `testdata/golden/fixture-*.html`.",
     "Anything not listed in the matrix is unsupported, and unsupported input must degrade gracefully: the declaration is ignored, the node is skipped, or a documented error is returned. It never crashes (`documentation/fidelity.md`, Failure modes).",
     "The status legend is three-valued: Implemented, Partial (parsed and used for a subset; the rest degrades silently), and Not implemented (parsed and dropped, or never parsed).",
+    "Coverage counts are catalog-based, not prose: the W3C webref list holds 818 property names, and the 2026-09-12 snapshot (`plans/0.2.6/catalog/coverage-summary.json`) marks 354 Implemented, 0 Partial, and 464 Unsupported. The 0.2.6 CSS coverage program is in flight on this VERSION 0.2.5 tree.",
+    "0.2.6-era coverage in this tree: logical margins/padding/inset/sizing and logical border radii; multi-layer backgrounds (`background-size`, `-position`, `-repeat`, `-clip`, `-origin`); `border-image`; multi-layer `box-shadow` with inset and spread; `text-shadow` and decoration longhands (`text-decoration-thickness`, `-color`, `text-underline-offset`); static 2D `transform` plus individual `translate`/`rotate`/`scale`; and 28 `-webkit-*` aliases remapped to implemented bases (matrix 5.3).",
+    "The 2026-09-12 catalog audit holds `font-feature-settings`, `font-kerning`, and `font-variant-caps` Unsupported: the names are dropped with no layout or shaping consumer. `font-language-override` stays Implemented with an OpenType shaper consumer.",
     "Prefer the matrix over marketing prose: if a row says Implemented, there should be a code path and preferably a test or golden fixture to prove it.",
     "CLI URL fetch over `http`/`https` is a supported input path, but it is not the same as browser-grade print: live URL output stays exploratory until Phase 21 acceptance against vendored fixtures."
    ]
@@ -55,11 +58,11 @@
     ],
     [
      "ul, ol, li",
-     "Simple lists with bullet markers; `ol` also renders bullets (decimal markers not implemented)"
+     "Simple lists; markers include disc/circle/square, decimal/decimal-leading-zero, lower/upper-alpha, and lower/upper-roman"
     ],
     [
      "table, thead, tbody, tfoot, tr, th, td",
-     "Table subset; `colspan` yes, `rowspan` no; `thead` repeats on continuation pages"
+     "Table subset; `colspan` and `rowspan` Implemented; `<caption>` renders with `caption-side` top/bottom/left/right; `thead` repeats on continuation pages"
     ],
     [
      "img",
@@ -75,7 +78,7 @@
     ],
     [
      "pre, code",
-     "`pre` honors `white-space: pre`; `code` has no monospace face (single embedded font family)"
+     "`pre` honors `white-space: pre`; `code` follows the author font stack, with generic `monospace` mapped to bundled Liberation Mono"
     ],
     [
      "blockquote",
@@ -106,6 +109,12 @@
     ],
     [
      "Box",
+     "border-radius (+ corner longhands)",
+     "Implemented",
+     "Shorthand and longhands, `rx / ry` slash, elliptical Bezier paint, and percent corners resolved per axis"
+    ],
+    [
+     "Box",
      "width, height, min/max-width/height",
      "Implemented",
      "`%` resolves against a viewport approximation; consumed by blocks and images"
@@ -118,15 +127,39 @@
     ],
     [
      "Box",
-     "overflow",
-     "Partial",
-     "Used to pick sticky scrollports; no general paint clipping"
+     "logical `margin`/`padding`/`inset`/size (`margin-block`, `padding-inline`, `inset-*`, `inline-size`, ...)",
+     "Implemented",
+     "Map to physical geometry for horizontal and vertical writing modes; tests `TestLogicalMargin`, `TestLogicalPadding`, `TestLogicalInset`, `TestLogicalSize`"
+    ],
+    [
+     "Box",
+     "logical border radii (`border-start-start-radius` and siblings)",
+     "Implemented",
+     "Map onto physical corner radii across writing modes; catalog snapshot 2026-09-12"
+    ],
+    [
+     "Box",
+     "overflow, overflow-x, overflow-y",
+     "Implemented",
+     "Sticky scrollport selection plus descendant paint clipping to the padding box for `hidden`/`clip`/`auto`/`scroll` (`overflow_clip.go`); `visible` does not clip"
+    ],
+    [
+     "Box",
+     "box-shadow",
+     "Implemented",
+     "Multi-layer shadows with inset layers, spread expansion, and blur approximation; does not change layout size (`box_shadow.go`)"
+    ],
+    [
+     "Box",
+     "border-image (+ source/slice/width/outset/repeat)",
+     "Implemented",
+     "Border image slicing and tiling (`appendBorderImage`, `layout_chrome.go`); catalog snapshot 2026-09-12"
     ],
     [
      "Flow",
      "display",
      "Implemented / Partial",
-     "Core values implemented; `flex` and `grid` route to the print CSS subset; `none` tested; `table-caption` and `table-column(-group)` not implemented"
+     "Core values implemented; `flex`/`inline-flex` route to Stage A flex and `grid`/`inline-grid` to Stage B + C grid lite; `table-caption` renders above the table; `table-column`/`table-column-group` are not implemented"
     ],
     [
      "Flow",
@@ -137,14 +170,14 @@
     [
      "Flow",
      "position",
-     "Partial",
-     "Static; `relative`/`absolute`/`fixed` lite; `sticky` clamps to the page content box (print scrollport) or an overflow box at offset 0"
+     "Implemented (lite)",
+     "Static in-flow plus `relative`/`absolute`/`fixed` lite; `sticky` clamps `top`/`bottom`/`left`/`right` in the page content box (print scrollport) or an overflow box at offset 0"
     ],
     [
      "Text",
      "font-family",
-     "Partial",
-     "Embedded Liberation Sans family plus `--font-path`, `--use-system-fonts`, and local `@font-face` TTF/OTF/WOFF1; missing faces fall back to Liberation"
+     "Implemented",
+     "Named and generic families; embedded Liberation Sans plus `--font-path`, `--use-system-fonts`, and `@font-face` TTF/OTF/WOFF1 from local paths or `https://`; missing faces fall back through the author stack to Liberation"
     ],
     [
      "Text",
@@ -173,20 +206,44 @@
     [
      "Text",
      "text-indent, word-spacing, text-transform",
+     "Implemented",
+     "`text-indent` shifts the first line; `word-spacing` widens ASCII spaces; `text-transform` applies uppercase/lowercase/capitalize at measure and paint"
+    ],
+    [
+     "Text",
+     "text-shadow",
+     "Implemented",
+     "One soft shadow copy per collected shadow, behind the run (`emitTextShadowRuns`, `inline_paint.go`)"
+    ],
+    [
+     "Text",
+     "text-decoration-thickness, text-decoration-color, text-underline-offset",
+     "Implemented",
+     "Decoration longhands consumed in inline paint; `text-decoration-skip-*` subset per matrix 2.3"
+    ],
+    [
+     "Text",
+     "font-language-override",
+     "Implemented (subset)",
+     "OpenType language tag threaded into shaping (`shape_gotext.go`); observable with DejaVu Sans `SRB` `locl` substitution"
+    ],
+    [
+     "Text",
+     "font-feature-settings, font-kerning, font-variant-caps",
      "Not implemented",
-     "Parsed and dropped, or never parsed; no crash"
+     "Held Unsupported by the 2026-09-12 catalog audit: names are dropped with no layout or shaping consumer"
     ],
     [
      "Text",
      "white-space",
-     "Partial",
-     "normal/nowrap/pre implemented; `pre-wrap` and `pre-line` collapse to `pre`"
+     "Implemented",
+     "`normal`/`nowrap`/`pre`; `pre-wrap` preserves spaces and wraps; `pre-line` collapses spaces, keeps newlines, and wraps"
     ],
     [
      "Text",
      "vertical-align",
-     "Partial",
-     "Table cells top/middle/bottom; inline replaced elements"
+     "Implemented",
+     "Table cells top/middle/bottom; inline replaced elements against the baseline"
     ],
     [
      "Color",
@@ -197,14 +254,32 @@
     [
      "Color",
      "background (shorthand)",
-     "Not implemented",
-     "Only `background-color` exists; gradients are ignored"
+     "Implemented",
+     "Color token plus multi-layer `background-image` (`url(...)`, pure-Go linear/radial gradients)"
+    ],
+    [
+     "Color",
+     "background-size, background-position, background-repeat, background-clip, background-origin",
+     "Implemented",
+     "Multi-layer sizing (`contain`/`cover`/explicit), positioning, repeat tiling, and clip/origin boxes (`background_image.go`, `background_repeat.go`); catalog snapshot 2026-09-12"
     ],
     [
      "Color",
      "opacity",
      "Partial",
      "PDF ExtGState; nested opacities multiply; `filter: opacity()` accepted, other filters ignored"
+    ],
+    [
+     "Transform",
+     "transform, transform-origin, translate, rotate, scale",
+     "Implemented (static 2D)",
+     "Paint CTM integration with stacking and absolute/fixed containing blocks; no animation timelines and no 3D (matrix 5, fixture-40)"
+    ],
+    [
+     "Coverage",
+     "vendor-prefixed `-webkit-*` aliases",
+     "Partial",
+     "28 alias names remap to implemented bases; 42 stay Unsupported, including `-webkit-background-clip`/`-origin`/`-size` whose unprefixed bases now ship (matrix 5.3)"
     ],
     [
      "Table",
@@ -215,8 +290,8 @@
     [
      "Table",
      "border-collapse, table-layout, caption-side",
-     "Not implemented",
-     "Parsed, never consumed; separate model and auto layout only; `<caption>` does not render"
+     "Implemented",
+     "Collapsed border resolution with spacing suppressed; `table-layout: fixed` lite when the table width is definite; `caption-side` top/bottom/left/right"
     ],
     [
      "Paged",
@@ -239,8 +314,8 @@
     [
      "Paged",
      "@page",
-     "Not implemented",
-     "Skipped gracefully at parse"
+     "Partial",
+     "Unnamed `margin`/`size` apply to every page; `:first`/`:left`/`:right` override margins (LTR page 1 is `:right`; `:first` wins); `page: ident` gives named pages with sibling breaks; `@top-*`/`@bottom-*` margin boxes fill empty CLI header/footer slots; size stays unnamed-only"
     ]
    ]
   },
@@ -249,11 +324,11 @@
    "id": "unsupported",
    "heading": "Explicitly unsupported",
    "items": [
-    "JavaScript: `<script>` is stripped at load and DOM APIs do not exist; `--enable-javascript` is accepted but ignored with a warning.",
+    "JavaScript: `<script>` is stripped at load and DOM APIs do not exist. `--enable-javascript`, `--run-script`, `--window-status`, and the other JS flags are not registered; they fail parse as `unknown option` (matrix 7.5, Policy A).",
     "Browser parity: full WebKit or Chrome print parity is an explicit non-milestone; banned claims include pixel-perfect output, full CSS, and browser replacement (`documentation/fidelity.md`, Claims language).",
-    "WebP, AVIF, SVG-as-img: not decodable by the stdlib; the image is skipped or a broken-image placeholder is painted. The `internal/svg` subset (rect/circle/path) covers inline SVG logos and grids.",
-    "PDF encryption, duplex, and AcroForm: out of scope; `--produce-forms` is rejected as an unknown option. PDF/A-3a, PDF/A-4, PDF/UA-1, and PDF/UA-2 shipped in 0.2.2 as opt-in `--pdf-profile` / `WithPDFProfile` (default remains unclaimed PDF 1.4; version alone is not a claim). Older PDF/A-1 / A-2 and PDF/X stay absent.",
-    "Remote and WOFF2 `@font-face` sources plus `data:` URLs: skipped by policy; only local TTF/OTF/WOFF1 load through the `FetchSub` ACL.",
+    "WebP and AVIF are not implemented: the image is skipped or a broken-image placeholder is painted. SVG-as-`<img>` is implemented through `internal/svg` (allowlisted `tdewolff/canvas`, rect/circle/path subset); the remaining 53 SVG presentation properties stay unsupported (matrix 5.2).",
+    "PDF encryption, duplex, and AcroForm: out of scope; `--produce-forms` is not registered and is rejected as an unknown option, and the PDF writer has no form model. PDF/A-3a, PDF/A-4, PDF/UA-1, and PDF/UA-2 shipped in 0.2.2 as opt-in `--pdf-profile` / `Document.PDFProfile` (default remains unclaimed PDF 1.4; version alone is not a claim). Older PDF/A-1 / A-2 and PDF/X stay absent.",
+    "`@font-face`: TTF/OTF (TrueType outlines) and WOFF1 load from local paths or `https://` through the `FetchSub` ACL and `NetworkPolicy` on PDF and image paths. WOFF2, EOT, and `data:` sources are skipped; CFF/`OTTO` fonts are rejected.",
     "Complex-script shaping is partial: Arabic OT via `go-text/typesetting` (GSUB) with presentation-form fallback, CJK via Type0/CID; no CGO HarfBuzz."
    ]
   },

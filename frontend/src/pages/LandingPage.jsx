@@ -47,7 +47,7 @@ export default function LandingPage() {
             tables and multi-page documents with headers, footers and outlines. Two surfaces, same engine.
           </p>
           <div className="landing-actions">
-            <Link className="button button-primary" to="/getting-started">
+            <Link className="button button-primary" to="/documentation/getting-started">
               Get started <span aria-hidden="true">-&gt;</span>
             </Link>
             <Link className="button button-secondary" to="/live-demo">Try Live Demo</Link>
@@ -200,10 +200,10 @@ export default function LandingPage() {
         <p>Build once, run anywhere. No browser steps.</p>
         <div className="close-code">
           <code>gowkhtmltopdf input.html output.pdf</code>
-          <Link className="button button-primary" to="/getting-started">Get started <span aria-hidden="true">-&gt;</span></Link>
+          <Link className="button button-primary" to="/documentation/getting-started">Get started <span aria-hidden="true">-&gt;</span></Link>
         </div>
         <div className="close-links">
-          <Link to="/getting-started">First conversion</Link>
+          <Link to="/documentation/getting-started">First conversion</Link>
           <span aria-hidden="true">&middot;</span>
           <Link to="/documentation/library-api">Go library</Link>
           <span aria-hidden="true">&middot;</span>

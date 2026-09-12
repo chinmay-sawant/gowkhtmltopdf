@@ -5,27 +5,27 @@
   {
    "type": "hero",
    "title": "Fonts: embedded defaults, opt-in discovery",
-   "lede": "Every PDF embeds the Liberation Sans family by default, with no font scanning at all. Non-Latin runs switch to a Type0/CID path, and complex-script shaping goes only as far as the pure-Go engine can take it."
+   "lede": "Every PDF can use the bundled Liberation Sans, Serif, and Mono families plus a DejaVu Sans fallback, with no font scanning at all. Runes above U+00FF switch to a Type0/CID path, and OpenType shaping applies only as far as the face tables and the pure-Go engine allow."
   },
   {
    "type": "cards",
    "heading": "Bundled vs discovered faces",
    "items": [
     {
-     "title": "Bundled: Liberation Sans",
-     "body": "By default every PDF embeds the Liberation Sans family (Regular / Bold / Italic / BoldItalic). Latin-1 text uses a simple TrueType subset with WinAnsi-style single-byte codes; nothing is scanned and no directories are touched."
+     "title": "Bundled: Liberation plus DejaVu",
+     "body": "Every conversion can use Liberation Sans, Liberation Serif, and Liberation Mono (Regular / Bold / Italic / BoldItalic) plus DejaVu Sans Regular+Bold as the Unicode fallback. Faces are embedded from `internal/pdf/assets` and parsed lazily by `pdf.LoadDefaultFaces`; Latin-1 text uses a simple TrueType subset with WinAnsi-style single-byte codes."
     },
     {
      "title": "Opt-in: discovered faces",
-     "body": "`--font-path DIR` scans `DIR` (and shallow children) for `.ttf` and TrueType-flavored `.otf` files and is repeatable. `--use-system-fonts` also scans common OS font directories such as `/usr/share/fonts` while skipping proprietary Windows and corefont trees."
+     "body": "`--font-path DIR` scans `DIR` plus two levels of subdirectories (`pdf.ScanFontDirs`, `fontScanMaxDepth = 2`) for `.ttf` and `.otf` files and is repeatable. `--use-system-fonts` also scans common OS font directories such as `/usr/share/fonts` while skipping proprietary Windows and corefont trees."
     },
     {
      "title": "Matching and fallback",
-     "body": "CSS `font-family` lists are matched against discovered family names (name table) before falling back to Liberation. Only the generic families `serif`, `sans-serif`, and `monospace` expand to Liberation by name."
+     "body": "`pdf.FaceSet.ResolveFamily` maps common names and generics onto bundled faces: `serif` / `georgia` / `times` -> Liberation Serif; `monospace` / `courier` / `consolas` -> Liberation Mono; `sans-serif` / `arial` / `helvetica` -> Liberation Sans; `system-ui` / `DejaVu Sans` -> bundled DejaVu. Names outside the table resolve against the opt-in registry first, then fall through the author's comma stack to Liberation Sans."
     },
     {
      "title": "CJK readiness",
-     "body": "Han, kana, and Hangul render when a capable TTF is on the font path, for example `fonts-noto-cjk`. The tiny OFL subset `NotoSansKR-HangulSubset.ttf` in `testdata/fonts` exists for CI and the fixture-27 smoke test only, not as a production CJK face."
+     "body": "Han, kana, and Hangul render when a capable TTF is on the font path, for example `fonts-noto-cjk`. Production Hangul needs a Hangul-capable TTF on `--font-path`; the tiny OFL subset `NotoSansKR-HangulSubset.ttf` in `testdata/fonts` exists for CI and the fixture-27 smoke test only, not as a production CJK face."
     }
    ]
   },
@@ -39,7 +39,7 @@
    "rows": [
     [
      "`--font-path DIR`",
-     "Scan `DIR` (and shallow children) for `.ttf` / TrueType-flavored `.otf`; repeatable"
+     "Scan `DIR` plus two levels of subdirectories for `.ttf` / `.otf`; repeatable (`pdf.ScanFontDirs`, `fontScanMaxDepth = 2`)"
     ],
     [
      "`--use-system-fonts`",
@@ -47,15 +47,15 @@
     ],
     [
      "Family matching",
-     "Named CSS families resolve as named via the name table; only generics (`serif` / `sans-serif` / `monospace`) expand to Liberation"
+     "Bundled mapping covers common names and generics (`pdf.FaceSet.ResolveFamily`); other names resolve named via the opt-in registry, then fall through the comma stack to Liberation Sans"
     ],
     [
      "Glyph coverage fallback",
-     "Missing IPA / uncommon Unicode glyphs fall back to any face on the opt-in registry that covers the codepoint, preferring DejaVu and Noto family names"
+     "Missing IPA / uncommon Unicode glyphs walk CSS family (registry, then bundled) -> Liberation weight/style -> bundled DejaVu -> any opt-in registry face that covers the codepoint (`pdf.Registry.FindWithGlyph`, prefers DejaVu/Noto names)"
     ],
     [
      "Default (no flags)",
-     "Liberation Sans Regular / Bold / Italic / BoldItalic embedded; Latin-1 uses a simple TrueType subset with WinAnsi-style single-byte codes"
+     "Bundled Liberation Sans / Serif / Mono (R/B/I/BI) and DejaVu Sans Regular+Bold available; Latin-1 uses a simple TrueType subset with WinAnsi-style single-byte codes"
     ]
    ]
   },
@@ -92,13 +92,13 @@
      "body": "OpenType applies when the face and reverse-cmap succeed, but production Indic quality is not claimed beyond that. The fallback keeps combining marks after the base with no in-tree matra reordering."
     },
     {
-     "heading": "@font-face: local WOFF1 and TTF only",
-     "body": "`@font-face` is partial: local `url(...ttf|otf|woff)` under the loader ACL (`--allow-local-files` / `--allow`) is fetched via `FetchSub`, parsed (WOFF1 to SFNT via stdlib zlib), and registered for the document on both PDF and image paths (`convert.MergeFontFaces`).",
+     "heading": "@font-face: TTF / OTF / WOFF1",
+     "body": "`@font-face` is partial: `url(...ttf|otf|woff)` sources are fetched through the document's loader (local paths under `--allow-local-files` / `--allow`, remote `http(s)` under the same NetworkPolicy as `img` / `link`), parsed (WOFF1 decompressed to SFNT via `compress/zlib`, TrueType outlines only), and registered for the document on both PDF and image paths (`prepare.ResourceContext.MergeFontFaces`).",
      "bullets": [
-      "WOFF1 is supported: decompress, then `ParseTTF`, TrueType outlines only.",
-      "WOFF2, EOT, remote `https://`, and `data:` sources are skipped with a warning.",
+      "WOFF1 is supported: decompress, then `pdf.ParseTTF`, TrueType outlines only.",
+      "`.woff2`, `.eot`, and `data:` sources are skipped with a warning (`internal/convert/prepare/styles.go:468-476`); remote `http(s)` sources are fetched, not skipped.",
       "`font-weight` and `font-style` on `@font-face` are parsed but ignored at register time (the alias is the family name only).",
-      "`halt` / `palt` are requested via typesetting `FontFeatures` for CJK / East-Asian punctuation runs, and via `ParseFontFeatureSettings` / `ShapeTextFontWithFeatures` when CSS `font-feature-settings` is supplied."
+      "`halt` / `palt` are requested via typesetting `FontFeatures` for CJK / East-Asian punctuation runs, and via `ParseFontFeatureSettings` / `ShapeTextFontWithFeatures` when CSS `font-feature-settings` is supplied. CSS `font-feature-settings`, `font-kerning`, and `font-variant-caps` wiring is in-flight 0.2.6 work on master (CHANGELOG 0.2.6, plans/0.2.6/), not in the cut 0.2.5 release."
      ]
     }
    ]
@@ -107,7 +107,7 @@
    "type": "callout",
    "variant": "warn",
    "title": "Rejected and skipped formats",
-   "body": "CFF / `OTTO` OpenType fonts are rejected outright: TrueType outlines only. WOFF2 is not supported (it needs Brotli, `go-text/typesetting` has WOFF1 only, and no new direct modules are added; the gap is tracked as `DecodeWOFF2` / `TestDecodeWOFF2Gap`). Remote `https://` and `data:` `@font-face` sources are skipped with a warning by design (ACL and no-webfont-CDN policy)."
+   "body": "CFF / `OTTO` OpenType fonts are rejected outright: TrueType outlines only (`pdf.ParseTTF` returns `errFontCFFNotSupported`). WOFF2 is not supported: `pdf.ParseFontBytes` returns `errWOFF2Unsupported` because Brotli is not allowlisted, and the gap is pinned by `TestDecodeWOFF2Gap` (internal/pdf/woff_test.go:210). `.eot` and `data:` `@font-face` sources are skipped with a warning; remote `http(s)` sources are fetched under the same ACL and NetworkPolicy as other subresources."
   }
  ]
 }

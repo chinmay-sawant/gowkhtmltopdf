@@ -754,7 +754,7 @@ export default function BenchmarksPage() {
           <li>
             Fixture: {SNAPSHOT.fixture}. Method: {SNAPSHOT.method}.
           </li>
-          <li>This is the generic convert path. Page islands are a benchmark-only opt-in.</li>
+          <li>This is the generic convert path; the benchmark-only page-island opt-in was removed in the 0.2.6 cleanup.</li>
           <li>Numbers are a labeled snapshot, not an SLA. Reproduce on your machine.</li>
         </ul>
         <pre>

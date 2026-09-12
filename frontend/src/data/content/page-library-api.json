@@ -24,17 +24,18 @@
       "heading": "Public surface",
       "headers": ["Type", "Role", "Key methods"],
       "rows": [
-        ["Document", "HTML sources and PDF options", "Validate, WritePDF, WritePDFOutline, PDF"],
+        ["Document", "HTML sources and PDF options", "Validate, WritePDF, WritePDFOutline, PDF; options are struct fields such as PDFVersion, PDFProfile, Copies, and Network"],
         ["ImageDocument", "One HTML source and image options", "Validate, WriteImage, Image"],
-        ["Content", "Exactly one HTML, File, or URL source", "HTML, File, URL helpers"],
-        ["NetworkPolicy", "HTTP(S) loading policy", "CompatibleNetworkPolicy, RestrictedNetworkPolicy"]
+        ["Content", "Exactly one HTML, File, or URL source", "HTML(html, base...), File(path), URL(rawURL), Validate"],
+        ["NetworkPolicy", "HTTP(S) loading policy", "CompatibleNetworkPolicy (default), RestrictedNetworkPolicy (blocks private destinations and cross-host redirects)"],
+        ["Package helpers", "Version banner and constructors", "Version, LibraryVersion (0.12.7-dev), NewDocument(pages...), MaxDocumentCopies (1000)"]
       ]
     },
     {
       "type": "callout",
       "variant": "info",
       "title": "Ownership and validation",
-      "body": "HTML bytes and option slices are copied at the public boundary. Validate reports invalid sources, formats, page geometry, profiles, and empty documents before the renderer opens output. AllowLocalFiles is opt-in; Network config remains explicit. The public API is v0.2.4 and the upstream compatibility identifier remains LibraryVersion = 0.12.7-dev."
+      "body": "HTML bytes and option slices are copied at the public boundary. Validate reports invalid sources, formats, page geometry, profiles, and empty documents before the renderer opens output. AllowLocalFiles is opt-in; Network config remains explicit. The public API is v0.2.5 (VERSION); LibraryVersion = 0.12.7-dev is the upstream wkhtmltopdf compatibility identifier, not the release number (api.go:24). PDFVersion and PDFProfile are Document fields; the 0.2.5 root package has no With... option functions."
     }
   ]
 }

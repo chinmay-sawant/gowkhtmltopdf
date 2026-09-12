@@ -10,10 +10,10 @@
     {
       "type": "stats",
       "items": [
-        { "value": "15.2x", "label": "faster at 2 pages (17 ms vs 258 ms)" },
-        { "value": "8.3x", "label": "faster at 10 pages (34 ms vs 286 ms)" },
-        { "value": "2.4x", "label": "faster at 100 pages (229 ms vs 541 ms)" },
-        { "value": "1.4x", "label": "faster at 500 pages (1.288 s vs 1.753 s)" }
+        { "value": "14.95x", "label": "faster at 2 pages (17 ms vs 258 ms)" },
+        { "value": "8.29x", "label": "faster at 10 pages (34 ms vs 286 ms)" },
+        { "value": "2.36x", "label": "faster at 100 pages (229 ms vs 541 ms)" },
+        { "value": "1.36x", "label": "faster at 500 pages (1.288 s vs 1.753 s)" }
       ]
     },
     {
@@ -94,7 +94,7 @@
       "type": "callout",
       "variant": "info",
       "title": "Concurrent-layout prototype rejected, left unwired",
-      "body": "The phase-6 prototype rendered independent top-level sections in parallel and merged deterministically. It passed the equivalence contract (op-for-op display lists, page counts, date-normalized PDF bytes, golden 65/65, flat B/op), but its best paired same-process gain was 5.4% (serial 596 ms versus 564 ms at W=2), below the required 15% floor. It was rejected for shipping, pipeline overlap was not attempted, and production stays serial. The prototype and its differential tests remain in internal/layout/parallel.go and parallel_test.go with no production caller."
+      "body": "The phase-6 prototype rendered independent top-level sections in parallel and merged deterministically. It passed the equivalence contract (op-for-op display lists, page counts, date-normalized PDF bytes, golden 65/65, flat B/op), but its best paired same-process gain was 5.4% (serial 596 ms versus 564 ms at W=2), below the required 15% floor. It was rejected for shipping, pipeline overlap was not attempted, and production stays serial. The prototype and its differential tests were deleted in the 0.2.6 cleanup (plans/0.2.6/ponytail/0.2.6-ponytail-audit.md); no production caller remains."
     },
     {
       "type": "table",
@@ -201,7 +201,7 @@
         "The concurrent-layout prototype (5.4% paired gain against a 15% floor) is rejected for shipping and has no production caller.",
         "2-page B/op rows include the one-time default-font work (about 4.0 MB on the internal path) because each sample is a fresh 1x process. Do not compare them to the 2026-08-19 multi-iteration matrix without that caveat.",
         "The public Go library rows call Document.WritePDF and ImageDocument.WriteImage directly. The approximately 20x landing claim keeps the dated recovery-capture boundary: 258 ms divided by 10.88 ms at 2 pages, using the wkhtmltopdf CLI as the baseline.",
-        "The report fixture is testdata/golden/benchmarks/templates/report.html.tmpl with 20 invoice rows per requested page. Page islands (convert.NewBenchmarkPDFRequest) are a benchmark-only opt-in; ordinary CLI and library requests stay on the generic path.",
+        "The report fixture is testdata/golden/benchmarks/templates/report.html.tmpl with 20 invoice rows per requested page. Page islands and their convert.NewBenchmarkPDFRequest opt-in were removed in the 0.2.6 cleanup; every row is a generic-path measurement.",
         "Full matrices, historical snapshots, and raw go test rows live in testdata/golden/benchmarks/, documentation/performance.md, and plans/0.2.6/perf-time/results/phase-7/."
       ]
     }

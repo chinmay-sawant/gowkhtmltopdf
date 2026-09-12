@@ -95,4 +95,13 @@ assert.match(liveDemoStyles, /:focus-visible/, 'live demo styles should define k
 assert.match(liveDemoStyles, /prefers-reduced-motion/, 'live demo styles should define reduced-motion behavior')
 console.log('  ✓ Browser live demo assets, route, and image output options verified.')
 
+// 8. Check Getting Started is a documentation page with a legacy redirect
+console.log('\n8. Checking Getting Started lives under /documentation...')
+const docsPageSource = readFileSync(join(root, 'src', 'pages', 'DocumentationPage.jsx'), 'utf8')
+assert.match(docsPageSource, /DOCS = \['getting-started'/, 'DocumentationPage DOCS should start with getting-started')
+assert.match(docsPageSource, /'getting-started': 'getting-started\.md'/, 'DOC_FILE_MAP should map getting-started')
+assert.match(appSource, /\['getting-started', 'getting-started'\]/, 'App should redirect /getting-started into /documentation')
+assert.match(appSource, /Navigate to=['"]\/documentation\/getting-started['"]/, '/documentation should redirect to getting-started')
+console.log('  ✓ Getting Started is served from the documentation surface.')
+
 console.log('\n🎉 All frontend smoke tests passed successfully!\n')
