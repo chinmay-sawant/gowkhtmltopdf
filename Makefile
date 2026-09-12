@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-quick test-serial test-race lint lint-frontend build wasm wasm-test fmt golden golden-update samples samples-python screenshots weasyprint clean claim-scan bench bench-engine bench-lib bench-inprocess bench-cli-compare c-shared bindings-clean check-versions python-binding-test python-benchmarks python-api
+.PHONY: test test-unit test-quick test-serial test-race lint lint-frontend size-check build wasm wasm-test fmt golden golden-update samples samples-python screenshots weasyprint clean claim-scan bench bench-engine bench-lib bench-inprocess bench-cli-compare c-shared bindings-clean check-versions python-binding-test python-benchmarks python-api
 # Pure-Go runtime: the standard library plus the allowlisted direct modules
 # below. No cgo, browser, or native converter process is required.
 # Direct third-party requires must stay ⊆ {
@@ -52,10 +52,11 @@ test-serial:
 test-race:
 	go test -race -count=1 -p $(TEST_P) -parallel $(TEST_PARALLEL) $(GO_TEST_FLAGS) $(RACE_PKGS)
 
-# Runs every linter enabled in .golangci.yml (enable-all), then frontend
-# `npm run lint` (ESLint plus src/data content/config checks). Installs the
-# pinned golangci-lint binary into $(go env GOPATH)/bin when missing. Always
-# builds with GOTOOLCHAIN=local so the binary matches go.mod's go1.26 toolchain.
+# Runs every linter enabled in .golangci.yml (enable-all), the file-size gate
+# (scripts/check-file-size.sh), then frontend `npm run lint` (ESLint plus
+# src/data content/config checks). Installs the pinned golangci-lint binary
+# into $(go env GOPATH)/bin when missing. Always builds with GOTOOLCHAIN=local
+# so the binary matches go.mod's go1.26 toolchain.
 lint:
 	@command -v golangci-lint >/dev/null 2>&1 || { \
 		echo "golangci-lint not found; installing $(GOLANGCI_LINT_VERSION) with local Go toolchain..."; \
@@ -63,7 +64,14 @@ lint:
 	}
 	golangci-lint version
 	golangci-lint run ./...
+	$(MAKE) size-check
 	$(MAKE) lint-frontend
+
+# File-size soft-limit gate (AGENTS.md "Code structure"). Scans .go files and
+# verifies the over-limit files recorded in scripts/file-size-allowlist.txt.
+# Called by `lint`, so CI enforces it alongside golangci-lint.
+size-check:
+	bash scripts/check-file-size.sh
 
 lint-frontend:
 	@command -v npm >/dev/null 2>&1 || { echo "npm is required for frontend lint" >&2; exit 1; }

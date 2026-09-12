@@ -1,0 +1,12 @@
+# Single source of truth for .go files over the ~2,000-line soft limit in
+# AGENTS.md ("Code structure"). Keep this list in sync with that bullet.
+# Changing a recorded count is a deliberate, reviewed change: a number moves
+# only when the file's growth or shrink has been reviewed.
+#
+# Format: <repo-relative path><TAB><line count>, one entry per line.
+# Enforced by scripts/check-file-size.sh via `make size-check`, which `make lint`
+# calls, so CI fails when this list drifts from the tree.
+internal/layout/layout.go	2497
+internal/layout/style_properties.go	2194
+internal/imageout/imageout.go	2058
+internal/layout/inline_paint.go	2018

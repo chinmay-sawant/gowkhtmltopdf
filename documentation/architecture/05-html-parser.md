@@ -240,7 +240,7 @@ DOM, so the package must stay dependency-free to keep it usable by every layer.
 | Package | Why it needs the tree |
 |---------|----------------------|
 | `internal/css` | Selector matching against nodes (`css.go`, `has.go`). |
-| `internal/layout` | Style resolution, box building, inline collection, tables, floats, multicol, images, paint (`style.go`, `style_cascade.go`, `layout_flow.go`, `inline_collect.go`, `layout_tables.go`, `flex.go`, `grid.go`, `float.go`, `multicol.go`, `layout_images.go`, `paint_flow.go`, `container.go`, `pseudo_content.go`, `layout_measure.go`). |
+| `internal/layout` | Style resolution, box building, inline collection, tables, floats, multicol, images, paint (`style.go`, `style_cascade.go`, `layout_flow.go`, `inline_collect.go`, `layout_tables.go`, `flex.go`, `grid.go`, `float.go`, `multicol.go`, `layout_images.go`, `paint_flow_breaks.go`, `container.go`, `pseudo_content.go`, `layout_measure.go`). |
 | `internal/convert` (+ `prepare/`) | Main parse entry (`prepare/prepare.go:154`), stylesheet collection (`prepare/styles.go:32-99`), HF/TOC/outline/links (`hf.go`, `toc.go`, `outline.go`, `links.go`). |
 | `internal/outline` | Heading collection for PDF bookmarks (`outline.go:121`). |
 | `internal/imageout` | Image-mode rendering shares the same parse→layout path (`imageout.go:121,128,170`). |

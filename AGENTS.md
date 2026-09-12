@@ -144,8 +144,8 @@ The real gates, in order of cost:
 |------|---------|----------------|
 | Unit + integration | `make test` | Full suite green (`-p 2 -parallel 2` by default; see Makefile) |
 | Claims | `make claim-scan` | No forbidden claims (stdlib-only, Qt WebKit, byte-identical determinism, etc.) in doc.go, README, documentation/, frontend content, cli help |
-| Lint | `make lint` | golangci-lint (pinned v1.64.8) clean; chains `lint-frontend` (npm) |
-| Golden corpus | `make golden` | All 61 fixtures convert with correct structure, page-count envelopes, embedded fonts, ordered text needles |
+| Lint | `make lint` | golangci-lint (pinned v1.64.8) clean; chains `size-check` (file-size ledger) and `lint-frontend` (npm) |
+| Golden corpus | `make golden` | All 62 fixtures convert with correct structure, page-count envelopes, embedded fonts, ordered text needles |
 | Release | `RELEASE.md` checklist | Hard gates for any release: `make check-versions`, `make test`, `make golden`, `make claim-scan`, `make lint`, plus `make build` with version-stamp check; Python and frontend extras when touched |
 
 Release work always starts at `RELEASE.md`. It holds the version-source
@@ -252,11 +252,16 @@ that fails if `docs/` goes dirty.
 
 ## Code structure
 
-- **File size soft limit: ~2,000 lines.** Two legacy files exceed it today:
-  `internal/layout/paint_flow.go` (~2.4k) and
-  `internal/layout/paint_pagination.go` (~2.2k). Do not grow them further;
+- **File size soft limit: ~2,000 lines.** Four files exceed it today:
+  `internal/layout/layout.go` (2,497), `internal/layout/style_properties.go`
+  (2,194), `internal/imageout/imageout.go` (2,058), and
+  `internal/layout/inline_paint.go` (2,018). Do not grow them further;
   extract a cohesive piece into a same-package file whenever you touch them.
-  No new file crosses the limit without a written reason.
+  No new file crosses the limit without a written reason. `make size-check`
+  scans every non-pruned `.go` file, test files included, and fails when the
+  tree disagrees with `scripts/file-size-allowlist.txt`, the single source of
+  truth for over-limit files. `make lint` runs it, so CI enforces it; a
+  recorded count moves only as a deliberate, reviewed change.
 - **Split module-wise, not length-wise.** Divide by responsibility (each
   stage, view, store, or profile gets a focused file), never "cut here"
   chunks. Follow existing seams: `internal/layout` already splits paint /

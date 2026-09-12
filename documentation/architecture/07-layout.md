@@ -5,8 +5,8 @@
 `internal/layout` is the **style-resolution + formatting engine** of
 gowkhtmltopdf: it turns the parsed, CSS-matched HTML tree into an
 **absolute-positioned display list** that both output backends consume. It is
-the largest single domain in the repository (~33,650 lines including tests,
-27 production `.go` files, 62 test files, 244 test functions).
+the largest single domain in the repository (~77,380 lines including tests,
+77 production `.go` files, 155 test files, 590 test functions).
 
 The package's own contract (doc comment on `internal/layout/layout.go:1`):
 
@@ -29,7 +29,7 @@ the certified independent-block path) and then `layout.PaintContext`
 to paginate and emit PDF content streams. `internal/imageout` reuses the *same* layout entry
 points but rasterizes the display list instead of painting PDF. Headers and
 footers are themselves laid out as small nested documents with the same
-engine (`internal/convert/hf.go:319,426`), then painted as a single clipped
+engine (`internal/convert/hf.go:427,530`), then painted as a single clipped
 band via `layout.PaintBandContext`.
 
 Layout owns **pagination as well as geometry**: page-break policies, table-row
@@ -62,43 +62,55 @@ intrinsic multi-pass cycles, full Multicol L1/L2 balancing.
 
 ## 2. Package / file map
 
-Production files (`internal/layout`, 27 files, ~33,650 lines with tests).
-Line counts are approximate from `wc -l`.
+Production files (`internal/layout`, 77 files, 45,039 production lines;
+77,380 lines with tests). Line counts are approximate from `wc -l`.
 
 | File | Lines | Responsibility |
 |------|------:|----------------|
-| `layout.go` | 1394 | Package entry points (`Layout`, `LayoutContext`, `WithWorkspace`), `Options`/`Result`/`Op`/`Workspace`/`ElementLocation` types, `engine` state, `build` dispatch (block/img/hr/table/flex/grid/multicol/out-of-flow), block width/height resolution, font-face selection & rune fallback |
-| `style.go` | 660 | `ResolvedStyle` struct, `initialStyle()`, inheritance walk, `styleStore` interning (canonical `*ResolvedStyle` sharing), `resolveStyles*` entry points, `styleContext`, `sizeContainer` |
-| `style_cascade.go` | 573 | `cascadeRaw` (UA + author + inline with specificity/order/!important), `matchedRules`, custom properties (`--*`) merge + var resolution, inherit table, cascade-win comparison |
-| `style_properties.go` | 1253 | Property-group dispatch (`styleGroups` table): display/position/flex/multicol/grid/box/border/color/text/table-break/transform; all `apply*` setters |
-| `style_values.go` | 1010 | Value parsers: lengths, font-size keywords, line-height, border widths, flex/grid shorthands, `uaDecls` UA table, `uaRules(name)` |
-| `container.go` | 287 | `@container` size-query support: `findSizeContainer`, `measureSizeContainers`, `contentInlineSize` |
-| `layout_flow.go` | 850 | In-flow child dispatch (`flowChildren`/`flowOneChild`), inline-run collection, list markers, float placement + packing, BFC float-state push/pop, image ref resolution (incl. SVG raster) |
-| `inline.go` | 925 | Inline formatting: item packing into lines, float exclusion (`lineBounds`), overflow splitting, word-break policies, justification, line metrics, glue/sticky-tail handling |
-| `inline_collect.go` | 740 | Inline item collection: text (pre/wrapped), `<br>`, `<img>`, inline-block, inline spans, href attachment, whitespace squeezing, `::before`/`::after` content, soft-wrap punctuation rules |
-| `inline_paint.go` | 590 | Inline emission to ops: text runs (per-face), decoration (underline/line-through), inline-block/image paint, face-run splitting for fallback |
-| `layout_tables.go` | 1002 | Table layout: row/col collection, cell placement (colspan/rowspan occupancy), column sizing (min/max/%/abs), row heights, border emission, `<thead>` header-row counting, rowspan line redistribution |
-| `layout_measure.go` | 983 | Measurement passes: cell min/max-content, band baseline grouping (rowspan vertical distribution), `minContentWidth` per word-break policy, `layoutCell` |
-| `flex.go` | 1286 | Flex layout: row/column, wrap, grow/shrink/basis, align/justify, order, min-main-size clamps, `applyRelativeOffset` |
-| `grid.go` | 1664 | Grid layout: track defs (`fr`, `minmax`, `repeat`), auto-placement (row/column/dense), template areas, span resolution, row sizing, item placement/alignment |
-| `multicol.go` | 504 | Multi-column lite: count/width/gap/span/fill, segment collection, spanner flow, single-column fallback |
+| `layout.go` | 2497 | Package entry points (`Layout`, `LayoutContext`, `WithWorkspace`), `Options`/`Result`/`Op`/`Workspace`/`ElementLocation` types, `engine` state, `build` dispatch (block/img/hr/table/flex/grid/multicol/out-of-flow), block width/height resolution, font-face selection & rune fallback |
+| `layout_section.go` | 134 | Independent-block public path: `ResolveStyles` (shared cascade + interning), `NodeWithWorkspace` (sequential layout borrowing display-list storage), `assembleNodeResult` |
+| `independent_blocks.go` | 148 | `IndependentBlocks`/`IndependentBlocksForOptions` gate for the certified one-at-a-time body-child run; fails closed on floats, abspos, flex/grid items, or page-break gaps |
+| `style.go` | 889 | `ResolvedStyle` struct, `initialStyle()`, inheritance walk (`resolveStylesCtx`), `styleStore` interning (`append` canonicalizes `*ResolvedStyle` sharing), `styleContext`, `sizeContainer`; generated intern fingerprint/equality in `style_intern_gen.go` |
+| `style_cascade.go` | 1475 | `cascadeRaw` (UA + author + inline with specificity/order/!important), `matchedRules`, custom properties (`--*`) merge + `resolveRawVars`, `inheritableProps`/`inheritProps`, cascade-win comparison, `styleGroups` dispatch + `applyStyleProp` routing |
+| `style_properties.go` | 2194 | Property-group `apply*` setters: display/position/flex/multicol/grid/box/border/color/text/table-break/transform, plus `applyIgnoredGroup`; the dispatch order lives in `style_cascade.go` |
+| `style_values.go` | 1845 | Value parsers: lengths, font-size keywords, line-height, border widths, flex/grid shorthands, `uaDecls` UA table, `uaRules(name)` |
+| `container.go` | 166 | `@container` size-query support: `findSizeContainer`, `measureSizeContainersContext`, `contentInlineSize` |
+| `layout_flow.go` | 1287 | In-flow child dispatch (`flowChildren`/`flowOneChild`), inline-run collection, list markers (`emitListMarker`), float placement + packing, BFC float-state push/pop, image ref resolution (incl. SVG raster) |
+| `inline.go` | 1211 | Inline formatting: item packing into lines, float exclusion (`lineBounds`), overflow splitting, word-break policies, justification, line metrics, glue/sticky-tail handling |
+| `inline_collect.go` | 1286 | Inline item collection: text (pre/wrapped), `<br>`, `<img>`, inline-block, inline spans, href attachment, whitespace squeezing, `::before`/`::after` content, soft-wrap punctuation rules |
+| `inline_paint.go` | 2018 | Inline emission to ops: text runs (per-face), decoration (underline/line-through), inline-block/image paint, face-run splitting for fallback |
+| `layout_tables.go` | 1392 | Table layout: row/col collection, cell placement (colspan/rowspan occupancy), column sizing (min/max/%/abs), row heights, border emission, `<thead>` header-row counting, rowspan line redistribution |
+| `layout_measure.go` | 1130 | Measurement passes: cell min/max-content, band baseline grouping (rowspan vertical distribution), `minContentWidth` per word-break policy, `layoutCell` |
+| `flex.go` | 1647 | Flex layout: row/column, wrap, grow/shrink/basis, align/justify, order, min-main-size clamps, `applyRelativeOffset` |
+| `grid.go` | 797 | Grid entry + column defs (`auto-fit`), subgrid inheritance, preferred-height measurement, span-row growth, item emission; track parsing in `grid_parse.go`, placement in `grid_placement.go`, track sizing in `grid_tracks.go`, line runs in `grid_run.go`, masonry in `grid_masonry.go` |
+| `multicol.go` | 763 | Multi-column lite: count/width/gap/span/fill, segment collection, spanner flow, single-column fallback |
 | `float.go` | 234 | `floatState`: clear semantics, left/right placement, exclusion (`exclusion`), BFC establishment |
-| `sticky.go` | 234 | Print-scoped sticky: `tagSticky`, `applyStickyPrint` (page content box scrollport), overflow scrollport @0, `clampStickyX/Y`, op shifting |
-| `transform.go` | 879 | `Matrix2D`, transform-list parsing, `transform-origin`, `stampBoxTransforms` (composed CTM + opacity stamping) |
-| `layout_chrome.go` | 480 | Background/border op generation (`prependChrome`), deferred chrome merge, border lines (solid/dashed/dotted), `markOpsFixed`, radius |
-| `layout_images.go` | 317 | Replaced-element sizing: intrinsic ratio policy, `width`/`height` attrs + CSS, aspect-ratio preservation, `buildHR`, PNG/JPEG dimension sniffing |
-| `paint.go` | 981 | `Paint`/`PaintContext` (pagination orchestration), `PaintBand`/`PaintBandContext` (single-band, used by HF), op→PDF dispatch, `PaintStyle`/`StyleOf` (shared fill/stroke/fake-bold policy), `populateLocations`, `canvasToPDF`, `roundedRectPath` |
-| `tagging.go` | 516 | Tagged-PDF walk: structure tree from boxes when a profile is active. List nesting is `L` → `LI` → `LBody` → `Link` (ISO 32000 list model; `ensureInlineParent` wraps links/figures so they are not bare kids of `L`/`LI`) |
-| `paint_flow.go` | 1725 | Flow-index machinery (`shiftFlowY` etc.), page-break policies (`avoidInside`, `beforeAlways`, `afterBreaks`, `rowsIntact`, `keepHeadingWithNext`, `orphansWidows` + heuristic), thead repetition |
-| `paint_pagination.go` | 1502 | `paginateOps`, `paginationFixpoint`, `snapCrossingTextOps`, `splitCrossingRects` (op fragmentation w/ identity), `capTablePageBreaks` (border-gap sealing), `stripOrphanRowChrome` |
-| `paint_order.go` | — | `PaintOrder` — canonical z-order policy shared by PDF, band, and raster adapters |
-| `pseudo_content.go` | 368 | `::before`/`::after` `content:` cascade + value parsing (strings, `attr()`, escapes) |
-| `mnd_const.go` | — | Named magic numbers (magic-number linter constants) |
-| `doc.go` | — | Package doc stub (real contract lives on `layout.go` header) |
+| `sticky.go` | 235 | Print-scoped sticky: `tagSticky`, `applyStickyPrint` (page content box scrollport), overflow scrollport @0, `clampStickyX/Y`, op shifting |
+| `transform.go` | 1190 | `Matrix2D`, transform-list parsing, `transform-origin`, `stampBoxTransforms` (composed CTM + opacity stamping) |
+| `layout_chrome.go` | 975 | Background/border op generation (`prependChrome`), deferred chrome merge (`finalizeChrome`), border lines (solid/dashed/dotted), `markOpsFixed`, rounded-border ops; radius parsing in `border_radius.go`, layered decor in `background_image.go`, `gradient.go`, `box_shadow.go`, `border_image.go` |
+| `layout_images.go` | 592 | Replaced-element sizing: intrinsic ratio policy, `width`/`height` attrs + CSS, aspect-ratio preservation, `buildImage`/`paintReplacedImage`, `buildHR`, orientation/DPI scaling; EXIF/DPI parsing in `image_exif.go`, inline SVG layout in `layout_svg.go` |
+| `paint.go` | 1642 | `Paint`/`PaintContext` (pagination orchestration), `PaintBand`/`PaintBandContext` (single-band, used by HF), op→PDF dispatch (`drawFill`/`drawStroke`/`drawLine`/`drawText`/`drawImage`), `PaintStyle`/`StyleOf`/`FakeBoldFor` (shared fill/stroke/fake-bold policy), `populateLocations`, `canvasToPDF`, `buildPagesAfterSplits`, `paintPages` |
+| `tagging.go` | 538 | Tagged-PDF walk: structure tree from boxes when a profile is active. List nesting is `L` → `LI` → `LBody` → `Link` (ISO 32000 list model; `ensureInlineParent` wraps links/figures so they are not bare kids of `L`/`LI`) |
+| `overflow_clip.go` | 461 | Overflow clipping: padding-box `clipRect` geometry and descendant paint clipping for `hidden`/`clip`/`auto`/`scroll` |
+| `paint_flow_index.go` | 615 | Flow-index machinery (`shiftFlowY`, `shiftFlowBounded`), per-page op/box buckets (`flowIndexStorage`, exact-capacity via `sizePageBuckets`), index build/invalidate/release |
+| `paint_flow_breaks.go` | 1389 | Page-break policies: `avoidInside` (break-inside:avoid + implicit keep-together), `beforeAlways`/`afterBreaks` (forced breaks), `keepHeadingWithNext`, ink-extent helpers |
+| `paint_flow_tables.go` | 859 | Table-row integrity (`rowsIntact`), `normalizeTableRowGaps`, `repeatTableHeaders` and header continuation pages |
+| `paint_flow_orphans.go` | 221 | `orphansWidows`: CSS Fragmentation Rule 3 for countable lines, geometric short-block heuristic for nested/uncountable cases |
+| `paint_pagination_fixpoint.go` | 480 | `paginateOps`, `paginationFixpoint` (where the 10-iteration policy loop lives), `settleBeforeAlways`, `snapCrossingTextOps` |
+| `paint_pagination_split.go` | 264 | `splitCrossingRects` (op fragmentation preserving identity), `assignOpIDs`, fragment geometry (`openSideStrokeFragment` etc.), `remapBoxOpRanges` |
+| `paint_pagination_seal.go` | 1294 | `capTablePageBreaks` (border-gap sealing), `stripOrphanRowChrome`, continuation-edge stubs and cluster sealing |
+| `paint_pagination_chrome.go` | 406 | `stretchPaginatedChrome`: chrome ink measurement, vertical rail/dashed-rail stretching for boxes split across pages |
+| `paint_order.go` | 80 | `PaintOrder` - canonical z-order policy shared by PDF, band, and raster adapters |
+| `pseudo_content.go` | 497 | `::before`/`::after` `content:` cascade + value parsing (strings, `attr()`, escapes); counter/quote values resolve in `counter.go` |
+| `counter.go` | 629 | CSS counters and quotes: `counter-reset`/`counter-increment` state, `counter()`/`counters()` values, quote-style stack for `content:` |
+| `page_named.go` | 165 | CSS named pages: inter-sibling `page:` break forcing (`applyNamedPageBreaks`), `PageNames`, per-page margins (`PageMarginsForPage`) |
+| `mnd_const.go` | 13 | Named magic numbers (magic-number linter constants) |
+| `doc.go` | 6 | Package doc stub (real contract lives on `layout.go` header) |
 
-Test files (62): the largest are `layout_test.go` (1374, core formatting +
-pagination), `sticky_test.go` (904), `flex_test.go` (878), `grid_test.go`
-(873), `fixture_bugs_test.go` (552), `style_store_test.go` (422). See §9.
+Test files (155): the largest are `layout_test.go` (1479, core formatting +
+pagination), `fixture56_renderer_test.go` (1259, fixture-56 renderer
+regressions), `flex_test.go` (1094), `grid_test.go` (1024), `sticky_test.go`
+(967), `style_share_test.go` (685). See §9.
 
 ### `internal/line` — naming note
 
@@ -115,97 +127,97 @@ Flagged so future readers do not search the wrong package.
 
 | Symbol | File:line | Purpose |
 |--------|-----------|---------|
-| `Layout(root *html.Node, opts Options) (*Result, error)` | `layout.go:696` | Legacy background-context layout |
-| `LayoutContext(ctx, root, opts) (*Result, error)` | `layout.go:703` | Cancellation-aware layout; observed at style pass and recursion boundaries |
-| `WithWorkspace(ctx, root, opts, ws *Workspace) (*Result, error)` | `layout.go:712` | Sequential internal form borrowing display-list storage; `Workspace.Release` returns it |
-| `Paint(doc *pdf.Document, res, opts)` / `PaintContext(...)` | `paint.go:62,69` | Paginate display list + paint into a `pdf.Document` |
-| `PaintBand(p, c, ops, opts)` / `PaintBandContext(...)` | `paint.go:498,504` | Single-band paint on an existing page content stream (HTML HF); no pagination, no fixed stamps |
+| `Layout(root *html.Node, opts Options) (*Result, error)` | `layout.go:1153` | Legacy background-context layout |
+| `LayoutContext(ctx, root, opts) (*Result, error)` | `layout.go:1160` | Cancellation-aware layout; observed at style pass and recursion boundaries |
+| `WithWorkspace(ctx, root, opts, ws *Workspace) (*Result, error)` | `layout.go:1169` | Sequential internal form borrowing display-list storage; `Workspace.Release` returns it |
+| `Paint(doc *pdf.Document, res, opts)` / `PaintContext(...)` | `paint.go:279,288` | Paginate display list + paint into a `pdf.Document` |
+| `PaintBand(p, c, ops, opts)` / `PaintBandContext(...)` | `paint.go:881,887` | Single-band paint on an existing page content stream (HTML HF); no pagination, no fixed stamps |
 | `PaintOrder(ops []Op) []int` | `paint_order.go:8` | Canonical display-list z-order used by all three backends |
-| `CloneResult(res) *Result` | `layout.go:116` | Deep copy for TOC page-count fixpoint (`internal/convert/toc.go:164`) |
-| `Workspace.Release(res)` | `layout.go:216` | Return op storage; clears box/paint indexes |
+| `CloneResult(res) *Result` | `layout.go:227` | Deep copy for TOC page-count fixpoint (`internal/convert/toc.go:159`) |
+| `Workspace.Release(res)` | `layout.go:335` | Return op storage; clears box/paint indexes |
 
 ### Core data types
 
 | Type | File:line | Notes |
 |------|-----------|-------|
-| `Options` | `layout.go:62` | Width/Height (content box pt), `Font`/`Faces`/`Registry`, `Sheets []*css.Stylesheet`, `Media` (`"print"`/`"screen"`/`""`), `Images func(src) ([]byte, error)`, `Background`, `DebugBoxes`, `Zoom`, `PrintLinkUnderline` |
-| `Result` | `layout.go:81` | `Ops []Op`, canvas `Width`/`Height`, private box tree, `Pages [][]int` (page→op indices), `Locations []ElementLocation` |
-| `Op` | `layout.go:271` | Discriminated by `OpKind`: `OpFillRect`, `OpStrokeRect`, `OpLine`, `OpText`, `OpImage`, `OpLinkURI`, `OpBullet`; carries `ID` (stable identity across fragmentation), font/size/letter-spacing/text-transform, image bytes, `Fixed`, `StickyID`, `ZIndex`, `Positioned`, `Xform`, `PaintOpacity`, `Radius` |
-| `ElementLocation` | `layout.go:238` | `Node`, `Page`, `X/Y/W/H` canvas rect; consumed by `internal/outline.Lookup` and link assembly |
-| `ResolvedStyle` | `style.go:65` | ~1.3 KB fully resolved style: display/position/float, box model, flex/grid/multicol fields, text fields, `Transform`/`Opacity`, `CustomProps` |
-| `box` | `layout.go:~948` | Laid-out box: node, style pointer, border-box x/y/w/h, kind, op range `[opStart,opEnd]`, children, table rows/cells, sticky state, image ref |
-| `engine` | `layout.go:333` | One layout run: options, ctx, styles map, op buffer, z-index stack, BFC float stack, caches (faces, images, rune fallback), `imgMaxW`/`inlineCBW` context widths |
+| `Options` | `layout.go:98` | Width/Height (content box pt), `Font`/`Faces`/`Registry`, `Sheets []*css.Stylesheet`, `Media` (`"print"`/`"screen"`/`""`), `Images func(src) ([]byte, error)`, `Background`, `DebugBoxes`, `Zoom`, `PrintLinkUnderline` |
+| `Result` | `layout.go:153` | `Ops []Op`, canvas `Width`/`Height`, private box tree, `Pages [][]int` (page→op indices), `Locations []ElementLocation` |
+| `Op` | `layout.go:431` | Discriminated by `OpKind`: `OpFillRect`, `OpStrokeRect`, `OpLine`, `OpText`, `OpImage`, `OpLinkURI`, `OpBullet`; carries `ID` (stable identity across fragmentation), font/size/letter-spacing/text-transform, image bytes, `Fixed`, `StickyID`, `ZIndex`, `Positioned`, `Xform`, `PaintOpacity`, `Radius` |
+| `ElementLocation` | `layout.go:365` | `Node`, `Page`, `X/Y/W/H` canvas rect; consumed by `internal/outline.Lookup` and link assembly |
+| `ResolvedStyle` | `style.go:106` | ~1.3 KB fully resolved style: display/position/float, box model, flex/grid/multicol fields, text fields, `Transform`/`Opacity`, `CustomProps` |
+| `box` | `layout.go:1546` | Laid-out box: node, style pointer, border-box x/y/w/h, kind, op range `[opStart,opEnd]`, children, table rows/cells, sticky state, image ref |
+| `engine` | `layout.go:550` | One layout run: options, ctx, styles map, op buffer, z-index stack, BFC float stack, caches (faces, images, rune fallback), `imgMaxW`/`inlineCBW` context widths |
 
 ### Style resolution entry points
 
 | Symbol | File:line | Purpose |
 |--------|-----------|---------|
-| `resolveStylesForLayout(root, opts)` | `layout.go:825` | Cascade + optional `@container` re-cascade (measures size containers, one nested remount) |
-| `resolveStylesCtx(root, ctx)` | `style.go:350` | Top-down walk; text nodes share parent style; `styleStore.intern` canonicalizes |
-| `cascadeRaw(ctx, node) map[string]string` | `style_cascade.go:306` | Winning declaration per property across UA sheet → author sheets (media/container/selector gated) → inline style |
-| `applyStyleProp` via `styleGroups` | `style_cascade.go:537,560` | Immutable 11-entry dispatch table for property groups |
-| `inheritProps` | `style_cascade.go:172` | 20 inheritable property groups copied unless locally declared |
+| `resolveStylesForLayout(root, opts)` | `layout.go:1318` | Cascade + optional `@container` re-cascade (measures size containers, one nested remount) |
+| `resolveStylesCtx(root, ctx)` | `style.go:638` | Top-down walk; text nodes share parent style; `styleStore.append` canonicalizes |
+| `cascadeRaw(ctx, node) map[string]string` | `style_cascade.go:511` | Winning declaration per property across UA sheet → author sheets (media/container/selector gated) → inline style |
+| `applyStyleProp` via `styleGroups` | `style_cascade.go:1397`, table at `:1305` | Immutable 16-entry dispatch table for property groups |
+| `inheritProps` | `style_cascade.go:362` | 20 inheritable property groups copied unless locally declared |
 
 ### Layout build dispatch
 
-`engine.build` (`layout.go:996`) is the recursive tree walk:
+`engine.build` (`layout.go:1606`) is the recursive tree walk:
 
 ```text
 build(node, availW, x, y)
 ├─ display:none → nil
-├─ <img> → buildImage        (layout_images.go:196)
-├─ <hr>  → buildHR           (layout_images.go:225)
-├─ position:fixed/absolute → buildOutOfFlow (layout.go:1298)
-├─ buildInFlowDisplay        (layout.go:1367) — single dispatch:
-│   ├─ flex/inline-flex  → buildFlex   (flex.go:57)
-│   ├─ grid/subgrid      → buildGrid   (grid.go:26)
-│   ├─ multicol          → buildMulticol (multicol.go:33)
-│   ├─ table display     → buildTable  (layout_tables.go:9)
-│   └─ else              → buildBlock  (layout.go:1118)
+├─ <img> → buildImage        (layout_images.go:373)
+├─ <hr>  → buildHR           (layout_images.go:500)
+├─ position:fixed/absolute → buildOutOfFlow (layout.go:2365)
+├─ buildInFlowDisplay        (layout.go:2470) — single dispatch:
+│   ├─ flex/inline-flex  → buildFlex   (flex.go:62)
+│   ├─ grid/subgrid      → buildGrid   (grid.go:40)
+│   ├─ multicol          → buildMulticol (multicol.go:34)
+│   ├─ table display     → buildTable  (layout_tables.go:10)
+│   └─ else              → buildBlock  (layout.go:1745)
 └─ finishBuiltBox: relative offset, sticky tag, fixed stamp
 ```
 
 Notable design: `buildInFlowDisplay` is shared between in-flow and
 out-of-flow builds so abspos/fixed flex/grid containers get the correct
 formatting context; a `figure{display:table;float:right}` heuristic
-(`useBlockForTableDisplay`, `layout.go:1094`) routes table-*displayed but
+(`useBlockForTableDisplay`, `layout.go:1719`) routes table-*displayed but
 non-tabular hosts to ordinary blocks.
 
 ## 4. Data & control flow
 
 ### Typical PDF body-object invocation
 
-1. `internal/convert/convert.go:504` calls `layout.LayoutContext(ctx, root, state.bodyLayoutOpts(objectRender))` with `Width/Height` = content-box geometry from `hfGeom` (`convert/hf_geometry.go`), `Media:"print"`, the prepared stylesheet set, font registry, zoom, and the images fetch callback.
-2. `layoutContext` (`layout.go:716`):
+1. `internal/convert/convert.go:615` calls `layout.LayoutContext(ctx, root, state.bodyLayoutOpts(objectRender))` with `Width/Height` = content-box geometry from `hfGeom` (`convert/hf_geometry.go`), `Media:"print"`, the prepared stylesheet set, font registry, zoom, and the images fetch callback.
+2. `layoutContext` (`layout.go:1174`):
    - loads default faces via `pdf.LoadDefaultFaces()` unless overridden;
    - `resolveStylesForLayout` runs the cascade (and the `@container` second pass when size-container rules exist);
    - `newEngine` builds the engine with a `scale` from `zoomScale(opts.Zoom)`.
-3. `finalizeResult` (`layout.go:784`): `eng.build(root, opts.Width, 0, 0)` recursively emits ops; `finalizeChrome` merges deferred background/border ops; box tree is flattened; `stampBoxTransforms` bakes CSS transforms/opacity into ops when any box needed it.
-4. Back in `convert.go`, smart-shrinking may re-layout with an effective zoom (`convert.go:529`); relative link URIs resolved; external-link stripping.
-5. `layout.PaintContext(ctx, run.doc, lres, paintOptions(state.geom))` (`convert.go:549`) paginates and paints. `Paint` (`paint.go:69`) sequence:
+3. `finalizeResult` (`layout.go:1249`): `eng.build(root, opts.Width, 0, 0)` recursively emits ops; `finalizeChrome` merges deferred background/border ops; box tree is flattened; `stampBoxTransforms` bakes CSS transforms/opacity into ops when any box needed it.
+4. Back in `convert.go`, smart-shrinking may re-layout with an effective zoom (`convert.go:682`); relative link URIs resolved; external-link stripping.
+5. `layout.PaintContext(ctx, run.doc, lres, paintOptions(state.geom))` (`convert.go:549`) paginates and paints. `Paint` (`paint.go:288`) sequence:
    - `paginateOps` → `snapCrossingTextOps` → `paginationFixpoint` (up to 10 iterations of avoidInside/beforeAlways/afterBreaks/rowsIntact/keepHeadingWithNext/orphansWidows) → `repeatTableHeaders`;
    - `splitCrossingRects` (rect ops fragmented at page boundaries, preserving `Op.ID`), `stripOrphanRowChrome`, `capTablePageBreaks` (border-gap sealing), `applyStickyPrint`;
    - `buildPagesAfterSplits` re-buckets ops into pages; `populateLocations` fills `Result.Locations`;
-   - `paintPages` dispatches each op onto PDF content streams via `drawFill/drawStroke/drawLine/drawText/drawImage` (`paint.go:801+`).
-6. `convert.go:555` collects headings via `collectObjectHeadings(root, lres, ...)`; `internal/outline.Lookup` maps heading nodes through `res.Locations`; links consume `res.Locations` for `#frag` anchors (`convert/links.go:42`).
+   - `paintPages` dispatches each op onto PDF content streams via `drawFill/drawStroke/drawLine/drawText/drawImage` (`paint.go:1162+`).
+6. `convert.go:634` collects headings via `collectObjectHeadings(root, lres, ...)`; `internal/outline.Lookup` maps heading nodes through `res.Locations`; links consume `res.Locations` for `#frag` anchors (`convert/links.go:42`).
 
 ### Canvas → PDF mapping
 
 Layout uses a **y-down continuous canvas** with the origin at the top-left of
-page 0's content area. `canvasToPDF` (`paint.go:789`) maps to PDF y-up:
+page 0's content area. `canvasToPDF` (`paint.go:1154`) maps to PDF y-up:
 `y_pdf = pageH - marginTop - y_canvas + pageIdx*contentH`. `hfGeom.pdfY`
-(`convert/hf_geometry.go:27`) provides the same mapping for link/outline
+(`convert/hf_geometry.go:108`) provides the same mapping for link/outline
 destinations outside paint.
 
 ### Nested layouts (headers/footers, TOC)
 
-- HTML header/footer: `internal/convert/hf.go:319` lays out the HF document
+- HTML header/footer: `internal/convert/hf.go:427` lays out the HF document
   once at content width; when placeholders (`[page]` etc.) are present it
-  re-lays-out per page at draw time (`hf.go:426`) and paints via
-  `PaintBandContext` clipped to the margin band (`hf.go:406-474`).
-- TOC: `internal/convert/toc.go:202` lays out the generated TOC document; the
+  re-lays-out per page at draw time (`hf.go:530`) and paints via
+  `PaintBandContext` clipped to the margin band (`hf.go:591`).
+- TOC: `internal/convert/toc.go:197` lays out the generated TOC document; the
   page-count fixpoint re-paints into a scratch document via
-  `layout.PaintContext(ctx, scratch, cloneResult(res), ...)` (`toc.go:164`).
+  `layout.PaintContext(ctx, scratch, cloneResult(res), ...)` (`toc.go:159`).
 
 ## 5. Cross-package dependencies
 
@@ -216,7 +228,7 @@ destinations outside paint.
 | `internal/html` | `html.Node` tree walk, node types/attributes |
 | `internal/css` | `Stylesheet`/`Rule`/`Selector`, `Specificity`, `MediaMatches`, `ParseInline`, `ParseColor`, `ParseLength`, `HasContainerRules` |
 | `internal/pdf` | `pdf.Font` (metrics/glyph IDs), `pdf.FaceSet` (`LoadDefaultFaces`, `ResolveFamily`), `pdf.Registry` (opt-in `--font-path` faces), `pdf.Document`/`Page`/`Content` for paint |
-| `internal/svg` | `svg.Rasterize` for inline SVG images (`layout_flow.go:53`) |
+| `internal/svg` | `svg.Rasterize` for inline SVG images (`layout_flow.go:103`) |
 | stdlib | `context`, `errors`, `fmt`, `math`, `sort`, `strconv`, `strings`, `image`-adjacent (not for decode — that lives in pdf/imageout) |
 
 Note: text shaping via `go-text/typesetting` lives in `internal/pdf`
@@ -230,9 +242,9 @@ convert into layout, never the reverse.
 | Consumer | Usage |
 |----------|-------|
 | `internal/convert` | Body objects (`LayoutContext` + `PaintContext`), HTML HF (`LayoutContext` + `PaintBandContext`), TOC (`LayoutContext` + scratch `PaintContext`), links (`Result.Locations`), outline (`Result.Locations`) |
-| `internal/imageout` | `LayoutContext` (`imageout.go:180,261`), then rasterizes `res.Ops` in `rasterPaintOrder` order (`imageout.go:496`) |
+| `internal/imageout` | `LayoutContext` (`imageout.go:264,388`), then rasterizes `res.Ops` in `rasterPaintOrder` order (`imageout.go:531`) |
 | `internal/convert/render` | Renders via the convert adapter; page ordering/copies are render's concern, layout supplies page counts through paint |
-| `internal/outline` | `Location` projections are satisfied by `layout.ElementLocation` (`NodeRef`/`PageIndex`/`Bounds` at `layout.go:246-256`) |
+| `internal/outline` | `Location` projections are satisfied by `layout.ElementLocation` (`Node`/`Page`/`X,Y,W,H` at `layout.go:365-370`; `NodeRef` at `:373`) |
 
 ### Import-direction rule
 
@@ -287,7 +299,7 @@ bands, positioned-over-in-flow) is resolved at paint time by `PaintOrder`.
 ### Single engine, three paint personalities
 
 `Paint`, `PaintBand`, and the raster adapter share `PaintOrder` and
-`StyleOf`/`FakeBoldFor` (`paint.go:428-481`) so fake-bold gating (Latin-only,
+`StyleOf`/`FakeBoldFor` (`paint.go:807,850`) so fake-bold gating (Latin-only,
 to avoid CJK streak artifacts), translucent-fill pre-composition, and stroke
 min-width behave identically in PDF, HF, and PNG/JPEG. Pagination + fixed
 stamps belong to `Paint` only; bands skip them.
@@ -295,9 +307,9 @@ stamps belong to `Paint` only; bands skip them.
 ### Pagination is a display-list rewrite, not a layout re-run
 
 Page breaks, avoid policies, thead clones, sticky clamps, and rect splits are
-implemented as **op/box transformations with a flow index** (`paint_flow.go`
-`shiftFlowY` + per-page buckets), capped at 10 fixpoint iterations to bound
-worst-case cost. Table rows never split; text ops move wholly at line level;
+implemented as **op/box transformations with a flow index**
+(`paint_flow_index.go` `shiftFlowY` + per-page buckets), capped at 10
+fixpoint iterations to bound worst-case cost. Table rows never split; text ops move wholly at line level;
 only rect-type ops fragment across pages. This is markedly cheaper than
 re-layout per page and keeps `Result.Locations` consistent with the final
 pagination via `populateLocations`.
@@ -313,7 +325,7 @@ lengths only (geometry stays in points).
 ### wkhtmltopdf work-alike compromises
 
 - `--zoom` is applied in layout (`Options.Zoom` → `scalePt`) rather than as a
-  page-size change; smart-shrinking multiplies user zoom (`convert.go:529`).
+  page-size change; smart-shrinking multiplies user zoom (`convert.go:682`).
 - Print media default: `convert.go:35-36` — PDF layout always uses `"print"`.
 - HTML headers/footers are nested single-band documents clipped to margin
   bands, matching wkhtmltopdf's `--header-html` behavior.
@@ -336,27 +348,27 @@ lengths only (geometry stays in points).
 
 ### Style interning
 
-`styleStore.intern` (`style.go:464`) canonicalizes identical
+`styleStore.append` (`style.go:758`) canonicalizes identical
 `ResolvedStyle`s to a single pointer per layout run (coarse discriminator key
 + full value compare). Boxes hold a `*ResolvedStyle` (~1.3 KB avoided per
 box; table cells dominate box counts). Custom-property styles bypass
-interning. Tested by `style_store_test.go`.
+interning. Tested by `style_share_test.go`.
 
 ### Two-pass / fixpoint patterns
 
 - **`@container` double cascade**: pass 1 without container sizes; measure
   size containers; re-cascade with the container map; one nested remount when
-  container types change (`resolveStylesForLayout`, `layout.go:825`).
+  container types change (`resolveStylesForLayout`, `layout.go:1318`).
 - **Pagination fixpoint**: up to 10 iterations over
   avoidInside / beforeAlways / afterBreaks / rowsIntact /
-  keepHeadingWithNext / orphansWidows (`paint_pagination.go:490`).
+  keepHeadingWithNext / orphansWidows (`paint_pagination_fixpoint.go:107`).
 - **TOC page-count fixpoint** (in convert) relies on `CloneResult` +
   scratch `PaintContext`.
 
 ### Op identity
 
 Every op carries a monotonically increasing `ID` (`engine.add`,
-`layout.go:628`). Rect fragmentation keeps the source `ID` on all fragments
+`layout.go:946`). Rect fragmentation keeps the source `ID` on all fragments
 (`splitCrossingRects`), so element → op-range ownership can be remapped after
 splits (`remapBoxOpRanges`). Legacy/test-constructed ops get IDs at paint
 time (`assignOpIDs`).
@@ -366,7 +378,8 @@ time (`assignOpIDs`).
 The engine is deliberately single-threaded and reuses scratch storage:
 `inlineItemPool`, `bfcPool`, `faceByStyle`/`faceByRune` caches, `imgCache`
 (one decode per src per run), `Workspace` (display-list storage reuse),
-per-page exact-capacity buckets in `pageBuckets`. Context
+per-page exact-capacity buckets (`flowIndexStorage.pages`, sized by
+`sizePageBuckets`). Context
 cancellation is checked at recursion boundaries (`checkContext`, cheap
 enough to run per build call).
 
@@ -419,33 +432,33 @@ ACL (`documentation/THREAT-MODEL.md`):
 
 ## 9. Testing & verification
 
-244 test functions across 62 files in `internal/layout`, plus layout-driven
+590 test functions across 155 files in `internal/layout`, plus layout-driven
 golden fixtures in `internal/convert`.
 
 ### Core unit suites
 
 | Test file | Coverage |
 |-----------|----------|
-| `layout_test.go` (1374) | Block stacking, widths/margins, margin collapse, padding/border box, text align/wrapping, `white-space:pre`, font em/inherit, cascade + inline style, link pseudo color, IPA glyph fallback, background fill, display:none, bullets, bold/underline, tables + colspan, image intrinsic sizing, paginate-and-paint, single page, debug boxes, `hr`, zoom, page-break parsing/application, boundary fill split, table row no-split |
-| `flex_test.go` (878) / `grid_test.go` (873) | 24 flex + 21 grid tests: direction, wrap, justify/align, grow/shrink/basis, order, gaps; tracks, fr/minmax, auto-placement, dense, areas, spans |
-| `sticky_test.go` (904) | 13 tests: overflow scrollport @0, no page clones, clamp top/CB limits, continuation pages, fixture-31 split fills preserve paint order |
-| `transform_test.go` (349) | 9 tests: parse, origin, matrix math, stamping |
-| `multicolumn_test.go`, `multicol_test.go` (246) | 5 tests: props, used count/width, span:all, lines don't straddle pages |
-| `orphans_widows_test.go` (273) | 5 tests: Rule 3 with countable lines + geometric heuristic |
-| `overflow_wrap_test.go` (200) | 5 tests: break-word/anywhere/keep-all |
+| `layout_test.go` (1479) | Block stacking, widths/margins, margin collapse, padding/border box, text align/wrapping, `white-space:pre`, font em/inherit, cascade + inline style, link pseudo color, IPA glyph fallback, background fill, display:none, bullets, bold/underline, tables + colspan, image intrinsic sizing, paginate-and-paint, single page, debug boxes, `hr`, zoom, page-break parsing/application, boundary fill split, table row no-split |
+| `flex_test.go` (1094) / `grid_test.go` (1024) | 28 flex + 23 grid tests: direction, wrap, justify/align, grow/shrink/basis, order, gaps; tracks, fr/minmax, auto-placement, dense, areas, spans |
+| `sticky_test.go` (967) | 14 tests: overflow scrollport @0, no page clones, clamp top/CB limits, continuation pages, fixture-31 split fills preserve paint order |
+| `transform_test.go` (488) | 11 tests: parse, origin, matrix math, stamping |
+| `multicol_test.go` (576) | 11 tests: props, used count/width, span:all, lines don't straddle pages |
+| `orphans_widows_test.go` (272) | 5 tests: Rule 3 with countable lines + geometric heuristic |
+| `overflow_wrap_test.go` (199) | 5 tests: break-word/anywhere/keep-all |
 | `pagination_thead_test.go` | thead repeat across pages |
 | `table_rowspan_test.go`, `table_continuation_border_test.go`, `table_ref_stack_test.go`, `table_collapse_grid_test.go`, `table_empty_row_test.go`, `table_avoid_blank_test.go` | Table edge cases: rowspan occupancy, continuation borders, empty rows, avoid-blank bands |
-| `style_store_test.go` (422) | Interning policy, pointer stability across chunks, shared vs distinct cascade results |
-| `container_test.go` (287) | `@container` named/unnamed/or/not, nearest-wins, layout switch |
+| `style_share_test.go` (685), `style_intern_gen_test.go` (286) | Interning policy, pointer stability across chunks, shared vs distinct cascade results; generated fingerprint/equality guards |
+| `container_test.go` (301) | `@container` named/unnamed/or/not, nearest-wins, layout switch |
 | `media_query_test.go`, `has_test.go`, `hlist_pseudo_test.go`, `pseudo_content` tests | Media queries, `:has`, pseudo-elements/content |
 | `wiki_*` tests (infobox float, print chrome), `float_*` tests | Wiki-corpus-driven float behavior |
-| `architecture_followup_test.go` (298) | Container-state equality, split-crossing identity remap, image size policy, context cancellation, flow-index maintenance, benchmarks |
-| `fixture_bugs_test.go` (552), `fixture_render_regression_test.go`, `requested_fixture_regression_test.go` | Regression tests for golden fixture bugs |
+| `architecture_followup_test.go` (470) | Container-state equality, split-crossing identity remap, image size policy, context cancellation, flow-index maintenance, benchmarks |
+| `fixture_bugs_test.go` (551), `fixture_render_regression_test.go`, `requested_fixture_regression_test.go` | Regression tests for golden fixture bugs |
 
 ### Golden fixtures
 
 `internal/convert/golden_test.go` (TestGoldenCorpus, TestGoldenCorpusAllFixtures)
-renders 57 fixtures in `testdata/golden/fixture-*.html` and asserts structural
+renders 62 fixtures in `testdata/golden/fixture-*.html` and asserts structural
 output properties plus PNG baselines under `testdata/golden/assets`. Layout
 subsystems are exercised by dedicated fixtures: floats (22/29/38), flex
 (25/28/32/33), grid (28/32/34/35), multicol (39), transforms (40), sticky

@@ -65,8 +65,9 @@ the dotted settings shown in engine tables below are internal only.
 - **Controlled-report scope** — not a pixel-perfect clone of arbitrary
   websites. Flex/grid and positioning are "lite"; JavaScript is not executed.
 
-Scale: ~240 Go files in `internal/` (layout is the largest domain) plus the
-public `api.go`, two `cmd/` binaries, a React documentation site (`frontend/`,
+Scale: 167 source Go files in `internal/`, 448 including tests (layout is the
+largest domain), plus the public `api.go`, two `cmd/` binaries, a React
+documentation site (`frontend/`,
 deploys to `docs/`), golden fixtures (`testdata/`), committed samples
 (`output/`), and phase ledgers (`plans/`).
 
