@@ -4,7 +4,7 @@ import "github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
 
 // emptyExtra is the shared zero extra for ops that never set a rare payload.
 // Writers must detach before mutating so the singleton stays zero.
-var emptyExtra = &opExtra{} //nolint:exhaustruct // shared zero extra
+var emptyExtra = &opExtra{} //nolint:exhaustruct,gochecknoglobals // immutable zero singleton shared by all ops
 
 // opExtra holds display-list payloads that are empty on the report fixture
 // (no images, URIs, transforms, or structure tags on typical fill/text/grid
@@ -52,7 +52,9 @@ func (op *Op) bindEmptyExtra() {
 
 // BindEmptyExtra points a nil extra at the shared zero extra so readers in
 // other packages can load BlendMode, Xform, and Image without panicking.
-func (op *Op) BindEmptyExtra() { op.bindEmptyExtra() } //nolint:stylecheck // Op methods already mix op/paintOp receivers
+//
+//nolint:stylecheck // Op methods already mix op/paintOp receivers
+func (op *Op) BindEmptyExtra() { op.bindEmptyExtra() }
 
 func (op *Op) setURI(uri string) {
 	if uri == "" {

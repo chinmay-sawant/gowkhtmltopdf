@@ -10,7 +10,6 @@ import (
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
 )
 
-//nolint:cyclop,funlen // per-section layout, clone, and paint is one pipeline
 func renderIndependentBlocks(
 	ctx context.Context,
 	doc *pdf.Document,

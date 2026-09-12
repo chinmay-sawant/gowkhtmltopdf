@@ -78,6 +78,7 @@ func TestSectionTextCountMatchesOpText(t *testing.T) {
 
 	cmd, _ := newCommand(t, htmlSrc, filepath.Join(t.TempDir(), "out.pdf"))
 	data := runPDF(t, cmd)
+
 	if pageCount(data) != 2 {
 		t.Fatalf("pages = %d, want 2", pageCount(data))
 	}
