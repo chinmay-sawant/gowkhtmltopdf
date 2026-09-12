@@ -60,13 +60,6 @@
   margin-bottom: 16px;
 }
 
-.landing-micro {
-  max-width: 72ch;
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.65;
-}
-
 .landing-micro code {
   font-family: var(--mono);
   font-size: 12px;
@@ -300,6 +293,10 @@
 /* Fit: 2x2 bento */
 .landing-fit {
   padding: 56px 0 0;
+}
+
+.landing-fit .landing-section-head {
+  max-width: 100%;
 }
 
 .fit-grid {

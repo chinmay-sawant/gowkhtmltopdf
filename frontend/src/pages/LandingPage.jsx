@@ -36,26 +36,22 @@ export default function LandingPage() {
 
       <section className="landing-hero-minimal" aria-labelledby="landing-title">
         <div className="landing-hero-main">
-          <p className="landing-kicker">HTML to PDF &middot; Pure Go &middot; No browser process, no cgo</p>
+          <p className="landing-kicker">HTML to PDF &middot; Pure Go</p>
           <h1 id="landing-title">
             Your HTML,
             <br />
             <em>as a print-ready PDF.</em>
           </h1>
           <p className="landing-lede">
-            One purpose: turn HTML you author into paginated PDFs. Invoices, reports, certificates,
-            tables and multi-page documents with headers, footers and outlines. Two surfaces, same engine.
+            Authored HTML in, paginated PDF out with 350+ CSS properties: tables and flex, borders
+            and backgrounds, shadows and transforms.
           </p>
           <div className="landing-actions">
             <Link className="button button-primary" to="/documentation/getting-started">
               Get started <span aria-hidden="true">-&gt;</span>
             </Link>
             <Link className="button button-secondary" to="/live-demo">Try Live Demo</Link>
-            <Link className="button button-secondary" to="/showcase">View samples</Link>
           </div>
-          <p className="landing-micro">
-            Drop-in binary <code>gowkhtmltopdf</code> or native Go library <code>Document</code>. Static build with <code>CGO_ENABLED=0</code>.
-          </p>
         </div>
 
         <div className="landing-code-card" aria-label="Minimal conversion example">
