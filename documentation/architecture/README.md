@@ -83,7 +83,7 @@ deploys to `docs/`), golden fixtures (`testdata/`), committed samples
 | HTML parser | `internal/html` | Tolerant tokenizer + tree (any tag accepted), entities, no JS | [05-html-parser.md](05-html-parser.md) |
 | CSS subsystem | `internal/css` | CSS subset parse, selectors, cascade, media queries, `:has`, container rules (`:target` never matches) | [06-css.md](06-css.md) |
 | Layout engine | `internal/layout` | Style cascade, block/inline/table/flex/grid/float/multicol, pagination, paint ops. `internal/line` is log severity, not wrapping | [07-layout.md](07-layout.md) |
-| Convert pipeline | `internal/convert` (+ `prepare/`, `render/`, `islands/`), `internal/outline` | Job orchestration: HF, TOC, outline, links, copies/collate; islands are benchmark-only | [08-convert-pipeline.md](08-convert-pipeline.md) |
+| Convert pipeline | `internal/convert` (+ `prepare/`, `render/`), `internal/outline` | Job orchestration: HF, TOC, outline, links, copies/collate | [08-convert-pipeline.md](08-convert-pipeline.md) |
 | PDF writer | `internal/pdf` (+ `assets/`), `internal/pdfprofile` | PDF writer (default 1.4, opt-in 1.7 / 2.0 via `WriterPolicy`; opt-in `--pdf-profile`), font subsetting, Type0/CID, images, annotations, outlines, tagged structure | [09-pdf-writer.md](09-pdf-writer.md) |
 | Image output & SVG | `internal/imageout`, `internal/svg` | PNG/JPEG raster path, TTF outline AA (2× supersample), SVG→raster | [10-imageout-svg.md](10-imageout-svg.md) |
 
@@ -108,7 +108,7 @@ cmd/* ─► internal/cli ─► internal/settings    │
    internal/layout    ◄── produces the display list for pdf OR imageout
    internal/line      ◄── log severity protocol only (not line wrapping)
    internal/outline   ◄── pure headings→outline; no layout/pdf types (locationReader seam)
-   internal/convert   ◄── the hub; its subpackages prepare/, render/, islands/
+   internal/convert   ◄── the hub; its subpackages prepare/, render/
                           never import convert (cycle rule)
    internal/pdfprofile◄── leaf: canonical profile tokens / aliases (settings + pdf)
    internal/pdf       ◄── writer sink; imports pdfprofile; layout/imageout reuse faces + shaping
@@ -215,7 +215,7 @@ Full model: [../THREAT-MODEL.md](../THREAT-MODEL.md) and
 | [05-html-parser.md](05-html-parser.md) | HTML parser | allowlisted tokenizer, tree model, entities, tolerance, no-JS policy |
 | [06-css.md](06-css.md) | CSS subsystem | selector support, cascade, media/container queries, value parsing, degrade rules |
 | [07-layout.md](07-layout.md) | Layout engine | style cascade, all formatting contexts, line breaking/shaping, pagination, display list |
-| [08-convert-pipeline.md](08-convert-pipeline.md) | Convert pipeline | internal `Request`, 3-stage lifecycle, HF/TOC two-pass fixpoint, outline; page islands are **benchmark-only** |
+| [08-convert-pipeline.md](08-convert-pipeline.md) | Convert pipeline | internal `Request`, 3-stage lifecycle, HF/TOC two-pass fixpoint, outline |
 | [09-pdf-writer.md](09-pdf-writer.md) | PDF writer | PDF 1.4 default / 1.7 & 2.0 opt-in, `--pdf-profile` claims, tagging/MCR, font subsetting, Type0/CID, outlines, byte stability |
 | [10-imageout-svg.md](10-imageout-svg.md) | Image output & SVG | raster path, TTF outline AA, SVG rasterization, fidelity limits vs PDF |
 
@@ -254,5 +254,3 @@ Known upstream gaps worth reconciling (from the domain reviews):
   custom width/height measurements. The former duplicate `Size.PageSize`
   field was removed and settings parity tests protect the single source of
   truth.
-- Page islands (`internal/convert/islands`) are a benchmark-only
-  optimization, not a user feature. Production/CLI requests never opt in.

@@ -40,7 +40,7 @@ func encodeInto(buf *limitedImageBuffer, img image.Image, format string, quality
 			return fmt.Errorf("png encode: %w", err)
 		}
 	case formatJPG:
-		if err := jpeg.Encode(buf, ycbcr420FastPath(img), &jpeg.Options{Quality: clampJPEGQuality(quality)}); err != nil {
+		if err := jpeg.Encode(buf, img, &jpeg.Options{Quality: clampJPEGQuality(quality)}); err != nil {
 			return fmt.Errorf("jpeg encode: %w", err)
 		}
 	default:
@@ -80,22 +80,6 @@ func clampJPEGQuality(quality int) int {
 	}
 
 	return quality
-}
-
-// ycbcr420FastPath returns the 4:2:0 planes image/jpeg reads directly when
-// the NRGBA conversion is byte-exact; non-NRGBA inputs (and odd origins) keep
-// the encoder's own At-based conversion.
-func ycbcr420FastPath(img image.Image) image.Image {
-	nrgba, ok := img.(*image.NRGBA)
-	if !ok {
-		return img
-	}
-
-	if ycbcr := nrgbaToYCbCr420(nrgba); ycbcr != nil {
-		return ycbcr
-	}
-
-	return img
 }
 
 // limitedImageBuffer is an io.Writer that refuses to grow past limit bytes.

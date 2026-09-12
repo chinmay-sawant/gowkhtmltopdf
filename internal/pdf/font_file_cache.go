@@ -41,7 +41,7 @@ type fontFileCache struct {
 	maxEntries int
 }
 
-//nolint:gochecknoglobals // cross-conversion cache, mirroring semanticRegexCache
+//nolint:gochecknoglobals // cross-conversion cache
 var parsedFontCache = newFontFileCache()
 
 func newFontFileCache() *fontFileCache {

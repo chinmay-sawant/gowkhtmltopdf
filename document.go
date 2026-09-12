@@ -412,7 +412,7 @@ func (d *Document) pdfGlobal(dumpOutline bool) settings.PdfGlobal {
 	}
 	global.Grayscale = d.Grayscale
 	global.PageOffset = d.PageOffset
-	global.ExcludeFromOutline = documentCloneStrings(d.ExcludeFromOutline)
+	global.ExcludeFromOutline = slices.Clone(d.ExcludeFromOutline)
 	if d.Header != nil {
 		global.Header = mapHeaderFooter(*d.Header)
 	}
@@ -422,8 +422,8 @@ func (d *Document) pdfGlobal(dumpOutline bool) settings.PdfGlobal {
 	if d.AllowLocalFiles {
 		global.Load.EnableLocalFileAccess = true
 	}
-	global.Load.Allow = documentCloneStrings(d.Allow)
-	global.FontPaths = documentCloneStrings(d.FontPaths)
+	global.Load.Allow = slices.Clone(d.Allow)
+	global.FontPaths = slices.Clone(d.FontPaths)
 	global.UseSystemFonts = d.UseSystemFonts
 	if d.Network != nil {
 		load.ApplyNetworkPolicy(&global.Load, *d.Network)
@@ -493,8 +493,8 @@ func (d *ImageDocument) toImageRequest(output io.Writer) *imageout.Request {
 	if d.AllowLocalFiles {
 		global.Load.EnableLocalFileAccess = true
 	}
-	global.Load.Allow = documentCloneStrings(d.Allow)
-	global.FontPaths = documentCloneStrings(d.FontPaths)
+	global.Load.Allow = slices.Clone(d.Allow)
+	global.FontPaths = slices.Clone(d.FontPaths)
 	global.UseSystemFonts = d.UseSystemFonts
 	if d.Network != nil {
 		load.ApplyNetworkPolicy(&global.Load, *d.Network)
@@ -547,7 +547,7 @@ func mapContent(object *settings.PdfObject, content Content) {
 	switch {
 	case content.HTML != nil:
 		object.Page = ""
-		object.Load.InlineHTML = cloneBytes(content.HTML)
+		object.Load.InlineHTML = slices.Clone(content.HTML)
 		object.Load.InlineBase = content.Base
 	case content.File != "":
 		object.Page = content.File
@@ -577,7 +577,7 @@ func mapHeaderFooter(header HeaderFooter) settings.HeaderFooter {
 		Line:     header.Line,
 		Spacing:  header.Spacing,
 		HTMLURL:  header.HTMLURL,
-		Replace:  documentCloneStringMap(header.Replace),
+		Replace:  maps.Clone(header.Replace),
 	}
 }
 
@@ -616,7 +616,7 @@ func boolValue(value *bool, fallback bool) bool {
 }
 
 func clonePage(page Page) Page {
-	page.Source.HTML = cloneBytes(page.Source.HTML)
+	page.Source.HTML = slices.Clone(page.Source.HTML)
 	page.Header = cloneHeaderFooter(page.Header)
 	page.Footer = cloneHeaderFooter(page.Footer)
 
@@ -629,15 +629,7 @@ func cloneHeaderFooter(header *HeaderFooter) *HeaderFooter {
 	}
 
 	clone := *header
-	clone.Replace = documentCloneStringMap(header.Replace)
+	clone.Replace = maps.Clone(header.Replace)
 
 	return &clone
-}
-
-func documentCloneStrings(src []string) []string {
-	return slices.Clone(src)
-}
-
-func documentCloneStringMap(src map[string]string) map[string]string {
-	return maps.Clone(src)
 }

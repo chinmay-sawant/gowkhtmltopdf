@@ -1663,7 +1663,7 @@ func applyTextGroup(
 	case "text-align-last", "text-align-all", tabSizeProperty, "text-wrap", "text-wrap-mode", "text-wrap-style",
 		"white-space-collapse", "white-space-trim", "hyphens", "hyphenate-character",
 		"text-justify", "line-break", "text-decoration-line", "text-decoration-color",
-		"text-decoration-style", "text-decoration-thickness", "text-decoration-inset",
+		"text-decoration-style", "text-decoration-thickness",
 		"text-underline-offset", "text-underline-position", textShadowProperty,
 		textEmphasisProperty, textEmphasisStyleProperty, textEmphasisColorProperty,
 		textEmphasisPositionProperty, textEmphasisSkipProperty:

@@ -52,9 +52,7 @@ var ErrAccessDenied = errors.New("local file access denied")
 var ErrNetworkPolicy = errors.New("network policy denied request")
 
 // ErrInvalidProxy is returned when a configured proxy is not an absolute URL
-// with a scheme and host. NewLoader preserves its historical return shape and
-// records this error for the first Load call; NewLoaderWithError exposes the
-// fail-fast form for new callers.
+// with a scheme and host. NewLoaderWithError reports it at construction time.
 var ErrInvalidProxy = errors.New("invalid proxy configuration")
 
 // ErrNilLoader is returned when a load operation is attempted with a nil Loader.
@@ -416,11 +414,11 @@ type Loader struct {
 	Resolver IPResolver
 
 	// Allow and EnableLocalFileAccess remain exported compatibility fields for
-	// existing internal callers; NewLoader initializes them from cloned policy
-	// values, and file-access checks intentionally read these effective fields.
+	// existing internal callers; the constructors initialize them from cloned
+	// policy values, and file-access checks intentionally read these effective
+	// fields.
 	Allow                 []string
 	EnableLocalFileAccess bool
-	initErr               error
 	testDial              func(ctx context.Context, network, address string) (net.Conn, error)
 }
 
@@ -491,39 +489,9 @@ func (l *Loader) SetResolver(r IPResolver) {
 	l.Resolver = r
 }
 
-// NewLoader builds a Loader from global load settings, applying the full
-// load policy (proxy, allow prefixes, local-access flag) in one place.
-//
-// Deprecated: use NewLoaderWithError. This constructor preserves the
-// historical shape for existing callers: when proxy validation fails it
-// returns a Loader that stashes the error in initErr, so the failure surfaces
-// on the first Load/FetchSub instead of at the request boundary.
-func NewLoader(global settings.LoadGlobal) *Loader {
-	loader, err := NewLoaderWithError(global)
-	if err == nil {
-		return loader
-	}
-
-	// Preserve the historical constructor shape for existing callers. New
-	// callers should use NewLoaderWithError so initialization failures are
-	// handled at their request boundary instead of on the first load.
-	policy := ResolveEffectiveLoadGlobal(global, settings.LoadGlobal{}) //nolint:exhaustruct // empty mode override
-
-	return &Loader{ //nolint:exhaustruct // intentional zero/partial fields
-		Global:                policy,
-		Network:               networkPolicyFromGlobal(global),
-		Log:                   io.Discard,
-		MaxBodySize:           DefaultMaxBodySize,
-		MaxRedirects:          DefaultMaxRedirects,
-		Allow:                 cloneStrings(policy.Allow),
-		EnableLocalFileAccess: policy.EnableLocalFileAccess,
-		initErr:               err,
-	}
-}
-
 // NewLoaderWithError builds a Loader from global load settings and validates
 // proxy configuration before installing the HTTP transport. It is the
-// fail-fast constructor; NewLoader is deprecated.
+// fail-fast constructor.
 func NewLoaderWithError(global settings.LoadGlobal) (*Loader, error) {
 	effective := ResolveEffectiveLoadGlobal(global, settings.LoadGlobal{}) //nolint:exhaustruct // empty mode override
 
@@ -545,8 +513,7 @@ func networkPolicyFromGlobal(global settings.LoadGlobal) NetworkPolicy {
 
 // NewLoaderWithNetworkPolicy builds a Loader with an explicit network policy.
 // NewLoaderWithError is the fail-fast constructor for callers that use the
-// historical permissive HTTP behavior with global settings; NewLoader is
-// deprecated.
+// historical permissive HTTP behavior with global settings.
 func NewLoaderWithNetworkPolicy(global settings.LoadGlobal, network NetworkPolicy) (*Loader, error) {
 	policy := ResolveEffectiveLoadGlobal(global, settings.LoadGlobal{}) //nolint:exhaustruct // empty mode override
 
@@ -896,15 +863,9 @@ func parseProxy(raw string) (*url.URL, error) {
 // (lp.InlineHTML) is returned as-is and skips GuessURL entirely; subresources
 // resolve against lp.InlineBase when set. Every loaded document is checked
 // for a supported charset at this seam (see checkDocumentCharset).
-//
-//nolint:cyclop // multi-branch resource loader
 func (l *Loader) Load(ctx context.Context, input string, pageLoad settings.LoadPage) (*Resource, error) {
 	if l == nil {
 		return nil, ErrNilLoader
-	}
-
-	if l.initErr != nil {
-		return nil, l.initErr
 	}
 
 	if err := l.validateLimits(); err != nil {
@@ -1505,10 +1466,6 @@ func (l *Loader) loadErrorResponse(
 func (l *Loader) FetchSub(ctx context.Context, base, ref string, pageLoad settings.LoadPage) (*Resource, error) {
 	if l == nil {
 		return nil, ErrNilLoader
-	}
-
-	if l.initErr != nil {
-		return nil, l.initErr
 	}
 
 	if err := l.validateLimits(); err != nil {

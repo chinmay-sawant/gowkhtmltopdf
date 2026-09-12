@@ -235,24 +235,7 @@ func hasFoldPrefix(text, prefix string) bool {
 		return false
 	}
 
-	for i := range len(prefix) {
-		textByte := text[i]
-		prefixByte := prefix[i]
-
-		if textByte >= 'A' && textByte <= 'Z' {
-			textByte += 'a' - 'A'
-		}
-
-		if prefixByte >= 'A' && prefixByte <= 'Z' {
-			prefixByte += 'a' - 'A'
-		}
-
-		if textByte != prefixByte {
-			return false
-		}
-	}
-
-	return true
+	return strings.EqualFold(text[:len(prefix)], prefix)
 }
 
 // parseAtRule consumes one at-rule at the start of src, appending any

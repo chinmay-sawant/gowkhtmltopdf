@@ -19,6 +19,9 @@ import (
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
+// htmlSectionName is the [section] placeholder token.
+const htmlSectionName = "section"
+
 // hfParms is the per-page substitution state for header/footer text. page,
 // topage and frompage are 1-based; replaces holds the merged --replace map.
 type hfParms struct {
@@ -497,14 +500,6 @@ func (r *hfDrawResult) warn(object, page int, band string, err error) {
 	})
 }
 
-//nolint:unused // warning emitter helper for compatibility adapter
-func (r *hfDrawResult) emitWarnings(log io.Writer) {
-	for _, warning := range r.warnings {
-		line.Emit(log, line.Warn, "object %d page %d: %s header/footer: %v",
-			warning.object, warning.page+1, warning.band, warning.err)
-	}
-}
-
 // drawHTMLHF paints a cached HTML header/footer onto page, clipped to the
 // margin band. The HF document's canvas origin maps to `spacing` points from
 // the page top (header) or from the page bottom (footer); x is aligned with
@@ -740,17 +735,6 @@ func effectiveMargins(ctx context.Context, loader *load.Loader, font *pdf.Font, 
 	state.geom.recomputeContent()
 
 	return state.registry, nil
-}
-
-// drawHeadersFooters is the compatibility adapter for the existing caller.
-// The result-producing implementation below keeps the failure policy
-// explicit: body output remains usable, every recoverable HF error is
-// collected, and the adapter emits one warning per failed band.
-//
-//nolint:lll,unused // compatibility adapter for existing caller
-func drawHeadersFooters(ctx context.Context, hf hfLoader, doc *pdf.Document, req *Request, plan *pagePlan, headings []*outline.Heading, log io.Writer) {
-	res := drawHeadersFootersResult(ctx, hf, doc, req, plan, headings)
-	res.emitWarnings(log)
 }
 
 // drawHeadersFootersResult is the final pass that paints the effective

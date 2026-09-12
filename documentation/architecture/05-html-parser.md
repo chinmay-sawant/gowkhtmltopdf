@@ -16,8 +16,7 @@ every downstream stage walks:
 - `internal/outline` **walks the tree** to collect `h1..h6` headings for PDF
   bookmarks;
 - `internal/convert` re-uses the tree for **TOC generation**, **header/footer
-  HTML**, **relative-link resolution**, and the **benchmark "page islands"**
-  fast path.
+  HTML**, and **relative-link resolution**.
 
 The package is deliberately *not* a full HTML5 parser and *not* a browser DOM.
 It implements the **HTML subset gowkhtmltopdf accepts** — tags, attributes,
@@ -222,11 +221,6 @@ are interleaved in a single pass.
   template string parsed at `internal/convert/toc.go:192` (the converter
   *generates* HTML and re-enters the pipeline at the parse seam — a neat
   demonstration of the parser as the shared input contract).
-- **Benchmark islands** — the "page islands" fast path clones the tree shell
-  (`cloneShell`/`Root`, `internal/convert/islands/plan.go:101-131`) to render
-  benchmark-report sections in parallel; it relies on `FirstChild("html")`,
-  `FirstChild("body")`, `Walk`, `TextContentOf("title")`
-  (`islands/plan.go:62-77`).
 
 ## 5. Cross-package dependencies
 
@@ -247,7 +241,7 @@ DOM, so the package must stay dependency-free to keep it usable by every layer.
 |---------|----------------------|
 | `internal/css` | Selector matching against nodes (`css.go`, `has.go`). |
 | `internal/layout` | Style resolution, box building, inline collection, tables, floats, multicol, images, paint (`style.go`, `style_cascade.go`, `layout_flow.go`, `inline_collect.go`, `layout_tables.go`, `flex.go`, `grid.go`, `float.go`, `multicol.go`, `layout_images.go`, `paint_flow.go`, `container.go`, `pseudo_content.go`, `layout_measure.go`). |
-| `internal/convert` (+ `prepare/`, `islands/`) | Main parse entry (`prepare/prepare.go:154`), stylesheet collection (`prepare/styles.go:32-99`), HF/TOC/outline/links/page-islands (`hf.go`, `toc.go`, `outline.go`, `links.go`, `page_islands.go`, `islands/plan.go`). |
+| `internal/convert` (+ `prepare/`) | Main parse entry (`prepare/prepare.go:154`), stylesheet collection (`prepare/styles.go:32-99`), HF/TOC/outline/links (`hf.go`, `toc.go`, `outline.go`, `links.go`). |
 | `internal/outline` | Heading collection for PDF bookmarks (`outline.go:121`). |
 | `internal/imageout` | Image-mode rendering shares the same parse→layout path (`imageout.go:121,128,170`). |
 

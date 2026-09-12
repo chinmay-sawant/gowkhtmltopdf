@@ -555,7 +555,7 @@ func TestContainerRecascadeStyleReuse(t *testing.T) {
 
 	pass1 := resolveStyles(root, []*css.Stylesheet{cssSheet}, "print", testViewport, 800)
 
-	cinfo := measureSizeContainers(root, pass1, testViewport)
+	cinfo := measureContainers(t, root, pass1)
 	if len(cinfo) == 0 {
 		t.Fatal("fixture produced no size containers")
 	}

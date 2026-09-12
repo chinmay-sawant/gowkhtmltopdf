@@ -89,41 +89,6 @@ const (
 	sAbort                = "abort"
 )
 
-// ColorMode mirrors wkhtmltopdf --color-mode. Kept as a parse helper for
-// Set("colormode"); the engine stores only PdfGlobal.Grayscale.
-//
-// ponytail: ColorMode is not a stored field — convert reads Grayscale only.
-type ColorMode int
-
-const (
-	ColorModeColor ColorMode = iota
-	ColorModeGrayscale
-)
-
-func (m ColorMode) String() string {
-	switch m {
-	case ColorModeColor:
-		return "color"
-	case ColorModeGrayscale:
-		return "grayscale"
-	}
-
-	return sUnknown
-}
-
-// ParseColorMode accepts "color" (default) or "grayscale" (case-insensitive,
-// matching ParseOrientation and ParseLoadErrorHandling).
-func ParseColorMode(value string) (ColorMode, error) {
-	switch normalize(value) {
-	case "", "color":
-		return ColorModeColor, nil
-	case "grayscale":
-		return ColorModeGrayscale, nil
-	}
-
-	return ColorModeColor, errInvalid("color-mode", value, "color|grayscale")
-}
-
 // Orientation mirrors wkhtmltopdf --orientation.
 type Orientation int
 
@@ -373,7 +338,7 @@ type Web struct {
 	PrintLinkUnderline bool
 }
 
-// LoadGlobal holds load settings shared by all page loads. NewLoader applies
+// LoadGlobal holds load settings shared by all page loads. NewLoaderWithError applies
 // the full policy (proxy, allow prefixes, local-access flag) in one place.
 type LoadGlobal struct {
 	Proxy                 string
@@ -497,7 +462,7 @@ type PdfGlobal struct {
 	Quiet              bool
 	Web                Web
 	// Load carries the shared load policy: Proxy, Allow (ACL prefixes) and
-	// EnableLocalFileAccess live on LoadGlobal, applied by load.NewLoader.
+	// EnableLocalFileAccess live on LoadGlobal, applied by load.NewLoaderWithError.
 	Load                 LoadGlobal
 	FontPaths            []string // --font-path directories (opt-in TTF discovery)
 	UseSystemFonts       bool     // --use-system-fonts

@@ -14,8 +14,8 @@ const (
 
 // TestPerf3OutputBytesPin is the PERF3-03 equivalence pin for the 500-page
 // report on the generic library path. Document.WritePDF builds convert.NewPDFRequest
-// (document.go), not NewBenchmarkPDFRequest / page islands. HTML is the same
-// report fixture the public benchmark uses (libraryBenchmarkReportHTML).
+// (document.go). HTML is the same report fixture the public benchmark uses
+// (libraryBenchmarkReportHTML).
 func TestPerf3OutputBytesPin(t *testing.T) {
 	t.Parallel()
 

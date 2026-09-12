@@ -1,6 +1,6 @@
 {
   "generated": "2026-09-02",
-  "scope": "Validate mapping engine_status=implemented (355) against non-test Go under internal/layout",
+  "scope": "Validate mapping engine_status=implemented against non-test Go under internal/layout; 27 rows demoted to unsupported on 2026-09-12 keep DEMOTED entries for audit",
   "method": [
     "switch prop { case \"name\": } in style_properties/paint/advanced/leftovers/cascade",
     "case ConstIdent where const ConstIdent = \"name\"",
@@ -13,9 +13,10 @@
     "_test.go"
   ],
   "counts": {
-    "VERIFIED": 355
+    "VERIFIED": 328,
+    "DEMOTED": 27
   },
-  "implemented_total": 355,
+  "implemented_total": 328,
   "properties": [
     {
       "property": "-webkit-align-content",
@@ -1847,27 +1848,27 @@
       "property": "color-adjust",
       "kind": "shorthand",
       "legacy_of": null,
-      "validation": "VERIFIED",
-      "evidence_kind": "case-string",
+      "validation": "DEMOTED",
+      "evidence_kind": "removed",
       "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 102,
-      "files": [
-        "internal/layout/style_advanced_props.go"
-      ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "primary_line": null,
+      "files": [],
+      "claimed_code_path": "",
+      "demoted_by": "PT26-LAY-04",
+      "notes": "Parsed-and-stored no-op with no layout, paint, or image reader; field and apply arm removed 2026-09-12. Catalog row demoted implemented -> unsupported."
     },
     {
       "property": "color-scheme",
       "kind": "longhand",
       "legacy_of": null,
-      "validation": "VERIFIED",
-      "evidence_kind": "case-string",
+      "validation": "DEMOTED",
+      "evidence_kind": "removed",
       "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 112,
-      "files": [
-        "internal/layout/style_advanced_props.go"
-      ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "primary_line": null,
+      "files": [],
+      "claimed_code_path": "",
+      "demoted_by": "PT26-LAY-04",
+      "notes": "Parsed-and-stored no-op with no layout, paint, or image reader; field and apply arm removed 2026-09-12. Catalog row demoted implemented -> unsupported."
     },
     {
       "property": "column-count",
@@ -2004,79 +2005,79 @@
       "property": "contain",
       "kind": "longhand",
       "legacy_of": null,
-      "validation": "VERIFIED",
-      "evidence_kind": "case-string",
+      "validation": "DEMOTED",
+      "evidence_kind": "removed",
       "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 135,
-      "files": [
-        "internal/layout/style_advanced_props.go"
-      ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "primary_line": null,
+      "files": [],
+      "claimed_code_path": "",
+      "demoted_by": "PT26-LAY-04",
+      "notes": "Parsed-and-stored no-op with no layout, paint, or image reader; field and apply arm removed 2026-09-12. Catalog row demoted implemented -> unsupported."
     },
     {
       "property": "contain-intrinsic-block-size",
       "kind": "longhand",
       "legacy_of": null,
-      "validation": "VERIFIED",
-      "evidence_kind": "case-string",
+      "validation": "DEMOTED",
+      "evidence_kind": "removed",
       "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 132,
-      "files": [
-        "internal/layout/style_advanced_props.go"
-      ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "primary_line": null,
+      "files": [],
+      "claimed_code_path": "",
+      "demoted_by": "PT26-LAY-04",
+      "notes": "Parsed-and-stored no-op with no layout, paint, or image reader; field and apply arm removed 2026-09-12. Catalog row demoted implemented -> unsupported."
     },
     {
       "property": "contain-intrinsic-height",
       "kind": "longhand",
       "legacy_of": null,
-      "validation": "VERIFIED",
-      "evidence_kind": "case-string",
+      "validation": "DEMOTED",
+      "evidence_kind": "removed",
       "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 126,
-      "files": [
-        "internal/layout/style_advanced_props.go"
-      ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "primary_line": null,
+      "files": [],
+      "claimed_code_path": "",
+      "demoted_by": "PT26-LAY-04",
+      "notes": "Parsed-and-stored no-op with no layout, paint, or image reader; field and apply arm removed 2026-09-12. Catalog row demoted implemented -> unsupported."
     },
     {
       "property": "contain-intrinsic-inline-size",
       "kind": "longhand",
       "legacy_of": null,
-      "validation": "VERIFIED",
-      "evidence_kind": "case-string",
+      "validation": "DEMOTED",
+      "evidence_kind": "removed",
       "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 129,
-      "files": [
-        "internal/layout/style_advanced_props.go"
-      ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "primary_line": null,
+      "files": [],
+      "claimed_code_path": "",
+      "demoted_by": "PT26-LAY-04",
+      "notes": "Parsed-and-stored no-op with no layout, paint, or image reader; field and apply arm removed 2026-09-12. Catalog row demoted implemented -> unsupported."
     },
     {
       "property": "contain-intrinsic-size",
       "kind": "shorthand",
       "legacy_of": null,
-      "validation": "VERIFIED",
-      "evidence_kind": "case-string",
+      "validation": "DEMOTED",
+      "evidence_kind": "removed",
       "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 120,
-      "files": [
-        "internal/layout/style_advanced_props.go"
-      ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "primary_line": null,
+      "files": [],
+      "claimed_code_path": "",
+      "demoted_by": "PT26-LAY-04",
+      "notes": "Parsed-and-stored no-op with no layout, paint, or image reader; field and apply arm removed 2026-09-12. Catalog row demoted implemented -> unsupported."
     },
     {
       "property": "contain-intrinsic-width",
       "kind": "longhand",
       "legacy_of": null,
-      "validation": "VERIFIED",
-      "evidence_kind": "case-string",
+      "validation": "DEMOTED",
+      "evidence_kind": "removed",
       "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 123,
-      "files": [
-        "internal/layout/style_advanced_props.go"
-      ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "primary_line": null,
+      "files": [],
+      "claimed_code_path": "",
+      "demoted_by": "PT26-LAY-04",
+      "notes": "Parsed-and-stored no-op with no layout, paint, or image reader; field and apply arm removed 2026-09-12. Catalog row demoted implemented -> unsupported."
     },
     {
       "property": "container",
@@ -2135,14 +2136,14 @@
       "property": "content-visibility",
       "kind": "longhand",
       "legacy_of": null,
-      "validation": "VERIFIED",
-      "evidence_kind": "case-string",
+      "validation": "DEMOTED",
+      "evidence_kind": "removed",
       "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 138,
-      "files": [
-        "internal/layout/style_advanced_props.go"
-      ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "primary_line": null,
+      "files": [],
+      "claimed_code_path": "",
+      "demoted_by": "PT26-LAY-04",
+      "notes": "Parsed-and-stored no-op with no layout, paint, or image reader; field and apply arm removed 2026-09-12. Catalog row demoted implemented -> unsupported."
     },
     {
       "property": "counter-increment",
@@ -2200,14 +2201,14 @@
       "property": "dynamic-range-limit",
       "kind": "longhand",
       "legacy_of": null,
-      "validation": "VERIFIED",
-      "evidence_kind": "case-string",
+      "validation": "DEMOTED",
+      "evidence_kind": "removed",
       "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 115,
-      "files": [
-        "internal/layout/style_advanced_props.go"
-      ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "primary_line": null,
+      "files": [],
+      "claimed_code_path": "",
+      "demoted_by": "PT26-LAY-04",
+      "notes": "Parsed-and-stored no-op with no layout, paint, or image reader; field and apply arm removed 2026-09-12. Catalog row demoted implemented -> unsupported."
     },
     {
       "property": "empty-cells",
@@ -2396,40 +2397,40 @@
       "property": "font-language-override",
       "kind": "longhand",
       "legacy_of": null,
-      "validation": "VERIFIED",
-      "evidence_kind": "case-string",
+      "validation": "DEMOTED",
+      "evidence_kind": "removed",
       "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 153,
-      "files": [
-        "internal/layout/style_advanced_props.go"
-      ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "primary_line": null,
+      "files": [],
+      "claimed_code_path": "",
+      "demoted_by": "PT26-LAY-05",
+      "notes": "Parsed-and-stored no-op with no layout, paint, or image reader; field and apply arm removed 2026-09-12. Catalog row demoted implemented -> unsupported."
     },
     {
       "property": "font-optical-sizing",
       "kind": "longhand",
       "legacy_of": null,
-      "validation": "VERIFIED",
-      "evidence_kind": "case-string",
+      "validation": "DEMOTED",
+      "evidence_kind": "removed",
       "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 148,
-      "files": [
-        "internal/layout/style_advanced_props.go"
-      ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "primary_line": null,
+      "files": [],
+      "claimed_code_path": "",
+      "demoted_by": "PT26-LAY-05",
+      "notes": "Parsed-and-stored no-op with no layout, paint, or image reader; field and apply arm removed 2026-09-12. Catalog row demoted implemented -> unsupported."
     },
     {
       "property": "font-palette",
       "kind": "longhand",
       "legacy_of": null,
-      "validation": "VERIFIED",
-      "evidence_kind": "case-string",
+      "validation": "DEMOTED",
+      "evidence_kind": "removed",
       "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 156,
-      "files": [
-        "internal/layout/style_advanced_props.go"
-      ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "primary_line": null,
+      "files": [],
+      "claimed_code_path": "",
+      "demoted_by": "PT26-LAY-05",
+      "notes": "Parsed-and-stored no-op with no layout, paint, or image reader; field and apply arm removed 2026-09-12. Catalog row demoted implemented -> unsupported."
     },
     {
       "property": "font-size",
@@ -2461,14 +2462,14 @@
       "property": "font-variation-settings",
       "kind": "longhand",
       "legacy_of": null,
-      "validation": "VERIFIED",
-      "evidence_kind": "case-string",
+      "validation": "DEMOTED",
+      "evidence_kind": "removed",
       "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 145,
-      "files": [
-        "internal/layout/style_advanced_props.go"
-      ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "primary_line": null,
+      "files": [],
+      "claimed_code_path": "",
+      "demoted_by": "PT26-LAY-05",
+      "notes": "Parsed-and-stored no-op with no layout, paint, or image reader; field and apply arm removed 2026-09-12. Catalog row demoted implemented -> unsupported."
     },
     {
       "property": "font-weight",
@@ -2513,14 +2514,14 @@
       "property": "forced-color-adjust",
       "kind": "longhand",
       "legacy_of": null,
-      "validation": "VERIFIED",
-      "evidence_kind": "case-string",
+      "validation": "DEMOTED",
+      "evidence_kind": "removed",
       "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 107,
-      "files": [
-        "internal/layout/style_advanced_props.go"
-      ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "primary_line": null,
+      "files": [],
+      "claimed_code_path": "",
+      "demoted_by": "PT26-LAY-04",
+      "notes": "Parsed-and-stored no-op with no layout, paint, or image reader; field and apply arm removed 2026-09-12. Catalog row demoted implemented -> unsupported."
     },
     {
       "property": "gap",
@@ -2748,27 +2749,27 @@
       "property": "image-orientation",
       "kind": "longhand",
       "legacy_of": null,
-      "validation": "VERIFIED",
-      "evidence_kind": "case-string",
+      "validation": "DEMOTED",
+      "evidence_kind": "removed",
       "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 89,
-      "files": [
-        "internal/layout/style_advanced_props.go"
-      ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "primary_line": null,
+      "files": [],
+      "claimed_code_path": "",
+      "demoted_by": "PT26-LAY-04",
+      "notes": "Parsed-and-stored no-op with no layout, paint, or image reader; field and apply arm removed 2026-09-12. Catalog row demoted implemented -> unsupported."
     },
     {
       "property": "image-resolution",
       "kind": "longhand",
       "legacy_of": null,
-      "validation": "VERIFIED",
-      "evidence_kind": "case-string",
+      "validation": "DEMOTED",
+      "evidence_kind": "removed",
       "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 94,
-      "files": [
-        "internal/layout/style_advanced_props.go"
-      ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "primary_line": null,
+      "files": [],
+      "claimed_code_path": "",
+      "demoted_by": "PT26-LAY-04",
+      "notes": "Parsed-and-stored no-op with no layout, paint, or image reader; field and apply arm removed 2026-09-12. Catalog row demoted implemented -> unsupported."
     },
     {
       "property": "inline-size",
@@ -3334,14 +3335,14 @@
       "property": "object-view-box",
       "kind": "longhand",
       "legacy_of": null,
-      "validation": "VERIFIED",
-      "evidence_kind": "case-string",
+      "validation": "DEMOTED",
+      "evidence_kind": "removed",
       "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 99,
-      "files": [
-        "internal/layout/style_advanced_props.go"
-      ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "primary_line": null,
+      "files": [],
+      "claimed_code_path": "",
+      "demoted_by": "PT26-LAY-04",
+      "notes": "Parsed-and-stored no-op with no layout, paint, or image reader; field and apply arm removed 2026-09-12. Catalog row demoted implemented -> unsupported."
     },
     {
       "property": "opacity",
@@ -3902,14 +3903,14 @@
       "property": "print-color-adjust",
       "kind": "longhand",
       "legacy_of": null,
-      "validation": "VERIFIED",
-      "evidence_kind": "case-string",
+      "validation": "DEMOTED",
+      "evidence_kind": "removed",
       "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 102,
-      "files": [
-        "internal/layout/style_advanced_props.go"
-      ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "primary_line": null,
+      "files": [],
+      "claimed_code_path": "",
+      "demoted_by": "PT26-LAY-04",
+      "notes": "Parsed-and-stored no-op with no layout, paint, or image reader; field and apply arm removed 2026-09-12. Catalog row demoted implemented -> unsupported."
     },
     {
       "property": "quotes",
@@ -4099,14 +4100,14 @@
       "property": "text-combine-upright",
       "kind": "longhand",
       "legacy_of": null,
-      "validation": "VERIFIED",
-      "evidence_kind": "case-string",
+      "validation": "DEMOTED",
+      "evidence_kind": "removed",
       "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 170,
-      "files": [
-        "internal/layout/style_advanced_props.go"
-      ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "primary_line": null,
+      "files": [],
+      "claimed_code_path": "",
+      "demoted_by": "PT26-LAY-05",
+      "notes": "Parsed-and-stored no-op with no layout, paint, or image reader; field and apply arm removed 2026-09-12. Catalog row demoted implemented -> unsupported."
     },
     {
       "property": "text-decoration",
@@ -4138,14 +4139,14 @@
       "property": "text-decoration-inset",
       "kind": "longhand",
       "legacy_of": null,
-      "validation": "VERIFIED",
-      "evidence_kind": "case-string",
+      "validation": "DEMOTED",
+      "evidence_kind": "removed",
       "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 216,
-      "files": [
-        "internal/layout/style_advanced_props.go"
-      ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "primary_line": null,
+      "files": [],
+      "claimed_code_path": "",
+      "demoted_by": "PT26-LAY-05",
+      "notes": "Parsed-and-stored no-op with no layout, paint, or image reader; field and apply arm removed 2026-09-12. Catalog row demoted implemented -> unsupported."
     },
     {
       "property": "text-decoration-line",
@@ -4164,27 +4165,27 @@
       "property": "text-decoration-skip",
       "kind": "shorthand",
       "legacy_of": null,
-      "validation": "VERIFIED",
-      "evidence_kind": "case-string",
+      "validation": "DEMOTED",
+      "evidence_kind": "removed",
       "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 199,
-      "files": [
-        "internal/layout/style_advanced_props.go"
-      ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "primary_line": null,
+      "files": [],
+      "claimed_code_path": "",
+      "demoted_by": "PT26-LAY-05",
+      "notes": "Parsed-and-stored no-op with no layout, paint, or image reader; field and apply arm removed 2026-09-12. Catalog row demoted implemented -> unsupported."
     },
     {
       "property": "text-decoration-skip-box",
       "kind": "longhand",
       "legacy_of": null,
-      "validation": "VERIFIED",
-      "evidence_kind": "case-string",
+      "validation": "DEMOTED",
+      "evidence_kind": "removed",
       "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 207,
-      "files": [
-        "internal/layout/style_advanced_props.go"
-      ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "primary_line": null,
+      "files": [],
+      "claimed_code_path": "",
+      "demoted_by": "PT26-LAY-05",
+      "notes": "Parsed-and-stored no-op with no layout, paint, or image reader; field and apply arm removed 2026-09-12. Catalog row demoted implemented -> unsupported."
     },
     {
       "property": "text-decoration-skip-ink",
@@ -4203,27 +4204,27 @@
       "property": "text-decoration-skip-self",
       "kind": "longhand",
       "legacy_of": null,
-      "validation": "VERIFIED",
-      "evidence_kind": "case-string",
+      "validation": "DEMOTED",
+      "evidence_kind": "removed",
       "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 210,
-      "files": [
-        "internal/layout/style_advanced_props.go"
-      ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "primary_line": null,
+      "files": [],
+      "claimed_code_path": "",
+      "demoted_by": "PT26-LAY-05",
+      "notes": "Parsed-and-stored no-op with no layout, paint, or image reader; field and apply arm removed 2026-09-12. Catalog row demoted implemented -> unsupported."
     },
     {
       "property": "text-decoration-skip-spaces",
       "kind": "longhand",
       "legacy_of": null,
-      "validation": "VERIFIED",
-      "evidence_kind": "case-string",
+      "validation": "DEMOTED",
+      "evidence_kind": "removed",
       "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 213,
-      "files": [
-        "internal/layout/style_advanced_props.go"
-      ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "primary_line": null,
+      "files": [],
+      "claimed_code_path": "",
+      "demoted_by": "PT26-LAY-05",
+      "notes": "Parsed-and-stored no-op with no layout, paint, or image reader; field and apply arm removed 2026-09-12. Catalog row demoted implemented -> unsupported."
     },
     {
       "property": "text-decoration-style",
@@ -4346,14 +4347,14 @@
       "property": "text-orientation",
       "kind": "longhand",
       "legacy_of": null,
-      "validation": "VERIFIED",
-      "evidence_kind": "case-string",
+      "validation": "DEMOTED",
+      "evidence_kind": "removed",
       "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 173,
-      "files": [
-        "internal/layout/style_advanced_props.go"
-      ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "primary_line": null,
+      "files": [],
+      "claimed_code_path": "",
+      "demoted_by": "PT26-LAY-05",
+      "notes": "Parsed-and-stored no-op with no layout, paint, or image reader; field and apply arm removed 2026-09-12. Catalog row demoted implemented -> unsupported."
     },
     {
       "property": "text-overflow",
@@ -4530,14 +4531,14 @@
       "property": "unicode-bidi",
       "kind": "longhand",
       "legacy_of": null,
-      "validation": "VERIFIED",
-      "evidence_kind": "case-string",
+      "validation": "DEMOTED",
+      "evidence_kind": "removed",
       "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 178,
-      "files": [
-        "internal/layout/style_advanced_props.go"
-      ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "primary_line": null,
+      "files": [],
+      "claimed_code_path": "",
+      "demoted_by": "PT26-LAY-05",
+      "notes": "Parsed-and-stored no-op with no layout, paint, or image reader; field and apply arm removed 2026-09-12. Catalog row demoted implemented -> unsupported."
     },
     {
       "property": "vertical-align",
@@ -4695,5 +4696,6 @@
       ],
       "claimed_code_path": "internal/layout/style_properties.go"
     }
-  ]
+  ],
+  "updated": "2026-09-12"
 }

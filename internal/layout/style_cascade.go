@@ -281,37 +281,8 @@ var inheritableProps = []inheritCopy{ //nolint:gochecknoglobals // static inheri
 	{[]string{"stroke-dasharray"}, func(dst, src *ResolvedStyle) { dst.StrokeDashArray = src.StrokeDashArray }},
 	{[]string{"stroke-dashoffset"}, func(dst, src *ResolvedStyle) { dst.StrokeDashOffset = src.StrokeDashOffset }},
 	{[]string{"stroke-miterlimit"}, func(dst, src *ResolvedStyle) { dst.StrokeMiterLimit = src.StrokeMiterLimit }},
-	{[]string{"image-orientation"}, func(dst, src *ResolvedStyle) { dst.ImageOrientation = src.ImageOrientation }},
-	{[]string{"image-resolution"}, func(dst, src *ResolvedStyle) { dst.ImageResolution = src.ImageResolution }},
-	{[]string{"print-color-adjust", "color-adjust"}, func(dst, src *ResolvedStyle) {
-		dst.PrintColorAdjust = src.PrintColorAdjust
-	}},
-	{[]string{"forced-color-adjust"}, func(dst, src *ResolvedStyle) {
-		dst.ForcedColorAdjust = src.ForcedColorAdjust
-	}},
-	{[]string{"color-scheme"}, func(dst, src *ResolvedStyle) { dst.ColorScheme = src.ColorScheme }},
-	{[]string{"dynamic-range-limit"}, func(dst, src *ResolvedStyle) {
-		dst.DynamicRangeLimit = src.DynamicRangeLimit
-	}},
-	{[]string{"font-variation-settings"}, func(dst, src *ResolvedStyle) {
-		dst.FontVariationSettings = src.FontVariationSettings
-	}},
-	{[]string{"font-optical-sizing"}, func(dst, src *ResolvedStyle) {
-		dst.FontOpticalSizing = src.FontOpticalSizing
-	}},
-	{[]string{"font-language-override"}, func(dst, src *ResolvedStyle) {
-		dst.FontLanguageOverride = src.FontLanguageOverride
-	}},
-	{[]string{"font-palette"}, func(dst, src *ResolvedStyle) { dst.FontPalette = src.FontPalette }},
-	{[]string{"text-combine-upright"}, func(dst, src *ResolvedStyle) {
-		dst.TextCombineUpright = src.TextCombineUpright
-	}},
-	{[]string{"text-orientation"}, func(dst, src *ResolvedStyle) { dst.TextOrientation = src.TextOrientation }},
 	{[]string{"text-decoration-skip-ink"}, func(dst, src *ResolvedStyle) {
 		dst.TextDecorationSkipInk = src.TextDecorationSkipInk
-	}},
-	{[]string{"text-decoration-skip"}, func(dst, src *ResolvedStyle) {
-		dst.TextDecorationSkip = src.TextDecorationSkip
 	}},
 	{[]string{"empty-cells"}, func(dst, src *ResolvedStyle) { dst.EmptyCells = src.EmptyCells }},
 }

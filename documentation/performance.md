@@ -1,8 +1,7 @@
 # Performance
 
 Numbers on this page are **labeled snapshots**, not a live SLA. Host, GOCACHE
-state, and whether a run used the **generic** convert path or the
-**benchmark-only page-island** path all change wall time and RSS.
+state, and the measured code revision all change wall time and RSS.
 
 **Current snapshot: 2026-09-11 perf-time phase-7 closure capture.** The 0.2.6
 perf-time plan cut warm 500-page time from 1,228.72 ms to a measured 576.33 ms
@@ -43,10 +42,10 @@ Related:
 | Public library `go test -bench` | `Document.WritePDF` / `ImageDocument.WriteImage` wall time, `B/op`, `allocs/op` | **2026-09-11 perf-time rows below; the perf-improve, recovery, and 2026-08-19 matrices are historical** |
 | Phase 9.3 gate | Two full-pipeline runs of a 10-section invoice fixture; CI budget only | Historical timings below; CI still asserts **< 5 s** per run |
 
-Page islands (`convert.NewBenchmarkPDFRequest`) are an **internal benchmark
-opt-in**. They are not a user-facing CLI or library mode. Comparing an
-island-era CLI number to today’s generic CLI is not a like-for-like fidelity
-or RSS guarantee.
+The former certified page-island benchmark opt-in
+(`convert.NewBenchmarkPDFRequest`) was removed in the 0.2.6 cleanup; every row
+on this page is a generic-path measurement. Comparing an island-era number to a
+generic one was never a like-for-like fidelity or RSS guarantee.
 
 ---
 
@@ -57,8 +56,7 @@ This is the closure capture for the 0.2.6 perf-time plan
 display-list, pagination, compression, and image-encode work landed. It is a
 **working-tree capture** on the uncommitted 0.2.6 tree; `VERSION` still reads
 0.2.5. Host: Linux amd64, 13th Gen Intel Core i7-13700HX (WSL2, 24 CPUs,
-7.6 GiB RAM). Toolchain: go1.26.4. Only the generic paths were measured;
-certified page islands are not part of any row.
+7.6 GiB RAM). Toolchain: go1.26.4. Only the generic path was measured.
 
 The warm matrix ran as **three independent fresh processes**; the standalone
 internal, public-library PDF, and public-library image rows are **three
@@ -153,8 +151,7 @@ This is the closure capture for the 0.2.6 warm-path performance plan
 forced-break, display-list, and page-bucketing phases landed. It is a
 **working-tree capture** on the uncommitted 0.2.6 tree; `VERSION` still reads
 0.2.5. Host: Linux amd64, 13th Gen Intel Core i7-13700HX (WSL2, 24 CPUs,
-7.6 GiB RAM). Toolchain: go1.26.4. Only the generic paths were measured;
-certified page islands are not part of any row.
+7.6 GiB RAM). Toolchain: go1.26.4. Only the generic path was measured.
 
 In-process and public-library rows are **three independent `1x` samples per
 workload**, one fresh process per sample, captured with
@@ -228,8 +225,8 @@ is 15.16 ops per node against a 1.2887 ratio on the benchmark template.
 The current capture is a **0.2.6 performance-recovery working tree**
 measurement. `VERSION` still reads 0.2.5, so it is a working-tree snapshot,
 not a released build. Host: Linux amd64, 13th Gen Intel Core i7-13700HX
-(WSL2, 24 CPUs, 7.6 GiB RAM). Toolchain: go1.26.4. Only the generic paths
-were measured; certified page islands are not part of any row.
+(WSL2, 24 CPUs, 7.6 GiB RAM). Toolchain: go1.26.4. Only the generic path
+was measured.
 
 In-process and public-library rows are **three independent `1x` samples per
 workload**, one fresh process per sample, captured with
@@ -606,7 +603,7 @@ calls `Document.WritePDF` directly and does not launch the gowkhtmltopdf CLI.
 ## Direct CLI comparison vs wkhtmltopdf (historical, island-era)
 
 The **2026-08-09** table below is **historical pre-CR-02 / island-era CLI**.
-Ordinary CLI documents no longer take the page-island path.
+The page-island path itself was removed in the 0.2.6 cleanup.
 
 The current documented process snapshot is the 2026-09-11 capture above and
 in [`testdata/golden/benchmarks/README.md`](../testdata/golden/benchmarks/README.md).
@@ -643,19 +640,12 @@ in the [benchmark documentation](../testdata/golden/benchmarks/README.md).
 
 ---
 
-## Page islands (benchmark-only)
+## Page islands (removed in the 0.2.6 cleanup)
 
-Certified page islands exist so large, regular report templates can be timed
-without pretending every HTML document is island-shaped.
-
-- **User-facing path:** `NewPDFRequest` / the CLI / the public library API —
-  **generic** layout. No island opt-in.
-- **Benchmark path:** `convert.NewBenchmarkPDFRequest` sets
-  `benchmarkPageIslands`. Used by `BenchmarkPDFPages/certified-islands` and
-  related tests only.
-
-Do not compare a certified-islands `B/op` or RSS row to a generic HTML
-fidelity review without saying so.
+Certified page islands were an internal benchmark-only optimization for large,
+regular report templates. The 0.2.6 cleanup deleted the path, its
+`convert.NewBenchmarkPDFRequest` constructor, and the `internal/convert/islands`
+package, so every current row on this page is a generic-path measurement.
 
 ---
 

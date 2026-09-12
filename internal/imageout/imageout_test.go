@@ -52,23 +52,27 @@ func renderHTMLOpts(src string, opts RenderOptions) (image.Image, error) {
 	return Render(root, opts)
 }
 
-func TestRunValidatesBeforeOpeningOutput(t *testing.T) {
+// TestRunRequestValidatesBeforeWritingOutput proves preflight runs before the
+// encoder: a request with no renderable objects fails validation and the
+// output writer receives no bytes.
+func TestRunRequestValidatesBeforeWritingOutput(t *testing.T) {
 	t.Parallel()
 
-	output := filepath.Join(t.TempDir(), "out.png")
-	cmd := &cli.Command{
-		Global: settings.DefaultPdfGlobal(),
-		Image:  settings.DefaultImageGlobal(),
-		Output: output,
-	}
+	var output bytes.Buffer
+	req := NewRequest(
+		settings.DefaultPdfGlobal(),
+		settings.DefaultImageGlobal(),
+		nil,
+		&output,
+	)
 
-	err := Run(t.Context(), cmd, nil)
+	err := RunRequest(t.Context(), req, nil)
 	if !errors.Is(err, settings.ErrNoRenderableObjects) {
-		t.Fatalf("Run() = %v, want errors.Is(..., %v)", err, settings.ErrNoRenderableObjects)
+		t.Fatalf("RunRequest() = %v, want errors.Is(..., %v)", err, settings.ErrNoRenderableObjects)
 	}
 
-	if _, statErr := os.Stat(output); !errors.Is(statErr, os.ErrNotExist) {
-		t.Fatalf("output stat error = %v, want os.ErrNotExist", statErr)
+	if output.Len() != 0 {
+		t.Fatalf("RunRequest wrote %d bytes after a validation failure, want 0", output.Len())
 	}
 }
 
@@ -461,8 +465,9 @@ func runCommand(t *testing.T, args ...string) *cli.Command {
 	return cmd
 }
 
-// TestRunEndToEnd drives Run through the CLI: local HTML file to PNG and to
-// JPEG, checking flags (--width/--format/--quality) reach the output.
+// TestRunEndToEnd drives a parsed CLI command through RunRequest: local HTML
+// file to PNG and to JPEG, checking flags (--width/--format/--quality) reach
+// the decoded output.
 func TestRunEndToEnd(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -474,21 +479,16 @@ func TestRunEndToEnd(t *testing.T) {
 		t.Fatalf("write input: %v", err)
 	}
 
-	pngOut := filepath.Join(dir, "out.png")
+	cmd := runCommand(t, "--width", "200", "--format", "png", "-o", filepath.Join(dir, "out.png"), input)
 
-	cmd := runCommand(t, "--width", "200", "--format", "png", "-o", pngOut, input)
-	if err := Run(t.Context(), cmd, io.Discard); err != nil {
-		t.Fatalf("Run png: %v", err)
+	var pngBuf bytes.Buffer
+
+	req := NewRequest(cmd.Global, cmd.Image, cmd.Objects, &pngBuf)
+	if err := RunRequest(t.Context(), req, io.Discard); err != nil {
+		t.Fatalf("RunRequest png: %v", err)
 	}
 
-	file, err := os.Open(pngOut)
-	if err != nil {
-		t.Fatalf("open png: %v", err)
-	}
-
-	defer file.Close()
-
-	img, err := png.Decode(file)
+	img, err := png.Decode(bytes.NewReader(pngBuf.Bytes()))
 	if err != nil {
 		t.Fatalf("decode png: %v", err)
 	}
@@ -497,21 +497,16 @@ func TestRunEndToEnd(t *testing.T) {
 		t.Errorf("png width = %d, want 200", img.Bounds().Dx())
 	}
 
-	jpgOut := filepath.Join(dir, "out.jpg")
+	cmd = runCommand(t, "--width", "200", "--format", "jpg", "--quality", "30", "-o", filepath.Join(dir, "out.jpg"), input)
 
-	cmd = runCommand(t, "--width", "200", "--format", "jpg", "--quality", "30", "-o", jpgOut, input)
-	if err := Run(t.Context(), cmd, io.Discard); err != nil {
-		t.Fatalf("Run jpg: %v", err)
+	var jpgBuf bytes.Buffer
+
+	req = NewRequest(cmd.Global, cmd.Image, cmd.Objects, &jpgBuf)
+	if err := RunRequest(t.Context(), req, io.Discard); err != nil {
+		t.Fatalf("RunRequest jpg: %v", err)
 	}
 
-	jpgFile, err := os.Open(jpgOut)
-	if err != nil {
-		t.Fatalf("open jpg: %v", err)
-	}
-
-	defer jpgFile.Close()
-
-	jimg, err := jpeg.Decode(jpgFile)
+	jimg, err := jpeg.Decode(bytes.NewReader(jpgBuf.Bytes()))
 	if err != nil {
 		t.Fatalf("decode jpg: %v", err)
 	}

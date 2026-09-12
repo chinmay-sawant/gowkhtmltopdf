@@ -8,10 +8,10 @@ import (
 	"testing"
 )
 
-// makeYCbCrProbeImage builds a deterministic NRGBA image with varied colors,
+// makeJPEGProbeImage builds a deterministic NRGBA image with varied colors,
 // and transparent pixels when requested (alpha reaches 0 so premultiplication
 // matters).
-func makeYCbCrProbeImage(rect image.Rectangle, transparent bool) *image.NRGBA {
+func makeJPEGProbeImage(rect image.Rectangle, transparent bool) *image.NRGBA {
 	img := image.NewNRGBA(rect)
 
 	for row := rect.Min.Y; row < rect.Max.Y; row++ {
@@ -33,8 +33,8 @@ func makeYCbCrProbeImage(rect image.Rectangle, transparent bool) *image.NRGBA {
 	return img
 }
 
-// stdlibJPEGBytes encodes img through image/jpeg, which uses its own
-// per-pixel toYCbCr conversion for NRGBA input.
+// stdlibJPEGBytes encodes img through image/jpeg with the same options encode
+// passes, producing the reference bytes for the parity assertions below.
 func stdlibJPEGBytes(t *testing.T, img image.Image, quality int) []byte {
 	t.Helper()
 
@@ -46,11 +46,11 @@ func stdlibJPEGBytes(t *testing.T, img image.Image, quality int) []byte {
 	return buf.Bytes()
 }
 
-// TestNRGBAToYCbCr420KeepsJPEGBytes is the byte-equality proof for the fast
-// path: the precomputed 4:2:0 planes must encode to exactly the bytes the
-// stdlib NRGBA path produces, including odd dimensions, transparency, and
-// shifted even origins.
-func TestNRGBAToYCbCr420KeepsJPEGBytes(t *testing.T) {
+// TestEncodeJPGMatchesStdlibBytes is the byte-stability proof for the JPEG
+// encoder: encode hands the image straight to image/jpeg, so its bytes must
+// equal a direct jpeg.Encode of the same image at the same quality, including
+// odd dimensions, transparency, and shifted even origins.
+func TestEncodeJPGMatchesStdlibBytes(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
@@ -76,29 +76,28 @@ func TestNRGBAToYCbCr420KeepsJPEGBytes(t *testing.T) {
 				testCase.origin.X, testCase.origin.Y,
 				testCase.origin.X+testCase.width, testCase.origin.Y+testCase.height,
 			)
-			img := makeYCbCrProbeImage(rect, testCase.transparent)
+			img := makeJPEGProbeImage(rect, testCase.transparent)
 			want := stdlibJPEGBytes(t, img, 90)
 
-			ycbcr := nrgbaToYCbCr420(img)
-			if ycbcr == nil {
-				t.Fatal("nrgbaToYCbCr420 returned nil for an even origin")
+			got, err := encode(img, formatJPG, 90, false)
+			if err != nil {
+				t.Fatalf("encode: %v", err)
 			}
 
-			got := stdlibJPEGBytes(t, ycbcr, 90)
 			if !bytes.Equal(got, want) {
-				t.Fatalf("YCbCr JPEG differs from NRGBA JPEG: %d vs %d bytes", len(got), len(want))
+				t.Fatalf("encode JPEG differs from jpeg.Encode at %v: %d vs %d bytes", rect, len(got), len(want))
 			}
 		})
 	}
 }
 
-// TestEncodeJPGUsesFastPathForNRGBA checks the encode wiring: a JPEG from
-// encode must match the stdlib NRGBA path byte for byte.
-func TestEncodeJPGUsesFastPathForNRGBA(t *testing.T) {
+// TestEncodeJPGMatchesStdlibAtQuality checks the quality wiring: the quality
+// reaches jpeg.Options unchanged for a transparent probe image.
+func TestEncodeJPGMatchesStdlibAtQuality(t *testing.T) {
 	t.Parallel()
 
 	for _, size := range []image.Point{{X: 64, Y: 48}, {X: 37, Y: 23}} {
-		img := makeYCbCrProbeImage(image.Rect(0, 0, size.X, size.Y), true)
+		img := makeJPEGProbeImage(image.Rect(0, 0, size.X, size.Y), true)
 		want := stdlibJPEGBytes(t, img, 80)
 
 		got, err := encode(img, formatJPG, 80, false)
@@ -107,30 +106,7 @@ func TestEncodeJPGUsesFastPathForNRGBA(t *testing.T) {
 		}
 
 		if !bytes.Equal(got, want) {
-			t.Fatalf("encode JPEG differs from stdlib NRGBA JPEG at %v: %d vs %d bytes", size, len(got), len(want))
+			t.Fatalf("encode JPEG differs from jpeg.Encode at %v: %d vs %d bytes", size, len(got), len(want))
 		}
-	}
-}
-
-// TestNRGBAToYCbCr420RejectsOddOrigin covers the fallback: an odd origin
-// cannot be represented on the 4:2:0 grid, so encode must keep the stdlib
-// NRGBA conversion and still produce identical bytes.
-func TestNRGBAToYCbCr420RejectsOddOrigin(t *testing.T) {
-	t.Parallel()
-
-	img := image.NewNRGBA(image.Rect(1, 2, 33, 18))
-	if ycbcr := nrgbaToYCbCr420(img); ycbcr != nil {
-		t.Fatal("nrgbaToYCbCr420 accepted an odd origin")
-	}
-
-	want := stdlibJPEGBytes(t, img, 75)
-
-	got, err := encode(img, formatJPG, 75, false)
-	if err != nil {
-		t.Fatalf("encode: %v", err)
-	}
-
-	if !bytes.Equal(got, want) {
-		t.Fatalf("odd-origin JPEG differs from stdlib NRGBA JPEG: %d vs %d bytes", len(got), len(want))
 	}
 }

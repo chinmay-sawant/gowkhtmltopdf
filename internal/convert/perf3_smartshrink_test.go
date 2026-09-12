@@ -36,7 +36,6 @@ func TestSmartShrinkNoRelayoutWhenWithinTenthPoint(t *testing.T) {
 
 			return &layout.Result{Width: 100, MaxContentX: 100.05}, nil
 		},
-		nil,
 	)
 
 	if err != nil {
@@ -80,7 +79,6 @@ func TestSmartShrinkRelayoutsWhenMaxContentXOverflows(t *testing.T) {
 
 			return &layout.Result{Width: width, MaxContentX: maxX}, nil
 		},
-		nil,
 	)
 
 	if err != nil {

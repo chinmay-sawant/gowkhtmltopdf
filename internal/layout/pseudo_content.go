@@ -10,7 +10,6 @@ import (
 const (
 	contentNormal             = "normal"
 	singleQuotedContentMinLen = 2
-	listMarkerDisc            = "•"
 )
 
 // pseudoContent cascades the CSS content property for ::before/::after on n.
@@ -495,60 +494,4 @@ func decodeHexEscape(value string, start int) (rune, int) {
 
 func isHex(c byte) bool {
 	return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
-}
-
-// listItemMarkerText returns the marker for a display:list-item element
-// based on its ListStyleType. Used by inline_paint when parent is display:list-item.
-func listItemMarkerText(style ResolvedStyle, node *html.Node) string { //nolint:unused // used by inline_paint.go.
-	typ := style.ListStyleType
-	if typ == "" {
-		typ = listStyleDisc
-	}
-	// Reuse layout's markerText logic for disc/circle/square/decimal etc.
-	// When node is available, counter-based types could use its position.
-	// For inline-paint fallback, use simple glyphs.
-	switch typ {
-	case listStyleDisc:
-		return listMarkerDisc
-	case listStyleCircle:
-		return "○"
-	case listStyleSquare:
-		return "■"
-	case listStyleDecimal, listStyleDecimalZero:
-		// Inline fallback without counter context – markerText in layout_flow would compute index.
-		// Use generic "1."; real <ol> path uses emitListMarker with correct counter.
-		if node != nil {
-			return markerText(node, typ)
-		}
-
-		return "1."
-	case listStyleLowerAlpha, listStyleLowerLatin, listStyleUpperAlpha,
-		listStyleUpperLatin, listStyleLowerRoman, listStyleUpperRoman:
-		return listMarkerAlphaRoman(typ)
-	default:
-		if node != nil {
-			return markerText(node, typ)
-		}
-
-		return listMarkerDisc
-	}
-}
-
-//nolint:unused // helper for listItemMarkerText above.
-func listMarkerAlphaRoman(typ string) string {
-	switch typ {
-	case listStyleLowerAlpha, listStyleLowerLatin:
-		return "a."
-	case listStyleUpperAlpha, listStyleUpperLatin:
-		return "A."
-	case listStyleLowerRoman:
-		return "i."
-	default:
-		return "I."
-	}
-}
-
-// isDisplayListItem reports whether the style is a list-item display.
-func isDisplayListItem(style *ResolvedStyle) bool { //nolint:unused // used by inline_paint.go.
-	return style != nil && style.Display == "list-item"
 }

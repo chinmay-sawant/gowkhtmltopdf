@@ -214,7 +214,7 @@ func runStyleMemoFixture(t *testing.T, fixture styleMemoFixture) {
 
 	if fixture.container {
 		pass1 := resolveStylesWith(root, opts, nil)
-		containers = measureSizeContainers(root, pass1, opts.Width)
+		containers = measureContainers(t, root, pass1)
 
 		if len(containers) == 0 {
 			t.Fatal("fixture produced no size containers")
@@ -252,27 +252,9 @@ func TestStyleMemoSharesRepeatedElements(t *testing.T) {
 
 	const rows = 64
 
-	var markup strings.Builder
+	root, opts, styles := repeatedTableStyles(t, rows)
 
-	markup.WriteString(`<html><body><table>`)
-
-	for range rows {
-		markup.WriteString(`<tr><td class="plain">x</td><td class="amount">1</td></tr>`)
-	}
-
-	markup.WriteString(`</table></body></html>`)
-
-	root := mustParse(t, markup.String())
-	opts := Options{
-		Sheets: []*css.Stylesheet{sheet(t, `
-			td { border: 1px solid #000; padding: 1px }
-			td.amount { text-align: right }
-		`)},
-		Media:  "print",
-		Width:  testViewport,
-		Height: 800,
-	}
-	styles := resolveStylesWith(root, opts, nil)
+	requireSameResolvedValues(t, "memo shares repeated elements", styles, resolveStylesMemoDisabled(root, opts, nil))
 
 	plain := styleRecordsByClass(t, root, styles, "plain")
 	amount := styleRecordsByClass(t, root, styles, "amount")
@@ -284,128 +266,6 @@ func TestStyleMemoSharesRepeatedElements(t *testing.T) {
 	requireSharedRecords(t, "memoized td.plain", plain)
 	requireSharedRecords(t, "memoized td.amount", amount)
 	requireDistinctRecords(t, "td.plain vs td.amount", plain[0], amount[0])
-}
-
-// TestInheritablePropBitsComplete pins the declared-property mask table: every
-// inheritable name maps to its own entry's bit, and the table fits one word.
-func TestInheritablePropBitsComplete(t *testing.T) {
-	t.Parallel()
-
-	if len(inheritableProps) > 64 {
-		t.Fatalf("inheritableProps has %d entries; the uint64 declared mask fits 64", len(inheritableProps))
-	}
-
-	// Names can be shared between entries (list-style), so the expected bit
-	// set for a name is the OR of every entry that lists it.
-	wantBits := make(map[string]uint64, len(inheritablePropBits))
-
-	for i, entry := range inheritableProps {
-		for _, name := range entry.names {
-			wantBits[name] |= uint64(1) << i
-		}
-	}
-
-	for name, want := range wantBits {
-		got, ok := inheritablePropBits[name]
-		if !ok {
-			t.Errorf("inheritable property %q missing from inheritablePropBits", name)
-
-			continue
-		}
-
-		if got != want {
-			t.Errorf("inheritable property %q bits = %#x, want %#x", name, got, want)
-		}
-	}
-
-	for name := range inheritablePropBits {
-		if _, ok := wantBits[name]; !ok {
-			t.Errorf("inheritablePropBits has stale name %q", name)
-		}
-	}
-}
-
-// TestDeclaredInheritableMask pins the fold itself: a multi-name entry sets
-// one bit for either spelling, unknown properties contribute nothing, and an
-// empty map yields no bits.
-func TestDeclaredInheritableMask(t *testing.T) {
-	t.Parallel()
-
-	if got := declaredInheritableMask(nil); got != 0 {
-		t.Fatalf("nil raw mask = %#x, want 0", got)
-	}
-
-	wordWrap, ok := inheritablePropBits["word-wrap"]
-	if !ok {
-		t.Fatal("word-wrap must share the overflow-wrap entry")
-	}
-
-	overflowWrap := inheritablePropBits["overflow-wrap"]
-
-	if got := declaredInheritableMask(map[string]string{"word-wrap": "break-word"}); got != wordWrap {
-		t.Fatalf("word-wrap mask = %#x, want %#x", got, wordWrap)
-	}
-
-	if got := declaredInheritableMask(map[string]string{"overflow-wrap": "normal"}); got != overflowWrap {
-		t.Fatalf("overflow-wrap mask = %#x, want %#x", got, overflowWrap)
-	}
-
-	if wordWrap != overflowWrap {
-		t.Fatalf("word-wrap bit %#x != overflow-wrap bit %#x", wordWrap, overflowWrap)
-	}
-
-	if got := declaredInheritableMask(map[string]string{"margin-top": "0", "display": "block"}); got != 0 {
-		t.Fatalf("non-inheritable declarations mask = %#x, want 0", got)
-	}
-
-	color := inheritablePropBits["color"]
-
-	if got := declaredInheritableMask(map[string]string{"color": "#fff"}); got != color {
-		t.Fatalf("color mask = %#x, want %#x", got, color)
-	}
-}
-
-// TestSortRestLonghandPropsPreservesSortOrder pins the replacement sort
-// against sort.Strings: the longhand pass must keep the exact byte order the
-// old implementation produced, because overlapping longhands depend on it.
-func TestSortRestLonghandPropsPreservesSortOrder(t *testing.T) {
-	t.Parallel()
-
-	cases := [][]string{
-		nil,
-		{},
-		{"a"},
-		{"overflow-x", "overflow", "overflow-y"},
-		{"z-index", "color", "width", "margin-top", "border-top-width", "background", "background-color"},
-		{"b", "a", "d", "c", "f", "e"},
-	}
-
-	for _, input := range cases {
-		want := append([]string(nil), input...)
-		sortStringsReference(want)
-
-		got := append([]string(nil), input...)
-		got = sortRestLonghandProps(got)
-
-		if !reflect.DeepEqual(got, want) {
-			t.Errorf("sortRestLonghandProps(%v) = %v, want %v", input, got, want)
-		}
-	}
-}
-
-// sortStringsReference is the byte order the longhand pass has always used.
-func sortStringsReference(props []string) {
-	for i := 1; i < len(props); i++ {
-		prop := props[i]
-		prev := i - 1
-
-		for prev >= 0 && props[prev] > prop {
-			props[prev+1] = props[prev]
-			prev--
-		}
-
-		props[prev+1] = prop
-	}
 }
 
 // TestStyleMemoLookupRejectsDifferentHits guards the collision-safety half:

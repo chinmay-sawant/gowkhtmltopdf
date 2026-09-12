@@ -24,8 +24,8 @@ load → parse → CSS → layout → paginate → paint → write
 ```
 
 The conversion package (`internal/convert`) drives the pipeline; for each
-body object it calls `layout.LayoutContext` (or `layout.WithWorkspace` for the
-explicit internal benchmark page-island path) and then `layout.PaintContext`
+body object it calls `layout.LayoutContext` (or `layout.NodeWithWorkspace` for
+the certified independent-block path) and then `layout.PaintContext`
 to paginate and emit PDF content streams. `internal/imageout` reuses the *same* layout entry
 points but rasterizes the display list instead of painting PDF. Headers and
 footers are themselves laid out as small nested documents with the same
@@ -122,7 +122,7 @@ Flagged so future readers do not search the wrong package.
 | `PaintBand(p, c, ops, opts)` / `PaintBandContext(...)` | `paint.go:498,504` | Single-band paint on an existing page content stream (HTML HF); no pagination, no fixed stamps |
 | `PaintOrder(ops []Op) []int` | `paint_order.go:8` | Canonical display-list z-order used by all three backends |
 | `CloneResult(res) *Result` | `layout.go:116` | Deep copy for TOC page-count fixpoint (`internal/convert/toc.go:164`) |
-| `Workspace.Release(res)` | `layout.go:216` | Return op storage; clears box/paint indexes (page-islands path) |
+| `Workspace.Release(res)` | `layout.go:216` | Return op storage; clears box/paint indexes |
 
 ### Core data types
 
@@ -206,8 +206,6 @@ destinations outside paint.
 - TOC: `internal/convert/toc.go:202` lays out the generated TOC document; the
   page-count fixpoint re-paints into a scratch document via
   `layout.PaintContext(ctx, scratch, cloneResult(res), ...)` (`toc.go:164`).
-- Page islands (benchmark mode): `internal/convert/page_islands.go:103` lays
-  out each section with `layout.WithWorkspace` and `defer workspace.Release(res)`.
 
 ## 5. Cross-package dependencies
 
@@ -231,7 +229,7 @@ convert into layout, never the reverse.
 
 | Consumer | Usage |
 |----------|-------|
-| `internal/convert` | Body objects (`LayoutContext` + `PaintContext`), HTML HF (`LayoutContext` + `PaintBandContext`), TOC (`LayoutContext` + scratch `PaintContext`), page islands (`WithWorkspace` + `PaintContext`), links (`Result.Locations`), outline (`Result.Locations`) |
+| `internal/convert` | Body objects (`LayoutContext` + `PaintContext`), HTML HF (`LayoutContext` + `PaintBandContext`), TOC (`LayoutContext` + scratch `PaintContext`), links (`Result.Locations`), outline (`Result.Locations`) |
 | `internal/imageout` | `LayoutContext` (`imageout.go:180,261`), then rasterizes `res.Ops` in `rasterPaintOrder` order (`imageout.go:496`) |
 | `internal/convert/render` | Renders via the convert adapter; page ordering/copies are render's concern, layout supplies page counts through paint |
 | `internal/outline` | `Location` projections are satisfied by `layout.ElementLocation` (`NodeRef`/`PageIndex`/`Bounds` at `layout.go:246-256`) |
@@ -367,8 +365,8 @@ time (`assignOpIDs`).
 
 The engine is deliberately single-threaded and reuses scratch storage:
 `inlineItemPool`, `bfcPool`, `faceByStyle`/`faceByRune` caches, `imgCache`
-(one decode per src per run), `Workspace` (display-list storage reuse for
-page islands), per-page exact-capacity buckets in `pageBuckets`. Context
+(one decode per src per run), `Workspace` (display-list storage reuse),
+per-page exact-capacity buckets in `pageBuckets`. Context
 cancellation is checked at recursion boundaries (`checkContext`, cheap
 enough to run per build call).
 

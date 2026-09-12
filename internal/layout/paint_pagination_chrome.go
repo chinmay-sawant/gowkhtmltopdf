@@ -54,12 +54,11 @@ func calculateChromeContentBottom(boxNode *box, oldBottom, inkBottom float64, ha
 		return oldBottom
 	}
 
-	style, ok := paintChromeStyleOf(boxNode)
-	if !ok {
+	if boxNode == nil || boxNode.style == nil {
 		return oldBottom
 	}
 
-	desiredBottom := inkBottom + style.paddingBottom
+	desiredBottom := inkBottom + boxNode.style.PaddingBottom
 	if desiredBottom > oldBottom {
 		return desiredBottom
 	}
@@ -119,12 +118,11 @@ func boxIsFloatOrFigure(boxNode *box) bool {
 		return true
 	}
 
-	style, ok := paintChromeStyleOf(boxNode)
-	if !ok {
+	if boxNode.style == nil {
 		return false
 	}
 
-	return style.float == floatLeft || style.float == floatRight
+	return boxNode.style.Float == floatLeft || boxNode.style.Float == floatRight
 }
 
 func lastInFlowChildBottom(boxNode *box) float64 {
@@ -139,8 +137,7 @@ func lastInFlowChildBottom(boxNode *box) float64 {
 			continue
 		}
 
-		style, ok := paintChromeStyleOf(child)
-		if ok && (style.position == positionAbsolute || style.position == positionFixed) {
+		if child.style != nil && (child.style.Position == positionAbsolute || child.style.Position == positionFixed) {
 			continue
 		}
 
@@ -154,12 +151,14 @@ func lastInFlowChildBottom(boxNode *box) float64 {
 
 //nolint:wsl // border ownership checks are intentionally explicit
 func hasOwnVerticalChrome(ops []Op, boxNode *box) bool {
-	style, ok := paintChromeStyleOf(boxNode)
-	if !ok {
+	if boxNode == nil || boxNode.style == nil {
 		return false
 	}
-	leftBorder := style.borderLeft.Width > 0 && style.borderLeft.Style != cssDisplayNone
-	rightBorder := style.borderRight.Width > 0 && style.borderRight.Style != cssDisplayNone
+
+	style := boxNode.style
+
+	leftBorder := style.BorderLeft.Width > 0 && style.BorderLeft.Style != cssDisplayNone
+	rightBorder := style.BorderRight.Width > 0 && style.BorderRight.Style != cssDisplayNone
 	if !leftBorder && !rightBorder {
 		return false
 	}
@@ -181,13 +180,14 @@ func hasOwnVerticalChrome(ops []Op, boxNode *box) bool {
 
 //nolint:cyclop,wsl // fragment collection deliberately mirrors paint ownership
 func normalizeOwnVerticalChrome(ops []Op, boxNode *box) {
-	style, ok := paintChromeStyleOf(boxNode)
-	if !ok {
+	if boxNode == nil || boxNode.style == nil {
 		return
 	}
 
-	leftBorder := style.borderLeft.Width > 0 && style.borderLeft.Style != cssDisplayNone
-	rightBorder := style.borderRight.Width > 0 && style.borderRight.Style != cssDisplayNone
+	style := boxNode.style
+
+	leftBorder := style.BorderLeft.Width > 0 && style.BorderLeft.Style != cssDisplayNone
+	rightBorder := style.BorderRight.Width > 0 && style.BorderRight.Style != cssDisplayNone
 
 	type lineRef struct{ opIdx, segIdx int }
 
@@ -277,8 +277,7 @@ func isVerticalLineOp(operation Op) bool {
 // isDashLikeVerticalRail is true when a vertical side stroke must not be H-stretched:
 // dashed/dotted CSS on that side, or a short segment that is already a dash piece.
 func isDashLikeVerticalRail(operation Op, boxNode *box) bool {
-	style, ok := paintChromeStyleOf(boxNode)
-	if !isVerticalLineOp(operation) || !ok {
+	if !isVerticalLineOp(operation) || boxNode == nil || boxNode.style == nil {
 		return false
 	}
 
@@ -286,8 +285,8 @@ func isDashLikeVerticalRail(operation Op, boxNode *box) bool {
 		return true
 	}
 
-	onLeft := nearLayout(operation.X, boxNode.x) && isDashedOrDottedStyle(style.borderLeft.Style)
-	onRight := nearLayout(operation.X, boxNode.x+boxNode.w) && isDashedOrDottedStyle(style.borderRight.Style)
+	onLeft := nearLayout(operation.X, boxNode.x) && isDashedOrDottedStyle(boxNode.style.BorderLeft.Style)
+	onRight := nearLayout(operation.X, boxNode.x+boxNode.w) && isDashedOrDottedStyle(boxNode.style.BorderRight.Style)
 
 	return onLeft || onRight
 }
@@ -313,10 +312,11 @@ func isHorizontalChromeForBox(operation Op, boxNode *box, oldBottom float64) boo
 		return true
 	}
 
-	style, ok := paintChromeStyleOf(boxNode)
-	if !ok {
+	if boxNode.style == nil {
 		return false
 	}
+
+	style := boxNode.style
 
 	// Dashed/dotted fragments sit on the edge with dash-sized W.
 	inside := operation.X >= boxNode.x-1e-6 &&
@@ -325,11 +325,11 @@ func isHorizontalChromeForBox(operation Op, boxNode *box, oldBottom float64) boo
 		return false
 	}
 
-	if onTop && isDashedOrDottedStyle(style.borderTop.Style) {
+	if onTop && isDashedOrDottedStyle(style.BorderTop.Style) {
 		return true
 	}
 
-	if onBottom && isDashedOrDottedStyle(style.borderBottom.Style) {
+	if onBottom && isDashedOrDottedStyle(style.BorderBottom.Style) {
 		return true
 	}
 
@@ -359,7 +359,7 @@ func stretchOwnBoxChrome(operation *Op, boxNode *box, oldBottom, newBottom float
 	if operation == nil || boxNode == nil {
 		return
 	}
-	style, ok := paintChromeStyleOf(boxNode)
+	style := boxNode.style
 
 	if (operation.Kind == OpFillRect || operation.Kind == OpStrokeRect) &&
 		nearLayout(operation.X, boxNode.x) && nearLayout(operation.W, boxNode.w) {
@@ -379,9 +379,9 @@ func stretchOwnBoxChrome(operation *Op, boxNode *box, oldBottom, newBottom float
 		}
 	}
 
-	if operation.Kind == OpLine && operation.W == 0 && operation.H > 0 && ok &&
-		((style.borderLeft.Width > 0 && nearLayout(operation.X, boxNode.x)) ||
-			(style.borderRight.Width > 0 && nearLayout(operation.X, boxNode.x+boxNode.w))) &&
+	if operation.Kind == OpLine && operation.W == 0 && operation.H > 0 && style != nil &&
+		((style.BorderLeft.Width > 0 && nearLayout(operation.X, boxNode.x)) ||
+			(style.BorderRight.Width > 0 && nearLayout(operation.X, boxNode.x+boxNode.w))) &&
 		operation.Y >= boxNode.y-1e-6 && operation.Y <= boxNode.y+boxNode.height+1e-6 &&
 		nearLayout(operation.Y+operation.H, oldBottom) {
 		// Never elongate a dash/dot segment into a solid stub.

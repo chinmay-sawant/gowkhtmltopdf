@@ -70,15 +70,14 @@ door, not a computational engine.
 | `NetworkPolicy` | `load.go:125-135` | Explicit network trust boundary: scheme and host allowlists, private-network blocking, cross-host redirect blocking. Presets `CompatibleNetworkPolicy` (`load.go:140`) and `RestrictedNetworkPolicy` (`load.go:149`); `ApplyNetworkPolicy` (`load.go:166`) writes one into `settings.LoadGlobal`. |
 | `AccessController` | `load.go:254-256` | The local-file ACL: `AllowPrefixes` plus `Allowed(path)`. Default deny. |
 | `IPResolver` | `load.go:386-391` | Host address lookup seam for restricted-policy private-IP checks and pinned dials; `net.DefaultResolver` satisfies it (`load.go:394`), and `SetResolver` replaces it at runtime. |
-| `Loader` | `load.go:407-425` | The fetch engine: `*http.Client`, `settings.LoadGlobal` policy snapshot, `Network NetworkPolicy`, `Resolver IPResolver`, `io.Writer` log, `MaxBodySize`, `MaxRedirects`, plus compatibility fields `Allow` / `EnableLocalFileAccess` (effective ACL state) and a private `initErr`. |
+| `Loader` | `load.go:407-425` | The fetch engine: `*http.Client`, `settings.LoadGlobal` policy snapshot, `Network NetworkPolicy`, `Resolver IPResolver`, `io.Writer` log, `MaxBodySize`, `MaxRedirects`, plus compatibility fields `Allow` / `EnableLocalFileAccess` (effective ACL state). |
 
 ### 3.2 Constructors & policy helpers
 
 | Symbol | Location | Purpose |
 |--------|----------|---------|
-| `NewLoader(global settings.LoadGlobal)` | `load.go:501` | Deprecated compatibility shim: builds the loader but defers proxy-validation failure to the first `Load`/`FetchSub` call (recorded in `initErr`). Kept for historical callers; new callers use `NewLoaderWithError`. |
 | `NewLoaderWithError(global settings.LoadGlobal) (*Loader, error)` | `load.go:527` | Fail-fast constructor: validates proxy config and installs the HTTP transport before returning. **This is the one new callers use**: `convert.Run` and `imageout` construct the loader at the request boundary so invalid policy fails before any pipeline state is built. |
-| `NewLoaderWithNetworkPolicy(global settings.LoadGlobal, network NetworkPolicy) (*Loader, error)` | `load.go:550` | Explicit network-policy constructor; the two constructors above delegate to it. |
+| `NewLoaderWithNetworkPolicy(global settings.LoadGlobal, network NetworkPolicy) (*Loader, error)` | `load.go:550` | Explicit network-policy constructor; the other constructors delegate to it. |
 | `CompatibleNetworkPolicy() NetworkPolicy` | `load.go:140` | Historical behavior preset: HTTP(S) only; private hosts and cross-host redirects allowed. Default for existing constructors. |
 | `RestrictedNetworkPolicy() NetworkPolicy` | `load.go:149` | Untrusted-input preset: private/link-local targets and cross-host redirects blocked unless explicitly allowlisted. Backs `--restrict-network`. |
 | `ApplyNetworkPolicy(dst *settings.LoadGlobal, policy NetworkPolicy)` | `load.go:166` | Stores a `NetworkPolicy` into settings with slice fields cloned and `NetworkPolicySet` raised. |
@@ -310,9 +309,8 @@ acceptable — see `documentation/fidelity.md` for the claims language.
 ### 6.3 Security posture shapes the code
 
 The ACL, caps, and timeouts are not bolted on; they are baked into the
-control flow (see §8). The two-constructor design (`NewLoader` vs
-`NewLoaderWithError`) exists so policy validation happens **at the request
-boundary** — `convert.Run` deliberately constructs the loader before fonts,
+control flow (see §8). The fail-fast `NewLoaderWithError` design exists so policy validation happens
+**at the request boundary** — `convert.Run` deliberately constructs the loader before fonts,
 layout state, or document output are initialized (`convert.go:410-415`).
 
 ### 6.4 Trade-offs worth knowing

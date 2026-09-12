@@ -52,7 +52,7 @@ line counts from `wc -l` (2026-09):
 |------|------:|----------------|
 | `css.go` | 971 | Stylesheet/rule/selector/declaration model; top-level parser; at-rule dispatch (`@media`, `@container`, `@page`, `@font-face`, `@import`, skip-others); block/paren scanning; `ParseSelectors`; specificity |
 | `selector_parser.go` | 637 | Selector-chain and compound parsing; attribute selectors incl. the ASCII `i` flag; pseudo classification; recursive `:has()`/`:not()`/`:is()`/`:where()` argument parsers (`appendIsWherePseudo`, `isWherePseudo`) |
-| `match.go` | 846 | Right-to-left matching (`Match`, `MatchPseudo`, `matchPart`, `matchPseudos`, `matchPseudo` incl. `:is()`/`:where()` via `matchAnySelector`); `:nth-child`/of-type arithmetic; bounded process-global sibling index cache (`sibCache`, match.go:105) |
+| `match.go` | 729 | Right-to-left matching (`Match`, `MatchPseudo`, `matchPart`, `matchPseudos`, `matchPseudo` incl. `:is()`/`:where()` via `matchAnySelector`); `:nth-child`/of-type arithmetic; direct sibling scans in `getSiblingInfo` |
 | `import.go` | 107 | `@import` prelude parsing into `Stylesheet.Imports` (`parseImportRule`); never fetches |
 | `page_margin.go` | 223 | Lite unnamed `@page` margin-box parsing (`PageMarginBoxes`); quoted content strings only |
 | `values.go` | 854 | Declaration-block splitting (`ParseInline`); `!important`; length/number/color parsing; `var()` fallback + custom-property resolution; font-family splitting; named-color table |
@@ -99,7 +99,7 @@ The two complementary roles are worth distinguishing early:
 | `PseudoClass` | css.go:123 | Named pseudo with optional `Arg` (`:nth-child`), `Has []RelativeSelector`, `Not []Selector`, and a pre-parsed integer `nth nthForm` |
 | `Declaration` | css.go:134 | `Prop`, `Value`, `Important` — the raw wire form of a `prop: value[!important]` pair |
 | `PageStyle` | css.go:59 | `@page` margin/size declarations kept as raw strings, resolved at the PDF boundary |
-| `FontFace` | css.go:66 | `@font-face` local subset: `Family` + raw `Src` (consumed by `convert.MergeFontFaces`) |
+| `FontFace` | css.go:66 | `@font-face` local subset: `Family` + raw `Src` (consumed by `prepare.ResourceContext.MergeFontFaces`) |
 
 ### 3.2 Public entry points (exported functions)
 
@@ -146,7 +146,7 @@ The two complementary roles are worth distinguishing early:
 
 ### 4.1 Stylesheet collection (the entry into css for a document)
 
-1. `internal/convert/prepare/styles.go` `CollectSheets` walks the HTML tree with
+1. `internal/convert/prepare` `ResourceContext.CollectSheets` walks the HTML tree with
    `root.Walk`, visiting every `style` and `link` element (styles.go:35–48).
 2. Inline `<style>` text → `css.Parse` (styles.go:90); `<link rel=stylesheet>`
    is first gated by media/viewport via `linkStylesheet` (styles.go:164, itself
@@ -262,7 +262,7 @@ convert, or pdf, and it makes the package independently testable.
 |----------|--------------|
 | `internal/layout` (style_cascade.go, style.go, style_properties.go, transform.go, pseudo_content.go, layout.go) | `Parse`, `Match`, `MatchPseudo`, `Specificity`, `MediaMatches`, `ParseInline`, `ParseLength`, `LengthToPt`, `ParseColor`, `ParseFontFamily`, `ParseNumber`, `ResolveVar`, `ResolveCustomProps`, `ParseContainerNameValue`, `ParseContainerShorthand`, `HasContainerRules` |
 | `internal/convert/prepare` (styles.go, simplify.go, prepare.go) | `Parse` for `<style>`/`<link>`/helper sheets; `MediaMatches` for link media gating; `FontFaces`/`FontFaceURLs` for font merging |
-| `internal/convert` (outline.go, toc.go, page_islands.go, simplify.go) | `ParseSelectors` for `--exclude-from-outline`; `ParseLength` in TOC geometry; `Parse` of `islandBreakOverrideCSS` |
+| `internal/convert` (outline.go, toc.go) | `ParseSelectors` for `--exclude-from-outline`; `ParseLength` in TOC geometry |
 | `internal/outline` (outline.go) | `css.Selector` matching for outline exclusion |
 | `internal/imageout` (imageout.go) | Same pipeline in image mode (load → parse → css → layout → raster) |
 | `api.go` / `internal/cli` / `internal/settings` | *None directly* — settings inject sheets/media via layout options |
@@ -277,7 +277,7 @@ imports layout, convert, pdf, load, or settings. All viewport/media/container
   needs a document-global order across many sheets. Layout treats the order as
   per-sheet and relies on sheet iteration order for cross-sheet tiebreaks
   (style_cascade.go:225). Callers who build compound sheet lists must keep
-  document order intact (CollectSheets does).
+  document order intact (ResourceContext.CollectSheets does).
 - `Selector.spec` cache means **mutating a parsed Selector's parts after
   parsing yields stale specificity**; `Specificity` only falls back to a walk
   when `specValid` is false (css.go:1738). Today no caller mutates parsed
@@ -414,7 +414,7 @@ attack path for hostile HTML, so its posture matters:
   network access anywhere in the package.
 - **Resource amplification is capped outside css**: linked-stylesheet and
   `@font-face` fetches are governed by `internal/load`'s ACL and by
-  `prepare.CollectSheets`'s rule limits (soft warn 25k, hard cap 1M,
+  `ResourceContext.CollectSheets`'s rule limits (soft warn 25k, hard cap 1M,
   styles.go:21/33/63) — see `documentation/THREAT-MODEL.md`.
 - **No CSS-triggered exfiltration**: `url()` is only honored in
   `@font-face src` via `FontFaceURLs` (and only through the loader's policy);
@@ -520,7 +520,7 @@ Open questions an architect should keep an eye on:
     (style_cascade.go, style.go, style_properties.go, transform.go,
     pseudo_content.go).
   - `04-load.md` — the loader whose ACL governs stylesheet/font fetches that
-    `prepare.CollectSheets` triggers.
-  - `08-convert-pipeline.md` — prepare/simplify/outline/islands consumers
-    (`.Sheets`, `FontFaces`, `ParseSelectors`, `islandBreakOverrideCSS`).
+    `ResourceContext.CollectSheets` triggers.
+  - `08-convert-pipeline.md` — prepare/simplify/outline consumers
+    (`.Sheets`, `FontFaces`, `ParseSelectors`).
   - `10-imageout-svg.md` — image-mode reuse of the same css→layout path.

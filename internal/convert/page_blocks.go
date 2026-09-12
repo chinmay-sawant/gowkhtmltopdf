@@ -3,7 +3,6 @@ package convert
 import (
 	"context"
 	"fmt"
-	"io"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/layout"
@@ -17,7 +16,6 @@ func renderIndependentBlocks(
 	root *html.Node,
 	blocks []*html.Node,
 	render objectRenderContext,
-	log io.Writer,
 ) error {
 	opts := state.bodyLayoutOpts(render)
 	styles, err := layout.ResolveStyles(ctx, root, opts)
@@ -56,7 +54,6 @@ func renderIndependentBlocks(
 
 	state.pages = doc.PageCount() - start
 	state.offset = start
-	_ = log
 
 	return nil
 }
@@ -88,7 +85,7 @@ func paintIndependentResult(
 		state.headings = append(state.headings, heading)
 	}
 
-	appendIslandNavigation(
+	appendBlockNavigation(
 		&state.navigation,
 		collectBodyNavigation(res),
 		pageOffset,
@@ -96,4 +93,38 @@ func paintIndependentResult(
 	)
 
 	return nil
+}
+
+func mergePageNames(dst []string, src []string, offset int) []string {
+	if len(src) == 0 || offset < 0 {
+		return dst
+	}
+
+	need := offset + len(src)
+	if len(dst) < need {
+		dst = append(dst, make([]string, need-len(dst))...)
+	}
+
+	copy(dst[offset:], src)
+
+	return dst
+}
+
+func appendBlockNavigation(dst *bodyNavigation, src bodyNavigation, pageOffset int, contentH float64) {
+	if dst.ids == nil {
+		dst.ids = make(map[string]layout.ElementLocation, len(src.ids))
+	}
+
+	yOffset := float64(pageOffset) * contentH
+
+	for id, loc := range src.ids {
+		loc.Page += pageOffset
+		loc.Y += yOffset
+		dst.ids[id] = loc
+	}
+
+	for _, link := range src.links {
+		link.loc.Y += yOffset
+		dst.links = append(dst.links, link)
+	}
 }

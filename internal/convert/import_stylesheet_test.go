@@ -35,12 +35,10 @@ func TestImportStylesheet(t *testing.T) {
 	}
 
 	page := cmd.Objects[0]
-	sheets := prepare.CollectSheets(
+	resources := prepare.NewResourceContext(loader, "file://"+filepath.ToSlash(dir)+"/", page.Load)
+	sheets := resources.CollectSheets(
 		t.Context(),
-		loader,
 		root,
-		"file://"+filepath.ToSlash(dir)+"/",
-		page.Load,
 		prepare.SheetOptions{
 			ViewportW: 600, ViewportH: 800, MediaType: mediaPrint,
 		},

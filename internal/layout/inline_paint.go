@@ -1233,66 +1233,6 @@ func (e *engine) truncateForEllipsis(text string, budget float64, sty *ResolvedS
 	return res
 }
 
-// emitInlineBullet paints the list-item marker for a bullet item.
-//
-//nolint:unused // list-item bullet painter kept with its marker and display helpers in pseudo_content.go
-func (e *engine) emitInlineBullet(item *inlineItem, leftX, baseline, size float64) {
-	if item.style == nil {
-		return
-	}
-
-	typ := strings.ToLower(strings.TrimSpace(item.style.ListStyleType))
-	if typ == "" || typ == inlineStyleNone {
-		return
-	}
-
-	// Only for display:list-item; text items inherit that display from parent div
-	if !isDisplayListItem(item.style) {
-		return
-	}
-
-	// Dedupe: avoid double bullet when emitInlineText is called per word on same line.
-	if e.hasInlineBullet(baseline) {
-		return
-	}
-
-	text := listItemMarkerText(*item.style, nil)
-	face := e.faceFor(item.style)
-
-	if face == nil {
-		face = e.font
-	}
-
-	const markerGapRatio = 0.35
-
-	markerW := e.measureTextFace(text, item.style)
-	posX := leftX - markerW - size*markerGapRatio
-
-	if posX < 0 {
-		posX = 0
-	}
-
-	e.add(Op{ //nolint:exhaustruct // intentional zero fields
-		Kind: OpBullet, X: posX, Y: baseline, Text: text, Font: face, Size: size,
-		InkDescent: e.fontDescentFace(face, size),
-		R:          item.style.Color[0], G: item.style.Color[1], B: item.style.Color[2],
-	})
-}
-
-// hasInlineBullet reports whether a bullet marker is already painted at the
-// baseline: emitInlineText runs per word on a line, so markers dedupe.
-//
-//nolint:unused // dedupe helper for the retained list-item bullet painter
-func (e *engine) hasInlineBullet(baseline float64) bool {
-	for idx := len(e.ops) - 1; idx >= 0 && idx >= len(e.ops)-4; idx-- {
-		if e.ops[idx].Kind == OpBullet && e.ops[idx].Y == baseline && e.ops[idx].Text != "" {
-			return true
-		}
-	}
-
-	return false
-}
-
 // measureTextFace measures s using per-rune CSS font-family fallback
 // (same face selection as paint).
 //
@@ -1493,7 +1433,9 @@ func (e *engine) splitTextByFace(cssSheet string, sty *ResolvedStyle) []faceRun 
 		}
 
 		current = face
-		width += e.glyphAdvance(face, size, runic)
+		if face != nil {
+			width += face.AdvanceInPoints(runic, size)
+		}
 		runeCount++
 
 		if runic == ' ' {
@@ -1536,7 +1478,7 @@ func (e *engine) primaryFaceRun(cssSheet string, sty *ResolvedStyle) (faceRun, b
 	spaceCount := 0
 
 	for _, runic := range paintText {
-		width += e.glyphAdvance(primary, size, runic)
+		width += primary.AdvanceInPoints(runic, size)
 		runeCount++
 
 		if runic == ' ' {

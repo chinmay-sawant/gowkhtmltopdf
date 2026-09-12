@@ -66,7 +66,7 @@ func TestContainerQueryNamedInlineSize(t *testing.T) {
 		<div class="card narrow"><p class="title" id="n">Narrow</p></div>
 	</body></html>`)
 	styles := resolveStyles(root, []*css.Stylesheet{cssSheet}, "print", testViewport, 800)
-	cinfo := measureSizeContainers(root, styles, testViewport)
+	cinfo := measureContainers(t, root, styles)
 	styles = resolveStylesWithContainers(root, []*css.Stylesheet{cssSheet}, "print", testViewport, 800, cinfo)
 
 	byID := map[string]*html.Node{}
@@ -105,6 +105,21 @@ func TestContainerQueryNamedInlineSize(t *testing.T) {
 	}
 }
 
+// measureContainers runs the context-aware container measurement with the
+// shared test viewport.
+func measureContainers(
+	t *testing.T, root *html.Node, styles map[*html.Node]*ResolvedStyle,
+) map[*html.Node]sizeContainer {
+	t.Helper()
+
+	cinfo, err := measureSizeContainersContext(t.Context(), root, styles, testViewport)
+	if err != nil {
+		t.Fatalf("measure containers: %v", err)
+	}
+
+	return cinfo
+}
+
 func TestContainerQueryUnnamedAndOrNot(t *testing.T) {
 	t.Parallel()
 
@@ -132,7 +147,7 @@ func TestContainerQueryUnnamedAndOrNot(t *testing.T) {
 		</div>
 	</body></html>`)
 	pass1 := resolveStyles(root, []*css.Stylesheet{cssSheet}, "print", testViewport, 800)
-	cinfo := measureSizeContainers(root, pass1, testViewport)
+	cinfo := measureContainers(t, root, pass1)
 	styles := resolveStylesWithContainers(root, []*css.Stylesheet{cssSheet}, "print", testViewport, 800, cinfo)
 	byID := map[string]*html.Node{}
 
@@ -181,7 +196,7 @@ func TestContainerQueryRequiresContainment(t *testing.T) {
 	</body></html>`)
 	pass1 := resolveStyles(root, []*css.Stylesheet{cssSheet}, "print", testViewport, 800)
 
-	cinfo := measureSizeContainers(root, pass1, testViewport)
+	cinfo := measureContainers(t, root, pass1)
 	if len(cinfo) != 0 {
 		t.Fatalf("expected no size containers, got %d", len(cinfo))
 	}
@@ -255,7 +270,7 @@ func TestContainerQueryNearestNamedWins(t *testing.T) {
 		<div class="outer"><div class="inner"><span class="t" id="t">t</span></div></div>
 	</body></html>`)
 	pass1 := resolveStyles(root, []*css.Stylesheet{cssSheet}, "print", testViewport, 800)
-	cinfo := measureSizeContainers(root, pass1, testViewport)
+	cinfo := measureContainers(t, root, pass1)
 	styles := resolveStylesWithContainers(root, []*css.Stylesheet{cssSheet}, "print", testViewport, 800, cinfo)
 
 	var tNode *html.Node

@@ -62,11 +62,6 @@ type Request struct {
 	// diagnostics/document metadata can never be appended to a PDF stream.
 	// It is only required when Global.DumpOutline is true.
 	OutlineOutput io.Writer
-	// benchmarkPageIslands is an internal-only performance hook. It is never
-	// inferred from HTML content; production and CLI requests always use the
-	// generic document renderer. Benchmark tests opt in through the dedicated
-	// constructor below.
-	benchmarkPageIslands bool
 }
 
 func (r *Request) now() time.Time {
@@ -120,21 +115,6 @@ func NewPDFRequest(global settings.PdfGlobal, objects []settings.PdfObject, outp
 	}
 }
 
-// NewBenchmarkPDFRequest builds the explicitly opted-in benchmark request.
-// This constructor is intentionally internal (the package itself is under
-// internal/) and keeps the benchmark-only page-island optimization separate
-// from normal HTML rendering.
-func NewBenchmarkPDFRequest(
-	global settings.PdfGlobal,
-	objects []settings.PdfObject,
-	output, outline io.Writer,
-) *Request {
-	req := NewPDFRequest(global, objects, output, outline)
-	req.benchmarkPageIslands = true
-
-	return req
-}
-
 // Validate checks the explicit output contract before any loading or font
 // initialization occurs. This makes a missing sink deterministic and cheap to
 // test through the engine seam.
@@ -159,8 +139,8 @@ func (r *Request) Validate() error {
 		return ErrMissingOutlineOutput
 	}
 
-	if err := ValidateRenderableObjects(r.Objects); err != nil {
-		return err
+	if err := settings.ValidateRenderableObjects(r.Objects); err != nil {
+		return err //nolint:wrapcheck // settings sentinels pass through unwrapped by contract
 	}
 
 	if _, err := PolicyForGlobal(r.Global); err != nil {
@@ -265,16 +245,6 @@ func PolicyForGlobal(glob settings.PdfGlobal) (pdf.WriterPolicy, error) {
 		return pdf.WriterPolicy{},
 			fmt.Errorf("%w: %q", settings.ErrInvalidPDFVersion, version)
 	}
-}
-
-// ValidateRenderableObjects applies the shared input invariant used by both
-// PDF and image requests. A request may contain TOC metadata, but it must
-// also contain at least one body object with either a non-empty page source
-// or inline HTML bytes.
-//
-//nolint:wrapcheck // delegating alias to shared settings package
-func ValidateRenderableObjects(objects []settings.PdfObject) error {
-	return settings.ValidateRenderableObjects(objects)
 }
 
 // runContext owns the dependencies for one conversion lifecycle. It is the
@@ -627,19 +597,9 @@ func (run *runContext) renderObject(ctx context.Context, obj *settings.PdfObject
 		printLinkUnderline: printUL,
 	}
 
-	if run.req.benchmarkPageIslands {
-		if plan, ok := benchmarkPageIslandPlan(root); ok {
-			if err := renderBenchmarkPageIslands(ctx, run.doc, state, root, plan, objectRender, run.log); err != nil {
-				return nil, fmt.Errorf("object %d (%s): certified page islands: %w", idx+1, obj.Page, err)
-			}
-
-			return state, nil
-		}
-	}
-
 	layoutOpts := state.bodyLayoutOpts(objectRender)
 	if blocks, ok := layout.IndependentBlocksForOptions(ctx, root, layoutOpts); ok && len(blocks) > 1 {
-		if err := renderIndependentBlocks(ctx, run.doc, state, root, blocks, objectRender, run.log); err != nil {
+		if err := renderIndependentBlocks(ctx, run.doc, state, root, blocks, objectRender); err != nil {
 			return nil, fmt.Errorf("object %d (%s): independent blocks: %w", idx+1, obj.Page, err)
 		}
 
@@ -654,7 +614,6 @@ func (run *runContext) renderObject(ctx context.Context, obj *settings.PdfObject
 		func(options layout.Options) (*layout.Result, error) {
 			return layout.LayoutContext(ctx, root, options)
 		},
-		nil,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("object %d (%s): %w", idx+1, obj.Page, err)
@@ -680,16 +639,13 @@ func (run *runContext) renderObject(ctx context.Context, obj *settings.PdfObject
 
 type layoutBodyFunc func(layout.Options) (*layout.Result, error)
 
-type layoutReleaseFunc func(*layout.Result)
-
-//nolint:cyclop,wsl // smart-shrink is one bounded second-pass policy.
+//nolint:wsl // smart-shrink is one bounded second-pass policy.
 func layoutBody(
 	ctx context.Context,
 	state *objectState,
 	render objectRenderContext,
 	log io.Writer,
 	layoutFn layoutBodyFunc,
-	release layoutReleaseFunc,
 ) (*layout.Result, objectRenderContext, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, render, fmt.Errorf("layout: %w", err)
@@ -724,9 +680,6 @@ func layoutBody(
 		effZoom = zoom * zoomFactor
 	}
 	render.zoom = effZoom
-	if release != nil {
-		release(result)
-	}
 	if err := ctx.Err(); err != nil {
 		return nil, render, fmt.Errorf("smart-shrink layout: %w", err)
 	}

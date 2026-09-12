@@ -394,14 +394,18 @@ func setMediaType(media *MediaType) setter {
 // setGrayscaleFromColorMode maps colormode strings onto the Grayscale bool.
 func setGrayscaleFromColorMode(grayscale *bool) setter {
 	return func(raw string) error {
-		m, err := ParseColorMode(raw)
-		if err != nil {
-			return err
+		switch normalize(raw) {
+		case "", sColor:
+			*grayscale = false
+
+			return nil
+		case sGrayscale:
+			*grayscale = true
+
+			return nil
 		}
 
-		*grayscale = m == ColorModeGrayscale
-
-		return nil
+		return errInvalid("color-mode", raw, "color|grayscale")
 	}
 }
 
@@ -419,23 +423,6 @@ func marginEdgePtr(margin *Margin, edge string) (*float64, bool) {
 		return &margin.Right, true
 	default:
 		return nil, false
-	}
-}
-
-// marginValue returns the field of margin named by edge. The bool is false
-// for an unrecognized edge, mirroring marginEdgePtr.
-func marginValue(margin *Margin, edge string) (float64, bool) {
-	switch edge {
-	case "top":
-		return margin.Top, true
-	case "bottom":
-		return margin.Bottom, true
-	case "left":
-		return margin.Left, true
-	case "right":
-		return margin.Right, true
-	default:
-		return 0, false
 	}
 }
 
@@ -696,12 +683,12 @@ func registerGlobalGeometryKeys(keys keyTable[PdfGlobal]) {
 		regGlobal("margin."+edge,
 			func(dst *PdfGlobal, raw string) error { return marginSetter(&dst.Margin, edge)(raw) },
 			func(dst *PdfGlobal) (string, bool) {
-				val, ok := marginValue(&dst.Margin, edge)
+				ptr, ok := marginEdgePtr(&dst.Margin, edge)
 				if !ok {
 					return "", false
 				}
 
-				return fmtFloat(val), true
+				return fmtFloat(*ptr), true
 			},
 		)
 	}
@@ -1044,14 +1031,9 @@ func (g *ImageGlobal) Set(name, value string) error {
 // Web.Background); everything else goes to ImageGlobal.Set. ImageConverter.Set
 // delegates here.
 func ApplyImageKey(global *PdfGlobal, img *ImageGlobal, name, value string) error {
-	return ApplyImageKeyNormalized(global, img, normalizeDots(name), value)
-}
+	normalized := normalizeDots(name)
 
-// ApplyImageKeyNormalized routes an already normalized image-mode key. It is
-// kept separate so public wrappers can normalize once for alias handling
-// without paying a second trim/lowercase pass.
-func ApplyImageKeyNormalized(global *PdfGlobal, img *ImageGlobal, name, value string) error {
-	switch name {
+	switch normalized {
 	case "background", "web.background":
 		if global == nil {
 			return errImageBackgroundNeedsGlobal
@@ -1059,6 +1041,6 @@ func ApplyImageKeyNormalized(global *PdfGlobal, img *ImageGlobal, name, value st
 
 		return global.Set("background", value)
 	default:
-		return img.Set(name, value)
+		return img.Set(normalized, value)
 	}
 }

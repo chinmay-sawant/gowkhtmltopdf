@@ -83,7 +83,7 @@ func TestLimitedImageBufferRejectsOverflow(t *testing.T) {
 func TestEncodeCopiesOutOfThePooledBuffer(t *testing.T) {
 	t.Parallel()
 
-	first := makeYCbCrProbeImage(image.Rect(0, 0, 32, 24), true)
+	first := makeJPEGProbeImage(image.Rect(0, 0, 32, 24), true)
 
 	firstBytes, err := encode(first, formatJPG, 80, false)
 	if err != nil {
@@ -92,7 +92,7 @@ func TestEncodeCopiesOutOfThePooledBuffer(t *testing.T) {
 
 	snapshot := slices.Clone(firstBytes)
 
-	second := makeYCbCrProbeImage(image.Rect(0, 0, 32, 24), false)
+	second := makeJPEGProbeImage(image.Rect(0, 0, 32, 24), false)
 	if _, err := encode(second, formatJPG, 80, false); err != nil {
 		t.Fatalf("second encode: %v", err)
 	}

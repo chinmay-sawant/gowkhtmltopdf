@@ -2,7 +2,7 @@
 
 This document is the deep-dive architecture reference for `internal/convert`
 and its companion packages (`internal/convert/prepare`, `internal/convert/render`,
-`internal/convert/islands`, `internal/outline`). It expands the package-map row
+`internal/outline`). It expands the package-map row
 in [../architecture.md](../architecture.md) ("PDF job orchestration (HF, TOC,
 links, copies)") into the detail needed to navigate the code, change the
 pipeline, or build on it.
@@ -66,15 +66,12 @@ test files where listed.
 | `request.go` | Type-safe `PDFRequest` / `ImageRequest` API, `ToRequest` adapters, `RunTypedPDF` | 76 |
 | `convert.go` | `Request` union type, limits, `Validate[PDF|Image]`, `Run`, `renderObject`, `runContext`, smart-shrink | 616 |
 | `convert_helpers.go` | Page geometry (`pageGeometry`), CSS @page margin override, media resolve, link URI resolution, `loadFontRegistry`, `DefaultTOCXSL` | 227 |
-| `prepare.go` | Thin aliases re-exporting the `internal/convert/prepare` seam (`PrepareDocument`, `CollectSheets`, `MergeFontFaces`) | 57 |
-| `simplify.go` | Aliases for the DOM-simplification profiles (`AppendSimplifySheet`, `SimplifyDOMEnabled/Profile`) | 26 |
 | `hf.go` | Header/footer engine: placeholders, text bands, HTML HF child-document load/layout/draw, auto margins, `drawHeadersFootersResult` | 766 |
 | `hf_geometry.go` | `hfGeom` page geometry (points, content area, y-down→y-up conversion helpers) | 44 |
 | `toc.go` | TOC generation: effective TOC settings, built-in HTML template (`genTOCHTML`), two-pass fixed-point render (`renderTOCObjects`) | 282 |
 | `outline.go` | Per-object state `objectState`, placements, heading collection/flattening, `--exclude-from-outline`, `emitOutline` → `pdf.Outline` | 214 |
 | `links.go` | Same-document links: `bodyNavigation` projection, `applyInternalLinks`, `applyTOCLinks`, id index, URI stripping | 291 |
 | `page_plan.go` | `pagePlan` owner model over `render.Plan`; `tocFirstOrder`, copy materialization/order helpers, `percent` progress | 191 |
-| `page_islands.go` | Certified per-section rendering path for the benchmark fixture (recognition in `islands`, layout driver here) | 175 |
 | `pdf_pipeline.go` | `pdfPipeline` adapter implementing `render.Pipeline`: stage order, assembleTOC/Outline/Links/Document/Copies/HF, Finalize write | 186 |
 | `doc.go` | Package overview + HTTP-status error note | 6 |
 | `convert_test.go` | End-to-end `RunPDF*` tests: objects, copies, media, progress, quiet, cancel, smart-shrink | 704 |
@@ -83,10 +80,9 @@ test files where listed.
 | `golden_test.go` | Golden-fixture comparisons produced from `testdata/golden/*.html` (regenerate with `make samples`) | 626 |
 | `hf_links_test.go` | Header/footer + link interactions (dest wiring, page history) | 385 |
 | `links_resolve_test.go` | `collectBodyNavigation`, `buildBodyIDIndex`, `resolveRelativeLinkURIs` | 118 |
-| `page_islands_test.go` | Certified island rendering contract (one page per section, fail-closed) | 69 |
 | `simplify_test.go` | DOM simplify profiles + `AppendSimplifySheet` ordering | 259 |
 | `fontface_test.go` | @font-face merge, WOFF/TTF parsing, registry handoff | 393 |
-| `benchmarks_test.go` / `perf_test.go` / `quality_test.go` / `web_fixtures_test.go` / `wk_compare_test.go` / `benchmarks_image_assets_test.go` | Benchmark-report islands, perf seams, quality gates, web fixture parity | ~1.4k combined |
+| `benchmarks_test.go` / `perf_test.go` / `quality_test.go` / `web_fixtures_test.go` / `wk_compare_test.go` / `benchmarks_image_assets_test.go` | Perf seams, quality gates, web fixture parity | ~1.4k combined |
 
 ### 2.2 `internal/convert/prepare`: shared load/parse/style/font phase
 
@@ -108,14 +104,7 @@ calls `prepare.Document` via `ResourceContext`).
 | `pipeline_test.go` | Stage-cancel behavior tests | 78 |
 | `plan_test.go` | Copy/collate page mapping tests | 39 |
 
-### 2.4 `internal/convert/islands`: certified page islands (benchmark fixture)
-
-| File | Responsibility | Lines |
-|------|----------------|-------|
-| `plan.go` | `BenchmarkPlan` fixture certification (marker + title + `section.benchmark-page` body), `ReleaseBenchmarkBodyChildren`, shallow virtual DOM view `Root` | 153 |
-| `plan_test.go` | Certification and sibling-release contract | 41 |
-
-### 2.5 `internal/outline`: heading tree & dump XML
+### 2.4 `internal/outline`: heading tree & dump XML
 
 | File | Responsibility | Lines |
 |------|----------------|-------|
@@ -209,14 +198,6 @@ small `Location` projection).
 | `func stripLinkURIs(...)` | links.go:77 | Neutralizes external link ops in place (`layout.DeactivateOp`) when `--no-external-links`. |
 | `func resolveRelativeLinkURIs(...)` / `resolveRelativeLinkURI(...)` | convert_helpers.go:178 / 192 | Rewrites relative OpLinkURI values against the page base (skips `#`, schemes, mailto). |
 
-### 3.9 Certified islands (benchmark path)
-
-| Symbol | Location | Purpose |
-|--------|----------|---------|
-| `func benchmarkPageIslandPlan(root)` | page_islands.go:37 | Delegates fixture recognition to `islands.BenchmarkPlan`; fails closed for anything else. |
-| `func renderBenchmarkPageIslands(...)` | page_islands.go:46 | Renders each certified `section.benchmark-page` as exactly one page using a shared `layout.Workspace`; trims memory every N islands; appends headings/navigation per island. |
-| `func (island) render(...)` | page_islands.go:100 | Per-section layout/paint; errors if an island expands past one page (`errCertifiedIslandExpanded`). |
-
 ## 4. Data & control flow
 
 ### 4.1 Typical library conversion (`Document.WritePDF`)
@@ -307,7 +288,6 @@ internal/app ─────┬─ internal/cli        (Command → Request adap
                   └─ internal/convert
 internal/convert ─┬─ internal/convert/prepare   (load/parse/style/font phase)
                   ├─ internal/convert/render    (lifecycle driver + page-index model)
-                  ├─ internal/convert/islands   (certified benchmark islands)
                   ├─ internal/css      (stylesheets, @page margins, selectors for outline Exclude)
                   ├─ internal/html     (parse documents/HF/TOC; node walking)
                   ├─ internal/layout   (LayoutContext, PaintContext, PaintBand, Op model)
@@ -322,7 +302,7 @@ Import-direction rule (enforced by the internal/ directory structure, no
 cycles allowed):
 
 - `convert` may import every other internal package.
-- `convert`'s subpackages (`prepare`, `render`, `islands`) may NOT import
+- `convert`'s subpackages (`prepare`, `render`) may NOT import
   `convert` (convert imports them, so a back-edge would be a cycle). They
   depend only on `internal/html`, `internal/css`, `internal/layout`,
   `internal/load`, `internal/pdf`, `internal/settings`, and stdlib.
@@ -392,20 +372,10 @@ Who depends on `convert` (i.e. the callers above the seam):
 
 7. **`prepare` exists so PDF and image mode cannot drift.** The
    load→parse→style→font phase is identical for both sinks; extracting it
-   into `internal/convert/prepare` (re-exported through the thin aliases in
-   convert/prepare.go for compatibility) is the seam that keeps fidelity
+   into `internal/convert/prepare` is the seam that keeps fidelity
    consistent.
 
-8. **Certified island rendering is an explicit, narrow benchmark optimization.**
-   Ordinary requests never select the per-section path from document prose.
-   Only the internal `NewBenchmarkPDFRequest` opts into recognition of the
-   generated report fixture (comment marker + title + `section.benchmark-page`
-   body, `islands/plan.go`). Everything else stays on the complete-document
-   layout path. The benchmark path clones a parent-consistent virtual tree;
-   `debug.FreeOSMemory()` every 4 islands and a shared `layout.Workspace` bound
-   peak memory for that explicitly owned workload.
-
-9. **`internal/outline` stays pure.** It computes trees/XML/lookups but never
+8. **`internal/outline` stays pure.** It computes trees/XML/lookups but never
    touches PDF coordinates or page refs; `emitOutline` and `hfGeom.pdfXY`
    live in convert. This is why `outline` can be unit-tested without a PDF
    harness and reused wherever a heading tree is needed.
@@ -440,7 +410,7 @@ Who depends on `convert` (i.e. the callers above the seam):
 - **Merged `--replace` maps.** `mergedReplaces` (convert.go:598) merges all
   four surfaces (global+object × header+footer) so CLI (which stores
   `--replace` on header only) and library users see the same substitution set.
-- **Fail-closed certification.** Islands, TOC XSL (falls back to the built-in
+- **Fail-closed certification.** TOC XSL (falls back to the built-in
   template with a warning, toc.go:176), and unknown HF markup (treated as
   raw, warned) all fail closed rather than guess.
 - **Nil-driven policy propagation.** `prep.Resource.Skip` lets the load
@@ -500,10 +470,9 @@ constructs, but it is the enforcement point for several security rules:
   shipped regression corpus incl. invoices, purchase orders, TOC documents,
   certificates, and the benchmark report.
 - **Focused unit tests**: `links_resolve_test.go` (navigation projection,
-  id-index duplicates-last, URI resolution), `page_islands_test.go`,
-  `render/plan_test.go` (copy/collate mapping), `render/pipeline_test.go`
-  (stage cancellation), `islands/plan_test.go` (certification + sibling
-  release), `internal/outline/outline_test.go` (tree, XML dump, sections).
+  id-index duplicates-last, URI resolution), `render/plan_test.go`
+  (copy/collate mapping), `render/pipeline_test.go` (stage cancellation),
+  `internal/outline/outline_test.go` (tree, XML dump, sections).
 - **Perf/quality gates**: `perf_test.go`, `quality_test.go`,
   `benchmarks_test.go`, `wk_compare_test.go` (behavioral parity with
   wkhtmltopdf for the fixture corpus).
@@ -527,9 +496,6 @@ constructs, but it is the enforcement point for several security rules:
 - **Fonts**: only the embedded Liberation Sans for general text; `@font-face`
   supports WOFF1/TTF/OTF and rejects WOFF2/EOT/`data:` (prepare/styles.go
   `fetchFontFace`) with warnings. See [../fonts.md](../fonts.md).
-- **Islands path is fixture-locked**: remaining benchmark pages and
-  open-web documents always take the full-document layout path
-  (islands/plan.go:27).
 - **Controlled-report scope**: per [../deferred.md](../deferred.md) and the
   fidelity tiers in [../fidelity.md](../fidelity.md) (Tier 1 closed, Tier 2
   core shipped), the pipeline is not optimized for JavaScript-heavy SPAs;

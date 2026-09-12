@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
-	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
 
 func TestIndependentBlocksReportShape(t *testing.T) {
@@ -75,28 +74,6 @@ func TestIndependentBlocksFlexBody(t *testing.T) {
 	}
 }
 
-func TestCopyPaintMetadata(t *testing.T) {
-	t.Parallel()
-
-	res := layoutHTML(t, `<html><body>
-		<p id="top">hello</p>
-		<p style="page-break-before:always"><a href="#top">back</a></p>
-	</body></html>`)
-
-	meta := CopyPaintMetadata(res, 800)
-	if len(meta.Locations) == 0 {
-		t.Fatal("expected locations")
-	}
-
-	if !meta.HasIDs {
-		t.Fatal("expected HasIDs")
-	}
-
-	if !meta.HasFragmentLinks {
-		t.Fatal("expected HasFragmentLinks")
-	}
-}
-
 func TestWorkspaceReusesOps(t *testing.T) {
 	t.Parallel()
 
@@ -114,7 +91,6 @@ func TestWorkspaceReusesOps(t *testing.T) {
 	}
 
 	capBefore := cap(first.Ops)
-	_ = CopyPaintMetadata(first, 400)
 	workspace.Release(first)
 
 	second, err := WithWorkspace(t.Context(), root, opts, workspace)
@@ -138,45 +114,5 @@ func TestIndependentBlocksUsesStylesNotClassName(t *testing.T) {
 
 	if _, ok := IndependentBlocks(root, styles, 700); ok {
 		t.Fatal("class name alone must not match")
-	}
-}
-
-func TestSectionChromeHashHoles(t *testing.T) {
-	t.Parallel()
-
-	a := mustParse(t, `<html><body><section><h1>Invoice 1</h1><p>SKU-1</p></section></body></html>`)
-	b := mustParse(t, `<html><body><section><h1>Invoice 2</h1><p>SKU-2</p></section></body></html>`)
-	stylesA := resolveStyles(a, nil, "print", testViewport, 800)
-	stylesB := resolveStyles(b, nil, "print", testViewport, 800)
-
-	secA := a.FirstChild("html").FirstChild("body").FirstChild("section")
-	secB := b.FirstChild("html").FirstChild("body").FirstChild("section")
-
-	if SectionChromeHash(secA, stylesA) == 0 {
-		t.Fatal("expected non-zero hash")
-	}
-
-	if SectionChromeHash(secA, stylesA) == SectionChromeHash(secB, stylesB) {
-		t.Fatal("different style pointers should not share a hash")
-	}
-
-	same := mustParse(t, `<html><body><section><h1>x</h1></section><section><h1>y</h1></section></body></html>`)
-	styles := resolveStyles(same, nil, "print", testViewport, 800)
-	body := same.FirstChild("html").FirstChild("body")
-
-	var secs []*html.Node
-
-	for _, child := range body.Children {
-		if child.Type == html.ElementNode && child.Name == htmlSection {
-			secs = append(secs, child)
-		}
-	}
-
-	if len(secs) != 2 {
-		t.Fatalf("sections = %d", len(secs))
-	}
-
-	if SectionChromeHash(secs[0], styles) != SectionChromeHash(secs[1], styles) {
-		t.Fatal("same tree shape and interned styles should share a hash")
 	}
 }

@@ -510,34 +510,61 @@ func TestParseEnums(t *testing.T) {
 		t.Error("invalid orientation must error")
 	}
 
-	if v, _ := ParseColorMode("grayscale"); v != ColorModeGrayscale {
-		t.Error("color-mode grayscale")
+	if v, _ := ParseLoadErrorHandling("skip"); v != LoadErrorSkip {
+		t.Error("load-error-handling skip")
+	}
+}
+
+// TestColorModeSetGrayscale drives the colormode key through the global key
+// table, the path flag parsing and callers use.
+func TestColorModeSetGrayscale(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		raw  string
+		want bool
+	}{
+		{name: "empty defaults to color", raw: "", want: false},
+		{name: "color", raw: "color", want: false},
+		{name: "color case-insensitive", raw: "Color", want: false},
+		{name: "grayscale", raw: "grayscale", want: true},
+		{name: "grayscale case-insensitive", raw: "GRAYSCALE", want: true},
 	}
 
-	if v, _ := ParseColorMode("GRAYSCALE"); v != ColorModeGrayscale {
-		t.Error("color-mode grayscale must be case-insensitive")
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			global := DefaultPdfGlobal()
+			global.Grayscale = !testCase.want
+
+			if err := global.Set("colormode", testCase.raw); err != nil {
+				t.Fatalf("Set(colormode, %q) error: %v", testCase.raw, err)
+			}
+
+			if global.Grayscale != testCase.want {
+				t.Errorf("Grayscale = %v, want %v", global.Grayscale, testCase.want)
+			}
+		})
 	}
 
-	if v, _ := ParseColorMode("Color"); v != ColorModeColor {
-		t.Error("color-mode color must be case-insensitive")
-	}
+	global := DefaultPdfGlobal()
+	global.Grayscale = true
 
-	if v, err := ParseColorMode("sepia"); err == nil || v != ColorModeColor {
+	if err := global.Set("colormode", "sepia"); err == nil {
 		t.Error("invalid color-mode must error")
 	}
 
-	if v, _ := ParseLoadErrorHandling("skip"); v != LoadErrorSkip {
-		t.Error("load-error-handling skip")
+	if !global.Grayscale {
+		t.Error("invalid color-mode must not change Grayscale")
 	}
 }
 
 func TestEnumStringReportsUnknownForInvalid(t *testing.T) {
 	t.Parallel()
 
-	if got := ColorMode(99).String(); got != sUnknown {
-		t.Errorf("ColorMode(99).String() = %q, want unknown", got)
-	}
-	if got := Orientation(99).String(); got != sUnknown { //nolint:wsl // test table
+	if got := Orientation(99).String(); got != sUnknown {
 		t.Errorf("Orientation(99).String() = %q, want unknown", got)
 	}
 	if got := LoadErrorHandling(42).String(); got != sUnknown { //nolint:wsl
@@ -582,10 +609,6 @@ func TestMarginEdgeUnknown(t *testing.T) {
 	ptr, ok := marginEdgePtr(&m, "side")
 	if ok || ptr != nil {
 		t.Errorf("marginEdgePtr(unknown) = (%v, %v), want (nil, false)", ptr, ok)
-	}
-
-	if _, ok := marginValue(&m, "side"); ok {
-		t.Error("marginValue(unknown) must report not-found")
 	}
 
 	if ptr, ok := marginEdgePtr(&m, "top"); !ok || ptr != &m.Top {

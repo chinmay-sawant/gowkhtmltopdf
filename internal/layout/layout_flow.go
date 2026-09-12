@@ -35,24 +35,24 @@ const (
 	alphaBase = 26
 )
 
-func (e *engine) contentBox(posX, boxW float64, style boxModelStyle) (float64, float64) {
-	borderLeft := borderLayoutWidth(style, style.borderLeft)
-	borderRight := borderLayoutWidth(style, style.borderRight)
-	contentW := boxW - e.scalePt(style.paddingLeft) - e.scalePt(style.paddingRight) -
+func (e *engine) contentBox(posX, boxW float64, style *ResolvedStyle) (float64, float64) {
+	borderLeft := borderLayoutWidth(style, style.BorderLeft)
+	borderRight := borderLayoutWidth(style, style.BorderRight)
+	contentW := boxW - e.scalePt(style.PaddingLeft) - e.scalePt(style.PaddingRight) -
 		e.scalePt(borderLeft) - e.scalePt(borderRight)
 
 	if contentW < 0 {
 		contentW = 0
 	}
 
-	return posX + e.scalePt(borderLeft) + e.scalePt(style.paddingLeft), contentW
+	return posX + e.scalePt(borderLeft) + e.scalePt(style.PaddingLeft), contentW
 }
 
 // borderLayoutWidth uses the device width for border-image boxes. Border
 // image replaces the normal border paint, so its content area must use the
 // same converted width as the emitted image slices.
-func borderLayoutWidth(style boxModelStyle, side border) float64 {
-	if style.borderImageSource != "" && side.PaintWidth > 0 {
+func borderLayoutWidth(style *ResolvedStyle, side border) float64 {
+	if style.BorderImageSource != "" && side.PaintWidth > 0 {
 		return side.PaintWidth
 	}
 
@@ -770,7 +770,7 @@ func (e *engine) emitListMarker(node *html.Node, style ResolvedStyle, contentX, 
 
 	if face != nil {
 		for _, r := range text {
-			minW += e.glyphAdvance(face, size, r)
+			minW += face.AdvanceInPoints(r, size)
 		}
 	}
 

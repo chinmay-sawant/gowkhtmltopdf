@@ -1,18 +1,18 @@
 {
-  "generated": "2026-09-02",
+  "generated": "2026-09-12",
   "sources": {
     "webref": "@webref/css (css.json via unpkg, captured 2026-08-27)",
     "all_properties": "https://www.w3.org/Style/CSS/all-properties.en.json",
     "mdn_units": "mdn/data css/units.json",
     "mdn_properties": "mdn/data css/properties.json (overlay for mdn_url/groups)",
-    "engine": "honesty pass plus standard compositing support; 2 compositing properties remain partial"
+    "engine": "honesty pass plus standard compositing support; 2 compositing properties remain partial; 2026-09-12 ponytail audit PT26-LAY-04/05 demoted 27 parsed-and-stored no-op properties to unsupported"
   },
   "counts": {
     "webref_properties": 818,
     "mapped_properties": 818,
     "properties_by_engine_status": {
-      "implemented": 355,
-      "unsupported": 461,
+      "implemented": 328,
+      "unsupported": 488,
       "ignored": 0,
       "partial": 2
     },

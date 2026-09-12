@@ -13,7 +13,6 @@ import (
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/line"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/load"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
-	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
 const (
@@ -33,13 +32,6 @@ type SheetOptions struct {
 	// before linked and imported media queries are gated, so size features
 	// see the final page box the cascade will use. nil keeps ViewportW/H.
 	PageBoxViewport func(inline []*css.Stylesheet) (width, height float64)
-}
-
-// CollectSheets gathers inline and linked stylesheets in document order.
-//
-//nolint:lll // stylesheet collection flow
-func CollectSheets(ctx context.Context, loader *load.Loader, root *html.Node, base string, loadPage settings.LoadPage, opts SheetOptions, log io.Writer) []*css.Stylesheet {
-	return NewResourceContext(loader, base, loadPage).CollectSheets(ctx, root, opts, log)
 }
 
 type sheetCollector struct {
@@ -428,19 +420,6 @@ func linkStylesheet(node *html.Node, viewportW, viewportH float64, mediaType str
 	}
 	media := node.Attribute("media")
 	return media == "" || css.MediaMatches(media, mediaType, viewportW, viewportH)
-}
-
-// LinkStylesheet retains the stylesheet media predicate as a small seam for
-// the conversion package's white-box compatibility tests.
-func LinkStylesheet(node *html.Node, viewportW, viewportH float64, mediaType string) bool {
-	return linkStylesheet(node, viewportW, viewportH, mediaType)
-}
-
-// MergeFontFaces loads supported @font-face sources into registry.
-//
-//nolint:lll // font-face collection flow
-func MergeFontFaces(ctx context.Context, loader *load.Loader, registry *pdf.Registry, sheets []*css.Stylesheet, base string, loadPage settings.LoadPage, idx int, log io.Writer) *pdf.Registry {
-	return NewResourceContext(loader, base, loadPage).MergeFontFaces(ctx, registry, sheets, idx, log)
 }
 
 //nolint:wsl,nlreturn,lll // font-face collection flow

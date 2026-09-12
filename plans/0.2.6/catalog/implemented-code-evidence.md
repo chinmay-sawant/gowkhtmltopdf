@@ -1,6 +1,6 @@
-# Implemented property code evidence (2026-09-02)
+# Implemented property code evidence (2026-09-02; demotion update 2026-09-12)
 
-Cross-check of all **355** `engine_status: implemented` rows in `mapping.json` against **non-test** Go under `internal/layout`.
+Cross-check of the **328** current `engine_status: implemented` rows in `mapping.json` against **non-test** Go under `internal/layout`. The 27 rows demoted to `unsupported` on 2026-09-12 stay in the machine-readable list with `validation: DEMOTED`.
 
 Tests (`*_test.go`) were excluded.
 
@@ -8,7 +8,8 @@ Tests (`*_test.go`) were excluded.
 
 | Validation | Count | Meaning |
 |------------|------:|----------|
-| VERIFIED | 355 | apply arm: `case`, `raw["prop"]`, vendor alias, const case, or `prop ==` |
+| VERIFIED | 328 | apply arm: `case`, `raw["prop"]`, vendor alias, const case, or `prop ==` |
+| DEMOTED | 27 | parsed-and-stored no-op; field and apply arm removed 2026-09-12 (PT26-LAY-04/05) |
 | UNVERIFIED | 0 | no non-test layout evidence |
 | **Total** | **355** | |
 
@@ -20,9 +21,11 @@ Machine-readable list (every property + file + line): [`implemented-code-evidenc
 |------|----------:|
 | `internal/layout/style_properties.go` | 166 |
 | `internal/layout/style_cascade.go` | 90 |
-| `internal/layout/style_advanced_props.go` | 56 |
+| `internal/layout/style_advanced_props.go` | 29 |
 | `internal/layout/style_paint_props.go` | 37 |
 | `internal/layout/style_leftovers.go` | 6 |
+
+DEMOTED entries are not counted in this rollup.
 
 ## By primary file
 
@@ -292,7 +295,7 @@ Machine-readable list (every property + file + line): [`implemented-code-evidenc
 | `padding-inline-end` | case-string | 691 |
 | `padding-inline-start` | case-string | 689 |
 
-### `internal/layout/style_advanced_props.go` (57)
+### `internal/layout/style_advanced_props.go` (29 verified, 27 demoted)
 
 | Property | Evidence | Line |
 |----------|----------|-----:|
@@ -301,30 +304,30 @@ Machine-readable list (every property + file + line): [`implemented-code-evidenc
 | `bookmark-level` | case-string | 21 |
 | `bookmark-state` | case-string | 33 |
 | `box-decoration-break` | case-string | 84 |
-| `color-adjust` | case-string | 102 |
-| `color-scheme` | case-string | 112 |
-| `contain` | case-string | 135 |
-| `contain-intrinsic-block-size` | case-string | 132 |
-| `contain-intrinsic-height` | case-string | 126 |
-| `contain-intrinsic-inline-size` | case-string | 129 |
-| `contain-intrinsic-size` | case-string | 120 |
-| `contain-intrinsic-width` | case-string | 123 |
-| `content-visibility` | case-string | 138 |
-| `dynamic-range-limit` | case-string | 115 |
+| `color-adjust` | case-string (removed 2026-09-12) | - |
+| `color-scheme` | case-string (removed 2026-09-12) | - |
+| `contain` | case-string (removed 2026-09-12) | - |
+| `contain-intrinsic-block-size` | case-string (removed 2026-09-12) | - |
+| `contain-intrinsic-height` | case-string (removed 2026-09-12) | - |
+| `contain-intrinsic-inline-size` | case-string (removed 2026-09-12) | - |
+| `contain-intrinsic-size` | case-string (removed 2026-09-12) | - |
+| `contain-intrinsic-width` | case-string (removed 2026-09-12) | - |
+| `content-visibility` | case-string (removed 2026-09-12) | - |
+| `dynamic-range-limit` | case-string (removed 2026-09-12) | - |
 | `empty-cells` | case-string | 50 |
-| `font-language-override` | case-string | 153 |
-| `font-optical-sizing` | case-string | 148 |
-| `font-palette` | case-string | 156 |
-| `font-variation-settings` | case-string | 145 |
+| `font-language-override` | case-string (removed 2026-09-12) | - |
+| `font-optical-sizing` | case-string (removed 2026-09-12) | - |
+| `font-palette` | case-string (removed 2026-09-12) | - |
+| `font-variation-settings` | case-string (removed 2026-09-12) | - |
 | `footnote-display` | case-string | 38 |
 | `footnote-policy` | case-string | 43 |
-| `forced-color-adjust` | case-string | 107 |
-| `image-orientation` | case-string | 89 |
-| `image-resolution` | case-string | 94 |
+| `forced-color-adjust` | case-string (removed 2026-09-12) | - |
+| `image-orientation` | case-string (removed 2026-09-12) | - |
+| `image-resolution` | case-string (removed 2026-09-12) | - |
 | `line-clamp` | case-string | 58 |
 | `margin-trim` | case-string | 76 |
 | `max-lines` | case-string | 67 |
-| `object-view-box` | case-string | 99 |
+| `object-view-box` | case-string (removed 2026-09-12) | - |
 | `overflow-clip-margin-block` | case-string | 234 |
 | `overflow-clip-margin-block-end` | case-string | 234 |
 | `overflow-clip-margin-block-start` | case-string | 234 |
@@ -335,23 +338,23 @@ Machine-readable list (every property + file + line): [`implemented-code-evidenc
 | `overflow-clip-margin-left` | case-string | 228 |
 | `overflow-clip-margin-right` | case-string | 222 |
 | `overflow-clip-margin-top` | case-string | 219 |
-| `print-color-adjust` | case-string | 102 |
+| `print-color-adjust` | case-string (removed 2026-09-12) | - |
 | `string-set` | case-string | 48 |
-| `text-combine-upright` | case-string | 170 |
-| `text-decoration-inset` | case-string | 216 |
-| `text-decoration-skip` | case-string | 199 |
-| `text-decoration-skip-box` | case-string | 207 |
+| `text-combine-upright` | case-string (removed 2026-09-12) | - |
+| `text-decoration-inset` | case-string (removed 2026-09-12) | - |
+| `text-decoration-skip` | case-string (removed 2026-09-12) | - |
+| `text-decoration-skip-box` | case-string (removed 2026-09-12) | - |
 | `text-decoration-skip-ink` | case-string | 202 |
-| `text-decoration-skip-self` | case-string | 210 |
-| `text-decoration-skip-spaces` | case-string | 213 |
+| `text-decoration-skip-self` | case-string (removed 2026-09-12) | - |
+| `text-decoration-skip-spaces` | case-string (removed 2026-09-12) | - |
 | `text-emphasis` | case-string | 181 |
 | `text-emphasis-color` | case-string | 184 |
 | `text-emphasis-position` | case-string | 190 |
 | `text-emphasis-skip` | case-string | 196 |
 | `text-emphasis-style` | case-string | 193 |
-| `text-orientation` | case-string | 173 |
+| `text-orientation` | case-string (removed 2026-09-12) | - |
 | `text-overflow` | case-string | 53 |
-| `unicode-bidi` | case-string | 178 |
+| `unicode-bidi` | case-string (removed 2026-09-12) | - |
 
 ### `internal/layout/style_paint_props.go` (37)
 

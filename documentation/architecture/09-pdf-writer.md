@@ -147,7 +147,7 @@ writer does not expose a partially synchronized concurrency contract.
 | `NewContent` | `content.go:88` | Empty builder |
 | Graphics state | `content.go:150-210` | `Save/Restore` (`q/Q`), `SetFillColor`/`SetStrokeColor` (`rg/RG`, grayscale fold here when `doc.grayscale`), `SetLineWidth` (`w`), `SetOpacity` (`/opacity gs` + ExtGState) |
 | Path ops | `content.go:212-260` | `MoveTo/LineTo/CurveTo/Rect/Fill/Stroke/Clip` (`m/l/c/re/f/S/W n`) |
-| `Transform` | `content.go:263` | 6-element `cm` CTM (used for images, page islands, and vector transforms) |
+| `Transform` | `content.go:263` | 6-element `cm` CTM (used for images and vector transforms) |
 | Text ops | `content.go:269-333` | `SetFont` (`Tf`, dedupes identical state), `BeginText/EndText`, `TextAt` (`Td`), `TextMatrix` (`Tm`), `TextLeading` (`TL`), `SetCharSpacing` (`Tc`), `TextNextLine` (`T*`), `TextRenderMode` (`Tr`, mode 2 = fake bold) |
 | `UseEmbeddedFont` | `content.go:302` | Registers a parsed TTF under a resource name; runes drawn under it are subset into the PDF |
 | `TextShow` | `content.go:414` | The text emitter: ASCII fast path; otherwise shape, decide Type0, split mixed runs; records runes for the subsetter |
@@ -359,7 +359,7 @@ Non-test importers:
 
 | Importer | Use |
 |----------|-----|
-| `internal/convert` (+ `prepare/`, `render/plan.go`, `hf.go`, `toc.go`, `links.go`, `outline.go`, `page_islands.go`, `page_plan.go`) | `pdf.NewDocument`, `DefaultFont`, `Registry`, layout paint into `*pdf.Document`, TOC/outline/links/copies/headers-footers assembly, `doc.Write` |
+| `internal/convert` (+ `prepare/`, `render/plan.go`, `hf.go`, `toc.go`, `links.go`, `outline.go`, `page_plan.go`) | `pdf.NewDocument`, `DefaultFont`, `Registry`, layout paint into `*pdf.Document`, TOC/outline/links/copies/headers-footers assembly, `doc.Write` |
 | `internal/layout` (`layout.go`, `inline_paint.go`, `paint.go`) | `pdf.Font`/`FaceSet`/`Registry` face selection and metrics; painting into `Page.Content()` |
 | `internal/imageout` (`imageout.go`, `ttfraster.go`) | `pdf.Font` parsing, `pdf.ShapeRun`/`ShapeTextFont`, `pdf.FlattenContour` for glyph rasterization, `pdf.Registry`/`DefaultSystemFontDirs` |
 

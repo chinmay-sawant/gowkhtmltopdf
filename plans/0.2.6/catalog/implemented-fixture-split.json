@@ -1267,8 +1267,9 @@
           "legacy_of": null,
           "group": "(ungrouped)",
           "syntax": "<'print-color-adjust'>",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Shorthand ((ungrouped)). Expands into longhands; Effect cell applies a representative value."
+          "code_path": "",
+          "description": "Demoted `color-adjust` ((ungrouped)). Parsed-and-stored no-op removed 2026-09-12 (PT26-LAY-04); the effect cell documents the dropped declaration and paints as if not set.",
+          "status": "demoted"
         },
         {
           "property": "color-scheme",
@@ -1276,8 +1277,9 @@
           "legacy_of": null,
           "group": "CSS Color",
           "syntax": "normal | [ light | dark | <custom-ident> ]+ && only?",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Implemented `color-scheme` (CSS Color). Effect cell applies a representative value for visual checks."
+          "code_path": "",
+          "description": "Demoted `color-scheme` (CSS Color). Parsed-and-stored no-op removed 2026-09-12 (PT26-LAY-04); the effect cell documents the dropped declaration and paints as if not set.",
+          "status": "demoted"
         },
         {
           "property": "column-count",
@@ -1375,8 +1377,9 @@
           "legacy_of": null,
           "group": "CSS Containment",
           "syntax": "none | strict | content | [ [size | inline-size] || layout || style || paint ]",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Implemented `contain` (CSS Containment). Effect cell applies a representative value for visual checks."
+          "code_path": "",
+          "description": "Demoted `contain` (CSS Containment). Parsed-and-stored no-op removed 2026-09-12 (PT26-LAY-04); the effect cell documents the dropped declaration and paints as if not set.",
+          "status": "demoted"
         },
         {
           "property": "contain-intrinsic-block-size",
@@ -1384,8 +1387,9 @@
           "legacy_of": null,
           "group": "CSS Box Sizing",
           "syntax": "auto? [ none | <length [0,\u221e]> ]",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Implemented `contain-intrinsic-block-size` (CSS Box Sizing). Effect cell applies a representative value for visual checks."
+          "code_path": "",
+          "description": "Demoted `contain-intrinsic-block-size` (CSS Box Sizing). Parsed-and-stored no-op removed 2026-09-12 (PT26-LAY-04); the effect cell documents the dropped declaration and paints as if not set.",
+          "status": "demoted"
         },
         {
           "property": "contain-intrinsic-height",
@@ -1393,8 +1397,9 @@
           "legacy_of": null,
           "group": "CSS Box Sizing",
           "syntax": "auto? [ none | <length [0,\u221e]> ]",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Implemented `contain-intrinsic-height` (CSS Box Sizing). Effect cell applies a representative value for visual checks."
+          "code_path": "",
+          "description": "Demoted `contain-intrinsic-height` (CSS Box Sizing). Parsed-and-stored no-op removed 2026-09-12 (PT26-LAY-04); the effect cell documents the dropped declaration and paints as if not set.",
+          "status": "demoted"
         },
         {
           "property": "contain-intrinsic-inline-size",
@@ -1402,8 +1407,9 @@
           "legacy_of": null,
           "group": "CSS Box Sizing",
           "syntax": "auto? [ none | <length [0,\u221e]> ]",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Implemented `contain-intrinsic-inline-size` (CSS Box Sizing). Effect cell applies a representative value for visual checks."
+          "code_path": "",
+          "description": "Demoted `contain-intrinsic-inline-size` (CSS Box Sizing). Parsed-and-stored no-op removed 2026-09-12 (PT26-LAY-04); the effect cell documents the dropped declaration and paints as if not set.",
+          "status": "demoted"
         },
         {
           "property": "contain-intrinsic-size",
@@ -1411,8 +1417,9 @@
           "legacy_of": null,
           "group": "CSS Box Sizing",
           "syntax": "[ auto? [ none | <length [0,\u221e]> ] ]{1,2}",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Shorthand (CSS Box Sizing). Expands into longhands; Effect cell applies a representative value."
+          "code_path": "",
+          "description": "Demoted `contain-intrinsic-size` (CSS Box Sizing). Parsed-and-stored no-op removed 2026-09-12 (PT26-LAY-04); the effect cell documents the dropped declaration and paints as if not set.",
+          "status": "demoted"
         },
         {
           "property": "contain-intrinsic-width",
@@ -1420,8 +1427,9 @@
           "legacy_of": null,
           "group": "CSS Box Sizing",
           "syntax": "auto? [ none | <length [0,\u221e]> ]",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Implemented `contain-intrinsic-width` (CSS Box Sizing). Effect cell applies a representative value for visual checks."
+          "code_path": "",
+          "description": "Demoted `contain-intrinsic-width` (CSS Box Sizing). Parsed-and-stored no-op removed 2026-09-12 (PT26-LAY-04); the effect cell documents the dropped declaration and paints as if not set.",
+          "status": "demoted"
         },
         {
           "property": "container",
@@ -1465,8 +1473,9 @@
           "legacy_of": null,
           "group": "CSS Containment",
           "syntax": "visible | auto | hidden",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Implemented `content-visibility` (CSS Containment). Effect cell applies a representative value for visual checks."
+          "code_path": "",
+          "description": "Demoted `content-visibility` (CSS Containment). Parsed-and-stored no-op removed 2026-09-12 (PT26-LAY-04); the effect cell documents the dropped declaration and paints as if not set.",
+          "status": "demoted"
         },
         {
           "property": "counter-increment",
@@ -1510,8 +1519,9 @@
           "legacy_of": null,
           "group": "CSS Color",
           "syntax": "standard | no-limit | constrained | <dynamic-range-limit-mix()>",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Implemented `dynamic-range-limit` (CSS Color). Effect cell applies a representative value for visual checks."
+          "code_path": "",
+          "description": "Demoted `dynamic-range-limit` (CSS Color). Parsed-and-stored no-op removed 2026-09-12 (PT26-LAY-04); the effect cell documents the dropped declaration and paints as if not set.",
+          "status": "demoted"
         },
         {
           "property": "fill",
@@ -1636,8 +1646,9 @@
           "legacy_of": null,
           "group": "CSS Fonts",
           "syntax": "normal | <string>",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Font-related longhand/shorthand affecting typeface metrics or variant features."
+          "code_path": "",
+          "description": "Demoted `font-language-override` (CSS Fonts). Parsed-and-stored no-op removed 2026-09-12 (PT26-LAY-05); the effect cell documents the dropped declaration and paints as if not set.",
+          "status": "demoted"
         },
         {
           "property": "font-optical-sizing",
@@ -1645,8 +1656,9 @@
           "legacy_of": null,
           "group": "CSS Fonts",
           "syntax": "auto | none",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Font-related longhand/shorthand affecting typeface metrics or variant features."
+          "code_path": "",
+          "description": "Demoted `font-optical-sizing` (CSS Fonts). Parsed-and-stored no-op removed 2026-09-12 (PT26-LAY-05); the effect cell documents the dropped declaration and paints as if not set.",
+          "status": "demoted"
         },
         {
           "property": "font-palette",
@@ -1654,8 +1666,9 @@
           "legacy_of": null,
           "group": "CSS Fonts",
           "syntax": "normal | light | dark | <palette-identifier> | <palette-mix()>",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Font-related longhand/shorthand affecting typeface metrics or variant features."
+          "code_path": "",
+          "description": "Demoted `font-palette` (CSS Fonts). Parsed-and-stored no-op removed 2026-09-12 (PT26-LAY-05); the effect cell documents the dropped declaration and paints as if not set.",
+          "status": "demoted"
         },
         {
           "property": "font-size",
@@ -1681,8 +1694,9 @@
           "legacy_of": null,
           "group": "CSS Fonts",
           "syntax": "normal | [ <opentype-tag> <number> ]#",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Font-related longhand/shorthand affecting typeface metrics or variant features."
+          "code_path": "",
+          "description": "Demoted `font-variation-settings` (CSS Fonts). Parsed-and-stored no-op removed 2026-09-12 (PT26-LAY-05); the effect cell documents the dropped declaration and paints as if not set.",
+          "status": "demoted"
         },
         {
           "property": "font-weight",
@@ -1717,8 +1731,9 @@
           "legacy_of": null,
           "group": "CSS Color",
           "syntax": "auto | none | preserve-parent-color",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Implemented `forced-color-adjust` (CSS Color). Effect cell applies a representative value for visual checks."
+          "code_path": "",
+          "description": "Demoted `forced-color-adjust` (CSS Color). Parsed-and-stored no-op removed 2026-09-12 (PT26-LAY-04); the effect cell documents the dropped declaration and paints as if not set.",
+          "status": "demoted"
         },
         {
           "property": "gap",
@@ -1879,8 +1894,9 @@
           "legacy_of": null,
           "group": "CSS Images",
           "syntax": "from-image | none | [ <angle> || flip ]",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Implemented `image-orientation` (CSS Images). Effect cell applies a representative value for visual checks."
+          "code_path": "",
+          "description": "Demoted `image-orientation` (CSS Images). Parsed-and-stored no-op removed 2026-09-12 (PT26-LAY-04); the effect cell documents the dropped declaration and paints as if not set.",
+          "status": "demoted"
         },
         {
           "property": "image-resolution",
@@ -1888,8 +1904,9 @@
           "legacy_of": null,
           "group": "CSS Images",
           "syntax": "[ from-image || <resolution> ] && snap?",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Implemented `image-resolution` (CSS Images). Effect cell applies a representative value for visual checks."
+          "code_path": "",
+          "description": "Demoted `image-resolution` (CSS Images). Parsed-and-stored no-op removed 2026-09-12 (PT26-LAY-04); the effect cell documents the dropped declaration and paints as if not set.",
+          "status": "demoted"
         },
         {
           "property": "inline-size",
@@ -2299,8 +2316,9 @@
           "legacy_of": null,
           "group": "CSS Images",
           "syntax": "none | <basic-shape-rect>",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Implemented `object-view-box` (CSS Images). Effect cell applies a representative value for visual checks."
+          "code_path": "",
+          "description": "Demoted `object-view-box` (CSS Images). Parsed-and-stored no-op removed 2026-09-12 (PT26-LAY-04); the effect cell documents the dropped declaration and paints as if not set.",
+          "status": "demoted"
         },
         {
           "property": "opacity",
@@ -2686,8 +2704,9 @@
           "legacy_of": null,
           "group": "CSS Color",
           "syntax": "economy | exact",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Implemented `print-color-adjust` (CSS Color). Effect cell applies a representative value for visual checks."
+          "code_path": "",
+          "description": "Demoted `print-color-adjust` (CSS Color). Parsed-and-stored no-op removed 2026-09-12 (PT26-LAY-04); the effect cell documents the dropped declaration and paints as if not set.",
+          "status": "demoted"
         },
         {
           "property": "quotes",
@@ -2821,8 +2840,9 @@
           "legacy_of": null,
           "group": "CSS Writing Modes",
           "syntax": "none | all | [ digits <integer [2,4]>? ]",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Text layout/painting control. Compare the demo label against the Effect cell."
+          "code_path": "",
+          "description": "Demoted `text-combine-upright` (CSS Writing Modes). Parsed-and-stored no-op removed 2026-09-12 (PT26-LAY-05); the effect cell documents the dropped declaration and paints as if not set.",
+          "status": "demoted"
         },
         {
           "property": "text-decoration",
@@ -2848,8 +2868,9 @@
           "legacy_of": null,
           "group": "CSS Text Decoration",
           "syntax": "<length-percentage>{1,2} | auto",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Text decoration/emphasis painting (line, color, style, thickness, or offset)."
+          "code_path": "",
+          "description": "Demoted `text-decoration-inset` (CSS Text Decoration). Parsed-and-stored no-op removed 2026-09-12 (PT26-LAY-05); the effect cell documents the dropped declaration and paints as if not set.",
+          "status": "demoted"
         },
         {
           "property": "text-decoration-line",
@@ -2866,8 +2887,9 @@
           "legacy_of": null,
           "group": "CSS Text Decoration",
           "syntax": "none | auto",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Text decoration/emphasis painting (line, color, style, thickness, or offset)."
+          "code_path": "",
+          "description": "Demoted `text-decoration-skip` (CSS Text Decoration). Parsed-and-stored no-op removed 2026-09-12 (PT26-LAY-05); the effect cell documents the dropped declaration and paints as if not set.",
+          "status": "demoted"
         },
         {
           "property": "text-decoration-skip-box",
@@ -2875,8 +2897,9 @@
           "legacy_of": null,
           "group": "(ungrouped)",
           "syntax": "none | all",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Text decoration/emphasis painting (line, color, style, thickness, or offset)."
+          "code_path": "",
+          "description": "Demoted `text-decoration-skip-box` ((ungrouped)). Parsed-and-stored no-op removed 2026-09-12 (PT26-LAY-05); the effect cell documents the dropped declaration and paints as if not set.",
+          "status": "demoted"
         },
         {
           "property": "text-decoration-skip-ink",
@@ -2893,8 +2916,9 @@
           "legacy_of": null,
           "group": "(ungrouped)",
           "syntax": "auto | skip-all | [ skip-underline || skip-overline || skip-line-through ] | no-skip",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Text decoration/emphasis painting (line, color, style, thickness, or offset)."
+          "code_path": "",
+          "description": "Demoted `text-decoration-skip-self` ((ungrouped)). Parsed-and-stored no-op removed 2026-09-12 (PT26-LAY-05); the effect cell documents the dropped declaration and paints as if not set.",
+          "status": "demoted"
         },
         {
           "property": "text-decoration-skip-spaces",
@@ -2902,8 +2926,9 @@
           "legacy_of": null,
           "group": "(ungrouped)",
           "syntax": "none | all | [ start || end ]",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Text decoration/emphasis painting (line, color, style, thickness, or offset)."
+          "code_path": "",
+          "description": "Demoted `text-decoration-skip-spaces` ((ungrouped)). Parsed-and-stored no-op removed 2026-09-12 (PT26-LAY-05); the effect cell documents the dropped declaration and paints as if not set.",
+          "status": "demoted"
         },
         {
           "property": "text-decoration-style",
@@ -2992,8 +3017,9 @@
           "legacy_of": null,
           "group": "CSS Writing Modes",
           "syntax": "mixed | upright | sideways",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Text layout/painting control. Compare the demo label against the Effect cell."
+          "code_path": "",
+          "description": "Demoted `text-orientation` (CSS Writing Modes). Parsed-and-stored no-op removed 2026-09-12 (PT26-LAY-05); the effect cell documents the dropped declaration and paints as if not set.",
+          "status": "demoted"
         },
         {
           "property": "text-overflow",
@@ -3118,8 +3144,9 @@
           "legacy_of": null,
           "group": "CSS Writing Modes",
           "syntax": "normal | embed | isolate | bidi-override | isolate-override | plaintext",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Implemented `unicode-bidi` (CSS Writing Modes). Effect cell applies a representative value for visual checks."
+          "code_path": "",
+          "description": "Demoted `unicode-bidi` (CSS Writing Modes). Parsed-and-stored no-op removed 2026-09-12 (PT26-LAY-05); the effect cell documents the dropped declaration and paints as if not set.",
+          "status": "demoted"
         },
         {
           "property": "vertical-align",
@@ -3231,5 +3258,7 @@
         }
       ]
     }
-  }
+  },
+  "updated": "2026-09-12",
+  "demoted": 27
 }

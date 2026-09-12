@@ -78,7 +78,7 @@ original face.
 
 ## `@font-face`
 
-`convert/prepare.MergeFontFaces` registers document faces on **both PDF and
+`prepare.ResourceContext.MergeFontFaces` registers document faces on **both PDF and
 image** paths.
 
 | `src` | Behavior |

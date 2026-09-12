@@ -1,18 +1,5 @@
 package settings
 
-// StampEmptyHFOverride clears header/footer and marks them as explicitly set
-// so HeaderFor/FooterFor do not fall through to PdfGlobal.
-func StampEmptyHFOverride(obj *PdfObject) {
-	if obj == nil {
-		return
-	}
-
-	obj.HeaderSet, obj.FooterSet = true, true
-
-	var empty HeaderFooter
-	obj.Header, obj.Footer = empty, empty
-}
-
 // StampCover marks obj as a cover page: excluded from the outline and with no
 // inherited document headers/footers unless the caller sets HF afterward.
 func StampCover(obj *PdfObject) {
@@ -22,7 +9,10 @@ func StampCover(obj *PdfObject) {
 
 	obj.IsCover = true
 	obj.IncludeInOutline = false
-	StampEmptyHFOverride(obj)
+	obj.HeaderSet, obj.FooterSet = true, true
+
+	var empty HeaderFooter
+	obj.Header, obj.Footer = empty, empty
 }
 
 // StampTOC marks obj as a table-of-contents placeholder object.

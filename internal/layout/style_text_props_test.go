@@ -112,7 +112,6 @@ func TestTextEmphasisPropsReachWave3(t *testing.T) {
 		"text-emphasis-color":    "#c00",
 		"text-emphasis-position": "under",
 		"text-emphasis-skip":     "spaces",
-		"text-decoration-inset":  "3px",
 	}
 	applyRestProps(&s, raw, ctx, nil)
 
@@ -127,8 +126,5 @@ func TestTextEmphasisPropsReachWave3(t *testing.T) {
 	}
 	if s.CustomProps["__emph_skip"] != "spaces" {
 		t.Errorf("expected __emph_skip spaces, got %q", s.CustomProps["__emph_skip"])
-	}
-	if s.TextDecorationInset != "3px" {
-		t.Errorf("expected TextDecorationInset 3px, got %q", s.TextDecorationInset)
 	}
 }

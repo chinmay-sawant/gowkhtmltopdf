@@ -201,20 +201,21 @@ func opOwnsHorizontalSide(oper *Op, boxNode *box, phase opOwnerPhase, tol float6
 // opOwnsChromeHorizontalSide reports whether a horizontal rail matches the
 // chrome-repair shape checks for the box's top or bottom border.
 func opOwnsChromeHorizontalSide(oper *Op, boxNode *box, tol float64, onTop, onBottom bool) bool {
-	style, ok := paintChromeStyleOf(boxNode)
-	if !ok {
+	if boxNode == nil || boxNode.style == nil {
 		return false
 	}
+
+	style := boxNode.style
 
 	if math.Abs(oper.W-boxNode.w) <= tol {
 		return true
 	}
 
-	if onTop && isDashedOrDottedStyle(style.borderTop.Style) {
+	if onTop && isDashedOrDottedStyle(style.BorderTop.Style) {
 		return true
 	}
 
-	if onBottom && isDashedOrDottedStyle(style.borderBottom.Style) {
+	if onBottom && isDashedOrDottedStyle(style.BorderBottom.Style) {
 		return true
 	}
 
@@ -228,16 +229,17 @@ func chromeVerticalBorderExists(oper *Op, boxNode *box, onLeft, onRight bool) bo
 		return false
 	}
 
-	style, ok := paintChromeStyleOf(boxNode)
-	if !ok {
+	if boxNode == nil || boxNode.style == nil {
 		return false
 	}
 
-	if onLeft && !(style.borderLeft.Width > 0 && style.borderLeft.Style != cssDisplayNone) {
+	style := boxNode.style
+
+	if onLeft && !(style.BorderLeft.Width > 0 && style.BorderLeft.Style != cssDisplayNone) {
 		return false
 	}
 
-	if onRight && !(style.borderRight.Width > 0 && style.borderRight.Style != cssDisplayNone) {
+	if onRight && !(style.BorderRight.Width > 0 && style.BorderRight.Style != cssDisplayNone) {
 		return false
 	}
 

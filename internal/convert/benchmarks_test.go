@@ -72,14 +72,10 @@ type benchmarkTemplateData struct {
 
 type benchmarkPDFMode string
 
-const (
-	benchmarkPDFGeneric          benchmarkPDFMode = "generic"
-	benchmarkPDFCertifiedIslands benchmarkPDFMode = "certified-islands"
-)
+const benchmarkPDFGeneric benchmarkPDFMode = "generic"
 
 var benchmarkPDFModes = []benchmarkPDFMode{ //nolint:gochecknoglobals // fixed comparison matrix
 	benchmarkPDFGeneric,
-	benchmarkPDFCertifiedIslands,
 }
 
 type tvMazeImage struct {
@@ -336,7 +332,7 @@ func executeBenchmarkTemplate(tb testing.TB, tpl *template.Template, data any) [
 	return append([]byte(nil), rendered.Bytes()...)
 }
 
-func benchmarkPDFRequest(html []byte, output io.Writer, mode benchmarkPDFMode) *convert.Request {
+func benchmarkPDFRequest(html []byte, output io.Writer) *convert.Request {
 	global := settings.DefaultPdfGlobal()
 	global.Quiet = true
 	object := settings.DefaultPdfObject()
@@ -345,14 +341,7 @@ func benchmarkPDFRequest(html []byte, output io.Writer, mode benchmarkPDFMode) *
 
 	objects := []settings.PdfObject{object}
 
-	switch mode {
-	case benchmarkPDFGeneric:
-		return convert.NewPDFRequest(global, objects, output, nil)
-	case benchmarkPDFCertifiedIslands:
-		return convert.NewBenchmarkPDFRequest(global, objects, output, nil)
-	default:
-		panic(fmt.Sprintf("unsupported benchmark PDF mode %q", mode))
-	}
+	return convert.NewPDFRequest(global, objects, output, nil)
 }
 
 func benchmarkPDFMetadata(tb testing.TB, mode benchmarkPDFMode) {
@@ -403,9 +392,8 @@ func benchmarkDataURL(data []byte) string {
 }
 
 // BenchmarkPDFPages measures the full inline-HTML to PDF pipeline for the
-// fixed page-size matrix in both generic and explicitly certified-island
-// request modes. Template execution is intentionally outside this benchmark
-// so it isolates conversion cost for already-materialized HTML.
+// fixed page-size matrix. Template execution is intentionally outside this
+// benchmark so it isolates conversion cost for already-materialized HTML.
 func BenchmarkPDFPages(b *testing.B) {
 	tpl := loadBenchmarkTemplate(b, "report.html.tmpl")
 	sources := make(map[int][]byte, len(benchmarkPageSizes))
@@ -423,7 +411,7 @@ func BenchmarkPDFPages(b *testing.B) {
 			for _, pages := range benchmarkPageSizes {
 				b.Run(fmt.Sprintf("%dPages", pages), func(b *testing.B) {
 					var output bytes.Buffer
-					req := benchmarkPDFRequest(sources[pages], &output, mode)
+					req := benchmarkPDFRequest(sources[pages], &output)
 
 					b.ResetTimer()
 
@@ -454,8 +442,7 @@ func BenchmarkPDFPages(b *testing.B) {
 }
 
 // BenchmarkTemplatePages measures template execution plus the full PDF
-// pipeline in both request modes. It uses the same page-size matrix as
-// BenchmarkPDFPages.
+// pipeline. It uses the same page-size matrix as BenchmarkPDFPages.
 func BenchmarkTemplatePages(b *testing.B) {
 	tpl := loadBenchmarkTemplate(b, "report.html.tmpl")
 
@@ -467,7 +454,7 @@ func BenchmarkTemplatePages(b *testing.B) {
 				data := benchmarkTemplateData{Pages: benchmarkPages(pages)}
 				b.Run(fmt.Sprintf("%dPages", pages), func(b *testing.B) {
 					var output bytes.Buffer
-					req := benchmarkPDFRequest(nil, &output, mode)
+					req := benchmarkPDFRequest(nil, &output)
 
 					b.ReportMetric(float64(pages), "pages")
 					b.ResetTimer()
@@ -585,7 +572,7 @@ func TestGenerateBenchmarkOutputs(t *testing.T) { //nolint:cyclop,funlen // mate
 
 		var output bytes.Buffer
 
-		req := benchmarkPDFRequest(source, &output, benchmarkPDFCertifiedIslands)
+		req := benchmarkPDFRequest(source, &output)
 		if err := convert.Run(t.Context(), req, io.Discard, nil); err != nil {
 			t.Fatalf("generate PDF output for %d pages: %v", pages, err)
 		}
@@ -597,7 +584,7 @@ func TestGenerateBenchmarkOutputs(t *testing.T) { //nolint:cyclop,funlen // mate
 		writeBenchmarkOutput(t, fmt.Sprintf("pdf-pages-%03d.pdf", pages), output.Bytes())
 
 		output.Reset()
-		templateRequest := benchmarkPDFRequest(nil, &output, benchmarkPDFCertifiedIslands)
+		templateRequest := benchmarkPDFRequest(nil, &output)
 
 		if err := reportTemplate.Execute(&output, benchmarkTemplateData{
 			Pages: benchmarkPages(pages),
@@ -706,7 +693,7 @@ func TestGenerateLiveMovieOutput(t *testing.T) {
 	var pdfOutput bytes.Buffer
 	if err := convert.Run(
 		t.Context(),
-		benchmarkPDFRequest(source, &pdfOutput, benchmarkPDFGeneric),
+		benchmarkPDFRequest(source, &pdfOutput),
 		io.Discard,
 		nil,
 	); err != nil {

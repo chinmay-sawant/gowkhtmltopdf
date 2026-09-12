@@ -8,6 +8,11 @@ import (
 // opaque16 is the fully opaque 16-bit channel value color.NRGBA.RGBA returns.
 const opaque16 = 0xffff
 
+// channelShift converts the 16-bit channel values color.Color.RGBA returns
+// into the 8-bit channels the NRGBA model stores, matching the model's
+// truncating shift.
+const channelShift = 8
+
 // scaleNearest resizes src to w×h with nearest-neighbour sampling. Go 1.26
 // removed image/draw's BiLinear/NearestNeighbor scalers, so a tiny scaler
 // lives here; natural-size images take the draw.Draw fast path in paint.

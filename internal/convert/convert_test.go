@@ -19,9 +19,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/chinmay-sawant/gowkhtmltopdf/internal/convert/prepare"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
-	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/imageout"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
@@ -303,48 +301,6 @@ func TestLinkMediaGateUsesFinalPageBox(t *testing.T) {
 				t.Errorf("gated text hidden = %v, want %v (text %q)", hidden, testCase.wantHidden, text)
 			}
 		})
-	}
-}
-
-func TestLinkStylesheetMediaMatches(t *testing.T) {
-	t.Parallel()
-
-	mark := func(media string) *html.Node {
-		return &html.Node{
-			Type:  html.ElementNode,
-			Name:  "link",
-			Attrs: map[string]string{"rel": "stylesheet", "href": "x.css", "media": media},
-		}
-	}
-
-	const viewW, viewH = 538.0, 785.0
-
-	if !prepare.LinkStylesheet(mark(""), viewW, viewH, mediaPrint) {
-		t.Error("empty media should load")
-	}
-
-	if !prepare.LinkStylesheet(mark("print"), viewW, viewH, mediaPrint) {
-		t.Error("print should load")
-	}
-
-	if !prepare.LinkStylesheet(mark("all"), viewW, viewH, mediaPrint) {
-		t.Error("all should load")
-	}
-
-	if prepare.LinkStylesheet(mark("screen"), viewW, viewH, mediaPrint) {
-		t.Error("screen-only must be excluded for print")
-	}
-
-	if !prepare.LinkStylesheet(mark("(min-width: 500px)"), viewW, viewH, mediaPrint) {
-		t.Error("min-width feature matching A4 content should load")
-	}
-
-	if prepare.LinkStylesheet(mark("(min-width: 2000px)"), viewW, viewH, mediaPrint) {
-		t.Error("unmatched min-width must not load")
-	}
-
-	if !prepare.LinkStylesheet(mark("screen"), viewW, viewH, "screen") {
-		t.Error("screen media type should accept screen stylesheets")
 	}
 }
 
