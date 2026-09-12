@@ -437,6 +437,20 @@ After Phase 79 closed at **202 / 0 / 616 / 0**, the remaining **616 Unsupported*
 
 Standing rules in every 80-84 checklist: **no git commands unless the user explicitly asks**; after status changes update both `catalog/mapping.json` and `catalog/coverage-summary.json` (plus `property-counts.md`); mapping last per `HONESTY-GATES.md`.
 
+## Amendment (2026-09-12): 24 demoted rows re-implemented
+
+PT26-LAY-04/05 demoted 27 parsed-and-stored no-op rows to unsupported. The same day, 24 of them were re-implemented with apply arms plus real layout, paint, or shaping consumers, per [HONEY-GATES](../HONESTY-GATES.md):
+
+- Containment (7): `contain`, `contain-intrinsic-size/-width/-height/-block-size/-inline-size`, `content-visibility`.
+- Print color adjust (5): `color-adjust`, `print-color-adjust`, `forced-color-adjust`, `color-scheme`, `dynamic-range-limit`.
+- Image adjust (3): `image-orientation`, `image-resolution`, `object-view-box`.
+- Text support (8): `unicode-bidi`, `text-orientation`, `text-combine-upright`, `text-decoration-inset`, `text-decoration-skip` and its three longhands.
+- Fonts (1): `font-language-override` (OpenType tags mapped to BCP47 and threaded into `shaping.Input.Language`).
+
+Catalog: **352 Implemented / 2 Partial / 464 Unsupported / 0 Ignored**. The three remaining font rows (`font-optical-sizing`, `font-palette`, `font-variation-settings`) stay unsupported; they need variable-font instancing and COLR/CPAL painting. `isolation` and `mix-blend-mode` remain partial pending PDF transparency groups.
+
+Evidence: `catalog/implemented-code-evidence.md`, fixtures 61 and 62, and `make lint` / `make golden` exit 0 on 2026-09-12.
+
 ## Out of scope (unless this ledger is amended)
 
 - JavaScript, SPA hydration, `--enable-javascript`
