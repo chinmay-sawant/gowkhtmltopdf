@@ -36,15 +36,14 @@ export default function LandingPage() {
 
       <section className="landing-hero-minimal" aria-labelledby="landing-title">
         <div className="landing-hero-main">
-          <p className="landing-kicker">HTML to PDF &middot; Pure Go</p>
           <h1 id="landing-title">
-            Your HTML,
+            HTML -&gt; PDF,
             <br />
-            <em>as a print-ready PDF.</em>
+            <em>No Chromium and No Blink.</em>
           </h1>
           <p className="landing-lede">
-            Authored HTML in, paginated PDF out with 350+ CSS properties: tables and flex, borders
-            and backgrounds, shadows and transforms.
+            More than 350 CSS properties supported: tables and flex, borders and backgrounds,
+            shadows and transforms, and more.
           </p>
           <div className="landing-actions">
             <Link className="button button-primary" to="/documentation/getting-started">

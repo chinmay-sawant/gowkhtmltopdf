@@ -16,17 +16,10 @@
   border-bottom: 1px solid var(--line);
 }
 
-.landing-kicker {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 16px;
-  color: var(--muted);
-  font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+/* Keeps the headline where it sat with the old kicker line above it:
+   11px mono line at the inherited 1.65 line-height plus its 16px margin. */
+.landing-hero-main {
+  padding-top: 34px;
 }
 
 .landing-hero-minimal h1 {
