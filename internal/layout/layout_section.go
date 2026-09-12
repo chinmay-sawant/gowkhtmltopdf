@@ -94,6 +94,12 @@ func NodeWithWorkspace(
 
 	eng.finalizeChrome(rootBox)
 
+	return assembleNodeResult(eng, rootBox, opts, workspace), nil
+}
+
+// assembleNodeResult turns the built tree into the caller-facing Result:
+// flattened boxes, final height, transform stamps, and census counters.
+func assembleNodeResult(eng *engine, rootBox *box, opts Options, workspace *Workspace) *Result {
 	boxes := make([]*box, 0)
 	flattenBoxes(rootBox, &boxes)
 
@@ -124,5 +130,5 @@ func NodeWithWorkspace(
 		workspace.ops = res.Ops
 	}
 
-	return res, nil
+	return res
 }
