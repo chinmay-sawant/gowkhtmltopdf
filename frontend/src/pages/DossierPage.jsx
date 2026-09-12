@@ -258,10 +258,10 @@ export default function DossierPage() {
                 type="button"
                 className={`coverage-stat-pill segment-implemented${status === 'implemented' ? ' active' : ''}`}
                 onClick={() => handleStatusChange(status === 'implemented' ? 'all' : 'implemented')}
-                title="Filter by Implemented"
+                title="Filter by Implemented / Fixed"
               >
                 <span className="dot" style={{ background: '#9BBF88' }} />
-                <span>Implemented:</span>
+                <span>Implemented / Fixed:</span>
                 <strong>{implPct}%</strong>
                 <span className="stat-pill-count">({implCount})</span>
               </button>
@@ -295,11 +295,11 @@ export default function DossierPage() {
               className={`coverage-segment segment-implemented${status === 'implemented' ? ' active' : ''}`}
               style={{ width: `${implPct}%` }}
               onClick={() => handleStatusChange(status === 'implemented' ? 'all' : 'implemented')}
-              aria-label={`Implemented: ${implCount} issues (${implPct}%). Click to ${status === 'implemented' ? 'clear filter' : 'filter'}`}
+              aria-label={`Implemented / Fixed: ${implCount} issues (${implPct}%). Click to ${status === 'implemented' ? 'clear filter' : 'filter'}`}
               aria-pressed={status === 'implemented'}
-              title={`Implemented: ${implCount} issues (${implPct}%)`}
+              title={`Implemented / Fixed: ${implCount} issues (${implPct}%)`}
             >
-              <span className="segment-text">{implPct}% Implemented</span>
+              <span className="segment-text">{implPct}% Implemented / Fixed</span>
             </button>
             <button
               type="button"

@@ -355,6 +355,10 @@ html[data-theme='dark'] .coverage-segment.segment-not-implemented {
   margin-bottom: 0;
 }
 
+.dossier-toolbar .pagination {
+  margin-top: 0;
+}
+
 .dossier-main-content {
   min-width: 0;
 }

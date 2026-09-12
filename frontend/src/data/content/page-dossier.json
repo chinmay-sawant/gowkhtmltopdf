@@ -5,7 +5,7 @@
   {
    "type": "hero",
    "title": "All 1,329 open wkhtmltopdf issues, classified",
-    "lede": "Every open issue in the wkhtmltopdf/wkhtmltopdf repository, mapped against what gowkhtmltopdf can do. All 1,329 issues carry a verdict with evidence: 469 implemented, 298 partial, 562 not implemented."
+    "lede": "Every open issue in the wkhtmltopdf/wkhtmltopdf repository, mapped against what gowkhtmltopdf can do. All 1,329 issues carry a verdict with evidence: 547 implemented, 339 partial, 443 not implemented."
   },
   {
    "type": "callout",
@@ -19,7 +19,7 @@
    "sections": [
     {
      "heading": "A full scrape, fully classified",
-      "body": "The dossier starts from all 1,329 open issues scraped from the upstream wkhtmltopdf issue tracker, including title, body, labels, and dates. Every issue was read and classified against the gowkhtmltopdf codebase; there are no unassessed rows left. Every row has a category and a verdict with evidence. The first 100 were read in depth and carry a hand-written key-detail note, plus all 15 recorded workarounds; the remaining 1,229 carry their tracker metadata (labels, comment counts) alongside the same verdict and evidence fields. Three validation sweeps have been run: the first re-checked the not-implemented rows (8 moved); a second sweep on 2026-08-15 re-audited verdicts against 0.2.1/0.2.2 (30 rows moved); and a third sweep the same day used five subagents on the live 0.2.1 tree plus 0.2.2 on master. That pass rewrote Codebase status notes that still used pre-Policy A language (Ignored vs Rejected), stale rowspan / stdlib-only / VERSION 0.1.0 claims, and local-only @font-face. 18 rows changed verdict, e.g. Qt OLE/segfault sidesteps and CSS grid support to implemented, combined text+HTML footers and inline SVG paths to not implemented."
+      "body": "The dossier starts from all 1,329 open issues scraped from the upstream wkhtmltopdf issue tracker, including title, body, labels, and dates. Every issue was read and classified against the gowkhtmltopdf codebase; there are no unassessed rows left. Every row has a category and a verdict with evidence. The most recent 98 were read in depth and carry a hand-written key-detail note, plus all 15 recorded workarounds; the remaining 1,229 carry their tracker metadata (labels, comment counts) alongside the same verdict and evidence fields. Five validation sweeps have been run. The first re-checked the not-implemented rows (8 moved). A second, on 2026-08-15, re-audited verdicts against 0.2.1/0.2.2 (30 rows moved). A third the same day used five subagents on the live 0.2.1 tree: 18 rows changed verdict, and the pass rewrote pre-Policy A language (Ignored vs Rejected) plus stale rowspan / stdlib-only / VERSION 0.1.0 claims. A fourth, on 2026-09-13, used ten subagents across all 1,329 rows against the 0.2.6 tree: 73 verdicts moved (56 to implemented, 16 to partial, 1 to not implemented) and 72 evidence notes were refreshed, mostly replacing stale no-C-ABI, background-image-ignored, calc-absent, and inline-SVG-unsupported claims. A fifth pass the same day re-challenged every not-implemented row with ten more subagents: 67 more verdicts moved (24 to implemented, 43 to partial) and 16 evidence notes were repaired. The remaining 443 not-implemented rows break down, by the checking agents' own counting, as about 163 needing a JavaScript engine, 132 missing a specific CSS/HTML/CLI feature, 49 packaging or wrapper-ABI gaps, 35 arbitrary-site parity non-goals, 30 environment-only reports, and the rest smaller categories (fonts, encryption, SVG subset, PDF-level features)."
     },
     {
      "heading": "Every verdict cites evidence",
@@ -40,18 +40,18 @@
      "label": "open wkhtmltopdf issues tracked"
     },
     {
-     "value": "469",
-     "percent": "35%",
+     "value": "547",
+     "percent": "41%",
      "label": "implemented"
     },
     {
-     "value": "298",
-     "percent": "22%",
+     "value": "339",
+     "percent": "26%",
      "label": "partial"
     },
     {
-     "value": "562",
-     "percent": "42%",
+     "value": "443",
+     "percent": "33%",
      "label": "not implemented"
     }
    ]
