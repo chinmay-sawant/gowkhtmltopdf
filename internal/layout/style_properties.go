@@ -1887,7 +1887,7 @@ func applyTextSpacingProps(style *ResolvedStyle, prop, value string, fsize float
 // applyTableBreakGroup handles table layout, page-break, orphans/widows, and container queries.
 func applyTableBreakGroup(
 	style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext,
-	parent *ResolvedStyle, _ bool,
+	parent *ResolvedStyle, hasParent bool,
 ) bool {
 	switch prop {
 	case "border-collapse", "border-spacing", "table-layout", "caption-side":
@@ -1900,7 +1900,7 @@ func applyTableBreakGroup(
 	case "orphans", "widows":
 		return applyOrphansWidowsProps(style, prop, value)
 	case "container-type", "container-name", containerKeyword:
-		return applyContainerProps(style, prop, value)
+		return applyContainerProps(style, prop, value, parent, hasParent)
 	default:
 		return false
 	}
@@ -2054,29 +2054,6 @@ func applyOrphansWidowsProps(style *ResolvedStyle, prop, value string) bool {
 	case "widows":
 		if n, ok := parseOrphansWidowsInt(value); ok {
 			style.Widows = n
-		}
-	default:
-		return false
-	}
-
-	return true
-}
-
-func applyContainerProps(style *ResolvedStyle, prop, value string) bool {
-	switch prop {
-	case "container-type":
-		switch strings.ToLower(value) {
-		case contentNormal, "size", "inline-size":
-			style.ContainerType = strings.ToLower(value)
-		}
-	case "container-name":
-		style.ContainerName = css.ParseContainerNameValue(value)
-	case containerKeyword:
-		name, ctype := css.ParseContainerShorthand(value)
-		style.ContainerName = name
-
-		if ctype != "" {
-			style.ContainerType = ctype
 		}
 	default:
 		return false

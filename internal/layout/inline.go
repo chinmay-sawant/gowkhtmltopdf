@@ -884,6 +884,14 @@ func (e *engine) emitLine(
 		textAlign = boxNode.style.TextAlignLast
 	}
 
+	// A vertical-rl block advances columns right-to-left, so a single column
+	// anchors at the content box's right edge. text-align along the vertical
+	// axis is not implemented; justify keeps the shared path.
+	if boxNode != nil && boxNode.style != nil &&
+		boxNode.style.WritingMode == writingModeVerticalRL && textAlign != cssTextAlignJustify {
+		textAlign = floatRight
+	}
+
 	// Coalesce adjacent same-style text runs into one op so PDF/image paint
 	// advances match layout (avoids word-by-word Tj gaps). Skip when
 	// justifying — gaps are distributed between word items. Legacy

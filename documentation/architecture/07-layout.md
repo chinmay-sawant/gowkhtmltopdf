@@ -62,8 +62,8 @@ intrinsic multi-pass cycles, full Multicol L1/L2 balancing.
 
 ## 2. Package / file map
 
-Production files (`internal/layout`, 77 files, 45,039 production lines;
-77,380 lines with tests). Line counts are approximate from `wc -l`.
+Production files (`internal/layout`, 80 files, 45,232 production lines;
+77,743 lines with tests). Line counts are approximate from `wc -l`.
 
 | File | Lines | Responsibility |
 |------|------:|----------------|
@@ -72,13 +72,16 @@ Production files (`internal/layout`, 77 files, 45,039 production lines;
 | `independent_blocks.go` | 148 | `IndependentBlocks`/`IndependentBlocksForOptions` gate for the certified one-at-a-time body-child run; fails closed on floats, abspos, flex/grid items, or page-break gaps |
 | `style.go` | 889 | `ResolvedStyle` struct, `initialStyle()`, inheritance walk (`resolveStylesCtx`), `styleStore` interning (`append` canonicalizes `*ResolvedStyle` sharing), `styleContext`, `sizeContainer`; generated intern fingerprint/equality in `style_intern_gen.go` |
 | `style_cascade.go` | 1475 | `cascadeRaw` (UA + author + inline with specificity/order/!important), `matchedRules`, custom properties (`--*`) merge + `resolveRawVars`, `inheritableProps`/`inheritProps`, cascade-win comparison, `styleGroups` dispatch + `applyStyleProp` routing |
-| `style_properties.go` | 2194 | Property-group `apply*` setters: display/position/flex/multicol/grid/box/border/color/text/table-break/transform, plus `applyIgnoredGroup`; the dispatch order lives in `style_cascade.go` |
+| `style_properties.go` | 2171 | Property-group `apply*` setters: display/position/flex/multicol/grid/box/border/color/text/table-break/transform, plus `applyIgnoredGroup`; the dispatch order lives in `style_cascade.go` |
+| `style_container_props.go` | 110 | Container property apply arm: `container` shorthand plus `container-name`/`container-type` validation and CSS-wide keyword resolution (`inherit` copies the parent, `initial`/`unset`/`revert` reset) |
 | `style_values.go` | 1845 | Value parsers: lengths, font-size keywords, line-height, border widths, flex/grid shorthands, `uaDecls` UA table, `uaRules(name)` |
 | `container.go` | 166 | `@container` size-query support: `findSizeContainer`, `measureSizeContainersContext`, `contentInlineSize` |
 | `layout_flow.go` | 1287 | In-flow child dispatch (`flowChildren`/`flowOneChild`), inline-run collection, list markers (`emitListMarker`), float placement + packing, BFC float-state push/pop, image ref resolution (incl. SVG raster) |
-| `inline.go` | 1211 | Inline formatting: item packing into lines, float exclusion (`lineBounds`), overflow splitting, word-break policies, justification, line metrics, glue/sticky-tail handling |
+| `inline.go` | 1219 | Inline formatting: item packing into lines, float exclusion (`lineBounds`), overflow splitting, word-break policies, justification, line metrics, glue/sticky-tail handling; `vertical-rl` lines anchor at the content box's right edge |
 | `inline_collect.go` | 1286 | Inline item collection: text (pre/wrapped), `<br>`, `<img>`, inline-block, inline spans, href attachment, whitespace squeezing, `::before`/`::after` content, soft-wrap punctuation rules |
-| `inline_paint.go` | 2018 | Inline emission to ops: text runs (per-face), decoration (underline/line-through), inline-block/image paint, face-run splitting for fallback |
+| `inline_paint.go` | 1953 | Inline emission to ops: text runs (per-face), decoration (underline/line-through), inline-block/image paint, face-run splitting for fallback |
+| `inline_vertical_writing.go` | 82 | Vertical writing paint: `text-orientation: upright` rune stacking, `text-combine-upright` cells centered in the column |
+| `inline_vertical_align.go` | 79 | `vertical-align` shifts: `alignedInlineTop`, `effectiveVerticalAlignShift` (sub/super ratios, % of line-height, lengths) |
 | `layout_tables.go` | 1392 | Table layout: row/col collection, cell placement (colspan/rowspan occupancy), column sizing (min/max/%/abs), row heights, border emission, `<thead>` header-row counting, rowspan line redistribution |
 | `layout_measure.go` | 1130 | Measurement passes: cell min/max-content, band baseline grouping (rowspan vertical distribution), `minContentWidth` per word-break policy, `layoutCell` |
 | `flex.go` | 1647 | Flex layout: row/column, wrap, grow/shrink/basis, align/justify, order, min-main-size clamps, `applyRelativeOffset` |

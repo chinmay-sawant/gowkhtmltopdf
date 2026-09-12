@@ -252,11 +252,11 @@ that fails if `docs/` goes dirty.
 
 ## Code structure
 
-- **File size soft limit: ~2,000 lines.** Four files exceed it today:
+- **File size soft limit: ~2,000 lines.** Three files exceed it today:
   `internal/layout/layout.go` (2,497), `internal/layout/style_properties.go`
-  (2,194), `internal/imageout/imageout.go` (2,058), and
-  `internal/layout/inline_paint.go` (2,018). Do not grow them further;
-  extract a cohesive piece into a same-package file whenever you touch them.
+  (2,171), and `internal/imageout/imageout.go` (2,058). Do not grow them
+  further; extract a cohesive piece into a same-package file whenever you
+  touch them.
   No new file crosses the limit without a written reason. `make size-check`
   scans every non-pruned `.go` file, test files included, and fails when the
   tree disagrees with `scripts/file-size-allowlist.txt`, the single source of

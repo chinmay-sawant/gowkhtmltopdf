@@ -221,8 +221,8 @@ func TestUnicodeBidiOverrideKeepsSpaces(t *testing.T) {
 }
 
 // TestTextOrientationUprightVsMixedPaint proves text-orientation:upright
-// paints unrotated runs in a vertical writing mode while the mixed default
-// keeps the existing -90 degree run rotation.
+// stacks each glyph unrotated down the column while the mixed default keeps
+// the existing -90 degree run rotation.
 func TestTextOrientationUprightVsMixedPaint(t *testing.T) {
 	t.Parallel()
 
@@ -231,13 +231,23 @@ func TestTextOrientationUprightVsMixedPaint(t *testing.T) {
 		`<span style="writing-mode:vertical-rl">CD</span>`+
 		`</p></body></html>`)
 
-	_, upright, found := textOpIndex(res, "AB")
-	if !found {
-		t.Fatal("no text op for AB")
+	_, aOp, aFound := textOpIndex(res, "A")
+	_, bOp, bFound := textOpIndex(res, "B")
+
+	if !aFound || !bFound {
+		t.Fatalf("upright AB produced glyph ops A=%v B=%v, want one op per glyph", aFound, bFound)
 	}
 
-	if upright.RotateDeg != 0 {
-		t.Fatalf("upright RotateDeg = %v, want 0", upright.RotateDeg)
+	if diff := aOp.X - bOp.X; diff < -0.5 || diff > 0.5 {
+		t.Errorf("upright glyph X = %.2f and %.2f, want one centered column", aOp.X, bOp.X)
+	}
+
+	if bOp.Y <= aOp.Y {
+		t.Errorf("upright glyphs A y=%.2f B y=%.2f, want B below A", aOp.Y, bOp.Y)
+	}
+
+	if aOp.RotateDeg != 0 || bOp.RotateDeg != 0 {
+		t.Errorf("upright RotateDeg = %v/%v, want 0", aOp.RotateDeg, bOp.RotateDeg)
 	}
 
 	_, mixed, found := textOpIndex(res, "CD")
@@ -247,6 +257,42 @@ func TestTextOrientationUprightVsMixedPaint(t *testing.T) {
 
 	if mixed.RotateDeg != -90 {
 		t.Fatalf("mixed RotateDeg = %v, want -90", mixed.RotateDeg)
+	}
+}
+
+// TestVerticalRLColumnAnchorsRightAndCombinedCellCenters proves a vertical-rl
+// column anchors at the content box's right edge and a text-combine-upright
+// cell centers itself in the column.
+func TestVerticalRLColumnAnchorsRightAndCombinedCellCenters(t *testing.T) {
+	t.Parallel()
+
+	res := layoutHTML(t, `<html><body style="margin:0">`+
+		`<div style="width:200pt;writing-mode:vertical-rl;text-orientation:upright;font-size:10pt">AB</div>`+
+		`<div style="width:200pt;writing-mode:vertical-rl;text-combine-upright:digits 2;font-size:10pt">12</div>`+
+		`</body></html>`)
+
+	_, aOp, aFound := textOpIndex(res, "A")
+	_, bOp, bFound := textOpIndex(res, "B")
+	_, cell, cellFound := textOpIndex(res, "12")
+
+	if !aFound || !bFound || !cellFound {
+		t.Fatalf("missing ops: A=%v B=%v cell=%v", aFound, bFound, cellFound)
+	}
+
+	if aOp.X < 150 {
+		t.Errorf("upright column X = %.2f, want near the 200pt block's right edge", aOp.X)
+	}
+
+	if bOp.X < 150 {
+		t.Errorf("upright column B X = %.2f, want near the 200pt block's right edge", bOp.X)
+	}
+
+	if cell.X < 150 {
+		t.Errorf("combined cell X = %.2f, want near the 200pt block's right edge", cell.X)
+	}
+
+	if cell.RotateDeg != 0 {
+		t.Errorf("combined cell RotateDeg = %v, want 0", cell.RotateDeg)
 	}
 }
 

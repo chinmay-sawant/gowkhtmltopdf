@@ -1188,7 +1188,9 @@ func sameInlineStyle(acc, boxN *ResolvedStyle) bool {
 		acc.TextDecorationSkipBox == boxN.TextDecorationSkipBox &&
 		acc.TextDecorationSkipSelf == boxN.TextDecorationSkipSelf &&
 		acc.TextDecorationSkipSpaces == boxN.TextDecorationSkipSpaces &&
-		acc.TextDecorationSkipInk == boxN.TextDecorationSkipInk
+		acc.TextDecorationSkipInk == boxN.TextDecorationSkipInk &&
+		acc.VerticalAlign == boxN.VerticalAlign &&
+		acc.VerticalAlignShift == boxN.VerticalAlignShift
 }
 
 func lineHeightOf(st *ResolvedStyle) float64 {

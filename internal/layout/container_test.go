@@ -50,6 +50,67 @@ func TestContainerPropsParsed(t *testing.T) {
 	}
 }
 
+func TestContainerCSSWideKeywords(t *testing.T) {
+	t.Parallel()
+
+	cssSheet := sheet(t, `
+		.p { container-type: inline-size; container-name: card }
+		.ti { container-type: inherit }
+		.ni { container-name: inherit }
+		.si { container: inherit }
+		.tu { container-type: unset }
+		.ns { container-name: initial }
+		.sr { container: revert }
+	`)
+	root := mustParse(t, `<html><body>
+		<div class="p">
+			<div class="ti" id="ti"></div>
+			<div class="ni" id="ni"></div>
+			<div class="si" id="si"></div>
+		</div>
+		<div class="tu" id="tu"></div>
+		<div class="ns" id="ns"></div>
+		<div class="sr" id="sr"></div>
+	</body></html>`)
+	styles := resolveStyles(root, []*css.Stylesheet{cssSheet}, "print", testViewport, 800)
+	byID := map[string]*html.Node{}
+
+	var walk func(*html.Node)
+	walk = func(node *html.Node) {
+		if node.Type == html.ElementNode {
+			if id := node.Attribute("id"); id != "" {
+				byID[id] = node
+			}
+		}
+
+		for _, c := range node.Children {
+			walk(c)
+		}
+	}
+	walk(root)
+
+	want := map[string]struct{ typ, name string }{
+		"ti": {typ: containerInlineSize},
+		"ni": {name: "card"},
+		"si": {typ: containerInlineSize, name: "card"},
+		"tu": {typ: contentNormal},
+		"ns": {},
+		"sr": {typ: contentNormal},
+	}
+
+	for rowID, wantStyle := range want {
+		got := styles[byID[rowID]]
+		if got == nil {
+			t.Fatalf("%s: no resolved style", rowID)
+		}
+
+		if got.ContainerType != wantStyle.typ || got.ContainerName != wantStyle.name {
+			t.Errorf("%s: type=%q name=%q, want type=%q name=%q",
+				rowID, got.ContainerType, got.ContainerName, wantStyle.typ, wantStyle.name)
+		}
+	}
+}
+
 func TestContainerQueryNamedInlineSize(t *testing.T) {
 	t.Parallel()
 	// 12pt font → 20em = 240pt. Wide card 400px=300pt matches; narrow 100px=75pt does not.
