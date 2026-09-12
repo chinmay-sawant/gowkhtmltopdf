@@ -296,6 +296,10 @@ PR bodies live in `plans/PR/`. Phase checklist format comes from
   intentional prior work
 - `skills/diagnose-fixture-picture/` - Effect-cell screenshots, authorship vs
   engine classification, 3-agent analysis council, 4-agent picture verify
+- `skills/diff-verify/` - history-aware change review: trace every removed or
+  rewritten line to the commit that introduced it, read that commit's
+  message, and flag changes that undo an earlier deliberate fix or re-add
+  code removed on purpose (read-only, 3-4 sub-agents by default)
 - `skills/golang-anti-patterns/` - top 50 Go anti-patterns catalog, detection
   heuristics, and idiomatic Go pattern replacements
 - `skills/ponytail*` - laziness protocol family (YAGNI reviews, debt ledger)
