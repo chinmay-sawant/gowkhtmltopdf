@@ -156,24 +156,6 @@
      "Border image slicing and tiling (`appendBorderImage`, `layout_chrome.go`); catalog snapshot 2026-09-12"
     ],
     [
-     "Flow",
-     "display",
-     "Implemented / Partial",
-     "Core values implemented; `flex`/`inline-flex` route to Stage A flex and `grid`/`inline-grid` to Stage B + C grid lite; `table-caption` renders above the table; `table-column`/`table-column-group` are not implemented"
-    ],
-    [
-     "Flow",
-     "float, clear",
-     "Implemented (lite)",
-     "Out-of-flow packing with simple exclusion; in-flow tables always clear below floats"
-    ],
-    [
-     "Flow",
-     "position",
-     "Implemented (lite)",
-     "Static in-flow plus `relative`/`absolute`/`fixed` lite; `sticky` clamps `top`/`bottom`/`left`/`right` in the page content box (print scrollport) or an overflow box at offset 0"
-    ],
-    [
      "Text",
      "font-family",
      "Implemented",
@@ -190,12 +172,6 @@
      "font-weight, font-style",
      "Implemented",
      "Weight 700+ selects Liberation Bold; fake stroke bold only if the bold face is missing"
-    ],
-    [
-     "Text",
-     "text-align",
-     "Implemented (justify lite)",
-     "Left/right/center; `justify` distributes leftover space on non-final lines"
     ],
     [
      "Text",
@@ -220,18 +196,6 @@
      "text-decoration-thickness, text-decoration-color, text-underline-offset",
      "Implemented",
      "Decoration longhands consumed in inline paint; `text-decoration-skip-*` subset per matrix 2.3"
-    ],
-    [
-     "Text",
-     "font-language-override",
-     "Implemented (subset)",
-     "OpenType language tag threaded into shaping (`shape_gotext.go`); observable with DejaVu Sans `SRB` `locl` substitution"
-    ],
-    [
-     "Text",
-     "font-feature-settings, font-kerning, font-variant-caps",
-     "Not implemented",
-     "Held Unsupported by the 2026-09-12 catalog audit: names are dropped with no layout or shaping consumer"
     ],
     [
      "Text",
@@ -264,24 +228,6 @@
      "Multi-layer sizing (`contain`/`cover`/explicit), positioning, repeat tiling, and clip/origin boxes (`background_image.go`, `background_repeat.go`); catalog snapshot 2026-09-12"
     ],
     [
-     "Color",
-     "opacity",
-     "Partial",
-     "PDF ExtGState; nested opacities multiply; `filter: opacity()` accepted, other filters ignored"
-    ],
-    [
-     "Transform",
-     "transform, transform-origin, translate, rotate, scale",
-     "Implemented (static 2D)",
-     "Paint CTM integration with stacking and absolute/fixed containing blocks; no animation timelines and no 3D (matrix 5, fixture-40)"
-    ],
-    [
-     "Coverage",
-     "vendor-prefixed `-webkit-*` aliases",
-     "Partial",
-     "28 alias names remap to implemented bases; 42 stay Unsupported, including `-webkit-background-clip`/`-origin`/`-size` whose unprefixed bases now ship (matrix 5.3)"
-    ],
-    [
      "Table",
      "border-spacing",
      "Implemented",
@@ -301,21 +247,75 @@
     ],
     [
      "Paged",
+     "@media print / screen",
+     "Implemented",
+     "Media filtering against `Media: \"print\"`; size feature queries partial"
+    ],
+    [
+     "Flow",
+     "display",
+     "Implemented / Partial",
+     "Core values implemented; `flex`/`inline-flex` route to Stage A flex and `grid`/`inline-grid` to Stage B + C grid lite; `table-caption` renders above the table; `table-column`/`table-column-group` are not implemented"
+    ],
+    [
+     "Flow",
+     "float, clear",
+     "Implemented (lite)",
+     "Out-of-flow packing with simple exclusion; in-flow tables always clear below floats"
+    ],
+    [
+     "Flow",
+     "position",
+     "Implemented (lite)",
+     "Static in-flow plus `relative`/`absolute`/`fixed` lite; `sticky` clamps `top`/`bottom`/`left`/`right` in the page content box (print scrollport) or an overflow box at offset 0"
+    ],
+    [
+     "Text",
+     "text-align",
+     "Implemented (justify lite)",
+     "Left/right/center; `justify` distributes leftover space on non-final lines"
+    ],
+    [
+     "Text",
+     "font-language-override",
+     "Implemented (subset)",
+     "OpenType language tag threaded into shaping (`shape_gotext.go`); observable with DejaVu Sans `SRB` `locl` substitution"
+    ],
+    [
+     "Transform",
+     "transform, transform-origin, translate, rotate, scale",
+     "Implemented (static 2D)",
+     "Paint CTM integration with stacking and absolute/fixed containing blocks; no animation timelines and no 3D (matrix 5, fixture-40)"
+    ],
+    [
+     "Color",
+     "opacity",
+     "Partial",
+     "PDF ExtGState; nested opacities multiply; `filter: opacity()` accepted, other filters ignored"
+    ],
+    [
+     "Coverage",
+     "vendor-prefixed `-webkit-*` aliases",
+     "Partial",
+     "28 alias names remap to implemented bases; 42 stay Unsupported, including `-webkit-background-clip`/`-origin`/`-size` whose unprefixed bases now ship (matrix 5.3)"
+    ],
+    [
+     "Paged",
      "orphans, widows",
      "Partial",
      "Parsed (initial 2); fragmentation Rule 3 when line boxes are countable, geometric heuristic otherwise"
     ],
     [
      "Paged",
-     "@media print / screen",
-     "Implemented",
-     "Media filtering against `Media: \"print\"`; size feature queries partial"
-    ],
-    [
-     "Paged",
      "@page",
      "Partial",
      "Unnamed `margin`/`size` apply to every page; `:first`/`:left`/`:right` override margins (LTR page 1 is `:right`; `:first` wins); `page: ident` gives named pages with sibling breaks; `@top-*`/`@bottom-*` margin boxes fill empty CLI header/footer slots; size stays unnamed-only"
+    ],
+    [
+     "Text",
+     "font-feature-settings, font-kerning, font-variant-caps",
+     "Not implemented",
+     "Held Unsupported by the 2026-09-12 catalog audit: names are dropped with no layout or shaping consumer"
     ]
    ]
   },
