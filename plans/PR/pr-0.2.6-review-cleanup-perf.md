@@ -184,7 +184,7 @@ ok  github.com/chinmay-sawant/gowkhtmltopdf/internal/convert  5.379s
 | `.js` | 15 | 293 | 198 |
 | `.json` | 19 | 2588 | 2220 |
 | `.jsx` | 8 | 337 | 393 |
-| `.md` | 71 | 10144 | 638 |
+| `.md` | 72 | 10340 | 638 |
 | `.mjs` | 1 | 9 | 0 |
 | `.pdf` | 74 | Binary | Binary |
 | `.png` | 317 | Binary | Binary |
@@ -193,4 +193,4 @@ ok  github.com/chinmay-sawant/gowkhtmltopdf/internal/convert  5.379s
 | `.wasm` | 2 | Binary | Binary |
 | `.webp` | 291 | Binary | Binary |
 | No extension | 2 | 25 | 5 |
-| **Total** | **1059** | **43174** | **8182** |
+| **Total** | **1060** | **43370** | **8182** |
