@@ -183,12 +183,12 @@ ok  github.com/chinmay-sawant/gowkhtmltopdf/internal/convert  5.379s
 | --- | ---: | ---: | ---: |
 | `.css` | 5 | 115 | 154 |
 | `.csv` | 3 | 17 | 17 |
-| `.go` | 239 | 27482 | 4502 |
+| `.go` | 240 | 27625 | 4536 |
 | `.html` | 7 | 1267 | 55 |
 | `.js` | 15 | 293 | 198 |
 | `.json` | 19 | 2588 | 2220 |
 | `.jsx` | 8 | 337 | 393 |
-| `.md` | 72 | 10340 | 638 |
+| `.md` | 72 | 10375 | 638 |
 | `.mjs` | 1 | 9 | 0 |
 | `.pdf` | 74 | Binary | Binary |
 | `.png` | 317 | Binary | Binary |
@@ -197,4 +197,4 @@ ok  github.com/chinmay-sawant/gowkhtmltopdf/internal/convert  5.379s
 | `.wasm` | 2 | Binary | Binary |
 | `.webp` | 291 | Binary | Binary |
 | No extension | 2 | 25 | 5 |
-| **Total** | **1060** | **43370** | **8182** |
+| **Total** | **1061** | **43548** | **8216** |
