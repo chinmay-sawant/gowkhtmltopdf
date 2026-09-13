@@ -204,18 +204,21 @@ make build:               bin/gowkhtmltopdf --version -> 0.2.6 (matches VERSION)
 | --- | ---: | ---: | ---: |
 | `.css` | 5 | 115 | 154 |
 | `.csv` | 3 | 17 | 17 |
-| `.go` | 242 | 27804 | 4536 |
+| `.go` | 244 | 27808 | 4540 |
+| `.h` | 1 | 1 | 1 |
 | `.html` | 7 | 1267 | 55 |
 | `.js` | 15 | 293 | 198 |
 | `.json` | 19 | 2588 | 2220 |
 | `.jsx` | 8 | 337 | 393 |
-| `.md` | 72 | 10410 | 638 |
+| `.md` | 76 | 10423 | 652 |
 | `.mjs` | 1 | 9 | 0 |
 | `.pdf` | 74 | Binary | Binary |
-| `.png` | 317 | Binary | Binary |
+| `.png` | 429 | Binary | Binary |
+| `.py` | 2 | 2 | 2 |
 | `.sh` | 2 | 490 | 0 |
+| `.toml` | 1 | 1 | 1 |
 | `.txt` | 3 | 407 | 0 |
 | `.wasm` | 2 | Binary | Binary |
-| `.webp` | 291 | Binary | Binary |
-| No extension | 2 | 25 | 5 |
-| **Total** | **1063** | **43762** | **8216** |
+| `.webp` | 395 | Binary | Binary |
+| No extension | 3 | 26 | 6 |
+| **Total** | **1290** | **43784** | **8239** |
