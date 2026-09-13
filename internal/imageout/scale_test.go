@@ -145,6 +145,58 @@ func TestScaleNearestGenericMatchesConvert(t *testing.T) {
 	}
 }
 
+// TestScaleNearestWindowMatchesFullCrop is the parity proof for the strip
+// window scaler: scaling a window must byte-match the same crop of the full
+// scale for every supported source type and window placement.
+func TestScaleNearestWindowMatchesFullCrop(t *testing.T) {
+	t.Parallel()
+
+	full := image.Rect(0, 0, 83, 54)
+	windows := []image.Rectangle{
+		full,
+		image.Rect(13, 7, 60, 31),
+		image.Rect(0, 0, 83, 12),
+		image.Rect(80, 50, 83, 54),
+		image.Rect(41, 27, 42, 28),
+	}
+
+	for name, src := range newScaleProbeSources() {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			whole := scaleNearest(src, full.Dx(), full.Dy())
+			if whole == nil {
+				t.Fatal("full scale returned nil")
+			}
+
+			for _, window := range windows {
+				got := scaleNearestWindow(src, full, window)
+				if got == nil {
+					t.Fatalf("window %v returned nil", window)
+				}
+
+				want := cropNRGBA(whole, window)
+				if got.Bounds() != want.Bounds() || !bytes.Equal(got.Pix, want.Pix) {
+					t.Fatalf("window %v differs from the full-scale crop", window)
+				}
+			}
+		})
+	}
+}
+
+// cropNRGBA copies rect out of src into a rect-sized canvas.
+func cropNRGBA(src *image.NRGBA, rect image.Rectangle) *image.NRGBA {
+	dst := image.NewNRGBA(image.Rect(0, 0, rect.Dx(), rect.Dy()))
+
+	for row := range rect.Dy() {
+		srcOffset := src.PixOffset(rect.Min.X, rect.Min.Y+row)
+		dstOffset := dst.PixOffset(0, row)
+		copy(dst.Pix[dstOffset:dstOffset+4*rect.Dx()], src.Pix[srcOffset:srcOffset+4*rect.Dx()])
+	}
+
+	return dst
+}
+
 // TestScaleNearestGenericDoesNotBoxPixels guards the point of the fast path:
 // per-pixel color boxing would show up as allocations proportional to the
 // destination, far above the destination canvas itself.

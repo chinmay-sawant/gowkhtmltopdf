@@ -228,3 +228,34 @@ Residual risk, same shift shape but not reachable from `internal/convert`:
 (`internal/layout/parallel.go:424`) also translate `Op.X/Y` without
 `Grid.Segs`. `ParallelLayout` is opt-in and unwired; a sticky collapsed table
 has no repro test yet. Parked for a follow-up.
+
+## post-publication perf regression and fix (2026-09-13)
+
+The new large-PNG strip path (`tile_raster.go`, `pngfast.go`) made fixture-49
+and fixture-53 rebuild the same 65.6 MiB scaled poster canvas on every 1 MiB
+strip: the canvas exceeds `maxScaledCacheBytes` (64 MiB), so
+`rasterImageCache.scaledImage` could never admit it and the corpus bench moved
+from wave-c 206.7 / 206.8 MB to 1334.1 / 1329.2 MB B/op with +38 to +49% time
+per fixture. Attribution: `output/profiles/2026-09-13/profiling-notes.md`.
+
+- [x] **PERFT-FIX-01 · imageout** Scale only the visible window when a clipped
+  draw's full scaled canvas cannot fit the cache. `paintImage` moved to
+  `internal/imageout/paint_image.go` (`imageout.go` 2058 -> 2010 lines,
+  `scripts/file-size-allowlist.txt` updated) and `scaleNearestWindow` added to
+  `internal/imageout/scale.go` with the same sampling grid and clamping, so the
+  pixels byte-match a crop of the full scale. Parity tests:
+  `TestScaleNearestWindowMatchesFullCrop` (every source type and window
+  placement) plus the existing `TestStripRasterMatchesFullCanvas`. Proof:
+  `go test ./internal/imageout -count=1` exit 0, `make golden` exit 0 with no
+  golden output changes, `make test` exit 0 (22 ok, 0 FAIL), `make lint` exit 0,
+  `make claim-scan` clean.
+
+- [x] **PERFT-FIX-02 · measurement** Re-run the corpus bench on the final tree.
+  fixture-49 1395 ms / 1334 MB -> 151 ms / 43 MB; fixture-53
+  1486 ms / 1329 MB -> 151 ms / 38 MB. Whole PNG corpus 8023 ms / 3.65 GB ->
+  4917 ms / 0.94 GB (62 rasterable of 66 templates, 3 passes, `-benchmem`).
+  PDF and JPEG rows move with the host window only. Evidence:
+  `output/profiles/2026-09-13/fix-verify.md`, `bench-*-fixed.txt`.
+
+- [ ] **follow-up, separate change** JPEG 101M allocs/op from the deleted
+  YCbCr 4:2:0 preconversion (`PT26-OUT-02`); restore decision pending.

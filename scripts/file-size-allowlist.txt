@@ -8,4 +8,4 @@
 # calls, so CI fails when this list drifts from the tree.
 internal/layout/layout.go	2497
 internal/layout/style_properties.go	2171
-internal/imageout/imageout.go	2058
+internal/imageout/imageout.go	2010

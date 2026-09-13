@@ -17,15 +17,26 @@ const channelShift = 8
 // removed image/draw's BiLinear/NearestNeighbor scalers, so a tiny scaler
 // lives here; natural-size images take the draw.Draw fast path in paint.
 func scaleNearest(src image.Image, w, h int) *image.NRGBA {
-	if nrgba, ok := src.(*image.NRGBA); ok {
-		return scaleNearestNRGBA(nrgba, w, h)
-	}
+	full := image.Rect(0, 0, w, h)
 
-	return scaleNearestGeneric(src, w, h)
+	return scaleNearestWindow(src, full, full)
 }
 
-func scaleNearestNRGBA(src *image.NRGBA, width, height int) *image.NRGBA {
-	dst, err := newRasterImage(width, height)
+// scaleNearestWindow returns only window of the nearest-neighbour scale that
+// scaleNearest(src, full.Dx(), full.Dy()) would produce. A clipped draw whose
+// full scaled canvas exceeds the scaled-image cache uses it so the strip
+// raster never rebuilds the same oversized canvas per strip; the sampling grid
+// and clamping are the same, so window pixels byte-match the full-scale crop.
+func scaleNearestWindow(src image.Image, full, window image.Rectangle) *image.NRGBA {
+	if nrgba, ok := src.(*image.NRGBA); ok {
+		return scaleNearestNRGBAWindow(nrgba, full, window)
+	}
+
+	return scaleNearestGenericWindow(src, full, window)
+}
+
+func scaleNearestNRGBAWindow(src *image.NRGBA, full, window image.Rectangle) *image.NRGBA {
+	dst, err := newRasterImage(window.Dx(), window.Dy())
 	if err != nil {
 		return nil
 	}
@@ -36,17 +47,19 @@ func scaleNearestNRGBA(src *image.NRGBA, width, height int) *image.NRGBA {
 		return dst
 	}
 
-	scaleX := float64(srcBounds.Dx()) / float64(width)
+	scaleX := float64(srcBounds.Dx()) / float64(full.Dx())
+	scaleY := float64(srcBounds.Dy()) / float64(full.Dy())
+	offsetX := window.Min.X - full.Min.X
+	offsetY := window.Min.Y - full.Min.Y
 
-	scaleY := float64(srcBounds.Dy()) / float64(height)
-	for row := range height {
-		srcY := srcBounds.Min.Y + int((float64(row)+pixelCenter)*scaleY)
+	for row := range window.Dy() {
+		srcY := srcBounds.Min.Y + int((float64(offsetY+row)+pixelCenter)*scaleY)
 		if srcY > srcBounds.Max.Y-1 {
 			srcY = srcBounds.Max.Y - 1
 		}
 
-		for col := range width {
-			srcX := srcBounds.Min.X + int((float64(col)+pixelCenter)*scaleX)
+		for col := range window.Dx() {
+			srcX := srcBounds.Min.X + int((float64(offsetX+col)+pixelCenter)*scaleX)
 			if srcX > srcBounds.Max.X-1 {
 				srcX = srcBounds.Max.X - 1
 			}
@@ -65,8 +78,16 @@ func scaleNearestNRGBA(src *image.NRGBA, width, height int) *image.NRGBA {
 // exact color.NRGBAModel math; every other image type keeps
 // color.NRGBAModel.Convert as the fallback. All paths produce byte-identical
 // output, and the concrete paths avoid boxing one color per sampled pixel.
-func scaleNearestGeneric(src image.Image, width, height int) *image.NRGBA {
-	dst, err := newRasterImage(width, height)
+func scaleNearestGeneric(src image.Image, w, h int) *image.NRGBA {
+	full := image.Rect(0, 0, w, h)
+
+	return scaleNearestGenericWindow(src, full, full)
+}
+
+// scaleNearestGenericWindow is scaleNearestGeneric for a window of the full
+// scale; scaleNearestWindow routes every non-NRGBA source here.
+func scaleNearestGenericWindow(src image.Image, full, window image.Rectangle) *image.NRGBA {
+	dst, err := newRasterImage(window.Dx(), window.Dy())
 	if err != nil {
 		return nil
 	}
@@ -79,22 +100,22 @@ func scaleNearestGeneric(src image.Image, width, height int) *image.NRGBA {
 
 	switch typed := src.(type) {
 	case *image.YCbCr:
-		scaleNearestSampled(dst, srcBounds, width, height, func(x, y int) color.NRGBA {
+		scaleNearestSampled(dst, srcBounds, full, window, func(x, y int) color.NRGBA {
 			return nrgbaFromYCbCr(typed.YCbCrAt(x, y))
 		})
 
 	case *image.NRGBA:
-		scaleNearestSampled(dst, srcBounds, width, height, func(x, y int) color.NRGBA {
+		scaleNearestSampled(dst, srcBounds, full, window, func(x, y int) color.NRGBA {
 			return typed.NRGBAAt(x, y)
 		})
 
 	case *image.RGBA:
-		scaleNearestSampled(dst, srcBounds, width, height, func(x, y int) color.NRGBA {
+		scaleNearestSampled(dst, srcBounds, full, window, func(x, y int) color.NRGBA {
 			return nrgbaFromRGBA(typed.RGBAAt(x, y))
 		})
 
 	default:
-		scaleNearestSampled(dst, srcBounds, width, height, func(x, y int) color.NRGBA {
+		scaleNearestSampled(dst, srcBounds, full, window, func(x, y int) color.NRGBA {
 			converted, ok := color.NRGBAModel.Convert(src.At(x, y)).(color.NRGBA)
 			if !ok {
 				var zero color.NRGBA
@@ -110,21 +131,24 @@ func scaleNearestGeneric(src image.Image, width, height int) *image.NRGBA {
 }
 
 // scaleNearestSampled writes the nearest-neighbour sample of srcBounds for
-// every destination pixel, resolving the source pixel through sample.
+// every pixel of window in the full-scale destination grid, resolving the
+// source pixel through sample.
 func scaleNearestSampled(
-	dst *image.NRGBA, srcBounds image.Rectangle, width, height int, sample func(x, y int) color.NRGBA,
+	dst *image.NRGBA, srcBounds, full, window image.Rectangle, sample func(x, y int) color.NRGBA,
 ) {
-	scaleX := float64(srcBounds.Dx()) / float64(width)
+	scaleX := float64(srcBounds.Dx()) / float64(full.Dx())
+	scaleY := float64(srcBounds.Dy()) / float64(full.Dy())
+	offsetX := window.Min.X - full.Min.X
+	offsetY := window.Min.Y - full.Min.Y
 
-	scaleY := float64(srcBounds.Dy()) / float64(height)
-	for row := range height {
-		srcY := srcBounds.Min.Y + int((float64(row)+pixelCenter)*scaleY)
+	for row := range window.Dy() {
+		srcY := srcBounds.Min.Y + int((float64(offsetY+row)+pixelCenter)*scaleY)
 		if srcY > srcBounds.Max.Y-1 {
 			srcY = srcBounds.Max.Y - 1
 		}
 
-		for col := range width {
-			srcX := srcBounds.Min.X + int((float64(col)+pixelCenter)*scaleX)
+		for col := range window.Dx() {
+			srcX := srcBounds.Min.X + int((float64(offsetX+col)+pixelCenter)*scaleX)
 			if srcX > srcBounds.Max.X-1 {
 				srcX = srcBounds.Max.X - 1
 			}
