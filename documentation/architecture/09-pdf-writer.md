@@ -147,7 +147,7 @@ writer does not expose a partially synchronized concurrency contract.
 | `NewContent` | `content.go:88` | Empty builder |
 | Graphics state | `content.go:150-210` | `Save/Restore` (`q/Q`), `SetFillColor`/`SetStrokeColor` (`rg/RG`, grayscale fold here when `doc.grayscale`), `SetLineWidth` (`w`), `SetOpacity` (`/opacity gs` + ExtGState) |
 | Path ops | `content.go:212-260` | `MoveTo/LineTo/CurveTo/Rect/Fill/Stroke/Clip` (`m/l/c/re/f/S/W n`) |
-| `Transform` | `content.go:263` | 6-element `cm` CTM (used for images, page islands, and vector transforms) |
+| `Transform` | `content.go:263` | 6-element `cm` CTM (used for images and vector transforms) |
 | Text ops | `content.go:269-333` | `SetFont` (`Tf`, dedupes identical state), `BeginText/EndText`, `TextAt` (`Td`), `TextMatrix` (`Tm`), `TextLeading` (`TL`), `SetCharSpacing` (`Tc`), `TextNextLine` (`T*`), `TextRenderMode` (`Tr`, mode 2 = fake bold) |
 | `UseEmbeddedFont` | `content.go:302` | Registers a parsed TTF under a resource name; runes drawn under it are subset into the PDF |
 | `TextShow` | `content.go:414` | The text emitter: ASCII fast path; otherwise shape, decide Type0, split mixed runs; records runes for the subsetter |
@@ -347,6 +347,11 @@ ensureFont(fnt, name, used)
 - **`internal/pdf/assets`** (embedded font bytes) and **`internal/pdfprofile`**
   (canonical profile tokens / aliases; `policy.go` re-exports). No new
   flavours live in the writer.
+- **`internal/line` and `internal/settings`, in `registry.go` only**: the one
+  deliberate exception. `RegistryFromGlobal` (`registry.go:364`) reads the
+  font-path policy from `settings.PdfGlobal`, and `LogFontRegistryScan`
+  (`registry.go:32`) emits the scan notice through `line.Emit`
+  (`registry.go:11-12`). No other file in the package imports either module.
 
 ### What depends on `internal/pdf`
 
@@ -354,7 +359,7 @@ Non-test importers:
 
 | Importer | Use |
 |----------|-----|
-| `internal/convert` (+ `prepare/`, `render/plan.go`, `hf.go`, `toc.go`, `links.go`, `outline.go`, `page_islands.go`, `page_plan.go`) | `pdf.NewDocument`, `DefaultFont`, `Registry`, layout paint into `*pdf.Document`, TOC/outline/links/copies/headers-footers assembly, `doc.Write` |
+| `internal/convert` (+ `prepare/`, `render/plan.go`, `hf.go`, `toc.go`, `links.go`, `outline.go`, `page_plan.go`) | `pdf.NewDocument`, `DefaultFont`, `Registry`, layout paint into `*pdf.Document`, TOC/outline/links/copies/headers-footers assembly, `doc.Write` |
 | `internal/layout` (`layout.go`, `inline_paint.go`, `paint.go`) | `pdf.Font`/`FaceSet`/`Registry` face selection and metrics; painting into `Page.Content()` |
 | `internal/imageout` (`imageout.go`, `ttfraster.go`) | `pdf.Font` parsing, `pdf.ShapeRun`/`ShapeTextFont`, `pdf.FlattenContour` for glyph rasterization, `pdf.Registry`/`DefaultSystemFontDirs` |
 
@@ -362,13 +367,17 @@ Non-test importers:
 
 `internal/pdf` sits below `layout` / `convert` and imports only stdlib, the
 one allowlisted shaping module, `internal/pdf/assets`, and the
-`internal/pdfprofile` leaf. Nothing inside `internal/pdf` knows HTML, CSS,
-settings, or CLI. `Get("pdfprofile")` canonicalization lives in
-`internal/settings` (stores `pdfprofile.Parse` output). Any change to the
+`internal/pdfprofile` leaf. The single deliberate exception is
+`registry.go:11-12`, which imports `internal/line` and `internal/settings` for
+`RegistryFromGlobal` (`registry.go:364`) and `LogFontRegistryScan`
+(`registry.go:32`): font-path policy lives in `settings.PdfGlobal` and the
+scan notice is emitted through `internal/line`. No other file in the package
+knows HTML, CSS, settings, or CLI. `Get("pdfprofile")` canonicalization lives
+in `internal/settings` (stores `pdfprofile.Parse` output). Any change to the
 paint surface (`Content` API) ripples into `layout/paint.go` and, for fonts
 and shaping, into `imageout`. The unit-test files inside the package may
 also be imported by other packages' tests (e.g. layout golden tests construct
-`pdf.Document`s directly) — a sign the package is the shared writer/test
+`pdf.Document`s directly), a sign the package is the shared writer/test
 foundation.
 
 ## 6. Design decisions & trade-offs

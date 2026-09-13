@@ -19,9 +19,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/chinmay-sawant/gowkhtmltopdf/internal/convert/prepare"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
-	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/imageout"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
@@ -162,6 +160,39 @@ func TestRunPDFWebImagesFalse(t *testing.T) {
 	}
 }
 
+// TestRunPDFObjectWebImagesGate proves the PDF fetch gate folds the object
+// web.images layer through settings.ResolveImages: an object-level false
+// disables embedding while the defaults keep it on. Mirrors the image-mode
+// gate test in internal/imageout/images_gate_test.go.
+func TestRunPDFObjectWebImagesGate(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		objectWeb settings.Web
+		wantImage bool
+	}{
+		{name: "object default enables", objectWeb: settings.Web{Images: true}, wantImage: true},
+		{name: "object disables", objectWeb: settings.Web{Images: false}, wantImage: false},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			pngB64 := pngDataURL(t, 12, 12)
+			html := `<html><body><p>gate</p><img src="` + pngB64 + `"></body></html>`
+			cmd, _ := newCommand(t, html, filepath.Join(t.TempDir(), "out.pdf"))
+			cmd.Objects[0].Web = testCase.objectWeb
+
+			data := runPDF(t, cmd)
+			if got := bytes.Contains(data, []byte("/Subtype /Image")); got != testCase.wantImage {
+				t.Errorf("image embedded = %v, want %v", got, testCase.wantImage)
+			}
+		})
+	}
+}
+
 func TestRunPDFLinkedStylesheet(t *testing.T) {
 	t.Parallel()
 
@@ -208,45 +239,68 @@ func TestRunPDFPrintLinkMediaFeatures(t *testing.T) {
 	_ = runPDFWithLog(t, cmd, &log)
 }
 
-func TestLinkStylesheetMediaMatches(t *testing.T) {
+// TestLinkMediaGateUsesFinalPageBox proves link and @import media size
+// features are gated against the post-@page viewport. Default A4 content is
+// about 538.6pt wide; @page { margin: 0 } widens it past 560pt, so a
+// (min-width: 560pt) sheet loads only when the final page box matches. The
+// stylesheet hides a sentinel paragraph, so the parsed text owns the verdict.
+func TestLinkMediaGateUsesFinalPageBox(t *testing.T) {
 	t.Parallel()
 
-	mark := func(media string) *html.Node {
-		return &html.Node{
-			Type:  html.ElementNode,
-			Name:  "link",
-			Attrs: map[string]string{"rel": "stylesheet", "href": "x.css", "media": media},
-		}
+	const gated = "HIDDENBYGATE"
+
+	tests := []struct {
+		name       string
+		head       string
+		wantHidden bool
+	}{
+		{
+			name: "link matches final page box",
+			head: `<style>@page { margin: 0 }</style>` +
+				`<link rel="stylesheet" href="gate.css" media="(min-width: 560pt)">`,
+			wantHidden: true,
+		},
+		{
+			name:       "link misses default page box",
+			head:       `<link rel="stylesheet" href="gate.css" media="(min-width: 560pt)">`,
+			wantHidden: false,
+		},
+		{
+			name: "import matches final page box",
+			head: `<style>@page { margin: 0 }</style>` +
+				`<style>@import url("gate.css") (min-width: 560pt);</style>`,
+			wantHidden: true,
+		},
 	}
 
-	const viewW, viewH = 538.0, 785.0
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 
-	if !prepare.LinkStylesheet(mark(""), viewW, viewH, mediaPrint) {
-		t.Error("empty media should load")
-	}
+			htmlDoc := `<html><head>` + testCase.head + `</head><body>
+<p class="gate">` + gated + `</p><p>ALWAYS</p></body></html>`
 
-	if !prepare.LinkStylesheet(mark("print"), viewW, viewH, mediaPrint) {
-		t.Error("print should load")
-	}
+			cmd, dir := newCommand(t, htmlDoc, filepath.Join(t.TempDir(), "out.pdf"))
+			if err := os.WriteFile(filepath.Join(dir, "gate.css"), []byte(".gate { display: none }"), 0o600); err != nil {
+				t.Fatalf("write gate.css: %v", err)
+			}
 
-	if !prepare.LinkStylesheet(mark("all"), viewW, viewH, mediaPrint) {
-		t.Error("all should load")
-	}
+			data := runPDF(t, cmd)
 
-	if prepare.LinkStylesheet(mark("screen"), viewW, viewH, mediaPrint) {
-		t.Error("screen-only must be excluded for print")
-	}
+			sem, err := pdf.ParseSemantic(data)
+			if err != nil {
+				t.Fatalf("ParseSemantic: %v", err)
+			}
 
-	if !prepare.LinkStylesheet(mark("(min-width: 500px)"), viewW, viewH, mediaPrint) {
-		t.Error("min-width feature matching A4 content should load")
-	}
+			text := sem.DocumentText()
+			if !strings.Contains(text, "ALWAYS") {
+				t.Fatalf("control text missing; page text = %q", text)
+			}
 
-	if prepare.LinkStylesheet(mark("(min-width: 2000px)"), viewW, viewH, mediaPrint) {
-		t.Error("unmatched min-width must not load")
-	}
-
-	if !prepare.LinkStylesheet(mark("screen"), viewW, viewH, "screen") {
-		t.Error("screen media type should accept screen stylesheets")
+			if hidden := !strings.Contains(text, gated); hidden != testCase.wantHidden {
+				t.Errorf("gated text hidden = %v, want %v (text %q)", hidden, testCase.wantHidden, text)
+			}
+		})
 	}
 }
 

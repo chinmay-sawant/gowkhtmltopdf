@@ -16,7 +16,7 @@ testdata/golden/
   fixture-01-simple-invoice.html       # single page, minimal CSS
   fixture-02-table-heavy-invoice.html  # wide table, borders, many rows
   fixture-03-multi-page-invoice.html   # >1 page, page-break usage
-  fixture-04-*.html .. fixture-62-*.html   # phase-9.1+ corpus (skip *-header/footer companions)
+  fixture-04-*.html .. fixture-63-*.html   # phase-9.1+ corpus (skip *-header/footer companions)
   fixture-36-header.html / fixture-36-footer.html  # nested HF companions for fixture-36
   fixture-49-night-train-poster.html       # one-page illustrated poster
   fixture-50-letter-template.html           # one-page stationery template
@@ -25,7 +25,7 @@ testdata/golden/
   fixture-53-asteria-observatory-poster.html # second poster variant
   fixture-54-ember-harbor-storybook.html   # four-page Ember Harbor storybook
   fixture-55-lantern-cooperative-report.html # self-contained pure HTML/CSS operations brief
-  fixture-56-architecture-diagram.html      # 20-page architecture diagram, linked CSS
+  fixture-56-architecture-diagram.html      # 21-page architecture diagram, linked CSS
   fixture-56-architecture-diagram.css       # linked stylesheet for fixture-56
   architecture-diagram.html                 # corpus fixture (5-page library-API diagram); not written by api/generate.go
   api/                                      # library-API generator (go run ./testdata/golden/api; also make samples)
@@ -113,7 +113,7 @@ proves. Page envelopes are pinned in `internal/convert/golden_test.go`
 | 53 | Asteria poster variant: shared theme with a different illustration and copy | 1 |
 | 54 | Ember Harbor storybook: cover + three chapter pages, shared `theme-print-stories.css`, local illustrations (needle `Ember Harbor`) | 4 |
 | 55 | Self-contained operations brief: inline CSS, status cards, route table, action plan, and page breaks | 3 |
-| 56 | Architecture diagram: hero, pipeline strip, TOC, 10 domain sections (modern semantic tags: `dialog`, `details/summary`, `mark`, `meter`, `progress`, `output`, `time`, `data`, `kbd`, `samp`, `var`, `dfn`, `cite`, `ruby`, `rt`, `rp`, `bdi`, `bdo`, `wbr`, `ins`, `del`, `sub`, `sup`, `aside`, `address`, `fieldset`, `legend`, `picture`, `search`; modern CSS: `oklch()`/`color-mix()`/`clamp()`/logical properties with graceful-degrade fallbacks), linked `fixture-56-architecture-diagram.css`, dependency DAG, PDF-vs-image, security; derived from `documentation/architecture/` (commit ef526f9) | 20 |
+| 56 | Architecture diagram: hero, pipeline strip, TOC, 10 domain sections (modern semantic tags: `dialog`, `details/summary`, `mark`, `meter`, `progress`, `output`, `time`, `data`, `kbd`, `samp`, `var`, `dfn`, `cite`, `ruby`, `rt`, `rp`, `bdi`, `bdo`, `wbr`, `ins`, `del`, `sub`, `sup`, `aside`, `address`, `fieldset`, `legend`, `picture`, `search`; modern CSS: `oklch()`/`color-mix()`/`clamp()`/logical properties with graceful-degrade fallbacks), linked `fixture-56-architecture-diagram.css`, dependency DAG, PDF-vs-image, security; derived from `documentation/architecture/` (commit ef526f9) | 21 |
 | 57 | Vanguard telemetry audit narrative plus browser-print probe gallery for all 356 implemented CSS properties (each declared with representative print styling; needle VANGUARD-CSS-356-IMPLEMENTED). | 9 |
 | 58 | Unsupported CSS worklist audit: safe parsing, cascade degrade, and crash resilience verification gallery for all 462 unsupported CSS properties (needle UNSUPPORTED-WORKLIST-AUDIT). | 9 |
 | 60 | Implemented CSS props audit slice A (~1/3): property/description/effect gallery; Liberation via `--font-path testdata/fonts/implemented-audit`; needle `IMPLEMENTED-PROPS-A`. | 8 |

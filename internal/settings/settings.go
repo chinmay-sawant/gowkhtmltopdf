@@ -89,41 +89,6 @@ const (
 	sAbort                = "abort"
 )
 
-// ColorMode mirrors wkhtmltopdf --color-mode. Kept as a parse helper for
-// Set("colormode"); the engine stores only PdfGlobal.Grayscale.
-//
-// ponytail: ColorMode is not a stored field — convert reads Grayscale only.
-type ColorMode int
-
-const (
-	ColorModeColor ColorMode = iota
-	ColorModeGrayscale
-)
-
-func (m ColorMode) String() string {
-	switch m {
-	case ColorModeColor:
-		return "color"
-	case ColorModeGrayscale:
-		return "grayscale"
-	}
-
-	return sUnknown
-}
-
-// ParseColorMode accepts "color" (default) or "grayscale" (case-insensitive,
-// matching ParseOrientation and ParseLoadErrorHandling).
-func ParseColorMode(value string) (ColorMode, error) {
-	switch normalize(value) {
-	case "", "color":
-		return ColorModeColor, nil
-	case "grayscale":
-		return ColorModeGrayscale, nil
-	}
-
-	return ColorModeColor, errInvalid("color-mode", value, "color|grayscale")
-}
-
 // Orientation mirrors wkhtmltopdf --orientation.
 type Orientation int
 
@@ -298,12 +263,47 @@ func ResolveImageMedia(global PdfGlobal, image ImageGlobal, obj *PdfObject) stri
 	return ResolveMedia(sScreen, web, objWeb)
 }
 
+// ResolveImages folds the web.images flag across the layers that register it:
+// the global web settings, an optional image-mode layer (nil outside image
+// mode), and an optional object layer (nil when the caller has no object).
+// Images stay enabled only when every supplied layer enables them, so an
+// explicit web.images=false on global, image, or object disables fetching.
+// Canonical constructors (DefaultPdfGlobal, DefaultImageGlobal,
+// DefaultPdfObject) all default the flag to true, so an untouched layer never
+// disables images on its own.
+func ResolveImages(global Web, image *ImageGlobal, obj *PdfObject) bool {
+	enabled := global.Images
+
+	if image != nil {
+		enabled = enabled && image.Web.Images
+	}
+
+	if obj != nil {
+		enabled = enabled && obj.Web.Images
+	}
+
+	return enabled
+}
+
 // Margin holds the four page margins in millimetres.
 type Margin struct {
 	Top    float64
 	Bottom float64
 	Left   float64
 	Right  float64
+}
+
+// ValidMargins reports whether m follows the engine margin contract. Every
+// value must be finite and left/right must be non-negative. Top and bottom
+// accept any finite negative value as the engine's auto-margin sentinel:
+// internal/convert/hf.go measures the header/footer band and reserves it,
+// which is the same contract the CLI and root Document already expose.
+func ValidMargins(m Margin) bool {
+	if !finite(m.Top) || !finite(m.Right) || !finite(m.Bottom) || !finite(m.Left) {
+		return false
+	}
+
+	return m.Left >= 0 && m.Right >= 0
 }
 
 // DefaultMargins match pdfsettings.cc: 10 mm on all sides.
@@ -338,7 +338,7 @@ type Web struct {
 	PrintLinkUnderline bool
 }
 
-// LoadGlobal holds load settings shared by all page loads. NewLoader applies
+// LoadGlobal holds load settings shared by all page loads. NewLoaderWithError applies
 // the full policy (proxy, allow prefixes, local-access flag) in one place.
 type LoadGlobal struct {
 	Proxy                 string
@@ -462,7 +462,7 @@ type PdfGlobal struct {
 	Quiet              bool
 	Web                Web
 	// Load carries the shared load policy: Proxy, Allow (ACL prefixes) and
-	// EnableLocalFileAccess live on LoadGlobal, applied by load.NewLoader.
+	// EnableLocalFileAccess live on LoadGlobal, applied by load.NewLoaderWithError.
 	Load                 LoadGlobal
 	FontPaths            []string // --font-path directories (opt-in TTF discovery)
 	UseSystemFonts       bool     // --use-system-fonts
@@ -564,6 +564,9 @@ func DefaultPdfObject() PdfObject {
 		IncludeInOutline: true,
 		UseOutline:       true,
 		Load:             DefaultLoadPage(),
+		Web: Web{ //nolint:exhaustruct // intentional zero/partial fields
+			Images: true,
+		},
 	}
 }
 

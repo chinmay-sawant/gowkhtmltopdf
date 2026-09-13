@@ -51,11 +51,11 @@ func TestStampTOCDefaults(t *testing.T) {
 	}
 }
 
-func TestStampEmptyHFOverrideBlocksGlobalFallthrough(t *testing.T) {
+func TestStampCoverBlocksGlobalFallthrough(t *testing.T) {
 	t.Parallel()
 
 	obj := settings.DefaultPdfObject()
-	settings.StampEmptyHFOverride(&obj)
+	settings.StampCover(&obj)
 
 	global := settings.DefaultPdfGlobal()
 	global.Header.Left = "global-header"

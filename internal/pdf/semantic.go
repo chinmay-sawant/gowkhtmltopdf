@@ -9,100 +9,21 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 )
 
-//nolint:gochecknoglobals // precompiled regexes and pattern cache
 var (
 	semanticObjectHeaderRE = regexp.MustCompile(`^(\d+) 0 obj\n`)
 	semanticRefRE          = regexp.MustCompile(`(\d+) 0 R`)
 	semanticResourceRE     = regexp.MustCompile(`/([A-Za-z][A-Za-z0-9_]*)\s+(\d+)\s+0\s+R`)
 	semanticNumberRE       = regexp.MustCompile(`[-+]?\d+(?:\.\d+)?`)
-	semanticLiteralRE      = regexp.MustCompile(`(?s)(\((?:\\.|[^\\)])*\))\s*Tj`)
-	semanticHexRE          = regexp.MustCompile(`(?s)<([0-9A-Fa-f]*)>\s*Tj`)
-	semanticDestRE         = regexp.MustCompile(`/Dest\s*\[\s*(\d+)\s+0\s+R`)
-	semanticRegexCache     = newRegexCache()
+	// semanticContentRE matches the content-stream tokens the semantic text
+	// extractor consumes in stream order: literal Tj, hex Tj, and Do (a Form
+	// XObject invocation whose text is extracted recursively).
+	semanticContentRE = regexp.MustCompile(
+		`(?s)(\((?:\\.|[^\\)])*\))\s*Tj|<([0-9A-Fa-f]*)>\s*Tj|/([A-Za-z][A-Za-z0-9_]*)\s+Do`,
+	)
+	semanticDestRE = regexp.MustCompile(`/Dest\s*\[\s*(\d+)\s+0\s+R`)
 )
-
-// semanticRegexCacheCap bounds the compiled-pattern cache. Patterns are
-// derived from dict keys, so the working set is small and fixed in practice;
-// the cap only guarantees hostile input cannot grow memory without bound.
-const semanticRegexCacheCap = 64
-
-// regexCache is a small LRU of compiled regexes. The full pattern string is
-// the key; hit moves the entry to the most-recent position, and overflow
-// evicts the least-recent one.
-type regexCache struct {
-	mu    sync.Mutex
-	re    map[string]*regexp.Regexp
-	order []string
-}
-
-func newRegexCache() *regexCache {
-	return &regexCache{ //nolint:exhaustruct // zero-value mutex is intentional
-		re:    make(map[string]*regexp.Regexp, semanticRegexCacheCap),
-		order: make([]string, 0, semanticRegexCacheCap),
-	}
-}
-
-func (c *regexCache) get(patternStr string) (*regexp.Regexp, bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	regex, ok := c.re[patternStr]
-	if !ok {
-		return nil, false
-	}
-
-	for i, key := range c.order {
-		if key == patternStr {
-			c.order = append(c.order[:i], c.order[i+1:]...)
-
-			break
-		}
-	}
-
-	c.order = append(c.order, patternStr)
-
-	return regex, true
-}
-
-func (c *regexCache) put(patternStr string, regex *regexp.Regexp) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if _, ok := c.re[patternStr]; ok {
-		return
-	}
-
-	if len(c.order) >= semanticRegexCacheCap {
-		oldest := c.order[0]
-		c.order = c.order[1:]
-		delete(c.re, oldest)
-	}
-
-	c.re[patternStr] = regex
-	c.order = append(c.order, patternStr)
-}
-
-// compileSemanticRE returns the compiled pattern for a dict-key lookup,
-// compiling on a cache miss. The patterns are QuoteMeta'd keys plus fixed
-// suffixes, so compile errors are not expected; they are returned instead of
-// panicking.
-func compileSemanticRE(patternStr string) (*regexp.Regexp, error) {
-	if regex, ok := semanticRegexCache.get(patternStr); ok {
-		return regex, nil
-	}
-
-	regex, err := regexp.Compile(patternStr)
-	if err != nil {
-		return nil, fmt.Errorf("compile semantic pattern %q: %w", patternStr, err)
-	}
-
-	semanticRegexCache.put(patternStr, regex)
-
-	return regex, nil
-}
 
 // SemanticDoc is a small, production-safe view of a PDF this package emits.
 // It exposes document-order page text, embedded image XObjects, and
@@ -596,9 +517,11 @@ func parseSemanticPage(objects map[int]semanticObject, pageRef int) (semanticPag
 		return semanticPage{}, err
 	}
 
+	collectNestedImages(stream, resources, objects, images, map[int]bool{})
+
 	return semanticPage{
 		mediaBox: [4]float64{mediaBox[0], mediaBox[1], mediaBox[2], mediaBox[3]},
-		text:     extractSemanticText(stream),
+		text:     extractSemanticText(stream, resources, objects, map[int]bool{}),
 		fonts:    fonts,
 		images:   images,
 		annots:   annots,
@@ -629,18 +552,120 @@ func decodeSemanticStream(object semanticObject) ([]byte, error) {
 	return decoded, nil
 }
 
-func extractSemanticText(stream []byte) string {
+// extractSemanticText returns the text operators of stream in stream order.
+// A Do operator that invokes a Form XObject recurses into the form's stream at
+// its document position, so text painted inside a transparency group stays
+// visible to callers that assert authored content. visited guards reference
+// cycles along the current recursion path only.
+func extractSemanticText(stream []byte, resources string, objects map[int]semanticObject, visited map[int]bool) string {
 	var text strings.Builder
 
-	for _, match := range semanticLiteralRE.FindAllSubmatch(stream, -1) {
-		text.WriteString(decodePDFLiteral(string(match[1])))
-	}
-
-	for _, match := range semanticHexRE.FindAllSubmatch(stream, -1) {
-		text.WriteString(decodePDFHex(string(match[1])))
+	for _, match := range semanticContentRE.FindAllSubmatchIndex(stream, -1) {
+		switch {
+		case match[2] >= 0:
+			text.WriteString(decodePDFLiteral(string(stream[match[2]:match[3]])))
+		case match[4] >= 0:
+			text.WriteString(decodePDFHex(string(stream[match[4]:match[5]])))
+		case match[6] >= 0:
+			text.WriteString(formSemanticText(string(stream[match[6]:match[7]]), resources, objects, visited))
+		}
 	}
 
 	return text.String()
+}
+
+// formSemanticText extracts one /Name Do form XObject's text, or "" when the
+// name is not a form resource.
+func formSemanticText(name, resources string, objects map[int]semanticObject, visited map[int]bool) string {
+	ref, found := nestedXObjectRef(name, resources)
+	if !found || visited[ref] {
+		return ""
+	}
+
+	object, ok := objects[ref]
+	if !ok || !strings.Contains(object.dict, "/Subtype /Form") {
+		return ""
+	}
+
+	stream, err := decodeSemanticStream(object)
+	if err != nil {
+		return ""
+	}
+
+	childResources, err := requiredDictionary(object.dict, "/Resources")
+	if err != nil {
+		childResources = ""
+	}
+
+	visited[ref] = true
+	text := extractSemanticText(stream, childResources, objects, visited)
+	delete(visited, ref)
+
+	return text
+}
+
+// collectNestedImages adds image XObjects referenced inside Form XObjects to
+// the page's image map so HasImageXObject stays true for a grouped image. A
+// name already bound to the same reference is kept; a collision with a
+// different reference gets a ref-derived key.
+//
+//nolint:cyclop // image and form dispatch over one Do token stream
+func collectNestedImages(
+	stream []byte, resources string, objects map[int]semanticObject, images map[string]int, visited map[int]bool,
+) {
+	for _, match := range semanticContentRE.FindAllSubmatchIndex(stream, -1) {
+		if match[6] < 0 {
+			continue
+		}
+
+		name := string(stream[match[6]:match[7]])
+
+		ref, found := nestedXObjectRef(name, resources)
+		if !found || visited[ref] {
+			continue
+		}
+
+		object, found := objects[ref]
+		if !found {
+			continue
+		}
+
+		switch {
+		case strings.Contains(object.dict, "/Subtype /Image"):
+			if existing, exists := images[name]; exists && existing != ref {
+				name = name + "_x" + strconv.Itoa(ref)
+			}
+
+			images[name] = ref
+		case strings.Contains(object.dict, "/Subtype /Form"):
+			childStream, err := decodeSemanticStream(object)
+			if err != nil {
+				continue
+			}
+
+			childResources, err := requiredDictionary(object.dict, "/Resources")
+			if err != nil {
+				childResources = ""
+			}
+
+			visited[ref] = true
+			collectNestedImages(childStream, childResources, objects, images, visited)
+			delete(visited, ref)
+		}
+	}
+}
+
+// nestedXObjectRef resolves a /Name Do resource to its object reference using
+// the resource dictionary of the invoking content stream.
+func nestedXObjectRef(name, resources string) (int, bool) {
+	refs, err := resourceRefs(resources, "/XObject")
+	if err != nil {
+		return 0, false
+	}
+
+	ref, ok := refs[name]
+
+	return ref, ok
 }
 
 //nolint:cyclop // escape sequence decoding shares the literal bytes
@@ -813,7 +838,7 @@ func requiredRef(dict, key string) (int, error) {
 }
 
 func optionalRef(dict, key string) (int, bool) {
-	pattern, err := compileSemanticRE(regexp.QuoteMeta(key) + `\s+(\d+)\s+0\s+R`)
+	pattern, err := regexp.Compile(regexp.QuoteMeta(key) + `\s+(\d+)\s+0\s+R`)
 	if err != nil {
 		return 0, false
 	}
@@ -843,7 +868,7 @@ func requiredRefArray(dict, key string) ([]int, error) {
 }
 
 func optionalRefArray(dict, key string) ([]int, bool) {
-	pattern, err := compileSemanticRE(regexp.QuoteMeta(key) + `\s*\[([^\]]*)\]`)
+	pattern, err := regexp.Compile(regexp.QuoteMeta(key) + `\s*\[([^\]]*)\]`)
 	if err != nil {
 		return nil, false
 	}
@@ -869,7 +894,7 @@ func optionalRefArray(dict, key string) ([]int, bool) {
 }
 
 func requiredNumberArray(dict, key string, want int) ([]float64, error) {
-	pattern, err := compileSemanticRE(regexp.QuoteMeta(key) + `\s*\[([^\]]*)\]`)
+	pattern, err := regexp.Compile(regexp.QuoteMeta(key) + `\s*\[([^\]]*)\]`)
 	if err != nil {
 		return nil, fmt.Errorf("compile pattern for %s: %w", key, err)
 	}
@@ -902,7 +927,7 @@ func requiredNumberArray(dict, key string, want int) ([]float64, error) {
 }
 
 func requiredInt(dict, key string) (int, error) {
-	pattern, err := compileSemanticRE(regexp.QuoteMeta(key) + `\s+(\d+)`)
+	pattern, err := regexp.Compile(regexp.QuoteMeta(key) + `\s+(\d+)`)
 	if err != nil {
 		return 0, fmt.Errorf("compile pattern for %s: %w", key, err)
 	}
@@ -924,7 +949,7 @@ func requiredInt(dict, key string) (int, error) {
 }
 
 func optionalLiteral(dict, key string) (string, bool) {
-	pattern, err := compileSemanticRE(regexp.QuoteMeta(key) + `\s+(\((?:\\.|[^\\)])*\))`)
+	pattern, err := regexp.Compile(regexp.QuoteMeta(key) + `\s+(\((?:\\.|[^\\)])*\))`)
 	if err != nil {
 		return "", false
 	}

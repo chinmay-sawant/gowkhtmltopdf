@@ -15,9 +15,10 @@ import (
 // Registry indexes discoverable TTF faces by CSS family name (lowercased).
 // Liberation defaults stay available via FaceSet; this holds opt-in folder fonts.
 type Registry struct {
-	mu       sync.RWMutex
-	byFamily map[string][]*Font // family → faces (any weight/style)
-	faces    []*Font            // stable registration order for fallback scans
+	mu            sync.RWMutex
+	byFamily      map[string][]*Font // family → faces (any weight/style)
+	exactByFamily map[string][]*Font // exact family tokens only (bundled aliases)
+	faces         []*Font            // stable registration order for fallback scans
 }
 
 // NewRegistry returns an empty font registry.
@@ -86,6 +87,14 @@ func (r *Registry) AddFont(fnt *Font) {
 	}
 }
 
+// normalizeFamilyKey lowercases and strips quotes from one CSS family name,
+// matching the keys AddFamilyAlias and Lookup use.
+func normalizeFamilyKey(family string) string {
+	key := strings.ToLower(strings.TrimSpace(family))
+
+	return strings.Trim(key, `"'`)
+}
+
 // AddFamilyAlias registers f under an explicit CSS family name.
 //
 //nolint:wsl // lock initialization and registration must remain one critical section.
@@ -101,14 +110,40 @@ func (r *Registry) AddFamilyAlias(family string, font *Font) {
 	}
 	r.registerFaceLocked(font)
 
-	key := strings.ToLower(strings.TrimSpace(family))
-	key = strings.Trim(key, `"'`)
-
+	key := normalizeFamilyKey(family)
 	if key == "" {
 		return
 	}
 
 	r.byFamily[key] = append(r.byFamily[key], font)
+}
+
+// AddExactFamilyAlias registers font under an explicit CSS family name for
+// exact family tokens only. Unlike AddFamilyAlias, the generic serif /
+// sans-serif / monospace expansions do not see the alias. The bundled DejaVu
+// fallback faces use it: an exact font-family:'DejaVu Sans' must resolve them,
+// while the sans-serif expansion (which lists "dejavu sans" as a fallback
+// candidate) must keep preferring Liberation. The face is not added to the
+// fallback scan order because the FaceSet already covers it.
+//
+//nolint:wsl // lock initialization and registration must remain one critical section.
+func (r *Registry) AddExactFamilyAlias(family string, font *Font) {
+	if r == nil || font == nil {
+		return
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.exactByFamily == nil {
+		r.exactByFamily = map[string][]*Font{}
+	}
+
+	key := normalizeFamilyKey(family)
+	if key == "" {
+		return
+	}
+
+	r.exactByFamily[key] = append(r.exactByFamily[key], font)
 }
 
 // Lookup returns a face matching family list + weight/italic, or nil.
@@ -124,8 +159,15 @@ func (r *Registry) Lookup(families []string, weight int, italic bool) *Font {
 	defer r.mu.RUnlock()
 
 	for _, fam := range families {
-		for _, key := range fontFamilyKeys(fam) {
+		keys := fontFamilyKeys(fam)
+		for _, key := range keys {
 			faces := r.byFamily[key]
+			if len(faces) == 0 && len(keys) == 1 {
+				// A single key means the token is a named family, not one of
+				// the generic expansions: bundled exact aliases are visible.
+				faces = r.exactByFamily[key]
+			}
+
 			if len(faces) == 0 {
 				continue
 			}
@@ -142,9 +184,7 @@ func (r *Registry) Lookup(families []string, weight int, italic bool) *Font {
 // fontFamilyKeys returns lowercase registry keys to try for one CSS family
 // token. Named families stay as-is; only CSS generics expand to Liberation.
 func fontFamilyKeys(fam string) []string {
-	key := strings.ToLower(strings.TrimSpace(fam))
-	key = strings.Trim(key, `"'`)
-
+	key := normalizeFamilyKey(fam)
 	if key == "" {
 		return nil
 	}
@@ -275,6 +315,42 @@ func pickFace(faces []*Font, weight int, italic bool) *Font {
 	return best
 }
 
+// HasVariationAxes reports whether the face carries an fvar table, that is,
+// whether it is a variable font. The bundled Liberation and DejaVu faces are
+// static, so this is false for every default face.
+//
+// The font-variation consumer in internal/layout uses the probe to tell a
+// spec-correct no-op (static face, CSS variations have no effect) from a known
+// gap (variable face the writer cannot instance).
+func (f *Font) HasVariationAxes() bool {
+	if f == nil {
+		return false
+	}
+
+	f.ensureParsed()
+
+	_, ok := f.tables["fvar"]
+
+	return ok
+}
+
+// HasColorPalette reports whether the face carries both COLR and CPAL, the
+// tables font-palette needs to select a color palette. The PDF writer embeds
+// glyf outlines only and has no CPAL/COLR painting path, so a true result
+// identifies a known gap rather than supported palette painting.
+func (f *Font) HasColorPalette() bool {
+	if f == nil {
+		return false
+	}
+
+	f.ensureParsed()
+
+	_, hasCOLR := f.tables["COLR"]
+	_, hasCPAL := f.tables["CPAL"]
+
+	return hasCOLR && hasCPAL
+}
+
 // DefaultSystemFontDirs returns common system font directories for the current OS.
 // Callers must opt in via --use-system-fonts; nothing is scanned by default.
 // Proprietary Windows/corefont trees are omitted — use Liberation (bundled)
@@ -359,43 +435,39 @@ func RegistryFromPaths(fontPaths []string, useSystemFonts bool) *Registry {
 	return ScanFontDirs(dirs)
 }
 
-// RegistryFromGlobal builds an opt-in font registry from PdfGlobal font
-// settings. Returns nil when nothing was configured. Callers own logging.
+// RegistryFromGlobal builds the font registry for one conversion from
+// PdfGlobal font settings. It always returns a registry: even when no font
+// paths are configured, the bundled DejaVu Sans fallback faces are registered
+// as exact family aliases so font-family:'DejaVu Sans' resolves without opt-in
+// discovery. Callers own logging.
 func RegistryFromGlobal(global settings.PdfGlobal) *Registry {
-	return RegistryFromPaths(global.FontPaths, global.UseSystemFonts)
+	registry := RegistryFromPaths(global.FontPaths, global.UseSystemFonts)
+	if registry == nil {
+		registry = NewRegistry()
+	}
+
+	// Exact aliases only: the generic sans-serif expansion lists "dejavu sans"
+	// as a fallback candidate, and registering the bundled faces there would
+	// switch every generic sans-serif run from Liberation to DejaVu.
+	if faces, err := LoadDefaultFaces(); err == nil {
+		registry.AddExactFamilyAlias(dejaVuSansFamily, faces.UnicodeFallback)
+		registry.AddExactFamilyAlias(dejaVuSansFamily, faces.UnicodeFallbackBold)
+	}
+
+	return registry
 }
 
 // scanFontFile parses a font file into the registry, skipping anything that
-// is not a TTF/OTF or fails to parse.
+// is not a TTF/OTF or fails to parse. Parses are memoized across conversions
+// by loadFontFile (see font_file_cache.go).
 func scanFontFile(out *Registry, path string, entry os.DirEntry) {
 	low := strings.ToLower(entry.Name())
 	if !strings.HasSuffix(low, ".ttf") && !strings.HasSuffix(low, ".otf") {
 		return
 	}
 
-	if info, err := entry.Info(); err == nil && info.Size() > maxFontBytes {
-		return
+	fnt := loadFontFile(path, entry)
+	if fnt != nil {
+		out.AddFont(fnt)
 	}
-
-	file, err := os.Open(path)
-	if err != nil {
-		return
-	}
-	defer file.Close()
-
-	data, err := io.ReadAll(io.LimitReader(file, int64(maxFontBytes)+1))
-	if err != nil || len(data) > maxFontBytes {
-		return
-	}
-
-	fnt, err := ParseTTF(data)
-	if err != nil {
-		return
-	}
-
-	if fnt.PostScriptName == "" {
-		fnt.PostScriptName = strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
-	}
-
-	out.AddFont(fnt)
 }

@@ -4,17 +4,17 @@
     "all_properties": "https://www.w3.org/Style/CSS/all-properties.en.json",
     "mdn_units": "mdn/data css/units.json",
     "mdn_properties": "mdn/data css/properties.json (overlay for mdn_url/groups)",
-    "engine": "honesty pass plus standard compositing support; 2 compositing properties remain partial",
-    "generated": "2026-09-02"
+    "engine": "honesty pass plus standard compositing support; mix-blend-mode and isolation completed 2026-09-12 with element-level transparency groups in PDF and grouped raster composites in PNG; 2026-09-12 ponytail audit PT26-LAY-04/05 demoted 27 parsed-and-stored no-op properties to unsupported; the same day 24 were re-implemented with real layout/paint consumers (3 CSS Fonts rows stay demoted)",
+    "generated": "2026-09-12"
   },
   "summary": {
     "webref_properties": 818,
     "mapped_properties": 818,
     "properties_by_engine_status": {
-      "implemented": 355,
-      "unsupported": 461,
+      "implemented": 354,
+      "unsupported": 464,
       "ignored": 0,
-      "partial": 2
+      "partial": 0
     },
     "properties_print_relevant": 818,
     "properties_goal_implement": 818,
@@ -5547,8 +5547,8 @@
       "mdn_status": null,
       "groups": [],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_advanced_props.go",
-      "notes": ""
+      "code_path": "internal/layout/style_color_adjust_props.go",
+      "notes": "Implemented subset: economy|exact. exact forces this element's background paint past the --no-background economy gate. Consumer internal/layout/background_image.go:30; call sites internal/layout/inline_paint.go:312, layout_chrome.go:425, layout_tables.go:100/1276. Re-implemented 2026-09-12 (PT26-LAY-04 reversal)."
     },
     {
       "property": "color-interpolation",
@@ -5614,8 +5614,8 @@
         "CSS Color"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_advanced_props.go",
-      "notes": ""
+      "code_path": "internal/layout/style_color_adjust_props.go",
+      "notes": "Implemented root-scoped: only the html element's used value is read; the first light/dark token picks the scheme, dark paints the #121212 canvas and light default text, custom idents are dropped. Consumer internal/layout/paint.go:111-117/165/183/207."
     },
     {
       "property": "column-count",
@@ -6173,8 +6173,8 @@
         "CSS Containment"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_advanced_props.go",
-      "notes": "Parsed, stored at style.go:348 (ResolvedStyle.Contain), parsed but no layout effect for print - performance hint only (layout/paint/style containment has no consumer). Implemented (parsed, no visual effect for print)."
+      "code_path": "internal/layout/style_containment_props.go",
+      "notes": "Implemented subset: size uses contain-intrinsic-* for the as-if-empty box, paint clips descendant paint to the padding box; layout and style parse with no print effect, inline-size is not implemented. Apply arm internal/layout/style_containment_props.go:45; consumers internal/layout/layout_flow.go:224/262 and the overflow-clip stamp."
     },
     {
       "property": "contain-intrinsic-block-size",
@@ -6196,8 +6196,8 @@
         "CSS Box Sizing"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_advanced_props.go",
-      "notes": "Parsed, stored at style.go:347 (ResolvedStyle.ContainIntrinsicBlockSize), placeholder block size for size containment - no layout consumer. Implemented (parsed, no visual effect)."
+      "code_path": "internal/layout/style_containment_props.go",
+      "notes": "Implemented with contain:size: block axis maps to height in horizontal-tb (swaps in vertical writing modes). Consumer internal/layout/layout_flow.go:262."
     },
     {
       "property": "contain-intrinsic-height",
@@ -6219,8 +6219,8 @@
         "CSS Box Sizing"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_advanced_props.go",
-      "notes": "Parsed, stored at style.go:345 (ResolvedStyle.ContainIntrinsicHeight), placeholder height for size containment - no layout consumer. Implemented (parsed, no visual effect)."
+      "code_path": "internal/layout/style_containment_props.go",
+      "notes": "Implemented with contain:size: physical height placeholder. Consumer internal/layout/layout_flow.go:262 (containmentIntrinsicHeight)."
     },
     {
       "property": "contain-intrinsic-inline-size",
@@ -6242,8 +6242,8 @@
         "CSS Box Sizing"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_advanced_props.go",
-      "notes": "Parsed, stored at style.go:346 (ResolvedStyle.ContainIntrinsicInlineSize), placeholder inline size for size containment - no layout consumer. Implemented (parsed, no visual effect)."
+      "code_path": "internal/layout/style_containment_props.go",
+      "notes": "Implemented with contain:size: inline axis maps to width in horizontal-tb (swaps in vertical writing modes). Consumer internal/layout/layout_flow.go:758."
     },
     {
       "property": "contain-intrinsic-size",
@@ -6268,8 +6268,8 @@
         "CSS Box Sizing"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_advanced_props.go",
-      "notes": "Parsed, stored at style.go:343 (ResolvedStyle.ContainIntrinsicSize), placeholder size for size containment - no layout consumer for print, paints as if not set. Implemented (parsed, no visual effect)."
+      "code_path": "internal/layout/style_containment_props.go",
+      "notes": "Implemented with contain:size: placeholder width and height; one value mirrors to both axes. Consumer internal/layout/layout_flow.go:262 (height) and :758 (width)."
     },
     {
       "property": "contain-intrinsic-width",
@@ -6291,8 +6291,8 @@
         "CSS Box Sizing"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_advanced_props.go",
-      "notes": "Parsed, stored at style.go:344 (ResolvedStyle.ContainIntrinsicWidth), placeholder width for size containment - no layout consumer. Implemented (parsed, no visual effect)."
+      "code_path": "internal/layout/style_containment_props.go",
+      "notes": "Implemented with contain:size: physical width placeholder. Consumer internal/layout/layout_flow.go:758 (containmentIntrinsicWidth)."
     },
     {
       "property": "container",
@@ -6409,8 +6409,8 @@
         "CSS Containment"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_advanced_props.go",
-      "notes": "Parsed, stored at style.go:349 (ResolvedStyle.ContentVisibility), performance hint (auto/visible/hidden) - no layout effect for print, paints as if visible. Implemented (parsed, no visual effect)."
+      "code_path": "internal/layout/style_containment_props.go",
+      "notes": "Implemented subset: hidden skips descendant layout and paint and keeps the intrinsic size (0 when unset); visible and auto are print no-ops. Consumer internal/layout/layout_flow.go:211/757."
     },
     {
       "property": "continue",
@@ -7599,8 +7599,8 @@
         "CSS Color"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_advanced_props.go",
-      "notes": ""
+      "code_path": "internal/layout/style_color_adjust_props.go",
+      "notes": "Implemented as an sRGB clamp: standard and constrained-high clamp channels; high and no-limit pass through (the writer emits sRGB). Consumer internal/layout/paint.go:223 (sRGBRangeLimit), used at 1064/1099/1404/1425."
     },
     {
       "property": "empty-cells",
@@ -8456,8 +8456,8 @@
         "CSS Fonts"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_advanced_props.go",
-      "notes": ""
+      "code_path": "internal/layout/style_font_variant_props.go",
+      "notes": "Implemented subset: OpenType language tags map to BCP47 (TRK->tr, SRB->sr, AZE->az, ROM->ro, HUN->hu, POL->pl, CES->cs, SLV->sl, SKY->sk; others lowercased). Consumer: OpText.TextLanguage (internal/layout/op_extra.go) feeds shaping.Input.Language via internal/pdf/shape_gotext.go:216 for PDF and PNG. Observable with DejaVu Sans SRB locl glyph substitution."
     },
     {
       "property": "font-optical-sizing",
@@ -8478,9 +8478,9 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "implemented",
-      "code_path": "internal/layout/style_advanced_props.go",
-      "notes": ""
+      "engine_status": "unsupported",
+      "code_path": "",
+      "notes": "Optical sizing hint (`auto` / `none`); parsed and stored but text shaping never consumed it. Field and apply arm removed 2026-09-12 by ponytail audit PT26-LAY-05 (no layout, paint, or shaping reader); declaration is now dropped, catalog demoted implemented -> unsupported."
     },
     {
       "property": "font-palette",
@@ -8501,9 +8501,9 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "implemented",
-      "code_path": "internal/layout/style_advanced_props.go",
-      "notes": ""
+      "engine_status": "unsupported",
+      "code_path": "",
+      "notes": "Color-font palette selection; parsed and stored but shaping and raster never consumed it. Field and apply arm removed 2026-09-12 by ponytail audit PT26-LAY-05 (no layout, paint, or shaping reader); declaration is now dropped, catalog demoted implemented -> unsupported."
     },
     {
       "property": "font-size",
@@ -8927,9 +8927,9 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "implemented",
-      "code_path": "internal/layout/style_advanced_props.go",
-      "notes": ""
+      "engine_status": "unsupported",
+      "code_path": "",
+      "notes": "Raw variable-font axis list; parsed and stored but text shaping never consumed it. Field and apply arm removed 2026-09-12 by ponytail audit PT26-LAY-05 (no layout, paint, or shaping reader); declaration is now dropped, catalog demoted implemented -> unsupported."
     },
     {
       "property": "font-weight",
@@ -9039,8 +9039,8 @@
         "CSS Color"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_advanced_props.go",
-      "notes": ""
+      "code_path": "internal/layout/style_color_adjust_props.go",
+      "notes": "Implemented: print has no forced-colors mode; none keeps author colors by opting out of the dark-scheme text default (preserve-parent-color behaves like auto). Consumer internal/layout/paint.go:208, read at paint.go:115."
     },
     {
       "property": "frame-sizing",
@@ -9770,8 +9770,8 @@
         "CSS Images"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_advanced_props.go",
-      "notes": ""
+      "code_path": "internal/layout/style_image_adjust_props.go",
+      "notes": "Implemented subset: from-image (JPEG EXIF), none, or explicit <angle> [flip]; an explicit angle replaces EXIF. Consumer internal/layout/layout_images.go:219/237."
     },
     {
       "property": "image-rendering",
@@ -9816,8 +9816,8 @@
         "CSS Images"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_advanced_props.go",
-      "notes": ""
+      "code_path": "internal/layout/style_image_adjust_props.go",
+      "notes": "Implemented subset: from-image | <resolution> | from-image <resolution>; dpi/dpcm/dppx/x convert to DPI so 300dpi renders smaller than the 96dpi default. Consumer internal/layout/layout_images.go:250/256."
     },
     {
       "property": "initial-letter",
@@ -10267,9 +10267,9 @@
       "groups": [
         "Compositing and Blending"
       ],
-      "engine_status": "partial",
-      "code_path": "internal/layout/style_advanced_props.go; internal/layout/layout.go",
-      "notes": "Parsed into ResolvedStyle. isolate creates a stacking context and clears an inherited operation blend mode for its subtree; full isolated transparency groups are not available in the PDF writer."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
+      "notes": "Parsed into ResolvedStyle.Isolation. isolate creates a stacking context and an isolated element group even with an empty blend mode; PDF emits a Form XObject with /Group << /S /Transparency /I true /CS /DeviceRGB >> and no /BM entry, PNG composites the group from a transparent scratch backdrop. Consumers layout.go:1024 (group create) and :1075 (Isolate true); tests TestIsolationClearsInheritedOperationBlendScope and TestIsolationOnlyGroupUsesNoBlendExtGState. Subset: a group subtree split across pages composites as one isolated group per page fragment with nothing dropped; element opacity stays per descendant op and group composite alpha is 1, so CSS once-at-group opacity is not implemented; the group composites at its last member's position in the engine global paint order, not a full CSS stacking-context tree; Form /BBox is the page box (conservative, never clips); PDF/UA tagging inside forms was not validated by veraPDF in this session. Fixture 61 cell 99: the auto chip multiplies to dark green while the isolate chip stays blue."
     },
     {
       "property": "justify-content",
@@ -11862,9 +11862,9 @@
       "groups": [
         "Compositing and Blending"
       ],
-      "engine_status": "partial",
-      "code_path": "internal/layout/style_advanced_props.go; internal/layout/layout.go; internal/layout/paint.go; internal/imageout/blend.go; internal/pdf/content.go",
-      "notes": "Standard CSS blend modes are parsed and applied to emitted display-list operations in PDF and PNG. This is operation-level compositing; full element-group backdrop semantics are not available in the current flat display list and PDF writer. The newer plus-lighter value remains unsupported. Verified by TestMixBlendModeReachesDisplayList and TestPaintBlendedFillUsesMultiply."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_advanced_props.go",
+      "notes": "Standard CSS blend modes parse into ResolvedStyle.MixBlendMode and paint as element-level transparency groups. Apply arm style_advanced_props.go:69; consumers layout.go:1024 (pushZ creates the element group) and :1058 (enterBlendIsolation writes BlendGroup.Mode); PDF content.go:377 EndTransparencyGroup emits the Form XObject with /Group << /S /Transparency /I true /CS /DeviceRGB >> and /BM via ExtGState; PNG imageout/groups.go compositeBlend at :163 composites each group buffer once; form fonts share the page subset (pdf.go:977 finalizeForms after unionFontRunes); sibling paint routes by each op's own group chain (paint_groups.go target/enter/closeReady); group alpha per distinct value via SetGroupOpacity. Tests TestBlendGroupMarkersNestAroundSubtree, TestBlendGroupEmitsTransparencyForm, TestSiblingBlendGroupsEmitSiblingForms, TestRasterizeSiblingOutsideBlendGroupKeepsPixels, TestBlendGroupKeepsPlainFlexSiblingOutOfForm, TestTransparencyGroupFontMatchesPageFont. Subset: a group subtree split across pages composites as one isolated group per page fragment with nothing dropped; element opacity stays per descendant op and group composite alpha is 1, so CSS once-at-group opacity is not implemented; the group composites at its last member's position in the engine global paint order, not a full CSS stacking-context tree; plus-lighter remains unsupported; Form /BBox is the page box (conservative, never clips); PDF/UA tagging inside forms was not validated by veraPDF in this session. Fixture 62 cell 16: the multiply chip renders dark green while the normal control keeps translucent blue."
     },
     {
       "property": "nav-down",
@@ -12016,8 +12016,8 @@
         "CSS Images"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_advanced_props.go",
-      "notes": ""
+      "code_path": "internal/layout/style_image_adjust_props.go",
+      "notes": "Implemented rect subset: inset()/xywh()/rect() crop the source; circle()/ellipse()/polygon() parse and store but do not crop. Consumer internal/layout/layout_images.go:319."
     },
     {
       "property": "offset",
@@ -13765,8 +13765,8 @@
         "CSS Color"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_advanced_props.go",
-      "notes": ""
+      "code_path": "internal/layout/style_color_adjust_props.go",
+      "notes": "Implemented subset: economy|exact (initial economy). exact forces this element's background paint past the --no-background economy gate. Consumer internal/layout/background_image.go:30; call sites internal/layout/inline_paint.go:312, layout_chrome.go:425, layout_tables.go:100/1276."
     },
     {
       "property": "quotes",
@@ -16709,8 +16709,8 @@
         "CSS Writing Modes"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_advanced_props.go",
-      "notes": ""
+      "code_path": "internal/layout/style_text_support_props.go",
+      "notes": "Implemented subset: all or digits N paints a vertical-writing run upright; no scaled combine cell, mixed digit/letter runs stay rotated. Consumer internal/layout/inline_paint.go:370/381."
     },
     {
       "property": "text-decoration",
@@ -16783,8 +16783,8 @@
         "CSS Text Decoration"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_advanced_props.go",
-      "notes": ""
+      "code_path": "internal/layout/style_text_support_props.go",
+      "notes": "Implemented subset: auto or 1-2 lengths; the first endpoint is stored in points and trims the decoration endpoints (percentages rejected). Consumer internal/layout/inline_paint.go:887."
     },
     {
       "property": "text-decoration-line",
@@ -16834,8 +16834,8 @@
         "CSS Text Decoration"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_advanced_props.go",
-      "notes": ""
+      "code_path": "internal/layout/style_text_support_props.go",
+      "notes": "Implemented subset: none|auto shorthand expands onto the skip-self/box/spaces/ink longhands. Consumer internal/layout/inline_paint.go:599/826."
     },
     {
       "property": "text-decoration-skip-box",
@@ -16855,8 +16855,8 @@
       "mdn_status": null,
       "groups": [],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_advanced_props.go",
-      "notes": ""
+      "code_path": "internal/layout/style_text_support_props.go",
+      "notes": "Implemented subset: all breaks the stroke at an item with inline chrome; none draws across. Consumer internal/layout/inline_paint.go:599."
     },
     {
       "property": "text-decoration-skip-ink",
@@ -16899,8 +16899,8 @@
       "mdn_status": null,
       "groups": [],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_advanced_props.go",
-      "notes": ""
+      "code_path": "internal/layout/style_text_support_props.go",
+      "notes": "Implemented subset: skip-all suppresses the item's own decoration (ancestor decorations are not propagated). Consumer internal/layout/inline_paint.go:599."
     },
     {
       "property": "text-decoration-skip-spaces",
@@ -16920,8 +16920,8 @@
       "mdn_status": null,
       "groups": [],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_advanced_props.go",
-      "notes": ""
+      "code_path": "internal/layout/style_text_support_props.go",
+      "notes": "Implemented subset: none|all|[start||end] trim spacer runes from decoration spans. Consumer internal/layout/inline_paint.go:599/684."
     },
     {
       "property": "text-decoration-style",
@@ -17195,8 +17195,8 @@
         "CSS Writing Modes"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_advanced_props.go",
-      "notes": ""
+      "code_path": "internal/layout/style_text_support_props.go",
+      "notes": "Implemented subset: upright paints vertical-writing runs at 0 degrees; sideways behaves like mixed (rotated). Consumer internal/layout/inline_paint.go:370/375."
     },
     {
       "property": "text-overflow",
@@ -18069,8 +18069,8 @@
         "CSS Writing Modes"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_advanced_props.go",
-      "notes": ""
+      "code_path": "internal/layout/style_text_support_props.go",
+      "notes": "Implemented run-level: bidi-override/isolate-override and the embed/isolate/plaintext scopes reorder runs under rtl (runs, not characters). Consumer internal/layout/inline_collect.go:127/143."
     },
     {
       "property": "user-select",

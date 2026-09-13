@@ -264,12 +264,11 @@ func collectImportSheets(
 	}
 
 	var logBuf bytes.Buffer
-	sheets := prepare.CollectSheets(
+
+	resources := prepare.NewResourceContext(loader, server.URL+"/index.html", settings.DefaultLoadPage())
+	sheets := resources.CollectSheets(
 		t.Context(),
-		loader,
 		root,
-		server.URL+"/index.html",
-		settings.DefaultLoadPage(),
 		prepare.SheetOptions{
 			ViewportW: 600, ViewportH: 800, MediaType: fixture.media,
 		},

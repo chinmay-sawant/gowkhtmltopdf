@@ -15,8 +15,13 @@
 | [HONESTY-GATES.md](HONESTY-GATES.md) | Anti catalog-only close rules + flip packet |
 | [implemented-honesty-pass.md](implemented-honesty-pass.md) | 2026-08-28 audit of Implemented rows (152 kept / 14 demoted) |
 | [review/](review) | Post-ship architecture + ponytail ledger for commit `48e06dbc` |
+| [perf-review/phase-wise-checklist.md](perf-review/phase-wise-checklist.md) | Performance recovery plan for the supplied 0.2.4 versus current PDF and image regressions (executed and validated 2026-09-11; image target met, PDF target improved but not met; evidence in `perf-review/results/2026-09-11/`) |
+| [perf-improve/phase-wise-checklist.md](perf-improve/phase-wise-checklist.md) | Wave 1 warm-path allocation plan, complete 2026-09-11, Snapshot L. Do not reopen. |
+| [perf-improve/wave-2-50pct/phase-wise-checklist.md](perf-improve/wave-2-50pct/phase-wise-checklist.md) | Wave 2 live ledger: cut remaining Snapshot M ns/op and B/op in half on library and CLI. Not started. |
+| [perf-time/phase-wise-checklist.md](perf-time/phase-wise-checklist.md) | Warm-path time plan, complete 2026-09-11, Snapshot M. Do not reopen. |
 | [agy-review/](agy-review) | Go Design Patterns and Go Code Style review ledgers |
 | [86-canonical-0.2.6-wasm.md](86-canonical-0.2.6-wasm.md) | Browser WASM conversion, PDF preview, and image output ledger, phases 86-93 |
+| [ponytail/](ponytail/) | Current-tree deletion and simplification audit: 40 open, evidence-backed cleanup rows |
 
 Workflow: [`../../skills/phase-wise-checklist/SKILLS.md`](../../skills/phase-wise-checklist/SKILLS.md)
 
@@ -32,4 +37,4 @@ Catalog-driven CSS coverage: map the WebRef property list onto the engine, finis
 
 - `make test`, `make lint`, `make claim-scan`, `make golden`, `make build` green 2026-08-27 on `feature/026-extended-css-support`
 - Mapping counts: `catalog/coverage-summary.json`
-- VERSION still 0.2.5. Leftovers are `[~]` in the canonical ledger (fixture-gated flex/float depth). Phase 54 `page: ident` and `@page` margin boxes shipped lite (see phase-54).
+- VERSION bumped to 0.2.6 (2026-09-13). Leftovers are `[~]` in the canonical ledger (fixture-gated flex/float depth). Phase 54 `page: ident` and `@page` margin boxes shipped lite (see phase-54).

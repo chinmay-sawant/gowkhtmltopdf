@@ -42,34 +42,43 @@ func capTablePageBreaks(res *Result, contentH float64) {
 
 	const eps = 2.0
 
-	_, horiz, vertStarts, vertEnds, horizByY := collectTableBorderSegments(res)
+	verts, horiz, vertStarts, vertEnds, horizByY := collectTableBorderSegments(res)
 	seal := func(gVal, minX, maxX, borderW, red, green, blue float64) {
 		sealBorderGap(res, &horiz, horizByY, eps, gVal, minX, maxX, borderW, red, green, blue)
 	}
 	coverage := func(y, minX, maxX float64) bool {
-		full, _, _, _ := hCoverage(horizByY, y, minX, maxX)
+		full, _, _, _ := hCoverage(horiz, horizByY, y, minX, maxX)
+
+		return full
+	}
+	coverageBeforeEnd := func(y, minX, maxX, pageEnd float64) bool {
+		full, _, _, _ := hCoverageBounded(horiz, horizByY, y, minX, maxX, pageEnd)
 
 		return full
 	}
 
+	// Seals only add horizontal rules, so the byStart vertical clusters are
+	// stable across the top and bottom checks and are built once.
+	starts := clusterVerticals(verts, vertStarts, vertEnds, true)
+
 	// (1) Classic page-top stubs.
-	sealPageTopStubs(vertStarts, coverage, seal, maxPage, contentH, eps)
+	sealPageTopStubs(verts, vertStarts, coverage, seal, maxPage, contentH, eps)
 
 	// (2) Seal incomplete tops of multi-column vertical clusters that start a
 	// continuation-page body band (under repeated thead or at page top).
 	// Mid-table rowspan holes keep skipped tops so continuous year cells stay
 	// unsplit; only the page-fragment open edge is closed.
-	sealPageTopClusters(vertStarts, vertEnds, contentH, coverage, seal)
+	sealPageTopClusters(starts, contentH, coverage, seal)
 
 	// Row bottoms: seal when verticals end near a page bottom and no full
 	// horizontal closes the strip (next row's top moved to the following page).
-	sealPageBottomClusters(vertStarts, vertEnds, contentH, coverage, seal, eps)
+	sealPageBottomClusters(verts, vertStarts, vertEnds, starts, contentH, coverageBeforeEnd, seal, eps)
 }
 
 // sealBorderGap appends a horizontal rule at gVal spanning [minX, maxX] unless
 // a near-identical rule already exists.
 func sealBorderGap(
-	res *Result, horiz *[]hseg, horizByY map[int][]hseg, eps, gVal, minX, maxX, borderW, red, green, blue float64,
+	res *Result, horiz *[]hseg, horizByY borderSegIndex, eps, gVal, minX, maxX, borderW, red, green, blue float64,
 ) {
 	if maxX-minX < bandClusterMinSpan || borderW < 0 {
 		return
@@ -79,7 +88,8 @@ func sealBorderGap(
 		borderW = sealFallbackWidth
 	}
 	// Avoid exact duplicates.
-	for _, h := range *horiz {
+	for i := range *horiz {
+		h := &(*horiz)[i]
 		if math.Abs(h.y-gVal) <= 0.5 && math.Abs(h.x0-minX) <= eps && math.Abs(h.x1-maxX) <= eps {
 			return
 		}
@@ -94,19 +104,19 @@ func sealBorderGap(
 	// display list. Rebuild the index before any later movement consults it.
 	invalidateFlowIndex(res)
 
-	sealed := hseg{minX, maxX, gVal, borderW, red, green, blue}
-	*horiz = append(*horiz, sealed)
-	horizByY[roundY(gVal)] = append(horizByY[roundY(gVal)], sealed)
+	*horiz = append(*horiz, hseg{minX, maxX, gVal, borderW, red, green, blue})
+	key := roundY(gVal)
+	horizByY[key] = append(horizByY[key], segIdx(len(*horiz)-1))
 }
 
 // sealPageTopClusters closes vertical clusters that start near the top of a
 // continuation page's body band.
 func sealPageTopClusters(
-	vertStarts, vertEnds map[int][]vseg, contentH float64,
+	starts map[int]borderCluster, contentH float64,
 	coverage func(y, minX, maxX float64) bool,
 	seal func(gVal, minX, maxX, borderW, red, green, blue float64),
 ) {
-	for _, child := range clusterVerticals(vertStarts, vertEnds, true) {
+	for _, child := range starts {
 		if !isBandCluster(child) {
 			continue
 		}
@@ -140,14 +150,13 @@ func sealPageTopClusters(
 // enough: fixture-61 props 31/82 leave ~95pt of empty page below the last row
 // when the next row+thead cannot fit, which sat outside the old 80pt band.
 func sealPageBottomClusters(
-	vertStarts, vertEnds map[int][]vseg, contentH float64,
-	coverage func(y, minX, maxX float64) bool,
+	verts []vseg, vertStarts, vertEnds borderSegIndex, starts map[int]borderCluster,
+	contentH float64,
+	coverage func(y, minX, maxX, pageEnd float64) bool,
 	seal func(gVal, minX, maxX, borderW, red, green, blue float64),
 	eps float64,
 ) {
-	starts := clusterVerticals(vertStarts, vertEnds, true)
-
-	for _, child := range clusterVerticals(vertStarts, vertEnds, false) {
+	for _, child := range clusterVerticals(verts, vertStarts, vertEnds, false) {
 		if !isBandCluster(child) {
 			continue
 		}
@@ -164,7 +173,7 @@ func sealPageBottomClusters(
 			continue
 		}
 
-		if coverage(child.y, child.minX, child.maxX) {
+		if coverage(child.y, child.minX, child.maxX, pageBot) {
 			continue
 		}
 
@@ -284,69 +293,123 @@ func capTableMaxPage(res *Result, contentH float64) int {
 	return maxPage
 }
 
+// borderSegIndex maps a rounded Y bucket to positions in the segment slice the
+// index was built from. Storing indices keeps the three per-Y maps from
+// copying every 56-byte segment value into their own bucket slices.
+type borderSegIndex map[int][]int32
+
+// segIdx narrows a slice index for storage in a borderSegIndex. Segment
+// indices are bounded by the display-list length, which cannot approach
+// MaxInt32 before the ops slice allocation itself fails.
+func segIdx(i int) int32 {
+	return int32(i) //nolint:gosec // bounded by the ops slice length
+}
+
 // collectTableBorderSegments gathers non-fixed vertical/horizontal line ops
 // once and groups them by rounded Y.
-func collectTableBorderSegments(res *Result) ([]vseg, []hseg, map[int][]vseg, map[int][]vseg, map[int][]hseg) {
+func collectTableBorderSegments(res *Result) ([]vseg, []hseg, borderSegIndex, borderSegIndex, borderSegIndex) {
 	verts, horiz := collectBorderSegmentOps(res.Ops)
 
-	vertStarts := make(map[int][]vseg)
-	vertEnds := make(map[int][]vseg)
-	horizByY := make(map[int][]hseg)
+	vertStarts := make(borderSegIndex)
+	vertEnds := make(borderSegIndex)
+	horizByY := make(borderSegIndex)
 
 	for i := range verts {
-		v := verts[i]
+		v := &verts[i]
 		k0, k1 := roundY(v.y0), roundY(v.y1)
-		vertStarts[k0] = append(vertStarts[k0], v)
-		vertEnds[k1] = append(vertEnds[k1], v)
+		vertStarts[k0] = append(vertStarts[k0], segIdx(i))
+		vertEnds[k1] = append(vertEnds[k1], segIdx(i))
 	}
 
 	for i := range horiz {
-		h := horiz[i]
-		ky := roundY(h.y)
-		horizByY[ky] = append(horizByY[ky], h)
+		ky := roundY(horiz[i].y)
+		horizByY[ky] = append(horizByY[ky], segIdx(i))
 	}
 
 	return verts, horiz, vertStarts, vertEnds, horizByY
 }
 
 // collectBorderSegmentOps gathers non-fixed line ops as vertical or horizontal
-// border segments.
+// border segments. A counting pass runs first so both result slices are
+// allocated exactly once at their final size; append growth from zero was the
+// dominant allocation in this path (63,000 vertical segments per 500 pages).
 func collectBorderSegmentOps(ops []Op) ([]vseg, []hseg) {
-	verts := make([]vseg, 0)
-	horiz := make([]hseg, 0)
+	vertCount, horizCount := countBorderSegmentOps(ops)
 
-	for i := range ops {
-		paintOp := &ops[i]
-		if paintOp.Fixed || paintOp.Kind != OpLine {
-			continue
+	verts := make([]vseg, 0, vertCount)
+	horiz := make([]hseg, 0, horizCount)
+
+	visitLineOps(ops, func(paintOp Op) {
+		if !isSealableBorderLineOp(&paintOp) {
+			return
 		}
 
-		if paintOp.H > 2 && (paintOp.W < 1 || paintOp.W < paintOp.H*0.05) {
+		switch {
+		case isVerticalBorderSegment(&paintOp):
 			verts = append(verts, vseg{
 				x: paintOp.X, y0: paintOp.Y, y1: paintOp.Y + paintOp.H,
 				w: paintOp.Width, r: paintOp.R, g: paintOp.G, b: paintOp.B,
 			})
-
-			continue
-		}
-
-		if paintOp.W > 2 && paintOp.H < 1 {
+		case isHorizontalBorderSegment(&paintOp):
 			horiz = append(horiz, hseg{
 				x0: paintOp.X, x1: paintOp.X + paintOp.W, y: paintOp.Y,
 				w: paintOp.Width, r: paintOp.R, g: paintOp.G, b: paintOp.B,
 			})
 		}
-	}
+	})
 
 	return verts, horiz
+}
+
+// countBorderSegmentOps counts the same segment classification
+// collectBorderSegmentOps fills, so the fill pass can preallocate exactly.
+func countBorderSegmentOps(ops []Op) (int, int) {
+	vertCount, horizCount := 0, 0
+
+	visitLineOps(ops, func(paintOp Op) {
+		if !isSealableBorderLineOp(&paintOp) {
+			return
+		}
+
+		switch {
+		case isVerticalBorderSegment(&paintOp):
+			vertCount++
+		case isHorizontalBorderSegment(&paintOp):
+			horizCount++
+		}
+	})
+
+	return vertCount, horizCount
+}
+
+// isSealableBorderLineOp reports whether a line op can back a seal border
+// segment. Seals paint in raw canvas coordinates, so an op whose painted
+// geometry differs from X/Y/W/H (XformSet) is not usable as evidence: a rotated
+// chip's rails would otherwise merge with its parent's dashed border fragments
+// in one Y bucket and seal a solid full-span rule across the stage
+// (fixture-62 prop 63 `rotate:12deg`).
+func isSealableBorderLineOp(paintOp *Op) bool {
+	return !paintOp.Fixed && !paintOp.XformSet && paintOp.Kind == OpLine
+}
+
+// isVerticalBorderSegment reports a tall, narrow line op (a table rule).
+func isVerticalBorderSegment(paintOp *Op) bool {
+	return paintOp.H > 2 && (paintOp.W < 1 || paintOp.W < paintOp.H*0.05)
+}
+
+// isHorizontalBorderSegment reports a wide, flat line op (a table rule).
+func isHorizontalBorderSegment(paintOp *Op) bool {
+	return paintOp.W > 2 && paintOp.H < 1
 }
 
 // roundY bins a canvas Y into 0.5pt buckets.
 func roundY(y float64) int { return int(math.Round(y * yBucketScale)) }
 
 // clusterVerticals merges vertical segments sharing a start (byStart) or end
-// Y into clusters with the min/max x and dominant stroke.
-func clusterVerticals(vertStarts, vertEnds map[int][]vseg, byStart bool) map[int]borderCluster {
+// Y into clusters with the min/max x and dominant stroke. Every segment in one
+// bucket has the same rounded key by construction, so each bucket folds into
+// exactly one cluster.
+func clusterVerticals(verts []vseg, vertStarts, vertEnds borderSegIndex, byStart bool) map[int]borderCluster {
 	groups := vertStarts
 	if !byStart {
 		groups = vertEnds
@@ -354,23 +417,23 @@ func clusterVerticals(vertStarts, vertEnds map[int][]vseg, byStart bool) map[int
 
 	out := make(map[int]borderCluster, len(groups))
 
-	for _, group := range groups {
-		for _, val := range group {
-			keyY := val.y0
-			if !byStart {
-				keyY = val.y1
-			}
+	for bucket, group := range groups {
+		if len(group) == 0 {
+			continue
+		}
 
-			bucket := roundY(keyY)
+		first := verts[group[0]]
 
-			child, ok := out[bucket]
-			if !ok {
-				out[bucket] = borderCluster{y: keyY, minX: val.x, maxX: val.x, bw: val.w, r: val.r, g: val.g, b: val.b, n: 1}
+		child := borderCluster{
+			y: vsegKeyY(first, byStart), minX: first.x, maxX: first.x,
+			bw: first.w, r: first.r, g: first.g, b: first.b, n: 1,
+		}
 
-				continue
-			}
+		for _, idx := range group[1:] {
+			val := verts[idx]
 
 			child.n++
+
 			if val.x < child.minX {
 				child.minX = val.x
 			}
@@ -379,16 +442,37 @@ func clusterVerticals(vertStarts, vertEnds map[int][]vseg, byStart bool) map[int
 				child.maxX = val.x
 			}
 			// Prefer average y so we sit on the dominant edge.
-			child.y = (child.y*float64(child.n-1) + keyY) / float64(child.n)
-			out[bucket] = child
+			child.y = (child.y*float64(child.n-1) + vsegKeyY(val, byStart)) / float64(child.n)
 		}
+
+		out[bucket] = child
 	}
 
 	return out
 }
 
+// vsegKeyY returns the segment end used for clustering: the top when climbing
+// by start, the bottom otherwise.
+func vsegKeyY(v vseg, byStart bool) float64 {
+	if byStart {
+		return v.y0
+	}
+
+	return v.y1
+}
+
 // hCoverage reports whether horizontal segments near posY span [minX, maxX].
-func hCoverage(horizByY map[int][]hseg, posY, minX, maxX float64) (bool, float64, float64, bool) {
+func hCoverage(horiz []hseg, horizByY borderSegIndex, posY, minX, maxX float64) (bool, float64, float64, bool) {
+	return hCoverageBounded(horiz, horizByY, posY, minX, maxX, math.Inf(1))
+}
+
+// hCoverageBounded is hCoverage that ignores horizontal segments at or below
+// pageEnd when the strip end sits above pageEnd. A next-page row border within
+// eps of the split row's rails must not close the strip: the rails then end
+// open (fixture-60 prop 31 after the auto-height bottom border shift).
+func hCoverageBounded(
+	horiz []hseg, horizByY borderSegIndex, posY, minX, maxX, pageEnd float64,
+) (bool, float64, float64, bool) {
 	const eps = 2.0
 
 	var covMin, covMax float64
@@ -397,8 +481,13 @@ func hCoverage(horizByY map[int][]hseg, posY, minX, maxX float64) (bool, float64
 
 	key := roundY(posY)
 	for k := key - int(eps*yBucketScale) - 1; k <= key+int(eps*yBucketScale)+1; k++ {
-		for _, height := range horizByY[k] {
-			covMin, covMax, has = mergeCoverageSeg(height, posY, minX, maxX, eps, covMin, covMax, has)
+		for _, idx := range horizByY[k] {
+			height := &horiz[idx]
+			if posY < pageEnd-1e-9 && height.y >= pageEnd-1e-9 {
+				continue
+			}
+
+			covMin, covMax, has = mergeCoverageSeg(*height, posY, minX, maxX, eps, covMin, covMax, has)
 		}
 	}
 
@@ -442,7 +531,7 @@ func mergeCoverageSeg(
 // sealPageTopStubs seals vertical stubs that start exactly at a page top with
 // no closing horizontal rule.
 func sealPageTopStubs(
-	vertStarts map[int][]vseg,
+	verts []vseg, vertStarts borderSegIndex,
 	coverage func(y, minX, maxX float64) bool,
 	seal func(gVal, minX, maxX, borderW, red, green, blue float64),
 	maxPage int, contentH, eps float64,
@@ -450,7 +539,7 @@ func sealPageTopStubs(
 	for p := 1; p <= maxPage; p++ {
 		pageTop := float64(p) * contentH
 
-		minX, maxX, borderW, redN, green, blueN, node := pageTopStubBounds(vertStarts, pageTop, eps)
+		minX, maxX, borderW, redN, green, blueN, node := pageTopStubBounds(verts, vertStarts, pageTop, eps)
 
 		if node < sealStubMinCount {
 			continue
@@ -467,7 +556,7 @@ func sealPageTopStubs(
 // pageTopStubBounds scans vertical segments at pageTop for the min/max x and
 // dominant stroke of the stub cluster, returning how many stubs matched.
 func pageTopStubBounds(
-	vertStarts map[int][]vseg, pageTop, eps float64,
+	verts []vseg, vertStarts borderSegIndex, pageTop, eps float64,
 ) (float64, float64, float64, float64, float64, float64, int) {
 	var minX, maxX, borderW, red, green, blue float64
 
@@ -475,7 +564,8 @@ func pageTopStubBounds(
 
 	key := roundY(pageTop)
 	for k := key - int(eps*yBucketScale) - 1; k <= key+int(eps*yBucketScale)+1; k++ {
-		for _, val := range vertStarts[k] {
+		for _, idx := range vertStarts[k] {
+			val := &verts[idx]
 			if val.y0 < pageTop-eps || val.y0 > pageTop+eps {
 				continue
 			}
@@ -544,88 +634,20 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 	closePageLeadingSectionChromeWithTargets(res, contentH, stickyTargets)
 }
 
-// pageIndexedOps buckets non-fixed ops by their canvas page.
+// pageIndexedOps buckets non-fixed ops by their canvas page with the shared
+// edge bias. It is a forced fresh build into the scratch store; the live flow
+// index is deliberately untouched because callers mutate ops while iterating
+// the returned snapshot.
 func pageIndexedOps(res *Result, contentH float64) [][]int {
-	for idx := range res.Ops {
-		if res.Ops[idx].Fixed {
-			continue
-		}
-
-		if _, ok := checkedFlowPageOfY(res.Ops[idx].Y, contentH); !ok {
-			return nil
-		}
+	if res == nil {
+		return nil
 	}
 
-	maxPage := maxNonFixedOpPage(res.Ops, contentH)
-
-	counts := pageOpCounts(res.Ops, contentH, maxPage)
-
-	pageOps := make([][]int, len(counts))
-
-	for p := range counts {
-		pageOps[p] = make([]int, 0, counts[p])
+	if !buildPageIndex(res.Ops, contentH, layoutEpsilon, &res.flowScratch) {
+		return nil
 	}
 
-	fillPageOpBuckets(pageOps, res.Ops, contentH)
-
-	return pageOps
-}
-
-func maxNonFixedOpPage(ops []Op, contentH float64) int {
-	maxPage := 0
-
-	for idx := range ops {
-		if ops[idx].Fixed {
-			continue
-		}
-
-		page, ok := checkedFlowPageOfY(ops[idx].Y, contentH)
-		if !ok {
-			continue
-		}
-
-		if page > maxPage {
-			maxPage = page
-		}
-	}
-
-	return maxPage
-}
-
-func pageOpCounts(ops []Op, contentH float64, maxPage int) []int {
-	counts := make([]int, maxPage+1)
-
-	for idx := range ops {
-		if ops[idx].Fixed {
-			continue
-		}
-
-		page, ok := checkedFlowPageOfY(ops[idx].Y, contentH)
-		if !ok {
-			continue
-		}
-
-		if page <= maxPage {
-			counts[page]++
-		}
-	}
-
-	return counts
-}
-
-func fillPageOpBuckets(pageOps [][]int, ops []Op, contentH float64) {
-	for idx := range ops {
-		if ops[idx].Fixed {
-			continue
-		}
-
-		page, ok := checkedFlowPageOfY(ops[idx].Y, contentH)
-		if !ok || page >= len(pageOps) {
-			continue
-		}
-
-		pageOps[page] = append(pageOps[page], idx)
-	}
+	return res.flowScratch.pages
 }
 
 // opInPageBand reports whether the op's top edge sits within [pageTop, pageBot).
@@ -657,7 +679,7 @@ func lastInkBottom(res *Result, idxs []int, pageTop, pageBot float64) (float64, 
 			bot = paintOp.Y + height
 		case OpImage:
 			bot = paintOp.Y + paintOp.H
-		case OpFillRect, OpStrokeRect, OpLine, OpLinkURI, OpUnknown, opKindNoop:
+		case OpFillRect, OpStrokeRect, OpLine, OpGridRun, OpLinkURI, OpUnknown, opKindNoop:
 			continue
 		}
 
@@ -692,8 +714,14 @@ func stripOrphanRows(res *Result, idxs []int, pageTop, pageBot, lastInkBot float
 
 // stripOrphanRowOp zeros one row-sized fill or horizontal rule that sits
 // below the last ink. Returns whether it was stripped.
+//
+//nolint:cyclop // grid runs are an explicit no-strip arm
 func stripOrphanRowOp(paintOp *Op, lastInkBot float64) bool {
 	switch paintOp.Kind {
+	case OpGridRun:
+		// Grid runs carry verticals and shared chrome; the orphan pass does
+		// not strip them op-atomically (capTablePageBreaks owns grid seals).
+		return false
 	case OpFillRect, OpStrokeRect:
 		// Multi-page frame fragments keep a StrokeMask (open top/bottom).
 		// Zeroing their height still leaves a masked top stroke that paints as
@@ -835,7 +863,7 @@ func clipTrailingBandOp(res *Result, paintOp *Op, pageTop, pageBot, contentBot f
 		} else if isTrailingContinuationRule(res, paintOp, pageBot, contentBot) {
 			paintOp.Y = contentBot
 		}
-	case OpStrokeRect, OpText, OpImage, OpLinkURI, OpBullet, OpUnknown, opKindNoop:
+	case OpStrokeRect, OpGridRun, OpText, OpImage, OpLinkURI, OpBullet, OpUnknown, opKindNoop:
 	}
 }
 
@@ -966,6 +994,10 @@ func clipStickySectionChrome(
 // clipStickySectionChromeOp trims one sticky-section wash or side border to
 // the content bottom.
 func clipStickySectionChromeOp(paintOp *Op, target stickySectionChromeTarget, contentBot float64) {
+	if !opOwnedBy(paintOp, target.box, opOwnerSeal) {
+		return
+	}
+
 	switch paintOp.Kind {
 	case OpFillRect:
 		if target.hasBackground && sameRectFrame(paintOp, target) && sameRGB(paintOp, target.background) {
@@ -975,7 +1007,7 @@ func clipStickySectionChromeOp(paintOp *Op, target stickySectionChromeTarget, co
 		if target.sideMatches(paintOp) {
 			paintOp.H = contentBot - paintOp.Y
 		}
-	case OpStrokeRect, OpText, OpImage, OpLinkURI, OpBullet, OpUnknown, opKindNoop:
+	case OpStrokeRect, OpGridRun, OpText, OpImage, OpLinkURI, OpBullet, OpUnknown, opKindNoop:
 	}
 }
 
@@ -1102,24 +1134,30 @@ func clipSectionChromeOp(paintOp *Op, target stickySectionChromeTarget, closeY f
 		if isSectionChromeSideBorder(paintOp, target, closeY) {
 			paintOp.H = closeY - paintOp.Y
 		}
-	case OpStrokeRect, OpText, OpImage, OpLinkURI, OpBullet, OpUnknown, opKindNoop:
+	case OpStrokeRect, OpGridRun, OpText, OpImage, OpLinkURI, OpBullet, OpUnknown, opKindNoop:
 	}
 }
 
 // isSectionChromeWash reports a page-leading section background wash whose
 // bottom does not align with closeY.
 func isSectionChromeWash(paintOp *Op, target stickySectionChromeTarget, closeY float64) bool {
-	return target.hasBackground && paintOp.H > 40 && sameRectFrame(paintOp, target) &&
+	return target.hasBackground && paintOp.H > 40 && opOwnedBy(paintOp, target.box, opOwnerSeal) &&
+		sameRectFrame(paintOp, target) &&
 		sameRGB(paintOp, target.background) && !nearLayout(paintOp.Y+paintOp.H, closeY)
 }
 
 // isSectionChromeSideBorder reports a page-leading section side border whose
 // bottom does not align with closeY.
 func isSectionChromeSideBorder(paintOp *Op, target stickySectionChromeTarget, closeY float64) bool {
-	return paintOp.H > 40 && target.sideMatches(paintOp) && !nearLayout(paintOp.Y+paintOp.H, closeY)
+	return paintOp.H > 40 && opOwnedBy(paintOp, target.box, opOwnerSeal) &&
+		target.sideMatches(paintOp) && !nearLayout(paintOp.Y+paintOp.H, closeY)
 }
 
 type stickySectionChromeTarget struct {
+	// box is the section box whose chrome this target matches. opOwnedBy
+	// uses it to reject ops that only look like frame chrome (outline and
+	// shadow awareness lives in one place).
+	box               *box
 	x, y, w           float64
 	background        [3]float64
 	hasBackground     bool
@@ -1161,6 +1199,7 @@ func stickySectionChromeTargets(root *box) []stickySectionChromeTarget {
 func stickyTargetFor(parent *box) stickySectionChromeTarget {
 	sty := parent.style
 	target := stickySectionChromeTarget{ //nolint:exhaustruct // intentional zero fields
+		box:               parent,
 		x:                 parent.x,
 		y:                 parent.y,
 		w:                 parent.w,

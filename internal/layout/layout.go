@@ -18,6 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -169,6 +170,32 @@ type Result struct {
 	flowBoxPage  []int
 	flowBoxPos   []int
 
+	// flowStore, flowBoxStore and flowScratch retain the flow-index backing
+	// arrays across rebuilds. The live flow* fields are cleared on
+	// invalidation (callers detect a missing index by length) while these
+	// stores keep the capacity for the next rebuild. releaseFlowIndex clears
+	// the stores at the PDF-05 release point.
+	flowStore    flowIndexStorage
+	flowBoxStore flowIndexStorage
+	flowScratch  flowIndexStorage
+
+	// hasAvoidInside and hasAfterBreak are style-only census facts rebuilt at
+	// the top of each pagination pass. The fixpoint skips a policy walk when
+	// its fact is false.
+	hasAvoidInside bool
+	hasAfterBreak  bool
+
+	// hasStructElems records that buildStructureTree assigned structure
+	// elements. A later non-UA repaint must still clear them.
+	hasStructElems bool
+
+	// pageSnapHeight records the page content height that multicol column
+	// snapping used during Layout (Options.Height). Paint compares it with
+	// its own content height so columns cannot snap to one boundary while
+	// paint splits at another. Zero means no page-height-dependent snapping
+	// ran, so any paint height is acceptable.
+	pageSnapHeight float64
+
 	// Pages maps page index → indices into Ops of the ops painted on that
 	// page. Filled by Paint using its pagination semantics (an op goes to
 	// the page containing its top edge; ops crossing a page boundary move
@@ -178,6 +205,19 @@ type Result struct {
 	// first op landed on and its canvas rect. Filled by Paint; boxes without
 	// ops use the page of their y position.
 	Locations []ElementLocation
+
+	// MaxContentX is the right edge of fill, stroke, and image ops. Layout
+	// sets it to at least Width so convert can skip a second op walk. Zero
+	// means unknown (hand-built Result values).
+	MaxContentX float64
+	// HasIDs is set during Paint when any location node has an id attribute.
+	HasIDs bool
+	// HasFragmentLinks is set during Layout when any OpLinkURI starts with '#'.
+	HasFragmentLinks bool
+	// skipInitialBeforeAlways is set for independently painted body blocks.
+	// Those results already start a new PDF page, so page-break-before:always
+	// on the block itself would insert a blank page.
+	skipInitialBeforeAlways bool
 }
 
 // CloneResult returns an independent pagination result. Display-list image
@@ -199,6 +239,14 @@ func CloneResult(res *Result) *Result {
 	clone.flowBoxes = cloneIndexPages(res.flowBoxes)
 	clone.flowBoxPage = append([]int(nil), res.flowBoxPage...)
 	clone.flowBoxPos = append([]int(nil), res.flowBoxPos...)
+	// The retained stores are scratch capacity: a clone must not reset arrays
+	// the source still uses, so it starts with empty stores.
+	clone.flowStore.reset()
+	clone.flowBoxStore.reset()
+	clone.flowScratch.reset()
+	// cloneOps nils StructElem on every op, so the clone has no assigned
+	// structure elements even when the source did.
+	clone.hasStructElems = false
 
 	boxes := make(map[*box]*box, len(res.boxes))
 	clone.root = cloneBoxGraph(res.root, boxes)
@@ -219,10 +267,7 @@ func cloneOps(src []Op) []Op {
 	dst := make([]Op, len(src))
 	for i := range src {
 		dst[i] = src[i]
-		dst[i].Image = append([]byte(nil), src[i].Image...)
-		// Structure elements belong to the document that was painted. A clone
-		// must let its destination document build its own structure tree.
-		dst[i].StructElem = nil
+		dst[i].opExtra = cloneOpExtra(src[i].opExtra)
 	}
 
 	return dst
@@ -292,7 +337,12 @@ func (w *Workspace) Release(res *Result) {
 		return
 	}
 
-	w.ops = res.Ops[:0]
+	ops := res.Ops
+	for i := range ops {
+		ops[i] = Op{} //nolint:exhaustruct // drop extra pointers so Release can GC rare payloads
+	}
+
+	w.ops = ops[:0]
 	res.Ops = nil
 	res.root = nil
 	res.boxes = nil
@@ -302,6 +352,9 @@ func (w *Workspace) Release(res *Result) {
 	res.flowBoxes = nil
 	res.flowBoxPage = nil
 	res.flowBoxPos = nil
+	res.flowStore.reset()
+	res.flowBoxStore.reset()
+	res.flowScratch.reset()
 	res.Pages = nil
 	res.Locations = nil
 }
@@ -327,8 +380,9 @@ func (loc ElementLocation) Bounds() (float64, float64, float64, float64) {
 	return loc.X, loc.Y, loc.W, loc.H
 }
 
-// OpKind discriminates display-list operations.
-type OpKind int
+// OpKind discriminates display-list operations. uint8 keeps the hot Op
+// record packed; the enum is smaller than 256 values.
+type OpKind uint8
 
 const (
 	// OpUnknown is the zero value of OpKind. Layout never emits it; a zero
@@ -342,6 +396,10 @@ const (
 	OpImage
 	OpLinkURI
 	OpBullet
+	// OpGridRun is one table row's collapsed border grid emitted as a single
+	// display-list entry. Grid holds the ordered line segments the row used to
+	// append as individual OpLine entries; painters replay them in order.
+	OpGridRun
 )
 
 // Stroke masks are used only by rounded border display-list operations.
@@ -363,6 +421,13 @@ const (
 
 // Op is one display-list operation. Coordinates are in canvas points; for
 // OpText and OpBullet, Y is the baseline.
+//
+// Rare payloads (URI, Image, Xform, BlendMode, structure tags, text-transform)
+// live on the embedded *opExtra so the hot record is 256 bytes. Promoted
+// field names stay so readers (paint, convert, imageout, tests) keep op.URI
+// and op.Image. Writers must detachExtra before mutating those fields.
+//
+//nolint:recvcheck // paint readers take Op by value; extra writers need *Op
 type Op struct {
 	// ID is the stable logical identity of the operation. Pagination may split
 	// one operation into several fragments; fragments retain this ID so
@@ -370,84 +435,26 @@ type Op struct {
 	// a new document operation.
 	ID uint64
 
-	Kind    OpKind
 	X, Y    float64
 	W, H    float64
 	R, G, B float64 // 0..1
 	Alpha   float64
 	Width   float64 // stroke width for OpLine
-	// StrokeMask selects sides for a rounded OpStrokeRect. Zero means the
-	// complete rounded rectangle; non-zero masks are used for mixed CSS
-	// borders whose accented side must retain its corner arcs.
-	StrokeMask uint8
-	// LineInset selects inward paint geometry for mixed-width straight borders.
-	// The logical OpLine coordinates remain on the border-box edge so
-	// pagination ownership checks keep using layout geometry.
-	LineInset uint8
 
-	Text string
-	Font *pdf.Font
 	Size float64
 	// LetterSpacing is the CSS letter-spacing value in points for text paint.
 	LetterSpacing float64
-	// TextTransform is applied when the text operation is painted.
-	TextTransform string
-	Bold          bool
-	NoFakeBold    bool
-	FontFeatures  string
-
-	URI string
-
-	Image  []byte // PNG or JPEG bytes
-	ImgW   int
-	ImgH   int
-	IsJPEG bool
-	Alt    string // Alt text for Figure elements under PDF/UA-1
-
-	// IsBackground marks background/border images that belong to the chrome layer.
-	IsBackground bool
-
-	// Fixed marks ops from position:fixed boxes; Paint stamps them on every
-	// page at viewport-relative coordinates.
-	Fixed bool
-
-	// Pinned keeps canvas Y stable under later index-suffix flow shifts
-	// (repeated thead clones appended after document ops). Unlike Fixed,
-	// pinned ops paint only on their natural page.
-	Pinned bool
-
-	// StickyID links display-list ops to a position:sticky box after parent
-	// prependChrome shifts op indices (0 = not sticky).
-	StickyID int
-
-	// ZIndex paints later (higher) above earlier ops when non-zero or set.
-	ZIndex    int
-	ZIndexSet bool
-
-	// Positioned marks operations emitted by an absolute/fixed subtree. Within
-	// the same z-index band, positioned descendants paint above in-flow text,
-	// while their own backgrounds remain below their own content.
-	Positioned bool
-
-	// RotateDeg rotates the glyph around its baseline origin (PDF text matrix).
-	// Independent of CSS transform CTM (which wraps the whole op via Xform).
-	RotateDeg float64
 	// InkDescent is the glyph descent below the baseline. H remains the line
 	// box height; pagination uses this narrower metric for generated text so a
 	// line is not moved merely because its leading crosses a page boundary.
 	InkDescent float64
 
-	// Xform is a baked canvas-space CSS 2D transform (identity if unset).
-	// Applied at paint via PDF cm (see pdfCTMFromCSS). Sibling flow unaffected.
-	Xform    Matrix2D
-	XformSet bool
+	Text string
+	Font *pdf.Font
+	// Grid holds the line segments of an OpGridRun. Nil for every other kind.
+	Grid *GridRun
+	*opExtra
 
-	// PaintOpacity is element opacity (CSS opacity / filter:opacity), 0..1.
-	// 0 or unset (≥1) means fully opaque. Nested opacities are multiplied.
-	PaintOpacity float64
-	// BlendMode is the CSS compositing mode for this display-list operation.
-	// Empty and normal both mean source-over.
-	BlendMode string
 	// Radius is the uniform border radius for rounded fill/stroke rectangles.
 	// RadiusY is the vertical radius when corners are elliptical; 0 means ry=rx.
 	Radius                                                                 float64
@@ -455,8 +462,44 @@ type Op struct {
 	RadiusY                                                                float64
 	RadiusTopLeftY, RadiusTopRightY, RadiusBottomRightY, RadiusBottomLeftY float64
 
-	// StructElem is the PDF/UA-1 logical structure element associated with this op.
-	StructElem *pdf.StructElem
+	// StickyID links display-list ops to a position:sticky box after parent
+	// prependChrome shifts op indices (0 = not sticky).
+	StickyID int
+	// ZIndex paints later (higher) above earlier ops when non-zero or set.
+	ZIndex int
+	// RotateDeg rotates the glyph around its baseline origin (PDF text matrix).
+	// Independent of CSS transform CTM (which wraps the whole op via Xform).
+	RotateDeg float32
+
+	Kind OpKind
+	// StrokeMask selects sides for a rounded OpStrokeRect. Zero means the
+	// complete rounded rectangle; non-zero masks are used for mixed CSS
+	// borders whose accented side must retain its corner arcs.
+	StrokeMask uint8
+	// LineInset selects inward paint geometry for mixed-width straight borders.
+	// The logical OpLine coordinates remain on the border-box edge so
+	// pagination ownership checks keep using layout geometry.
+	LineInset  uint8
+	Bold       bool
+	NoFakeBold bool
+	IsJPEG     bool
+	// IsBackground marks background/border images that belong to the chrome layer.
+	IsBackground bool
+	// Fixed marks ops from position:fixed boxes; Paint stamps them on every
+	// page at viewport-relative coordinates.
+	Fixed bool
+	// Pinned keeps canvas Y stable under later index-suffix flow shifts
+	// (repeated thead clones appended after document ops). Unlike Fixed,
+	// pinned ops paint only on their natural page.
+	Pinned bool
+	// ZIndexSet marks an explicitly assigned ZIndex (including zero).
+	ZIndexSet bool
+	// Positioned marks operations emitted by an absolute/fixed subtree. Within
+	// the same z-index band, positioned descendants paint above in-flow text,
+	// while their own backgrounds remain below their own content.
+	Positioned bool
+	// XformSet marks a baked Xform; identity matrices stay unset.
+	XformSet bool
 }
 
 // PaintLineGeometry returns the line geometry after applying mixed-border
@@ -512,19 +555,29 @@ type engine struct {
 	faces    *pdf.FaceSet
 	registry *pdf.Registry
 	// styles holds immutable resolved styles per node (from resolveStylesCtx).
-	// Transient layout sizes use styleOverrides; callers use stylePtr for
-	// shared *ResolvedStyle without a second copy.
-	styles         map[*html.Node]*ResolvedStyle
-	styleOverrides []styleOverride
-	ops            []Op
-	noEmit         bool // measurement mode: compute geometry without emitting ops
-	height         float64
-	scale          float64 // zoom factor applied to style lengths (>= 1)
-	zIndex         int
-	zIndexSet      bool
-	positioned     bool
-	blendMode      string
-	stickySeq      int // monotonically increasing sticky box IDs (for Op.StickyID)
+	// Transient layout sizes use styleOverrides and engine-generated anonymous
+	// nodes use syntheticStyles; callers use stylePtr for shared
+	// *ResolvedStyle without a second copy.
+	styles          map[*html.Node]*ResolvedStyle
+	syntheticStyles map[*html.Node]*ResolvedStyle
+	styleOverrides  []styleOverride
+	ops             []Op
+	gridScratch     []GridSeg // reusable row-grid collector storage
+	noEmit          bool      // measurement mode: compute geometry without emitting ops
+	height          float64
+	scale           float64 // zoom factor applied to style lengths (>= 1)
+	zIndex          int
+	zIndexSet       bool
+	positioned      bool
+	blendMode       string
+	// blendGroup is the CSS element group that owns newly emitted ops
+	// (mix-blend-mode or isolation: isolate). nil means page-level paint.
+	// blendGroupOwner is the style that created the innermost group, so the
+	// same element's inline runs are not wrapped in a second group.
+	blendGroup      *BlendGroup
+	blendGroupOwner *ResolvedStyle
+	nextGroupID     int
+	stickySeq       int // monotonically increasing sticky box IDs (for Op.StickyID)
 	// transformCBDepth counts ancestors with transform≠none; fixed→absolute CB.
 	transformCBDepth int
 	// imgMaxW > 0 clamps replaced <img> boxes to this containing-block width
@@ -570,6 +623,11 @@ type engine struct {
 	// needsXformStamp is set when any built box has transform≠none or
 	// opacity<1 so stampBoxTransforms can skip the full tree walk.
 	needsXformStamp bool
+	// pageSnapHeight records the finite Options.Height that multicol column
+	// snapping used (0 when no multicol page-height snapping ran). Paint
+	// rejects a mismatch instead of splitting ops at a boundary the layout
+	// never snapped to.
+	pageSnapHeight float64
 }
 
 // styleOverride temporarily substitutes one node's resolved style while that
@@ -642,6 +700,12 @@ func (e *engine) lookupFaceFor(sty *ResolvedStyle) *pdf.Font {
 		return e.font
 	}
 
+	return resolveFontVariants(sty, e.lookupBaseFaceFor(sty))
+}
+
+// lookupBaseFaceFor resolves the CSS family/weight/italic face without the
+// font-variation family consumer.
+func (e *engine) lookupBaseFaceFor(sty *ResolvedStyle) *pdf.Font {
 	if e.registry != nil {
 		if f := e.registry.Lookup(sty.FontFamily, sty.FontWeight, sty.FontItalic); f != nil {
 			return f
@@ -659,6 +723,61 @@ func (e *engine) lookupFaceFor(sty *ResolvedStyle) *pdf.Font {
 	}
 
 	return e.font
+}
+
+// fontVariantCapability records the tables the CSS font variation family
+// needs from a resolved face.
+type fontVariantCapability struct {
+	variationAxes bool // fvar present: variable font
+	colorPalette  bool // COLR and CPAL present: color-palette font
+}
+
+// resolveFontVariants is the face-resolution consumer for font-optical-sizing,
+// font-variation-settings, and font-palette. It reads the three fields and the
+// resolved face's OpenType tables, then returns the face the writer will use.
+//
+// Static faces (every bundled Liberation and DejaVu face) have no fvar and no
+// COLR/CPAL; CSS makes all three properties no-ops there, so returning the
+// default face is spec-correct.
+//
+// A registry face loaded with --font-path can expose fvar and/or COLR+CPAL.
+// This writer cannot apply either: pdf.Font embeds default-instance glyf
+// outlines and has no CPAL/COLR painting path, and go-text v0.3.4 variable
+// instancing (font.Face.SetVariations) only affects the shaping/raster face,
+// not the embedded outlines. Such a face still resolves to its default
+// instance. That is a known gap, recorded rather than faked by shaping with
+// variation coordinates the PDF would not embed.
+func resolveFontVariants(sty *ResolvedStyle, face *pdf.Font) *pdf.Font {
+	if sty == nil || face == nil {
+		return face
+	}
+
+	wantsAxes := sty.FontVariationSettings != fontVariantNormal || sty.FontOpticalSizing == fontOpticalAuto
+	wantsPalette := sty.FontPalette != fontVariantNormal
+
+	if !wantsAxes && !wantsPalette {
+		return face
+	}
+
+	capability := faceFontVariantCapability(face)
+	if (wantsAxes && !capability.variationAxes) || (wantsPalette && !capability.colorPalette) {
+		return face
+	}
+
+	return face
+}
+
+// faceFontVariantCapability probes the resolved face for variation and palette
+// tables. Both are false for the static bundled faces.
+func faceFontVariantCapability(face *pdf.Font) fontVariantCapability {
+	if face == nil {
+		return fontVariantCapability{} //nolint:exhaustruct // zero value means neither capability
+	}
+
+	return fontVariantCapability{
+		variationAxes: face.HasVariationAxes(),
+		colorPalette:  face.HasColorPalette(),
+	}
 }
 
 // faceForRune picks the first CSS font-family face (then defaults) that has a
@@ -835,12 +954,18 @@ func (e *engine) add(paintOp Op) {
 	}
 
 	if !e.noEmit {
+		paintOp.bindEmptyExtra()
 		paintOp.ZIndex = e.zIndex
 		paintOp.ZIndexSet = e.zIndexSet
 		paintOp.Positioned = e.positioned
 
-		if paintOp.BlendMode == "" || paintOp.BlendMode == blendNormal {
-			paintOp.BlendMode = e.blendMode
+		if e.blendGroup != nil {
+			// Group members carry the group pointer, not the inherited blend
+			// mode: the painter composites the buffered group once instead of
+			// blending every operation separately.
+			paintOp.setBlendGroup(e.blendGroup)
+		} else if paintOp.BlendMode == "" || paintOp.BlendMode == blendNormal {
+			paintOp.setBlendMode(e.blendMode)
 		}
 
 		e.ops = append(e.ops, paintOp)
@@ -869,8 +994,33 @@ func (e *engine) checkContext() bool {
 	return false
 }
 
-func (e *engine) pushZ(style ResolvedStyle) (int, bool, bool, string) {
-	prevZ, prevSet, prevPositioned, prevBlend := e.zIndex, e.zIndexSet, e.positioned, e.blendMode
+// blendScope captures the state pushZ overrides for one element so popZ can
+// restore it and close the element's group.
+type blendScope struct {
+	prevZ          int
+	prevZSet       bool
+	prevPositioned bool
+	prevBlendMode  string
+	prevGroup      *BlendGroup
+	prevGroupOwner *ResolvedStyle
+	// beginMark is the op index of this element's begin marker, -1 when the
+	// element creates no group.
+	beginMark int
+}
+
+// pushZ enters one element's stacking and compositing scope, emitting the
+// group begin marker when mix-blend-mode or isolation creates a group. owner
+// is the resolved style pointer that identifies the element.
+func (e *engine) pushZ(style ResolvedStyle, owner *ResolvedStyle) blendScope {
+	prev := blendScope{
+		prevZ:          e.zIndex,
+		prevZSet:       e.zIndexSet,
+		prevPositioned: e.positioned,
+		prevBlendMode:  e.blendMode,
+		prevGroup:      e.blendGroup,
+		prevGroupOwner: e.blendGroupOwner,
+		beginMark:      -1,
+	}
 	createsBlendContext := style.MixBlendMode != blendNormal || style.Isolation == "isolate"
 
 	if style.Position == positionAbsolute || style.Position == positionFixed {
@@ -878,9 +1028,13 @@ func (e *engine) pushZ(style ResolvedStyle) (int, bool, bool, string) {
 	}
 
 	e.enterStackingContext(style, createsBlendContext)
-	e.enterBlendIsolation(style)
+	e.enterBlendIsolation(style, owner)
 
-	return prevZ, prevSet, prevPositioned, prevBlend
+	if e.blendGroup != prev.prevGroup {
+		prev.beginMark = e.addGroupMark(e.blendGroup, groupMarkBegin)
+	}
+
+	return prev
 }
 
 // enterStackingContext applies CSS stacking-context creation: an explicit
@@ -897,24 +1051,102 @@ func (e *engine) enterStackingContext(style ResolvedStyle, createsBlendContext b
 	}
 }
 
-// enterBlendIsolation applies the transform stamp, the isolation reset, and
-// the blend-mode override for the current stacking context.
-func (e *engine) enterBlendIsolation(style ResolvedStyle) {
+// enterBlendIsolation applies the transform stamp and enters the element's
+// blend group. An HTML element that blends, or that isolates, is an isolated
+// group per CSS Compositing 3.2, so the group starts on a transparent
+// backdrop; descendants inherit the group membership instead of the mode.
+func (e *engine) enterBlendIsolation(style ResolvedStyle, owner *ResolvedStyle) {
 	if style.HasTransform || style.Opacity < 1 {
 		e.needsXformStamp = true
 	}
+
+	// normalizeBlendMode accepts the CSS vocabulary; the style apply arm
+	// already normalized MixBlendMode, so only "normal"/empty skip.
+	mode := ""
+	if style.MixBlendMode != "" && style.MixBlendMode != blendNormal {
+		mode = style.MixBlendMode
+	}
+
+	if mode == "" && style.Isolation != "isolate" {
+		return
+	}
+
+	e.nextGroupID++
+	e.blendGroup = &BlendGroup{
+		ID:      e.nextGroupID,
+		Mode:    mode,
+		Isolate: true,
+		Parent:  e.blendGroup,
+	}
+	e.blendGroupOwner = owner
 
 	if style.Isolation == "isolate" {
 		e.blendMode = ""
 	}
 
-	if style.MixBlendMode != blendNormal {
-		e.blendMode = style.MixBlendMode
+	if mode != "" {
+		e.blendMode = mode
 	}
 }
 
-func (e *engine) popZ(prevZ int, prevSet bool, prevPositioned bool, prevBlend string) {
-	e.zIndex, e.zIndexSet, e.positioned, e.blendMode = prevZ, prevSet, prevPositioned, prevBlend
+// addGroupMark appends a begin/end boundary op for group and returns its op
+// index, or -1 when emission is suppressed.
+func (e *engine) addGroupMark(group *BlendGroup, mark uint8) int {
+	if group == nil || e.checkContext() || e.noEmit {
+		return -1
+	}
+
+	e.nextOpID++
+
+	markOp := Op{ //nolint:exhaustruct // marker ops carry only identity and scope
+		ID:         e.nextOpID,
+		Kind:       OpUnknown,
+		ZIndex:     e.zIndex,
+		ZIndexSet:  e.zIndexSet,
+		Positioned: e.positioned,
+	}
+	markOp.setGroupMark(group, mark)
+	e.ops = append(e.ops, markOp)
+
+	return len(e.ops) - 1
+}
+
+// patchGroupMark stamps the owning element's geometry onto a boundary marker.
+// Flow scans (table sliver repair, row tops, page buckets) read op Y, so a
+// zero-height marker at the canvas origin would move unrelated boxes.
+func (e *engine) patchGroupMark(idx int, posX, posY, width, height float64) {
+	if idx < 0 || idx >= len(e.ops) {
+		return
+	}
+
+	e.ops[idx].X = posX
+	e.ops[idx].Y = posY
+	e.ops[idx].W = width
+	e.ops[idx].H = height
+}
+
+// popZ restores the scope pushZ saved. When the element created a group, the
+// end marker is emitted here so the markers stay balanced even when the
+// subtree build emitted no paint operations.
+func (e *engine) popZ(scope blendScope, boxNode *box) {
+	if scope.beginMark >= 0 {
+		if boxNode != nil {
+			e.patchGroupMark(scope.beginMark, boxNode.x, boxNode.y, boxNode.w, boxNode.height)
+		}
+
+		endMark := e.addGroupMark(e.blendGroup, groupMarkEnd)
+
+		if boxNode != nil {
+			e.patchGroupMark(endMark, boxNode.x, boxNode.y, boxNode.w, boxNode.height)
+		}
+	}
+
+	e.zIndex = scope.prevZ
+	e.zIndexSet = scope.prevZSet
+	e.positioned = scope.prevPositioned
+	e.blendMode = scope.prevBlendMode
+	e.blendGroup = scope.prevGroup
+	e.blendGroupOwner = scope.prevGroupOwner
 }
 
 // Layout renders the document into a display list.
@@ -1028,11 +1260,12 @@ func finalizeResult(eng *engine, root *html.Node, opts Options) (*Result, error)
 	flattenBoxes(boxNode, &boxes)
 
 	res := &Result{ //nolint:exhaustruct // intentional zero fields
-		Ops:    eng.ops,
-		Width:  opts.Width,
-		Height: opts.Height,
-		root:   boxNode,
-		boxes:  boxes,
+		Ops:            eng.ops,
+		Width:          opts.Width,
+		Height:         opts.Height,
+		pageSnapHeight: eng.pageSnapHeight,
+		root:           boxNode,
+		boxes:          boxes,
 	}
 	if boxNode != nil {
 		res.Height = boxNode.y + boxNode.height
@@ -1048,7 +1281,34 @@ func finalizeResult(eng *engine, root *html.Node, opts Options) (*Result, error)
 		stampBoxTransforms(boxNode, IdentityMatrix(), res.Ops)
 	}
 
+	res.MaxContentX, res.HasFragmentLinks = censusOps(res.Ops, opts.Width)
+
 	return res, nil
+}
+
+// censusOps records the right edge of fill/stroke/image ops and whether any
+// link URI is a same-document fragment. Width is the floor so MaxContentX is
+// never zero after a real Layout (zero stays the hand-built Result signal).
+func censusOps(ops []Op, width float64) (float64, bool) {
+	maxX := width
+	hasFrag := false
+
+	for idx := range ops {
+		switch ops[idx].Kind {
+		case OpFillRect, OpStrokeRect, OpImage:
+			if ext := ops[idx].X + ops[idx].W; ext > maxX {
+				maxX = ext
+			}
+		case OpLinkURI:
+			if !hasFrag && strings.HasPrefix(ops[idx].URI, "#") {
+				hasFrag = true
+			}
+		case OpLine, OpGridRun, OpText, OpBullet, OpUnknown, opKindNoop:
+			continue
+		}
+	}
+
+	return maxX, hasFrag
 }
 
 // resolveStylesForLayout runs the cascade, re-cascading once when @container
@@ -1122,19 +1382,40 @@ func sameSizeContainers(a, b map[*html.Node]sizeContainer) bool {
 }
 
 func (e *engine) stylePtr(node *html.Node) *ResolvedStyle {
-	for idx := len(e.styleOverrides) - 1; idx >= 0; idx-- {
-		override := e.styleOverrides[idx]
+	for _, override := range slices.Backward(e.styleOverrides) {
 		if override.node == node {
 			return override.style
 		}
 	}
 
-	if p := e.styles[node]; p != nil {
+	if p := e.syntheticStyles[node]; p != nil {
+		return p
+	}
+
+	styles := e.styles
+	if p := styles[node]; p != nil {
 		return p
 	}
 
 	// Missing node (should not happen for walked trees): stable empty style.
 	return &zeroResolvedStyle
+}
+
+// hasStyle reports whether node has a resolved, overridden, or synthetic
+// style. stylePtr returns the shared zero style when it does not.
+func (e *engine) hasStyle(node *html.Node) bool {
+	return e.stylePtr(node) != &zeroResolvedStyle
+}
+
+// setSyntheticStyle records the used style of an engine-generated anonymous
+// node (flex/multicol item wrappers). Synthetic styles live beside the
+// immutable cascade map so every reader observes them through stylePtr.
+func (e *engine) setSyntheticStyle(node *html.Node, style *ResolvedStyle) {
+	if e.syntheticStyles == nil {
+		e.syntheticStyles = make(map[*html.Node]*ResolvedStyle)
+	}
+
+	e.syntheticStyles[node] = style
 }
 
 // styleVal returns a by-value ResolvedStyle for APIs that still take values.
@@ -1152,13 +1433,18 @@ func (s *ResolvedStyle) HorizChrome() float64 {
 	return s.PaddingLeft + s.PaddingRight + s.BorderLeft.Width + s.BorderRight.Width
 }
 
-// VertChrome returns unscaled vertical padding plus border width.
-func (s *ResolvedStyle) VertChrome() float64 {
-	if s == nil {
-		return 0
-	}
+// horizontalChrome returns the scaled horizontal padding and border width for
+// sizing helpers.
+func (s *ResolvedStyle) horizontalChrome(eng *engine) float64 {
+	return eng.scalePt(s.PaddingLeft) + eng.scalePt(s.PaddingRight) +
+		eng.scalePt(s.BorderLeft.Width) + eng.scalePt(s.BorderRight.Width)
+}
 
-	return s.PaddingTop + s.PaddingBottom + s.BorderTop.Width + s.BorderBottom.Width
+// verticalChrome returns the scaled vertical padding and border width for
+// sizing helpers.
+func (s *ResolvedStyle) verticalChrome(eng *engine) float64 {
+	return eng.scalePt(s.PaddingTop) + eng.scalePt(s.PaddingBottom) +
+		eng.scalePt(s.BorderTop.Width) + eng.scalePt(s.BorderBottom.Width)
 }
 
 // buildWithStyle builds node with an engine-local style override. The override
@@ -1201,11 +1487,23 @@ func estimateOpCapacity(root *html.Node) int {
 		return 0
 	}
 
-	nodes := 0
+	nodes, cells := 0, 0
 
-	root.Walk(func(*html.Node) { nodes++ })
+	root.Walk(func(node *html.Node) {
+		nodes++
 
-	capacity := nodes * three / two
+		if node.Type == html.ElementNode && (node.Name == "td" || node.Name == "th") {
+			cells++
+		}
+	})
+
+	// Collapsed table grids batch a row's border lines into one OpGridRun, so
+	// the old 3/2 ops-per-node bound over-reserved by about two entries per
+	// cell (the grid lines a cell used to contribute). Subtract that bound;
+	// append growth still covers documents that emit more than the estimate.
+	const gridLinesPerCell = 2
+
+	capacity := nodes*three/two - gridLinesPerCell*cells
 	if capacity < minOpCapacity {
 		capacity = minOpCapacity
 	}
@@ -1253,7 +1551,12 @@ type box struct {
 	style     *ResolvedStyle
 	x, y      float64 // border-box top-left
 	w, height float64 // border-box size
-	kind      boxKind
+	// outlineInflate is the scaled distance from the border box to the
+	// outline stroke centerline (0 when no outline paints). Stamped where
+	// outline ops are emitted so paint-time ownership checks need no engine
+	// scale (opOwnedBy).
+	outlineInflate float64
+	kind           boxKind
 	// packed flags — keep together to avoid padding.
 	paginationShifted bool // row was moved by a table pagination fixpoint
 	hasInk            bool // cell has non-whitespace ink (see nodeHasTableInk)
@@ -1315,8 +1618,7 @@ func (e *engine) build(node *html.Node, availW, posX, posY float64) *box {
 		return nil
 	}
 
-	prevZ, prevSet, prevPositioned, prevBlend := e.pushZ(sty)
-	defer e.popZ(prevZ, prevSet, prevPositioned, prevBlend)
+	scope := e.pushZ(sty, e.stylePtr(node))
 	// Ancestor transforms only (own transform does not change this box's CB).
 	underXformCB := e.transformCBDepth > 0
 	start := len(e.ops)
@@ -1327,6 +1629,8 @@ func (e *engine) build(node *html.Node, availW, posX, posY float64) *box {
 		boxNode.opStart, boxNode.opEnd = start, len(e.ops)-1
 		e.finishBuiltBox(boxNode, sty, underXformCB)
 	}
+
+	e.popZ(scope, boxNode)
 
 	return boxNode
 }
@@ -1442,7 +1746,7 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 	boxNode := &box{ //nolint:exhaustruct // intentional zero fields
 		node: node, style: e.stylePtr(node), kind: boxKindBlock, x: posX, y: posY,
 	}
-	boxStyle := boxModelStyleOf(&style)
+	boxStyle := &style
 	w, margL := resolveBlockWidth(e, boxStyle, availW)
 	boxNode.w = w
 
@@ -1454,7 +1758,7 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 	// bg → borders → children (otherwise fills cover text).
 	contentStart := len(e.ops)
 
-	curY := e.scalePt(boxStyle.paddingTop) + e.scalePt(borderLayoutWidth(boxStyle, boxStyle.borderTop))
+	curY := e.scalePt(boxStyle.PaddingTop) + e.scalePt(borderLayoutWidth(boxStyle, boxStyle.BorderTop))
 	enclose := e.pushBFCFloats(style, contentX, contentW)
 	widget := node.Name == htmlMeter || node.Name == "progress"
 	chkWidget := isInputCheckbox(node)
@@ -1482,12 +1786,6 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 	}
 
 	e.popBFCFloats(enclose)
-	// padding-bottom is inside the border box (space above border-bottom /
-	// letterhead rules — fixture-07/16).
-	curY += e.scalePt(boxStyle.paddingBottom)
-	if boxStyle.borderImageSource != "" && boxStyle.height < 0 && boxStyle.heightPercent < 0 {
-		curY += e.scalePt(borderLayoutWidth(boxStyle, boxStyle.borderBottom))
-	}
 
 	if isVerticalWritingMode(style.WritingMode) {
 		curY = e.verticalWritingHeight(contentStart, curY, style)
@@ -1498,7 +1796,11 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 		e.emitListMarker(node, style, contentX, boxNode.firstBaseline)
 	}
 
-	boxNode.height = e.applyHeightConstraints(style, curY)
+	// Bottom padding and border are inside the border box (space above the
+	// bottom border / letterhead rules - fixture-07/16). The shared resolver
+	// adds them once for every formatting context and then applies
+	// height/min-height/max-height.
+	boxNode.height = e.resolveBorderBoxHeight(style, curY)
 	e.paintWidgetControl(node, style, boxNode, widget, chkWidget, posY)
 
 	e.paintPositionedPseudo(node, style, boxNode, pseudoBefore)
@@ -1546,7 +1848,7 @@ const maxTextareaRows = 30
 // has already added top padding/border to curY and will add bottom padding
 // after this call.
 func (e *engine) textareaAutoContentBottom(
-	style ResolvedStyle, node *html.Node, boxStyle boxModelStyle, curY float64,
+	style ResolvedStyle, node *html.Node, boxStyle *ResolvedStyle, curY float64,
 ) float64 {
 	rowsStr := strings.TrimSpace(node.Attribute("rows"))
 	rows := 2
@@ -1566,7 +1868,7 @@ func (e *engine) textareaAutoContentBottom(
 
 	scaledLineH := e.scalePt(lineH)
 	contentH := scaledLineH * float64(rows)
-	topChrome := e.scalePt(boxStyle.paddingTop) + e.scalePt(borderLayoutWidth(boxStyle, boxStyle.borderTop))
+	topChrome := e.scalePt(boxStyle.PaddingTop) + e.scalePt(borderLayoutWidth(boxStyle, boxStyle.BorderTop))
 	desired := topChrome + contentH
 
 	if curY < desired {
@@ -1599,7 +1901,7 @@ func (e *engine) paintPositionedPseudo( //nolint:cyclop
 		return
 	}
 
-	contentX, contentW := e.contentBox(boxNode.x, boxNode.w, boxModelStyleOf(&host))
+	contentX, contentW := e.contentBox(boxNode.x, boxNode.w, &host)
 	pseudoX := contentX + e.scalePt(style.MarginLeft)
 
 	if !style.LeftAuto {
@@ -1631,7 +1933,7 @@ func (e *engine) paintPositionedPseudo( //nolint:cyclop
 		baseline = pseudoY
 	}
 
-	prevZ, prevSet, prevPositioned, prevBlend := e.pushZ(*style)
+	scope := e.pushZ(*style, style)
 	e.add(Op{ //nolint:exhaustruct // generated pseudo text has no DOM box
 		Kind: OpText, X: pseudoX, Y: baseline, W: e.measureTextFace(text, style),
 		H: style.LineHeight * e.scale, Text: text, Font: face, Size: size,
@@ -1639,7 +1941,7 @@ func (e *engine) paintPositionedPseudo( //nolint:cyclop
 		R:          style.Color[0], G: style.Color[1], B: style.Color[2],
 		Bold: style.FontWeight >= fontWeightBoldValue,
 	})
-	e.popZ(prevZ, prevSet, prevPositioned, prevBlend)
+	e.popZ(scope, nil)
 }
 
 func (e *engine) verticalWritingHeight(contentStart int, current float64, style ResolvedStyle) float64 {
@@ -1690,7 +1992,7 @@ func (e *engine) paintValueWidget(node *html.Node, style ResolvedStyle, leftX, t
 		ratio = 1
 	}
 
-	contentX, contentW := e.contentBox(leftX, width, boxModelStyleOf(&style))
+	contentX, contentW := e.contentBox(leftX, width, &style)
 	contentY := topY + e.scalePt(style.BorderTop.Width) + e.scalePt(style.PaddingTop)
 
 	contentH := height - e.scalePt(style.BorderTop.Width+style.BorderBottom.Width) -
@@ -1780,13 +2082,13 @@ func blockFlowChildren(node *html.Node, nativeControl bool) []*html.Node {
 // current content height (extracted so buildBlock stays readable).
 // cbH is the containing-block height for % heights: <0 means indefinite (auto).
 func (e *engine) applyHeightConstraints(style ResolvedStyle, curY float64) float64 {
-	return e.applyHeightConstraintsWithCB(boxModelStyleOf(&style), curY, -1)
+	return e.applyHeightConstraintsWithCB(&style, curY, -1)
 }
 
-func (e *engine) clampBlockMaxHeight(style boxModelStyle, curY, cbH, vChrome float64) float64 {
-	if style.maxHeightPercent >= 0 && cbH >= 0 && cbH < 1e12 {
-		maxH := cbH * style.maxHeightPercent / oneHundred
-		if style.boxSizing != borderBox {
+func (e *engine) clampBlockMaxHeight(style *ResolvedStyle, curY, cbH, vChrome float64) float64 {
+	if style.MaxHeightPercent >= 0 && cbH >= 0 && cbH < 1e12 {
+		maxH := cbH * style.MaxHeightPercent / oneHundred
+		if style.BoxSizing != borderBox {
 			maxH += vChrome
 		}
 
@@ -1797,9 +2099,9 @@ func (e *engine) clampBlockMaxHeight(style boxModelStyle, curY, cbH, vChrome flo
 		return curY
 	}
 
-	if style.maxHeight >= 0 {
-		maxHeight := e.scalePt(style.maxHeight)
-		if style.boxSizing != borderBox {
+	if style.MaxHeight >= 0 {
+		maxHeight := e.scalePt(style.MaxHeight)
+		if style.BoxSizing != borderBox {
 			maxHeight += vChrome
 		}
 
@@ -1811,10 +2113,10 @@ func (e *engine) clampBlockMaxHeight(style boxModelStyle, curY, cbH, vChrome flo
 	return curY
 }
 
-func (e *engine) calcMinHeight(style boxModelStyle, cbH, vChrome float64) float64 {
-	if style.minHeightPercent >= 0 && cbH >= 0 && cbH < 1e12 {
-		minH := cbH * style.minHeightPercent / oneHundred
-		if style.boxSizing != borderBox {
+func (e *engine) calcMinHeight(style *ResolvedStyle, cbH, vChrome float64) float64 {
+	if style.MinHeightPercent >= 0 && cbH >= 0 && cbH < 1e12 {
+		minH := cbH * style.MinHeightPercent / oneHundred
+		if style.BoxSizing != borderBox {
 			minH += vChrome
 		}
 
@@ -1825,8 +2127,8 @@ func (e *engine) calcMinHeight(style boxModelStyle, cbH, vChrome float64) float6
 		return minH
 	}
 
-	minHeight := e.scalePt(style.minHeight)
-	if style.boxSizing != borderBox {
+	minHeight := e.scalePt(style.MinHeight)
+	if style.BoxSizing != borderBox {
 		minHeight += vChrome
 	}
 
@@ -1837,7 +2139,7 @@ func (e *engine) calcMinHeight(style boxModelStyle, cbH, vChrome float64) float6
 	return minHeight
 }
 
-func (e *engine) clampBlockMinHeight(style boxModelStyle, curY, cbH, vChrome float64) float64 {
+func (e *engine) clampBlockMinHeight(style *ResolvedStyle, curY, cbH, vChrome float64) float64 {
 	minH := e.calcMinHeight(style, cbH, vChrome)
 	if minH > 0 && curY < minH {
 		return minH
@@ -1846,8 +2148,29 @@ func (e *engine) clampBlockMinHeight(style boxModelStyle, curY, cbH, vChrome flo
 	return curY
 }
 
+// borderBoxBottom adds a box's auto bottom chrome (padding-bottom and
+// border-bottom) to a content-flow bottom. Every formatting context calls it
+// so an auto-height bordered box is the same height whether it is a block,
+// flex container, multicol container, grid, table, or measured cell. The
+// border-image device width is used when the border paints as an image.
+func (e *engine) borderBoxBottom(style ResolvedStyle, contentBottom float64) float64 {
+	boxStyle := &style
+	contentBottom += e.scalePt(boxStyle.PaddingBottom)
+	contentBottom += e.scalePt(borderLayoutWidth(boxStyle, boxStyle.BorderBottom))
+
+	return contentBottom
+}
+
+// resolveBorderBoxHeight is the used border-box height resolver: bottom
+// chrome, then height/min-height/max-height. A definite height floors the
+// content height instead of capping it, so CSS overflow keeps taller content
+// visible.
+func (e *engine) resolveBorderBoxHeight(style ResolvedStyle, contentBottom float64) float64 {
+	return e.applyHeightConstraints(style, e.borderBoxBottom(style, contentBottom))
+}
+
 // applyHeightConstraintsWithCB is the definite-CB form for min/max percent.
-func (e *engine) applyHeightConstraintsWithCB(style boxModelStyle, curY float64, cbH float64) float64 {
+func (e *engine) applyHeightConstraintsWithCB(style *ResolvedStyle, curY float64, cbH float64) float64 {
 	if h, ok := resolveUsedHeight(style, cbH, e); ok {
 		if curY < h {
 			curY = h
@@ -1855,7 +2178,7 @@ func (e *engine) applyHeightConstraintsWithCB(style boxModelStyle, curY float64,
 	}
 
 	vChrome := 0.0
-	if style.boxSizing != borderBox {
+	if style.BoxSizing != borderBox {
 		vChrome = style.verticalChrome(e)
 	}
 
@@ -1866,9 +2189,9 @@ func (e *engine) applyHeightConstraintsWithCB(style boxModelStyle, curY float64,
 
 // resolveBlockWidth computes a block's used border-box width and the scaled
 // left margin. Horizontal auto margins center (or push) a definite-width box.
-func resolveBlockWidth(eng *engine, style boxModelStyle, availW float64) (float64, float64) {
-	margR := eng.scalePt(style.marginRight)
-	margL := eng.scalePt(style.marginLeft)
+func resolveBlockWidth(eng *engine, style *ResolvedStyle, availW float64) (float64, float64) {
+	margR := eng.scalePt(style.MarginRight)
+	margL := eng.scalePt(style.MarginLeft)
 	// Default: fill remaining width after horizontal margins.
 	width := availW - margL - margR
 	if width < 0 {
@@ -1879,7 +2202,7 @@ func resolveBlockWidth(eng *engine, style boxModelStyle, availW float64) (float6
 	// content-box (default): specified width is the content width, so the
 	// border box grows by horizontal padding + border. border-box: specified
 	// width already is the border-box size.
-	if definiteW && style.boxSizing != borderBox {
+	if definiteW && style.BoxSizing != borderBox {
 		width += style.horizontalChrome(eng)
 	}
 
@@ -1891,17 +2214,17 @@ func resolveBlockWidth(eng *engine, style boxModelStyle, availW float64) (float6
 
 // resolveAutoMargins centers (or pushes) a definite-width block via auto
 // horizontal margins (CSS2.1 §10.3.3).
-func resolveAutoMargins(style boxModelStyle, definiteW bool, width, availW, margL, margR float64) float64 {
-	if definiteW && (style.marginLeftAuto || style.marginRightAuto) {
+func resolveAutoMargins(style *ResolvedStyle, definiteW bool, width, availW, margL, margR float64) float64 {
+	if definiteW && (style.MarginLeftAuto || style.MarginRightAuto) {
 		free := availW - width
 		if free < 0 {
 			free = 0
 		}
 
 		switch {
-		case style.marginLeftAuto && style.marginRightAuto:
+		case style.MarginLeftAuto && style.MarginRightAuto:
 			margL = free / two
-		case style.marginLeftAuto:
+		case style.MarginLeftAuto:
 			margL = free - margR
 			if margL < 0 {
 				margL = 0
@@ -1914,41 +2237,41 @@ func resolveAutoMargins(style boxModelStyle, definiteW bool, width, availW, marg
 
 // resolveDefiniteWidth applies the width/width% to *w. Returns false when the
 // width resolves to auto (cyclic % honesty: indefinite containing block).
-func resolveDefiniteWidth(eng *engine, style boxModelStyle, availW float64, width *float64) bool {
-	definiteW := style.width >= 0 || style.widthPercent >= 0
+func resolveDefiniteWidth(eng *engine, style *ResolvedStyle, availW float64, width *float64) bool {
+	definiteW := style.Width >= 0 || style.WidthPercent >= 0
 
 	switch {
-	case style.widthPercent >= 0:
+	case style.WidthPercent >= 0:
 		// Cyclic % honesty: indefinite containing block → treat as auto.
 		if availW > 0 && availW < 1e12 {
-			*width = availW * style.widthPercent / oneHundred
+			*width = availW * style.WidthPercent / oneHundred
 		} else {
 			definiteW = false
 		}
-	case style.width >= 0:
-		*width = eng.scalePt(style.width)
+	case style.Width >= 0:
+		*width = eng.scalePt(style.Width)
 	}
 
 	return definiteW
 }
 
 // clampBlockMinMax applies the min/max-width constraints to w.
-func clampBlockMinMax(eng *engine, style boxModelStyle, availW, width float64) float64 {
+func clampBlockMinMax(eng *engine, style *ResolvedStyle, availW, width float64) float64 {
 	width = clampBlockMaxWidth(eng, style, availW, width)
 
 	return clampBlockMinWidth(eng, style, availW, width)
 }
 
-func clampBlockMinWidth(eng *engine, style boxModelStyle, availW, width float64) float64 {
+func clampBlockMinWidth(eng *engine, style *ResolvedStyle, availW, width float64) float64 {
 	hChrome := 0.0
-	if style.boxSizing != borderBox {
+	if style.BoxSizing != borderBox {
 		hChrome = style.horizontalChrome(eng)
 	}
 
-	if style.minWidthPercent >= 0 && availW > 0 && availW < 1e12 {
-		minW := availW * style.minWidthPercent / oneHundred
+	if style.MinWidthPercent >= 0 && availW > 0 && availW < 1e12 {
+		minW := availW * style.MinWidthPercent / oneHundred
 
-		if style.boxSizing != borderBox {
+		if style.BoxSizing != borderBox {
 			minW += hChrome
 		}
 
@@ -1959,9 +2282,9 @@ func clampBlockMinWidth(eng *engine, style boxModelStyle, availW, width float64)
 		return width
 	}
 
-	if style.minWidth > 0 {
-		minW := eng.scalePt(style.minWidth)
-		if style.boxSizing != borderBox {
+	if style.MinWidth > 0 {
+		minW := eng.scalePt(style.MinWidth)
+		if style.BoxSizing != borderBox {
 			minW += hChrome
 		}
 
@@ -1973,16 +2296,16 @@ func clampBlockMinWidth(eng *engine, style boxModelStyle, availW, width float64)
 	return width
 }
 
-func clampBlockMaxWidth(eng *engine, style boxModelStyle, availW, width float64) float64 {
+func clampBlockMaxWidth(eng *engine, style *ResolvedStyle, availW, width float64) float64 {
 	hChrome := 0.0
-	if style.boxSizing != borderBox {
+	if style.BoxSizing != borderBox {
 		hChrome = style.horizontalChrome(eng)
 	}
 
-	if style.maxWidthPercent >= 0 && availW > 0 && availW < 1e12 {
-		maxW := availW * style.maxWidthPercent / oneHundred
+	if style.MaxWidthPercent >= 0 && availW > 0 && availW < 1e12 {
+		maxW := availW * style.MaxWidthPercent / oneHundred
 
-		if style.boxSizing != borderBox {
+		if style.BoxSizing != borderBox {
 			maxW += hChrome
 		}
 
@@ -1993,9 +2316,9 @@ func clampBlockMaxWidth(eng *engine, style boxModelStyle, availW, width float64)
 		return width
 	}
 
-	if style.maxWidth >= 0 {
-		maxW := eng.scalePt(style.maxWidth)
-		if style.boxSizing != borderBox {
+	if style.MaxWidth >= 0 {
+		maxW := eng.scalePt(style.MaxWidth)
+		if style.BoxSizing != borderBox {
 			maxW += hChrome
 		}
 
@@ -2010,26 +2333,26 @@ func clampBlockMaxWidth(eng *engine, style boxModelStyle, availW, width float64)
 // resolveUsedHeight returns a definite border-box height when the style has a
 // usable height. HeightPercent requires a definite containing-block height
 // (cbH >= 0); otherwise the percentage is treated as auto (cyclic honesty).
-func resolveUsedHeight(sty boxModelStyle, cbH float64, engN *engine) (float64, bool) {
-	if sty.heightPercent >= 0 {
+func resolveUsedHeight(sty *ResolvedStyle, cbH float64, engN *engine) (float64, bool) {
+	if sty.HeightPercent >= 0 {
 		if cbH < 0 {
 			return 0, false
 		}
 
-		height := cbH * sty.heightPercent / oneHundred
-		if sty.boxSizing != borderBox {
+		height := cbH * sty.HeightPercent / oneHundred
+		if sty.BoxSizing != borderBox {
 			height += sty.verticalChrome(engN)
 		}
 
 		return height, true
 	}
 
-	if sty.height < 0 {
+	if sty.Height < 0 {
 		return 0, false
 	}
 
-	height := engN.scalePt(sty.height)
-	if sty.boxSizing != borderBox {
+	height := engN.scalePt(sty.Height)
+	if sty.BoxSizing != borderBox {
 		height += sty.verticalChrome(engN)
 	}
 

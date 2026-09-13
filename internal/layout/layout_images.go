@@ -1,7 +1,10 @@
 package layout
 
 import (
+	"bytes"
 	"encoding/binary"
+	"image"
+	"image/draw"
 	"strconv"
 	"strings"
 
@@ -52,10 +55,16 @@ func (e *engine) usedImageSize(
 	node *html.Node, style ResolvedStyle, ref *imageRef,
 ) imageUsedSize {
 	var size imageUsedSize
+
 	if ref != nil {
-		size.w = e.scalePt(pxToPt(float64(ref.w)))
-		size.h = e.scalePt(pxToPt(float64(ref.h)))
+		intW, intH := orientedImagePixelDims(ref, style)
+		scale := imageResolutionScale(style, ref)
+		size.w = e.scalePt(pxToPt(float64(intW) * scale))
+		size.h = e.scalePt(pxToPt(float64(intH) * scale))
 	}
+
+	// Aspect-ratio fills must see the oriented axes, not the raw SOF dims.
+	ref = orientedImageRatioRef(ref, style)
 
 	attrW, attrH := e.imageAttrDims(node)
 	if attrW > 0 {
@@ -200,12 +209,176 @@ func (e *engine) imageMaxWidth(style ResolvedStyle, cssW bool) float64 {
 	return maxW
 }
 
+// --- image adjustment consumers: image-orientation, image-resolution,
+// object-view-box ---
+
+// imageOrientationFor reads image-orientation for one content image and
+// returns the clockwise rotation in degrees, the post-rotation horizontal
+// mirror, and whether the pixels need a transform. from-image reads the JPEG
+// EXIF orientation; none ignores it; an explicit angle replaces EXIF.
+func imageOrientationFor(style ResolvedStyle, ref *imageRef) (float64, bool, bool) {
+	switch style.ImageOrientation {
+	case "", imageAdjustFromImage:
+		if ref == nil || !ref.isJPEG {
+			return 0, false, false
+		}
+
+		orientation := jpegEXIFOrientation(ref.data)
+		if orientation <= 1 || orientation > maxEXIFOrientation {
+			return 0, false, false
+		}
+
+		quarters, mirror := exifOrientationTransform(orientation)
+
+		return float64(quarters * degreesQuarterTurn), mirror, true
+	case "none": //nolint:goconst // fontOpticalNone is font-specific; none is the shared CSS keyword
+		return 0, false, false
+	default:
+		mirror := strings.HasSuffix(style.ImageOrientation, " flip")
+
+		deg := normalizeDegrees(style.ImageOrientationAngle)
+		if deg == 0 && !mirror {
+			return 0, false, false
+		}
+
+		return deg, mirror, true
+	}
+}
+
+// imageResolutionScale reads image-resolution and returns the intrinsic-pixel
+// to CSS-px factor. from-image uses the image's own resolution when the bytes
+// declare one, otherwise 96dpi; an explicit resolution always wins.
+func imageResolutionScale(style ResolvedStyle, ref *imageRef) float64 {
+	value := strings.TrimSpace(style.ImageResolution)
+	if value == "" {
+		return 1
+	}
+
+	fromImage := strings.Contains(value, imageAdjustFromImage)
+	dpi := style.ImageResolutionDPI
+
+	if fromImage && ref != nil {
+		if intrinsic := intrinsicImageResolutionDPI(ref.data); intrinsic > 0 {
+			dpi = intrinsic
+		}
+	}
+
+	if dpi <= 0 {
+		dpi = defaultImageResolutionDPI
+	}
+
+	return defaultImageResolutionDPI / dpi
+}
+
+// orientedImagePixelDims returns ref's pixel dimensions after any orientation
+// rotation that exchanges the axes.
+func orientedImagePixelDims(ref *imageRef, style ResolvedStyle) (int, int) {
+	if ref == nil {
+		return 0, 0
+	}
+
+	deg, _, active := imageOrientationFor(style, ref)
+	if active && quarterTurnSwapsAxes(deg) {
+		return ref.h, ref.w
+	}
+
+	return ref.w, ref.h
+}
+
+// orientedImageRatioRef returns ref with w/h swapped when the orientation
+// turns the axes. The same pointer comes back when no swap applies.
+func orientedImageRatioRef(ref *imageRef, style ResolvedStyle) *imageRef {
+	if ref == nil {
+		return nil
+	}
+
+	deg, _, active := imageOrientationFor(style, ref)
+	if !active || !quarterTurnSwapsAxes(deg) {
+		return ref
+	}
+
+	swapped := *ref
+	swapped.w, swapped.h = ref.h, ref.w
+
+	return &swapped
+}
+
+// adjustedPaintImage returns the ref the painter should emit after applying
+// image-orientation and object-view-box. The original ref comes back untouched
+// when neither property changes the pixels, so plain images keep their raw
+// bytes and JPEG fast path.
+func adjustedPaintImage(ref *imageRef, style ResolvedStyle) *imageRef {
+	if ref == nil || len(ref.data) == 0 {
+		return ref
+	}
+
+	deg, mirror, orient := imageOrientationFor(style, ref)
+
+	w, h := ref.w, ref.h
+	if orient && quarterTurnSwapsAxes(deg) {
+		w, h = h, w
+	}
+
+	cropRect, crop := objectViewBoxRect(style.ObjectViewBox, w, h)
+	if !orient && !crop {
+		return ref
+	}
+
+	if !orient {
+		data, err := cropBorderImage(ref.data, cropRect)
+		if err != nil {
+			return ref
+		}
+
+		return &imageRef{ //nolint:exhaustruct // paint-only copy, no crop cache
+			src: ref.src, data: data, w: cropRect.Dx(), h: cropRect.Dy(),
+		}
+	}
+
+	return orientedPaintImage(ref, deg, mirror, cropRect, crop)
+}
+
+// orientedPaintImage rasterizes the orientation transform, optionally crops
+// the view box from the oriented pixels, and re-encodes as PNG.
+func orientedPaintImage(ref *imageRef, deg float64, mirror bool, cropRect image.Rectangle, crop bool) *imageRef {
+	decoded, _, err := image.Decode(bytes.NewReader(ref.data))
+	if err != nil {
+		return ref
+	}
+
+	img := applyRasterOrientation(decoded, deg, mirror)
+	if crop {
+		rect := cropRect.Intersect(img.Bounds())
+		if rect.Empty() {
+			return ref
+		}
+
+		cropped := image.NewRGBA(image.Rect(0, 0, rect.Dx(), rect.Dy()))
+		draw.Draw(cropped, cropped.Bounds(), img, rect.Min, draw.Src)
+		img = cropped
+	}
+
+	data, err := encodePNGImage(img)
+	if err != nil {
+		return ref
+	}
+
+	bounds := img.Bounds()
+
+	return &imageRef{ //nolint:exhaustruct // paint-only copy, no crop cache
+		src: ref.src, data: data, w: bounds.Dx(), h: bounds.Dy(),
+	}
+}
+
 func (e *engine) buildImage(node *html.Node, sty ResolvedStyle, posX, posY float64, paint bool) *box {
 	boxNode := &box{ //nolint:exhaustruct // intentional zero fields
 		node: node, style: e.stylePtr(node), kind: boxKindReplaced, x: posX, y: posY,
 	}
 	boxNode.img = e.resolveImage(node.Attribute("src"))
 	size := e.usedImageSize(node, sty, boxNode.img)
+	// The paint copy carries orientation and object-view-box pixels; sizing
+	// above uses the original ref so the element keeps its intrinsic box.
+	boxNode.img = adjustedPaintImage(boxNode.img, sty)
 	thumbImg := e.thumbImageInsideFigure(node)
 	padL := e.scalePt(sty.PaddingLeft)
 	padR := e.scalePt(sty.PaddingRight)
@@ -272,18 +445,14 @@ func (e *engine) paintReplacedImage(
 		isJPEG = false
 	}
 
-	e.add(Op{ //nolint:exhaustruct // intentional zero fields
+	e.add((Op{ //nolint:exhaustruct // intentional zero fields
 		Kind:   OpImage,
 		X:      imgX,
 		Y:      imgY,
 		W:      imgW,
 		H:      imgH,
-		Image:  imgData,
-		ImgW:   boxNode.img.w,
-		ImgH:   boxNode.img.h,
 		IsJPEG: isJPEG,
-		Alt:    alt,
-	})
+	}).withImage(imgData, boxNode.img.w, boxNode.img.h, alt))
 
 	if thumbImg {
 		e.emitThumbImageBottomSeparator(sty, posX, posY, size.w, size.h)

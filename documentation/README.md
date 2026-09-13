@@ -22,7 +22,7 @@ and **[fidelity.md](fidelity.md)**.
 | Understand the pipeline and packages | [architecture.md](architecture.md), [architecture/](architecture/) |
 | Compare with wkhtmltopdf wrappers / browsers | [comparison-with-others/](comparison-with-others/) |
 | See what is deferred or out of scope | [deferred.md](deferred.md) |
-| Read performance numbers | [performance.md](performance.md), [`../testdata/golden/benchmarks/README.md`](../testdata/golden/benchmarks/README.md) |
+| Read performance numbers | [benchmarks.md](benchmarks.md) (current capture), [performance.md](performance.md), [`../testdata/golden/benchmarks/README.md`](../testdata/golden/benchmarks/README.md) |
 
 ## Guides
 
@@ -39,7 +39,8 @@ and **[fidelity.md](fidelity.md)**.
 | [compatibility-matrix.md](compatibility-matrix.md) | Normative per-element / per-property / per-flag contract |
 | [fonts.md](fonts.md) | Bundled faces, `--font-path`, Type0/CID, shaping limits |
 | [samples.md](samples.md) | Golden fixtures, `output/`, `make samples` / `make golden` |
-| [performance.md](performance.md) | Benchmarks, CLI comparison, how to measure |
+| [benchmarks.md](benchmarks.md) | Consolidated current benchmark capture (2026-09-12) and method |
+| [performance.md](performance.md) | Benchmarks, CLI comparison, how to measure, historical captures |
 | [deferred.md](deferred.md) | Deferred features, workload priority, next gates |
 
 ## Architecture

@@ -288,8 +288,9 @@ func TestLinkAnnotations(t *testing.T) {
 	data.SetCompression(false)
 	p1 := data.AddPage(200, 200)
 	p1.AddLinkURI([4]float64{10, 10, 110, 30}, "https://example.com")
-	p1.AddLinkDest([4]float64{10, 40, 110, 60}, 1, 50, 150)
-	data.AddPage(200, 200)
+
+	p2 := data.AddPage(200, 200)
+	p1.AddLinkDest([4]float64{10, 40, 110, 60}, p2, 50, 150)
 
 	out := string(writePDF(t, data))
 	for _, want := range []string{
@@ -302,6 +303,36 @@ func TestLinkAnnotations(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q", want)
 		}
+	}
+}
+
+// TestLinkDestSurvivesReorder proves internal link destinations are page
+// identities, not page indices: ReorderPages permutes the page order after
+// the annotation is added, and /Dest must still reference the original target
+// page object.
+func TestLinkDestSurvivesReorder(t *testing.T) {
+	t.Parallel()
+
+	doc := NewDocument()
+	doc.SetCompression(false)
+	page0 := doc.AddPage(200, 200)
+	page1 := doc.AddPage(200, 200)
+
+	page0.AddLinkDest([4]float64{10, 40, 110, 60}, page1, 50, 150)
+
+	if err := doc.ReorderPages([]int{1, 0}); err != nil {
+		t.Fatalf("ReorderPages: %v", err)
+	}
+
+	out := string(writePDF(t, doc))
+	want := "/Dest [" + page1.ref.String() + " /XYZ 50 150 null]"
+
+	if !strings.Contains(out, want) {
+		t.Errorf("link destination lost its target after reorder; missing %q", want)
+	}
+
+	if strings.Contains(out, "/Dest ["+page0.ref.String()) {
+		t.Error("link destination resolved to a reordered page index")
 	}
 }
 
@@ -436,6 +467,25 @@ func TestInfoDict(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q", want)
 		}
+	}
+}
+
+// TestSetInfoProducer proves the caller-set Producer reaches the Info dict.
+// The policy string is only the fallback (TestInfoDict covers the fallback);
+// before this change infoDict always overwrote the caller value.
+func TestSetInfoProducer(t *testing.T) {
+	t.Parallel()
+	d := fixedDoc(t)
+	d.AddPage(100, 100)
+	d.SetInfo("Producer", "x")
+
+	out := string(writePDF(t, d))
+	if !strings.Contains(out, "/Producer (x)") {
+		t.Errorf("missing caller-set /Producer (x)")
+	}
+
+	if strings.Contains(out, "/Producer (gowkhtmltopdf ") {
+		t.Error("policy producer must not override the caller-set value")
 	}
 }
 
@@ -840,10 +890,11 @@ func TestPDF17RichDocument(t *testing.T) {
 
 	// 5. Link Annotations (URI + Page GoTo)
 	page1.AddLinkURI([4]float64{50, 600, 250, 620}, "https://example.com/pdf17")
-	page1.AddLinkDest([4]float64{50, 450, 150, 530}, 1, 50, 750)
 
 	// Page 2: Additional page content for internal linking
 	page2 := doc.AddPage(600, 800)
+	page1.AddLinkDest([4]float64{50, 450, 150, 530}, page2, 50, 750)
+
 	content2 := page2.Content()
 	content2.UseEmbeddedFont("F1", fnt)
 	content2.BeginText()
@@ -1017,9 +1068,10 @@ func TestPDF17RichDocument(t *testing.T) {
 	_ = c2_1.AddPNGImage("P1", 200, 450, 100, 80, makePNG(t, true))
 
 	p2_1.AddLinkURI([4]float64{50, 600, 250, 620}, "https://example.com/pdf17")
-	p2_1.AddLinkDest([4]float64{50, 450, 150, 530}, 1, 50, 750)
 
 	p2_2 := doc2.AddPage(600, 800)
+	p2_1.AddLinkDest([4]float64{50, 450, 150, 530}, p2_2, 50, 750)
+
 	c2_2 := p2_2.Content()
 	c2_2.UseEmbeddedFont("F1", fnt)
 	c2_2.BeginText()

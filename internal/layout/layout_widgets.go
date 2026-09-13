@@ -41,8 +41,8 @@ func applyCheckboxAutoSize(eng *engine, style ResolvedStyle, boxNode *box, curY 
 	}
 
 	if style.Height < 0 && style.HeightPercent < 0 {
-		boxStyle := boxModelStyleOf(&style)
-		curY = chkSz + eng.scalePt(boxStyle.paddingTop) + eng.scalePt(borderLayoutWidth(boxStyle, boxStyle.borderTop))
+		boxStyle := &style
+		curY = chkSz + eng.scalePt(boxStyle.PaddingTop) + eng.scalePt(borderLayoutWidth(boxStyle, boxStyle.BorderTop))
 	}
 
 	return curY

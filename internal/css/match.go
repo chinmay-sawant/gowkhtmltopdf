@@ -3,142 +3,82 @@ package css
 import (
 	"strconv"
 	"strings"
-	"sync"
 	"unicode"
 	"unicode/utf8"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
 
-// siblingInfo aggregates all sibling metrics for a node in one cache lookup.
+// siblingInfo holds the sibling metrics tree-structural pseudo-classes need:
+// the neighbouring element siblings and the 1-based position of a node among
+// all element siblings and among same-name siblings.
 type siblingInfo struct {
 	prev          *html.Node
 	next          *html.Node
 	index         int
-	total         int
 	typeIndex     int
 	typeLastIndex int
 }
 
-type parentSibCache struct {
-	elemIdx     map[*html.Node]int
-	prev        map[*html.Node]*html.Node
-	next        map[*html.Node]*html.Node
-	typeIdx     map[*html.Node]int
-	typeLastIdx map[*html.Node]int
-	total       int
-}
-
-var (
-	sibMu    sync.RWMutex                           //nolint:gochecknoglobals // guards the sibling cache below
-	sibCache = make(map[*html.Node]*parentSibCache) //nolint:gochecknoglobals // process-wide sibling index cache
-)
-
-func getParentCache(parent *html.Node) *parentSibCache {
-	if parent == nil {
-		return nil
-	}
-
-	sibMu.RLock()
-	cached := sibCache[parent]
-	sibMu.RUnlock()
-
-	if cached != nil {
-		return cached
-	}
-
-	cached = buildParentCache(parent)
-
-	sibMu.Lock()
-	if existing := sibCache[parent]; existing != nil {
-		sibMu.Unlock()
-
-		return existing
-	}
-
-	sibCache[parent] = cached
-	sibMu.Unlock()
-
-	return cached
-}
-
-func buildParentCache(parent *html.Node) *parentSibCache {
-	elems := make([]*html.Node, 0, len(parent.Children))
-
-	for _, child := range parent.Children {
-		if child.Type == html.ElementNode {
-			elems = append(elems, child)
-		}
-	}
-
-	total := len(elems)
-	elemIdx := make(map[*html.Node]int, total)
-	prev := make(map[*html.Node]*html.Node, total)
-	next := make(map[*html.Node]*html.Node, total)
-
-	for idx, elem := range elems {
-		elemIdx[elem] = idx + 1
-
-		if idx > 0 {
-			prev[elem] = elems[idx-1]
-		}
-
-		if idx+1 < total {
-			next[elem] = elems[idx+1]
-		}
-	}
-
-	tagTotals := make(map[string]int, total)
-
-	for _, elem := range elems {
-		key := strings.ToLower(elem.Name)
-		tagTotals[key]++
-	}
-
-	typeIdx := make(map[*html.Node]int, total)
-	typeLastIdx := make(map[*html.Node]int, total)
-	seen := make(map[string]int, len(tagTotals))
-
-	for _, elem := range elems {
-		key := strings.ToLower(elem.Name)
-		seen[key]++
-		idx := seen[key]
-		typeIdx[elem] = idx
-		typeLastIdx[elem] = tagTotals[key] - idx + 1
-	}
-
-	return &parentSibCache{
-		elemIdx:     elemIdx,
-		prev:        prev,
-		next:        next,
-		typeIdx:     typeIdx,
-		typeLastIdx: typeLastIdx,
-		total:       total,
-	}
-}
-
+// getSiblingInfo scans node.Parent's element children once to derive node's
+// sibling metrics. The walk is local to one parent and keeps no state between
+// documents; selector matching visits a parent's children together, so the
+// scan stays short.
 func getSiblingInfo(node *html.Node) siblingInfo {
+	var info siblingInfo
+
 	if node == nil || node.Parent == nil {
 		// No parent means no sibling edges; only the 1-based indices
 		// carry meaning here.
-		return siblingInfo{ //nolint:exhaustruct // nil prev/next means uncached edges
-			index: 1, total: 1, typeIndex: 1, typeLastIndex: 1,
+		info.index = 1
+		info.typeIndex = 1
+		info.typeLastIndex = 1
+
+		return info
+	}
+
+	var (
+		prev      *html.Node
+		next      *html.Node
+		elemCount int
+		typeCount int
+		found     bool
+	)
+
+	for _, child := range node.Parent.Children {
+		if child.Type != html.ElementNode {
+			continue
+		}
+
+		elemCount++
+
+		if strings.EqualFold(child.Name, node.Name) {
+			typeCount++
+		}
+
+		switch {
+		case child == node:
+			found = true
+			info.index = elemCount
+			info.typeIndex = typeCount
+		case !found:
+			prev = child
+		case next == nil:
+			next = child
 		}
 	}
 
-	cached := getParentCache(node.Parent)
-	if cached == nil {
-		return siblingInfo{} //nolint:exhaustruct // zero info for uncached parent
+	if !found {
+		// node is not one of its parent's element children: all-zero
+		// metrics, matching the former cache-miss result.
+		return info
 	}
 
-	return siblingInfo{
-		prev:          cached.prev[node],
-		next:          cached.next[node],
-		index:         cached.elemIdx[node],
-		total:         cached.total,
-		typeIndex:     cached.typeIdx[node],
-		typeLastIndex: cached.typeLastIdx[node],
-	}
+	info.prev = prev
+	info.next = next
+	info.typeLastIndex = typeCount - info.typeIndex + 1
+
+	return info
 }
 
 // Match reports whether the selector matches the element node. Matching runs
@@ -425,37 +365,14 @@ func matchSubstringOp(op, val, want string) bool {
 }
 
 // containsWord reports whether want (a single space-free word) is one of the
-// space-separated words of val. Tokenizes val without allocating a fields
-// slice (same whitespace definition and Unicode fallback as hasClassToken).
-//
-//nolint:cyclop // two-zone token walk (ASCII, then Unicode fallback) stays linear
+// space-separated words of val. The space guard states the CSS ~= rule
+// directly; the token walk is shared with class matching (hasClassToken).
 func containsWord(val, want string) bool {
 	if want == "" || strings.Contains(want, " ") {
 		return false
 	}
 
-	for start := 0; start < len(val); {
-		for start < len(val) && isClassSpace(val[start]) {
-			start++
-		}
-
-		end := start
-		for end < len(val) && !isClassSpace(val[end]) {
-			if val[end] >= nonASCIIStart {
-				return hasUnicodeClassToken(val, want)
-			}
-
-			end++
-		}
-
-		if start < end && val[start:end] == want {
-			return true
-		}
-
-		start = end
-	}
-
-	return false
+	return hasClassToken(val, want)
 }
 
 func matchPseudo(pseudo PseudoClass, node *html.Node) bool {
@@ -558,25 +475,45 @@ func isLinkAnchor(n *html.Node) bool {
 	return href != ""
 }
 
+// previousElementSibling returns count's nearest element sibling before it,
+// scanning the parent's children directly.
 func previousElementSibling(count *html.Node) *html.Node {
 	if count == nil || count.Parent == nil {
 		return nil
 	}
 
-	if cached := getParentCache(count.Parent); cached != nil {
-		return cached.prev[count]
+	var prev *html.Node
+
+	for _, child := range count.Parent.Children {
+		if child == count {
+			return prev
+		}
+
+		if child.Type == html.ElementNode {
+			prev = child
+		}
 	}
 
 	return nil
 }
 
+// nextElementSibling returns count's nearest element sibling after it,
+// scanning the parent's children directly.
 func nextElementSibling(count *html.Node) *html.Node {
 	if count == nil || count.Parent == nil {
 		return nil
 	}
 
-	if cached := getParentCache(count.Parent); cached != nil {
-		return cached.next[count]
+	found := false
+
+	for _, child := range count.Parent.Children {
+		if found && child.Type == html.ElementNode {
+			return child
+		}
+
+		if child == count {
+			found = true
+		}
 	}
 
 	return nil

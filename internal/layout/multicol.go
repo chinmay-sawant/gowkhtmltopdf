@@ -38,7 +38,7 @@ func (e *engine) buildMulticol(node *html.Node, style ResolvedStyle, availW, x, 
 	boxNode.w = resolveUsedWidth(style, availW, e)
 	boxNode.x = x + e.multicolAutoMargin(style, availW, boxNode.w)
 
-	contentX, contentW := e.contentBox(boxNode.x, boxNode.w, boxModelStyleOf(&style))
+	contentX, contentW := e.contentBox(boxNode.x, boxNode.w, &style)
 	contentStart := len(e.ops)
 
 	curY := e.scalePt(style.PaddingTop) + e.scalePt(style.BorderTop.Width)
@@ -160,7 +160,7 @@ func multicolKids(n *html.Node, e *engine) []*html.Node {
 			Attrs: map[string]string{"data-gowk-anon": "multicol"},
 		}
 		anonStyle := anonymousMulticolItemStyle(parentStyle)
-		e.styles[anonymous] = &anonStyle
+		e.setSyntheticStyle(anonymous, &anonStyle)
 		kids = append(kids, anonymous)
 	}
 
@@ -225,8 +225,12 @@ func (e *engine) flowMulticolSpanner(boxNode *box, nodes []*html.Node, contentW,
 // both floors and caps the used height so oversized column strips cannot blow
 // up table-row pagination into blank pages.
 func clampMulticolHeight(curY float64, style ResolvedStyle, eng *engine) float64 {
-	curY += eng.scalePt(style.PaddingBottom)
-	if h, ok := resolveUsedHeight(boxModelStyleOf(&style), -1, eng); ok {
+	// The shared resolver adds bottom padding and border. A definite height
+	// caps here (unlike block flow) so an oversized column strip cannot blow
+	// up table-row pagination into blank pages.
+	curY = eng.borderBoxBottom(style, curY)
+
+	if h, ok := resolveUsedHeight(&style, -1, eng); ok {
 		curY = h
 	}
 
@@ -335,7 +339,11 @@ func (e *engine) flowMulticolSegment(
 	}
 
 	pageH := e.opts.Height
-	if pageH <= 0 {
+	if pageH > 0 {
+		// Record the boundary multicol snapped against so Paint can verify
+		// that its own content height owns the same page geometry.
+		e.pageSnapHeight = pageH
+	} else {
 		pageH = 1e12
 	}
 
@@ -463,8 +471,8 @@ func (e *engine) placeMulticolAnonColumns(
 			continue
 		}
 		if col > 0 {
-			e.ops[k].X += float64(col) * (colW + gap)
-			e.ops[k].Y -= float64(col) * bandH
+			shiftOpX(&e.ops[k], float64(col)*(colW+gap))
+			shiftOpY(&e.ops[k], -float64(col)*bandH)
 		}
 		if (e.ops[k].Kind == OpText || e.ops[k].Kind == OpBullet) && e.ops[k].Y < colMinY[col] {
 			colMinY[col] = e.ops[k].Y
@@ -483,7 +491,7 @@ func (e *engine) placeMulticolAnonColumns(
 		if a.col < 1 || math.IsInf(colMinY[a.col], 1) {
 			continue
 		}
-		e.ops[a.idx].Y -= colMinY[a.col] - anchor
+		shiftOpY(&e.ops[a.idx], -(colMinY[a.col] - anchor))
 	}
 
 	used := bandH
@@ -504,7 +512,7 @@ func (e *engine) placeMulticolAnonColumns(
 	limit := top + used
 	for _, a := range assigns {
 		op := &e.ops[a.idx]
-		if op.Kind == OpLine || op.Kind == OpStrokeRect {
+		if op.Kind == OpLine || op.Kind == OpStrokeRect || op.Kind == OpGridRun {
 			continue
 		}
 		if a.col < 0 || op.Y >= limit-0.01 {

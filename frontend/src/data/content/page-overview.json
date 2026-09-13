@@ -16,7 +16,7 @@
     "Native builds use no Chrome or WebKit process and CGO_ENABLED=0 produces statically linked binaries. The opt-in browser route runs the same Go pipeline through WebAssembly.",
     "Repeatable layout: the same HTML, settings, and fonts produce the same layout. Default CLI PDF bytes are not hash-stable because CreationDate and [date]/[time] use the wall clock unless you inject Now.",
     "Template-oriented scope: an allowlisted HTML model and a documented print CSS subset, with the compatibility matrix as the normative per-property contract.",
-    "Two surfaces: the gowkhtmltopdf and gowkhtmltoimage CLI binaries, plus an idiomatic Go library API in the root gowkhtmltopdf package (Document, ImageDocument)."
+    "Surfaces: the gowkhtmltopdf and gowkhtmltoimage CLI binaries; the root gowkhtmltopdf Go package (Document, ImageDocument); Python bindings that run the same engine in-process through an opt-in CGO_ENABLED=1 shared library; and an opt-in browser WASM adapter for inline HTML previews that does not read files, fetch remote resources, or run JavaScript."
    ]
   },
   {
@@ -68,7 +68,7 @@
     },
     {
      "heading": "5. Write: internal/pdf or internal/imageout",
-     "body": "PDF mode writes unclaimed PDF 1.4 by default, with zlib Flate streams, an embedded Liberation Sans subset with /Widths in 1000 units/em, link annotations, and a valid xref. 0.2.2: opt-in `--pdf-version 1.7` / `2.0` (or `WithPDFVersion`) change the file version only — that is not a PDF/A or PDF/UA claim. Opt-in `--pdf-profile` / `WithPDFProfile` (`a3a-ua1`, `a4-ua2`, and aliases) add claiming XMP, ICC OutputIntent, and tagging. Image mode rasterizes the same display list to PNG or JPEG. Both paths are orchestrated by internal/convert."
+     "body": "PDF mode writes unclaimed PDF 1.4 by default, with zlib Flate streams, an embedded Liberation Sans subset with /Widths in 1000 units/em, link annotations, and a valid xref. Opt-in `--pdf-version 1.7` / `2.0` (or `Document.PDFVersion`) sets the file version only - that is not a PDF/A or PDF/UA claim. Opt-in `--pdf-profile` / `Document.PDFProfile` (`a3a-ua1`, `a4-ua2`, and aliases) adds claiming XMP, ICC OutputIntent, and tagging. Image mode rasterizes the same display list to PNG or JPEG. Both paths are orchestrated by internal/convert."
     }
    ]
   },
@@ -76,15 +76,15 @@
    "type": "stats",
    "items": [
     {
-     "value": "15.5x",
-     "label": "faster than wkhtmltopdf at 2 pages"
+     "value": "18.5x",
+     "label": "faster than wkhtmltopdf at 2 pages (2026-09-12 capture)"
     },
     {
-     "value": "1.6x",
-     "label": "faster than wkhtmltopdf at 500 pages"
+     "value": "3.13x",
+     "label": "faster than wkhtmltopdf at 500 pages (2026-09-12 capture)"
     },
     {
-     "value": "17 ms",
+     "value": "14 ms",
      "label": "2-page HTML, current generic CLI"
     },
     {
@@ -97,7 +97,7 @@
    "type": "callout",
    "variant": "info",
    "title": "A kvetch: this is not a browser",
-   "body": "gowkhtmltopdf is a PDF engine based on HTML templates — without any wrappers — with a documented print CSS subset and deliberately has no JavaScript runtime. If you need full flexbox parity, interactive scripts, or pixel-identical WebKit output, use a real browser engine. This project is the fast, static-binary choice for authored HTML templates — invoices, certificates, storybooks, posters, and statements."
+   "body": "gowkhtmltopdf is a PDF engine based on HTML templates, without any wrappers, with a documented print CSS subset and deliberately has no JavaScript runtime. If you need full flexbox parity, interactive scripts, or pixel-identical WebKit output, use a real browser engine. This project is the fast, static-binary choice for authored HTML templates: invoices, certificates, storybooks, posters, and statements."
   }
  ]
 }

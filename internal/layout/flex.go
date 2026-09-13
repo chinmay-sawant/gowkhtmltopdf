@@ -72,7 +72,7 @@ func (e *engine) buildFlex(node *html.Node, sty ResolvedStyle, availW, x, posY f
 		}
 	}
 
-	contentX, contentW := e.contentBox(boxNode.x, boxNode.w, boxModelStyleOf(&sty))
+	contentX, contentW := e.contentBox(boxNode.x, boxNode.w, &sty)
 
 	contentStart := len(e.ops)
 	curY := e.scalePt(sty.PaddingTop) + e.scalePt(sty.BorderTop.Width)
@@ -92,9 +92,9 @@ func (e *engine) buildFlex(node *html.Node, sty ResolvedStyle, availW, x, posY f
 		curY = e.flowFlexRow(boxNode, kids, sty, contentW, contentX, posY, curY, colGap, rowGap)
 	}
 
-	curY += e.scalePt(sty.PaddingBottom)
-
-	curY = e.applyHeightConstraints(sty, curY)
+	// The shared resolver owns bottom padding, bottom border, and the
+	// height/min-height/max-height constraints for auto-height boxes.
+	curY = e.resolveBorderBoxHeight(sty, curY)
 
 	boxNode.height = curY
 	e.prependChrome(contentStart, boxNode, sty, boxNode.x, posY, boxNode.w, boxNode.height)
@@ -112,8 +112,7 @@ func (e *engine) flexChildren(node *html.Node, parentStyle ResolvedStyle) []*htm
 	for idx := 0; idx < len(node.Children); idx++ {
 		child := node.Children[idx]
 		if child.Type == html.ElementNode {
-			cs := e.styles[child]
-			if cs != nil && cs.Display != cssDisplayNone {
+			if cs := e.stylePtr(child); cs.Display != cssDisplayNone {
 				kids = append(kids, child)
 			}
 
@@ -137,7 +136,7 @@ func (e *engine) flexChildren(node *html.Node, parentStyle ResolvedStyle) []*htm
 			Type: html.ElementNode, Name: "span", Parent: node, Children: textNodes,
 		}
 		anonymousStyle := anonymousFlexItemStyle(parentStyle)
-		e.styles[anonymous] = &anonymousStyle
+		e.setSyntheticStyle(anonymous, &anonymousStyle)
 
 		kids = append(kids, anonymous)
 	}
@@ -271,7 +270,7 @@ func (e *engine) flexRowItems(kids []*html.Node, contentW float64) []flexMeas {
 	items := make([]flexMeas, 0, len(kids))
 
 	for _, kid := range kids {
-		cstate := e.styles[kid]
+		cstate := e.stylePtr(kid)
 
 		grow := cstate.FlexGrow
 		if grow < 0 {
@@ -399,7 +398,7 @@ func (e *engine) flexHypotheticalMainSize(item flexMeas, mainSize float64) float
 		size = minSize
 	}
 
-	if style := e.styles[item.n]; style != nil && style.MaxWidth >= 0 {
+	if style := e.stylePtr(item.n); style.MaxWidth >= 0 {
 		maxSize := e.scalePt(style.MaxWidth)
 		if size > maxSize {
 			size = maxSize
@@ -650,8 +649,8 @@ func (e *engine) measureFlexItemMaxContent(node *html.Node, style ResolvedStyle)
 			continue
 		}
 
-		childStyle := e.styles[child]
-		if childStyle == nil || childStyle.Display == cssDisplayNone {
+		childStyle := e.stylePtr(child)
+		if childStyle.Display == cssDisplayNone {
 			continue
 		}
 
@@ -716,7 +715,7 @@ func (e *engine) flexBoxSized(style ResolvedStyle, size, pad float64) float64 {
 //
 //nolint:cyclop // CSS min-size decision tree
 func (e *engine) flexMinMainSize(item flexMeas, mainSize float64) float64 {
-	cstate := e.styles[item.n]
+	cstate := e.stylePtr(item.n)
 	floor := 0.0
 
 	if cstate.MinWidthSet {
@@ -772,7 +771,7 @@ func (e *engine) flexSpecifiedWidthSuggestion(style ResolvedStyle, mainSize, pad
 // honored without leaving the line sum inconsistent when space remains.
 func (e *engine) flexClampMainWidths(items []flexMeas, widths []float64, contentW, mainSize float64) {
 	for idx, it := range items {
-		cstate := e.styles[it.n]
+		cstate := e.stylePtr(it.n)
 
 		floor := e.flexMinMainSize(it, mainSize)
 		if widths[idx] < floor {
@@ -1136,7 +1135,7 @@ func (e *engine) buildRowItems(
 			return nil, rowH
 		}
 
-		cstate := e.styles[item.n]
+		cstate := e.stylePtr(item.n)
 
 		forceStretch := flexItemCrossStretch(style, *cstate) && targetCross > 0
 		cblock := e.buildFlexRowItem(item.n, cstate, forceStretch, targetCross, widths[idx], leftX, topY+curY)
@@ -1186,7 +1185,7 @@ func (e *engine) alignRowItems(style ResolvedStyle, built []flexPlacedItem, topY
 		}
 
 		align := style.AlignItems
-		if cs, ok := e.styles[page.n]; ok && cs.AlignSelf != "" && cs.AlignSelf != fxAuto {
+		if cs := e.stylePtr(page.n); cs.AlignSelf != "" && cs.AlignSelf != fxAuto {
 			align = cs.AlignSelf
 		}
 
@@ -1279,7 +1278,7 @@ func (e *engine) flexSpecifiedBaseHeight(style ResolvedStyle, mainSize, padV flo
 // flexMinCrossMainSize is the column-axis content-based min-height floor
 // (Flexbox §4.5 lite). mainSize is the definite flex container content height.
 func (e *engine) flexMinCrossMainSize(node *html.Node, baseH, mainSize float64) float64 {
-	cstate := e.styles[node]
+	cstate := e.stylePtr(node)
 	floor := 0.0
 
 	if cstate.MinHeightPercent >= 0 && mainSize >= 0 {
@@ -1390,7 +1389,7 @@ func (e *engine) flexColumnItems(kids []*html.Node, contentW, contentH float64) 
 	items := make([]flexColMeas, 0, len(kids))
 
 	for _, kid := range kids {
-		cstate := e.styles[kid]
+		cstate := e.stylePtr(kid)
 
 		grow := cstate.FlexGrow
 		if grow < 0 {
@@ -1476,7 +1475,7 @@ func (e *engine) flexShrinkHeights(items []flexColMeas, heights []float64, defic
 
 func (e *engine) flexClampColumnHeights(items []flexColMeas, heights []float64, contentH float64) {
 	for idx, it := range items {
-		cstate := e.styles[it.n]
+		cstate := e.stylePtr(it.n)
 
 		floor := e.flexMinCrossMainSize(it.n, it.baseH, contentH)
 		if heights[idx] < floor {
@@ -1525,7 +1524,7 @@ func (e *engine) buildColumnItems(
 			return endY
 		}
 
-		itemStyle := e.styles[item.n]
+		itemStyle := e.stylePtr(item.n)
 		if itemStyle.MarginTopAuto {
 			autoMargins++
 		}
@@ -1546,7 +1545,7 @@ func (e *engine) buildColumnItems(
 	}
 
 	for idx, item := range items {
-		cstate := e.styles[item.n]
+		cstate := e.stylePtr(item.n)
 		if cstate.MarginTopAuto {
 			leftY += autoUnit
 		}

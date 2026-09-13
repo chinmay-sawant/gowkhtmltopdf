@@ -1,20 +1,20 @@
 {
-  "generated": "2026-09-02",
+  "generated": "2026-09-12",
   "sources": {
     "webref": "@webref/css (css.json via unpkg, captured 2026-08-27)",
     "all_properties": "https://www.w3.org/Style/CSS/all-properties.en.json",
     "mdn_units": "mdn/data css/units.json",
     "mdn_properties": "mdn/data css/properties.json (overlay for mdn_url/groups)",
-    "engine": "honesty pass plus standard compositing support; 2 compositing properties remain partial"
+    "engine": "honesty pass plus standard compositing support; mix-blend-mode and isolation completed 2026-09-12 with element-level transparency groups in PDF and grouped raster composites in PNG; 2026-09-12 ponytail audit PT26-LAY-04/05 demoted 27 parsed-and-stored no-op properties to unsupported; the same day 24 were re-implemented with real layout/paint consumers (3 CSS Fonts rows stay demoted)"
   },
   "counts": {
     "webref_properties": 818,
     "mapped_properties": 818,
     "properties_by_engine_status": {
-      "implemented": 355,
-      "unsupported": 461,
+      "implemented": 354,
+      "unsupported": 464,
       "ignored": 0,
-      "partial": 2
+      "partial": 0
     },
     "properties_print_relevant": 818,
     "properties_goal_implement": 818,

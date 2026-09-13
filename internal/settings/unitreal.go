@@ -3,6 +3,7 @@ package settings
 import (
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 )
@@ -49,11 +50,18 @@ func ParseUnitReal(raw string, impliedUnit string) (UnitReal, error) {
 	}
 
 	v, err := strconv.ParseFloat(strings.TrimSpace(raw), 64)
-	if err != nil {
+	if err != nil || !finite(v) {
 		return UnitReal{}, fmt.Errorf("%w: %q", ErrInvalidUnitReal, raw)
 	}
 
 	return UnitReal{Value: v, Unit: unit}, nil
+}
+
+// finite reports whether value is neither NaN nor an infinity. It mirrors the
+// root API predicate (document_validate.go finitePositive) so CLI and library
+// reject the same numeric inputs.
+func finite(value float64) bool {
+	return !math.IsNaN(value) && !math.IsInf(value, 0)
 }
 
 // Points converts to PDF points (1/72 inch) using the CSS reference ratio of

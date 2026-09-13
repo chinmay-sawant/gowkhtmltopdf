@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/errs"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
@@ -18,6 +19,9 @@ var errNilContext = errs.ErrNilContext
 var (
 	errInvalidPaintPage   = errors.New("layout: paint page must be finite and greater than zero")
 	errInvalidPaintMargin = errors.New("layout: paint margin")
+	// errPageSnapMismatch rejects painting a multicol result at a content
+	// height other than the one its columns snapped against.
+	errPageSnapMismatch = errors.New("layout: paint content height does not match the layout page height")
 )
 
 // Page-break keyword constants shared by the pagination passes.
@@ -70,6 +74,158 @@ type PaintOptions struct {
 	Named map[string]PageMargins `exhaustruct:"optional"`
 	// pageNames is filled at paint after pagination: page index -> page ident.
 	pageNames []string `exhaustruct:"optional"`
+	// colorAdjust carries the root element's resolved color-adjust family
+	// state (color-scheme, forced-color-adjust, dynamic-range-limit) into the
+	// shared draw* helpers. Unexported: PaintContext derives it from the
+	// document root; the zero value is light / auto / no-limit.
+	colorAdjust paintColorAdjust `exhaustruct:"optional"`
+}
+
+// Dark color-scheme defaults: canvas #121212, default text #e8e8e8.
+const (
+	darkSchemeCanvasChannel = 18.0 / 255.0
+	darkSchemeTextChannel   = 232.0 / 255.0
+)
+
+// paintColorAdjust is the root element's color-adjust state as paint consumes
+// it. color-scheme, forced-color-adjust, and dynamic-range-limit all inherit,
+// so the root's used values are the document defaults. darkCanvas is set only
+// when the used scheme is dark and the root declares no background color of
+// its own.
+type paintColorAdjust struct {
+	scheme            string
+	forcedColorAdjust string
+	rangeLimit        string
+	darkCanvas        bool
+}
+
+// rootColorAdjust resolves the paint-time color-adjust state once per Paint.
+// Missing root style data means light / auto / no-limit, which paints exactly
+// as the engine did before these properties existed.
+func rootColorAdjust(res *Result) paintColorAdjust {
+	style := rootElementStyle(res)
+	if style == nil {
+		return paintColorAdjust{} //nolint:exhaustruct // light/auto/no-limit defaults
+	}
+
+	scheme := usedColorScheme(style.ColorScheme)
+
+	return paintColorAdjust{
+		scheme:            scheme,
+		forcedColorAdjust: style.ForcedColorAdjust,
+		rangeLimit:        style.DynamicRangeLimit,
+		darkCanvas:        scheme == colorSchemeDark && style.BGColor[3] == 0,
+	}
+}
+
+// rootElementStyle returns the html element's style for a laid-out document,
+// falling back to the outermost box for fragment results (body blocks) and
+// hand-built Results. nil means no color-adjust data is available.
+func rootElementStyle(res *Result) *ResolvedStyle {
+	if res == nil {
+		return nil
+	}
+
+	if htmlBox := findRootElementBox(res.root); htmlBox != nil {
+		return htmlBox.style
+	}
+
+	if res.root != nil {
+		return res.root.style
+	}
+
+	return nil
+}
+
+// findRootElementBox returns the box for the document's html element, if the
+// tree has one. Parsed documents root at a #document box, so res.root.style is
+// not the html style.
+func findRootElementBox(boxNode *box) *box {
+	if boxNode == nil {
+		return nil
+	}
+
+	if boxNode.node != nil && boxNode.node.Name == htmlRootName {
+		return boxNode
+	}
+
+	for _, child := range boxNode.children {
+		if found := findRootElementBox(child); found != nil {
+			return found
+		}
+	}
+
+	return nil
+}
+
+// usedColorScheme picks the scheme a print render uses: the first listed
+// light/dark token wins (so "light dark" is light, "dark light" is dark),
+// "only light"/"only dark" force their token, and "normal" is light. Values
+// are normalized by the apply arm.
+func usedColorScheme(value string) string {
+	for _, token := range strings.Fields(strings.ToLower(value)) {
+		switch token {
+		case colorSchemeDark:
+			return colorSchemeDark
+		case colorSchemeLight:
+			return colorSchemeLight
+		}
+	}
+
+	return colorSchemeLight
+}
+
+// paintColorSchemeCanvas fills the page with the dark canvas default when the
+// root selected a dark scheme and declared no background color. Light schemes
+// leave the PDF page white, which is already the default canvas. Tagged PDF
+// treats the canvas as a background artifact like other chrome fills.
+func paintColorSchemeCanvas(content *pdf.Content, page *pdf.Page, cfg paintColorAdjust, isUA bool) {
+	if content == nil || page == nil || !cfg.darkCanvas {
+		return
+	}
+
+	if isUA {
+		content.BeginArtifact("Background")
+	}
+
+	content.SetFillColor(darkSchemeCanvasChannel, darkSchemeCanvasChannel, darkSchemeCanvasChannel)
+	content.Rect(0, 0, page.Width(), page.Height())
+	content.Fill()
+
+	if isUA {
+		content.EndArtifact()
+	}
+}
+
+// paintTextColor resolves the fill color for a text op. Dark scheme replaces
+// text still at the initial black, because that is how "no author color" and
+// "explicit color: black" both reach paint: ResolvedStyle has no ColorSet flag
+// to tell them apart (report: a ColorSet bool would make this exact). Author
+// colors other than black pass through. Print has no forced-colors mode, so
+// forced-color-adjust: none (keep author colors) opts out of this UA default
+// and auto defers to it.
+func paintTextColor(paintOp *Op, cfg paintColorAdjust) (float64, float64, float64) {
+	if cfg.scheme != colorSchemeDark || cfg.forcedColorAdjust == forcedColorAdjustNone {
+		return paintOp.R, paintOp.G, paintOp.B
+	}
+
+	if paintOp.R == 0 && paintOp.G == 0 && paintOp.B == 0 {
+		return darkSchemeTextChannel, darkSchemeTextChannel, darkSchemeTextChannel
+	}
+
+	return paintOp.R, paintOp.G, paintOp.B
+}
+
+// sRGBRangeLimit clamps channels to the sRGB range when dynamic-range-limit
+// asks for a limited output range. The PDF writer and the PNG/JPEG rasterizer
+// both emit sRGB, so standard and constrained-high clamp; high and no-limit
+// pass through (the writer cannot represent the extra range either way).
+func sRGBRangeLimit(r, g, b float64, limit string) (float64, float64, float64) {
+	if limit != dynamicRangeLimitStandard && limit != dynamicRangeLimitConstrainedHigh {
+		return r, g, b
+	}
+
+	return clamp01(r), clamp01(g), clamp01(b)
 }
 
 // validate rejects page geometry that would otherwise be silently reset:
@@ -154,12 +310,24 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 		contentH = opts.PageHeight
 	}
 
-	if err := validatePaintPageIndices(res.Ops, contentH); err != nil {
-		return err
+	// The single validation point below runs after every pagination pass, so
+	// the empty-document path and the pre-pagination state share this check
+	// instead of each running a full op scan of their own.
+	if !finitePositive(contentH) {
+		return errInvalidContentHeight
 	}
 
+	if res.pageSnapHeight > 0 && math.Abs(contentH-res.pageSnapHeight) > layoutCoordEpsilon {
+		return fmt.Errorf("%w: multicol snapped to %gpt, paint content height is %gpt",
+			errPageSnapMismatch, res.pageSnapHeight, contentH)
+	}
+
+	// Resolve the root color-adjust family once; every page shares it.
+	opts.colorAdjust = rootColorAdjust(res)
+
 	if len(res.Ops) == 0 {
-		doc.AddPage(opts.PageWidth, opts.PageHeight)
+		page := doc.AddPage(opts.PageWidth, opts.PageHeight)
+		paintColorSchemeCanvas(page.Content(), page, opts.colorAdjust, doc.IsUA())
 		populateLocations(res, contentH, nil)
 
 		return nil
@@ -167,15 +335,11 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 
 	applyNamedPageBreaks(res)
 
-	if _, err := paginateOps(ctx, res, contentH); err != nil {
+	if err := paginateOps(ctx, res, contentH); err != nil {
 		return err
 	}
 
 	stretchPaginatedChrome(res)
-
-	if err := validatePaintPageIndices(res.Ops, contentH); err != nil {
-		return err
-	}
 
 	fixedIdx := fixedOpIndices(res)
 
@@ -205,7 +369,13 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 
 	populateLocations(res, contentH, opPage)
 
-	clearStructureElements(res.Ops)
+	// Structure elements are only assigned for PDF/UA documents; a non-UA
+	// repaint clears them only when an earlier paint into a UA document left
+	// some behind.
+	if doc.IsUA() || res.hasStructElems {
+		clearStructureElements(res.Ops)
+		res.hasStructElems = false
+	}
 
 	if err := buildStructureTree(doc, res); err != nil {
 		return err
@@ -218,13 +388,38 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 	// continuation pages (fixture-62 #65 / #104-106 Effect cells).
 	restampBoxTransforms(res.root, res.Ops)
 
-	return paintPages(ctx, doc, res, opts, contentH, fixedIdx)
+	if err := paintPages(ctx, doc, res, opts, contentH, fixedIdx, hasBlendGroups(res.Ops)); err != nil {
+		return err
+	}
+
+	// Every flow reader has run: pagination, splitting, sticky, locations,
+	// page names, and paint. Drop the pagination-only indexes so headers and
+	// icons are not retained through PDF finalization. A later paint or
+	// pagination pass rebuilds them through ensureFlowIndex. Ops, Pages,
+	// Locations, boxes, and root stay: conversion reads them after Paint for
+	// page names, headings, and navigation.
+	releaseFlowIndex(res)
+
+	return nil
 }
 
 // fixedOpIndices collects the indices of viewport-fixed ops, which are
-// stamped on every page at viewport-relative coords.
+// stamped on every page at viewport-relative coords. The count pass returns
+// nil for the common no-fixed-op document without reserving len(ops) slots.
 func fixedOpIndices(res *Result) []int {
-	fixedIdx := make([]int, 0, len(res.Ops))
+	count := 0
+
+	for i := range res.Ops {
+		if res.Ops[i].Fixed {
+			count++
+		}
+	}
+
+	if count == 0 {
+		return nil
+	}
+
+	fixedIdx := make([]int, 0, count)
 
 	for i := range res.Ops {
 		if res.Ops[i].Fixed {
@@ -236,22 +431,26 @@ func fixedOpIndices(res *Result) []int {
 }
 
 // buildPagesAfterSplits re-derives page buckets from the final op Y
-// positions after rect splits and sticky shifts added or moved ops.
+// positions after rect splits and sticky shifts added or moved ops. The
+// forced fresh build reuses the scratch store; the buckets are then handed to
+// res.Pages, so the scratch is cleared and a later rebuild allocates fresh
+// rather than resetting arrays res.Pages still holds.
 func buildPagesAfterSplits(res *Result, contentH float64, _ []int) []int {
-	opPage, counts := pageBuckets(res.Ops, contentH)
-	res.Pages = make([][]int, len(counts))
-
-	for p := range counts {
-		if counts[p] > 0 {
-			res.Pages[p] = make([]int, 0, counts[p])
-		}
+	if res == nil {
+		return nil
 	}
 
-	for idx, p := range opPage {
-		if p >= 0 && p < len(counts) {
-			res.Pages[p] = append(res.Pages[p], idx)
-		}
+	if !buildPageIndex(res.Ops, contentH, layoutEpsilon, &res.flowScratch) {
+		res.Pages = nil
+
+		return nil
 	}
+
+	res.Pages = make([][]int, len(res.flowScratch.pages))
+	copy(res.Pages, res.flowScratch.pages)
+
+	opPage := res.flowScratch.pageOf
+	res.flowScratch.reset()
 
 	return opPage
 }
@@ -282,56 +481,6 @@ func validatePaintPageIndices(ops []Op, contentH float64) error {
 	return nil
 }
 
-// pageBuckets maps every op to its canvas page in one pass, with per-page
-// non-fixed op counts for exact-capacity buckets. Fixed ops leave pageOf at
-// its zero value; callers decide whether their fill pass includes them.
-//
-// The Y+layoutEpsilon bump matches appendOpFragments: a rect fragment ends
-// exactly at the next page top (Y = k*contentH), and float division of that
-// exact product can round just below k (e.g. (21*785.197)/785.197 =
-// 20.9999…). Without the bump the fragment is bucketed to the previous page,
-// which then paints two background bands while the intended page paints
-// none. The epsilon keeps a boundary-aligned op on the page it starts.
-func pageBuckets(ops []Op, contentH float64) ([]int, []int) {
-	// Page numbers are dense from 0..maxP, so counts index directly instead
-	// of a per-page map (page buckets below are exact-capacity, no growth).
-	maxPage := 0
-
-	for idx := range ops {
-		if ops[idx].Fixed {
-			continue
-		}
-
-		pageVal, ok := checkedFlowPageOfY(ops[idx].Y+layoutEpsilon, contentH)
-		if !ok {
-			return nil, nil
-		}
-
-		if pageVal > maxPage {
-			maxPage = pageVal
-		}
-	}
-
-	pageOf := make([]int, len(ops))
-	counts := make([]int, maxPage+1)
-
-	for idx := range ops {
-		if ops[idx].Fixed {
-			continue
-		}
-
-		pageVal, ok := checkedFlowPageOfY(ops[idx].Y+layoutEpsilon, contentH)
-		if !ok {
-			return nil, nil
-		}
-
-		pageOf[idx] = pageVal
-		counts[pageVal]++
-	}
-
-	return pageOf, counts
-}
-
 // contentSizeHint estimates initial Content buffer size from display list ops.
 func contentSizeHint(ops []Op, pageIdxs, fixedIdxs []int) int {
 	const (
@@ -356,14 +505,14 @@ func contentSizeHint(ops []Op, pageIdxs, fixedIdxs []int) int {
 }
 
 // paintPages paints every page: page content ops first, then the fixed layer
-// with page-local coordinates. The font-name map and paint closures are
-// allocated once and reused across pages; names still re-register per page via
-// UseEmbeddedFont after the map is cleared.
+// with page-local coordinates. The font-name map and group bookkeeping are
+// allocated once and reused across pages; a face registers on each content
+// stream (page or group buffer) that actually paints with it.
 //
-//nolint:funlen // one pass per page; shared paint/resName closures cover content and fixed layers
+//nolint:funlen // one pass per page; shared font and group bookkeeping cover content and fixed layers
 func paintPages(
 	ctx context.Context, doc *pdf.Document, res *Result, opts PaintOptions,
-	contentH float64, fixedIdx []int,
+	contentH float64, fixedIdx []int, hasGroups bool,
 ) error {
 	var paintErr error
 
@@ -373,7 +522,7 @@ func paintPages(
 	sortPaintIndices(res.Ops, fixedOrder)
 
 	fontNames := map[*pdf.Font]string{}
-	nextFont := 0
+	fontContent := map[string]*pdf.Content{}
 
 	var child *pdf.Content
 
@@ -382,50 +531,46 @@ func paintPages(
 	pageOrder := make([]int, 0, len(res.Pages))
 	isUA := doc != nil && doc.IsUA()
 
-	resName := func(face *pdf.Font) string {
-		if face == nil {
-			return "F0"
-		}
-
-		if n, ok := fontNames[face]; ok {
-			return n
-		}
-
-		n := "F" + strconv.Itoa(nextFont)
-		nextFont++
-		fontNames[face] = n
-		child.UseEmbeddedFont(n, face)
-
-		return n
-	}
-
 	for pageIdx, idxs := range res.Pages {
 		if err := ctx.Err(); err != nil {
 			return fmt.Errorf("layout: paint context: %w", err)
 		}
 
-		clear(fontNames)
-
-		nextFont = 0
-
 		page = doc.AddPage(opts.PageWidth, opts.PageHeight)
 		child = page.Content()
 		child.Grow(contentSizeHint(res.Ops, idxs, fixedOrder))
 
+		// Names are page-local: a cleared map makes the first use on each page
+		// re-register the face on that page's content stream.
+		clear(fontNames)
+
+		// Canvas default paints before every op on the page.
+		paintColorSchemeCanvas(child, page, opts.colorAdjust, isUA)
+
 		pageOrder = append(pageOrder[:0], idxs...)
 		sortPaintIndices(res.Ops, pageOrder)
 
+		var groups groupStack
+		if hasGroups {
+			groups = newGroupStack(page)
+			groups.prepare(res.Ops, pageOrder, fixedOrder)
+		}
+
 		painter := pagePainter{
-			child:    child,
-			page:     page,
-			pageN:    pageIdx,
-			contentH: contentH,
-			pageH:    page.Height(),
-			opts:     opts.forPage(pageIdx),
-			resName:  resName,
-			nextImg:  0,
-			err:      paintErr,
-			isUA:     isUA,
+			child:       child,
+			page:        page,
+			pageN:       pageIdx,
+			contentH:    contentH,
+			pageH:       page.Height(),
+			opts:        opts.forPage(pageIdx),
+			fontNames:   fontNames,
+			fontContent: fontContent,
+			nextFont:    0,
+			nextImg:     0,
+			err:         paintErr,
+			isUA:        isUA,
+			hasGroups:   hasGroups,
+			groups:      groups,
 		}
 
 		for _, idx := range pageOrder {
@@ -459,15 +604,69 @@ type pagePainter struct {
 	contentH float64
 	pageH    float64
 	opts     PaintOptions
-	resName  func(*pdf.Font) string
-	nextImg  int
-	err      error
-	isUA     bool
+	// fontNames maps a face to its page-local resource name; fontContent
+	// remembers which content stream each name was registered on so group
+	// buffers get their own /Font entries. Both are reused across pages.
+	fontNames   map[*pdf.Font]string
+	fontContent map[string]*pdf.Content
+	nextFont    int
+	nextImg     int
+	err         error
+	isUA        bool
+	hasGroups   bool
+	groups      groupStack
+}
+
+// fontName returns the page-local resource name for face and registers it on
+// target, the content stream that accepts this operation's paint (the page or
+// the operation's own group buffer). Ungrouped documents do no bookkeeping
+// beyond the pre-group font-name lookup.
+func (p *pagePainter) fontName(face *pdf.Font, target *pdf.Content) string {
+	if face == nil {
+		return "F0"
+	}
+
+	name, ok := p.fontNames[face]
+	if !ok {
+		name = "F" + strconv.Itoa(p.nextFont)
+		p.nextFont++
+		p.fontNames[face] = name
+		target.UseEmbeddedFont(name, face)
+
+		if p.hasGroups {
+			p.recordFontContent(name, target)
+		}
+
+		return name
+	}
+
+	if !p.hasGroups {
+		return name
+	}
+
+	if p.fontContent[name] != target {
+		target.UseEmbeddedFont(name, face)
+		p.recordFontContent(name, target)
+	}
+
+	return name
+}
+
+// recordFontContent remembers which content stream a font name was registered
+// on. The map is allocated on the first grouped font use only.
+func (p *pagePainter) recordFontContent(name string, target *pdf.Content) {
+	if p.fontContent == nil {
+		p.fontContent = map[string]*pdf.Content{}
+	}
+
+	p.fontContent[name] = target
 }
 
 //nolint:cyclop // marked content and opacity/transform wrapping for ops
 func (p *pagePainter) paintOp(paintOp *Op) {
-	if paintOp.Kind == opKindNoop {
+	paintOp.bindEmptyExtra()
+
+	if paintOp.Kind == opKindNoop || paintOp.GroupBoundary() != 0 {
 		return
 	}
 
@@ -482,31 +681,52 @@ func (p *pagePainter) paintOp(paintOp *Op) {
 		return
 	}
 
+	if p.hasGroups {
+		p.groups.enter(paintOp, p.child)
+	}
+
+	target := p.child
+
+	if p.hasGroups {
+		target = p.groups.target(paintOp, p.child)
+	}
+
 	needBlend := paintOp.BlendMode != "" && paintOp.BlendMode != blendNormal
-	opacity := pdfPaintOpacity(paintOp, needBlend)
+	// Alpha always reaches the stream as constant alpha: pre-compositing
+	// against white is wrong once an operation can sit over a non-white
+	// backdrop (a colored parent or another group), and the raster adapter
+	// keeps raw alpha as well. SetGroupOpacity gives every distinct value its
+	// own ExtGState so many values on one stream stay independent.
+	opacity := pdfPaintOpacity(paintOp, true)
 	needGS := paintOp.XformSet || opacity < 1 || needBlend
 
 	if needGS {
-		p.child.Save()
+		target.Save()
 	}
 
 	if paintOp.XformSet {
 		a, b, cc, d, e, f := pdfCTMFromCSS(paintOp.Xform, p.pageN, p.contentH, p.opts, p.page.Height())
-		p.child.Transform(a, b, cc, d, e, f)
+		target.Transform(a, b, cc, d, e, f)
 	}
 
 	if opacity < 1 {
-		p.child.SetOpacity(opacity)
+		target.SetGroupOpacity(opacity)
 	}
 
 	if needBlend {
-		p.child.SetBlendMode(paintOp.BlendMode)
+		target.SetBlendMode(paintOp.BlendMode)
 	}
 
-	p.paintWrappedOp(paintOp)
+	p.paintWrappedOp(paintOp, target)
 
 	if needGS {
-		p.child.Restore()
+		target.Restore()
+	}
+
+	if p.hasGroups {
+		if err := p.groups.leave(paintOp, p.child); err != nil && p.err == nil {
+			p.err = err
+		}
 	}
 }
 
@@ -514,50 +734,52 @@ func (p *pagePainter) paintOp(paintOp *Op) {
 // or directly when tagging is off.
 //
 //nolint:cyclop // UA marked-content dispatch over op kinds, moved out of paintOp
-func (p *pagePainter) paintWrappedOp(paintOp *Op) {
+func (p *pagePainter) paintWrappedOp(paintOp *Op, target *pdf.Content) {
 	elem := paintOp.StructElem
 
 	switch {
 	case p.isUA && elem != nil && paintOp.Kind != OpFillRect && paintOp.Kind != OpStrokeRect && paintOp.Kind != OpLine:
 		mcid := p.page.AllocMCID(elem)
-		p.child.BeginMarkedContent(string(elem.Tag), mcid)
-		p.drawPageOp(paintOp)
-		p.child.EndMarkedContent()
+		target.BeginMarkedContent(string(elem.Tag), mcid)
+		p.drawPageOp(paintOp, target)
+		target.EndMarkedContent()
 	case p.isUA && paintOp.Kind == OpFillRect:
-		p.child.BeginArtifact("Background")
-		p.drawPageOp(paintOp)
-		p.child.EndArtifact()
-	case p.isUA && (paintOp.Kind == OpStrokeRect || paintOp.Kind == OpLine):
-		p.child.BeginArtifact("Layout")
-		p.drawPageOp(paintOp)
-		p.child.EndArtifact()
+		target.BeginArtifact("Background")
+		p.drawPageOp(paintOp, target)
+		target.EndArtifact()
+	case p.isUA && (paintOp.Kind == OpStrokeRect || paintOp.Kind == OpLine || paintOp.Kind == OpGridRun):
+		target.BeginArtifact("Layout")
+		p.drawPageOp(paintOp, target)
+		target.EndArtifact()
 	case p.isUA:
-		p.child.BeginArtifact("Layout")
-		p.drawPageOp(paintOp)
-		p.child.EndArtifact()
+		target.BeginArtifact("Layout")
+		p.drawPageOp(paintOp, target)
+		target.EndArtifact()
 	default:
-		p.drawPageOp(paintOp)
+		p.drawPageOp(paintOp, target)
 	}
 }
 
 // drawPageOp dispatches one op to the shared fill/stroke/line/text/image
-// drawing routines.
-func (p *pagePainter) drawPageOp(paintOp *Op) {
+// drawing routines. target is the page content or the innermost group buffer.
+func (p *pagePainter) drawPageOp(paintOp *Op, target *pdf.Content) {
 	switch paintOp.Kind {
 	case OpFillRect:
-		drawFill(p.child, paintOp, p.pageN, p.contentH, p.opts, p.pageH)
+		drawFill(target, paintOp, p.pageN, p.contentH, p.opts, p.pageH)
 	case OpStrokeRect:
-		drawStroke(p.child, paintOp, p.pageN, p.contentH, p.opts, p.pageH)
+		drawStroke(target, paintOp, p.pageN, p.contentH, p.opts, p.pageH)
 	case OpLine:
-		drawLine(p.child, paintOp, p.pageN, p.contentH, p.opts, p.pageH)
+		drawLine(target, paintOp, p.pageN, p.contentH, p.opts, p.pageH)
+	case OpGridRun:
+		p.drawGridRun(paintOp, target)
 	case OpText, OpBullet:
-		drawText(p.child, paintOp, p.pageN, p.contentH, p.opts, p.pageH, p.resName(paintOp.Font))
+		drawText(target, paintOp, p.pageN, p.contentH, p.opts, p.pageH, p.fontName(paintOp.Font, target))
 	case OpImage:
 		name := "I" + strconv.Itoa(p.nextImg)
 		p.nextImg++
 
 		err := drawImage(
-			p.page, p.child, paintOp, p.pageN, p.contentH, p.opts, p.pageH, name,
+			p.page, target, paintOp, p.pageN, p.contentH, p.opts, p.pageH, name,
 		)
 		if err != nil && p.err == nil {
 			p.err = err
@@ -567,17 +789,21 @@ func (p *pagePainter) drawPageOp(paintOp *Op) {
 }
 
 // PaintStyle is the resolved per-op appearance that PDF and image adapters
-// share: translucent-fill pre-composition, stroke min-width, and the Latin-only
+// share: raw RGB plus source alpha, stroke min-width, and the Latin-only
 // fake-bold gate (stroking CJK/Type0 outlines creates horizontal streaks).
 type PaintStyle struct {
-	FillR, FillG, FillB float64 // final RGB; alpha pre-composited against white when translucent
-	FillAlpha           float64 // 1 after pre-composite; raw Op.Alpha when opaque
+	FillR, FillG, FillB float64 // raw source RGB; alpha travels separately
+	FillAlpha           float64 // source alpha, 1 when opaque or unset
 	StrokeWidth         float64
 	FakeBold            bool
 }
 
 // StyleOf resolves paint-semantics for op. Layout owns these decisions so
-// convert HF and imageout adapters do not drift.
+// convert HF and imageout adapters do not drift. Translucent fills keep their
+// source RGB and alpha: the PDF painter emits constant alpha through an
+// ExtGState, so a fill over a colored parent or inside a group composites
+// correctly instead of being flattened against white. The raster adapter draws
+// the same raw color with draw.Over (see imageout.paint).
 func StyleOf(paintOp *Op) PaintStyle {
 	if paintOp == nil {
 		return PaintStyle{FillAlpha: 1, StrokeWidth: 1} //nolint:exhaustruct // intentional zero fields
@@ -590,14 +816,8 @@ func StyleOf(paintOp *Op) PaintStyle {
 	if pstyle.StrokeWidth <= 0 {
 		pstyle.StrokeWidth = 1
 	}
-	// Pre-composite translucent fills against white paper (PDF path).
-	if paintOp.Alpha > 0 && paintOp.Alpha < 1 && !hasBlendMode(paintOp) {
-		a := paintOp.Alpha
-		pstyle.FillR = paintOp.R*a + (1 - a)
-		pstyle.FillG = paintOp.G*a + (1 - a)
-		pstyle.FillB = paintOp.B*a + (1 - a)
-		pstyle.FillAlpha = 1
-	} else if paintOp.Alpha > 0 {
+
+	if paintOp.Alpha > 0 && paintOp.Alpha < 1 {
 		pstyle.FillAlpha = paintOp.Alpha
 	}
 
@@ -606,15 +826,13 @@ func StyleOf(paintOp *Op) PaintStyle {
 	return pstyle
 }
 
-func hasBlendMode(paintOp *Op) bool {
-	return paintOp != nil && paintOp.BlendMode != "" && paintOp.BlendMode != blendNormal
-}
-
 func pdfPaintOpacity(paintOp *Op, includeAlpha bool) float64 {
 	opacity := 1.0
 	if paintOp == nil {
 		return opacity
 	}
+
+	paintOp.bindEmptyExtra()
 
 	if paintOp.PaintOpacity > 0 && paintOp.PaintOpacity < 1 {
 		opacity = paintOp.PaintOpacity
@@ -683,22 +901,39 @@ func PaintBandContext(ctx context.Context, page *pdf.Page, chld *pdf.Content, op
 	}
 
 	fontNames := map[*pdf.Font]string{}
+
+	var fontContent map[string]*pdf.Content
+
 	nextFont := 0
-	resName := func(face *pdf.Font) string {
+	resName := func(target *pdf.Content, face *pdf.Font) string {
 		if face == nil {
 			return "F0"
 		}
 
-		if n, ok := fontNames[face]; ok {
-			return n
+		name, ok := fontNames[face]
+		if !ok {
+			name = "B" + strconv.Itoa(nextFont)
+			nextFont++
+			fontNames[face] = name
 		}
 
-		n := "B" + strconv.Itoa(nextFont)
-		nextFont++
-		fontNames[face] = n
-		chld.UseEmbeddedFont(n, face)
+		if fontContent[name] != target {
+			target.UseEmbeddedFont(name, face)
 
-		return n
+			// The band content needs no tracking: a repeated registration is
+			// harmless, and skipping the write keeps ungrouped bands
+			// allocation-free. Group buffers are recorded so a later return
+			// to the band content re-registers the name there.
+			if target != chld {
+				if fontContent == nil {
+					fontContent = map[string]*pdf.Content{}
+				}
+
+				fontContent[name] = target
+			}
+		}
+
+		return name
 	}
 
 	return paintBandOps(ctx, page, chld, ops, opts, resName)
@@ -726,44 +961,76 @@ func bandPaintGeom(opts BandOptions, page *pdf.Page) (float64, float64, PaintOpt
 }
 
 // paintBandOps dispatches every op onto the band content stream in the same
-// PaintOrder used by the paginated body and raster adapter. Link operations
-// are still skipped here because annotations need document context and are
-// wired by the caller in display-list order.
+// PaintOrder used by the paginated body and raster adapter. Element groups
+// (mix-blend-mode / isolation) buffer their ops and composite once, exactly
+// like the body page path. Link operations are still skipped here because
+// annotations need document context and are wired by the caller in
+// display-list order.
+//
+//nolint:cyclop // group buffering adds two branches to the band dispatch loop
 func paintBandOps(
 	ctx context.Context, page *pdf.Page, chld *pdf.Content, ops []Op, opts BandOptions,
-	resName func(*pdf.Font) string,
+	resName func(*pdf.Content, *pdf.Font) string,
 ) error {
 	nextImg := 0
 	contentH, pageH, margins := bandPaintGeom(opts, page)
 
+	ordered := PaintOrder(ops)
+	hasGroups := hasBlendGroups(ops)
+
+	var groups groupStack
+
+	if hasGroups {
+		groups = newGroupStack(page)
+		groups.prepare(ops, ordered)
+	}
+
 	var firstErr error
 
-	for _, idx := range PaintOrder(ops) {
+	for _, idx := range ordered {
 		if err := ctx.Err(); err != nil {
 			return fmt.Errorf("layout: paint band context: %w", err)
 		}
 
 		paintOp := &ops[idx]
-		if paintOp.Kind == OpLinkURI || paintOp.Kind == opKindNoop {
+		if paintOp.Kind == OpLinkURI || paintOp.Kind == opKindNoop || paintOp.GroupBoundary() != 0 {
 			continue
 		}
 
-		paintBandOp(chld, page, paintOp, contentH, pageH, margins, resName, &nextImg, &firstErr)
+		target := chld
+
+		if hasGroups {
+			groups.enter(paintOp, chld)
+			target = groups.target(paintOp, chld)
+		}
+
+		paintBandOp(target, page, paintOp, contentH, pageH, margins, resName, &nextImg, &firstErr)
+
+		if hasGroups {
+			if err := groups.leave(paintOp, chld); err != nil && firstErr == nil {
+				firstErr = err
+			}
+		}
 	}
 
 	return firstErr
 }
 
 // paintBandOp paints one band op: graphics-state save, transform, opacity,
-// then the shared draw dispatch, and a final restore.
+// then the shared draw dispatch, and a final restore. chld is the operation's
+// own target: the page content or its group buffer.
 //
 //nolint:cyclop,wsl // band op opacity, transform and artifact wrapping
 func paintBandOp(
 	chld *pdf.Content, page *pdf.Page, paintOp *Op, contentH, pageH float64,
-	margins PaintOptions, resName func(*pdf.Font) string, nextImg *int, firstErr *error,
+	margins PaintOptions, resName func(*pdf.Content, *pdf.Font) string, nextImg *int, firstErr *error,
 ) {
+	paintOp.bindEmptyExtra()
+
 	needBlend := paintOp.BlendMode != "" && paintOp.BlendMode != blendNormal
-	opacity := pdfPaintOpacity(paintOp, needBlend)
+	// Same constant-alpha policy as the body painter: SetGroupOpacity so
+	// distinct values on one stream cannot overwrite each other's resource.
+	opacity := pdfPaintOpacity(paintOp, true)
 	needGS := paintOp.XformSet || opacity < 1 || needBlend
 	if needGS {
 		chld.Save()
@@ -775,7 +1042,7 @@ func paintBandOp(
 	}
 
 	if opacity < 1 {
-		chld.SetOpacity(opacity)
+		chld.SetGroupOpacity(opacity)
 	}
 	if needBlend {
 		chld.SetBlendMode(paintOp.BlendMode)
@@ -799,9 +1066,11 @@ func paintBandOp(
 }
 
 // drawBandOp dispatches one band op through the same draw* routines as body Paint.
+//
+//nolint:cyclop // grid runs replay segments, adding one dispatch arm
 func drawBandOp(
 	chld *pdf.Content, page *pdf.Page, paintOp *Op, contentH, pageH float64,
-	margins PaintOptions, resName func(*pdf.Font) string, nextImg *int, firstErr *error,
+	margins PaintOptions, resName func(*pdf.Content, *pdf.Font) string, nextImg *int, firstErr *error,
 ) {
 	switch paintOp.Kind {
 	case OpFillRect:
@@ -810,8 +1079,13 @@ func drawBandOp(
 		drawStroke(chld, paintOp, 0, contentH, margins, pageH)
 	case OpLine:
 		drawLine(chld, paintOp, 0, contentH, margins, pageH)
+	case OpGridRun:
+		for idx := range paintOp.Grid.Segs {
+			line := paintOp.Grid.asLine(paintOp, idx)
+			drawLine(chld, &line, 0, contentH, margins, pageH)
+		}
 	case OpText, OpBullet:
-		drawText(chld, paintOp, 0, contentH, margins, pageH, resName(paintOp.Font))
+		drawText(chld, paintOp, 0, contentH, margins, pageH, resName(chld, paintOp.Font))
 	case OpImage:
 		name := "I" + strconv.Itoa(*nextImg)
 		*nextImg++
@@ -823,8 +1097,11 @@ func drawBandOp(
 	}
 }
 
+//nolint:cyclop,nestif // location walk plus id census is one pass
 func populateLocations(res *Result, contentH float64, opPage []int) {
 	res.Locations = nil
+	res.HasIDs = false
+
 	if res.root == nil {
 		return
 	}
@@ -856,6 +1133,10 @@ func populateLocations(res *Result, contentH float64, opPage []int) {
 				}
 			}
 
+			if !res.HasIDs && boxNode.node.Attribute("id") != "" {
+				res.HasIDs = true
+			}
+
 			res.Locations = append(res.Locations, ElementLocation{
 				Node: boxNode.node, Page: page, X: boxNode.x, Y: boxNode.y, W: boxNode.w, H: boxNode.height,
 			})
@@ -881,9 +1162,10 @@ func canvasToPDF(opX, opY float64, pageIdx int, contentH float64, opts PaintOpti
 func drawFill(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintOptions, pageH float64) {
 	x, y := canvasToPDF(op.X, op.Y+op.H, pageIdx, contentH, opts, pageH)
 	ps := StyleOf(op)
-	c.SetFillColor(ps.FillR, ps.FillG, ps.FillB)
+	fillR, fillG, fillB := sRGBRangeLimit(ps.FillR, ps.FillG, ps.FillB, opts.colorAdjust.rangeLimit)
+	c.SetFillColor(fillR, fillG, fillB)
 	if op.Radius > 0 || opHasRoundedCorners(op) {
-		rx, ry := opRadiiXY(op)
+		rx, ry := OpRadiiXY(op)
 		roundedRectPathCorners(c, x, y, op.W, op.H, rx, ry)
 	} else {
 		c.Rect(x, y, op.W, op.H)
@@ -893,7 +1175,7 @@ func drawFill(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintO
 
 //nolint:varnamelen,wsl // PDF path helpers use compact graphics-state names
 func drawMaskedStroke(c *pdf.Content, op *Op, x, y, width float64) {
-	rx, ry := opRadiiXY(op)
+	rx, ry := OpRadiiXY(op)
 	if op.StrokeMask&StrokeMaskTop != 0 {
 		roundedTopPath(c, x, y, op.W, op.H, width, rx, ry)
 		c.Stroke()
@@ -915,7 +1197,8 @@ func drawMaskedStroke(c *pdf.Content, op *Op, x, y, width float64) {
 //nolint:varnamelen,wsl // PDF path helpers use compact graphics-state names
 func drawStroke(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintOptions, pageH float64) {
 	x, y := canvasToPDF(op.X, op.Y+op.H, pageIdx, contentH, opts, pageH)
-	c.SetStrokeColor(op.R, op.G, op.B)
+	strokeR, strokeG, strokeB := sRGBRangeLimit(op.R, op.G, op.B, opts.colorAdjust.rangeLimit)
+	c.SetStrokeColor(strokeR, strokeG, strokeB)
 	width := op.Width
 	if width <= 0 {
 		width = 1
@@ -928,7 +1211,7 @@ func drawStroke(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts Pain
 		return
 	}
 	if op.Radius > 0 || opHasRoundedCorners(op) {
-		rx, ry := opRadiiXY(op)
+		rx, ry := OpRadiiXY(op)
 		roundedRectPathCorners(c, x, y, op.W, op.H, rx, ry)
 	} else {
 		c.Rect(x, y, op.W, op.H)
@@ -1219,7 +1502,8 @@ func drawLine(chld *pdf.Content, paintOp *Op, pageIdx int, contentH float64, opt
 	xEnd, yEnd := canvasToPDF(x, y, pageIdx, contentH, opts, pageH)
 	xTwo, yTwo := canvasToPDF(x+w, y+h, pageIdx, contentH, opts, pageH)
 
-	chld.SetStrokeColor(paintOp.R, paintOp.G, paintOp.B)
+	strokeR, strokeG, strokeB := sRGBRangeLimit(paintOp.R, paintOp.G, paintOp.B, opts.colorAdjust.rangeLimit)
+	chld.SetStrokeColor(strokeR, strokeG, strokeB)
 	chld.SetLineWidth(width)
 	// Square caps project half the stroke past each endpoint so axis-aligned
 	// border sides meet at outer corners (butt caps leave a width/2 notch).
@@ -1235,8 +1519,12 @@ func drawLine(chld *pdf.Content, paintOp *Op, pageIdx int, contentH float64, opt
 func drawText(
 	chld *pdf.Content, paintOp *Op, pageIdx int, contentH float64, opts PaintOptions, pageH float64, fontName string,
 ) {
+	paintOp.bindEmptyExtra()
+
 	posX, posY := canvasToPDF(paintOp.X, paintOp.Y, pageIdx, contentH, opts, pageH)
-	chld.SetFillColor(paintOp.R, paintOp.G, paintOp.B)
+	fillR, fillG, fillB := paintTextColor(paintOp, opts.colorAdjust)
+	fillR, fillG, fillB = sRGBRangeLimit(fillR, fillG, fillB, opts.colorAdjust.rangeLimit)
+	chld.SetFillColor(fillR, fillG, fillB)
 
 	if fontName == "" {
 		fontName = "F0"
@@ -1263,12 +1551,12 @@ func drawText(
 	// Stroking CJK/Type0 outlines creates horizontal streak artifacts.
 	fakeBold := FakeBoldFor(paintOp)
 	if fakeBold {
-		chld.SetStrokeColor(paintOp.R, paintOp.G, paintOp.B)
+		chld.SetStrokeColor(fillR, fillG, fillB)
 		chld.SetLineWidth(paintOp.Size * fakeBoldStrokeRatio)
 		chld.TextRenderMode(pdfTextRenderFillStroke) // fill + stroke
 	}
 
-	chld.TextShow(transformInlineText(paintOp.Text, paintOp.TextTransform))
+	chld.TextShowLanguage(transformInlineText(paintOp.Text, paintOp.TextTransform), paintOp.TextLanguage())
 
 	if fakeBold {
 		chld.TextRenderMode(0)
@@ -1281,6 +1569,8 @@ func drawImage(
 	_ *pdf.Page, chld *pdf.Content, paintOp *Op, pageIdx int, contentH float64,
 	opts PaintOptions, pageH float64, name string,
 ) error {
+	paintOp.bindEmptyExtra()
+
 	posX, posY := canvasToPDF(paintOp.X, paintOp.Y+paintOp.H, pageIdx, contentH, opts, pageH)
 
 	if name == "" {
@@ -1305,6 +1595,8 @@ func drawImage(
 // drawLinkXform places a URI annotation. Annotations are page-space (not under
 // content-stream CTM), so CSS transforms are applied to the canvas rect first.
 func drawLinkXform(page *pdf.Page, paintOp *Op, pageIdx int, contentH float64, opts PaintOptions) pdf.ObjRef {
+	paintOp.bindEmptyExtra()
+
 	if len(paintOp.URI) > 0 && paintOp.URI[0] == '#' {
 		return 0
 	}

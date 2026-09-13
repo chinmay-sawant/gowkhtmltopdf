@@ -29,7 +29,7 @@ internal/settings ── structs ──► internal/cli (Command)
 internal/app (command→request)     convert.Request / imageout.Request
       │                                  │
       ▼                                  ▼
-internal/convert (PDF) / imageout ──► internal/load (NewLoader)
+internal/convert (PDF) / imageout ──► internal/load (NewLoaderWithError)
       │                                  │
       ├──► internal/layout / internal/pdf ▼
       └──► resource fetches honor LoadGlobal/LoadPage policy
@@ -50,11 +50,11 @@ nil-guard error identity stable across the library boundary.
 
 | File | Responsibility | Approx. lines |
 |------|----------------|---------------|
-| `internal/settings/settings.go` | Typed settings model: `PdfGlobal`, `PdfObject`, `ImageGlobal`, sub-structs (`Web`, `LoadGlobal`, `LoadPage`, `HeaderFooter`, `TableOfContent`, `Margin`, `Size`, `CropSettings`, `PostItem`), enums (`Orientation`, `ColorMode`, `LoadErrorHandling`, `MediaType`), `ParsePDFVersion` / `ParsePDFProfile` (profile parse delegates to `internal/pdfprofile`), wkhtml-compatible defaults, `ResolveMedia` | 449 |
+| `internal/settings/settings.go` | Typed settings model: `PdfGlobal`, `PdfObject`, `ImageGlobal`, sub-structs (`Web`, `LoadGlobal`, `LoadPage`, `HeaderFooter`, `TableOfContent`, `Margin`, `Size`, `CropSettings`, `PostItem`), enums (`Orientation`, `LoadErrorHandling`, `MediaType`), `ParsePDFVersion` / `ParsePDFProfile` (profile parse delegates to `internal/pdfprofile`), wkhtml-compatible defaults, `ResolveMedia` | 449 |
 | `internal/pdfprofile/profile.go` | Leaf: canonical profile tokens (`PDF/A-3a`, `PDF/UA-1`, `PDF/A-3a+PDF/UA-1`, `PDF/A-4`, `PDF/UA-2`, `PDF/A-4+PDF/UA-2`), alias `Parse`, `IsPDFA*` / `IsPDFUA*` | 140 |
 | `internal/settings/reflect.go` | The descriptor engine: `keyTable`/`field` tables, dotted-key `Set`/`Get`, type-coercing setters (`setBool`, `setFloat`, `setInt`, `setUnitMm`, …), ignored-key tables (Policy A), `ApplyImageKey` | 881 |
 | `internal/settings/getters.go` | `Get` methods on the three settings types; canonical string formatting helpers (`fmtBool`, `fmtFloat`, `fmtInt`, `fmtStrings`) | 37 |
-| `internal/settings/object_roles.go` | Shared cover/TOC stamps (`StampCover`, `StampEmptyHFOverride`, `StampTOC`) used by CLI and Document mappers | — |
+| `internal/settings/object_roles.go` | Shared cover/TOC stamps (`StampCover`, `StampTOC`) used by CLI and Document mappers | — |
 | `internal/settings/pagesize.go` | Static ISO/ANSI page-size table in points; `ParsePageSize(name) (w, h, err)` | 64 |
 | `internal/settings/unitreal.go` | `UnitReal` scalar with unit suffix (`10mm`, `1.5in`, `12pt`, `96px`, `100%`); `Points()` / `Mm()` conversion; `ErrInvalidUnitReal` | 94 |
 | `internal/settings/httperror.go` | `HttpStatusError` (load failure carrying HTTP status) and `HttpErrorCode` (status → wkhtmltopdf exit code: 404→2, 401→3, else 1) | 41 |
@@ -94,7 +94,6 @@ Supporting sub-structs (all in `settings.go`):
 | Symbol | Purpose | File:line |
 |--------|---------|-----------|
 | `Orientation` + `ParseOrientation` | portrait/landscape, case-insensitive | `settings.go:61` (approx.) / `settings.go:78` (approx.) |
-| `ColorMode` + `ParseColorMode` | `color`/`grayscale` parse helper; engine stores only `PdfGlobal.Grayscale` (ponytail note in source) | `settings.go:27` (approx.) / `settings.go:50` (approx.) |
 | `LoadErrorHandling` + `ParseLoadErrorHandling` | abort/skip/ignore | `settings.go:93` (approx.) / `settings.go:112` (approx.) |
 | `MediaType` + `ResolveMedia(base, global Web, obj *Web) string` | screen/print/ignore resolution; print-media-type override wins, then object media-type, then global, then base | `settings.go:126` (approx.) / `settings.go:137` |
 | `ParsePDFVersion` / `ParsePDFProfile` | Version: `""`/`1.4`/`1.7`/`2.0`. Profile: aliases (`a3a-ua1`, `a4-ua2`, …) → canonical tokens. Profile parse is `pdfprofile.Parse` | `settings.go:56` / `settings.go:76` |
@@ -146,7 +145,6 @@ Supporting sub-structs (all in `settings.go`):
 
 | Symbol | Purpose | File |
 |--------|---------|------|
-| `StampEmptyHFOverride` | Empty header/footer with `HeaderSet`/`FooterSet` true (blocks global HF inherit) | `object_roles.go` |
 | `StampCover` | `IsCover`, outline exclusion, empty HF override | `object_roles.go` |
 | `StampTOC` | TOC object flags (`IsTableOfContent`, `UseOutline`/`IncludeInOutline` false) | `object_roles.go` |
 
@@ -205,7 +203,7 @@ library `WithPDFVersion` / `PdfGlobalOptions` builder.
 
 | Consumer | What it reads | File:line |
 |----------|---------------|-----------|
-| `internal/load.NewLoader(global settings.LoadGlobal)` | Proxy, `Allow` ACL prefixes, `EnableLocalFileAccess` — applied once into the loader policy | `load.go:282` |
+| `internal/load.NewLoaderWithError(global settings.LoadGlobal)` | Proxy, `Allow` ACL prefixes, `EnableLocalFileAccess` — applied once into the loader policy | `load.go:282` |
 | `(*Loader).Load(ctx, input, pageLoad settings.LoadPage)` | Per-page zoom, auth, cookies, POST, media, timeout, `InlineHTML`/`InlineBase`, block-local-access | `load.go:394` |
 | `(*Loader).fileAccessAllowed(path, pageLoad)` | `EnableLocalFileAccess && !BlockLocalFileAccess` + `AccessController` prefix match | `load.go:811-817` |
 | `internal/load` HTTP failure path | Constructs `&settings.HttpStatusError{Status, URL}` → exit-code mapping at CLI | `load.go:1007-1010` |
@@ -245,9 +243,9 @@ imports only `errors`).
 | `document.go` / `api.go` (root) | Public model, validation, engine adapters, hooks, and stable sentinels |
 | `internal/app` | Imports `cli`, `convert`, `errs`; re-exports `ErrNilContext` |
 | `internal/convert` | Imports `settings`; `Request` embeds `PdfGlobal`/`PdfObject`/`*ImageGlobal`; typed `PDFRequest`/`ImageRequest` wrap it (`request.go`) |
-| `internal/load` | Imports `settings`; `NewLoader(settings.LoadGlobal)`, `Load(..., settings.LoadPage)`, emits `settings.HttpStatusError` |
+| `internal/load` | Imports `settings`; `NewLoaderWithError(settings.LoadGlobal)`, `Load(..., settings.LoadPage)`, emits `settings.HttpStatusError` |
 | `internal/imageout` | Imports `settings`; consumes `PdfGlobal`/`ImageGlobal`/`PdfObject` and `ResolveMedia` |
-| `internal/convert/prepare`, `internal/convert/render`, `internal/convert/islands` | Import `settings` transitively via `convert` types |
+| `internal/convert/prepare`, `internal/convert/render` | Import `settings` transitively via `convert` types |
 
 ### 5.3 Import-direction rule
 
@@ -402,7 +400,7 @@ originate**:
   (`--allow-local-files`) *and* a per-object opt-out that stays on by
   default.
 - **`Allow` prefixes** (`--allow` / `load.Allow`) are the only way to widen
-  the local ACL; `NewLoader` clones them into an `AccessController`
+  the local ACL; `NewLoaderWithError` clones them into an `AccessController`
   (`load.go:292-300`). Documented in `documentation/THREAT-MODEL.md` and
   `documentation/integration-security.md`.
 - **Inert-key acceptance is a compat surface, not an attack surface.** Keys

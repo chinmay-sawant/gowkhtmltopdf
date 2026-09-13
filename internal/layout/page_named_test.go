@@ -7,6 +7,9 @@ import (
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
 )
 
+// chapterPageName is the named page the inheritance tests reuse.
+const chapterPageName = "chapter"
+
 func TestPageNameInherits(t *testing.T) {
 	t.Parallel()
 
@@ -17,7 +20,7 @@ func TestPageNameInherits(t *testing.T) {
 	`)}, "print", testViewport, 800)
 
 	inner := styleByClass(t, styles, "inner")
-	if inner.PageName != "chapter" {
+	if inner.PageName != chapterPageName {
 		t.Fatalf("inner PageName = %q, want chapter (used-value inherit)", inner.PageName)
 	}
 
@@ -27,7 +30,7 @@ func TestPageNameInherits(t *testing.T) {
 	}
 
 	outer := styleByClass(t, styles, "outer")
-	if outer.PageName != "chapter" {
+	if outer.PageName != chapterPageName {
 		t.Fatalf("outer PageName = %q, want chapter", outer.PageName)
 	}
 }

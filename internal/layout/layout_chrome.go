@@ -23,17 +23,40 @@ func (e *engine) markOpsFixed(start, end int) {
 func appendBorderLineOps(
 	dst []Op, posX, posY, boxW, boxH, width float64, style string, red, green, blue float64,
 ) []Op {
+	var buf [8]GridSeg
+
+	segs := appendBorderLineSegments(buf[:0], posX, posY, boxW, boxH, width, style, red, green, blue)
+	for idx := range segs {
+		dst = append(dst, gridSegOp(segs[idx]))
+	}
+
+	return dst
+}
+
+// appendBorderLineSegments appends one border edge as grid segments: one
+// segment for solid styles, the expanded dash/dot run otherwise.
+func appendBorderLineSegments(
+	dst []GridSeg, posX, posY, boxW, boxH, width float64, style string, red, green, blue float64,
+) []GridSeg {
 	if width <= 0 || style == cssDisplayNone || (boxW <= 0 && boxH <= 0) {
 		return dst
 	}
 
 	if style != borderStyleDashed && style != borderStyleDotted {
-		return append(dst, Op{ //nolint:exhaustruct // intentional zero fields
-			Kind: OpLine, X: posX, Y: posY, W: boxW, H: boxH, Width: width, R: red, G: green, B: blue,
-		})
+		return append(dst, GridSeg{X: posX, Y: posY, W: boxW, H: boxH, Width: width, R: red, G: green, B: blue})
 	}
 
-	return appendDashedLineSegments(dst, posX, posY, boxW, boxH, width, style == borderStyleDotted, red, green, blue)
+	return appendDashedLineGridSegments(
+		dst, posX, posY, boxW, boxH, width, style == borderStyleDotted, red, green, blue,
+	)
+}
+
+// gridSegOp converts one grid segment into the OpLine it stands for.
+func gridSegOp(seg GridSeg) Op {
+	return Op{ //nolint:exhaustruct // intentional zero fields
+		Kind: OpLine, X: seg.X, Y: seg.Y, W: seg.W, H: seg.H,
+		Width: seg.Width, R: seg.R, G: seg.G, B: seg.B, LineInset: seg.LineInset,
+	}
 }
 
 func appendBorderLineOpsForSide(
@@ -53,18 +76,11 @@ func appendBorderLineOpsForSide(
 	return dst
 }
 
-// appendDashedLineSegments expands a dashed/dotted border edge into segment ops.
-func appendDashedLineSegments(
-	dst []Op, posX, posY, boxW, boxH, width float64, dotted bool, red, green, blue float64,
-) []Op {
-	horizontal := boxW > 0
-	length := boxW
-
-	if !horizontal {
-		length = boxH
-	}
-
-	drawLen, gap := width*3, width*2 // three=3, two=2 inlined; remaining two/three usages parked
+// dashedSegmentMetrics derives the draw and gap lengths for one dashed or
+// dotted edge and the upper bound on the segment count. Callers that size a
+// shared buffer for several sides use the bound to allocate once.
+func dashedSegmentMetrics(length, width float64, dotted bool) (drawLen, gap float64, segments int) {
+	drawLen, gap = width*3, width*2 // three=3, two=2 inlined; remaining two/three usages parked
 	if dotted {
 		drawLen, gap = width, width*1.5
 	}
@@ -77,9 +93,42 @@ func appendDashedLineSegments(
 		gap = 0.5
 	}
 
-	if n := int(length/(drawLen+gap)) + 1; cap(dst)-len(dst) < n {
+	return drawLen, gap, int(length/(drawLen+gap)) + 1
+}
+
+// borderSideOpCount returns the largest number of ops one border side can
+// append: one line for solid styles, the dashed segment bound otherwise.
+// length is an upper bound on the painted edge length of that side.
+func borderSideOpCount(length, width float64, style string) int {
+	if style != borderStyleDashed && style != borderStyleDotted {
+		return 1
+	}
+
+	_, _, segments := dashedSegmentMetrics(length, width, style == borderStyleDotted)
+	if segments < 1 {
+		return 1
+	}
+
+	return segments
+}
+
+// appendDashedLineGridSegments expands a dashed/dotted border edge into grid
+// segments.
+func appendDashedLineGridSegments(
+	dst []GridSeg, posX, posY, boxW, boxH, width float64, dotted bool, red, green, blue float64,
+) []GridSeg {
+	horizontal := boxW > 0
+	length := boxW
+
+	if !horizontal {
+		length = boxH
+	}
+
+	drawLen, gap, n := dashedSegmentMetrics(length, width, dotted)
+
+	if cap(dst)-len(dst) < n {
 		// Grow once for the expected segment count.
-		grown := make([]Op, len(dst), len(dst)+n)
+		grown := make([]GridSeg, len(dst), len(dst)+n)
 		copy(grown, dst)
 		dst = grown
 	}
@@ -95,8 +144,8 @@ func appendDashedLineSegments(
 			segX, segY, segW, segH = posX, posY+pos, 0.0, seg
 		}
 
-		dst = append(dst, Op{ //nolint:exhaustruct // intentional zero fields
-			Kind: OpLine, X: segX, Y: segY, W: segW, H: segH,
+		dst = append(dst, GridSeg{
+			X: segX, Y: segY, W: segW, H: segH,
 			Width: width, R: red, G: green, B: blue,
 		})
 	}
@@ -105,26 +154,13 @@ func appendDashedLineSegments(
 }
 
 // emitBorderLine appends one edge's border segments straight onto e.ops —
-// no intermediate []Op (hot path for collapsed table grids).
+// no intermediate []Op (hot path for box borders).
 func (e *engine) emitBorderLine(posX, posY, boxW, boxH, width float64, style string, red, green, blue float64) {
-	if width <= 0 || style == cssDisplayNone || (boxW <= 0 && boxH <= 0) {
-		return
-	}
+	var buf [8]GridSeg
 
-	if style != borderStyleDashed && style != borderStyleDotted {
-		e.add(Op{ //nolint:exhaustruct // intentional zero fields
-			Kind: OpLine, X: posX, Y: posY, W: boxW, H: boxH, Width: width, R: red, G: green, B: blue,
-		})
-
-		return
-	}
-
-	// Dashed/dotted: append into a tiny stack buffer then emit.
-	var buf [8]Op
-
-	segs := appendDashedLineSegments(buf[:0], posX, posY, boxW, boxH, width, style == borderStyleDotted, red, green, blue)
+	segs := appendBorderLineSegments(buf[:0], posX, posY, boxW, boxH, width, style, red, green, blue)
 	for i := range segs {
-		e.add(segs[i])
+		e.add(gridSegOp(segs[i]))
 	}
 }
 
@@ -137,10 +173,6 @@ func (e *engine) borderOps(sty ResolvedStyle, posX, posY, wid, height float64) [
 func (e *engine) borderOpsSides(
 	sty ResolvedStyle, posX, posY, wid, height float64, top, right, bottom, left bool,
 ) []Op {
-	const borderSideCount = 4
-
-	ops := make([]Op, 0, borderSideCount)
-
 	wTop := 0.0
 	if top && sty.BorderTop.Style != cssDisplayNone && borderPaint(sty.BorderTop) > 0 {
 		wTop = e.scalePt(borderPaint(sty.BorderTop))
@@ -168,6 +200,29 @@ func (e *engine) borderOpsSides(
 		topInset, rightInset = LineInsetTop, LineInsetRight
 		bottomInset, leftInset = LineInsetBottom, LineInsetLeft
 	}
+
+	// Size the slice once for the active sides. Edge lengths passed to the
+	// dashed splitter are at most wid/height, so bounding with those keeps the
+	// single allocation an upper bound; the per-call growth fallback still
+	// covers every other appendDashedLineSegments caller.
+	capHint := 0
+	if wTop > 0 {
+		capHint += borderSideOpCount(wid, wTop, sty.BorderTop.Style)
+	}
+
+	if wRight > 0 {
+		capHint += borderSideOpCount(height, wRight, sty.BorderRight.Style)
+	}
+
+	if wBottom > 0 {
+		capHint += borderSideOpCount(wid, wBottom, sty.BorderBottom.Style)
+	}
+
+	if wLeft > 0 {
+		capHint += borderSideOpCount(height, wLeft, sty.BorderLeft.Style)
+	}
+
+	ops := make([]Op, 0, capHint)
 
 	if wTop > 0 {
 		adjL := 0.0
@@ -287,7 +342,7 @@ func (e *engine) collapsedThumbCaption(caption *box) (*ResolvedStyle, bool) {
 		return nil, false
 	}
 
-	parentStyle := e.styles[parent]
+	parentStyle := e.stylePtr(parent)
 	if !isCollapsedThumbPair(parent, parentStyle, caption.style) {
 		return nil, false
 	}
@@ -310,7 +365,7 @@ func (e *engine) thumbImageInsideFigure(node *html.Node) bool {
 
 		for _, child := range parent.Children {
 			if child != nil && child.Name == "figcaption" {
-				captionBox := &box{node: child, style: e.styles[child]} //nolint:exhaustruct // style probe only
+				captionBox := &box{node: child, style: e.stylePtr(child)} //nolint:exhaustruct // style probe only
 				_, ok := e.collapsedThumbCaption(captionBox)
 
 				return ok
@@ -367,7 +422,7 @@ func (e *engine) prependChrome(insertAt int, boxNode *box, sty ResolvedStyle, po
 	// (CSS Backgrounds §7.1 / fixture-61 box-shadow-position), or the fill
 	// hides them.
 	chrome = e.appendBoxShadow(chrome, sty, posX, posY, width, height, radii, radiiY, false)
-	if sty.BGColor[3] > 0 && e.opts.Background {
+	if sty.BGColor[3] > 0 && e.backgroundPaintEnabled(&sty) {
 		bgOp := Op{ //nolint:exhaustruct // intentional zero fields
 			Kind: OpFillRect, X: posX, Y: posY, W: width, H: height,
 			R: sty.BGColor[0], G: sty.BGColor[1], B: sty.BGColor[2], Alpha: sty.BGColor[3], Radius: radius,
@@ -403,6 +458,10 @@ func (e *engine) prependChrome(insertAt int, boxNode *box, sty ResolvedStyle, po
 			chrome = append(chrome, e.collapsedOrFullBorderOps(boxNode, sty, posX, posY, width, height)...)
 		}
 	}
+	if boxNode != nil && outlinePaints(&sty) {
+		effW, _ := effectiveOutline(&sty)
+		boxNode.outlineInflate = e.scalePt(outlineInflate(effW, sty.OutlineOffset))
+	}
 	chrome = append(chrome, e.outlineOps(&sty, posX, posY, width, height)...)
 	stampOpRadiiY(chrome, radiiY)
 	if len(chrome) == 0 {
@@ -410,11 +469,14 @@ func (e *engine) prependChrome(insertAt int, boxNode *box, sty ResolvedStyle, po
 	}
 
 	for i := range chrome {
+		chrome[i].bindEmptyExtra()
 		chrome[i].ZIndex = e.zIndex
 		chrome[i].ZIndexSet = e.zIndexSet
 		chrome[i].Positioned = e.positioned
-		if chrome[i].BlendMode == "" || chrome[i].BlendMode == blendNormal {
-			chrome[i].BlendMode = e.blendMode
+		if e.blendGroup != nil {
+			chrome[i].setBlendGroup(e.blendGroup)
+		} else if chrome[i].BlendMode == "" || chrome[i].BlendMode == blendNormal {
+			chrome[i].setBlendMode(e.blendMode)
 		}
 	}
 
@@ -666,7 +728,9 @@ type chromeSpan struct{ start, end int }
 
 // mergeDeferredChrome splices deferred background/border ops into oldOps in
 // one linear pass. Paint order for multiple entries at the same index matches
-// immediate-splice nesting: later (outer) entries paint first.
+// immediate-splice nesting: later (outer) entries paint first. The merged
+// sequence is built backwards so spare capacity in oldOps is reused in place
+// when it fits; otherwise one exact-sized list is allocated.
 func mergeDeferredChrome(
 	oldOps []Op, entries []chromeEntry,
 ) ([]Op, []int, map[*box]chromeSpan) {
@@ -695,32 +759,61 @@ func mergeDeferredChrome(
 		totalChrome += len(it.ent.ops)
 	}
 
-	out := make([]Op, 0, len(oldOps)+totalChrome)
+	// Fill the merged list backwards: the forward sequence is
+	// [chrome at idx][oldOps[idx]] per index plus a trailing chrome block, so
+	// walking backwards writes old ops first, then the chrome block that
+	// precedes each one. Spare capacity in oldOps is used in place; otherwise
+	// one exact-sized list is allocated (no append growth).
+	need := len(oldOps) + totalChrome
+
+	var out []Op
+	if cap(oldOps)-len(oldOps) >= totalChrome {
+		out = oldOps[:need]
+	} else {
+		out = make([]Op, need)
+	}
+
 	oldToNew := make([]int, len(oldOps))
 	ownerChrome := map[*box]chromeSpan{}
+	write := need
 
-	oidx := 0
-	for idx, paintOp := range oldOps {
-		for oidx < len(order) && order[oidx].ent.at == idx {
-			ent := order[oidx].ent
-			cs := len(out)
-			out = append(out, ent.ops...)
-			recordOwnerChrome(ownerChrome, ent.b, cs, len(out)-1)
-
-			oidx++
-		}
-
-		oldToNew[idx] = len(out)
-		out = append(out, paintOp)
+	// Trailing chrome lands after every old op: entries whose at is past the
+	// last op. A negative at is unreachable by the forward cursor and blocks it
+	// for the rest of the walk, so then every entry becomes trailing.
+	firstTrailing := len(order)
+	for firstTrailing > 0 && order[firstTrailing-1].ent.at >= len(oldOps) {
+		firstTrailing--
 	}
-	// Trailing chrome (chrome-only boxes with insertAt == len(ops)).
-	for oidx < len(order) {
-		ent := order[oidx].ent
-		cs := len(out)
-		out = append(out, ent.ops...)
-		recordOwnerChrome(ownerChrome, ent.b, cs, len(out)-1)
 
-		oidx++
+	if len(order) > 0 && order[0].ent.at < 0 {
+		firstTrailing = 0
+	}
+
+	oidx := len(order) - 1
+	for oidx >= firstTrailing {
+		ent := order[oidx].ent
+		start := write - len(ent.ops)
+		copy(out[start:], ent.ops)
+		recordOwnerChrome(ownerChrome, ent.b, start, write-1)
+
+		write = start
+		oidx--
+	}
+
+	for idx := len(oldOps) - 1; idx >= 0; idx-- {
+		write--
+		out[write] = oldOps[idx]
+		oldToNew[idx] = write
+
+		for oidx >= 0 && order[oidx].ent.at == idx {
+			ent := order[oidx].ent
+			start := write - len(ent.ops)
+			copy(out[start:], ent.ops)
+			recordOwnerChrome(ownerChrome, ent.b, start, write-1)
+
+			write = start
+			oidx--
+		}
 	}
 
 	return out, oldToNew, ownerChrome

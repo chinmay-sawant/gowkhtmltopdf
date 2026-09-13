@@ -45,10 +45,9 @@ func (e *engine) buildInlineSVG(node *html.Node, sty ResolvedStyle, posX, posY f
 		imgX := posX + borderL + padL
 		imgY := posY + borderT + padT
 		opStart := len(e.ops)
-		e.add(Op{ //nolint:exhaustruct // intentional zero fields
+		e.add((Op{ //nolint:exhaustruct // intentional zero fields
 			Kind: OpImage, X: imgX, Y: imgY, W: size.w, H: size.h,
-			Image: ref.data, ImgW: ref.w, ImgH: ref.h,
-		})
+		}).withImage(ref.data, ref.w, ref.h, ""))
 		e.prependChrome(opStart, boxNode, sty, posX, posY, boxNode.w, boxNode.height)
 	}
 
@@ -155,10 +154,11 @@ func (e *engine) writeSVGNode(b *strings.Builder, node *html.Node) {
 }
 
 func (e *engine) writeSVGPresentationAttrs(b *strings.Builder, node *html.Node, written map[string]bool) {
-	st := e.styles[node]
-	if st == nil {
+	if !e.hasStyle(node) {
 		return
 	}
+
+	st := e.stylePtr(node)
 	if st.FillSet && !written["fill"] {
 		if st.FillOpacity == 0 && st.Fill == [3]float64{} {
 			b.WriteString(` fill="none"`)

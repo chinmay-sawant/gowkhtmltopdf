@@ -322,7 +322,7 @@ func boxInkExtent(res *Result, boxNode *box) float64 {
 		switch paintOp.Kind {
 		case OpText, OpBullet:
 			outBox += opVisibleInkHeight(paintOp)
-		case OpFillRect, OpStrokeRect, OpLine, OpImage, OpLinkURI, OpUnknown, opKindNoop:
+		case OpFillRect, OpStrokeRect, OpLine, OpGridRun, OpImage, OpLinkURI, OpUnknown, opKindNoop:
 			if paintOp.H > 0 {
 				outBox += paintOp.H
 			}
@@ -415,13 +415,46 @@ func (s *breakScanState) applyBreak(start int, deltaY float64, opCount int) {
 	s.events = append(s.events, breakEvent{start: start, dy: deltaY})
 }
 
-func shiftBoxesForForcedBreak(boxes []*box, targetBox *box, fromY, deltaY float64, start int) {
-	for _, b := range boxes {
-		if b == targetBox || b.y > fromY || (b.y == fromY && b.opStart >= start) {
-			b.y += deltaY
+func shiftBoxesForForcedBreak(
+	boxes []*box, targetBox *box, fromY, deltaY float64, start int, stats *forceBreakStats,
+) {
+	for _, boxNode := range boxes {
+		if stats != nil {
+			stats.visits++
+		}
+
+		if boxNode == targetBox || boxNode.y > fromY || (boxNode.y == fromY && boxNode.opStart >= start) {
+			if stats != nil {
+				stats.moves++
+			}
+
+			boxNode.y += deltaY
 		}
 	}
 }
+
+// forceBreakStats carries test-only counters for the forced-break passes.
+// Production runs with a nil stats pointer, so the counter branches stay cold.
+type forceBreakStats struct {
+	calls    int // beforeAlways invocations
+	targets  int // targets seen
+	changed  int // targets shifted
+	visits   int // shiftBoxesForForcedBreak loop iterations
+	moves    int // shiftBoxesForForcedBreak predicate hits
+	batched  int // calls resolved by the sorted batch path
+	negative int // negative target deltas (batch fallback trigger)
+	boxCount int
+	opCount  int
+}
+
+// forceBreakHook receives one beforeAlways call's counters when a test installs
+// it. It is never set in production.
+var forceBreakHook func(forceBreakStats) //nolint:gochecknoglobals // test hook
+
+// forceBreakBatchDisabled forces the exact per-target scan instead of the
+// sorted batch. Tests set it to compare both paths on identical inputs;
+// production never writes it.
+var forceBreakBatchDisabled bool //nolint:gochecknoglobals // test hook
 
 func applySuffixDifferences(ops []Op, suffixDy []float64) {
 	cum := 0.0
@@ -434,7 +467,7 @@ func applySuffixDifferences(ops []Op, suffixDy []float64) {
 			continue
 		}
 
-		ops[idx].Y += cum
+		shiftOpY(&ops[idx], cum)
 	}
 }
 
@@ -463,7 +496,13 @@ func collectBeforeAlwaysTargets(root *box, boxes []*box, opCount int) []beforeAl
 // processed by ascending opStart. Forced-break dys are recorded on a difference
 // array and applied to ops in one O(n) pass (plus O(boxes) live box updates per
 // break). Flow indexes are rebuilt once at the end.
+//
+//nolint:cyclop // skip flag plus the existing target/batch dispatch
 func beforeAlways(res *Result, contentH float64) bool {
+	if res != nil && res.skipInitialBeforeAlways {
+		return false
+	}
+
 	if res == nil || res.root == nil || contentH <= 0 {
 		return false
 	}
@@ -476,22 +515,291 @@ func beforeAlways(res *Result, contentH float64) bool {
 		return false
 	}
 
-	state := newBreakScanState(opCount, len(targets))
-	changed := false
+	stats := forceBreakStats{ //nolint:exhaustruct // zero counters start at zero
+		calls: 1, targets: len(targets), boxCount: len(boxes), opCount: opCount,
+	}
 
-	for _, target := range targets {
-		if processBeforeAlwaysTarget(target, boxes, state, res.Ops, opCount, contentH) {
-			changed = true
+	var statsPtr *forceBreakStats
+	if forceBreakHook != nil {
+		statsPtr = &stats
+
+		defer func() { forceBreakHook(stats) }()
+	}
+
+	var suffixDy []float64
+
+	changed := false
+	batched := false
+
+	if !forceBreakBatchDisabled {
+		if dy, batchChanged, ok := beforeAlwaysBatch(
+			boxes, targets, res.Ops, opCount, contentH, statsPtr,
+		); ok {
+			suffixDy = dy
+			changed = batchChanged
+			batched = true
+			stats.batched++
 		}
+	}
+
+	if !batched {
+		suffixDy, changed = beforeAlwaysScan(boxes, targets, res.Ops, opCount, contentH, statsPtr)
 	}
 
 	if !changed {
 		return false
 	}
 
-	applySuffixDifferences(res.Ops, state.suffixDy)
+	applySuffixDifferences(res.Ops, suffixDy)
 	invalidateFlowIndex(res)
 	ensureFlowIndex(res, contentH)
+
+	return true
+}
+
+// beforeAlwaysScan is the per-target shift scan: exact for any shape, and the
+// fallback when the sorted batch precondition fails.
+func beforeAlwaysScan(
+	boxes []*box, targets []beforeAlwaysTarget, ops []Op, opCount int, contentH float64, stats *forceBreakStats,
+) ([]float64, bool) {
+	state := newBreakScanState(opCount, len(targets))
+	changed := false
+
+	for _, target := range targets {
+		if processBeforeAlwaysTarget(target, boxes, state, ops, opCount, contentH, stats) {
+			changed = true
+
+			if stats != nil {
+				stats.changed++
+			}
+		}
+	}
+
+	return state.suffixDy, changed
+}
+
+// maxBatchBoundaryRun bounds the equal-Y run the batch path evaluates exactly;
+// a taller run falls back to the per-target scan.
+const maxBatchBoundaryRun = 64
+
+// beforeAlwaysBatch applies every forced-break shift in one sorted pass when
+// the flow boxes and the targets ascend in Y. Strict-suffix coverage follows
+// from the sorted order, and equal-Y runs are evaluated with the exact
+// per-target predicate. It returns the op suffix difference array, whether
+// anything moved, and ok=false when the shape (or a negative delta) requires
+// the exact per-target scan. Final box Y values replay the covering deltas in
+// event order, so placements match the scan bit for bit.
+func beforeAlwaysBatch(
+	boxes []*box, targets []beforeAlwaysTarget, ops []Op, opCount int, contentH float64, stats *forceBreakStats,
+) ([]float64, bool, bool) {
+	if !boxesAscendByY(boxes) || !targetsAscendByY(targets) {
+		return nil, false, false
+	}
+
+	batch := batchShiftState{ //nolint:exhaustruct // run state starts empty
+		state:       newBreakScanState(opCount, len(targets)),
+		deltas:      make([]float64, 0, len(targets)),
+		deltaTy:     make([]float64, 0, len(targets)),
+		boundaryIdx: make([]int, 0, len(targets)),
+		boundaryDy:  make([]float64, 0, len(targets)),
+		runTy:       math.Inf(-1),
+	}
+
+	for _, target := range targets {
+		if !batch.add(boxes, target, ops, opCount, contentH, stats) {
+			return nil, false, false
+		}
+	}
+
+	if len(batch.deltas) == 0 {
+		return batch.state.suffixDy, false, true
+	}
+
+	batch.applyBoxes(boxes)
+
+	return batch.state.suffixDy, true, true
+}
+
+// batchShiftState accumulates one beforeAlways batch: changed deltas in event
+// order plus the equal-Y boundary shifts, replayed on boxes at the end.
+type batchShiftState struct {
+	state       *breakScanState
+	deltas      []float64
+	deltaTy     []float64
+	boundaryIdx []int
+	boundaryDy  []float64
+	runVirtual  []float64
+	runTy       float64
+	runStart    int
+	runEnd      int
+}
+
+// loadRun prepares the equal-Y boundary run for originY. It returns false when
+// the run is too tall for the exact boundary evaluation.
+func (batch *batchShiftState) loadRun(boxes []*box, originY float64) bool {
+	if originY == batch.runTy {
+		return true
+	}
+
+	batch.runTy = originY
+	batch.runStart = sort.Search(len(boxes), func(i int) bool { return boxes[i].y >= originY })
+	batch.runEnd = sort.Search(len(boxes), func(i int) bool { return boxes[i].y > originY })
+
+	if batch.runEnd-batch.runStart > maxBatchBoundaryRun {
+		return false
+	}
+
+	if cap(batch.runVirtual) < batch.runEnd-batch.runStart {
+		batch.runVirtual = make([]float64, batch.runEnd-batch.runStart)
+	}
+
+	batch.runVirtual = batch.runVirtual[:batch.runEnd-batch.runStart]
+
+	base := originY
+	for i := range batch.deltas {
+		base += batch.deltas[i]
+	}
+
+	for i := range batch.runVirtual {
+		batch.runVirtual[i] = base
+	}
+
+	return true
+}
+
+// runVirtualY returns the box's current Y, or its original Y when the box is
+// not in the flattened list (the scan cannot move it either).
+func (batch *batchShiftState) runVirtualY(boxes []*box, targetBox *box) float64 {
+	for i := batch.runStart; i < batch.runEnd; i++ {
+		if boxes[i] == targetBox {
+			return batch.runVirtual[i-batch.runStart]
+		}
+	}
+
+	return targetBox.y
+}
+
+// add processes one target. It returns false to bail out to the exact scan.
+func (batch *batchShiftState) add(
+	boxes []*box, target beforeAlwaysTarget, ops []Op, opCount int, contentH float64, stats *forceBreakStats,
+) bool {
+	originY := target.box.y
+
+	if !batch.loadRun(boxes, originY) {
+		return false
+	}
+
+	targetVirtual := batch.runVirtualY(boxes, target.box)
+
+	start := target.start
+	if start < 0 {
+		start = 0
+	}
+
+	if start > opCount {
+		start = opCount
+	}
+
+	batch.state.advance(ops, start)
+
+	targetY, alreadyFresh := forcedBreakTargetY(targetVirtual, batch.state.maxEff, contentH)
+
+	if target.box.style != nil && target.box.style.MarginBreak == marginBreakKeep {
+		targetY += target.box.style.MarginTop
+	}
+
+	if alreadyFresh {
+		return true
+	}
+
+	deltaY := targetY - targetVirtual
+	if math.Abs(deltaY) <= layoutCoordEpsilon {
+		return true
+	}
+
+	// A negative delta can pull a target above boxes that missed earlier
+	// deltas, which breaks the original-Y suffix split. The scan is exact.
+	if deltaY < 0 {
+		return false
+	}
+
+	batch.state.applyBreak(start, deltaY, opCount)
+	batch.deltas = append(batch.deltas, deltaY)
+	batch.deltaTy = append(batch.deltaTy, originY)
+
+	if stats != nil {
+		stats.changed++
+	}
+
+	batch.applyRun(boxes, target.box, targetVirtual, start, deltaY)
+
+	return true
+}
+
+// applyRun shifts the equal-Y boundary boxes that the exact per-target
+// predicate selects.
+func (batch *batchShiftState) applyRun(boxes []*box, targetBox *box, targetVirtual float64, start int, deltaY float64) {
+	for runIdx := batch.runStart; runIdx < batch.runEnd; runIdx++ {
+		vi := batch.runVirtual[runIdx-batch.runStart]
+
+		covered := boxes[runIdx] == targetBox || vi > targetVirtual ||
+			(vi == targetVirtual && boxes[runIdx].opStart >= start)
+		if !covered {
+			continue
+		}
+
+		batch.runVirtual[runIdx-batch.runStart] += deltaY
+
+		batch.boundaryIdx = append(batch.boundaryIdx, runIdx)
+		batch.boundaryDy = append(batch.boundaryDy, deltaY)
+	}
+}
+
+// applyBoxes replays the recorded deltas per box: strict deltas first in event
+// order, then the equal-Y boundary deltas.
+func (batch *batchShiftState) applyBoxes(boxes []*box) {
+	strict := 0
+
+	for boxIdx := range boxes {
+		for strict < len(batch.deltaTy) && batch.deltaTy[strict] < boxes[boxIdx].y {
+			strict++
+		}
+
+		if strict == 0 {
+			continue
+		}
+
+		y := boxes[boxIdx].y
+		for i := range strict {
+			y += batch.deltas[i]
+		}
+
+		boxes[boxIdx].y = y
+	}
+
+	for n := range batch.boundaryIdx {
+		boxes[batch.boundaryIdx[n]].y += batch.boundaryDy[n]
+	}
+}
+
+// boxesAscendByY reports whether the flattened box list is non-decreasing in Y.
+func boxesAscendByY(boxes []*box) bool {
+	for i := 0; i+1 < len(boxes); i++ {
+		if boxes[i].y > boxes[i+1].y {
+			return false
+		}
+	}
+
+	return true
+}
+
+// targetsAscendByY reports whether target original Ys are non-decreasing.
+func targetsAscendByY(targets []beforeAlwaysTarget) bool {
+	for i := 0; i+1 < len(targets); i++ {
+		if targets[i].box.y > targets[i+1].box.y {
+			return false
+		}
+	}
 
 	return true
 }
@@ -503,6 +811,7 @@ func processBeforeAlwaysTarget(
 	ops []Op,
 	opCount int,
 	contentH float64,
+	stats *forceBreakStats,
 ) bool {
 	start := target.start
 	if start < 0 {
@@ -531,8 +840,12 @@ func processBeforeAlwaysTarget(
 		return false
 	}
 
+	if stats != nil && deltaY < 0 {
+		stats.negative++
+	}
+
 	state.applyBreak(start, deltaY, opCount)
-	shiftBoxesForForcedBreak(boxes, target.box, boxY, deltaY, start)
+	shiftBoxesForForcedBreak(boxes, target.box, boxY, deltaY, start, stats)
 
 	return true
 }
@@ -843,7 +1156,7 @@ func opInkEdges(paintOp Op) (float64, float64) {
 	case OpText, OpBullet:
 		yStart = paintOp.Y - paintOp.Size*textAscenderRatio
 		yEnd = paintOp.Y + paintOp.Size*textDescenderRatio
-	case OpLine:
+	case OpLine, OpGridRun:
 		if paintOp.H == 0 {
 			yEnd = paintOp.Y + math.Max(paintOp.Width, 1)
 		} else {
@@ -967,7 +1280,7 @@ func shiftSamePageOps(res *Result, fromY float64, page int, contentH, deltaY flo
 			continue
 		}
 
-		res.Ops[idx].Y += deltaY
+		shiftOpY(&res.Ops[idx], deltaY)
 	}
 }
 
@@ -1021,13 +1334,18 @@ func hasRoundedOwnChrome(res *Result, boxNode *box) bool {
 	}
 
 	hasRail := false
-	for idx := boxNode.opStart; idx <= boxNode.opEnd; idx++ {
-		op := res.Ops[idx]
+
+	forEachLineIndex(res.Ops, boxNode.opStart, boxNode.opEnd, func(opIdx, segIdx int) {
+		if hasRail {
+			return
+		}
+
+		op := lineViewAt(res.Ops, opIdx, segIdx)
 		if op.Kind == OpLine && op.W == 0 && op.H > 0 &&
 			nearLayout(op.X, boxNode.x) && nearLayout(op.Y, boxNode.y) {
 			hasRail = true
 		}
-	}
+	})
 
 	return hasRail
 }

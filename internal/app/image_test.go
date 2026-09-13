@@ -77,6 +77,40 @@ func TestRunImageDelegatesPreflightBeforeOpeningOutput(t *testing.T) {
 	}
 }
 
+func TestRunImageRejectsNegativeWidthBeforeOpeningOutput(t *testing.T) {
+	t.Parallel()
+
+	output := filepath.Join(t.TempDir(), "out.png")
+	existing := []byte("pre-existing output must survive")
+
+	if err := os.WriteFile(output, existing, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := &cli.Command{
+		Global: settings.DefaultPdfGlobal(),
+		Image:  settings.DefaultImageGlobal(),
+		Objects: []settings.PdfObject{{
+			Load: settings.LoadPage{InlineHTML: []byte("<h1>bad width</h1>")},
+		}},
+		Output: output,
+	}
+	cmd.Image.Width = -1
+
+	if err := app.RunImage(t.Context(), cmd, nil); err == nil {
+		t.Fatal("RunImage() = nil, want negative width error")
+	}
+
+	got, err := os.ReadFile(output)
+	if err != nil {
+		t.Fatalf("output was removed or unreadable after preflight: %v", err)
+	}
+
+	if !bytes.Equal(got, existing) {
+		t.Fatalf("output changed to %q, want untouched %q", got, existing)
+	}
+}
+
 func TestRunImageRejectsMultipleObjectsBeforeOpeningOutput(t *testing.T) {
 	t.Parallel()
 

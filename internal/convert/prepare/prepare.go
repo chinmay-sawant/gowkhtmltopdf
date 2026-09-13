@@ -154,6 +154,9 @@ type Options struct {
 	ObjectIndex     int
 	SimplifyDOM     bool
 	SimplifyProfile string
+	// PageBoxViewport, when set, replaces the stylesheet-gating viewport after
+	// inline <style> sheets are parsed (see SheetOptions.PageBoxViewport).
+	PageBoxViewport func(inline []*css.Stylesheet) (width, height float64)
 }
 
 // validate rejects viewport and media values that would silently mis-gate
@@ -227,6 +230,7 @@ func Document(ctx context.Context, loader *load.Loader, page string, loadPage se
 	prep.Sheets, err = prep.Resources.collectSheets(ctx, root, SheetOptions{
 		ViewportW: opts.ViewportW, ViewportH: opts.ViewportH,
 		MediaType: opts.MediaType, ObjectIndex: opts.ObjectIndex,
+		PageBoxViewport: opts.PageBoxViewport,
 	}, log)
 	if err != nil {
 		return nil, fmt.Errorf("collect stylesheets: %w", err)

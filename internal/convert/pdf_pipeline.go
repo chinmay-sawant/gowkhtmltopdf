@@ -47,6 +47,10 @@ func (p *pdfPipeline) Assemble(ctx context.Context) error {
 		return err
 	}
 
+	if err := p.buildPagePlan(); err != nil {
+		return err
+	}
+
 	if err := p.assembleLinks(ctx); err != nil {
 		return err
 	}
@@ -169,6 +173,23 @@ func (p *pdfPipeline) assembleLinks(ctx context.Context) error {
 	return nil
 }
 
+// buildPagePlan builds the single page-index model before link assembly.
+// Destinations are page identities resolved at write time and remapped per
+// copy group during materialization, but every later pass (links, copies,
+// headers/footers) reads the one plan built here.
+func (p *pdfPipeline) buildPagePlan() error {
+	run := p.run
+
+	plan, err := newPagePlan(run.tocs, run.bodies, run.req.Global.Copies, run.req.Global.Collate)
+	if err != nil {
+		return err
+	}
+
+	run.plan = plan
+
+	return nil
+}
+
 //nolint:wsl // document metadata and page planning have explicit checkpoints.
 func (p *pdfPipeline) assembleDocument(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
@@ -176,13 +197,15 @@ func (p *pdfPipeline) assembleDocument(ctx context.Context) error {
 	}
 
 	run := p.run
-	plan, err := newPagePlan(run.tocs, run.bodies, run.req.Global.Copies, run.req.Global.Collate)
+	if run.plan == nil {
+		plan, err := newPagePlan(run.tocs, run.bodies, run.req.Global.Copies, run.req.Global.Collate)
+		if err != nil {
+			return err
+		}
 
-	if err != nil {
-		return err
+		run.plan = plan
 	}
 
-	run.plan = plan
 	if run.req.Global.Title != "" {
 		run.doc.SetInfo("Title", run.req.Global.Title)
 	} else if run.doc.Policy().IsPDFUA1() || run.doc.Policy().IsPDFUA2() {

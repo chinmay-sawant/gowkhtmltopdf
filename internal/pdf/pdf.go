@@ -139,6 +139,7 @@ type Document struct {
 	creationTime      time.Time // zero value → deterministic fixed date
 	nextID            int
 	pages             []*Page
+	pendingForms      []pendingForm // transparency groups buffered until finalize (see finalizeForms)
 	outlineRoot       *Outline
 	fontCache         map[string]objRef // subset key -> font dict ref
 	fontRuneSet       map[string]map[rune]struct{}
@@ -161,6 +162,7 @@ type Document struct {
 	namedDests        []namedDestEntry // dual page+/SD destinations for PDF/UA-2
 	lang              string           // document language (default "en-US")
 	finalized         bool
+	finalizeErr       error // sticky first mutating finalize error; see failFinalize
 }
 
 // namedDestEntry is one PDF 2.0 named destination with a classic page
@@ -300,6 +302,7 @@ func (d *Document) setStream(r objRef, raw []byte) {
 type Page struct {
 	doc              *Document
 	ref              objRef
+	index            int // current position in Document.pages; updated by ReorderPages
 	width            float64
 	height           float64
 	content          *Content
@@ -314,7 +317,7 @@ type Page struct {
 type annotation struct {
 	rect            [4]float64 // x1,y1,x2,y2 in PDF coords
 	uri             string     // external link
-	destPage        int        // internal link target (0-based page index)
+	destPage        *Page      // internal link target identity, resolved to an index at write time
 	destX           float64
 	destY           float64
 	hasDest         bool
@@ -326,7 +329,12 @@ type annotation struct {
 
 // AddPage appends a page with the given size in points.
 func (d *Document) AddPage(width, height float64) *Page {
-	page := &Page{doc: d, width: width, height: height} //nolint:exhaustruct // intentional zero-value fields
+	page := &Page{ //nolint:exhaustruct // intentional zero-value fields
+		doc:    d,
+		index:  len(d.pages),
+		width:  width,
+		height: height,
+	}
 	page.ref = d.newObject()
 	contentRef := d.newObject()
 	page.contentRef = contentRef
@@ -399,6 +407,10 @@ func (d *Document) ReorderPages(order []int) error {
 
 	d.pages = next
 
+	for i, page := range d.pages {
+		page.index = i
+	}
+
 	return nil
 }
 
@@ -457,7 +469,7 @@ func (p *Page) AddLinkURI(rect [4]float64, uri string) ObjRef {
 	p.annots = append(p.annots, annotation{ //nolint:exhaustruct // intentional zero-value fields
 		rect:     rect,
 		uri:      uri,
-		destPage: 0,
+		destPage: nil,
 		destX:    0,
 		destY:    0,
 		hasDest:  false,
@@ -467,8 +479,15 @@ func (p *Page) AddLinkURI(rect [4]float64, uri string) ObjRef {
 	return ref
 }
 
-// AddLinkDest adds an internal GoTo annotation to a page (0-based index).
-func (p *Page) AddLinkDest(rect [4]float64, page int, destX, destY float64) ObjRef {
+// AddLinkDest adds an internal GoTo annotation targeting a page handle. The
+// target page is resolved to its current /Kids index at write time, so link
+// destinations survive ReorderPages and page copies. A nil target adds no
+// annotation and returns 0.
+func (p *Page) AddLinkDest(rect [4]float64, page *Page, destX, destY float64) ObjRef {
+	if page == nil {
+		return 0
+	}
+
 	ref := p.doc.newObject()
 	p.annots = append(p.annots, annotation{ //nolint:exhaustruct // intentional zero-value fields
 		rect:     rect,
@@ -481,6 +500,39 @@ func (p *Page) AddLinkDest(rect [4]float64, page int, destX, destY float64) ObjR
 	})
 
 	return ref
+}
+
+// RemapLinkDests rewrites every internal link destination on this page with
+// translate. Copy materialization uses it to re-aim a duplicated page's links
+// at the same copy of each destination page. A nil translate is a no-op.
+func (p *Page) RemapLinkDests(translate func(dest *Page) *Page) {
+	if p == nil || translate == nil {
+		return
+	}
+
+	for idx := range p.annots {
+		if !p.annots[idx].hasDest || p.annots[idx].destPage == nil {
+			continue
+		}
+
+		if next := translate(p.annots[idx].destPage); next != nil {
+			p.annots[idx].destPage = next
+		}
+	}
+}
+
+// pageIndexOf returns the current page-order index of target, or -1 when
+// target is nil or no longer belongs to d.pages.
+func (d *Document) pageIndexOf(target *Page) int {
+	if target == nil || target.doc != d {
+		return -1
+	}
+
+	if target.index < 0 || target.index >= len(d.pages) || d.pages[target.index] != target {
+		return -1
+	}
+
+	return target.index
 }
 
 // SetLinkDestStruct associates a structure element with the most recently
@@ -756,12 +808,21 @@ func (d *Document) embedMetadata() objRef {
 }
 
 // finalize builds catalog, pages tree, fonts, images, annots, outlines and
-// page objects once.
+// page objects once. Input validation failures (policy, no pages, missing UA
+// title) happen before any mutation and stay retryable. Once finalize starts
+// mutating the object graph, the first failure becomes sticky through
+// failFinalize: finalizePage releases each page's raw content buffer after its
+// stream is materialized, so a later retry could otherwise serialize empty
+// page streams from a document that looks fixed.
 //
 //nolint:cyclop,funlen // finalize coordinates entire document serialization pipeline
 func (d *Document) finalize() error {
 	if d.finalized {
 		return nil
+	}
+
+	if d.finalizeErr != nil {
+		return d.finalizeErr
 	}
 
 	if err := d.policy.Validate(); err != nil {
@@ -792,6 +853,10 @@ func (d *Document) finalize() error {
 
 	d.unionFontRunes()
 
+	if err := d.finalizeForms(); err != nil {
+		return d.failFinalize(err)
+	}
+
 	pageRefs := make([]string, 0, len(d.pages))
 	for _, p := range d.pages {
 		pageRefs = append(pageRefs, p.ref.String())
@@ -805,21 +870,19 @@ func (d *Document) finalize() error {
 	// Structure tree must be finalized before outlines/annots so StructElem
 	// refs are available for PDF/UA-2 structure destinations (/SD).
 	if err := d.finalizeStructure(); err != nil {
-		return err
+		return d.failFinalize(err)
 	}
 
 	// Outlines and page annots register dual named destinations under UA-2
 	// before the catalog is written (catalog needs /Names /Dests).
 	if d.outlineRoot != nil {
 		if err := d.finalizeOutlines(d.outlineRoot); err != nil {
-			return err
+			return d.failFinalize(err)
 		}
 	}
 
-	for _, p := range d.pages {
-		if err := d.finalizePage(p, pagesRef); err != nil {
-			return err
-		}
+	if err := d.finalizePages(pagesRef); err != nil {
+		return d.failFinalize(err)
 	}
 
 	namesRef := d.serializeNamedDests()
@@ -835,6 +898,16 @@ func (d *Document) finalize() error {
 	d.finalized = true
 
 	return nil
+}
+
+// failFinalize records err as the document's terminal mutating finalize error
+// and returns it. A mutating failure leaves partially built objects behind and
+// may leave earlier pages with released content buffers, so every later Write
+// returns this same error instead of silently serializing empty page streams.
+func (d *Document) failFinalize(err error) error {
+	d.finalizeErr = err
+
+	return err
 }
 
 // unionFontRunes materializes the document-wide rune sets collected while
@@ -874,6 +947,8 @@ func (d *Document) unionFontRunes() {
 			continue
 		}
 
+		fnt.ensureParsed()
+
 		type0 := needsType0(runes)
 		d.fontType0[name] = type0
 
@@ -890,6 +965,48 @@ func (d *Document) unionFontRunes() {
 		d.fontKeyFonts[name] = fnt
 		d.fontKeys[name] = fmt.Sprintf("v%d|%x|%s|%s", mode, fnt.fingerprint, baseName, runesKey(runes))
 	}
+}
+
+// finalizeForms materializes the transparency-group Form XObjects buffered by
+// Content.EndTransparencyGroup. Running after unionFontRunes means a form's
+// /Resources are built from the document-wide rune union, so the form embeds
+// the same font subsets pages do instead of a space-only placeholder. The
+// object references and Do operators were written during paint, so only the
+// dict and stream bytes are pending here. Forms appear in close order
+// (innermost first), which keeps nested resource assembly simple.
+func (d *Document) finalizeForms() error {
+	for idx := range d.pendingForms {
+		pending := &d.pendingForms[idx]
+		group := pending.content
+
+		resources, err := buildPageResources(group, d.iccRef, d.grayIccRef, d.policy.Version)
+		if err != nil {
+			return fmt.Errorf("pdf: transparency group resources: %w", err)
+		}
+
+		raw := group.buf.Bytes()
+		formDict := dict{}.add("/Type", "/XObject").
+			add("/Subtype", "/Form").
+			add("/FormType", "1").
+			add("/BBox", formBBox(pending.bbox)).
+			add("/Group", "<< /S /Transparency /I true /CS /DeviceRGB >>").
+			add("/Resources", resources)
+
+		if d.useCompression {
+			raw = flateBytes(raw)
+			formDict = formDict.add("/Filter", "/FlateDecode")
+		}
+
+		formDict = formDict.add("/Length", strconv.Itoa(len(raw)))
+
+		d.setDict(pending.ref, formDict.String())
+		d.setStream(pending.ref, raw)
+		group.releaseBuffer()
+	}
+
+	d.pendingForms = nil
+
+	return nil
 }
 
 func sortedStringKeys[V any](values map[string]V) []string {
@@ -1004,6 +1121,8 @@ func (d *Document) serializeNamedDests() objRef {
 }
 
 // infoDict builds the /Info dictionary with the (injectable) timestamps.
+// Each key has one writer: caller-set values from SetInfo win, and Producer
+// falls back to the writer policy when the caller did not set it.
 func (d *Document) infoDict() string {
 	now := d.creationTime
 	if now.IsZero() {
@@ -1017,16 +1136,22 @@ func (d *Document) infoDict() string {
 		}
 	}
 
-	return info.add("/Producer", d.encodeTextString(d.policy.ProducerVersion())).
+	producer := d.policy.ProducerVersion()
+	if v, ok := d.info["Producer"]; ok && v != "" {
+		producer = v
+	}
+
+	return info.add("/Producer", d.encodeTextString(producer)).
 		add("/CreationDate", pdfString(pdfDate(now))).
 		add("/ModDate", pdfString(pdfDate(now))).
 		String()
 }
 
-func (d *Document) finalizePage(page *Page, pagesRef objRef) error {
-	raw := page.content.Bytes()
+// finalizePage attaches the final stream bytes for one page and resolves its
+// resource dictionary. raw is already compressed when compression is on (see
+// finalizePages) and aliases the content builder when compression is off.
+func (d *Document) finalizePage(page *Page, pagesRef objRef, raw []byte) error {
 	if d.useCompression {
-		raw = flateBytes(raw)
 		d.setDict(page.contentRef, "<< /Length "+strconv.Itoa(len(raw))+" /Filter /FlateDecode >>")
 	} else {
 		d.setDict(page.contentRef, "<< /Length "+strconv.Itoa(len(raw))+" >>")
@@ -1038,6 +1163,15 @@ func (d *Document) finalizePage(page *Page, pagesRef objRef) error {
 	if err != nil {
 		return err
 	}
+
+	// The page's stream object now owns the serialized bytes: compression
+	// wrote a fresh Flate copy, or the object aliases the raw slice directly
+	// when compression is off. This is the last reader, so drop the builder's
+	// reference here to free the raw buffer at the peak point. After this,
+	// Page.Content() stays callable but Content.Bytes() returns an empty
+	// slice; finalize retries fail closed through Document.finalizeErr
+	// because the raw stream can no longer be rebuilt.
+	page.content.releaseBuffer()
 
 	parts := []string{
 		"<< /Type /Page",
@@ -1142,13 +1276,15 @@ func buildPageResources(content *Content, iccRef, grayIccRef objRef, version PDF
 	return res.String(), nil
 }
 
-func annotDescription(arg *annotation) string {
+func annotDescription(doc *Document, arg *annotation) string {
 	if arg.uri != "" {
 		return arg.uri
 	}
 
 	if arg.hasDest {
-		return fmt.Sprintf("Link to page %d", arg.destPage+1)
+		if idx := doc.pageIndexOf(arg.destPage); idx >= 0 {
+			return fmt.Sprintf("Link to page %d", idx+1)
+		}
 	}
 
 	return "Link"
@@ -1167,11 +1303,16 @@ func structureDestElem(arg *annotation, doc *Document) *StructElem {
 		return arg.destStruct
 	}
 
-	if doc == nil || !arg.hasDest || arg.destPage < 0 || arg.destPage >= len(doc.pages) {
+	if doc == nil || !arg.hasDest {
 		return nil
 	}
 
-	return firstPageStructElem(doc.pages[arg.destPage])
+	idx := doc.pageIndexOf(arg.destPage)
+	if idx < 0 {
+		return nil
+	}
+
+	return firstPageStructElem(doc.pages[idx])
 }
 
 func firstPageStructElem(page *Page) *StructElem {
@@ -1189,11 +1330,12 @@ func firstPageStructElem(page *Page) *StructElem {
 }
 
 func writeAnnotDest(buf *strings.Builder, doc *Document, arg *annotation) {
-	if arg.destPage < 0 || arg.destPage >= len(doc.pages) {
+	idx := doc.pageIndexOf(arg.destPage)
+	if idx < 0 {
 		return
 	}
 
-	pageRef := doc.pages[arg.destPage].ref
+	pageRef := doc.pages[idx].ref
 	// PDF/UA-2: dual named dest — /D page (Arlington/PDF/A) + /SD struct (UA-2 8.8).
 	if doc.policy.IsPDFUA2() {
 		name := doc.registerDualDest(pageRef, arg.destX, arg.destY, structureDestElem(arg, doc))
@@ -1221,7 +1363,7 @@ func (d *Document) buildAnnots(page *Page) {
 			num(r[0]), num(r[1]), num(r[2]), num(r[3]))
 
 		if d.policy.IsPDFUA1() || d.policy.IsPDFUA2() {
-			fmt.Fprintf(&buf, " /Contents %s", d.encodeTextString(annotDescription(arg)))
+			fmt.Fprintf(&buf, " /Contents %s", d.encodeTextString(annotDescription(d, arg)))
 
 			if arg.hasStructParent {
 				fmt.Fprintf(&buf, " /StructParent %d", arg.structParent)
@@ -1533,6 +1675,20 @@ type flateState struct {
 	zw  *zlib.Writer
 }
 
+// compress resets the state, writes raw through the zlib writer and returns a
+// fresh copy that owns its bytes. Reset-then-write produces the same bytes as
+// a newly created writer at the same level (see TestFlateStateResetMatchesFreshWriter),
+// which is what keeps parallel page streams equal to the serial path.
+func (s *flateState) compress(raw []byte) []byte {
+	s.buf.Reset()
+	s.zw.Reset(&s.buf)
+
+	_, _ = s.zw.Write(raw)
+	_ = s.zw.Close()
+
+	return append([]byte(nil), s.buf.Bytes()...)
+}
+
 //nolint:gochecknoglobals // compressor reuse across page streams; not a mutable global
 var flatePool sync.Pool
 
@@ -1540,25 +1696,20 @@ var flatePool sync.Pool
 // require the zlib wrapper, not raw DEFLATE (RFC 1951); viewers reject the
 // latter and the page appears empty. The compressor is reused across page
 // streams; the returned copy owns its bytes before the state goes back to the
-// pool.
+// pool. Single-page documents and non-page streams (fonts, images, ICC) stay
+// on this serial path; multi-page documents use the retained worker set in
+// flate_parallel.go.
 const maxPooledFlateBufferSize = 16 * 1024 * 1024 // 16 MiB max retention
 func flateBytes(raw []byte) []byte {
 	state, _ := flatePool.Get().(*flateState)
 	if state == nil {
 		state = &flateState{} //nolint:exhaustruct // intentional zero-value fields
 		state.zw, _ = zlib.NewWriterLevel(&state.buf, zlib.DefaultCompression)
-	} else {
-		state.buf.Reset()
-		state.zw.Reset(&state.buf)
 	}
 
-	_, _ = state.zw.Write(raw)
-	_ = state.zw.Close()
+	res := state.compress(raw)
 
-	res := append([]byte(nil), state.buf.Bytes()...)
-	stateBufCap := state.buf.Cap()
-
-	if stateBufCap <= maxPooledFlateBufferSize {
+	if state.buf.Cap() <= maxPooledFlateBufferSize {
 		flatePool.Put(state)
 	}
 

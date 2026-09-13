@@ -15,9 +15,14 @@ func paintBlended(
 	atlas *glyphAtlas,
 	imageCache *rasterImageCache,
 ) {
-	source := image.NewNRGBA(dst.Bounds())
-	opCopy := *paintOp
-	opCopy.BlendMode = ""
+	scratch := paintOpBounds(paintOp, pxPerPt).Intersect(dst.Bounds())
+	if scratch.Empty() {
+		return
+	}
+
+	source := image.NewNRGBA(scratch)
+	opCopy := paintOp.Clone()
+	opCopy.SetBlendMode("")
 	paint(source, &opCopy, pxPerPt, atlas, imageCache)
 	compositeBlend(dst, source, paintOp.BlendMode)
 }

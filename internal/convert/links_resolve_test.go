@@ -21,7 +21,7 @@ func TestBodyNavigationProjectionIsIndependentOfLayoutResult(t *testing.T) {
 	result := testBodyNavigationResult()
 	nav := collectBodyNavigation(result)
 	result.Locations[0].X = 99
-	result.Ops[0].URI = "#changed"
+	result.Ops[0].SetURI("#changed")
 
 	if got := nav.ids["target"].X; got != 3 {
 		t.Fatalf("projected destination X = %v, want copied value 3", got)
@@ -30,6 +30,13 @@ func TestBodyNavigationProjectionIsIndependentOfLayoutResult(t *testing.T) {
 	if got := nav.links[0].uri; got != "#target" {
 		t.Fatalf("projected link URI = %q, want copied value #target", got)
 	}
+}
+
+func testLinkOp(uri string, x, y, w, h float64) layout.Op {
+	op := layout.Op{Kind: layout.OpLinkURI, X: x, Y: y, W: w, H: h}
+	op.SetURI(uri)
+
+	return op
 }
 
 func testBodyNavigationResult() *layout.Result {
@@ -42,8 +49,8 @@ func testBodyNavigationResult() *layout.Result {
 			{Node: target, Page: 2, X: 3, Y: 4, W: 5, H: 6},
 		},
 		Ops: []layout.Op{
-			{Kind: layout.OpLinkURI, URI: "#target", X: 7, Y: 8, W: 9, H: 10},
-			{Kind: layout.OpLinkURI, URI: "https://example.com", X: 11, Y: 12},
+			testLinkOp("#target", 7, 8, 9, 10),
+			testLinkOp("https://example.com", 11, 12, 0, 0),
 		},
 	}
 }
@@ -110,11 +117,11 @@ func TestResolveRelativeLinkURIs(t *testing.T) {
 	t.Parallel()
 
 	ops := []layout.Op{
-		{Kind: layout.OpLinkURI, URI: "docs/a.html"},
-		{Kind: layout.OpLinkURI, URI: "//cdn.example/a.css"},
-		{Kind: layout.OpLinkURI, URI: "#frag"},
-		{Kind: layout.OpLinkURI, URI: "https://example.com/x"},
-		{Kind: layout.OpLinkURI, URI: "mailto:a@b.c"},
+		testLinkOp("docs/a.html", 0, 0, 0, 0),
+		testLinkOp("//cdn.example/a.css", 0, 0, 0, 0),
+		testLinkOp("#frag", 0, 0, 0, 0),
+		testLinkOp("https://example.com/x", 0, 0, 0, 0),
+		testLinkOp("mailto:a@b.c", 0, 0, 0, 0),
 	}
 	resolveRelativeLinkURIs(ops, "https://example.com/base/page.html")
 

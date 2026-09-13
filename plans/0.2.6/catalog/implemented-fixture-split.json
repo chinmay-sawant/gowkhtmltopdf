@@ -1267,8 +1267,9 @@
           "legacy_of": null,
           "group": "(ungrouped)",
           "syntax": "<'print-color-adjust'>",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Shorthand ((ungrouped)). Expands into longhands; Effect cell applies a representative value."
+          "code_path": "internal/layout/style_color_adjust_props.go",
+          "description": "Implemented `color-adjust` (legacy shorthand of print-color-adjust): `exact` forces this element's background paint past the print economy gate, `economy` keeps the gate. Consumer background_image.go:30, call sites inline_paint.go:312, layout_chrome.go:425, layout_tables.go:100/1276."
+
         },
         {
           "property": "color-scheme",
@@ -1276,8 +1277,9 @@
           "legacy_of": null,
           "group": "CSS Color",
           "syntax": "normal | [ light | dark | <custom-ident> ]+ && only?",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Implemented `color-scheme` (CSS Color). Effect cell applies a representative value for visual checks."
+          "code_path": "internal/layout/style_color_adjust_props.go",
+          "description": "Implemented root-scoped: the html element's first light/dark token selects a dark #121212 canvas and light default text where no author colors exist; other elements parse and inherit the value but it is not read. Consumer paint.go:111-117/165/207."
+
         },
         {
           "property": "column-count",
@@ -1375,8 +1377,9 @@
           "legacy_of": null,
           "group": "CSS Containment",
           "syntax": "none | strict | content | [ [size | inline-size] || layout || style || paint ]",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Implemented `contain` (CSS Containment). Effect cell applies a representative value for visual checks."
+          "code_path": "internal/layout/style_containment_props.go",
+          "description": "Implemented: `size` sizes the box from contain-intrinsic-* (as-if-empty) and `paint` clips descendant paint to the padding box; `layout`/`style` parse for cascade fidelity without a print-observable effect. Consumers layout_flow.go:224/262 and the overflow clip stamp."
+
         },
         {
           "property": "contain-intrinsic-block-size",
@@ -1384,8 +1387,9 @@
           "legacy_of": null,
           "group": "CSS Box Sizing",
           "syntax": "auto? [ none | <length [0,\u221e]> ]",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Implemented `contain-intrinsic-block-size` (CSS Box Sizing). Effect cell applies a representative value for visual checks."
+          "code_path": "internal/layout/style_containment_props.go",
+          "description": "Implemented with `contain:size`: block axis maps to height in horizontal-tb and swaps in vertical writing modes. Consumer layout_flow.go:262 via containmentIntrinsicHeight."
+
         },
         {
           "property": "contain-intrinsic-height",
@@ -1393,8 +1397,9 @@
           "legacy_of": null,
           "group": "CSS Box Sizing",
           "syntax": "auto? [ none | <length [0,\u221e]> ]",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Implemented `contain-intrinsic-height` (CSS Box Sizing). Effect cell applies a representative value for visual checks."
+          "code_path": "internal/layout/style_containment_props.go",
+          "description": "Implemented with `contain:size`: physical height placeholder. Consumer layout_flow.go:262 (containmentIntrinsicHeight) in flowChildren."
+
         },
         {
           "property": "contain-intrinsic-inline-size",
@@ -1402,8 +1407,9 @@
           "legacy_of": null,
           "group": "CSS Box Sizing",
           "syntax": "auto? [ none | <length [0,\u221e]> ]",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Implemented `contain-intrinsic-inline-size` (CSS Box Sizing). Effect cell applies a representative value for visual checks."
+          "code_path": "internal/layout/style_containment_props.go",
+          "description": "Implemented with `contain:size`: inline axis maps to width in horizontal-tb and swaps in vertical writing modes. Consumer layout_flow.go:758 via containmentIntrinsicWidth."
+
         },
         {
           "property": "contain-intrinsic-size",
@@ -1411,8 +1417,9 @@
           "legacy_of": null,
           "group": "CSS Box Sizing",
           "syntax": "[ auto? [ none | <length [0,\u221e]> ] ]{1,2}",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Shorthand (CSS Box Sizing). Expands into longhands; Effect cell applies a representative value."
+          "code_path": "internal/layout/style_containment_props.go",
+          "description": "Implemented with `contain:size`: the pair supplies the placeholder width and height; one value mirrors to both axes. Consumer layout_flow.go:262 (height) and layout_flow.go:758 (width)."
+
         },
         {
           "property": "contain-intrinsic-width",
@@ -1420,8 +1427,9 @@
           "legacy_of": null,
           "group": "CSS Box Sizing",
           "syntax": "auto? [ none | <length [0,\u221e]> ]",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Implemented `contain-intrinsic-width` (CSS Box Sizing). Effect cell applies a representative value for visual checks."
+          "code_path": "internal/layout/style_containment_props.go",
+          "description": "Implemented with `contain:size`: physical width placeholder. Consumer layout_flow.go:758 (containmentIntrinsicWidth) via blockFitContentMarginBox."
+
         },
         {
           "property": "container",
@@ -1465,8 +1473,9 @@
           "legacy_of": null,
           "group": "CSS Containment",
           "syntax": "visible | auto | hidden",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Implemented `content-visibility` (CSS Containment). Effect cell applies a representative value for visual checks."
+          "code_path": "internal/layout/style_containment_props.go",
+          "description": "Implemented `hidden`: descendant layout and paint are skipped and the box keeps its intrinsic size (0 when unset); `visible` and `auto` stay print no-ops. Consumers layout_flow.go:211 and layout_flow.go:757."
+
         },
         {
           "property": "counter-increment",
@@ -1510,8 +1519,9 @@
           "legacy_of": null,
           "group": "CSS Color",
           "syntax": "standard | no-limit | constrained | <dynamic-range-limit-mix()>",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Implemented `dynamic-range-limit` (CSS Color). Effect cell applies a representative value for visual checks."
+          "code_path": "internal/layout/style_color_adjust_props.go",
+          "description": "Implemented as an sRGB clamp: `standard` and `constrained-high` clamp channels; `high` and `no-limit` pass through because the writer only emits sRGB. Consumer paint.go:223 (sRGBRangeLimit), used at paint.go:1064/1099/1404/1425."
+
         },
         {
           "property": "fill",
@@ -1636,8 +1646,8 @@
           "legacy_of": null,
           "group": "CSS Fonts",
           "syntax": "normal | <string>",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Font-related longhand/shorthand affecting typeface metrics or variant features."
+          "code_path": "internal/layout/style_font_variant_props.go",
+          "description": "Implemented `font-language-override` (CSS Fonts). OpenType tags map to BCP47 and ride OpText.TextLanguage into shaping.Input.Language for PDF and PNG; DejaVu Sans SRB locl substitutes the glyph."
         },
         {
           "property": "font-optical-sizing",
@@ -1645,8 +1655,9 @@
           "legacy_of": null,
           "group": "CSS Fonts",
           "syntax": "auto | none",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Font-related longhand/shorthand affecting typeface metrics or variant features."
+          "code_path": "",
+          "description": "Demoted `font-optical-sizing` (CSS Fonts). Parsed-and-stored no-op removed 2026-09-12 (PT26-LAY-05); the effect cell documents the dropped declaration and paints as if not set.",
+          "status": "demoted"
         },
         {
           "property": "font-palette",
@@ -1654,8 +1665,9 @@
           "legacy_of": null,
           "group": "CSS Fonts",
           "syntax": "normal | light | dark | <palette-identifier> | <palette-mix()>",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Font-related longhand/shorthand affecting typeface metrics or variant features."
+          "code_path": "",
+          "description": "Demoted `font-palette` (CSS Fonts). Parsed-and-stored no-op removed 2026-09-12 (PT26-LAY-05); the effect cell documents the dropped declaration and paints as if not set.",
+          "status": "demoted"
         },
         {
           "property": "font-size",
@@ -1681,8 +1693,9 @@
           "legacy_of": null,
           "group": "CSS Fonts",
           "syntax": "normal | [ <opentype-tag> <number> ]#",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Font-related longhand/shorthand affecting typeface metrics or variant features."
+          "code_path": "",
+          "description": "Demoted `font-variation-settings` (CSS Fonts). Parsed-and-stored no-op removed 2026-09-12 (PT26-LAY-05); the effect cell documents the dropped declaration and paints as if not set.",
+          "status": "demoted"
         },
         {
           "property": "font-weight",
@@ -1717,8 +1730,9 @@
           "legacy_of": null,
           "group": "CSS Color",
           "syntax": "auto | none | preserve-parent-color",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Implemented `forced-color-adjust` (CSS Color). Effect cell applies a representative value for visual checks."
+          "code_path": "internal/layout/style_color_adjust_props.go",
+          "description": "Implemented: print has no forced-colors mode; `none` keeps author colors by opting text out of the dark-scheme default. Consumer paint.go:208 (paintTextColor), read at paint.go:115."
+
         },
         {
           "property": "gap",
@@ -1879,8 +1893,9 @@
           "legacy_of": null,
           "group": "CSS Images",
           "syntax": "from-image | none | [ <angle> || flip ]",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Implemented `image-orientation` (CSS Images). Effect cell applies a representative value for visual checks."
+          "code_path": "internal/layout/style_image_adjust_props.go",
+          "description": "Implemented: `from-image` (JPEG EXIF), `none`, and explicit `<angle> [flip]`; an explicit angle replaces EXIF and rotates inside the source canvas. Consumers layout_images.go:219 and :237."
+
         },
         {
           "property": "image-resolution",
@@ -1888,8 +1903,9 @@
           "legacy_of": null,
           "group": "CSS Images",
           "syntax": "[ from-image || <resolution> ] && snap?",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Implemented `image-resolution` (CSS Images). Effect cell applies a representative value for visual checks."
+          "code_path": "internal/layout/style_image_adjust_props.go",
+          "description": "Implemented: `from-image | <resolution> | from-image <resolution>`; dpi/dpcm/dppx and `x` convert to DPI so 300dpi renders smaller than the 96dpi default. Consumers layout_images.go:250 and :256."
+
         },
         {
           "property": "inline-size",
@@ -1970,7 +1986,7 @@
           "group": "Compositing and Blending",
           "syntax": "<isolation-mode>",
           "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Partial `isolation` (Compositing and Blending). The effect cell exercises the stacking-context boundary; full PDF transparency-group isolation is deferred."
+          "description": "Implemented `isolation` (Compositing and Blending). `isolate` creates an isolated element group: PDF emits a Form XObject with `/Group /S /Transparency /I true /CS /DeviceRGB` and no `/BM`, PNG composites from a transparent scratch backdrop. Fixture 61 cell 99: the auto chip multiplies to dark green while the isolate chip stays blue. Subset: page-split group fragments composite per page; group composite alpha is 1; group order follows the last member in the engine global paint order."
         },
         {
           "property": "justify-content",
@@ -2291,7 +2307,7 @@
           "group": "Compositing and Blending",
           "syntax": "<blend-mode> | plus-lighter",
           "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Partial `mix-blend-mode` (Compositing and Blending). The effect cell exercises operation-level blending; full element-group backdrop semantics are deferred."
+          "description": "Implemented `mix-blend-mode` (Compositing and Blending). Element-level transparency groups in PDF (`/Group /S /Transparency` Form XObject plus `/BM` ExtGState) and one group-buffer composite per group in PNG. Fixture 62 cell 16: the multiply chip renders dark green while the normal control keeps translucent blue. Subset: `plus-lighter` remains unsupported; page-split group fragments composite per page; group composite alpha is 1."
         },
         {
           "property": "object-view-box",
@@ -2299,8 +2315,9 @@
           "legacy_of": null,
           "group": "CSS Images",
           "syntax": "none | <basic-shape-rect>",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Implemented `object-view-box` (CSS Images). Effect cell applies a representative value for visual checks."
+          "code_path": "internal/layout/style_image_adjust_props.go",
+          "description": "Implemented: `inset()`, `xywh()`, and `rect()` crop the source image; `circle()`, `ellipse()`, and `polygon()` parse and store but do not crop. Consumer layout_images.go:319 (objectViewBoxRect)."
+
         },
         {
           "property": "opacity",
@@ -2686,8 +2703,9 @@
           "legacy_of": null,
           "group": "CSS Color",
           "syntax": "economy | exact",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Implemented `print-color-adjust` (CSS Color). Effect cell applies a representative value for visual checks."
+          "code_path": "internal/layout/style_color_adjust_props.go",
+          "description": "Implemented: `exact` forces this element's background paint past the print economy gate, `economy` is the initial. Consumer background_image.go:30, call sites inline_paint.go:312, layout_chrome.go:425, layout_tables.go:100/1276."
+
         },
         {
           "property": "quotes",
@@ -2821,8 +2839,9 @@
           "legacy_of": null,
           "group": "CSS Writing Modes",
           "syntax": "none | all | [ digits <integer [2,4]>? ]",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Text layout/painting control. Compare the demo label against the Effect cell."
+          "code_path": "internal/layout/style_text_support_props.go",
+          "description": "Implemented: `all` or `digits N` makes a run inside vertical writing paint upright; mixed digit/letter runs stay rotated and there is no scaled combine cell. Consumer inline_paint.go:370/381 (inlineRunRotation, combinesUpright)."
+
         },
         {
           "property": "text-decoration",
@@ -2848,8 +2867,9 @@
           "legacy_of": null,
           "group": "CSS Text Decoration",
           "syntax": "<length-percentage>{1,2} | auto",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Text decoration/emphasis painting (line, color, style, thickness, or offset)."
+          "code_path": "internal/layout/style_text_support_props.go",
+          "description": "Implemented: `auto` or 1-2 lengths; the first endpoint is stored in points and trims the decoration's outer endpoints (negative values extend). Consumer inline_paint.go:887."
+
         },
         {
           "property": "text-decoration-line",
@@ -2866,8 +2886,9 @@
           "legacy_of": null,
           "group": "CSS Text Decoration",
           "syntax": "none | auto",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Text decoration/emphasis painting (line, color, style, thickness, or offset)."
+          "code_path": "internal/layout/style_text_support_props.go",
+          "description": "Implemented `none|auto` shorthand expanded onto skip-self, skip-box, skip-spaces, and skip-ink longhands (`auto` resets to initial, `none` turns every skip off). Consumer inline_paint.go:599/826."
+
         },
         {
           "property": "text-decoration-skip-box",
@@ -2875,8 +2896,9 @@
           "legacy_of": null,
           "group": "(ungrouped)",
           "syntax": "none | all",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Text decoration/emphasis painting (line, color, style, thickness, or offset)."
+          "code_path": "internal/layout/style_text_support_props.go",
+          "description": "Implemented: `all` breaks a continuous stroke at an item with inline padding/border; `none` draws across the box chrome. Consumer inline_paint.go:599 (resolveTextDecorationSkipPolicy)."
+
         },
         {
           "property": "text-decoration-skip-ink",
@@ -2893,8 +2915,9 @@
           "legacy_of": null,
           "group": "(ungrouped)",
           "syntax": "auto | skip-all | [ skip-underline || skip-overline || skip-line-through ] | no-skip",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Text decoration/emphasis painting (line, color, style, thickness, or offset)."
+          "code_path": "internal/layout/style_text_support_props.go",
+          "description": "Implemented: `skip-all` suppresses this item's own decoration; decorations are painted per item and no ancestor decoration is propagated. Consumer inline_paint.go:599."
+
         },
         {
           "property": "text-decoration-skip-spaces",
@@ -2902,8 +2925,9 @@
           "legacy_of": null,
           "group": "(ungrouped)",
           "syntax": "none | all | [ start || end ]",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Text decoration/emphasis painting (line, color, style, thickness, or offset)."
+          "code_path": "internal/layout/style_text_support_props.go",
+          "description": "Implemented: `none | all | [ start || end ]` control which spacer runes the decoration spans skip. Consumers inline_paint.go:599 and :684 (decorationSegments)."
+
         },
         {
           "property": "text-decoration-style",
@@ -2992,8 +3016,9 @@
           "legacy_of": null,
           "group": "CSS Writing Modes",
           "syntax": "mixed | upright | sideways",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Text layout/painting control. Compare the demo label against the Effect cell."
+          "code_path": "internal/layout/style_text_support_props.go",
+          "description": "Implemented: `upright` draws glyphs upright in vertical writing; `sideways` is treated like `mixed` (rotated run). Consumer inline_paint.go:370/375."
+
         },
         {
           "property": "text-overflow",
@@ -3118,8 +3143,9 @@
           "legacy_of": null,
           "group": "CSS Writing Modes",
           "syntax": "normal | embed | isolate | bidi-override | isolate-override | plaintext",
-          "code_path": "internal/layout/style_advanced_props.go",
-          "description": "Implemented `unicode-bidi` (CSS Writing Modes). Effect cell applies a representative value for visual checks."
+          "code_path": "internal/layout/style_text_support_props.go",
+          "description": "Implemented: `bidi-override`/`isolate-override` plus the embed/isolate/plaintext scopes reorder runs under rtl (run order, not characters). Consumers inline_collect.go:127 and :143."
+
         },
         {
           "property": "vertical-align",
@@ -3231,5 +3257,7 @@
         }
       ]
     }
-  }
+  },
+  "updated": "2026-09-12",
+  "demoted": 4
 }

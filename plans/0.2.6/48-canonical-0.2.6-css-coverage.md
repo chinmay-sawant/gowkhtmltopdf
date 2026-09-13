@@ -47,7 +47,7 @@ Knowledge base: `knowledge-base/wiki/index.md`, `concepts/css-engine.md`, `compa
 
 | Fact (current evidence) | Location |
 |-------------------------|----------|
-| `VERSION` is `0.2.5` | `VERSION:1` |
+| `VERSION` is `0.2.6` | `VERSION:1` |
 | CSS parser keeps unknown ident names; layout drops them | `internal/css/values.go` `validPropName`; `applyIgnoredGroup` `style_properties.go:1341` |
 | Apply dispatch is 11 groups, not one switch in `style.go` | `style_cascade.go:711-722`, `style_properties.go` |
 | About 120 named properties have apply handlers | inventory 2026-08-27 against `style_properties.go` + `applyFontProps` |
@@ -436,6 +436,22 @@ After Phase 79 closed at **202 / 0 / 616 / 0**, the remaining **616 Unsupported*
 | 84 | skip print noop | 155 | Catalog notes; print non-goals |
 
 Standing rules in every 80-84 checklist: **no git commands unless the user explicitly asks**; after status changes update both `catalog/mapping.json` and `catalog/coverage-summary.json` (plus `property-counts.md`); mapping last per `HONESTY-GATES.md`.
+
+## Amendment (2026-09-12): 24 demoted rows re-implemented
+
+PT26-LAY-04/05 demoted 27 parsed-and-stored no-op rows to unsupported. The same day, 24 of them were re-implemented with apply arms plus real layout, paint, or shaping consumers, per [HONEY-GATES](../HONESTY-GATES.md):
+
+- Containment (7): `contain`, `contain-intrinsic-size/-width/-height/-block-size/-inline-size`, `content-visibility`.
+- Print color adjust (5): `color-adjust`, `print-color-adjust`, `forced-color-adjust`, `color-scheme`, `dynamic-range-limit`.
+- Image adjust (3): `image-orientation`, `image-resolution`, `object-view-box`.
+- Text support (8): `unicode-bidi`, `text-orientation`, `text-combine-upright`, `text-decoration-inset`, `text-decoration-skip` and its three longhands.
+- Fonts (1): `font-language-override` (OpenType tags mapped to BCP47 and threaded into `shaping.Input.Language`).
+
+Catalog: **354 Implemented / 0 Partial / 464 Unsupported / 0 Ignored**. The three remaining font rows (`font-optical-sizing`, `font-palette`, `font-variation-settings`) stay unsupported; they need variable-font instancing and COLR/CPAL painting.
+
+Transparency groups (same day): `isolation` and `mix-blend-mode` moved from partial to implemented. Apply arms `style_advanced_props.go:69` (`mix-blend-mode`) and `:89` (`isolation`); consumers `layout.go:1024` (`pushZ` group creation), `:1058` (`enterBlendIsolation` writes `BlendGroup.Mode`), and `:1075` (`Isolate: true`); PDF `pdf/content.go:377` `EndTransparencyGroup` emits a Form XObject with `/Group << /S /Transparency /I true /CS /DeviceRGB >>` and `/BM` via ExtGState; PNG `imageout/groups.go:163` composites each group buffer once; form fonts share the page subset (`pdf/pdf.go:977` `finalizeForms` after `unionFontRunes`); sibling paint routes by each op's own group chain (`paint_groups.go` `target`/`enter`/`closeReady`); group alpha per distinct value via `SetGroupOpacity`. Tests `TestBlendGroupMarkersNestAroundSubtree`, `TestBlendGroupEmitsTransparencyForm`, `TestSiblingBlendGroupsEmitSiblingForms`, `TestRasterizeSiblingOutsideBlendGroupKeepsPixels`, `TestIsolationClearsInheritedOperationBlendScope`, `TestIsolationOnlyGroupUsesNoBlendExtGState`, `TestBlendGroupKeepsPlainFlexSiblingOutOfForm`, `TestTransparencyGroupFontMatchesPageFont`. Honest subset: a group subtree split across pages composites as one isolated group per page fragment with nothing dropped; element opacity stays stamped per descendant op and group composite alpha is 1, so CSS once-at-group opacity is not implemented; the group composites at its last member's position in the engine's global paint order, not a full CSS stacking-context tree; `plus-lighter` remains unsupported; form `/BBox` is the page box (conservative, never clips); PDF/UA tagging inside forms was not validated by veraPDF in this session. Fixtures 61 cell 99 (auto chip multiplies to dark green, isolate chip stays blue) and 62 cell 16 (multiply chip dark green, normal control keeps translucent blue).
+
+Evidence: `catalog/implemented-code-evidence.md`, fixtures 61 and 62, and `make lint` / `make golden` exit 0 on 2026-09-12.
 
 ## Out of scope (unless this ledger is amended)
 

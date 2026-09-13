@@ -106,7 +106,7 @@ Exclusive file ownership. Typical split when several rows land together:
 3. Layout consumer (one of `grid.go` / `multicol.go` / `flex.go` / …)
 4. Paint / chrome (`layout_chrome.go`, `outline.go`, `inline_paint.go`, …)
 
-Rules: minimal edit; keep `paint_flow.go` from growing; add or extend a package
+Rules: minimal edit; keep the `paint_flow_*` files from growing; add or extend a package
 test for engine fixes; update generator when hand-editing 60/61/62 demos.
 
 ## Phase 6 - Picture council (4 parallel verify agents)

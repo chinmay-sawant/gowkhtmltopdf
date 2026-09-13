@@ -3,6 +3,8 @@ package pdf
 import (
 	"strings"
 	"testing"
+
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
 func TestFontFamilyKeysGenericsOnly(t *testing.T) {
@@ -18,6 +20,46 @@ func TestFontFamilyKeysGenericsOnly(t *testing.T) {
 
 	if got := fontFamilyKeys("sans-serif"); len(got) == 0 || got[0] != "liberation sans" {
 		t.Fatalf("sans-serif keys=%v", got)
+	}
+}
+
+// TestRegistryResolvesBundledDejaVuSans proves the default registry exposes
+// the bundled DejaVu Sans fallback faces under their CSS family name without
+// letting the generic sans-serif expansion switch to DejaVu, and that the
+// resolved face still applies the Serbian (SRB) locl substitution.
+func TestRegistryResolvesBundledDejaVuSans(t *testing.T) {
+	t.Parallel()
+
+	faces, err := LoadDefaultFaces()
+	if err != nil {
+		t.Fatalf("LoadDefaultFaces: %v", err)
+	}
+
+	reg := RegistryFromGlobal(settings.DefaultPdfGlobal())
+	if reg == nil {
+		t.Fatal("RegistryFromGlobal returned nil")
+	}
+
+	regular := reg.Lookup([]string{"DejaVu Sans"}, 400, false)
+	if regular != faces.UnicodeFallback {
+		t.Fatalf("DejaVu Sans regular resolved to %v, want the bundled fallback face", regular)
+	}
+
+	bold := reg.Lookup([]string{"DejaVu Sans"}, 700, false)
+	if bold != faces.UnicodeFallbackBold {
+		t.Fatalf("DejaVu Sans bold resolved to %v, want the bundled fallback bold face", bold)
+	}
+
+	// The exact alias must not capture the generic sans-serif expansion.
+	if got := reg.Lookup([]string{"sans-serif"}, 400, false); got != nil {
+		t.Fatalf("sans-serif resolved to %v through the bundled exact alias", got)
+	}
+
+	plain := ShapeTextFontWithFeaturesLanguage("б", regular, nil, "")
+	serbian := ShapeTextFontWithFeaturesLanguage("б", regular, nil, "SRB")
+
+	if plain == serbian {
+		t.Fatalf("SRB override did not change the shaped run for the fallback face: %q", plain)
 	}
 }
 

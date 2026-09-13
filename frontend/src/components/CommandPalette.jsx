@@ -16,7 +16,7 @@ const DOC_ITEMS = [
   {
     id: 'doc-cli',
     title: 'CLI Reference',
-    desc: 'Multi-object command grammar, global vs page-scoped flags, cover & TOC objects',
+    desc: 'Document-shaped grammar, global vs page-scoped flags, --cover and --toc',
     category: 'Documentation',
     url: '/documentation/cli',
     keywords: 'cli options flags terminal usage grammar objects page toc cover arguments',
@@ -34,7 +34,7 @@ const DOC_ITEMS = [
   {
     id: 'doc-architecture',
     title: 'Architecture & Pipeline',
-    desc: '10 domain packages, pipeline strip, layout domains, dependency DAG',
+    desc: 'Pipeline stages, package map, ownership, dependency DAG',
     category: 'Documentation',
     url: '/documentation/architecture',
     keywords: 'architecture pipeline domains layout dag parsing paint render engine design',
@@ -81,7 +81,7 @@ const DOC_ITEMS = [
     title: 'Getting Started',
     desc: 'Installation, build flags, first CLI and Go library document generation',
     category: 'Documentation',
-    url: '/getting-started',
+    url: '/documentation/getting-started',
     keywords: 'getting started installation quickstart build go install tutorial first pdf',
     icon: 'start',
   },
@@ -149,7 +149,7 @@ const FLAG_ITEMS = [
     category: 'CLI Flags',
     url: '/documentation/cli',
     flag: '--margin-left',
-    keywords: 'margin left spacing -L mm in px dimension',
+    keywords: 'margin left spacing mm in px dimension',
   },
   {
     id: 'flag-margin-right',
@@ -161,12 +161,12 @@ const FLAG_ITEMS = [
     keywords: 'margin right spacing -R mm in px dimension',
   },
   {
-    id: 'flag-enable-local-file-access',
-    title: '--enable-local-file-access',
+    id: 'flag-allow-local-files',
+    title: '--allow-local-files',
     desc: 'Allow reading local filesystem assets like images, stylesheets, and fonts',
     category: 'CLI Flags',
     url: '/documentation/cli',
-    flag: '--enable-local-file-access',
+    flag: '--allow-local-files',
     keywords: 'security local files images assets fs read disk filesystem access allow',
   },
   {
@@ -181,7 +181,7 @@ const FLAG_ITEMS = [
   {
     id: 'flag-grayscale',
     title: '--grayscale / -g',
-    desc: 'Render output PDF or raster images in grayscale mode',
+    desc: 'Render the output PDF in grayscale mode',
     category: 'CLI Flags',
     url: '/documentation/cli',
     flag: '--grayscale',
@@ -294,7 +294,7 @@ const DOSSIER_BENCH_ITEMS = [
     title: 'Dossier: CSS & Layout Issues',
     desc: 'Flexbox, table pagination, margins, floats, and container queries coverage',
     category: 'Benchmarks & Dossier',
-    url: '/dossier?cat=CSS%2Flayout',
+    url: '/dossier?category=CSS%2Flayout',
     keywords: 'dossier css layout flexbox tables margins page breaks floats queries',
     icon: 'dossier',
   },
@@ -303,7 +303,7 @@ const DOSSIER_BENCH_ITEMS = [
     title: 'Dossier: Font & Text Issues',
     desc: 'OpenType, UTF-8, CJK fonts, font fallback, and text decoration coverage',
     category: 'Benchmarks & Dossier',
-    url: '/dossier?cat=Fonts%2Fencoding%2Ftext',
+    url: '/dossier?category=Fonts%2Fencoding%2Ftext',
     keywords: 'dossier fonts text cjk utf-8 encoding fallback opentype unicode',
     icon: 'dossier',
   },
@@ -312,7 +312,7 @@ const DOSSIER_BENCH_ITEMS = [
     title: 'Dossier: Crash & Memory Issues',
     desc: 'Segmentation faults, infinite loops, and memory leak prevention',
     category: 'Benchmarks & Dossier',
-    url: '/dossier?cat=Crash%2Fhang%2Fmemory',
+    url: '/dossier?category=Crash%2Fhang%2Fmemory',
     keywords: 'dossier crash segfault memory leak hang infinite loop stability',
     icon: 'dossier',
   },
@@ -374,12 +374,12 @@ export default function CommandPalette() {
     {
       id: 'action-copy-install',
       title: 'Copy Go Install Command',
-      desc: 'go install github.com/chinmay-sawant/gowkhtmltopdf/cmd/gowkhtmltopdf@v0.2.3',
+      desc: 'go install github.com/chinmay-sawant/gowkhtmltopdf/cmd/gowkhtmltopdf@v0.2.6',
       category: 'Quick Actions',
-      keywords: 'install go binary cli copy command download build latest v0.2.3',
+      keywords: 'install go binary cli copy command download build latest v0.2.6',
       icon: 'copy',
       action: () => {
-        navigator.clipboard.writeText('go install github.com/chinmay-sawant/gowkhtmltopdf/cmd/gowkhtmltopdf@v0.2.3')
+        navigator.clipboard.writeText('go install github.com/chinmay-sawant/gowkhtmltopdf/cmd/gowkhtmltopdf@v0.2.6')
         showToast('Install command copied to clipboard!')
       },
     },

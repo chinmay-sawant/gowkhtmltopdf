@@ -42,7 +42,7 @@ make build
 | `make test-quick` | `make test` plus `-short` (skips long perf-budget tests) |
 | `make test-serial` | `-p 1 -parallel 1` when even capped runs freeze the desktop |
 | `make test-race` | `-race` on hot packages, same concurrency caps |
-| `make lint` | `golangci-lint run` (all linters via `.golangci.yml`) then `npm run lint` in `frontend/` |
+| `make lint` | `golangci-lint run` (all linters via `.golangci.yml`), `make size-check` (file-size ledger), then `npm run lint` in `frontend/` |
 | `make build` | `bin/gowkhtmltopdf`, `bin/gowkhtmltoimage` |
 | `make golden` | Golden fixture corpus (`internal/convert`), capped parallelism |
 | `make samples` | Regenerate `output/` fixtures + optional live wiki smoke |

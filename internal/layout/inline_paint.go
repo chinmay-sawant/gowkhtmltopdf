@@ -9,15 +9,11 @@ import (
 
 const (
 	textOverflowEllipsis = "ellipsis"
-	verticalAlignSub     = "sub"
-	verticalAlignSuper   = "super"
 	emphasisStyleFilled  = "filled"
 	inlineStyleNone      = "none"
 
 	fallbackAscentRatio  = 0.8
 	fallbackDescentRatio = 0.2
-
-	verticalAlignSubRatio = 0.2
 
 	emptyRunEpsilon = 0.01
 
@@ -72,6 +68,7 @@ type undRun struct {
 	hasHref   bool
 	style     string
 	blendMode string
+	group     *BlendGroup
 }
 
 // flush emits the accumulated underline stroke, if any.
@@ -80,8 +77,8 @@ type undRun struct {
 func (u *undRun) flush(e *engine) {
 	if u.active && u.w > 0.01 {
 		col := [3]float64{u.r, u.g, u.b}
-		prevBlend := e.blendMode
-		e.blendMode = u.blendMode
+		prevBlend, prevGroup := e.blendMode, e.blendGroup
+		e.blendMode, e.blendGroup = u.blendMode, u.group
 		switch strings.ToLower(strings.TrimSpace(u.style)) {
 		case "dashed":
 			e.emitDashedLine(u.x, u.y, u.w, u.uw, col)
@@ -98,6 +95,7 @@ func (u *undRun) flush(e *engine) {
 			})
 		}
 		e.blendMode = prevBlend
+		e.blendGroup = prevGroup
 	}
 
 	*u = undRun{} //nolint:exhaustruct // intentional zero fields
@@ -180,17 +178,15 @@ func (e *engine) emitInlineImage(
 			isJPEG = false
 		}
 
-		e.add(Op{ //nolint:exhaustruct // intentional zero fields
-			Kind: OpImage, X: imgX, Y: imgY, W: imgW, H: imgH,
-			Image: imgData, ImgW: item.imgRef.w, ImgH: item.imgRef.h, IsJPEG: isJPEG,
-			Alt: item.alt,
-		})
+		e.add((Op{ //nolint:exhaustruct // intentional zero fields
+			Kind: OpImage, X: imgX, Y: imgY, W: imgW, H: imgH, IsJPEG: isJPEG,
+		}).withImage(imgData, item.imgRef.w, item.imgRef.h, item.alt))
 	}
 
 	if item.href != "" {
-		e.add(Op{ //nolint:exhaustruct // intentional zero fields
-			Kind: OpLinkURI, X: leftX, Y: top, W: item.w, H: item.h, URI: item.href,
-		})
+		e.add((Op{ //nolint:exhaustruct // intentional zero fields
+			Kind: OpLinkURI, X: leftX, Y: top, W: item.w, H: item.h,
+		}).withURI(item.href))
 	}
 
 	leftX += item.w + item.marginR
@@ -255,7 +251,9 @@ func (e *engine) emitInlineText(
 		textBaseline -= ascent
 	}
 
-	leftX, runSpan := e.emitInlineFaceRuns(item, leftX, textBaseline, size, ascent, descent)
+	var runSpan float64
+
+	leftX, runSpan = e.emitTextRuns(item, leftX, textBaseline, shiftedBaseline, size, ascent, descent)
 
 	// Decoration: one stroke per logical link run on this line (not per
 	// face-run / nested style chunk). Thin stroke ~5% em, clamped for
@@ -311,7 +309,7 @@ func (e *engine) paintInlineChrome(style *ResolvedStyle, leftX, baseline, ascent
 		return
 	}
 
-	if style.BGColor[3] > 0 && e.opts.Background {
+	if style.BGColor[3] > 0 && e.backgroundPaintEnabled(style) {
 		radii, radiiY := usedBorderRadiiXY(*style, boxW, boxH)
 		fill := Op{ //nolint:exhaustruct // intentional zero fields
 			Kind: OpFillRect, X: leftX, Y: boxY, W: boxW, H: boxH,
@@ -361,67 +359,63 @@ func writingModeRotate(mode string) float64 {
 	return 0
 }
 
-// alignedInlineTop is the canvas Y of an atomic inline box (image or
-// inline-block). Keywords match CSS vertical-align; a length shift raises
-// (positive) or lowers (negative) a baseline-aligned box.
-func (e *engine) alignedInlineTop(item *inlineItem, lineY, lineH, baseline float64) float64 {
-	if item.style == nil {
-		return baseline - item.h
-	}
-
-	switch item.style.VerticalAlign {
-	case cssVerticalAlignTop:
-		return lineY
-	case cssVerticalAlignMiddle:
-		return lineY + (lineH-item.h)/2
-	case cssVerticalAlignBottom:
-		return lineY + lineH - item.h
-	default:
-		return baseline - item.h - e.scalePt(e.effectiveVerticalAlignShift(item.style))
-	}
-}
-
-// effectiveVerticalAlignShift maps vertical-align keywords and lengths to a
-// pt shift where positive raises. Handles sub/super and % of line-height
-// in addition to plain <length> stored in VerticalAlignShift.
-func (e *engine) effectiveVerticalAlignShift(style *ResolvedStyle) float64 {
-	if style == nil {
+// inlineRunRotation returns the text matrix rotation for one run. Horizontal
+// writing modes never rotate. In vertical writing modes:
+//   - text-orientation:upright draws glyphs upright (0 degrees)
+//   - text-combine-upright combines a whole digit run into one upright cell
+//   - mixed and sideways keep the existing rotated run (-90 degrees)
+//
+// Subset: there is no per-character orientation pass and no scaled combine
+// cell, so a combined run is painted upright at its normal font size.
+func inlineRunRotation(sty *ResolvedStyle, text string) float32 {
+	if sty == nil || !isVerticalWritingMode(sty.WritingMode) {
 		return 0
 	}
 
-	switch strings.ToLower(strings.TrimSpace(style.VerticalAlign)) {
-	case verticalAlignSub:
-		return style.FontSize * verticalAlignSubRatio
-	case verticalAlignSuper:
-		return style.FontSize * -0.4
-	}
-	// If VerticalAlign looks like a percent (e.g. "50%"), compute against
-	// line-height per CSS spec.
-	if pct := strings.TrimSpace(style.VerticalAlign); strings.HasSuffix(pct, "%") {
-		if percent, ok := parsePercent(pct); ok {
-			lineH := lineHeightOf(style)
-
-			return lineH * percent / oneHundred
+	switch strings.ToLower(strings.TrimSpace(sty.TextOrientation)) {
+	case textOrientationUpright:
+		return 0
+	case textOrientationSideways:
+		return float32(writingModeRotate(sty.WritingMode))
+	default:
+		if combinesUpright(sty.TextCombineUpright, text) {
+			return 0
 		}
-	}
 
-	return style.VerticalAlignShift
+		return float32(writingModeRotate(sty.WritingMode))
+	}
 }
 
-func parsePercent(value string) (float64, bool) {
-	trimmed := strings.TrimSpace(value)
-	if !strings.HasSuffix(trimmed, "%") {
-		return 0, false
+// combinesUpright reports whether text-combine-upright combines this run.
+// Subset: the engine paints one op per run, so the whole run combines when
+// "all" is set or when it is all digits within the "digits N" cap. Mixed
+// digit/letter runs and over-cap digit runs stay rotated.
+func combinesUpright(mode, text string) bool {
+	low := strings.ToLower(strings.TrimSpace(mode))
+	if low == columnSpanAll {
+		return text != ""
 	}
 
-	num := strings.TrimSpace(strings.TrimSuffix(trimmed, "%"))
-	parsed, err := strconv.ParseFloat(num, 64)
-
-	if err != nil {
-		return 0, false
+	if !strings.HasPrefix(low, "digits ") {
+		return false
 	}
 
-	return parsed, true
+	limit, err := strconv.Atoi(strings.TrimSpace(strings.TrimPrefix(low, "digits ")))
+	if err != nil || limit < 1 {
+		return false
+	}
+
+	digits := 0
+
+	for _, r := range text {
+		if r < '0' || r > '9' {
+			return false
+		}
+
+		digits++
+	}
+
+	return digits > 0 && digits <= limit
 }
 
 func inlineBorderVisible(side border) bool {
@@ -454,22 +448,21 @@ func (e *engine) emitInlineTextRun(
 		e.emitTextShadowRuns(item, run, textX, baseline, textWidth, size, descent)
 	}
 
-	e.add(Op{ //nolint:exhaustruct // intentional zero fields
+	e.add((Op{ //nolint:exhaustruct // intentional zero fields
 		Kind: OpText, X: textX, Y: baseline, W: textWidth, H: item.h,
 		Text: run.text, Font: run.face, Size: size,
 		InkDescent:    descent,
 		LetterSpacing: item.style.LetterSpacing * e.scale,
-		TextTransform: item.style.TextTransform,
 		Bold:          item.style.FontWeight >= fontWeightBoldValue,
 		R:             child[0], G: child[1], B: child[2],
-		RotateDeg: writingModeRotate(item.style.WritingMode),
-	})
+		RotateDeg: inlineRunRotation(item.style, run.text),
+	}).withTextTransform(item.style.TextTransform).withTextLanguage(fontShapingLanguage(item.style)))
 
 	if item.href != "" {
-		e.add(Op{ //nolint:exhaustruct // intentional zero fields
+		e.add((Op{ //nolint:exhaustruct // intentional zero fields
 			Kind: OpLinkURI, X: textX, Y: baseline - ascent, W: textWidth,
-			H: ascent + descent, URI: item.href,
-		})
+			H: ascent + descent,
+		}).withURI(item.href))
 	}
 }
 
@@ -482,18 +475,17 @@ func (e *engine) emitTextShadowRuns(
 	for _, shadow := range shadows {
 		opacity := shadowOpacity(shadow.blur)
 
-		shadowOp := Op{ //nolint:exhaustruct // intentional zero fields
+		shadowOp := (Op{ //nolint:exhaustruct // intentional zero fields
 			Kind: OpText, X: textX + shadow.x, Y: baseline + shadow.y, W: textWidth, H: item.h,
 			Text: run.text, Font: run.face, Size: size,
 			InkDescent:    descent,
 			LetterSpacing: item.style.LetterSpacing * e.scale,
-			TextTransform: item.style.TextTransform,
 			Bold:          item.style.FontWeight >= fontWeightBoldValue,
 			R:             shadow.color[0], G: shadow.color[1], B: shadow.color[2],
-			RotateDeg: writingModeRotate(item.style.WritingMode),
-		}
+			RotateDeg: inlineRunRotation(item.style, run.text),
+		}).withTextTransform(item.style.TextTransform).withTextLanguage(fontShapingLanguage(item.style))
 		if opacity > 0 && opacity < 1 {
-			shadowOp.PaintOpacity = opacity
+			shadowOp.setPaintOpacity(opacity)
 		}
 
 		e.add(shadowOp)
@@ -519,14 +511,281 @@ func shadowOpacity(blur float64) float64 {
 	return opacity
 }
 
+// textDecorationSkipPolicy is the paint-time view of the text-decoration-skip
+// longhands. Initial values resolve per CSS Text Decoration 4 even when the
+// plumbing still stores the legacy "objects" keyword: skip-spaces "objects"
+// resolves to "start end", skip-self/box to auto/none.
+type textDecorationSkipPolicy struct {
+	skipSpacesStart bool
+	skipSpacesEnd   bool
+	skipSpacesAll   bool
+	skipSelfAll     bool
+	noSkipSelf      bool
+	skipBoxAll      bool
+}
+
+// resolveTextDecorationSkipPolicy reads TextDecorationSkipSelf, -Box, and
+// -Spaces. Subset notes:
+//   - skip-self controls ancestor decorations in the spec; this engine paints
+//     decorations per item and does not propagate ancestor decorations, so
+//     skip-all suppresses the item's own decoration and no-skip disables
+//     space and ink skipping for it.
+//   - skip-box:all breaks a continuous stroke at an item with inline chrome
+//     (padding/border) instead of drawing across it; there are no ink bounds
+//     to compute the full margin-box skip geometry.
+//
+//nolint:cyclop // skip longhands resolve into one flat policy
+func resolveTextDecorationSkipPolicy(sty *ResolvedStyle) textDecorationSkipPolicy {
+	var policy textDecorationSkipPolicy
+
+	if sty == nil {
+		return policy
+	}
+
+	switch strings.ToLower(strings.TrimSpace(sty.TextDecorationSkipSelf)) {
+	case "skip-all":
+		policy.skipSelfAll = true
+	case textDecorationSkipNoSkip:
+		policy.noSkipSelf = true
+	}
+
+	if strings.EqualFold(strings.TrimSpace(sty.TextDecorationSkipBox), columnSpanAll) {
+		policy.skipBoxAll = true
+	}
+
+	spaces := strings.ToLower(strings.TrimSpace(sty.TextDecorationSkipSpaces))
+	if spaces == "" || spaces == "objects" {
+		spaces = textDecorationSkipStartEnd
+	}
+
+	// Allocation-free token scan: strings.Fields allocated a slice per
+	// decorated text item, which showed up as ~15 percent of 500-page
+	// benchmark allocations. The field holds at most two keywords.
+	for spaces != "" {
+		spaces = strings.TrimLeft(spaces, " \t\r\n")
+		if spaces == "" {
+			break
+		}
+
+		tok := spaces
+		if idx := strings.IndexAny(spaces, " \t\r\n"); idx >= 0 {
+			tok, spaces = spaces[:idx], spaces[idx:]
+		} else {
+			spaces = ""
+		}
+
+		switch tok {
+		case cssDisplayNone:
+			return policy
+		case columnSpanAll:
+			policy.skipSpacesAll = true
+		case fxStart:
+			policy.skipSpacesStart = true
+		case fxEnd:
+			policy.skipSpacesEnd = true
+		}
+	}
+
+	if policy.noSkipSelf {
+		policy.skipSpacesAll = false
+		policy.skipSpacesStart = false
+		policy.skipSpacesEnd = false
+	}
+
+	if policy.skipSpacesAll {
+		policy.skipSpacesStart = false
+		policy.skipSpacesEnd = false
+	}
+
+	return policy
+}
+
+// decoSeg is one paintable decoration span on a text item, in canvas X.
+type decoSeg struct {
+	start, end float64
+}
+
+func (s decoSeg) width() float64 { return s.end - s.start }
+
+// maxDecoSegs caps the per-item decoration segments held inline. A nowrap or
+// pre run with more words than this keeps a continuous stroke across the
+// overflow instead of allocating; decoration space skipping is best-effort
+// for those runs.
+const maxDecoSegs = 8
+
+// decoSegSet is a fixed-capacity segment list returned by value so the paint
+// hot path does not allocate per decorated text item.
+type decoSegSet struct {
+	segs [maxDecoSegs]decoSeg
+	n    int
+}
+
+func (s *decoSegSet) add(start, end float64) {
+	if s.n >= len(s.segs) {
+		s.segs[len(s.segs)-1].end = end
+
+		return
+	}
+
+	s.segs[s.n] = decoSeg{start: start, end: end}
+	s.n++
+}
+
+func (s *decoSegSet) count() int { return s.n }
+
+func (s *decoSegSet) get(i int) decoSeg { return s.segs[i] }
+
+// decorationSegments maps an item's text onto the spans its decoration lines
+// cover after text-decoration-skip-spaces and text-decoration-inset. Spaces
+// are skipped per the policy; inset trims the outer endpoints of the whole
+// span (positive) or extends them (negative). Advances come from rune
+// measurement, not glyph ink.
+//
+//nolint:cyclop,funlen // per-rune spacer skip and segment accumulation in one pass
+func (e *engine) decorationSegments(
+	item *inlineItem, runStart, runSpan float64, policy textDecorationSkipPolicy, inset float64,
+) decoSegSet {
+	var segs decoSegSet
+
+	if item.text == "" || runSpan <= emptyRunEpsilon {
+		return segs
+	}
+
+	firstInk, lastInk := -1, -1
+
+	idx := 0
+
+	for _, r := range item.text {
+		if !isDecorationSpacer(r) {
+			if firstInk < 0 {
+				firstInk = idx
+			}
+
+			lastInk = idx
+		}
+
+		idx++
+	}
+
+	if firstInk < 0 {
+		return segs
+	}
+
+	spanEnd := runStart + runSpan
+
+	cur := runStart
+	segStart := -1.0
+
+	flush := func() {
+		if segStart < 0 {
+			return
+		}
+
+		end := cur
+		if end > spanEnd {
+			end = spanEnd
+		}
+
+		if end > segStart {
+			segs.add(segStart, end)
+		}
+
+		segStart = -1
+	}
+
+	idx = 0
+
+	for _, char := range item.text {
+		adv := e.skipInkAdvance(char, item.style)
+		if cur+adv > spanEnd {
+			adv = spanEnd - cur
+		}
+
+		if adv < 0 {
+			adv = 0
+		}
+
+		if isDecorationSpacer(char) && skipDecorationSpacer(idx, firstInk, lastInk, policy) {
+			flush()
+
+			cur += adv
+			idx++
+
+			continue
+		}
+
+		if segStart < 0 {
+			segStart = cur
+		}
+
+		cur += adv
+		idx++
+	}
+
+	flush()
+
+	if segs.n == 0 {
+		return segs
+	}
+
+	// Inset applies to the decoration as a whole: trim the first segment's
+	// start and the last segment's end.
+	segs.segs[0].start += inset
+	segs.segs[segs.n-1].end -= inset
+
+	var out decoSegSet
+
+	for i := range segs.n {
+		if segs.segs[i].end-segs.segs[i].start > emptyRunEpsilon {
+			out.add(segs.segs[i].start, segs.segs[i].end)
+		}
+	}
+
+	return out
+}
+
+// skipDecorationSpacer reports whether the spacer at rune index idx is
+// skipped under the resolved policy.
+func skipDecorationSpacer(idx, firstInk, lastInk int, policy textDecorationSkipPolicy) bool {
+	switch {
+	case policy.skipSpacesAll:
+		return true
+	case idx < firstInk:
+		return policy.skipSpacesStart
+	case idx > lastInk:
+		return policy.skipSpacesEnd
+	default:
+		return false
+	}
+}
+
+// isDecorationSpacer reports a CSS spacer for text-decoration-skip-spaces:
+// Unicode Zs except U+202F NARROW NO-BREAK SPACE, plus the ASCII whitespace
+// inline layout already treats as a run separator.
+func isDecorationSpacer(r rune) bool {
+	switch r {
+	case ' ', '\t', '\n', '\r', '\u00A0':
+		return true
+	default:
+		return false
+	}
+}
+
 // paintDecoration draws the underline / line-through / overline strokes for one text
 // item, extending the active underline run when the styling continues.
 //
-//nolint:cyclop // decoration painting
+//nolint:cyclop,funlen,gocognit // decoration painting
 func (e *engine) paintDecoration(
 	item *inlineItem, runStart, runSpan, size, ascent, descent, baseline float64,
 	child [3]float64, und *undRun,
 ) {
+	policy := resolveTextDecorationSkipPolicy(item.style)
+	if policy.skipSelfAll {
+		und.flush(e)
+
+		return
+	}
+
 	// A visible border-bottom is already the link affordance (wiki
 	// `.mw-body a:not(.image){border-bottom:1px solid #aaa}`). Painting the
 	// forced href underline on top makes every link look double.
@@ -561,26 +820,84 @@ func (e *engine) paintDecoration(
 		uWidth = item.style.TextDecorationThickness
 	}
 
-	if wantUnderline {
-		// Sit clearly below glyph descenders (~1–2mm visual gap).
-		underY := baseline + descent + size*0.22 + item.style.TextUnderlineOffset
-		skipInk := strings.ToLower(strings.TrimSpace(item.style.TextDecorationSkipInk))
-		// Empty keeps legacy continuous underlines. Explicit auto/all gap at
-		// descenders; none keeps a solid stroke through g/j/p/q/y.
-		if !wsOnly && (skipInk == "auto" || skipInk == columnSpanAll) {
-			und.flush(e)
-			e.paintUnderlineSkipInk(item, runStart, underY, uWidth, decColor)
+	underY := baseline + descent + size*0.22 + item.style.TextUnderlineOffset
+
+	if wsOnly {
+		// Do not start a decoration on whitespace-only, but extend an active
+		// same-href underline across inter-word spaces.
+		if wantUnderline {
+			e.paintUnderline(item, runStart, runSpan, underY, uWidth, size, true, decColor, und)
 		} else {
-			e.paintUnderline(item, runStart, runSpan, underY, uWidth, size, wsOnly, decColor, und)
+			und.flush(e)
+		}
+
+		return
+	}
+
+	// skip-box:all subset: an item with inline padding/border breaks the
+	// continuous stroke instead of drawing across its box chrome.
+	if policy.skipBoxAll && item.chrome {
+		und.flush(e)
+	}
+
+	inset := e.scalePt(item.style.TextDecorationInset)
+	segs := e.decorationSegments(item, runStart, runSpan, policy, inset)
+
+	if segs.count() == 0 {
+		// Every rune was a skipped spacer: nothing to paint.
+		if !wantUnderline {
+			und.flush(e)
+		}
+
+		return
+	}
+
+	if wantUnderline {
+		skipInk := strings.ToLower(strings.TrimSpace(item.style.TextDecorationSkipInk))
+		if policy.noSkipSelf {
+			skipInk = cssDisplayNone
+		}
+
+		switch {
+		case segs.count() > 1:
+			// Spaces split the decoration; paint each word segment directly.
+			und.flush(e)
+
+			for i := range segs.count() {
+				seg := segs.get(i)
+				e.emitDecorationLineStyled(item.style, seg.start, underY, seg.width(), uWidth, decColor)
+			}
+		case skipInk == overflowAuto || skipInk == columnSpanAll:
+			und.flush(e)
+			e.paintUnderlineSkipInk(item, runStart, segs.get(0).start, segs.get(0).end, underY, uWidth, decColor)
+		default:
+			e.paintUnderline(item, segs.get(0).start, segs.get(0).width(), underY, uWidth, size, false, decColor, und)
 		}
 	} else {
 		und.flush(e)
 	}
 
-	e.paintLineThrough(item, runStart, runSpan, baseline, ascent, uWidth, wsOnly, decColor)
+	// Line-through and overline have no accumulator: per-item start/end space
+	// trims would leave a gap at every word boundary, so those decorations
+	// keep full spans unless the policy skips all spaces. Underlines heal
+	// interior trims in the undRun accumulator, so they use the edge policy.
+	bodyPolicy := policy
+	bodyPolicy.skipSpacesStart = false
+	bodyPolicy.skipSpacesEnd = false
 
-	if wantOverline && !wsOnly {
-		e.paintOverline(item, runStart, runSpan, baseline, ascent, uWidth, decColor)
+	bodySegs := segs
+	if !policy.skipSpacesAll {
+		bodySegs = e.decorationSegments(item, runStart, runSpan, bodyPolicy, inset)
+	}
+
+	if wantLineThrough {
+		strikeY := baseline - ascent*lineThroughOffsetRatio
+		e.paintDecorationSegments(item.style, bodySegs, strikeY, uWidth, decColor)
+	}
+
+	if wantOverline {
+		overlineY := baseline - ascent
+		e.paintDecorationSegments(item.style, bodySegs, overlineY, uWidth, decColor)
 	}
 }
 
@@ -627,55 +944,35 @@ func hasLineThrough(style *ResolvedStyle) bool {
 	return strings.Contains(strings.ToLower(style.TextDecorationLine), "line-through")
 }
 
-// paintLineThrough strokes the strike-through rule for a decorated text item.
-func (e *engine) paintLineThrough(
-	item *inlineItem, runStart, runSpan, baseline, ascent, uWidth float64,
-	wsOnly bool, child [3]float64,
+// paintDecorationSegments strokes each segment of one decoration line at lineY
+// using the item's text-decoration-style.
+func (e *engine) paintDecorationSegments(
+	sty *ResolvedStyle, segs decoSegSet, lineY, uWidth float64, col [3]float64,
 ) {
-	if hasLineThrough(item.style) && !wsOnly {
-		strikeY := baseline - ascent*lineThroughOffsetRatio
-
-		col := child
-
-		switch strings.ToLower(strings.TrimSpace(item.style.TextDecorationStyle)) {
-		case "dashed":
-			e.emitDashedLine(runStart, strikeY, runSpan, uWidth, col)
-		case "dotted":
-			e.emitDottedLine(runStart, strikeY, runSpan, uWidth, col)
-		case "wavy":
-			e.emitWavyLine(runStart, strikeY, runSpan, uWidth, col)
-		case "double":
-			e.emitDoubleLine(runStart, strikeY, runSpan, uWidth, col)
-		default:
-			e.add(Op{ //nolint:exhaustruct // intentional zero fields
-				Kind: OpLine, X: runStart, Y: strikeY, W: runSpan, H: 0,
-				Width: uWidth, R: col[0], G: col[1], B: col[2],
-			})
-		}
+	for i := range segs.count() {
+		seg := segs.get(i)
+		e.emitDecorationLineStyled(sty, seg.start, lineY, seg.width(), uWidth, col)
 	}
 }
 
-// paintOverline strokes the overline rule for a decorated text item at the top.
-func (e *engine) paintOverline(
-	item *inlineItem, runStart, runSpan, baseline, ascent, uWidth float64,
-	child [3]float64,
+// emitDecorationLineStyled strokes one decoration line span with the item's
+// text-decoration-style.
+func (e *engine) emitDecorationLineStyled(
+	sty *ResolvedStyle, startX, lineY, lineW, width float64, col [3]float64,
 ) {
-	overlineY := baseline - ascent
-	col := child
-
-	switch strings.ToLower(strings.TrimSpace(item.style.TextDecorationStyle)) {
+	switch strings.ToLower(strings.TrimSpace(sty.TextDecorationStyle)) {
 	case "dashed":
-		e.emitDashedLine(runStart, overlineY, runSpan, uWidth, col)
+		e.emitDashedLine(startX, lineY, lineW, width, col)
 	case "dotted":
-		e.emitDottedLine(runStart, overlineY, runSpan, uWidth, col)
+		e.emitDottedLine(startX, lineY, lineW, width, col)
 	case "wavy":
-		e.emitWavyLine(runStart, overlineY, runSpan, uWidth, col)
+		e.emitWavyLine(startX, lineY, lineW, width, col)
 	case "double":
-		e.emitDoubleLine(runStart, overlineY, runSpan, uWidth, col)
+		e.emitDoubleLine(startX, lineY, lineW, width, col)
 	default:
 		e.add(Op{ //nolint:exhaustruct // intentional zero fields
-			Kind: OpLine, X: runStart, Y: overlineY, W: runSpan, H: 0,
-			Width: uWidth, R: col[0], G: col[1], B: col[2],
+			Kind: OpLine, X: startX, Y: lineY, W: lineW, H: 0,
+			Width: width, R: col[0], G: col[1], B: col[2],
 		})
 	}
 }
@@ -742,22 +1039,37 @@ func (e *engine) skipInkAdvance(runic rune, style *ResolvedStyle) float64 {
 }
 
 // paintUnderlineSkipInk draws per-glyph underline segments, omitting strokes
-// under descender letters so skip-ink:auto/all is visible in print.
+// under descender letters so skip-ink:auto/all is visible in print. The
+// painted span is clipped to [spanStart, spanEnd], which carries the
+// text-decoration-skip-spaces edge trims and text-decoration-inset.
 func (e *engine) paintUnderlineSkipInk(
-	item *inlineItem, runStart, underY, uWidth float64, col [3]float64,
+	item *inlineItem, runStart, spanStart, spanEnd, underY, uWidth float64, col [3]float64,
 ) {
+	if spanEnd <= spanStart {
+		return
+	}
+
 	curX := runStart
 
-	gap := skipInkGap{segStart: runStart, inGap: false}
+	gap := skipInkGap{segStart: spanStart, inGap: false}
 
 	// Nudge the gap a little past the glyph box so the break reads in print.
 	gapPad := uWidth * skipInkGapPadRatio
 
 	flushSeg := func(endX float64) {
-		w := endX - gap.segStart
+		if endX > spanEnd {
+			endX = spanEnd
+		}
+
+		segStart := gap.segStart
+		if segStart < spanStart {
+			segStart = spanStart
+		}
+
+		w := endX - segStart
 		if w > emptyRunEpsilon {
 			e.add(Op{ //nolint:exhaustruct // intentional zero fields
-				Kind: OpLine, X: gap.segStart, Y: underY, W: w, H: 0,
+				Kind: OpLine, X: segStart, Y: underY, W: w, H: 0,
 				Width: uWidth, R: col[0], G: col[1], B: col[2],
 			})
 		}
@@ -812,6 +1124,7 @@ func (e *engine) paintUnderline(
 	und.hasHref = item.href != ""
 	und.style = item.style.TextDecorationStyle
 	und.blendMode = e.blendMode
+	und.group = e.blendGroup
 }
 
 // startsActiveUnder reports that the item continues an active underline run:
@@ -1237,66 +1550,6 @@ func (e *engine) truncateForEllipsis(text string, budget float64, sty *ResolvedS
 	return res
 }
 
-// emitInlineBullet paints the list-item marker for a bullet item.
-//
-//nolint:unused // list-item bullet painter kept with its marker and display helpers in pseudo_content.go
-func (e *engine) emitInlineBullet(item *inlineItem, leftX, baseline, size float64) {
-	if item.style == nil {
-		return
-	}
-
-	typ := strings.ToLower(strings.TrimSpace(item.style.ListStyleType))
-	if typ == "" || typ == inlineStyleNone {
-		return
-	}
-
-	// Only for display:list-item; text items inherit that display from parent div
-	if !isDisplayListItem(item.style) {
-		return
-	}
-
-	// Dedupe: avoid double bullet when emitInlineText is called per word on same line.
-	if e.hasInlineBullet(baseline) {
-		return
-	}
-
-	text := listItemMarkerText(*item.style, nil)
-	face := e.faceFor(item.style)
-
-	if face == nil {
-		face = e.font
-	}
-
-	const markerGapRatio = 0.35
-
-	markerW := e.measureTextFace(text, item.style)
-	posX := leftX - markerW - size*markerGapRatio
-
-	if posX < 0 {
-		posX = 0
-	}
-
-	e.add(Op{ //nolint:exhaustruct // intentional zero fields
-		Kind: OpBullet, X: posX, Y: baseline, Text: text, Font: face, Size: size,
-		InkDescent: e.fontDescentFace(face, size),
-		R:          item.style.Color[0], G: item.style.Color[1], B: item.style.Color[2],
-	})
-}
-
-// hasInlineBullet reports whether a bullet marker is already painted at the
-// baseline: emitInlineText runs per word on a line, so markers dedupe.
-//
-//nolint:unused // dedupe helper for the retained list-item bullet painter
-func (e *engine) hasInlineBullet(baseline float64) bool {
-	for idx := len(e.ops) - 1; idx >= 0 && idx >= len(e.ops)-4; idx-- {
-		if e.ops[idx].Kind == OpBullet && e.ops[idx].Y == baseline && e.ops[idx].Text != "" {
-			return true
-		}
-	}
-
-	return false
-}
-
 // measureTextFace measures s using per-rune CSS font-family fallback
 // (same face selection as paint).
 //
@@ -1497,7 +1750,9 @@ func (e *engine) splitTextByFace(cssSheet string, sty *ResolvedStyle) []faceRun 
 		}
 
 		current = face
-		width += face.AdvanceInPoints(runic, size)
+		if face != nil {
+			width += face.AdvanceInPoints(runic, size)
+		}
 		runeCount++
 
 		if runic == ' ' {

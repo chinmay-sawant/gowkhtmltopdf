@@ -10,10 +10,11 @@ import (
 )
 
 const (
-	minHintScale     = 18
-	minAAScale       = 16
-	minPolygonVerts  = 3
-	defaultSubsample = 6
+	minHintScale       = 18
+	minAAScale         = 16
+	minPolygonVerts    = 3
+	defaultSubsample   = 6
+	maxGlyphRasterSize = 2048
 )
 
 // ttfDrawString draws s with face metrics and anti-aliased TTF outlines so
@@ -31,6 +32,7 @@ func ttfDrawString(
 	img *image.NRGBA,
 	basex, basey float64,
 	text string,
+	lang string,
 	sizePt float64,
 	letterSpacing float64,
 	rotateDeg float64,
@@ -47,7 +49,7 @@ func ttfDrawString(
 		atlas = newGlyphAtlas()
 	}
 
-	run := pdf.ShapeRun(text, face, sizePt)
+	run := pdf.ShapeRunLanguage(text, face, sizePt, lang)
 	if run.Text == "" {
 		return
 	}
@@ -181,41 +183,69 @@ func drawGlyphAA(
 	originX := int(math.Round(basex + ent.originX))
 	originY := int(math.Round(basey + ent.originY))
 
+	// Clip the glyph rectangle against the canvas once instead of testing
+	// every pixel, then walk source and destination offsets incrementally.
 	bounds := ent.img.Bounds()
-	for row := bounds.Min.Y; row < bounds.Max.Y; row++ {
-		for pixelX := bounds.Min.X; pixelX < bounds.Max.X; pixelX++ {
-			alpha := ent.img.AlphaAt(pixelX, row).A
-			if alpha == 0 {
-				continue
-			}
+	clip := image.Rect(
+		originX+bounds.Min.X, originY+bounds.Min.Y,
+		originX+bounds.Max.X, originY+bounds.Max.Y,
+	).Intersect(dst.Bounds())
 
-			dstX, dstY := originX+pixelX, originY+row
-			if !image.Pt(dstX, dstY).In(dst.Bounds()) {
-				continue
-			}
+	if clip.Empty() {
+		return
+	}
 
-			srcA := uint32(alpha) * uint32(col.A) / channelMax
-			if srcA == 0 {
-				continue
-			}
+	for dstY := clip.Min.Y; dstY < clip.Max.Y; dstY++ {
+		srcOffset := ent.img.PixOffset(bounds.Min.X+clip.Min.X-originX, dstY-originY)
+		dstOffset := dst.PixOffset(clip.Min.X, dstY)
 
-			pixOff := dst.PixOffset(dstX, dstY)
-			dstR := uint32(dst.Pix[pixOff+0])
-			dstG := uint32(dst.Pix[pixOff+1])
-			dstB := uint32(dst.Pix[pixOff+2])
-			dstA := uint32(dst.Pix[pixOff+3])
-			invA := channelMax - srcA
-			//nolint:gosec // Over blend of byte channels stays in uint8 range
-			dst.Pix[pixOff+0] = uint8((uint32(col.R)*srcA + dstR*invA) / channelMax)
-			//nolint:gosec // Over blend of byte channels stays in uint8 range
-			dst.Pix[pixOff+1] = uint8((uint32(col.G)*srcA + dstG*invA) / channelMax)
-			//nolint:gosec // Over blend of byte channels stays in uint8 range
-			dst.Pix[pixOff+2] = uint8((uint32(col.B)*srcA + dstB*invA) / channelMax)
-			//nolint:gosec // Over blend of byte channels stays in uint8 range
-			dst.Pix[pixOff+3] = uint8(srcA + dstA*invA/channelMax)
-		}
+		blendGlyphRow(dst, dstOffset, ent.img.Pix[srcOffset:], col, clip.Dx())
 	}
 }
+
+// blendGlyphRow composites count alpha samples into consecutive NRGBA pixels
+// starting at dstOffset. The arithmetic is the original inline Over blend,
+// hoisted per row so the hot loop reads the run color once.
+func blendGlyphRow(dst *image.NRGBA, dstOffset int, alphaSamples []byte, col color.NRGBA, count int) {
+	colR, colG, colB, colA := uint32(col.R), uint32(col.G), uint32(col.B), uint32(col.A)
+
+	for index := range count {
+		alpha := alphaSamples[index]
+
+		if alpha != 0 {
+			srcA := uint32(alpha) * colA / channelMax
+			if srcA != 0 {
+				dstR := uint32(dst.Pix[dstOffset+0])
+				dstG := uint32(dst.Pix[dstOffset+1])
+				dstB := uint32(dst.Pix[dstOffset+2])
+				dstA := uint32(dst.Pix[dstOffset+3])
+				invA := channelMax - srcA
+				//nolint:gosec // Over blend of byte channels stays in uint8 range
+				dst.Pix[dstOffset+0] = uint8((colR*srcA + dstR*invA) / channelMax)
+				//nolint:gosec // Over blend of byte channels stays in uint8 range
+				dst.Pix[dstOffset+1] = uint8((colG*srcA + dstG*invA) / channelMax)
+				//nolint:gosec // Over blend of byte channels stays in uint8 range
+				dst.Pix[dstOffset+2] = uint8((colB*srcA + dstB*invA) / channelMax)
+				//nolint:gosec // Over blend of byte channels stays in uint8 range
+				dst.Pix[dstOffset+3] = uint8(srcA + dstA*invA/channelMax)
+			}
+		}
+
+		dstOffset += 4
+	}
+}
+
+// glyphScratch holds the per-glyph edge list and supersample active-row lists
+// so rasterGlyph reuses backing arrays across glyphs instead of allocating
+// them per glyph. rasterGlyph handles one glyph at a time, so a package-level
+// pool can serve concurrent Renders without sharing state.
+type glyphScratch struct {
+	edges      []glyphEdge
+	activeRows [8][]glyphEdge
+}
+
+//nolint:gochecknoglobals // per-glyph scratch recycling
+var glyphScratchPool sync.Pool
 
 func rasterGlyph(face *pdf.Font, runeVal rune, scale float64) *glyphCacheEntry {
 	contours := face.GlyphContours(runeVal)
@@ -234,7 +264,42 @@ func rasterGlyph(face *pdf.Font, runeVal rune, scale float64) *glyphCacheEntry {
 		return &glyphCacheEntry{} //nolint:exhaustruct // intentional zero/partial fields
 	}
 
-	edges := makeGlyphEdgeList(flat)
+	width, height, originX, originY, fits := glyphRasterBox(minX, minY, maxX, maxY, scale)
+	if !fits {
+		return &glyphCacheEntry{} //nolint:exhaustruct // intentional zero/partial fields
+	}
+
+	scratch, ok := glyphScratchPool.Get().(*glyphScratch)
+	if !ok || scratch == nil {
+		scratch = &glyphScratch{} //nolint:exhaustruct // zero-value scratch
+	}
+
+	defer glyphScratchPool.Put(scratch)
+
+	edges := makeGlyphEdgeList(scratch, flat)
+
+	// Supersample for greyscale AA. Higher factor for body-size text.
+	subsample := defaultSubsample
+	if scale*float64(face.UnitsPerEm()) < minAAScale {
+		subsample = 8
+	}
+
+	ss2 := subsample * subsample
+
+	alpha := rasterGlyphAlpha(scratch, edges, width, height, subsample, ss2, originX, originY, scale)
+
+	return &glyphCacheEntry{
+		img:     alpha,
+		originX: originX,
+		originY: originY,
+	}
+}
+
+// glyphRasterBox maps flattened contour bounds in font units to the padded
+// pixel canvas the glyph is rasterized into, plus the subpixel origin the
+// mask is placed at relative to the baseline-left. The final bool is false
+// when the canvas would exceed maxGlyphRasterSize and the glyph is skipped.
+func glyphRasterBox(minX, minY, maxX, maxY, scale float64) (int, int, float64, float64, bool) {
 	// scale font units -> pixels; y flips (font y-up, image y-down)
 	pad := 1.5
 	minXPx := minX * scale
@@ -252,36 +317,23 @@ func rasterGlyph(face *pdf.Font, runeVal rune, scale float64) *glyphCacheEntry {
 		height = 1
 	}
 
-	if width > 2048 || height > 2048 {
-		return &glyphCacheEntry{} //nolint:exhaustruct // intentional zero/partial fields
+	if width > maxGlyphRasterSize || height > maxGlyphRasterSize {
+		return 0, 0, 0, 0, false
 	}
 
-	originX := minXPx - pad
-	originY := minYPx - pad
-	// Supersample for greyscale AA. Higher factor for body-size text.
-	subsample := defaultSubsample
-	if scale*float64(face.UnitsPerEm()) < minAAScale {
-		subsample = 8
-	}
-
-	ss2 := subsample * subsample
-
-	alpha := rasterGlyphAlpha(edges, width, height, subsample, ss2, originX, originY, scale)
-
-	return &glyphCacheEntry{
-		img:     alpha,
-		originX: originX,
-		originY: originY,
-	}
+	return width, height, minXPx - pad, minYPx - pad, true
 }
 
-// makeGlyphEdgeList converts flattened contours into one flat edge list.
-func makeGlyphEdgeList(flat [][]pdf.GlyphPoint) []glyphEdge {
-	edges := make([]glyphEdge, 0, len(flat)*boxFilterFactor2)
+// makeGlyphEdgeList converts flattened contours into one flat edge list,
+// appending into scratch.edges so the backing array is reused across glyphs.
+func makeGlyphEdgeList(scratch *glyphScratch, flat [][]pdf.GlyphPoint) []glyphEdge {
+	edges := scratch.edges[:0]
 
 	for _, contour := range flat {
-		edges = append(edges, makeGlyphEdges(contour)...)
+		edges = appendGlyphEdges(edges, contour)
 	}
+
+	scratch.edges = edges
 
 	return edges
 }
@@ -289,23 +341,22 @@ func makeGlyphEdgeList(flat [][]pdf.GlyphPoint) []glyphEdge {
 // rasterGlyphAlpha supersamples every pixel and writes the coverage into an
 // alpha mask (the pixel loop of rasterGlyph, kept separate for scanline
 // locality between the active-edge and sampling passes).
-//
-//nolint:wsl // scanline scratch setup precedes the supersampling loops.
 func rasterGlyphAlpha(
+	scratch *glyphScratch,
 	flatEdges []glyphEdge,
 	width, height, subsample, ss2 int,
 	originX, originY, scale float64,
 ) *image.Alpha {
 	alpha := image.NewAlpha(image.Rect(0, 0, width, height))
-	var activeRows [8][]glyphEdge
+
 	for sampleY := range subsample {
-		activeRows[sampleY] = make([]glyphEdge, 0, len(flatEdges))
+		scratch.activeRows[sampleY] = scratch.activeRows[sampleY][:0]
 	}
 
 	for pixelY := range height {
 		for sampleY := range subsample {
 			fontY := -((float64(pixelY) + (float64(sampleY)+pixelCenter)/float64(subsample) + originY) / scale)
-			activeRows[sampleY] = activeEdgesInto(activeRows[sampleY][:0], flatEdges, fontY)
+			scratch.activeRows[sampleY] = activeEdgesInto(scratch.activeRows[sampleY][:0], flatEdges, fontY)
 		}
 
 		for pixelX := range width {
@@ -313,7 +364,7 @@ func rasterGlyphAlpha(
 
 			for sampleY := range subsample {
 				fontY := -((float64(pixelY) + (float64(sampleY)+pixelCenter)/float64(subsample) + originY) / scale)
-				active := activeRows[sampleY]
+				active := scratch.activeRows[sampleY]
 
 				for sampleX := range subsample {
 					// sample in font units
@@ -386,12 +437,11 @@ type glyphEdge struct {
 	dxdy       float64
 }
 
-func makeGlyphEdges(poly []pdf.GlyphPoint) []glyphEdge {
+// appendGlyphEdges appends the non-horizontal edges of poly to edges.
+func appendGlyphEdges(edges []glyphEdge, poly []pdf.GlyphPoint) []glyphEdge {
 	if len(poly) < minPolygonVerts {
-		return nil
+		return edges
 	}
-
-	edges := make([]glyphEdge, 0, len(poly))
 
 	for idx := range poly {
 		j := idx - 1

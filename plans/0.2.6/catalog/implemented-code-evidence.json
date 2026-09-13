@@ -1,6 +1,6 @@
 {
-  "generated": "2026-09-02",
-  "scope": "Validate mapping engine_status=implemented (355) against non-test Go under internal/layout",
+  "generated": "2026-09-12",
+  "scope": "Validate mapping engine_status=implemented against non-test Go under internal/layout; 3 CSS Fonts rows demoted to unsupported on 2026-09-12 keep DEMOTED entries for audit; 23 re-implemented rows carry consumer-read evidence.",
   "method": [
     "switch prop { case \"name\": } in style_properties/paint/advanced/leftovers/cascade",
     "case ConstIdent where const ConstIdent = \"name\"",
@@ -13,9 +13,10 @@
     "_test.go"
   ],
   "counts": {
-    "VERIFIED": 355
+    "VERIFIED": 354,
+    "DEMOTED": 3
   },
-  "implemented_total": 355,
+  "implemented_total": 354,
   "properties": [
     {
       "property": "-webkit-align-content",
@@ -1848,26 +1849,31 @@
       "kind": "shorthand",
       "legacy_of": null,
       "validation": "VERIFIED",
-      "evidence_kind": "case-string",
-      "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 102,
+      "evidence_kind": "consumer-read",
+      "primary_file": "internal/layout/background_image.go",
+      "primary_line": 30,
       "files": [
-        "internal/layout/style_advanced_props.go"
+        "internal/layout/style_color_adjust_props.go",
+        "internal/layout/background_image.go",
+        "internal/layout/inline_paint.go",
+        "internal/layout/layout_chrome.go",
+        "internal/layout/layout_tables.go"
       ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "claimed_code_path": "internal/layout/style_color_adjust_props.go"
     },
     {
       "property": "color-scheme",
       "kind": "longhand",
       "legacy_of": null,
       "validation": "VERIFIED",
-      "evidence_kind": "case-string",
-      "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 112,
+      "evidence_kind": "consumer-read",
+      "primary_file": "internal/layout/paint.go",
+      "primary_line": 111,
       "files": [
-        "internal/layout/style_advanced_props.go"
+        "internal/layout/style_color_adjust_props.go",
+        "internal/layout/paint.go"
       ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "claimed_code_path": "internal/layout/style_color_adjust_props.go"
     },
     {
       "property": "column-count",
@@ -2005,78 +2011,84 @@
       "kind": "longhand",
       "legacy_of": null,
       "validation": "VERIFIED",
-      "evidence_kind": "case-string",
-      "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 135,
+      "evidence_kind": "consumer-read",
+      "primary_file": "internal/layout/layout_flow.go",
+      "primary_line": 224,
       "files": [
-        "internal/layout/style_advanced_props.go"
+        "internal/layout/style_containment_props.go",
+        "internal/layout/layout_flow.go"
       ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "claimed_code_path": "internal/layout/style_containment_props.go"
     },
     {
       "property": "contain-intrinsic-block-size",
       "kind": "longhand",
       "legacy_of": null,
       "validation": "VERIFIED",
-      "evidence_kind": "case-string",
-      "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 132,
+      "evidence_kind": "consumer-read",
+      "primary_file": "internal/layout/layout_flow.go",
+      "primary_line": 262,
       "files": [
-        "internal/layout/style_advanced_props.go"
+        "internal/layout/style_containment_props.go",
+        "internal/layout/layout_flow.go"
       ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "claimed_code_path": "internal/layout/style_containment_props.go"
     },
     {
       "property": "contain-intrinsic-height",
       "kind": "longhand",
       "legacy_of": null,
       "validation": "VERIFIED",
-      "evidence_kind": "case-string",
-      "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 126,
+      "evidence_kind": "consumer-read",
+      "primary_file": "internal/layout/layout_flow.go",
+      "primary_line": 262,
       "files": [
-        "internal/layout/style_advanced_props.go"
+        "internal/layout/style_containment_props.go",
+        "internal/layout/layout_flow.go"
       ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "claimed_code_path": "internal/layout/style_containment_props.go"
     },
     {
       "property": "contain-intrinsic-inline-size",
       "kind": "longhand",
       "legacy_of": null,
       "validation": "VERIFIED",
-      "evidence_kind": "case-string",
-      "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 129,
+      "evidence_kind": "consumer-read",
+      "primary_file": "internal/layout/layout_flow.go",
+      "primary_line": 758,
       "files": [
-        "internal/layout/style_advanced_props.go"
+        "internal/layout/style_containment_props.go",
+        "internal/layout/layout_flow.go"
       ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "claimed_code_path": "internal/layout/style_containment_props.go"
     },
     {
       "property": "contain-intrinsic-size",
       "kind": "shorthand",
       "legacy_of": null,
       "validation": "VERIFIED",
-      "evidence_kind": "case-string",
-      "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 120,
+      "evidence_kind": "consumer-read",
+      "primary_file": "internal/layout/layout_flow.go",
+      "primary_line": 262,
       "files": [
-        "internal/layout/style_advanced_props.go"
+        "internal/layout/style_containment_props.go",
+        "internal/layout/layout_flow.go"
       ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "claimed_code_path": "internal/layout/style_containment_props.go"
     },
     {
       "property": "contain-intrinsic-width",
       "kind": "longhand",
       "legacy_of": null,
       "validation": "VERIFIED",
-      "evidence_kind": "case-string",
-      "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 123,
+      "evidence_kind": "consumer-read",
+      "primary_file": "internal/layout/layout_flow.go",
+      "primary_line": 758,
       "files": [
-        "internal/layout/style_advanced_props.go"
+        "internal/layout/style_containment_props.go",
+        "internal/layout/layout_flow.go"
       ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "claimed_code_path": "internal/layout/style_containment_props.go"
     },
     {
       "property": "container",
@@ -2136,13 +2148,14 @@
       "kind": "longhand",
       "legacy_of": null,
       "validation": "VERIFIED",
-      "evidence_kind": "case-string",
-      "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 138,
+      "evidence_kind": "consumer-read",
+      "primary_file": "internal/layout/layout_flow.go",
+      "primary_line": 211,
       "files": [
-        "internal/layout/style_advanced_props.go"
+        "internal/layout/style_containment_props.go",
+        "internal/layout/layout_flow.go"
       ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "claimed_code_path": "internal/layout/style_containment_props.go"
     },
     {
       "property": "counter-increment",
@@ -2201,13 +2214,14 @@
       "kind": "longhand",
       "legacy_of": null,
       "validation": "VERIFIED",
-      "evidence_kind": "case-string",
-      "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 115,
+      "evidence_kind": "consumer-read",
+      "primary_file": "internal/layout/paint.go",
+      "primary_line": 223,
       "files": [
-        "internal/layout/style_advanced_props.go"
+        "internal/layout/style_color_adjust_props.go",
+        "internal/layout/paint.go"
       ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "claimed_code_path": "internal/layout/style_color_adjust_props.go"
     },
     {
       "property": "empty-cells",
@@ -2397,39 +2411,44 @@
       "kind": "longhand",
       "legacy_of": null,
       "validation": "VERIFIED",
-      "evidence_kind": "case-string",
-      "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 153,
+      "evidence_kind": "raw",
+      "primary_file": "internal/pdf/shape_gotext.go",
+      "primary_line": 216,
       "files": [
-        "internal/layout/style_advanced_props.go"
+        "internal/layout/style_font_variant_props.go",
+        "internal/layout/op_extra.go",
+        "internal/layout/inline_paint.go",
+        "internal/layout/paint.go",
+        "internal/pdf/content.go",
+        "internal/pdf/shape_gotext.go"
       ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "claimed_code_path": "internal/layout/style_font_variant_props.go:50"
     },
     {
       "property": "font-optical-sizing",
       "kind": "longhand",
       "legacy_of": null,
-      "validation": "VERIFIED",
-      "evidence_kind": "case-string",
+      "validation": "DEMOTED",
+      "evidence_kind": "removed",
       "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 148,
-      "files": [
-        "internal/layout/style_advanced_props.go"
-      ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "primary_line": null,
+      "files": [],
+      "claimed_code_path": "",
+      "demoted_by": "PT26-LAY-05",
+      "notes": "Parsed-and-stored no-op with no layout, paint, or image reader; field and apply arm removed 2026-09-12. Catalog row demoted implemented -> unsupported."
     },
     {
       "property": "font-palette",
       "kind": "longhand",
       "legacy_of": null,
-      "validation": "VERIFIED",
-      "evidence_kind": "case-string",
+      "validation": "DEMOTED",
+      "evidence_kind": "removed",
       "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 156,
-      "files": [
-        "internal/layout/style_advanced_props.go"
-      ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "primary_line": null,
+      "files": [],
+      "claimed_code_path": "",
+      "demoted_by": "PT26-LAY-05",
+      "notes": "Parsed-and-stored no-op with no layout, paint, or image reader; field and apply arm removed 2026-09-12. Catalog row demoted implemented -> unsupported."
     },
     {
       "property": "font-size",
@@ -2461,14 +2480,14 @@
       "property": "font-variation-settings",
       "kind": "longhand",
       "legacy_of": null,
-      "validation": "VERIFIED",
-      "evidence_kind": "case-string",
+      "validation": "DEMOTED",
+      "evidence_kind": "removed",
       "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 145,
-      "files": [
-        "internal/layout/style_advanced_props.go"
-      ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "primary_line": null,
+      "files": [],
+      "claimed_code_path": "",
+      "demoted_by": "PT26-LAY-05",
+      "notes": "Parsed-and-stored no-op with no layout, paint, or image reader; field and apply arm removed 2026-09-12. Catalog row demoted implemented -> unsupported."
     },
     {
       "property": "font-weight",
@@ -2514,13 +2533,14 @@
       "kind": "longhand",
       "legacy_of": null,
       "validation": "VERIFIED",
-      "evidence_kind": "case-string",
-      "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 107,
+      "evidence_kind": "consumer-read",
+      "primary_file": "internal/layout/paint.go",
+      "primary_line": 208,
       "files": [
-        "internal/layout/style_advanced_props.go"
+        "internal/layout/style_color_adjust_props.go",
+        "internal/layout/paint.go"
       ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "claimed_code_path": "internal/layout/style_color_adjust_props.go"
     },
     {
       "property": "gap",
@@ -2749,26 +2769,28 @@
       "kind": "longhand",
       "legacy_of": null,
       "validation": "VERIFIED",
-      "evidence_kind": "case-string",
-      "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 89,
+      "evidence_kind": "consumer-read",
+      "primary_file": "internal/layout/layout_images.go",
+      "primary_line": 219,
       "files": [
-        "internal/layout/style_advanced_props.go"
+        "internal/layout/style_image_adjust_props.go",
+        "internal/layout/layout_images.go"
       ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "claimed_code_path": "internal/layout/style_image_adjust_props.go"
     },
     {
       "property": "image-resolution",
       "kind": "longhand",
       "legacy_of": null,
       "validation": "VERIFIED",
-      "evidence_kind": "case-string",
-      "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 94,
+      "evidence_kind": "consumer-read",
+      "primary_file": "internal/layout/layout_images.go",
+      "primary_line": 250,
       "files": [
-        "internal/layout/style_advanced_props.go"
+        "internal/layout/style_image_adjust_props.go",
+        "internal/layout/layout_images.go"
       ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "claimed_code_path": "internal/layout/style_image_adjust_props.go"
     },
     {
       "property": "inline-size",
@@ -2880,6 +2902,25 @@
         "internal/layout/style_properties.go"
       ],
       "claimed_code_path": "internal/layout/style_properties.go"
+    },
+    {
+      "property": "isolation",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "consumer-read",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 89,
+      "files": [
+        "internal/layout/style_advanced_props.go",
+        "internal/layout/layout.go",
+        "internal/layout/blend_group.go",
+        "internal/layout/paint_groups.go",
+        "internal/pdf/content.go",
+        "internal/pdf/pdf.go",
+        "internal/imageout/groups.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
     },
     {
       "property": "justify-content",
@@ -3331,17 +3372,37 @@
       "claimed_code_path": "internal/layout/style_properties.go"
     },
     {
+      "property": "mix-blend-mode",
+      "kind": "longhand",
+      "legacy_of": null,
+      "validation": "VERIFIED",
+      "evidence_kind": "consumer-read",
+      "primary_file": "internal/layout/style_advanced_props.go",
+      "primary_line": 69,
+      "files": [
+        "internal/layout/style_advanced_props.go",
+        "internal/layout/layout.go",
+        "internal/layout/blend_group.go",
+        "internal/layout/paint_groups.go",
+        "internal/pdf/content.go",
+        "internal/pdf/pdf.go",
+        "internal/imageout/groups.go"
+      ],
+      "claimed_code_path": "internal/layout/style_advanced_props.go"
+    },
+    {
       "property": "object-view-box",
       "kind": "longhand",
       "legacy_of": null,
       "validation": "VERIFIED",
-      "evidence_kind": "case-string",
-      "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 99,
+      "evidence_kind": "consumer-read",
+      "primary_file": "internal/layout/layout_images.go",
+      "primary_line": 319,
       "files": [
-        "internal/layout/style_advanced_props.go"
+        "internal/layout/style_image_adjust_props.go",
+        "internal/layout/layout_images.go"
       ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "claimed_code_path": "internal/layout/style_image_adjust_props.go"
     },
     {
       "property": "opacity",
@@ -3903,13 +3964,17 @@
       "kind": "longhand",
       "legacy_of": null,
       "validation": "VERIFIED",
-      "evidence_kind": "case-string",
-      "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 102,
+      "evidence_kind": "consumer-read",
+      "primary_file": "internal/layout/background_image.go",
+      "primary_line": 30,
       "files": [
-        "internal/layout/style_advanced_props.go"
+        "internal/layout/style_color_adjust_props.go",
+        "internal/layout/background_image.go",
+        "internal/layout/inline_paint.go",
+        "internal/layout/layout_chrome.go",
+        "internal/layout/layout_tables.go"
       ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "claimed_code_path": "internal/layout/style_color_adjust_props.go"
     },
     {
       "property": "quotes",
@@ -4100,13 +4165,14 @@
       "kind": "longhand",
       "legacy_of": null,
       "validation": "VERIFIED",
-      "evidence_kind": "case-string",
-      "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 170,
+      "evidence_kind": "consumer-read",
+      "primary_file": "internal/layout/inline_paint.go",
+      "primary_line": 370,
       "files": [
-        "internal/layout/style_advanced_props.go"
+        "internal/layout/style_text_support_props.go",
+        "internal/layout/inline_paint.go"
       ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "claimed_code_path": "internal/layout/style_text_support_props.go"
     },
     {
       "property": "text-decoration",
@@ -4139,13 +4205,14 @@
       "kind": "longhand",
       "legacy_of": null,
       "validation": "VERIFIED",
-      "evidence_kind": "case-string",
-      "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 216,
+      "evidence_kind": "consumer-read",
+      "primary_file": "internal/layout/inline_paint.go",
+      "primary_line": 887,
       "files": [
-        "internal/layout/style_advanced_props.go"
+        "internal/layout/style_text_support_props.go",
+        "internal/layout/inline_paint.go"
       ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "claimed_code_path": "internal/layout/style_text_support_props.go"
     },
     {
       "property": "text-decoration-line",
@@ -4165,26 +4232,28 @@
       "kind": "shorthand",
       "legacy_of": null,
       "validation": "VERIFIED",
-      "evidence_kind": "case-string",
-      "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 199,
+      "evidence_kind": "consumer-read",
+      "primary_file": "internal/layout/inline_paint.go",
+      "primary_line": 599,
       "files": [
-        "internal/layout/style_advanced_props.go"
+        "internal/layout/style_text_support_props.go",
+        "internal/layout/inline_paint.go"
       ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "claimed_code_path": "internal/layout/style_text_support_props.go"
     },
     {
       "property": "text-decoration-skip-box",
       "kind": "longhand",
       "legacy_of": null,
       "validation": "VERIFIED",
-      "evidence_kind": "case-string",
-      "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 207,
+      "evidence_kind": "consumer-read",
+      "primary_file": "internal/layout/inline_paint.go",
+      "primary_line": 599,
       "files": [
-        "internal/layout/style_advanced_props.go"
+        "internal/layout/style_text_support_props.go",
+        "internal/layout/inline_paint.go"
       ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "claimed_code_path": "internal/layout/style_text_support_props.go"
     },
     {
       "property": "text-decoration-skip-ink",
@@ -4204,26 +4273,28 @@
       "kind": "longhand",
       "legacy_of": null,
       "validation": "VERIFIED",
-      "evidence_kind": "case-string",
-      "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 210,
+      "evidence_kind": "consumer-read",
+      "primary_file": "internal/layout/inline_paint.go",
+      "primary_line": 599,
       "files": [
-        "internal/layout/style_advanced_props.go"
+        "internal/layout/style_text_support_props.go",
+        "internal/layout/inline_paint.go"
       ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "claimed_code_path": "internal/layout/style_text_support_props.go"
     },
     {
       "property": "text-decoration-skip-spaces",
       "kind": "longhand",
       "legacy_of": null,
       "validation": "VERIFIED",
-      "evidence_kind": "case-string",
-      "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 213,
+      "evidence_kind": "consumer-read",
+      "primary_file": "internal/layout/inline_paint.go",
+      "primary_line": 599,
       "files": [
-        "internal/layout/style_advanced_props.go"
+        "internal/layout/style_text_support_props.go",
+        "internal/layout/inline_paint.go"
       ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "claimed_code_path": "internal/layout/style_text_support_props.go"
     },
     {
       "property": "text-decoration-style",
@@ -4347,13 +4418,14 @@
       "kind": "longhand",
       "legacy_of": null,
       "validation": "VERIFIED",
-      "evidence_kind": "case-string",
-      "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 173,
+      "evidence_kind": "consumer-read",
+      "primary_file": "internal/layout/inline_paint.go",
+      "primary_line": 370,
       "files": [
-        "internal/layout/style_advanced_props.go"
+        "internal/layout/style_text_support_props.go",
+        "internal/layout/inline_paint.go"
       ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "claimed_code_path": "internal/layout/style_text_support_props.go"
     },
     {
       "property": "text-overflow",
@@ -4531,13 +4603,14 @@
       "kind": "longhand",
       "legacy_of": null,
       "validation": "VERIFIED",
-      "evidence_kind": "case-string",
-      "primary_file": "internal/layout/style_advanced_props.go",
-      "primary_line": 178,
+      "evidence_kind": "consumer-read",
+      "primary_file": "internal/layout/inline_collect.go",
+      "primary_line": 127,
       "files": [
-        "internal/layout/style_advanced_props.go"
+        "internal/layout/style_text_support_props.go",
+        "internal/layout/inline_collect.go"
       ],
-      "claimed_code_path": "internal/layout/style_advanced_props.go"
+      "claimed_code_path": "internal/layout/style_text_support_props.go"
     },
     {
       "property": "vertical-align",
@@ -4695,5 +4768,6 @@
       ],
       "claimed_code_path": "internal/layout/style_properties.go"
     }
-  ]
+  ],
+  "updated": "2026-09-12"
 }

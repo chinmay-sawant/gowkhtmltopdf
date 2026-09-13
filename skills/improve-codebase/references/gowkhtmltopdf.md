@@ -31,7 +31,10 @@ paint/write.
 - `cmd` → `app` → `cli` → `settings`. `cli` never imports `cmd` or the root.
 - Root `api.go` never imports `cli`. `convert` never imports `cli`.
 - `prepare` / `render` / `islands` never import `convert`.
-- `layout` / `pdf` never import `settings` or `cli`.
+- `layout` never imports `settings` or `cli`. `pdf` never imports `cli` and
+  imports `settings` only in `registry.go` (`RegistryFromGlobal` /
+  `LogFontRegistryScan`, together with `internal/line`), a deliberate
+  exception; no other `pdf` file imports either.
 - Untrusted bytes enter only via `load.Loader.Load` and
   `load.ResourceContext.Fetch`.
 - Known live leak to inspect, not to treat as a new invention:
@@ -64,9 +67,9 @@ paint/write.
 | CSS property | `layout` used values (`style.go`, `style_properties.go`, `style_cascade.go` `styleGroups` / `inheritableProps`) | optional `css/values.go`; consumer in layout/paint; matrix row |
 | Selector / pseudo | `internal/css` parse **and** match together | unknown pseudos stay on the compound and never match |
 | HTML element | `html` allowlist + `uaDecls` + `engine.build` | matrix §1 if it paints |
-| Formatting context / pagination | `layout` (`buildInFlowDisplay`, `paint_flow.go`, `paint_pagination.go`) | new `OpKind` → `paint.go` **and** imageout raster + `PaintOrder` |
+| Formatting context / pagination | `layout` (`buildInFlowDisplay`, the `paint_flow_*` and `paint_pagination_*` files) | new `OpKind` → `paint.go` **and** imageout raster + `PaintOrder` |
 | CLI flag / dotted key | `settings` struct + `reflect.go` `register*` + `cli/flags.go` | engine read; `TestKeyTableSetGetParity`; cli.md |
-| Typed `With*` | `settings/options.go` + thin `api.go` wrapper | `api_test.go`; library-api.md |
+| Typed `Document` option | `document.go` struct field + `pdfGlobal`/`mapPage` mapping | `document_test.go`; library-api.md |
 | PDF object | `internal/pdf` writer + convert wiring | needles, not byte-identical PDFs |
 | Image-only knob | `imageout` + `ImageGlobal` | do not fork CSS/layout |
 | Load / ACL | `internal/load` | THREAT-MODEL; deny stays default |

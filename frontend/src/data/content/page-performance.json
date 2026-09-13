@@ -5,58 +5,206 @@
     {
       "type": "hero",
       "title": "Labeled snapshots, not an SLA",
-      "lede": "The current generic CLI is faster than wkhtmltopdf 0.12.6.1 at every tested report size. The public Go library path is about 70x faster than the wkhtmltopdf CLI at 2 pages. Peak RSS is lower through 100 pages and higher from 200 pages. Open the Benchmarks page for the visual comparison."
+      "lede": "The 2026-09-12 capture shows the generic CLI faster and at lower peak RSS than wkhtmltopdf 0.12.6.1 at every tested report size, from 18.50x at 2 pages to 3.13x at 500 pages. The same capture carries full 2 to 500 page matrices: the internal generic path converts 500 pages in 535.34 ms at 111.44 MB B/op, the public library PDF in 532.24 ms at 113.10 MB B/op, and the public image path encodes 500 tiles in 34.02 ms. The 2026-09-11 perf-time closure and perf-improve captures and the 2026-08-19 0.2.4 rows stay on the page, each labeled historical. The concurrent-layout prototype was rejected (5.4% paired gain against a 15% floor) and left unwired. Open the Benchmarks page for the visual comparison."
     },
     {
       "type": "stats",
       "items": [
-        { "value": "15.5x", "label": "faster at 2 pages (17 ms vs 259 ms)" },
-        { "value": "9.2x", "label": "faster at 10 pages (30 ms vs 276 ms)" },
-        { "value": "2.9x", "label": "faster at 100 pages (184 ms vs 526 ms)" },
-        { "value": "1.6x", "label": "faster at 500 pages (1.042 s vs 1.671 s)" }
+        { "value": "18.50x", "label": "faster at 2 pages (14 ms vs 260 ms)" },
+        { "value": "11.18x", "label": "faster at 10 pages (26 ms vs 286 ms)" },
+        { "value": "4.35x", "label": "faster at 100 pages (126 ms vs 546 ms)" },
+        { "value": "3.13x", "label": "faster at 500 pages (562 ms vs 1.760 s)" }
       ]
     },
     {
       "type": "table",
-      "heading": "Direct CLI vs wkhtmltopdf (2026-08-19)",
+      "heading": "Direct CLI vs wkhtmltopdf (2026-09-12 capture)",
       "headers": ["Pages", "gowk time", "wkhtml time", "Speedup", "gowk RSS", "wkhtml RSS"],
       "rows": [
-        ["2", "17 ms", "259 ms", "15.46x", "23,808 KiB", "44,192 KiB"],
-        ["5", "22 ms", "268 ms", "12.36x", "24,960 KiB", "44,716 KiB"],
-        ["10", "30 ms", "276 ms", "9.21x", "27,264 KiB", "45,992 KiB"],
-        ["20", "45 ms", "317 ms", "7.06x", "30,528 KiB", "47,464 KiB"],
-        ["50", "112 ms", "406 ms", "3.63x", "43,200 KiB", "51,856 KiB"],
-        ["100", "184 ms", "526 ms", "2.85x", "61,248 KiB", "59,048 KiB"],
-        ["200", "376 ms", "811 ms", "2.15x", "96,192 KiB", "74,192 KiB"],
-        ["250", "480 ms", "964 ms", "2.01x", "116,736 KiB", "81,740 KiB"],
-        ["500", "1.042 s", "1.671 s", "1.60x", "208,128 KiB", "123,080 KiB"]
+        ["2", "14 ms", "260 ms", "18.50x", "19,200 KiB", "44,720 KiB"],
+        ["5", "19 ms", "269 ms", "14.37x", "21,696 KiB", "45,168 KiB"],
+        ["10", "26 ms", "286 ms", "11.18x", "25,152 KiB", "46,016 KiB"],
+        ["20", "36 ms", "315 ms", "8.74x", "25,920 KiB", "47,620 KiB"],
+        ["50", "69 ms", "403 ms", "5.85x", "29,760 KiB", "52,128 KiB"],
+        ["100", "126 ms", "546 ms", "4.35x", "35,904 KiB", "59,460 KiB"],
+        ["200", "234 ms", "852 ms", "3.64x", "44,928 KiB", "74,308 KiB"],
+        ["250", "288 ms", "1.008 s", "3.50x", "51,264 KiB", "81,820 KiB"],
+        ["500", "562 ms", "1.760 s", "3.13x", "79,296 KiB", "123,076 KiB"]
       ]
     },
     {
+      "type": "callout",
+      "variant": "info",
+      "title": "Faster and lower RSS at every tested size",
+      "body": "The 2026-09-12 capture has gowkhtmltopdf faster and at lower peak RSS than wkhtmltopdf at every size from 2 to 500 pages, including 500 pages (79,296 KiB versus 123,076 KiB). The older reading that gowk RSS was higher from 100 pages on comes from an earlier capture and is historical."
+    },
+    {
       "type": "table",
-      "heading": "Direct CLI vs WeasyPrint (2026-08-19)",
+      "heading": "Direct CLI vs WeasyPrint (2026-09-12)",
       "headers": ["Pages", "gowk time", "WeasyPrint time", "Speedup", "gowk RSS", "WeasyPrint RSS"],
       "rows": [
-        ["2", "19 ms", "616 ms", "32.15x", "24,576 KiB", "77,420 KiB"],
-        ["10", "31 ms", "1.352 s", "43.65x", "26,880 KiB", "106,000 KiB"],
-        ["50", "100 ms", "5.217 s", "52.01x", "42,624 KiB", "246,876 KiB"],
-        ["100", "186 ms", "10.528 s", "56.62x", "58,560 KiB", "423,004 KiB"]
+        ["2", "16 ms", "634 ms", "40.86x", "19,584 KiB", "81,648 KiB"],
+        ["10", "27 ms", "1.434 s", "53.62x", "24,576 KiB", "111,104 KiB"],
+        ["50", "71 ms", "5.441 s", "76.88x", "29,760 KiB", "252,412 KiB"],
+        ["100", "124 ms", "11.072 s", "89.43x", "34,752 KiB", "427,468 KiB"]
       ]
     },
     {
       "type": "table",
-      "heading": "Direct CLI vs Puppeteer / Chrome (2026-08-19)",
+      "heading": "Direct CLI vs Puppeteer / Chrome (2026-09-12)",
       "headers": ["Pages", "gowk time", "Puppeteer time", "Speedup", "gowk RSS", "Puppeteer RSS"],
       "rows": [
-        ["2", "18 ms", "1.411 s", "77.30x", "23,808 KiB", "944,056 KiB"],
-        ["10", "32 ms", "1.548 s", "47.84x", "27,264 KiB", "1,019,896 KiB"],
-        ["50", "121 ms", "2.069 s", "17.06x", "43,008 KiB", "1,108,580 KiB"],
-        ["100", "199 ms", "2.145 s", "10.78x", "62,016 KiB", "1,245,988 KiB"]
+        ["2", "16 ms", "1.445 s", "92.85x", "19,200 KiB", "940,600 KiB"],
+        ["10", "26 ms", "1.488 s", "57.16x", "24,192 KiB", "1,019,952 KiB"],
+        ["50", "72 ms", "1.801 s", "25.10x", "29,760 KiB", "1,119,360 KiB"],
+        ["100", "127 ms", "2.178 s", "17.16x", "35,136 KiB", "1,240,920 KiB"]
       ]
     },
     {
       "type": "table",
-      "heading": "In-process Go benchmark snapshot (2026-08-19)",
+      "heading": "In-process engine, internal generic path (2026-09-12)",
+      "headers": ["Pages", "Time", "B/op", "allocs/op"],
+      "rows": [
+        ["2", "5.14 ms", "4.09 MB", "4,136"],
+        ["5", "7.75 ms", "6.84 MB", "8,165"],
+        ["10", "11.77 ms", "4.63 MB", "14,879"],
+        ["20", "21.24 ms", "6.02 MB", "28,411"],
+        ["50", "53.54 ms", "13.24 MB", "69,498"],
+        ["100", "106.56 ms", "23.26 MB", "137,955"],
+        ["200", "204.88 ms", "44.66 MB", "275,206"],
+        ["250", "259.06 ms", "56.50 MB", "344,017"],
+        ["500", "535.34 ms", "111.44 MB", "687,421"]
+      ]
+    },
+    {
+      "type": "table",
+      "heading": "Public Go library PDF, Document.WritePDF (2026-09-12)",
+      "headers": ["Pages", "Time", "B/op", "allocs/op"],
+      "rows": [
+        ["2", "5.75 ms", "4.11 MB", "4,144"],
+        ["5", "8.83 ms", "6.87 MB", "8,179"],
+        ["10", "13.71 ms", "4.67 MB", "14,882"],
+        ["20", "21.13 ms", "6.09 MB", "28,417"],
+        ["50", "51.83 ms", "12.59 MB", "69,478"],
+        ["100", "107.16 ms", "23.45 MB", "137,942"],
+        ["200", "222.68 ms", "45.32 MB", "275,212"],
+        ["250", "266.55 ms", "57.32 MB", "344,020"],
+        ["500", "532.24 ms", "113.10 MB", "687,423"]
+      ]
+    },
+    {
+      "type": "table",
+      "heading": "Public Go library image, ImageDocument.WriteImage (2026-09-12)",
+      "headers": ["Tiles", "Time", "B/op", "allocs/op"],
+      "rows": [
+        ["2", "14.12 ms", "11.91 MB", "490"],
+        ["5", "12.25 ms", "3.45 MB", "578"],
+        ["10", "13.75 ms", "3.68 MB", "872"],
+        ["20", "12.96 ms", "3.82 MB", "1,137"],
+        ["50", "17.39 ms", "4.20 MB", "1,917"],
+        ["100", "30.16 ms", "20.00 MB", "3,215"],
+        ["200", "55.80 ms", "37.09 MB", "5,793"],
+        ["250", "16.78 ms", "6.38 MB", "7,179"],
+        ["500", "34.02 ms", "10.40 MB", "13,705"]
+      ]
+    },
+    {
+      "type": "table",
+      "heading": "CLI process, gowk only (cli-rss, 2026-09-12)",
+      "headers": ["Pages", "Time", "Peak RSS"],
+      "rows": [
+        ["2", "10 ms", "19,584 KiB"],
+        ["5", "10 ms", "22,080 KiB"],
+        ["10", "20 ms", "24,768 KiB"],
+        ["20", "30 ms", "26,496 KiB"],
+        ["50", "70 ms", "29,760 KiB"],
+        ["100", "120 ms", "34,752 KiB"],
+        ["200", "220 ms", "46,464 KiB"],
+        ["250", "280 ms", "51,840 KiB"],
+        ["500", "560 ms", "80,064 KiB"]
+      ]
+    },
+    {
+      "type": "table",
+      "heading": "Historical perf-time closure capture: internal and public PDF (2026-09-11)",
+      "headers": ["Row", "2 pages", "500 pages", "Pre-time baseline"],
+      "rows": [
+        ["Internal generic PDF time (warm matrix median)", "5.50 ms (cold)", "733.48 ms", "1,228.72 ms"],
+        ["Internal generic PDF time (standalone median)", "6.08 ms (cold)", "695.42 ms", "1,297.98 ms"],
+        ["Internal generic PDF B/op (warm matrix)", "4.03 MB (4,031,472 B, cold)", "163.02 MB (163,021,712 B)", "234.92 MB"],
+        ["Internal generic PDF B/op (standalone median)", "4.03 MB (4,031,712 B, cold)", "167.87 MB (167,865,712 B)", "235.50 MB"],
+        ["Internal generic PDF allocs/op (standalone median)", "4,453", "755,091", "1.15M"],
+        ["Public library PDF time", "6.11 ms (cold)", "698.79 ms", "1,240.82 ms"],
+        ["Public library PDF B/op", "4.05 MB (4,048,000 B, cold)", "169.65 MB (169,650,976 B)", "236.91 MB"],
+        ["Public library PDF allocs/op", "4,464", "755,100", "n/a"]
+      ]
+    },
+    {
+      "type": "table",
+      "heading": "Historical perf-time closure capture: public image (2026-09-11)",
+      "headers": ["Tiles", "Time", "B/op", "allocs/op", "B/op ceiling", "Encoded PNG"],
+      "rows": [
+        ["250", "25.72 ms", "14.30 MB (14,296,096 B)", "7,204", "14.45 MB", "141,917 B"],
+        ["500", "44.27 ms", "26.41 MB (26,414,016 B)", "13,635", "26.73 MB", "282,749 B"]
+      ]
+    },
+    {
+      "type": "callout",
+      "variant": "info",
+      "title": "Historical: allocation targets met, time targets split across two labeled windows (2026-09-11)",
+      "body": "The 2026-09-11 perf-time closure capture held every allocation target: 500-page B/op was 163.02 MB (warm matrix), 167.87 MB (standalone), and 169.65 MB (public library), 28.4% to 30.6% below the pre-time baselines and under the 234.92 MB ceiling. The 500-tile image time held at 44.27 ms. That window did not reproduce the phase-6 time: 733.48 ms matrix median and 695.42 ms standalone, with identical B/op. The phase-6 capture of the same production source measured 576.33 ms / 163,032,880 B, a 2.13x speedup that met the 615 ms stretch target, and the measured-lever floor (<= 830 ms) held. The 250-tile image median was 25.72 ms, 0.72 ms above the 25 ms line; the phase-5b raw samples measured 24.15 ms. The 2026-09-12 capture supersedes these times with 535.34 ms (internal) and 532.24 ms (public PDF) at 500 pages, at 111.44 MB and 113.10 MB B/op. Historical raw evidence: plans/0.2.6/perf-time/results/phase-7/final-capture.md."
+    },
+    {
+      "type": "callout",
+      "variant": "info",
+      "title": "Lossless PNGs about 50% larger, an intended trade",
+      "body": "The 2026-09-12 image rows encode 250 tiles in 16.78 ms at 141,917 B and 500 tiles in 34.02 ms at 282,749 B; tile counts are the benchmark's requested output tiles, 1024 px wide. The filter-none level-2 streaming writer (internal/imageout/pngfast.go) replaced image/png adaptive filtering above the direct-raster threshold. PNG stays lossless, decoded pixels are bit-identical, and files stay far below the 32 MiB maxImageEncoded budget. The about 50% PNG growth and the 1.97x / 2.22x speedup against the pre-time baselines are historical readings from the 2026-09-11 perf-time capture: 94,352 to 141,917 bytes at 250 tiles and 188,268 to 282,749 bytes at 500 tiles."
+    },
+    {
+      "type": "callout",
+      "variant": "info",
+      "title": "Concurrent-layout prototype rejected, left unwired",
+      "body": "The phase-6 prototype rendered independent top-level sections in parallel and merged deterministically. It passed the equivalence contract (op-for-op display lists, page counts, date-normalized PDF bytes, golden 65/65, flat B/op), but its best paired same-process gain was 5.4% (serial 596 ms versus 564 ms at W=2), below the required 15% floor. It was rejected for shipping, pipeline overlap was not attempted, and production stays serial. The prototype and its differential tests were deleted in the 0.2.6 cleanup (plans/0.2.6/ponytail/0.2.6-ponytail-audit.md); no production caller remains."
+    },
+    {
+      "type": "table",
+      "heading": "Historical perf-improve capture: internal and public PDF (2026-09-11)",
+      "headers": ["Row", "2 pages", "500 pages", "0.2.4 row"],
+      "rows": [
+        ["Internal generic PDF time (warm matrix)", "6.69 ms (cold)", "1,228.72 ms", "1,010 ms"],
+        ["Internal generic PDF time (standalone median)", "6.11 ms (cold)", "1,297.98 ms", "1,010 ms"],
+        ["Internal generic PDF B/op (warm matrix)", "2.67 MB (2,665,064 B, cold)", "234.92 MB (234,923,560 B)", "237.76 MB"],
+        ["Internal generic PDF B/op (standalone median)", "2.67 MB (2,665,080 B, cold)", "235.50 MB (235,496,640 B)", "237.76 MB"],
+        ["Internal generic PDF allocs/op (standalone median)", "6,170", "1,225,356", "1.15M"],
+        ["Public library PDF time", "7.14 ms (cold)", "1,240.82 ms", "1,104.51 ms"],
+        ["Public library PDF B/op", "2.68 MB (2,680,016 B, cold)", "236.91 MB (236,911,328 B)", "236.85 MB"],
+        ["Public library PDF allocs/op", "6,186", "1,225,373", "n/a"]
+      ]
+    },
+    {
+      "type": "table",
+      "heading": "Historical perf-improve capture: public image (2026-09-11)",
+      "headers": ["Tiles", "Time", "B/op", "allocs/op", "0.2.4 B/op"],
+      "rows": [
+        ["250", "50.72 ms", "14.45 MB (14,446,240 B)", "9,385", "20.66 MB"],
+        ["500", "98.47 ms", "26.73 MB (26,730,968 B)", "18,022", "52.00 MB"]
+      ]
+    },
+    {
+      "type": "callout",
+      "variant": "info",
+      "title": "Historical: perf-improve met the 240 MB B/op acceptance, 1.10 s time open",
+      "body": "The 2026-09-11 perf-improve capture put warm 500-page B/op at 234.92 MB (warm matrix) and 235.50 MB (standalone median), at or below the 240 MB acceptance and slightly below the 0.2.4 237.76 MB row. Warm 500-page time was 1,228.72 ms (warm matrix) and 1,297.98 ms (standalone median), above the 1.10 s acceptance; the perf-time work closed that gap to 576.33 ms in its phase-6 capture, and the 2026-09-12 capture now measures 535.34 ms (internal) and 532.24 ms (public PDF) at 500 pages. Historical raw evidence: plans/0.2.6/perf-improve/results/phase-7/final-capture.md."
+    },
+    {
+      "type": "callout",
+      "variant": "info",
+      "title": "Generic CLI, not the island-era path",
+      "body": "The 2026-09-12 CLI comparison rows are the generic convert path against wkhtmltopdf 0.12.6.1 with patched Qt; the gowk-only cli-rss table is the same binary measured without the comparison engine. The current in-process, public PDF, and public image rows come from the full ascending matrices in the 2026-09-12 capture, one fresh 1x process per round and the median of three rounds; B/op and allocs/op are the median-time sample's raw values, never averages. The 2-page B/op rows include the one-time default-font work (about 4.0 MB on the internal path), so they are not like-for-like with the 2026-08-19 multi-iteration matrix. CLI cells are the median of three timed process runs after one warmup. Peak RSS is /usr/bin/time %M and is never mixed with B/op. Do not compare these RSS numbers to older island-era CLI snapshots."
+    },
+    {
+      "type": "table",
+      "heading": "Historical in-process Go benchmark snapshot (2026-08-19, 0.2.4)",
       "headers": ["Workload", "2", "10", "100", "500"],
       "rows": [
         ["PDF pages (time / B/op / allocs)", "3.58 ms / 2.21 MB / 5.8K", "14.86 ms / 6.08 MB / 24.1K", "157.69 ms / 48.73 MB / 230.5K", "1.010 s / 237.76 MB / 1.15M"],
@@ -67,7 +215,7 @@
     },
     {
       "type": "table",
-      "heading": "Public Go library snapshot (2026-08-19)",
+      "heading": "Historical public Go library snapshot (2026-08-19, 0.2.4)",
       "headers": ["Workload", "2", "10", "100", "500"],
       "rows": [
         ["Public PDF (time / B/op / allocs)", "3.77 ms / 1.48 MB / 5.7K", "16.03 ms / 5.38 MB / 24.1K", "160.94 ms / 48.46 MB / 230.5K", "1.105 s / 236.85 MB / 1.15M"],
@@ -76,7 +224,7 @@
     },
     {
       "type": "table",
-      "heading": "Public Go library PDF vs wkhtmltopdf CLI (indicative)",
+      "heading": "Historical public library PDF vs wkhtmltopdf CLI (2026-08-19, indicative)",
       "headers": ["Pages", "wkhtmltopdf CLI", "Public library PDF", "Multiplier"],
       "rows": [
         ["2", "259 ms", "3.77 ms", "68.73x"],
@@ -92,7 +240,7 @@
     },
     {
       "type": "table",
-      "heading": "In-process PDF vs wkhtmltopdf CLI (indicative)",
+      "heading": "Historical in-process PDF vs wkhtmltopdf CLI (2026-08-19, indicative)",
       "headers": ["Pages", "wkhtmltopdf CLI", "In-process PDF", "Multiplier"],
       "rows": [
         ["2", "259 ms", "3.58 ms", "72.43x"],
@@ -107,28 +255,25 @@
       ]
     },
     {
-      "type": "callout",
-      "variant": "info",
-      "title": "Generic CLI, not the island-era path",
-      "body": "These rows are the current generic convert path against wkhtmltopdf 0.12.6.1 with patched Qt. Median of three timed process runs after one warmup. Peak RSS is /usr/bin/time %M. Do not compare these RSS numbers to older island-era CLI snapshots, and do not treat Go B/op as process RSS."
-    },
-    {
       "type": "code",
       "heading": "Reproduce",
       "language": "sh",
-      "code": "make bench\n./scripts/bench-external.sh --engines=puppeteer"
+      "code": "make bench-cli-compare\n./scripts/bench-external.sh\n./scripts/bench-performance-recovery.sh --mode=internal-pdf-warm --benchtime=1x --count=1\n./scripts/bench-performance-recovery.sh --mode=public-pdf --sizes=2,5,10,20,50,100,200,250,500 --benchtime=1x --count=1\n./scripts/bench-performance-recovery.sh --mode=public-image --sizes=2,5,10,20,50,100,200,250,500 --benchtime=1x --count=1\n./scripts/bench-performance-recovery.sh --mode=cli-rss --sizes=2,5,10,20,50,100,200,250,500 --runs=3"
     },
     {
       "type": "bullets",
       "heading": "What the numbers mean",
       "items": [
-        "CLI comparison is process wall time plus peak RSS for freshly built gowkhtmltopdf versus the installed wkhtmltopdf binary.",
-        "WeasyPrint and Puppeteer use the same generated report fixture; Puppeteer RSS includes the Node driver and headless Chrome process tree.",
-        "In-process go test -bench rows measure conversion inside the test process. B/op is cumulative allocation traffic.",
-        "The public Go library rows call Document.WritePDF and ImageDocument.WriteImage directly. The approximately 70x landing claim is 259 ms divided by 3.77 ms at 2 pages, using the wkhtmltopdf CLI as the baseline.",
-        "The report fixture is testdata/golden/benchmarks/templates/report.html.tmpl with 20 invoice rows per requested page.",
-        "Page islands (convert.NewBenchmarkPDFRequest) are a benchmark-only opt-in. Ordinary CLI and library requests stay on the generic path.",
-        "Full matrices, historical snapshots, and raw go test rows live in testdata/golden/benchmarks/ and documentation/performance.md."
+        "CLI comparison is process wall time plus peak RSS for freshly built gowkhtmltopdf versus the installed comparison tool. Puppeteer RSS is the peak process-tree reading for the Node driver plus headless Chrome, not a single-process /usr/bin/time %M value.",
+        "The current matrices come from the 2026-09-12 capture on the 0.2.6 working tree (VERSION 0.2.5), built with make build. CLI, WeasyPrint, and Puppeteer rows are the median of 3 timed runs after one warmup; internal, public PDF, and public image rows are one fresh 1x process per round, median of three rounds, with B/op and allocs/op taken from the median-time sample and never averaged.",
+        "The 2026-09-12 capture has gowkhtmltopdf faster and at lower peak RSS than wkhtmltopdf at every tested size, including 500 pages (79,296 KiB versus 123,076 KiB). The older reading that gowk RSS was higher from 100 pages on belongs to an earlier capture and is historical.",
+        "Historical: the 2026-09-11 perf-time closure window ran slower on wall time than the phase-6 capture 15 minutes earlier (733.48 ms versus 576.33 ms at 500 pages) with identical production source hashes and identical B/op. The 2.13x result is the phase-6 row; the closure rows are kept alongside it rather than replaced.",
+        "The image writer trades about 50% more lossless PNG bytes for roughly 2x faster encoding; decoded pixels and dimensions are unchanged. The current 2026-09-12 rows are 16.78 ms / 141,917 B at 250 tiles and 34.02 ms / 282,749 B at 500 tiles; tile counts are the benchmark's requested output tiles, 1024 px wide.",
+        "The concurrent-layout prototype (5.4% paired gain against a 15% floor) is rejected for shipping and has no production caller.",
+        "2-page B/op rows include the one-time default-font work (about 4.0 MB on the internal path) because each sample is a fresh 1x process. Do not compare them to the 2026-08-19 multi-iteration matrix without that caveat.",
+        "The public Go library rows call Document.WritePDF and ImageDocument.WriteImage directly. The 2-page public library PDF row is 5.75 ms against the 260 ms wkhtmltopdf CLI baseline in the 2026-09-12 capture, about 45x; the older approximately 20x landing claim is historical.",
+        "The report fixture is testdata/golden/benchmarks/templates/report.html.tmpl with 20 invoice rows per requested page. Page islands and their convert.NewBenchmarkPDFRequest opt-in were removed in the 0.2.6 cleanup; every row is a generic-path measurement.",
+        "Full matrices, historical snapshots, and raw rows live in testdata/golden/benchmarks/, documentation/benchmarks.md, documentation/performance.md, and the 2026-09-12 raw captures under plans/0.2.6/perf-review/results/2026-09-12/."
       ]
     }
   ]

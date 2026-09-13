@@ -194,7 +194,7 @@ func (s *parseState) step(arg string) error {
 		s.idx = len(s.argv)
 	case strings.HasPrefix(arg, "--"):
 		return s.parseLongFlag(arg)
-	case isShortFlag(arg):
+	case strings.HasPrefix(arg, "-") && len(arg) == 2:
 		return s.parseShortFlag(arg)
 	case strings.HasPrefix(arg, "-") && arg != "-":
 		return fmt.Errorf("%w %s", errUnknownOption, arg)
@@ -225,11 +225,6 @@ func docFlagErr(arg string) (bool, error) {
 	}
 
 	return false, nil
-}
-
-// isShortFlag reports whether arg is a single-char flag token ("-x").
-func isShortFlag(arg string) bool {
-	return strings.HasPrefix(arg, "-") && len(arg) == 2
 }
 
 // parseLongFlag handles one "--name" token: lookup, mode check and value
@@ -267,12 +262,6 @@ func (s *parseState) parseShortFlag(arg string) error {
 	return s.apply(name, spec, false, "", false)
 }
 
-// ParseMode is the explicit form of Parse for callers that know which
-// executable mode they are implementing.
-func ParseMode(argv []string, mode Mode) (*Command, error) {
-	return Parse(argv, mode)
-}
-
 func parseMode(modes []Mode) (Mode, error) {
 	if len(modes) > 1 {
 		return 0, errTooManyModes
@@ -296,10 +285,14 @@ func checkMode(name string, spec flagSpec, mode Mode) error {
 	}
 
 	modeName := "requested mode"
-	if mode == ModePDF {
+
+	switch mode {
+	case ModePDF:
 		modeName = "pdf mode"
-	} else if mode == ModeImage {
+	case ModeImage:
 		modeName = "image mode"
+	case ModeBoth:
+		modeName = "pdf or image mode"
 	}
 
 	return fmt.Errorf("option --%s is %w %s", name, errOptionNotSupported, modeName)
@@ -424,11 +417,7 @@ func (ctx *objectCtx) applyPage(command *Command, glob func(g *settings.PdfGloba
 func (s *parseState) apply(name string, spec flagSpec, negated bool, inlineVal string, hasInline bool) error {
 	switch spec.kind {
 	case flagBool:
-		flagBoolVal, err := parseBoolFlag(boolFlagState{
-			inlineVal: inlineVal,
-			hasInline: hasInline,
-			negated:   negated,
-		})
+		flagBoolVal, err := parseBoolFlag(inlineVal, hasInline, negated)
 		if err != nil {
 			return err
 		}
@@ -475,27 +464,21 @@ func (s *parseState) apply(name string, spec flagSpec, negated bool, inlineVal s
 	return fmt.Errorf("%w --%s", errUnknownFlagKind, name)
 }
 
-type boolFlagState struct {
-	inlineVal string
-	hasInline bool
-	negated   bool
-}
-
 // parseBoolFlag turns the bool-flag contract into a real bool: an inline value
 // (--flag=x) wins, otherwise --no-flag negates. Unknown inline values error.
-func parseBoolFlag(state boolFlagState) (bool, error) {
-	if state.hasInline {
-		switch strings.ToLower(state.inlineVal) {
+func parseBoolFlag(inlineVal string, hasInline, negated bool) (bool, error) {
+	if hasInline {
+		switch strings.ToLower(inlineVal) {
 		case "true", "1", "yes", "on":
 			return true, nil
 		case "false", "0", "no", "off":
 			return false, nil
 		}
 
-		return false, fmt.Errorf("%w %q", errInvalidBoolValue, state.inlineVal)
+		return false, fmt.Errorf("%w %q", errInvalidBoolValue, inlineVal)
 	}
 
-	return !state.negated, nil
+	return !negated, nil
 }
 
 func splitFlag(name string) (string, string, bool) {

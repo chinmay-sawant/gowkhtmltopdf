@@ -11,7 +11,7 @@
    "type": "bullets",
    "heading": "Requirements",
    "items": [
-    "Go 1.26 or newer. The first build may download the two allowlisted direct modules and their transitive Go module graph; later builds can run offline with the cache populated.",
+    "Go 1.26 or newer (go.mod declares go 1.26 and pins toolchain go1.26.4). The first build may download the two allowlisted direct modules and their transitive Go module graph; later builds can run offline with the cache populated.",
     "No cgo and no native libraries. Build with CGO_ENABLED=0 to get statically linked ELF/Mach-O binaries with no runtime library requirements.",
     "Native conversion uses no browser process, WebKit, or third-party HTML-to-PDF service. The optional browser route uses the same pipeline through WebAssembly.",
     "The two allowlisted direct pure-Go modules are github.com/go-text/typesetting for OpenType shaping and github.com/tdewolff/canvas for SVG rasterization; there is no browser or native converter dependency."
@@ -21,13 +21,13 @@
    "type": "code",
    "heading": "Install with Go",
    "language": "sh",
-   "code": "go install github.com/chinmay-sawant/gowkhtmltopdf/cmd/gowkhtmltopdf@v0.2.4\ngo install github.com/chinmay-sawant/gowkhtmltopdf/cmd/gowkhtmltoimage@v0.2.4\ngowkhtmltopdf --version   # Name: gowkhtmltopdf / Version: 0.2.4"
+   "code": "go install github.com/chinmay-sawant/gowkhtmltopdf/cmd/gowkhtmltopdf@v0.2.6\ngo install github.com/chinmay-sawant/gowkhtmltopdf/cmd/gowkhtmltoimage@v0.2.6\ngowkhtmltopdf --version   # Name: gowkhtmltopdf / Version: 0.2.6"
   },
   {
    "type": "code",
    "heading": "Build",
    "language": "sh",
-   "code": "# recommended: static binaries, version stamped from VERSION\nmake build\n# writes bin/gowkhtmltopdf and bin/gowkhtmltoimage\n\n# equivalent, explicit:\nCGO_ENABLED=0 go build -ldflags \"-X github.com/chinmay-sawant/gowkhtmltopdf/internal/cli.Version=$(cat VERSION)\" \\\n  -o bin/gowkhtmltopdf ./cmd/gowkhtmltopdf\nCGO_ENABLED=0 go build -ldflags \"-X github.com/chinmay-sawant/gowkhtmltopdf/internal/cli.Version=$(cat VERSION)\" \\\n  -o bin/gowkhtmltoimage ./cmd/gowkhtmltoimage\n\n./bin/gowkhtmltopdf --version   # Name: gowkhtmltopdf / Version: 0.2.4\n# VERSION is the project release. LibraryVersion (0.12.7-dev) is the\n# wkhtmltopdf settings-surface id, not the release number."
+   "code": "# recommended: static binaries, version stamped from VERSION\nmake build\n# writes bin/gowkhtmltopdf and bin/gowkhtmltoimage\n\n# equivalent, explicit:\nCGO_ENABLED=0 go build -ldflags \"-X github.com/chinmay-sawant/gowkhtmltopdf/internal/cli.Version=$(cat VERSION)\" \\\n  -o bin/gowkhtmltopdf ./cmd/gowkhtmltopdf\nCGO_ENABLED=0 go build -ldflags \"-X github.com/chinmay-sawant/gowkhtmltopdf/internal/cli.Version=$(cat VERSION)\" \\\n  -o bin/gowkhtmltoimage ./cmd/gowkhtmltoimage\n\n./bin/gowkhtmltopdf --version   # Name: gowkhtmltopdf / Version: 0.2.6\n# VERSION is the project release. LibraryVersion (0.12.7-dev) is the\n# wkhtmltopdf settings-surface id, not the release number."
   },
   {
    "type": "callout",
@@ -43,9 +43,9 @@
   },
   {
    "type": "code",
-   "heading": "Opt-in PDF version or profile (0.2.2)",
+   "heading": "Opt-in PDF version or profile",
    "language": "sh",
-   "code": "# Default is unclaimed PDF 1.4. --pdf-version is not a PDF/A or PDF/UA claim.\n./bin/gowkhtmltopdf --pdf-version 1.7 --allow-local-files -o /tmp/invoice-1.7.pdf \\\n  testdata/golden/fixture-01-simple-invoice.html\n\n# Dual PDF/A-3a + PDF/UA-1 (implies PDF 1.7)\n./bin/gowkhtmltopdf --pdf-profile a3a-ua1 --allow-local-files -o /tmp/invoice-a3a-ua1.pdf \\\n  testdata/golden/fixture-01-simple-invoice.html"
+   "code": "# Default is unclaimed PDF 1.4. --pdf-version is not a PDF/A or PDF/UA claim.\n./bin/gowkhtmltopdf --pdf-version 1.7 --allow-local-files -o /tmp/invoice-1.7.pdf \\\n  testdata/golden/fixture-01-simple-invoice.html\n./bin/gowkhtmltopdf --pdf-version 2.0 --allow-local-files -o /tmp/invoice-2.0.pdf \\\n  testdata/golden/fixture-01-simple-invoice.html\n\n# Dual PDF/A-3a + PDF/UA-1 (implies PDF 1.7)\n./bin/gowkhtmltopdf --pdf-profile a3a-ua1 --allow-local-files -o /tmp/invoice-a3a-ua1.pdf \\\n  testdata/golden/fixture-01-simple-invoice.html\n\n# Dual PDF/A-4 + PDF/UA-2 (implies PDF 2.0)\n./bin/gowkhtmltopdf --pdf-profile a4-ua2 --allow-local-files -o /tmp/invoice-a4-ua2.pdf \\\n  testdata/golden/fixture-01-simple-invoice.html"
   },
   {
    "type": "code",
@@ -91,47 +91,71 @@
    "rows": [
     [
      "test",
-     "go test ./... - the full test suite"
+     "Full suite with capped concurrency: go test -p 2 -parallel 2 ./...; override the caps with TEST_P / TEST_PARALLEL and pass extra flags with GO_TEST_FLAGS"
     ],
     [
-     "build",
-     "Builds both static binaries (gowkhtmltopdf, gowkhtmltoimage) into bin/"
+     "test-quick / test-unit",
+     "test-quick adds -short (skips long perf-budget tests); test-unit skips internal/convert; both keep the -p 2 -parallel 2 caps"
+    ],
+    [
+     "test-serial / test-race",
+     "test-serial runs -p 1 -parallel 1 for very low RAM; test-race runs -race -count=1 on internal/convert, layout, pdf, imageout, and load"
     ],
     [
      "lint",
-     "golangci-lint run ./... with the pinned version (default v1.64.8), then frontend npm run lint (ESLint plus src/data content and config checks)"
+     "golangci-lint (pinned v1.64.8), then size-check, then frontend npm run lint"
     ],
     [
-     "fmt",
-     "gofmt -w ."
+     "size-check / lint-frontend",
+     "size-check enforces the file-size soft limit (scripts/check-file-size.sh); lint-frontend runs ESLint plus the src/data content and config checks"
+    ],
+    [
+     "build",
+     "Builds both static binaries (gowkhtmltopdf, gowkhtmltoimage) into bin/, version stamped from VERSION"
+    ],
+    [
+     "wasm / wasm-test",
+     "wasm builds the browser artifact into frontend/public/wasm/ (GOOS=js GOARCH=wasm); wasm-test runs the adapter contract, frontend lint/build/tests, and the Chrome live-demo harness"
     ],
     [
      "golden",
-     "go test ./internal/convert/ -run 'TestGoldenCorpus' -v - walks every testdata/golden/*.html fixture and asserts PDF structure, embedded font, page envelope, and feature expectations"
+     "Walks every testdata/golden/*.html fixture and asserts PDF structure, embedded fonts, page envelopes, and feature flags"
     ],
     [
      "golden-update GOLDEN_FIXTURE=... GOLDEN_APPROVE=1",
      "Generates one explicitly approved fixture PDF under ignored testdata/golden/out/; never rewrites fixture sources"
     ],
     [
-     "samples",
-     "Regenerates output/: one PDF per golden fixture, a showcase TOC/header/footer/outline PDF, image PNGs, and a soft-fail live Wikipedia smoke"
+     "samples / samples-python / screenshots",
+     "samples rewrites output/ (fixture PDFs/PNGs, showcase TOC/header/footer/outline, 1.7/2.0 and profile smokes, soft-fail wiki fetch); samples-python writes output/python/ and needs CGO_ENABLED=1; screenshots regenerates the frontend showcase images"
     ],
     [
-     "bench",
-     "In-process Go benchmark matrix (PDF, template, image tiles)"
+     "weasyprint",
+     "Regenerates the WeasyPrint comparison PDFs under output/weasyprint/ (requires the weasyprint CLI)"
+    ],
+    [
+     "bench / bench-engine / bench-lib",
+     "bench runs the external CLI comparisons via scripts/bench-external.sh; bench-engine is the internal engine matrix (bench-inprocess is its alias); bench-lib times the public Document/ImageDocument API"
     ],
     [
      "bench-cli-compare",
-     "Process-level CLI comparison against installed wkhtmltopdf"
+     "Process-level comparison against installed wkhtmltopdf (make build first)"
     ],
     [
-     "claim-scan",
-     "Fail on forbidden over-claim phrases in user-facing docs"
+     "c-shared / bindings-clean",
+     "c-shared builds dist/libgowkhtmltopdf.so plus the generated header with CGO_ENABLED=1; bindings-clean removes dist/"
     ],
     [
-     "clean",
-     "rm -rf testdata/golden/out"
+     "python-binding-test / python-benchmarks / python-api",
+     "Builds the shared library and runs the Python unittest suite, the in-process Python benchmark matrix, or the Python sample generators"
+    ],
+    [
+     "claim-scan / check-versions",
+     "claim-scan fails on forbidden over-claim phrases; check-versions gates VERSION against bindings/python"
+    ],
+    [
+     "fmt / clean",
+     "gofmt -w .; clean removes testdata/golden/out and dist"
     ]
    ]
   }

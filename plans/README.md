@@ -11,7 +11,7 @@ Implementation plans and roadmaps for `gowkhtmltopdf`, partitioned by release ve
 | [0.2.3/](0.2.3/README.md) | **v0.2.3** — same engine as 0.2.2; GitHub module path / `go install` | [release notes](0.2.3/PR/release-v0.2.3.md) |
 | [0.2.4/](0.2.4/README.md) | **v0.2.4** — idiomatic Document API + CLI rethink + external benches (phases 31–39) | Complete; [release notes](0.2.4/PR/release-v0.2.4.md) |
 | [0.2.5/](0.2.5/README.md) | **v0.2.5 Python cgo c-shared bindings and PyPI** — phases 40–47 (in-process, `CGO_ENABLED=0` pure-Go default kept); font track `font/` already complete | Complete (released 2026-08-26; `VERSION` 0.2.5) |
-| [0.2.6/](0.2.6/README.md) | **v0.2.6 CSS coverage** - phases 48-78, catalog-driven CSS mapping; Partial program closed; Ignored reopen for browser-level print | Phases 48-67 complete on `feature/026-extended-css-support`. Phases 68-78 open (247 Ignored). VERSION still 0.2.5. |
+| [0.2.6/](0.2.6/README.md) | **v0.2.6 CSS coverage** - phases 48-78, catalog-driven CSS mapping; Partial program closed; Ignored reopen for browser-level print | Phases 48-67 complete on `feature/026-extended-css-support`. Phases 68-78 open (247 Ignored). VERSION 0.2.6 (bumped 2026-09-13). |
 
 ---
 
@@ -78,5 +78,6 @@ Implementation plans and roadmaps for `gowkhtmltopdf`, partitioned by release ve
 - [ignored-inventory.json](0.2.6/ignored-inventory.json) - Ownership map for the 247 Ignored names (phases 68-78)
 - [AGENTS.md](0.2.6/AGENTS.md) - Agent rules for this ledger
 - [86-canonical-0.2.6-wasm.md](0.2.6/86-canonical-0.2.6-wasm.md) - Browser WASM conversion, PDF preview, and image output phases 86-93
+- [perf-improve/wave-2-50pct/](0.2.6/perf-improve/wave-2-50pct/) - Live ledger to cut remaining Snapshot M ns/op and B/op in half (library and CLI). Wave 1 Snapshot L checklist stays closed.
 
 Phases 57-67 closed Partials (174 Implemented / 0 Partial). Phases 68-78 reopen all 247 Ignored for browser-level print. Leftover CSS rows in `0.2.0/phases/pending-phase-items/` move here with `[~]` pointers. WOFF2 sidecar cited in KB is not in this worktree unless amended.

@@ -1,8 +1,10 @@
 package layout
 
 import (
+	"cmp"
 	"context"
 	"fmt"
+	"slices"
 )
 
 // paginateOps assigns every op a page. Crossing text/image/link ops snap to
@@ -11,21 +13,27 @@ import (
 // pages derive from the final Y positions. Rect-type ops crossing a boundary
 // are split by Paint.
 //
+// It returns only an error: PaintContext rebuilds page buckets after rect
+// splitting and sticky shifts (buildPagesAfterSplits), so a pre-split
+// op-to-page slice here would be discarded. Tests that assert the settled
+// pre-split assignment use paginateOpsForTest.
+//
 // ctx is polled once per fixpoint iteration and every 64 op slots; on
 // cancellation it returns the error and the caller abandons the partially
 // shifted display list.
-func paginateOps(ctx context.Context, res *Result, contentH float64) ([]int, error) {
+func paginateOps(ctx context.Context, res *Result, contentH float64) error {
 	if err := ctx.Err(); err != nil {
-		return nil, fmt.Errorf("layout: paginate ops: %w", err)
+		return fmt.Errorf("layout: paginate ops: %w", err)
 	}
 
 	ensureFlowIndex(res, contentH)
+	res.buildPaginationCensus()
 	// Resolve forced section starts before snapping text to provisional page
 	// boundaries. Otherwise a row near the boundary of the unbroken flow can
 	// move its text alone; a later page-break-before shift then leaves the
 	// collapsed-table chrome behind at the old row position.
 	if err := settleBeforeAlways(ctx, res, contentH); err != nil {
-		return nil, err
+		return err
 	}
 
 	// Lift aside callouts that do not fit the remaining Y on this page
@@ -33,7 +41,7 @@ func paginateOps(ctx context.Context, res *Result, contentH float64) ([]int, err
 	// page top (that snap-then-shift left an internal gap in the card).
 	for range 10 {
 		if err := ctx.Err(); err != nil {
-			return nil, fmt.Errorf("layout: paginate ops: %w", err)
+			return fmt.Errorf("layout: paginate ops: %w", err)
 		}
 
 		if !keepImplicitAsides(res, contentH) {
@@ -42,11 +50,11 @@ func paginateOps(ctx context.Context, res *Result, contentH float64) ([]int, err
 	}
 
 	if err := snapCrossingTextOps(ctx, res, contentH); err != nil {
-		return nil, fmt.Errorf("layout: paginate ops: %w", err)
+		return fmt.Errorf("layout: paginate ops: %w", err)
 	}
 
 	if err := paginationFixpoint(ctx, res, contentH); err != nil {
-		return nil, err
+		return err
 	}
 
 	// After flow has settled, clone <thead> onto continuation pages.
@@ -63,36 +71,20 @@ func paginateOps(ctx context.Context, res *Result, contentH float64) ([]int, err
 	// Forced breaks win over the callout pack: a same-page snap must not
 	// leave page-break-before:always parked on the previous page.
 	if err := settleBeforeAlways(ctx, res, contentH); err != nil {
-		return nil, err
+		return err
 	}
 	// Sticky is applied in Paint after rect splitting (see splitCrossingRects).
-	return assignFlowPages(ctx, res, contentH)
-}
 
-// assignFlowPages maps every display-list op to its settled page.
-func assignFlowPages(ctx context.Context, res *Result, contentH float64) ([]int, error) {
-	opPage := make([]int, len(res.Ops))
-	poll := newCtxPoll(ctx)
-
-	for opIdx := range res.Ops {
-		if poll.poll() {
-			return nil, fmt.Errorf("layout: paginate ops: %w", poll.err)
-		}
-
-		page, ok := checkedFlowPageOfY(res.Ops[opIdx].Y, contentH)
-		if !ok {
-			opPage[opIdx] = -1
-		} else {
-			opPage[opIdx] = page
-		}
-	}
-
-	return opPage, nil
+	return nil
 }
 
 // settleBeforeAlways runs forced section-start resolution to a fixpoint:
 // page-break-before shifts repeat until none move anything.
 func settleBeforeAlways(ctx context.Context, res *Result, contentH float64) error {
+	if res != nil && res.skipInitialBeforeAlways {
+		return nil
+	}
+
 	for range 10 {
 		if err := ctx.Err(); err != nil {
 			return fmt.Errorf("layout: paginate ops: %w", err)
@@ -110,19 +102,28 @@ func settleBeforeAlways(ctx context.Context, res *Result, contentH float64) erro
 // anything or the iteration cap is reached. ctx is checked once per
 // iteration: each iteration is a full display-list pass, so a check keeps
 // cancellation latency under one pass instead of ten.
+//
+//nolint:cyclop // policy gates add explicit branches to the fixpoint
 func paginationFixpoint(ctx context.Context, res *Result, contentH float64) error {
 	for range 10 {
 		if err := ctx.Err(); err != nil {
 			return fmt.Errorf("layout: pagination fixpoint: %w", err)
 		}
 
-		changed := avoidInside(res, contentH)
+		changed := false
+
+		if res.hasAvoidInside {
+			changed = avoidInside(res, contentH)
+		}
+
 		if beforeAlways(res, contentH) {
 			changed = true
 		}
 
-		if afterBreaks(res, contentH) {
-			changed = true
+		if res.hasAfterBreak {
+			if afterBreaks(res, contentH) {
+				changed = true
+			}
 		}
 
 		if rowsIntact(res, contentH) {
@@ -143,6 +144,54 @@ func paginationFixpoint(ctx context.Context, res *Result, contentH float64) erro
 	}
 
 	return nil
+}
+
+// buildPaginationCensus records the style-only facts the fixpoint policies
+// branch on, so a policy that cannot fire does not walk the whole box tree
+// every iteration. The facts are static: they read styles and structure, not
+// positions, so one walk per Paint is enough even when the fixpoint loops.
+//
+// hasAvoidInside mirrors avoidInside's guard exactly:
+// !boxInsideTable(b) && b.height > 0 && isAvoidInsideBreak(b.style).
+// hasAfterBreak is conservative: it is set whenever any box declares
+// page-break-after: always|avoid, which is the only way afterBreaks can move
+// anything.
+func (res *Result) buildPaginationCensus() {
+	if res == nil {
+		return
+	}
+
+	res.hasAvoidInside = false
+	res.hasAfterBreak = false
+
+	if res.root == nil {
+		return
+	}
+
+	for _, boxNode := range flowBoxList(res) {
+		res.censusBox(boxNode)
+
+		if res.hasAvoidInside && res.hasAfterBreak {
+			return
+		}
+	}
+}
+
+// censusBox folds one box into the census flags.
+func (res *Result) censusBox(boxNode *box) {
+	if boxNode.style == nil {
+		return
+	}
+
+	if !res.hasAvoidInside && boxNode.height > 0 &&
+		!boxInsideTable(boxNode) && isAvoidInsideBreak(boxNode.style) {
+		res.hasAvoidInside = true
+	}
+
+	switch boxNode.style.PageBreakAfter {
+	case pageBreakAlways, pageBreakAvoid:
+		res.hasAfterBreak = true
+	}
 }
 
 // snapCrossingTextOps moves text/image/link ops that cross a page boundary to
@@ -174,7 +223,7 @@ func snapCrossingTextOps(ctx context.Context, res *Result, contentH float64) err
 			if paintOp.Y+opH > boundary+1e-9 {
 				snapOpToBoundary(res, idx, paintOp, boundary)
 			}
-		case OpFillRect, OpStrokeRect, OpLine, OpUnknown, opKindNoop:
+		case OpFillRect, OpStrokeRect, OpLine, OpGridRun, OpUnknown, opKindNoop:
 		}
 	}
 
@@ -183,6 +232,13 @@ func snapCrossingTextOps(ctx context.Context, res *Result, contentH float64) err
 
 type paintRange struct{ first, last int }
 
+// tablePaintRanges returns the table op spans prepared for stabbing queries:
+// sorted by first index, with each last replaced by the prefix maximum. The
+// caller's membership test is then a binary search plus one comparison, so
+// 174,000 queries cost O(log tables) each instead of an 87M-check scan.
+//
+// The spans are nested or disjoint (a table's range contains its descendants),
+// so the prefix maximum over first-sorted spans equals the union membership.
 func tablePaintRanges(res *Result) []paintRange {
 	if res == nil || res.root == nil {
 		return nil
@@ -198,17 +254,34 @@ func tablePaintRanges(res *Result) []paintRange {
 		ranges = append(ranges, paintRange{first: boxNode.opStart, last: boxNode.opEnd})
 	}
 
+	slices.SortFunc(ranges, func(left, right paintRange) int {
+		return cmp.Compare(left.first, right.first)
+	})
+
+	for idx := 1; idx < len(ranges); idx++ {
+		if ranges[idx].last < ranges[idx-1].last {
+			ranges[idx].last = ranges[idx-1].last
+		}
+	}
+
 	return ranges
 }
 
 func opInPaintRange(index int, ranges []paintRange) bool {
-	for _, span := range ranges {
-		if index >= span.first && index <= span.last {
-			return true
+	low, high := 0, len(ranges)-1
+	candidate := -1
+
+	for low <= high {
+		mid := int(uint(low+high) >> 1) //nolint:gosec // bounded by the range slice length
+		if ranges[mid].first <= index {
+			candidate = mid
+			low = mid + 1
+		} else {
+			high = mid - 1
 		}
 	}
 
-	return false
+	return candidate >= 0 && ranges[candidate].last >= index
 }
 
 // snapAscenderRatio reserves ascender room above snapped text so snapped
@@ -259,7 +332,7 @@ func snapOpForward(res *Result, idx int, paintOp *Op, boundary float64) {
 	for _, j := range chrome {
 		o := &res.Ops[j]
 		if o.Y < oldY-layoutCoordEpsilon {
-			o.Y += deltaY
+			shiftOpY(o, deltaY)
 		}
 	}
 }
@@ -285,13 +358,13 @@ func shiftNearestOwnedChrome(res *Result, opIndex int, oldY, deltaY float64) {
 		moved := false
 		for idx := boxNode.opStart; idx <= boxNode.opEnd && idx < len(res.Ops); idx++ {
 			chromeOp := &res.Ops[idx]
-			if idx == opIndex || !isOwnBoxChrome(*chromeOp, boxNode, boxNode.y+boxNode.height) ||
+			if idx == opIndex || !opOwnedBy(chromeOp, boxNode, opOwnerChrome) ||
 				chromeOp.Y >= oldY-layoutCoordEpsilon ||
 				(oldY-chromeOp.Y > rowChromeBandTolerance && chromeOp.Kind != OpLine) {
 				continue
 			}
 
-			chromeOp.Y += deltaY
+			shiftOpY(chromeOp, deltaY)
 			moved = true
 		}
 		if moved {

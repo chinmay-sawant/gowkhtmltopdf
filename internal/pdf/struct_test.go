@@ -66,7 +66,7 @@ func buildRichDoc(t *testing.T) []byte {
 
 		if idx == 0 {
 			page.AddLinkURI([4]float64{10, 10, 110, 30}, "https://example.com")
-			page.AddLinkDest([4]float64{10, 40, 110, 60}, 1, 50, 150)
+			page.AddLinkDest([4]float64{10, 40, 110, 60}, doc.PageAt(1), 50, 150)
 		}
 	}
 

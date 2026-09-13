@@ -10,7 +10,6 @@ import (
 const (
 	contentNormal             = "normal"
 	singleQuotedContentMinLen = 2
-	listMarkerDisc            = "•"
 )
 
 // pseudoContent cascades the CSS content property for ::before/::after on n.
@@ -92,7 +91,9 @@ func (e *engine) pseudoStyleContext() *styleContext {
 
 // pseudoStyle resolves the used style of generated content against the host
 // style. Generated content inherits from its host, then applies declarations
-// from the matching pseudo-element rules.
+// from the matching pseudo-element rules through the same raw-to-used
+// sequence as elements, so custom properties and var() references resolve
+// here too.
 func (e *engine) pseudoStyle(node *html.Node, pseudoEl string, host ResolvedStyle) *ResolvedStyle {
 	if e == nil || node == nil {
 		return &host
@@ -105,12 +106,9 @@ func (e *engine) pseudoStyle(node *html.Node, pseudoEl string, host ResolvedStyl
 		return e.stylePtr(node)
 	}
 
-	sty := initialStyle()
-	inheritProps(&sty, &host, raw)
-	applyFontProps(&sty, raw, host.FontSize, ctx)
-	applyRestProps(&sty, raw, ctx, &host)
-	inheritUnitlessLineHeight(&sty, &host, raw)
-	sty.famHash = hashFontFamily(sty.FontFamily)
+	var sty ResolvedStyle
+
+	applyRawToUsed(nil, ctx, &host, &sty, raw)
 
 	return &sty
 }
@@ -128,12 +126,12 @@ func selectContentDecl(ctx *styleContext, n *html.Node, pseudoEl string) *conten
 	var best *contentHit
 
 	for _, rowH := range ctx.matchedRules(n, pseudoEl) {
-		for _, d := range rowH.r.Decls {
+		for _, d := range rowH.rule.Decls {
 			if !strings.EqualFold(d.Prop, "content") {
 				continue
 			}
 
-			h := contentHit{value: d.Value, a: rowH.a, b: rowH.b, c: rowH.c, order: rowH.r.Order, important: d.Important}
+			h := contentHit{value: d.Value, a: rowH.a, b: rowH.b, c: rowH.c, order: rowH.rule.Order, important: d.Important}
 			if betterContentHit(h, best) {
 				hh := h
 				best = &hh
@@ -496,60 +494,4 @@ func decodeHexEscape(value string, start int) (rune, int) {
 
 func isHex(c byte) bool {
 	return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
-}
-
-// listItemMarkerText returns the marker for a display:list-item element
-// based on its ListStyleType. Used by inline_paint when parent is display:list-item.
-func listItemMarkerText(style ResolvedStyle, node *html.Node) string { //nolint:unused // used by inline_paint.go.
-	typ := style.ListStyleType
-	if typ == "" {
-		typ = listStyleDisc
-	}
-	// Reuse layout's markerText logic for disc/circle/square/decimal etc.
-	// When node is available, counter-based types could use its position.
-	// For inline-paint fallback, use simple glyphs.
-	switch typ {
-	case listStyleDisc:
-		return listMarkerDisc
-	case listStyleCircle:
-		return "○"
-	case listStyleSquare:
-		return "■"
-	case listStyleDecimal, listStyleDecimalZero:
-		// Inline fallback without counter context – markerText in layout_flow would compute index.
-		// Use generic "1."; real <ol> path uses emitListMarker with correct counter.
-		if node != nil {
-			return markerText(node, typ)
-		}
-
-		return "1."
-	case listStyleLowerAlpha, listStyleLowerLatin, listStyleUpperAlpha,
-		listStyleUpperLatin, listStyleLowerRoman, listStyleUpperRoman:
-		return listMarkerAlphaRoman(typ)
-	default:
-		if node != nil {
-			return markerText(node, typ)
-		}
-
-		return listMarkerDisc
-	}
-}
-
-//nolint:unused // helper for listItemMarkerText above.
-func listMarkerAlphaRoman(typ string) string {
-	switch typ {
-	case listStyleLowerAlpha, listStyleLowerLatin:
-		return "a."
-	case listStyleUpperAlpha, listStyleUpperLatin:
-		return "A."
-	case listStyleLowerRoman:
-		return "i."
-	default:
-		return "I."
-	}
-}
-
-// isDisplayListItem reports whether the style is a list-item display.
-func isDisplayListItem(style *ResolvedStyle) bool { //nolint:unused // used by inline_paint.go.
-	return style != nil && style.Display == "list-item"
 }

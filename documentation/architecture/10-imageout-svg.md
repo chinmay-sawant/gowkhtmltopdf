@@ -120,7 +120,7 @@ resolution), `internal/layout/mnd_const.go:62` (`svgRasterMax = 1024`),
 | Symbol | Location | Purpose |
 |--------|----------|---------|
 | `rasterizeContext` | `imageout.go:328` | Allocates a `rasterSS`× supersampled NRGBA canvas (white or transparent), paints ops in `layout.PaintOrder`, box-filters down to final size |
-| `rasterDimension` / `validateRasterSize` | `imageout.go:401/422` | Dimension guards: width/height ≤ 16,384; ≤ 64M pixels; ≤ 256 MiB backing bytes |
+| `rasterDimension` / `validateRasterSize` | `imageout.go:521/542` | Dimension guards on the supersampled canvas (`rasterSS = 2`): width/height ≤ 16,384 px (8,192 CSS px per side); ≤ 64M pixels (67,108,864; 16M CSS pixels); ≤ 256 MiB backing bytes |
 | `supersamplePixPool` | `imageout.go:321` | `sync.Pool` recycling of the large supersample pixel buffer across renders |
 | `paint` (dispatch) | `imageout.go:755` | Switch over `layout.OpKind`: `OpFillRect`/`OpStrokeRect`/`OpLine`/`OpText`/`OpBullet`/`OpImage`; `OpLinkURI` paints nothing |
 | `paintText` | `imageout.go:846` | Fractional-baseline text draw + fake-bold second pass (Latin-only gate in `layout.FakeBoldFor`) |
@@ -138,9 +138,9 @@ resolution), `internal/layout/mnd_const.go:62` (`svgRasterMax = 1024`),
 | `RenderObjects` | `imageout.go:1162` | `prepareImageDocument` → fetch func → `RenderContext`; stores the `image.Image` |
 | `Finalize` / `writeEncodedOutput` | `imageout.go:1209/1215` | Resolve format, composite transparent canvas onto white for JPEG (`onWhite`), encode, write to `req.Output` |
 | `prepareImageDocument` | `imageout.go` | Resolves media + SimplifyDOM profile, runs `prepare.Document` with `defaultViewportW/H = 768×576` |
-| `makeImageFetcher` | `imageout.go` | Wraps `prep.Resources.Fetch` with the `--no-images` gate and a bounded byte cache (64 fetches / 32 MiB) |
+| `makeImageFetcher` | `imageout.go` | Wraps `prep.Resources.Fetch` with the `settings.ResolveImages` gate (`--images` / `--no-images` write global `web.images`) and a bounded byte cache (64 fetches / 32 MiB) |
 | `fontRegistry` | `imageout.go` | Builds `pdf.Registry` from global `FontPaths` + system dirs (`ScanFontDirs`); nil when nothing to scan |
-| `imageLoadGlobal` | `imageout.go` | ACL merge: `Image.Load` ⊕ `Global.Load.Allow` / `EnableLocalFileAccess` before `load.NewLoader` |
+| `imageLoadGlobal` | `imageout.go` | ACL merge: `Image.Load` ⊕ `Global.Load.Allow` / `EnableLocalFileAccess` before `load.NewLoaderWithError` |
 | `imageout.Request` / `NewRequest` / `Validate` | `request.go` | Exactly one renderable object + non-nil `Output`; multiple objects are an error (`ErrMultipleInputs`), not “ignore extras” |
 | `resolveFormat` / `encode` / `onWhite` | `imageout.go` | PNG vs JPEG selection (`--format` wins, else `.jpg/.jpeg` extension, else PNG); JPEG quality clamp 1–100; JPEG transparency → warn + white composite |
 
@@ -183,7 +183,7 @@ resolution), `internal/layout/mnd_const.go:62` (`svgRasterMax = 1024`),
    - loads, lays out, rasterizes, and encodes into `req.Output`.
 4. `RunRequest`:
    - `req.Validate()` again (exactly one input object; extras are rejected);
-   - `load.NewLoader(imageLoadGlobal(req.Global, req.Image))` — ACL =
+   - `load.NewLoaderWithError(imageLoadGlobal(req.Global, req.Image))` — ACL =
      Image.Load merged with Global.Load (`--allow` / `--allow-local-files`);
    - `pdf.DefaultFont()` + `fontRegistry` (system + `--font-path`);
    - builds `imagePipeline` and runs `renderpipeline.Run` (the shared
@@ -195,14 +195,14 @@ resolution), `internal/layout/mnd_const.go:62` (`svgRasterMax = 1024`),
 RenderObjects
  ├─ prepareImageDocument(ctx, loader, obj, global, imgSet, registry, log)
  │    ├─ mediaFor(global, image, obj)          → "screen" default / print override
- │    ├─ SimplifyDOM profile resolution (prepare.SimplifyDOMEnabled/Profile)
+ │    ├─ SimplifyDOM profile resolution
  │    └─ prepare.Document(ctx, loader, obj.Page, obj.Load, registry,
  │           prepare.Options{ViewportW:768, ViewportH:576, MediaType, SimplifyDOM, ...})
- │           → load.Resource → html.ParseDocument → CollectSheets → MergeFontFaces
+ │           → load.Resource → html.ParseDocument → ResourceContext.CollectSheets → ResourceContext.MergeFontFaces
  │           → *prepare.Prepared{Root, Sheets, Resources, Registry}
  │    (prep.Resource.Skip  →  error "load-error policy is skip; nothing to render")
  ├─ makeImageFetcher(ctx, imgSet, prep, cache)
- │    └─ --no-images gate (errImagesDisabled) → prep.Resources.Fetch (bounded cache)
+ │    └─ ResolveImages gate: global && image && object (errImagesDisabled) → prep.Resources.Fetch (bounded cache)
  ├─ printLinkUnderline = Image|Global|Object Web flag OR
  └─ RenderContext(ctx, prep.Root, RenderOptions{Width, Height, Font, Registry,
       Sheets, Media, Images, Background, Transparent, Crop, SmartWidth, ...})
@@ -262,7 +262,7 @@ is a **one-way dependency of layout**, not of imageout — PDF mode benefits too
 | `internal/html` | `html.Node` tree from `prepare.Document` |
 | `internal/layout` | `LayoutContext`, `Options`, `Result`, `Op`, `PaintOrder`, `StyleOf`, `FakeBoldFor` |
 | `internal/line` | Structured log emission (`line.Emit`, severities) |
-| `internal/load` | `load.NewLoader` / policy application |
+| `internal/load` | `load.NewLoaderWithError` / policy application |
 | `internal/pdf` | `Font`, `Registry`, `DefaultFont`, `ShapeRun`, `GlyphContours`, `FlattenContour`, `ContourBounds`, `AdvanceInPoints`, `ScanFontDirs` |
 | `internal/settings` | `PdfGlobal`, `ImageGlobal`, `Web`, `LoadGlobal`, `LoadPage`, `PdfObject` |
 | stdlib `image`, `image/color`, `image/draw`, `image/png`, `image/jpeg` | Canvas, compositing, encoding — **no cgo, no external raster engine** |
@@ -353,7 +353,7 @@ contract (the P1-1 engine-seam goal).
 ## 7. Notable patterns & invariants
 
 - **Policy-in-one-place loading (P2-07):** full load policy (proxy, ACL,
-  local-access) is merged before `NewLoader`; no post-construction field pokes
+  local-access) is merged before `NewLoaderWithError`; no post-construction field pokes
   on `Loader`. `imageLoadGlobal` ORs `Image.Load` with `Global.Load`.
 - **Validate-before-open:** both `Run` and `app.RunImage` validate the request
   against `io.Discard` before `cmd.OpenOutput()` so a bad request never
@@ -447,6 +447,20 @@ contract (the P1-1 engine-seam goal).
   edges are softer than hinted/system renderers. Documented as a fidelity
   tier-1 success ("image mode not blocky 5×7 text") but not a hinting claim
   (`documentation/fidelity.md`).
+- **Raster budget envelope:** image mode caps the final canvas at 8,192 CSS
+  px per side and 16,777,216 CSS px (16M) in total. Painting runs at
+  `rasterSS = 2`, so the internal supersampled canvas is capped at 16,384 px
+  per side, 67,108,864 px (64M), and 256 MiB of NRGBA backing bytes
+  (`imageout.go:43-46`, `:92`, `:542-560`). A document that crosses the
+  envelope fails with a wrapped `errRasterTooLarge` (`imageout: raster
+  exceeds resource budget`) instead of being tiled or auto-scaled. Four
+  golden templates cross it at 1x (complex-css, font-examples, and
+  fixture-56 on the per-side cap; fixture-60 on the pixel cap), so the
+  image profiling harness records them as skipped. The remedy is manual:
+  lower `--zoom` (library `ImageDocument.Zoom`) below the fitting bound,
+  such as `--zoom 0.73` or lower for complex-css, about 11,208 CSS px tall;
+  or lower `--width` when the width is what overflows. PDF mode is not
+  subject to this cap.
 - **Nearest-neighbour `<img>` scaling** — large photo downscaling is blocky
   (accepted; Go 1.26 removed stdlib scalers). Natural-size logos/grids are
   exact. An analytic/filtered scaler is a possible future improvement.

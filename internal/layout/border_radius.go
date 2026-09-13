@@ -353,7 +353,11 @@ func opRadiiY(paintOp *Op) [4]float64 {
 	}
 }
 
-func opRadiiXY(paintOp *Op) ([4]float64, [4]float64) {
+// OpRadiiXY resolves an op's corner radii into unscaled X and Y axis arrays.
+// A missing Y radius copies X (circular corner); a zero X radius forces a
+// zero Y radius so a stale Y cannot paint a corner the op does not have. The
+// values are layout points, not raster pixels; callers scale as needed.
+func OpRadiiXY(paintOp *Op) ([4]float64, [4]float64) {
 	radiusX := opRadii(paintOp)
 	radiusY := opRadiiY(paintOp)
 

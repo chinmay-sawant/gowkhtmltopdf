@@ -1,12 +1,16 @@
 package pdf
 
 import (
-	"bytes"
 	"strings"
 	"sync"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf/assets"
 )
+
+// dejaVuSansFamily is the lowercase CSS family key of the bundled DejaVu Sans
+// fallback faces. ResolveFamily lowercases its input before comparing, and the
+// registry normalizes aliases to the same key.
+const dejaVuSansFamily = "dejavu sans"
 
 // FaceSet holds the bundled Liberation CSS families and Unicode fallback faces.
 //
@@ -32,117 +36,44 @@ type FaceSet struct {
 var (
 	defaultFacesOnce sync.Once
 	defaultFaces     *FaceSet
-	errDefaultFaces  error
 )
 
 // LoadDefaultFaces returns the embedded Liberation families and Unicode
-// fallback faces. The result is cached.
-//
-//nolint:cyclop,lll,funlen // face loading is an explicit fail-fast initialization sequence
+// fallback faces. The result is cached, and each face loads (clone + parse) on
+// first use, so a document only pays for the faces it touches.
 func LoadDefaultFaces() (*FaceSet, error) {
 	defaultFacesOnce.Do(func() {
-		faces := &FaceSet{} //nolint:exhaustruct // intentional zero-value fields
-
-		var err error
-		if faces.Regular, err = parseNamed(fallbackFontName, assets.LiberationSansRegular()); err != nil {
-			errDefaultFaces = err
-
-			return
+		defaultFaces = &FaceSet{
+			Regular:             parseNamed(fallbackFontName, assets.LiberationSansRegular),
+			Bold:                parseNamed("LiberationSans-Bold", assets.LiberationSansBold),
+			Italic:              parseNamed("LiberationSans-Italic", assets.LiberationSansItalic),
+			BoldItalic:          parseNamed("LiberationSans-BoldItalic", assets.LiberationSansBoldItalic),
+			Serif:               parseNamed("LiberationSerif", assets.LiberationSerifRegular),
+			SerifBold:           parseNamed("LiberationSerif-Bold", assets.LiberationSerifBold),
+			SerifItalic:         parseNamed("LiberationSerif-Italic", assets.LiberationSerifItalic),
+			SerifBoldItalic:     parseNamed("LiberationSerif-BoldItalic", assets.LiberationSerifBoldItalic),
+			Mono:                parseNamed("LiberationMono", assets.LiberationMonoRegular),
+			MonoBold:            parseNamed("LiberationMono-Bold", assets.LiberationMonoBold),
+			MonoItalic:          parseNamed("LiberationMono-Italic", assets.LiberationMonoItalic),
+			MonoBoldItalic:      parseNamed("LiberationMono-BoldItalic", assets.LiberationMonoBoldItalic),
+			UnicodeFallback:     parseNamed("DejaVuSans-UnicodeFallback", assets.UnicodeFallbackRegular),
+			UnicodeFallbackBold: parseNamed("DejaVuSans-UnicodeFallback-Bold", assets.UnicodeFallbackBold),
 		}
-
-		if faces.Bold, err = parseNamed("LiberationSans-Bold", assets.LiberationSansBold()); err != nil {
-			errDefaultFaces = err
-
-			return
-		}
-
-		if faces.Italic, err = parseNamed("LiberationSans-Italic", assets.LiberationSansItalic()); err != nil {
-			errDefaultFaces = err
-
-			return
-		}
-
-		if faces.BoldItalic, err = parseNamed("LiberationSans-BoldItalic", assets.LiberationSansBoldItalic()); err != nil {
-			errDefaultFaces = err
-
-			return
-		}
-
-		if faces.Serif, err = parseNamed("LiberationSerif", assets.LiberationSerifRegular()); err != nil {
-			errDefaultFaces = err
-
-			return
-		}
-
-		if faces.SerifBold, err = parseNamed("LiberationSerif-Bold", assets.LiberationSerifBold()); err != nil {
-			errDefaultFaces = err
-
-			return
-		}
-
-		if faces.SerifItalic, err = parseNamed("LiberationSerif-Italic", assets.LiberationSerifItalic()); err != nil {
-			errDefaultFaces = err
-
-			return
-		}
-
-		if faces.SerifBoldItalic, err = parseNamed("LiberationSerif-BoldItalic", assets.LiberationSerifBoldItalic()); err != nil {
-			errDefaultFaces = err
-
-			return
-		}
-
-		if faces.Mono, err = parseNamed("LiberationMono", assets.LiberationMonoRegular()); err != nil {
-			errDefaultFaces = err
-
-			return
-		}
-
-		if faces.MonoBold, err = parseNamed("LiberationMono-Bold", assets.LiberationMonoBold()); err != nil {
-			errDefaultFaces = err
-
-			return
-		}
-
-		if faces.MonoItalic, err = parseNamed("LiberationMono-Italic", assets.LiberationMonoItalic()); err != nil {
-			errDefaultFaces = err
-
-			return
-		}
-
-		if faces.MonoBoldItalic, err = parseNamed("LiberationMono-BoldItalic", assets.LiberationMonoBoldItalic()); err != nil {
-			errDefaultFaces = err
-
-			return
-		}
-
-		if faces.UnicodeFallback, err = parseNamed("DejaVuSans-UnicodeFallback", assets.UnicodeFallbackRegular()); err != nil {
-			errDefaultFaces = err
-
-			return
-		}
-
-		if faces.UnicodeFallbackBold, err = parseNamed("DejaVuSans-UnicodeFallback-Bold", assets.UnicodeFallbackBold()); err != nil {
-			errDefaultFaces = err
-
-			return
-		}
-
-		defaultFaces = faces
 	})
 
-	return defaultFaces, errDefaultFaces
+	return defaultFaces, nil
 }
 
-func parseNamed(name string, data []byte) (*Font, error) {
-	fnt, err := ParseTTF(bytes.Clone(data))
-	if err != nil {
-		return nil, err
-	}
-
+// parseNamed builds one bundled face. The accessor runs on first use, so the
+// single asset clone (for example assets.LiberationSansRegular copies the
+// embedded bytes once) and the parse are deferred until a document asks for
+// the face. A second clone on this path doubled the cold font charge, 3.15 MB
+// measured.
+func parseNamed(name string, load func() []byte) *Font {
+	fnt := newLazyFont(load)
 	fnt.PostScriptName = name
 
-	return fnt, nil
+	return fnt
 }
 
 // Resolve picks a face for the given CSS weight and italic flag.
@@ -162,7 +93,10 @@ func (fs *FaceSet) ResolveFamily(families []string, weight int, italic bool) *Fo
 			return resolveFamilyFaces(fs.Mono, fs.MonoBold, fs.MonoItalic, fs.MonoBoldItalic, weight, italic)
 		case "sans-serif", "arial", "helvetica", "tahoma", "verdana", "calibri", "liberation sans":
 			return fs.Resolve(weight, italic)
-		case "system-ui":
+		case "system-ui", dejaVuSansFamily:
+			// The DejaVu faces are the Unicode fallback family; an explicit
+			// font-family:'DejaVu Sans' (the font-language-override demo)
+			// resolves them instead of falling through to Liberation.
 			return resolveFamilyFaces(fs.UnicodeFallback, fs.UnicodeFallbackBold, nil, fs.UnicodeFallbackBold, weight, italic)
 		}
 	}

@@ -174,33 +174,70 @@ func tocFirstOrder(tocs, bodies []*objectState) []int {
 	return order
 }
 
+//nolint:cyclop,wsl // copy materialization and per-copy link rewiring
 func materializeCopies(ctx context.Context, doc *pdf.Document, ranges []render.Range, copies int) error {
 	if err := render.ValidateCopies(copies); err != nil {
 		return err
 	}
 
-	original := 0
-	for _, span := range ranges {
-		original += span.Count
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("assemble copies: %w", err)
 	}
 
-	if original == 0 {
+	if copies <= 1 {
 		return nil
+	}
+
+	logical := make([]int, 0, len(ranges))
+
+	for _, span := range ranges {
+		for page := span.Start; page < span.Start+span.Count; page++ {
+			logical = append(logical, page)
+		}
+	}
+
+	if len(logical) == 0 {
+		return nil
+	}
+
+	// originalOf maps each pre-copy page to its position in logical order.
+	// Duplicates are appended, so the logical indices keep resolving to the
+	// originals across copy iterations.
+	originalOf := make(map[*pdf.Page]int, len(logical))
+	for pos, page := range logical {
+		originalOf[doc.PageAt(page)] = pos
 	}
 
 	for copyIndex := 1; copyIndex < copies; copyIndex++ {
 		if err := ctx.Err(); err != nil {
 			return fmt.Errorf("assemble copies: %w", err)
 		}
-		for _, span := range ranges {
-			for page := span.Start; page < span.Start+span.Count; page++ {
-				if err := ctx.Err(); err != nil {
-					return fmt.Errorf("assemble copies: %w", err)
-				}
-				if _, err := doc.DuplicatePage(page); err != nil {
-					return fmt.Errorf("assemble copies: %w", err)
-				}
+
+		clones := make([]*pdf.Page, len(logical))
+		for pos, page := range logical {
+			if err := ctx.Err(); err != nil {
+				return fmt.Errorf("assemble copies: %w", err)
 			}
+
+			clone, err := doc.DuplicatePage(page)
+			if err != nil {
+				return fmt.Errorf("assemble copies: %w", err)
+			}
+
+			clones[pos] = clone
+		}
+
+		// A copied page's internal links must target the same copy of their
+		// destination pages: DuplicatePage copies destination identity, so
+		// re-aim each clone at this copy group's destinations.
+		for _, clone := range clones {
+			clone.RemapLinkDests(func(dest *pdf.Page) *pdf.Page {
+				if destPos, ok := originalOf[dest]; ok {
+					return clones[destPos]
+				}
+
+				return dest
+			})
 		}
 	}
 

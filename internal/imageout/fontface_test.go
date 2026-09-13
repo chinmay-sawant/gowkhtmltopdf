@@ -56,7 +56,8 @@ body { font-family: Custom, sans-serif; font-size: 14pt; }
 }
 
 // collectFontLayout runs the same load + sheet collection + font-face merge
-// path as Run, then lays out the document (same MergeFontFaces path as Run).
+// path as RunRequest, then lays out the document (same MergeFontFaces path as
+// RunRequest).
 func collectFontLayout(
 	t *testing.T,
 	cmd *cli.Command,
@@ -65,7 +66,7 @@ func collectFontLayout(
 ) (*layout.Result, *pdf.Registry) {
 	t.Helper()
 
-	loader, err := load.NewLoaderWithError(imageLoadGlobalCmd(cmd))
+	loader, err := load.NewLoaderWithError(imageLoadGlobal(cmd.Global, cmd.Image))
 	if err != nil {
 		t.Fatalf("new loader: %v", err)
 	}
@@ -80,19 +81,17 @@ func collectFontLayout(
 		t.Fatalf("parse: %v", err)
 	}
 
-	sheets := prepare.CollectSheets(
+	resources := prepare.NewResourceContext(loader, res.Base, cmd.Objects[0].Load)
+	sheets := resources.CollectSheets(
 		t.Context(),
-		loader,
 		root,
-		res.Base,
-		cmd.Objects[0].Load,
 		prepare.SheetOptions{
 			ViewportW: 768, ViewportH: 576, MediaType: "screen",
 		},
 		io.Discard,
 	)
 
-	reg := prepare.MergeFontFaces(t.Context(), loader, nil, sheets, res.Base, cmd.Objects[0].Load, 1, fontLog)
+	reg := resources.MergeFontFaces(t.Context(), nil, sheets, 1, fontLog)
 
 	def, err := pdf.DefaultFont()
 	if err != nil {
@@ -110,24 +109,9 @@ func collectFontLayout(
 	return lay, reg
 }
 
-// decodeTestPNG opens path and decodes it as PNG, failing the test otherwise.
-func decodeTestPNG(t *testing.T, path string) {
-	t.Helper()
-
-	file, err := os.Open(path)
-	if err != nil {
-		t.Fatalf("open png: %v", err)
-	}
-
-	defer file.Close()
-
-	if _, err := png.Decode(file); err != nil {
-		t.Fatalf("decode png: %v", err)
-	}
-}
-
 // TestFontFaceLocalUsesCustom proves ACL-allowed local @font-face registers
-// Custom and layout attaches that face (same MergeFontFaces path as Run).
+// Custom and layout attaches that face (same MergeFontFaces path as
+// RunRequest).
 func TestFontFaceLocalUsesCustom(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -143,36 +127,38 @@ func TestFontFaceLocalUsesCustom(t *testing.T) {
 
 	var log bytes.Buffer
 
-	if err := Run(t.Context(), cmd, &log); err != nil {
-		t.Fatalf("Run: %v\nlog: %s", err, log.String())
+	var out bytes.Buffer
+
+	req := NewRequest(cmd.Global, cmd.Image, cmd.Objects, &out)
+	if err := RunRequest(t.Context(), req, &log); err != nil {
+		t.Fatalf("RunRequest: %v\nlog: %s", err, log.String())
 	}
 
-	decodeTestPNG(t, pngOut)
+	if _, err := png.Decode(bytes.NewReader(out.Bytes())); err != nil {
+		t.Fatalf("decode png: %v", err)
+	}
 
-	// Open-box: same merge + layout as Run must attach Custom (not Liberation fallback).
+	// Open-box: same merge + layout as RunRequest must attach Custom (not Liberation fallback).
 	lay, reg := collectFontLayout(t, cmd, htmlPath, io.Discard)
 	if reg == nil || reg.Lookup([]string{"Custom"}, 400, false) == nil {
 		t.Fatal("expected Custom face in registry after MergeFontFaces")
 	}
 
-	sawCustom := false
+	assertCustomFontUsed(t, lay)
+}
+
+// assertCustomFontUsed fails unless a text op uses the Custom face.
+func assertCustomFontUsed(t *testing.T, lay *layout.Result) {
+	t.Helper()
 
 	for i := range lay.Ops {
 		op := &lay.Ops[i]
-		if op.Kind != layout.OpText || op.Font == nil {
-			continue
-		}
-
-		if op.Font.PostScriptName == "Custom" {
-			sawCustom = true
-
-			break
+		if op.Kind == layout.OpText && op.Font != nil && op.Font.PostScriptName == "Custom" {
+			return
 		}
 	}
 
-	if !sawCustom {
-		t.Error("expected layout text ops to use @font-face Custom")
-	}
+	t.Error("expected layout text ops to use @font-face Custom")
 }
 
 // TestFontFaceACLDeny ensures a denied @font-face src falls back without panic.
@@ -212,8 +198,12 @@ func TestFontFaceACLDeny(t *testing.T) {
 	cmd.Image.Format = "png"
 
 	var log bytes.Buffer
-	if err := Run(t.Context(), cmd, &log); err != nil {
-		t.Fatalf("Run: %v\nlog: %s", err, log.String())
+
+	var out bytes.Buffer
+
+	req := NewRequest(cmd.Global, cmd.Image, cmd.Objects, &out)
+	if err := RunRequest(t.Context(), req, &log); err != nil {
+		t.Fatalf("RunRequest: %v\nlog: %s", err, log.String())
 	}
 
 	warn := log.String()
@@ -221,7 +211,9 @@ func TestFontFaceACLDeny(t *testing.T) {
 		t.Errorf("expected @font-face ACL warning; log=%q", warn)
 	}
 
-	decodeTestPNG(t, pngOut)
+	if _, err := png.Decode(bytes.NewReader(out.Bytes())); err != nil {
+		t.Fatalf("decode png: %v", err)
+	}
 
 	// Face must not register under Custom when FetchSub is denied.
 	var denyLog bytes.Buffer

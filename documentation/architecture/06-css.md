@@ -3,14 +3,16 @@
 ## 1. Responsibility & position in the pipeline
 
 `internal/css` implements the **CSS subset** that gowkhtmltopdf accepts, and nothing
-more. Its package doc (internal/css/css.go, lines 1–18) states the contract
+more. Its package doc (internal/css/css.go, lines 1-13) states the contract
 precisely:
 
-> Scope: `*`, type, `.class`, `#id`, attribute selectors, `:first-child` /
-> `:last-child` / `:nth-child` / `:has()` / `:not()`, descendant/child/sibling
-> combinators, `@media` type + size-feature matching, `@container` size queries,
-> `!important`, inline style attributes. Unsupported constructs degrade without
-> panicking.
+> Scope: `*`, type, `.class`, `#id`, attribute selectors (`[attr]`, `=`, `~=`,
+> `*=`, `^=`, `$=`, `|=`, ASCII `i` flag),
+> `:first-child`/`:last-child`/`:nth-child`/`:first-of-type`/`:last-of-type`/
+> `:nth-of-type`/`:nth-last-of-type`/`:has()`/`:not()`/`:is()`/`:where()`,
+> descendant/child/sibling combinators, `@media` type + size-feature matching,
+> `@container` size queries, `!important`, inline style attributes. Unsupported
+> constructs degrade without panicking.
 
 The package sits **between the HTML tree and the layout engine** in the pipeline:
 
@@ -44,22 +46,35 @@ be reasoned about and fuzzed in isolation.
 ## 2. Package / file map
 
 All files live under `internal/css/` and belong to `package css`. Approximate
-line counts from `wc -l` (2026-08):
+line counts from `wc -l` (2026-09):
 
 | File | Lines | Responsibility |
 |------|------:|----------------|
-| `css.go` | 1784 | Stylesheet/rule/selector/declaration model; top-level parser; at-rule handling (`@media`, `@container`, `@page`, `@font-face`, `@import`, skip-others); selector parsing; right-to-left matching; specificity; `:nth-child` arithmetic; class/attr helpers |
-| `values.go` | 621 | Declaration-block splitting (`ParseInline`); `!important`; length/number/color parsing; `var()` fallback + custom-property resolution; font-family splitting; named-color table |
-| `container.go` | 723 | `@container` prelude parsing (`ContainerQuery`), boolean condition tree (`ContainerCond`), size-feature evaluation, length→pt conversion (`LengthToPt`), container-name/shorthand sidecars, `HasContainerRules` |
-| `has.go` | 406 | Paren/quote scanning shared by `:has()`, `:not()`, media & container features; strict selector-list parsing; relative selector matching; leftmost-match combinator walk; specificity max-of-arguments helpers |
-| `media.go` | 230 | `MediaMatches` evaluation of raw `@media` preludes: types (`print`/`screen`), size features, `orientation`, `not`/`only`, comma OR-lists |
-| `css_test.go` | 973 | Parse/matching/specificity/value/custom-prop tests |
-| `has_test.go` | 161 | `:has()`/`:not()` parse+match+specificity tests |
+| `css.go` | 971 | Stylesheet/rule/selector/declaration model; top-level parser; at-rule dispatch (`@media`, `@container`, `@page`, `@font-face`, `@import`, skip-others); block/paren scanning; `ParseSelectors`; specificity |
+| `selector_parser.go` | 637 | Selector-chain and compound parsing; attribute selectors incl. the ASCII `i` flag; pseudo classification; recursive `:has()`/`:not()`/`:is()`/`:where()` argument parsers (`appendIsWherePseudo`, `isWherePseudo`) |
+| `match.go` | 729 | Right-to-left matching (`Match`, `MatchPseudo`, `matchPart`, `matchPseudos`, `matchPseudo` incl. `:is()`/`:where()` via `matchAnySelector`); `:nth-child`/of-type arithmetic; direct sibling scans in `getSiblingInfo` |
+| `import.go` | 107 | `@import` prelude parsing into `Stylesheet.Imports` (`parseImportRule`); never fetches |
+| `page_margin.go` | 223 | Lite unnamed `@page` margin-box parsing (`PageMarginBoxes`); quoted content strings only |
+| `values.go` | 854 | Declaration-block splitting (`ParseInline`); `!important`; length/number/color parsing; `var()` fallback + custom-property resolution; font-family splitting; named-color table |
+| `container.go` | 744 | `@container` prelude parsing (`ContainerQuery`), boolean condition tree (`ContainerCond`), size-feature evaluation, length→pt conversion (`LengthToPt`), container-name/shorthand sidecars, `HasContainerRules` |
+| `has.go` | 365 | Paren/quote scanning shared by `:has()`, `:not()`, media & container features; strict selector-list parsing; relative selector matching; leftmost-match combinator walk; specificity max-of-arguments helpers |
+| `media.go` | 207 | `MediaMatches` evaluation of raw `@media` preludes: types (`print`/`screen`), size features, `orientation`, `not`/`only`, comma OR-lists |
+| `css_test.go` | 1198 | Parse/matching/specificity/value/custom-prop tests |
+| `has_test.go` | 215 | `:has()`/`:not()` parse+match+specificity tests |
+| `is_test.go` | 282 | `:is()`/`:where()` parse/match tests |
 | `container_test.go` | 189 | Container query parse/eval tests |
+| `nth_type_test.go` | 175 | `:first-of-type`/`:nth-of-type`/`:nth-last-of-type` tests |
+| `phase4_bench_test.go` | 153 | Selector/parse benchmarks |
+| `attr_iflag_test.go` | 124 | `[attr operator value i]` case-insensitivity flag tests |
+| `has_bench_test.go` | 89 | `:has()` benchmarks |
 | `media_test.go` | 86 | Media-query evaluation tests |
+| `parse_depth_test.go` | 85 | Parse-depth guard regression (`TestParseNestedFunctionalPseudoDepth`) |
 | `pseudo_element_drop_test.go` | 74 | Regression: `::before/::after` must not apply to the host |
+| `page_margin_test.go` | 70 | `@page` margin-box parsing tests |
 | `target_pseudo_test.go` | 55 | Regression: `:target` must not match the bare host |
 | `wiki_print_hide_test.go` | 52 | Real-world parser smoke test (Wikipedia print-hide sheets) |
+| `sibling_cache_test.go` | 51 | Sibling-cache bound/eviction regression |
+| `fuzz_test.go` | 31 | Fuzz guard for `Parse` (skips inputs over 64 KiB) |
 
 The two complementary roles are worth distinguishing early:
 
@@ -84,7 +99,7 @@ The two complementary roles are worth distinguishing early:
 | `PseudoClass` | css.go:123 | Named pseudo with optional `Arg` (`:nth-child`), `Has []RelativeSelector`, `Not []Selector`, and a pre-parsed integer `nth nthForm` |
 | `Declaration` | css.go:134 | `Prop`, `Value`, `Important` — the raw wire form of a `prop: value[!important]` pair |
 | `PageStyle` | css.go:59 | `@page` margin/size declarations kept as raw strings, resolved at the PDF boundary |
-| `FontFace` | css.go:66 | `@font-face` local subset: `Family` + raw `Src` (consumed by `convert.MergeFontFaces`) |
+| `FontFace` | css.go:66 | `@font-face` local subset: `Family` + raw `Src` (consumed by `prepare.ResourceContext.MergeFontFaces`) |
 
 ### 3.2 Public entry points (exported functions)
 
@@ -131,7 +146,7 @@ The two complementary roles are worth distinguishing early:
 
 ### 4.1 Stylesheet collection (the entry into css for a document)
 
-1. `internal/convert/prepare/styles.go` `CollectSheets` walks the HTML tree with
+1. `internal/convert/prepare` `ResourceContext.CollectSheets` walks the HTML tree with
    `root.Walk`, visiting every `style` and `link` element (styles.go:35–48).
 2. Inline `<style>` text → `css.Parse` (styles.go:90); `<link rel=stylesheet>`
    is first gated by media/viewport via `linkStylesheet` (styles.go:164, itself
@@ -247,7 +262,7 @@ convert, or pdf, and it makes the package independently testable.
 |----------|--------------|
 | `internal/layout` (style_cascade.go, style.go, style_properties.go, transform.go, pseudo_content.go, layout.go) | `Parse`, `Match`, `MatchPseudo`, `Specificity`, `MediaMatches`, `ParseInline`, `ParseLength`, `LengthToPt`, `ParseColor`, `ParseFontFamily`, `ParseNumber`, `ResolveVar`, `ResolveCustomProps`, `ParseContainerNameValue`, `ParseContainerShorthand`, `HasContainerRules` |
 | `internal/convert/prepare` (styles.go, simplify.go, prepare.go) | `Parse` for `<style>`/`<link>`/helper sheets; `MediaMatches` for link media gating; `FontFaces`/`FontFaceURLs` for font merging |
-| `internal/convert` (outline.go, toc.go, page_islands.go, simplify.go) | `ParseSelectors` for `--exclude-from-outline`; `ParseLength` in TOC geometry; `Parse` of `islandBreakOverrideCSS` |
+| `internal/convert` (outline.go, toc.go) | `ParseSelectors` for `--exclude-from-outline`; `ParseLength` in TOC geometry |
 | `internal/outline` (outline.go) | `css.Selector` matching for outline exclusion |
 | `internal/imageout` (imageout.go) | Same pipeline in image mode (load → parse → css → layout → raster) |
 | `api.go` / `internal/cli` / `internal/settings` | *None directly* — settings inject sheets/media via layout options |
@@ -262,7 +277,7 @@ imports layout, convert, pdf, load, or settings. All viewport/media/container
   needs a document-global order across many sheets. Layout treats the order as
   per-sheet and relies on sheet iteration order for cross-sheet tiebreaks
   (style_cascade.go:225). Callers who build compound sheet lists must keep
-  document order intact (CollectSheets does).
+  document order intact (ResourceContext.CollectSheets does).
 - `Selector.spec` cache means **mutating a parsed Selector's parts after
   parsing yields stale specificity**; `Specificity` only falls back to a walk
   when `specValid` is false (css.go:1738). Today no caller mutates parsed
@@ -292,15 +307,18 @@ imports layout, convert, pdf, load, or settings. All viewport/media/container
      adversarial input" property.
    - *Unsupported selectors never degrade to the host*. This is the
      single most subtle design rule in the package. `writePseudoLiteral`
-     (css.go:826) and `appendSimplePseudo` (css.go:1086) deliberately **keep
-     unknown/unmatchable pseudos on the compound** so that, e.g., `li:target`
-     cannot silently become `li` and apply `:target`'s declarations to every
-     list item (the code comment at css.go:826 documents a real regression:
+     (selector_parser.go:123-129) and `appendSimplePseudo`
+     (selector_parser.go:414) deliberately **keep unknown/unmatchable pseudos
+     on the compound** so that, e.g., `li:target` cannot silently become `li`
+     and apply `:target`'s declarations to every list item (the code comment at
+     selector_parser.go:123-128 documents a real regression:
      `p::before{width:120pt}` used to crush wiki body columns, and `li:target`
      would otherwise paint every reflist item blue). Unmatchable pseudos are
      stored, matched as `false`, and thus **suppress** the whole rule.
-     `:first-line`/`:first-letter` are rejected outright; `:is()/:where()` are
-     unknown (never match, css.go:123).
+     `:first-line`/`:first-letter` are rejected outright
+     (selector_parser.go:431); `:is()`/`:where()` parse as functional pseudos
+     with their argument selector lists (selector_parser.go:397-459) and match
+     when any argument matches (`matchAnySelector`, match.go:576).
 
 4. **Parse early, evaluate late.** Media preludes stay raw strings; container
    queries and `:nth-child` arguments are eagerly compiled (integer `nthForm`,
@@ -351,9 +369,10 @@ imports layout, convert, pdf, load, or settings. All viewport/media/container
   document order and use sheet order as the final tiebreak — the CSS "later
   wins" rule is reproduced exactly by `applyCascadeWin`'s order comparison.
 - **At-rules taxonomy**: `@media`/`@container` (flattened into rules),
-  `@page`/`@font-face` (side-channel structs), `@keyframes`/unknown (skipped).
-  There is **no `@import`, `@supports`, `@layer`, `@charset`, or nesting**;
-  any of these is silently skipped by `skipAtRule` (css.go:354).
+  `@page`/`@font-face` (side-channel structs), `@import` (recorded in
+  `Stylesheet.Imports` for the collection layer to fetch), `@keyframes`/unknown
+  (skipped). There is **no `@supports`, `@layer`, `@charset`, or nesting**;
+  any of these is silently skipped by `skipAtRule` (css.go:532).
 - **Inline is strongest**: layout gives `style=""` the sentinel specificity
   `1<<maxIntShift` — stronger than any sheet rule including `!important`
   (style_cascade.go:337). `!important` in inline style is parsed by
@@ -395,7 +414,7 @@ attack path for hostile HTML, so its posture matters:
   network access anywhere in the package.
 - **Resource amplification is capped outside css**: linked-stylesheet and
   `@font-face` fetches are governed by `internal/load`'s ACL and by
-  `prepare.CollectSheets`'s rule limits (soft warn 25k, hard cap 1M,
+  `ResourceContext.CollectSheets`'s rule limits (soft warn 25k, hard cap 1M,
   styles.go:21/33/63) — see `documentation/THREAT-MODEL.md`.
 - **No CSS-triggered exfiltration**: `url()` is only honored in
   `@font-face src` via `FontFaceURLs` (and only through the loader's policy);
@@ -439,15 +458,17 @@ Cross-package validation:
 Ground truth: documentation/compatibility-matrix.md (the normative allowlist)
 and documentation/deferred.md. Confirmed gaps in css itself:
 
-1. **Selectors**: `:is()`/`:where()` not implemented (unknown → never match,
-   css.go:123). `:first-line`/`:first-letter` rejected (css.go:1086).
-   `:has()` forbids nested `:has()` and pseudo-elements inside arguments
-   (css.go:1033). No `[attr operator value i]` case-insensitivity flag; no
-   escaped-ident unescaping beyond the naive `\` copy (css.go:882 area).
-2. **At-rules**: `@import` unsupported (linked sheets arrive only via
-   `<link>`/`<style>`); `@supports`, `@layer`, nesting, `@keyframes` and all
-   unknown at-rules are skip-parsed. Animations/transitions are explicitly
-   out of scope (static cascaded values only, css.go:195, deferred.md §4).
+1. **Selectors**: `:first-line`/`:first-letter` rejected
+   (selector_parser.go:431). `:has()` forbids nested `:has()` and
+   pseudo-elements inside arguments (selector_parser.go:372). No escaped-ident
+   unescaping beyond the naive `\` copy.
+2. **At-rules**: `@import` is parsed into `Stylesheet.Imports`
+   (import.go:10) and fetched by `prepare` under the same loader ACL as
+   `<link>`, with media gating and an 8-deep nesting cap (maxImportDepth,
+   prepare/styles.go:21; collector at :203, cap check at :215). `@supports`,
+   `@layer`, nesting, `@keyframes` and all unknown at-rules are skip-parsed.
+   Animations/transitions are explicitly out of scope (static cascaded values
+   only; `@keyframes` is skip-parsed at css.go:268; deferred.md §4).
 3. **Values**: `%` and viewport units (`vw`/`vh`) parse but `LengthToPt`
    returns `false` for them (container.go:113) — layout decides policy; a
    curated named-color subset, not CSS Color 4 (values.go:594, ponytail note);
@@ -477,12 +498,6 @@ and documentation/deferred.md. Confirmed gaps in css itself:
 
 Open questions an architect should keep an eye on:
 
-- Whether `:is()/:where()` should join before Tier 3 work (they appear
-  frequently in real-world sheets and would replace the "unknown → never
-  match" default).
-- Whether `@import` should be honored under the same ACL as `<link>` (currently
-  it silently disables the sheet entirely — a silent *feature loss*, not a
-  security hole).
 - Cross-sheet `Order` rebasing: if layout ever needs a single global order,
   `Stylesheet` will need a rebase helper rather than per-sheet counters.
 
@@ -505,7 +520,7 @@ Open questions an architect should keep an eye on:
     (style_cascade.go, style.go, style_properties.go, transform.go,
     pseudo_content.go).
   - `04-load.md` — the loader whose ACL governs stylesheet/font fetches that
-    `prepare.CollectSheets` triggers.
-  - `08-convert-pipeline.md` — prepare/simplify/outline/islands consumers
-    (`.Sheets`, `FontFaces`, `ParseSelectors`, `islandBreakOverrideCSS`).
+    `ResourceContext.CollectSheets` triggers.
+  - `08-convert-pipeline.md` — prepare/simplify/outline consumers
+    (`.Sheets`, `FontFaces`, `ParseSelectors`).
   - `10-imageout-svg.md` — image-mode reuse of the same css→layout path.

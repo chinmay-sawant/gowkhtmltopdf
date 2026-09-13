@@ -1,4 +1,5 @@
 //nolint:all
+//go:generate go run ../../scripts/gen-style-intern -dir . -out style_intern_gen.go
 package layout
 
 import (
@@ -312,70 +313,76 @@ type ResolvedStyle struct {
 	BorderImageOutset      string
 	BorderImageRepeat      string
 	// ListStylePosition is "inside" or "outside"; empty means outside.
-	ListStylePosition          string
-	QuotesRaw                  string
-	QuotesOpen                 string
-	QuotesClose                string
-	CounterReset               string
-	CounterIncrement           string
-	ListStyleImage             string
-	BoxShadowX                 float64
-	BoxShadowY                 float64
-	BoxShadowBlur              float64
-	BoxShadowSpread            float64
-	BoxShadowColor             [3]float64
-	BoxShadowSet               bool
-	BoxShadowInset             bool
-	BoxShadowRaw               string
-	Fill                       [3]float64
-	FillSet                    bool
-	FillOpacity                float64
-	Stroke                     [3]float64
-	StrokeSet                  bool
-	StrokeWidth                float64
-	StrokeWidthSet             bool
-	StrokeOpacity              float64
-	StrokeDashArray            []float64
-	StrokeDashOffset           float64
-	StrokeLineCap              string
-	StrokeLineJoin             string
-	StrokeMiterLimit           float64
-	TextOverflow               string
-	LineClamp                  int
-	MaxLines                   int
-	MarginTrim                 string
-	BoxDecorationBreak         string
-	ImageOrientation           string
-	ImageResolution            float64
-	ObjectViewBox              string
-	PrintColorAdjust           string
-	ForcedColorAdjust          string
-	ColorScheme                string
-	DynamicRangeLimit          string
-	ContainIntrinsicSize       string
-	ContainIntrinsicWidth      float64
-	ContainIntrinsicHeight     float64
-	ContainIntrinsicInlineSize float64
-	ContainIntrinsicBlockSize  float64
-	Contain                    string
-	ContentVisibility          string
-	FontVariationSettings      string
-	FontOpticalSizing          string
-	FontLanguageOverride       string
-	FontPalette                string
-	TextCombineUpright         string
-	TextOrientation            string
-	UnicodeBidi                string
-	TextDecorationSkip         string
-	TextDecorationSkipInk      string
-	TextDecorationSkipBox      string
-	TextDecorationSkipSelf     string
-	TextDecorationSkipSpaces   string
-	TextDecorationInset        string
-	OverflowClipMarginTop      float64
-	OverflowClipMarginRight    float64
-	OverflowClipMarginBottom   float64
-	OverflowClipMarginLeft     float64
+	ListStylePosition        string
+	QuotesRaw                string
+	QuotesOpen               string
+	QuotesClose              string
+	CounterReset             string
+	CounterIncrement         string
+	ListStyleImage           string
+	BoxShadowX               float64
+	BoxShadowY               float64
+	BoxShadowBlur            float64
+	BoxShadowSpread          float64
+	BoxShadowColor           [3]float64
+	BoxShadowSet             bool
+	BoxShadowInset           bool
+	BoxShadowRaw             string
+	Fill                     [3]float64
+	FillSet                  bool
+	FillOpacity              float64
+	Stroke                   [3]float64
+	StrokeSet                bool
+	StrokeWidth              float64
+	StrokeWidthSet           bool
+	StrokeOpacity            float64
+	StrokeDashArray          []float64
+	StrokeDashOffset         float64
+	StrokeLineCap            string
+	StrokeLineJoin           string
+	StrokeMiterLimit         float64
+	TextOverflow             string
+	LineClamp                int
+	MaxLines                 int
+	MarginTrim               string
+	BoxDecorationBreak       string
+	TextDecorationSkipInk    string
+	OverflowClipMarginTop    float64
+	OverflowClipMarginRight  float64
+	OverflowClipMarginBottom float64
+	OverflowClipMarginLeft   float64
+	// Containment and content visibility (CSS Containment).
+	Contain                    string  // "none" or space-separated: size layout paint style content
+	ContainIntrinsicWidth      float64 // pt; -1 = auto/unset
+	ContainIntrinsicHeight     float64 // pt; -1 = auto/unset
+	ContainIntrinsicBlockSize  float64 // pt; -1 = auto/unset
+	ContainIntrinsicInlineSize float64 // pt; -1 = auto/unset
+	ContentVisibility          string  // "visible" | "hidden" | "auto"
+	// Print color adjustment family.
+	ColorAdjust       string // print-color-adjust/color-adjust: "economy" | "exact"
+	ForcedColorAdjust string // "auto" | "none"
+	ColorScheme       string // raw value: "normal" | "light" | "dark" | "light dark" | "only light"
+	DynamicRangeLimit string // raw value
+	// Font variation / shaping overrides.
+	FontLanguageOverride  string // "normal" or quoted string
+	FontOpticalSizing     string // "auto" | "none"
+	FontPalette           string // raw value
+	FontVariationSettings string // raw value
+	// Image adjustment.
+	ImageOrientation      string  // "from-image" | "none" | raw angle
+	ImageOrientationAngle float64 // degrees; 0 = unset
+	ImageResolution       string  // "from-image" | raw resolution token
+	ImageResolutionDPI    float64 // 0 = unset/from-image
+	ObjectViewBox         string  // raw value
+	// Advanced text support.
+	TextCombineUpright       string  // "none" | "all" | "digits N"
+	TextDecorationInset      float64 // pt
+	TextDecorationSkip       string  // raw shorthand value
+	TextDecorationSkipBox    string
+	TextDecorationSkipSelf   string
+	TextDecorationSkipSpaces string
+	TextOrientation          string // "mixed" | "upright" | "sideways"
+	UnicodeBidi              string // "normal" | "embed" | "isolate" | "bidi-override" | "isolate-override" | "plaintext"
 	// CustomProps holds resolved CSS custom properties (--*) for this element
 	// (inherited). Shared with the parent map when the element declares none.
 	CustomProps map[string]string
@@ -469,6 +476,32 @@ func initialStyle() ResolvedStyle { //nolint:funlen // complete CSS initial-valu
 		Opacity:             1,
 		FillOpacity:         1,
 		StrokeOpacity:       1,
+
+		// Re-added support properties (2026-09-12 demotions).
+		Contain:                    "none",
+		ContainIntrinsicWidth:      -1,
+		ContainIntrinsicHeight:     -1,
+		ContainIntrinsicBlockSize:  -1,
+		ContainIntrinsicInlineSize: -1,
+		ContentVisibility:          "visible",
+		ColorAdjust:                "economy",
+		ForcedColorAdjust:          "auto",
+		ColorScheme:                "normal",
+		DynamicRangeLimit:          "no-limit",
+		FontLanguageOverride:       "normal",
+		FontOpticalSizing:          "auto",
+		FontPalette:                "normal",
+		FontVariationSettings:      "normal",
+		ImageOrientation:           imageAdjustFromImage,
+		ImageResolution:            imageAdjustFromImage,
+		ObjectViewBox:              "none",
+		TextCombineUpright:         "none",
+		TextDecorationSkip:         "auto",
+		TextDecorationSkipBox:      "none",
+		TextDecorationSkipSelf:     "auto",
+		TextDecorationSkipSpaces:   "start end",
+		TextOrientation:            "mixed",
+		UnicodeBidi:                "normal",
 	}
 }
 
@@ -501,6 +534,10 @@ type styleContext struct {
 	// are consumed before the next element is resolved.
 	cascadeWins  map[string]cascadeWin
 	cascadeProps map[string]string
+	// memo caches element resolutions for repeated declaration shapes. It is
+	// pass-local: every resolution pass builds a fresh styleContext, and
+	// container re-cascade passes do not use it.
+	memo styleResolutionMemo
 }
 
 // pollContext checks cancellation at bounded work intervals. Style matching is
@@ -617,8 +654,7 @@ func resolveStylesCtx(root *html.Node, ctx *styleContext) (map[*html.Node]*Resol
 
 		switch node.Type {
 		case html.ElementNode:
-			resolveElementStyle(node, ctx, parent, &store.candidate)
-			sty = store.append(store.candidate)
+			sty = resolveElementStyleMemo(node, ctx, parent, &store)
 		case html.TextNode:
 			sty = parent
 			if sty == nil {
@@ -705,31 +741,61 @@ const styleStoreChunkSize = 64
 
 // styleStore owns resolved styles for one resolution pass. It deliberately
 // does not cross Layout calls or @container re-cascade passes.
+//
+// Stored styles are immutable after insertion. append interns an exact
+// duplicate (styleInternFingerprint bucket plus styleInternEqual verification)
+// instead of storing another copy, so repeated table cells and inherited text
+// styles share one ~3.4 KiB record. The fingerprint is only a bucket key; the
+// equality check is the sharing decision.
 type styleStore struct {
 	candidate ResolvedStyle
 	chunks    [][]ResolvedStyle
+	// intern maps a candidate fingerprint to stored records. Buckets stay
+	// small because most documents repeat a few dozen distinct styles.
+	intern map[uint64][]*ResolvedStyle
 }
 
 func (s *styleStore) append(style ResolvedStyle) *ResolvedStyle {
+	fingerprint := styleInternFingerprint(&style)
+
+	for _, stored := range s.intern[fingerprint] {
+		if styleInternEqual(stored, &style) {
+			return stored
+		}
+	}
+
 	if len(s.chunks) == 0 || len(s.chunks[len(s.chunks)-1]) == styleStoreChunkSize {
 		s.chunks = append(s.chunks, make([]ResolvedStyle, 0, styleStoreChunkSize))
 	}
 
 	chunk := len(s.chunks) - 1
 	s.chunks[chunk] = append(s.chunks[chunk], style)
+	stored := &s.chunks[chunk][len(s.chunks[chunk])-1]
 
-	return &s.chunks[chunk][len(s.chunks[chunk])-1]
+	if s.intern == nil {
+		s.intern = make(map[uint64][]*ResolvedStyle)
+	}
+
+	s.intern[fingerprint] = append(s.intern[fingerprint], stored)
+
+	return stored
 }
 
 // zeroResolvedStyle is the empty style for comment/doctype nodes (shared).
 var zeroResolvedStyle ResolvedStyle //nolint:gochecknoglobals // immutable zero sentinel
 
-// resolveElementStyle cascades one element: inheritance, custom properties,
-// fonts, the remaining properties, and the operator/blockify policies.
-func resolveElementStyle(
-	node *html.Node, ctx *styleContext, parent, sty *ResolvedStyle,
+// applyRawToUsed turns a cascade raw map into a used ResolvedStyle. Element
+// and pseudo-element resolution share this sequence so neither path can skip
+// custom-property inheritance or var() substitution: inheritProps copies
+// inherited properties, mergeCustomProps folds in the node's custom
+// properties, resolveRawVars substitutes var() references, then the font,
+// remaining, and unitless line-height passes run. node is nil for generated
+// content (no html rem-base update).
+//
+//nolint:wsl // the raw-to-used sequence mirrors CSS inheritance order.
+func applyRawToUsed(
+	node *html.Node, ctx *styleContext, parent *ResolvedStyle, sty *ResolvedStyle, raw map[string]string,
 ) {
-	raw := cascadeRaw(ctx, node)
 	*sty = initialStyle()
 
 	var parentProps map[string]string
@@ -749,15 +815,47 @@ func resolveElementStyle(
 
 	applyFontProps(sty, raw, parentSize, ctx)
 
-	if node.Name == "html" && sty.FontSize > 0 {
+	if node != nil && node.Name == "html" && sty.FontSize > 0 && ctx != nil {
 		ctx.remBase = sty.FontSize
 	}
 
 	applyRestProps(sty, raw, ctx, parent)
 	inheritUnitlessLineHeight(sty, parent, raw)
+	// FontFamily is final here (inherited, or parsed by applyFontProps /
+	// parseFontShorthand); fingerprint it once so inline text measurement
+	// does not re-hash the family list per run.
+	sty.famHash = hashFontFamily(sty.FontFamily)
+}
+
+// resolveElementStyle cascades one element: the shared raw-to-used sequence
+// plus the operator and blockify policies.
+func resolveElementStyle(
+	node *html.Node, ctx *styleContext, parent, sty *ResolvedStyle,
+) {
+	resolveElementStyleWithHits(node, ctx, parent, sty, matchedElementHits(ctx, node))
+}
+
+// matchedElementHits returns the author-rule matches for node. Split out so
+// the memo path can build its key from the same list the cascade consumed.
+func matchedElementHits(ctx *styleContext, node *html.Node) []ruleHit {
+	if ctx == nil {
+		return nil
+	}
+
+	return ctx.matchedRules(node, "")
+}
+
+// resolveElementStyleWithHits is resolveElementStyle with the matched rules
+// already computed.
+func resolveElementStyleWithHits(
+	node *html.Node, ctx *styleContext, parent, sty *ResolvedStyle, hits []ruleHit,
+) {
+	raw := cascadeRaw(ctx, node, hits)
+	applyRawToUsed(node, ctx, parent, sty, raw)
+
 	// Opt-in operator policy (--print-link-underline): underline
-	// anchors with href after the cascade. Default off — author CSS
-	// (including text-decoration: inherit → parent) wins otherwise.
+	// anchors with href after the cascade. Default off so author CSS
+	// (including text-decoration: inherit from the parent) wins otherwise.
 	if ctx != nil && ctx.printLinkUnderline && node.Name == "a" && strings.TrimSpace(node.Attribute("href")) != "" {
 		sty.TextDecoration = cssTextDecorationUnderline
 	}
@@ -767,10 +865,6 @@ func resolveElementStyle(
 	if sty.Float != cssDisplayNone {
 		sty.Display = blockifyDisplayForFloat(sty.Display)
 	}
-	// FontFamily is final here (inherited, or parsed by applyFontProps /
-	// parseFontShorthand); fingerprint it once so inline text measurement
-	// does not re-hash the family list per run.
-	sty.famHash = hashFontFamily(sty.FontFamily)
 }
 
 // hasExplicitLineHeight reports whether a declaration sets line-height either

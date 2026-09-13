@@ -10,7 +10,12 @@ cmd/gowkhtmltoimage/gowkhtmltoimage
 # test artifacts
 /coverage.out
 /coverage.html
+*.test
 testdata/golden/out/
+
+# profiling harness output: heap/stack pprof files, benchmark text dumps, and
+# per-mode summaries. Reports derived from these live under plans/.
+output/profiles/
 
 # c-shared / python binding build artifacts (Phase 40.4). The committed
 # vendored header include/gowkhtmltopdf.h stays trackable: no include/*.h
@@ -63,3 +68,10 @@ bindings/python/**/__pycache__/
 bindings/python/build/
 bindings/python/dist/
 pen/
+
+
+plans/0.2.6/perf-review/results/*
+/plans/0.2.6/perf-improve/profiles/*
+/plans/0.2.6/perf-improve/results/*
+plans/0.2.6/perf-time/profiles/raw/*
+/plans/0.2.6/perf-time/results/*

@@ -1,9 +1,9 @@
 {
-  "name": "gowkhtmltopdf-issue-dossier",
+  "name": "gowkhtmltopdf-site",
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "wkhtmltopdf open issue dossier — how much gowkhtmltopdf already covers",
+  "description": "Product site for gowkhtmltopdf: docs, golden-fixture samples, benchmarks, browser WASM demo, and the wkhtmltopdf issue dossier",
   "scripts": {
     "dev": "vite",
     "build": "vite build && node scripts/copy-to-docs.mjs",
