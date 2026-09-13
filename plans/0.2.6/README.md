@@ -3,6 +3,7 @@
 | File / Folder | Role |
 |---------------|------|
 | [48-canonical-0.2.6-css-coverage.md](48-canonical-0.2.6-css-coverage.md) | Canonical v0.2.6 execution ledger, phases 48-84 |
+| [PR/release-v0.2.6.md](PR/release-v0.2.6.md) | GitHub Release body for v0.2.6 (2026-09-13) |
 | [phases/](phases) | Per-phase atomic checklists (80-84 = Unsupported triage) |
 | [catalog/](catalog) | Frozen CSS catalogs plus `mapping.json` vs current engine |
 | [property-counts.md](property-counts.md) | Property counts (implemented / partial / unsupported / ignored) |
