@@ -94,7 +94,7 @@ Land the 0.2.6 review wave on top of v0.2.5: warm-path time and memory recovery,
 - [x] `make golden` (full corpus, fresh run, all fixtures pass)
 - [x] `make build` (both binaries built with the 0.2.5 stamp)
 - [x] `make claim-scan` (clean)
-- [ ] `make test-race` not rerun in this PR; the phase-7 closure log records exit 0 (`plans/0.2.6/perf-time/results/phase-7/closure.md`)
+- [x] `make test-race` rerun on the final tree 2026-09-13, exit 0: convert 78.256s, layout 44.174s, pdf 11.623s, imageout 11.344s, load 4.029s. Supersedes the phase-7 closure run, which predated b35dc18 and 0562c20 (log: `plans/0.2.6/perf-time/results/recheck-2026-09-13/gate-make-test-race.log`).
 - [ ] `make bench` external captures not rerun; the committed 2026-09-12 capture in `documentation/benchmarks.md` is cited above
 
 ### Commands
@@ -105,6 +105,7 @@ make lint
 make golden
 make build
 make claim-scan
+make test-race
 ```
 
 ---
