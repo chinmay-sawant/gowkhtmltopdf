@@ -98,7 +98,7 @@
       "WOFF1 is supported: decompress, then `pdf.ParseTTF`, TrueType outlines only.",
       "`.woff2`, `.eot`, and `data:` sources are skipped with a warning (`internal/convert/prepare/styles.go:468-476`); remote `http(s)` sources are fetched, not skipped.",
       "`font-weight` and `font-style` on `@font-face` are parsed but ignored at register time (the alias is the family name only).",
-      "`halt` / `palt` are requested via typesetting `FontFeatures` for CJK / East-Asian punctuation runs, and via `ParseFontFeatureSettings` / `ShapeTextFontWithFeatures` when CSS `font-feature-settings` is supplied. CSS `font-feature-settings`, `font-kerning`, and `font-variant-caps` wiring is in-flight 0.2.6 work on master (CHANGELOG 0.2.6, plans/0.2.6/), not in the cut 0.2.5 release."
+      "`halt` / `palt` are requested via typesetting `FontFeatures` for CJK / East-Asian punctuation runs, and via `ParseFontFeatureSettings` / `ShapeTextFontWithFeatures` when CSS `font-feature-settings` is supplied. The CSS names `font-feature-settings`, `font-kerning`, and `font-variant-caps` stay Unsupported: the 2026-09-12 catalog audit holds them dropped with no layout consumer (`documentation/compatibility-matrix.md`)."
      ]
     }
    ]

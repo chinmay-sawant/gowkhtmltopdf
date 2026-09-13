@@ -12,8 +12,8 @@
    "heading": "Status at a glance",
    "items": [
     {
-     "title": "v0.2.5",
-     "body": "The current release (`VERSION`, stamped into the CLI). It ships the typed `Document` / `ImageDocument` APIs, the explicit CLI source/output grammar, the print CSS subset, and PNG/JPEG image mode. New in 0.2.5: in-process Python bindings on PyPI and the frozen C ABI v1 they run on (`bindings/c`, exported by an opt-in `make c-shared` build; native Go builds stay `CGO_ENABLED=0`). Default output is unclaimed PDF 1.4 with opt-in `--pdf-version` 1.7 / 2.0 and `--pdf-profile` (PDF/A-3a, PDF/A-4, PDF/UA-1, PDF/UA-2). The 0.2.6 CSS coverage program is in flight on this tree, not released: 818 webref properties cataloged at 354 Implemented / 464 Unsupported (2026-09-12 snapshot)."
+     "title": "v0.2.6",
+     "body": "The current release (`VERSION`, stamped into the CLI). It ships the typed `Document` / `ImageDocument` APIs, the explicit CLI source/output grammar, the print CSS subset, and PNG/JPEG image mode. New in 0.2.6: extended CSS coverage, with 818 webref properties cataloged at 354 Implemented, 0 Partial, and 464 Unsupported (2026-09-12 snapshot), plus the opt-in browser WASM adapter for inline HTML PDF, PNG, and JPEG previews. 0.2.5 shipped the in-process Python bindings on PyPI and the frozen C ABI v1 they run on (`bindings/c`, exported by an opt-in `make c-shared` build; native Go builds stay `CGO_ENABLED=0`). Default output is unclaimed PDF 1.4 with opt-in `--pdf-version` 1.7 / 2.0 and `--pdf-profile` (PDF/A-3a, PDF/A-4, PDF/UA-1, PDF/UA-2)."
     },
     {
      "title": "Repeatable layout",
@@ -104,7 +104,7 @@
      "Reopen only with different constraints or an external engine (`documentation/fidelity.md`, Tier 3)"
     ],
     [
-     "Browser WASM adapter (in flight, 0.2.6)",
+     "Browser WASM adapter (shipped in 0.2.6)",
      "Opt-in `make wasm` build and `/live-demo` route: inline HTML to PDF/PNG/JPEG in a Web Worker with bounded input, output, and request lifetime. It does not ship in the static binaries, run document JavaScript, or read local files",
      "Release workflow publishes the version-stamped `.wasm` artifact and loader after `make wasm-test`"
     ]

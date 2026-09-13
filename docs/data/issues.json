@@ -382,7 +382,7 @@
   "status": "not-implemented",
   "workaround": "",
   "key_detail": "Version upgrade 0.12.5 to 0.12.6 in ERPNext",
-  "evidence": "A wkhtmltopdf 0.12.x upgrade is N/A: this is a clean-room Go rewrite with its own VERSION 0.2.5 (VERSION file), not a drop-in 0.12 binary.",
+  "evidence": "A wkhtmltopdf 0.12.x upgrade is N/A: this is a clean-room Go rewrite with its own VERSION 0.2.6 (VERSION file), not a drop-in 0.12 binary.",
   "labels": [],
   "comments": 0,
   "created_at": "2022-11-04T06:46:18Z",
@@ -19176,7 +19176,7 @@
   "status": "not-implemented",
   "workaround": "",
   "key_detail": "1 labels, 3 comments",
-  "evidence": "0.13-alpha project-status question has no gowk analogue; gowk versions independently (VERSION 0.2.5, CHANGELOG.md).",
+  "evidence": "0.13-alpha project-status question has no gowk analogue; gowk versions independently (VERSION 0.2.6, CHANGELOG.md).",
   "labels": [
    "NeedInfo"
   ],

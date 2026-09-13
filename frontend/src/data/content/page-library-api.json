@@ -35,7 +35,7 @@
       "type": "callout",
       "variant": "info",
       "title": "Ownership and validation",
-      "body": "HTML bytes and option slices are copied at the public boundary. Validate reports invalid sources, formats, page geometry, profiles, and empty documents before the renderer opens output. AllowLocalFiles is opt-in; Network config remains explicit. The public API is v0.2.5 (VERSION); LibraryVersion = 0.12.7-dev is the upstream wkhtmltopdf compatibility identifier, not the release number (api.go:24). PDFVersion and PDFProfile are Document fields; the 0.2.5 root package has no With... option functions."
+      "body": "HTML bytes and option slices are copied at the public boundary. Validate reports invalid sources, formats, page geometry, profiles, and empty documents before the renderer opens output. AllowLocalFiles is opt-in; Network config remains explicit. The public API is v0.2.6 (VERSION); LibraryVersion = 0.12.7-dev is the upstream wkhtmltopdf compatibility identifier, not the release number (api.go:24). PDFVersion and PDFProfile are Document fields; the 0.2.6 root package has no With... option functions."
     }
   ]
 }

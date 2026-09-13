@@ -47,7 +47,7 @@ Knowledge base: `knowledge-base/wiki/index.md`, `concepts/css-engine.md`, `compa
 
 | Fact (current evidence) | Location |
 |-------------------------|----------|
-| `VERSION` is `0.2.5` | `VERSION:1` |
+| `VERSION` is `0.2.6` | `VERSION:1` |
 | CSS parser keeps unknown ident names; layout drops them | `internal/css/values.go` `validPropName`; `applyIgnoredGroup` `style_properties.go:1341` |
 | Apply dispatch is 11 groups, not one switch in `style.go` | `style_cascade.go:711-722`, `style_properties.go` |
 | About 120 named properties have apply handlers | inventory 2026-08-27 against `style_properties.go` + `applyFontProps` |
