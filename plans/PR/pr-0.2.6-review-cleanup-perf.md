@@ -29,6 +29,7 @@ Land the 0.2.6 review wave on top of v0.2.5: warm-path time and memory recovery,
 - Imageout: direct final-resolution raster threshold, streaming filter-none PNG writer (`internal/imageout/pngfast.go`), strip-window raster reuse, bounded supersample cache, pooled encode buffers, glyph scratch pools.
 - Memory profiling IMPROV-01..13: PDF B/op down 52 percent and allocs down 94.5 percent; image 500-tile B/op 94.97 MB to 27.2 MB; JPEG B/op down 43 percent (`plans/0.2.6/review/memory-profiling-2026-09-10.md`).
 - Snapshot M (committed in `testdata/golden/benchmarks/benchmark-results.txt`) records warm 500-page medians of 695.42 ms internal / 698.79 ms public library / 0.70 s CLI with B/op at or below target. The 615 ms warm, 620 ms public, and 0.66 s CLI time lines were not reproduced in that capture; host drift is the recorded difference. That is a recorded miss, not a claim.
+- Post-review strip fix (16c46fb): clipped draws of an oversized scaled image now scale only the visible window, so the 4096x1270 PNG posters stop rebuilding a 65.6 MiB canvas on each 1 MiB strip. fixture-49 1334.1 MB to 43.4 MB B/op and 1395 ms to 151 ms; fixture-53 1329.2 MB to 38.2 MB and 1486 ms to 151 ms; PNG corpus 3.65 GB to 0.94 GB B/op and 8023 ms to 4917 ms (62 rasterable of 66 templates, 3 passes, `-benchmem`).
 
 ### Layout, CSS, and correctness
 
@@ -95,6 +96,7 @@ Land the 0.2.6 review wave on top of v0.2.5: warm-path time and memory recovery,
 - [x] `make build` (both binaries built with the 0.2.5 stamp)
 - [x] `make claim-scan` (clean)
 - [x] `make test-race` rerun on the final tree 2026-09-13, exit 0: convert 78.256s, layout 44.174s, pdf 11.623s, imageout 11.344s, load 4.029s. Supersedes the phase-7 closure run, which predated b35dc18 and 0562c20 (log: `plans/0.2.6/perf-time/results/recheck-2026-09-13/gate-make-test-race.log`).
+- [x] `make test-race` rerun again after the strip fix (`16c46fb`), exit 0: convert 69.892s, layout 39.890s, pdf 15.092s, imageout 10.305s, load 4.047s (log: `plans/0.2.6/perf-time/results/recheck-2026-09-13/gate-make-test-race-strip-fix.log`).
 - [ ] `make bench` external captures not rerun; the committed 2026-09-12 capture in `documentation/benchmarks.md` is cited above
 
 ### Commands
@@ -158,6 +160,7 @@ ok  github.com/chinmay-sawant/gowkhtmltopdf/internal/convert  5.379s
 - fixture-63 has no row yet in the `testdata/golden/README.md` corpus table.
 - PERF3 byte and dimension pins are toolchain-sensitive (measured on go1.26.4); read the pin failure before blaming layout.
 - The wave-2 capture (`11752d3`) ran without `make lint`; the HEAD gates in this PR cover the current tree.
+- JPEG alloc count (about 101M per corpus pass) from the deleted YCbCr 4:2:0 preconversion (`PT26-OUT-02`); restore decision pending at `plans/0.2.6/perf-time/phase-wise-checklist.md`.
 
 ---
 
