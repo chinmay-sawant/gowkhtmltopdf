@@ -39,7 +39,7 @@ and **[fidelity.md](fidelity.md)**.
 | [compatibility-matrix.md](compatibility-matrix.md) | Normative per-element / per-property / per-flag contract |
 | [fonts.md](fonts.md) | Bundled faces, `--font-path`, Type0/CID, shaping limits |
 | [samples.md](samples.md) | Golden fixtures, `output/`, `make samples` / `make golden` |
-| [benchmarks.md](benchmarks.md) | Consolidated current benchmark capture (2026-09-12) and method |
+| [benchmarks.md](benchmarks.md) | Consolidated current benchmark capture (2026-09-13) and method |
 | [performance.md](performance.md) | Benchmarks, CLI comparison, how to measure, historical captures |
 | [deferred.md](deferred.md) | Deferred features, workload priority, next gates |
 

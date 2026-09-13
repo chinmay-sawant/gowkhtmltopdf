@@ -812,3 +812,157 @@ ok  	github.com/chinmay-sawant/gowkhtmltopdf	28.288s
 #     make test-race, veraPDF PDF/A-4 + PDF/UA-2, benchmark validators, and
 #     the post-publication frontend gates) exited 0; see
 #     plans/0.2.6/perf-time/results/phase-7/closure.md.
+
+# Snapshot N: 2026-09-13 full capture on the released 0.2.6 tree
+# (commit 8aab63a, VERSION 0.2.6). Same host as Snapshots K/L/M:
+# WSL2 x86_64, 13th Gen Intel Core i7-13700HX (24 CPUs), go1.26.4.
+# Fixture: testdata/golden/benchmarks/templates/report.html.tmpl
+# (20 invoice rows per requested page), sha256 e3b5387bed117844c3502915cd3def253738959feb894435720f3532746e6974.
+# Raw captures: plans/0.2.6/perf-review/results/2026-09-13/ (local, gitignored).
+# In-process rows: three fresh processes per workload, -benchtime=1x -count=1;
+# medians below; B/op and allocs are the median-time sample's raw values.
+
+# Snapshot N warm internal generic matrix raw rows (round 1, round 2, round 3):
+#   2Pages: 5,201,580 ns/op / 4,095,152 B/op / 4,139 allocs, 5,323,520 ns/op / 4,095,200 B/op / 4,140 allocs, 5,165,097 ns/op / 4,095,040 B/op / 4,138 allocs
+#   5Pages: 7,892,766 ns/op / 6,842,752 B/op / 8,163 allocs, 8,120,634 ns/op / 6,842,864 B/op / 8,164 allocs, 7,880,172 ns/op / 6,842,800 B/op / 8,164 allocs
+#   10Pages: 12,390,299 ns/op / 4,630,688 B/op / 14,872 allocs, 11,737,115 ns/op / 4,631,136 B/op / 14,878 allocs, 11,747,714 ns/op / 4,631,008 B/op / 14,876 allocs
+#   20Pages: 21,737,692 ns/op / 6,017,680 B/op / 28,406 allocs, 20,432,881 ns/op / 5,196,880 B/op / 28,390 allocs, 21,438,400 ns/op / 5,195,104 B/op / 28,374 allocs
+#   50Pages: 54,757,199 ns/op / 11,556,792 B/op / 69,429 allocs, 55,301,423 ns/op / 11,597,328 B/op / 69,437 allocs, 52,227,768 ns/op / 12,382,864 B/op / 69,468 allocs
+#   100Pages: 102,612,989 ns/op / 23,224,368 B/op / 137,953 allocs, 103,513,619 ns/op / 23,187,168 B/op / 137,943 allocs, 105,980,982 ns/op / 23,188,048 B/op / 137,949 allocs
+#   200Pages: 206,697,471 ns/op / 44,663,240 B/op / 275,216 allocs, 207,906,943 ns/op / 44,727,688 B/op / 275,212 allocs, 217,394,674 ns/op / 44,701,752 B/op / 275,220 allocs
+#   250Pages: 258,873,358 ns/op / 56,495,248 B/op / 344,011 allocs, 263,776,169 ns/op / 56,500,168 B/op / 344,017 allocs, 262,207,761 ns/op / 56,494,992 B/op / 344,008 allocs
+#   500Pages: 530,867,515 ns/op / 111,426,432 B/op / 687,414 allocs, 540,652,572 ns/op / 111,440,888 B/op / 687,410 allocs, 539,330,216 ns/op / 111,433,640 B/op / 687,406 allocs
+# Snapshot N warm internal generic matrix per-size medians:
+#   2Pages: 5,201,580 ns/op (5.20 ms) 4,095,152 B/op 4,139 allocs/op
+#   5Pages: 7,892,766 ns/op (7.89 ms) 6,842,752 B/op 8,163 allocs/op
+#   10Pages: 11,747,714 ns/op (11.75 ms) 4,631,008 B/op 14,876 allocs/op
+#   20Pages: 21,438,400 ns/op (21.44 ms) 5,195,104 B/op 28,374 allocs/op
+#   50Pages: 54,757,199 ns/op (54.76 ms) 11,556,792 B/op 69,429 allocs/op
+#   100Pages: 103,513,619 ns/op (103.51 ms) 23,187,168 B/op 137,943 allocs/op
+#   200Pages: 207,906,943 ns/op (207.91 ms) 44,727,688 B/op 275,212 allocs/op
+#   250Pages: 262,207,761 ns/op (262.21 ms) 56,494,992 B/op 344,008 allocs/op
+#   500Pages: 539,330,216 ns/op (539.33 ms) 111,433,640 B/op 687,406 allocs/op
+# Snapshot N public library PDF raw rows (round 1, round 2, round 3):
+#   2Pages: 5,348,653 ns/op / 4,111,664 B/op / 4,151 allocs, 6,104,237 ns/op / 4,111,776 B/op / 4,152 allocs, 5,495,162 ns/op / 4,111,664 B/op / 4,151 allocs
+#   5Pages: 8,515,860 ns/op / 6,875,288 B/op / 8,185 allocs, 8,989,226 ns/op / 6,869,760 B/op / 8,179 allocs, 9,595,814 ns/op / 6,869,824 B/op / 8,179 allocs
+#   10Pages: 13,542,244 ns/op / 4,670,960 B/op / 14,877 allocs, 13,414,920 ns/op / 3,849,360 B/op / 14,854 allocs, 12,501,586 ns/op / 3,849,408 B/op / 14,855 allocs
+#   20Pages: 21,561,511 ns/op / 6,091,456 B/op / 28,416 allocs, 21,915,300 ns/op / 6,091,792 B/op / 28,421 allocs, 21,947,366 ns/op / 6,090,640 B/op / 28,408 allocs
+#   50Pages: 55,108,230 ns/op / 12,592,016 B/op / 69,481 allocs, 54,493,397 ns/op / 12,554,160 B/op / 69,474 allocs, 53,060,074 ns/op / 12,554,864 B/op / 69,476 allocs
+#   100Pages: 108,803,667 ns/op / 23,486,528 B/op / 137,951 allocs, 105,580,386 ns/op / 23,486,512 B/op / 137,951 allocs, 107,195,213 ns/op / 23,522,880 B/op / 137,948 allocs
+#   200Pages: 214,321,561 ns/op / 45,385,616 B/op / 275,217 allocs, 212,925,270 ns/op / 45,464,712 B/op / 275,228 allocs, 219,795,222 ns/op / 45,274,704 B/op / 275,203 allocs
+#   250Pages: 295,245,326 ns/op / 57,339,400 B/op / 344,043 allocs, 263,457,152 ns/op / 57,322,096 B/op / 344,017 allocs, 267,335,868 ns/op / 57,328,040 B/op / 344,028 allocs
+#   500Pages: 554,557,992 ns/op / 113,088,416 B/op / 687,420 allocs, 550,980,243 ns/op / 113,082,120 B/op / 687,410 allocs, 558,634,568 ns/op / 113,107,000 B/op / 687,438 allocs
+# Snapshot N public library PDF per-size medians:
+#   2Pages: 5,495,162 ns/op (5.50 ms) 4,111,664 B/op 4,151 allocs/op
+#   5Pages: 8,989,226 ns/op (8.99 ms) 6,869,760 B/op 8,179 allocs/op
+#   10Pages: 13,414,920 ns/op (13.41 ms) 3,849,360 B/op 14,854 allocs/op
+#   20Pages: 21,915,300 ns/op (21.92 ms) 6,091,792 B/op 28,421 allocs/op
+#   50Pages: 54,493,397 ns/op (54.49 ms) 12,554,160 B/op 69,474 allocs/op
+#   100Pages: 107,195,213 ns/op (107.20 ms) 23,522,880 B/op 137,948 allocs/op
+#   200Pages: 214,321,561 ns/op (214.32 ms) 45,385,616 B/op 275,217 allocs/op
+#   250Pages: 267,335,868 ns/op (267.34 ms) 57,328,040 B/op 344,028 allocs/op
+#   500Pages: 554,557,992 ns/op (554.56 ms) 113,088,416 B/op 687,420 allocs/op
+# Snapshot N public library image raw rows (round 1, round 2, round 3):
+#   2Tiles: 12,333,802 ns/op / 11,916,392 B/op / 497 allocs, 14,255,890 ns/op / 11,910,816 B/op / 490 allocs, 15,006,743 ns/op / 11,910,928 B/op / 491 allocs
+#   5Tiles: 11,181,007 ns/op / 3,450,616 B/op / 578 allocs, 11,395,338 ns/op / 3,450,616 B/op / 578 allocs, 12,336,805 ns/op / 3,450,616 B/op / 578 allocs
+#   10Tiles: 13,912,764 ns/op / 3,681,680 B/op / 873 allocs, 13,329,136 ns/op / 3,681,680 B/op / 873 allocs, 12,912,363 ns/op / 3,681,680 B/op / 873 allocs
+#   20Tiles: 14,773,820 ns/op / 3,816,080 B/op / 1,137 allocs, 12,557,382 ns/op / 3,815,792 B/op / 1,134 allocs, 14,095,302 ns/op / 3,816,080 B/op / 1,137 allocs
+#   50Tiles: 16,667,852 ns/op / 4,197,768 B/op / 1,918 allocs, 16,640,297 ns/op / 4,197,752 B/op / 1,917 allocs, 16,669,562 ns/op / 4,197,752 B/op / 1,917 allocs
+#   100Tiles: 28,820,538 ns/op / 19,997,024 B/op / 3,215 allocs, 27,999,893 ns/op / 19,997,136 B/op / 3,216 allocs, 30,604,479 ns/op / 19,996,736 B/op / 3,213 allocs
+#   200Tiles: 59,391,780 ns/op / 37,091,504 B/op / 5,793 allocs, 57,080,581 ns/op / 37,091,520 B/op / 5,794 allocs, 62,571,307 ns/op / 37,091,808 B/op / 5,796 allocs
+#   250Tiles: 16,857,715 ns/op / 6,375,560 B/op / 7,179 allocs, 16,666,820 ns/op / 6,375,560 B/op / 7,179 allocs, 17,309,921 ns/op / 6,375,560 B/op / 7,179 allocs
+#   500Tiles: 33,380,040 ns/op / 10,397,400 B/op / 13,705 allocs, 34,563,033 ns/op / 10,397,400 B/op / 13,705 allocs, 33,506,081 ns/op / 10,397,400 B/op / 13,705 allocs
+# Snapshot N public library image per-size medians:
+#   2Tiles: 14,255,890 ns/op (14.26 ms) 11,910,816 B/op 490 allocs/op
+#   5Tiles: 11,395,338 ns/op (11.40 ms) 3,450,616 B/op 578 allocs/op
+#   10Tiles: 13,329,136 ns/op (13.33 ms) 3,681,680 B/op 873 allocs/op
+#   20Tiles: 14,095,302 ns/op (14.10 ms) 3,816,080 B/op 1,137 allocs/op
+#   50Tiles: 16,667,852 ns/op (16.67 ms) 4,197,768 B/op 1,918 allocs/op
+#   100Tiles: 28,820,538 ns/op (28.82 ms) 19,997,024 B/op 3,215 allocs/op
+#   200Tiles: 59,391,780 ns/op (59.39 ms) 37,091,504 B/op 5,793 allocs/op
+#   250Tiles: 16,857,715 ns/op (16.86 ms) 6,375,560 B/op 7,179 allocs/op
+#   500Tiles: 33,506,081 ns/op (33.51 ms) 10,397,400 B/op 13,705 allocs/op
+# Snapshot N make bench-engine per-size medians (three fresh processes;
+# source order ImageAssets, PDFPages/generic, TemplatePages/generic, WebFetchImage):
+#   BenchmarkImageAssets 2Images: 10,962,777 ns/op (10.96 ms) 5,852,944 B/op 1,247 allocs/op
+#   BenchmarkImageAssets 5Images: 8,942,699 ns/op (8.94 ms) 2,729,784 B/op 1,316 allocs/op
+#   BenchmarkImageAssets 10Images: 9,100,568 ns/op (9.10 ms) 2,933,864 B/op 1,619 allocs/op
+#   BenchmarkImageAssets 20Images: 13,990,490 ns/op (13.99 ms) 7,429,096 B/op 1,936 allocs/op
+#   BenchmarkImageAssets 50Images: 22,034,109 ns/op (22.03 ms) 12,448,344 B/op 2,981 allocs/op
+#   BenchmarkImageAssets 100Images: 40,199,418 ns/op (40.20 ms) 20,918,664 B/op 4,746 allocs/op
+#   BenchmarkImageAssets 200Images: 70,573,841 ns/op (70.57 ms) 37,866,576 B/op 8,263 allocs/op
+#   BenchmarkImageAssets 250Images: 87,740,186 ns/op (87.74 ms) 46,129,400 B/op 9,958 allocs/op
+#   BenchmarkImageAssets 500Images: 35,794,949 ns/op (35.79 ms) 11,819,120 B/op 19,416 allocs/op
+#   BenchmarkPDFPages/generic 2Pages: 3,213,524 ns/op (3.21 ms) 3,753,024 B/op 4,033 allocs/op
+#   BenchmarkPDFPages/generic 5Pages: 5,730,645 ns/op (5.73 ms) 6,842,320 B/op 8,160 allocs/op
+#   BenchmarkPDFPages/generic 10Pages: 11,528,130 ns/op (11.53 ms) 4,631,136 B/op 14,877 allocs/op
+#   BenchmarkPDFPages/generic 20Pages: 20,960,228 ns/op (20.96 ms) 6,018,384 B/op 28,412 allocs/op
+#   BenchmarkPDFPages/generic 50Pages: 51,074,735 ns/op (51.07 ms) 12,417,416 B/op 69,473 allocs/op
+#   BenchmarkPDFPages/generic 100Pages: 100,600,968 ns/op (100.60 ms) 23,181,560 B/op 137,932 allocs/op
+#   BenchmarkPDFPages/generic 200Pages: 215,260,001 ns/op (215.26 ms) 44,718,664 B/op 275,200 allocs/op
+#   BenchmarkPDFPages/generic 250Pages: 257,125,855 ns/op (257.13 ms) 55,670,280 B/op 343,983 allocs/op
+#   BenchmarkPDFPages/generic 500Pages: 521,723,850 ns/op (521.72 ms) 111,454,008 B/op 687,425 allocs/op
+#   BenchmarkTemplatePages/generic 2Pages: 3,338,602 ns/op (3.34 ms) 2,122,096 B/op 4,159 allocs/op
+#   BenchmarkTemplatePages/generic 5Pages: 6,179,049 ns/op (6.18 ms) 2,805,360 B/op 8,563 allocs/op
+#   BenchmarkTemplatePages/generic 10Pages: 11,039,609 ns/op (11.04 ms) 3,130,816 B/op 15,858 allocs/op
+#   BenchmarkTemplatePages/generic 20Pages: 21,947,744 ns/op (21.95 ms) 6,306,304 B/op 30,468 allocs/op
+#   BenchmarkTemplatePages/generic 50Pages: 52,420,765 ns/op (52.42 ms) 12,969,192 B/op 74,578 allocs/op
+#   BenchmarkTemplatePages/generic 100Pages: 104,467,327 ns/op (104.47 ms) 24,361,080 B/op 148,135 allocs/op
+#   BenchmarkTemplatePages/generic 200Pages: 212,536,891 ns/op (212.54 ms) 46,216,760 B/op 295,562 allocs/op
+#   BenchmarkTemplatePages/generic 250Pages: 261,618,423 ns/op (261.62 ms) 58,094,104 B/op 369,475 allocs/op
+#   BenchmarkTemplatePages/generic 500Pages: 539,472,504 ns/op (539.47 ms) 116,269,856 B/op 738,635 allocs/op
+#   BenchmarkWebFetchImage 2Images: 10,512,471 ns/op (10.51 ms) 2,818,352 B/op 1,661 allocs/op
+#   BenchmarkWebFetchImage 5Images: 10,179,348 ns/op (10.18 ms) 2,871,336 B/op 1,761 allocs/op
+#   BenchmarkWebFetchImage 10Images: 11,441,356 ns/op (11.44 ms) 3,103,648 B/op 2,120 allocs/op
+#   BenchmarkWebFetchImage 20Images: 13,736,957 ns/op (13.74 ms) 3,527,688 B/op 2,465 allocs/op
+#   BenchmarkWebFetchImage 50Images: 22,241,528 ns/op (22.24 ms) 4,794,064 B/op 3,526 allocs/op
+#   BenchmarkWebFetchImage 100Images: 38,028,451 ns/op (38.03 ms) 6,934,168 B/op 5,261 allocs/op
+#   BenchmarkWebFetchImage 200Images: 62,728,005 ns/op (62.73 ms) 11,250,224 B/op 8,722 allocs/op
+#   BenchmarkWebFetchImage 250Images: 81,520,943 ns/op (81.52 ms) 46,052,272 B/op 10,471 allocs/op
+#   BenchmarkWebFetchImage 500Images: 38,444,746 ns/op (38.44 ms) 11,535,504 B/op 19,929 allocs/op
+# Snapshot N make bench-lib warm -benchtime=10x rows (single process, one count):
+#   BenchmarkLibraryPDF/2Pages-24         	      10	   3607786 ns/op	   9.48 MB/s	     34210 output-bytes	         2.000 pages	 2319184 B/op	    3949 allocs/op
+#   BenchmarkLibraryPDF/5Pages-24         	      10	   5960293 ns/op	   7.18 MB/s	     42795 output-bytes	         5.000 pages	 2376742 B/op	    8030 allocs/op
+#   BenchmarkLibraryPDF/10Pages-24        	      10	  10573903 ns/op	   5.41 MB/s	     57239 output-bytes	        10.00 pages	 3714726 B/op	   14846 allocs/op
+#   BenchmarkLibraryPDF/20Pages-24        	      10	  20011934 ns/op	   4.23 MB/s	     84680 output-bytes	        20.00 pages	 5750604 B/op	   28406 allocs/op
+#   BenchmarkLibraryPDF/50Pages-24        	      10	  51458825 ns/op	   3.26 MB/s	    167525 output-bytes	        50.00 pages	12058926 B/op	   69463 allocs/op
+#   BenchmarkLibraryPDF/100Pages-24       	      10	  98185097 ns/op	   3.12 MB/s	    306321 output-bytes	       100.0 pages	22525916 B/op	  137931 allocs/op
+#   BenchmarkLibraryPDF/200Pages-24       	      10	 194299283 ns/op	   3.00 MB/s	    583670 output-bytes	       200.0 pages	43513024 B/op	  275198 allocs/op
+#   BenchmarkLibraryPDF/250Pages-24       	      10	 243959228 ns/op	   2.96 MB/s	    722322 output-bytes	       250.0 pages	55576817 B/op	  344013 allocs/op
+#   BenchmarkLibraryPDF/500Pages-24       	      10	 493995589 ns/op	   2.88 MB/s	   1420537 output-bytes	       500.0 pages	109354756 B/op	  687380 allocs/op
+#   BenchmarkLibraryImage/2Tiles-24       	      10	   9355608 ns/op	   0.42 MB/s	       512.0 height	      3938 output-bytes	         2.000 tiles	      1024 width	 3309789 B/op	     395 allocs/op
+#   BenchmarkLibraryImage/5Tiles-24       	      10	   9919574 ns/op	   0.50 MB/s	       512.0 height	      4961 output-bytes	         5.000 tiles	      1024 width	 3408896 B/op	     546 allocs/op
+#   BenchmarkLibraryImage/10Tiles-24      	      10	  11005817 ns/op	   0.67 MB/s	       512.0 height	      7388 output-bytes	        10.00 tiles	      1024 width	 3610521 B/op	     835 allocs/op
+#   BenchmarkLibraryImage/20Tiles-24      	      10	  11964583 ns/op	   0.95 MB/s	       512.0 height	     11408 output-bytes	        20.00 tiles	      1024 width	 3741131 B/op	    1100 allocs/op
+#   BenchmarkLibraryImage/50Tiles-24      	      10	  15249113 ns/op	   1.52 MB/s	       512.0 height	     23124 output-bytes	        50.00 tiles	      1024 width	 4107684 B/op	    1884 allocs/op
+#   BenchmarkLibraryImage/100Tiles-24     	      10	  25216909 ns/op	   1.76 MB/s	       840.0 height	     44464 output-bytes	       100.0 tiles	      1024 width	 6036271 B/op	    3173 allocs/op
+#   BenchmarkLibraryImage/200Tiles-24     	      10	  48830172 ns/op	   1.81 MB/s	      1608 height	     88564 output-bytes	       200.0 tiles	      1024 width	10380245 B/op	    5754 allocs/op
+#   BenchmarkLibraryImage/250Tiles-24     	      10	  17650298 ns/op	   8.04 MB/s	      2056 height	    141917 output-bytes	       250.0 tiles	      1024 width	 5859760 B/op	    7131 allocs/op
+#   BenchmarkLibraryImage/500Tiles-24     	      10	  33334410 ns/op	   8.48 MB/s	      4040 height	    282749 output-bytes	       500.0 tiles	      1024 width	 9640400 B/op	   13670 allocs/op
+# Snapshot N Python c-shared warm medians (make python-benchmarks, 1 warmup + 10 runs):
+#   PDF PDF/2Pages: median 3.52ms  (n=10, size=34210 bytes)
+#   PDF PDF/5Pages: median 5.75ms  (n=10, size=42795 bytes)
+#   PDF PDF/10Pages: median 10.76ms  (n=10, size=57239 bytes)
+#   PDF PDF/20Pages: median 21.91ms  (n=10, size=84680 bytes)
+#   PDF PDF/50Pages: median 49.63ms  (n=10, size=167525 bytes)
+#   PDF PDF/100Pages: median 98.44ms  (n=10, size=306321 bytes)
+#   PDF PDF/200Pages: median 198.74ms  (n=10, size=583670 bytes)
+#   PDF PDF/250Pages: median 246.38ms  (n=10, size=722322 bytes)
+#   PDF PDF/500Pages: median 504.93ms  (n=10, size=1420537 bytes)
+#   Image/2Tiles: median 9.67ms  (n=10, size=3938 bytes)
+#   Image/5Tiles: median 10.01ms  (n=10, size=4961 bytes)
+#   Image/10Tiles: median 11.91ms  (n=10, size=7388 bytes)
+#   Image/20Tiles: median 11.76ms  (n=10, size=11408 bytes)
+#   Image/50Tiles: median 15.06ms  (n=10, size=23124 bytes)
+#   Image/100Tiles: median 25.19ms  (n=10, size=44464 bytes)
+#   Image/200Tiles: median 47.29ms  (n=10, size=88564 bytes)
+#   Image/250Tiles: median 15.65ms  (n=10, size=141917 bytes)
+#   Image/500Tiles: median 31.66ms  (n=10, size=282749 bytes)
+# Snapshot N CLI and external rows are the machine-generated artifacts in
+# testdata/golden/benchmarks/{cli,weasyprint,puppeteer}-compare.{md,csv}; the
+# gowk-only cli-rss medians are in results/2026-09-13/cli/.
+# Key CLI rows, median of three timed runs after one warmup, %M peak RSS:
+#   2 pages: 13 ms / 19,584 KiB vs wkhtmltopdf 258 ms / 44,528 KiB (19.68x)
+#   100 pages: 124 ms / 35,520 KiB vs wkhtmltopdf 532 ms / 59,172 KiB (4.30x)
+#   500 pages: 573 ms / 80,448 KiB vs wkhtmltopdf 1.718 s / 123,068 KiB (3.00x)
+

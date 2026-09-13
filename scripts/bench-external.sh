@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# bench-external.sh — process-level CLI comparison of bin/gowkhtmltopdf
+# bench-external.sh - process-level CLI comparison of bin/gowkhtmltopdf
 # against the installed WeasyPrint and Puppeteer engines.
 #
 # The bench never invokes engine commands itself: each engine is run through
@@ -9,6 +9,13 @@
 # Usage:
 #   scripts/bench-external.sh [--engines=weasyprint,puppeteer]
 #                             [--sizes=2,10,50,100] [--runs=3]
+#                             [--gowk-baseline=cli-compare-results.csv]
+#
+# --gowk-baseline makes every engine table report the same gowkhtmltopdf CLI
+# series (the dedicated `make bench-cli-compare` capture) instead of timing
+# gowk again per engine session, so the CLI-vs-engine tables never disagree
+# about the gowk column. Without it, gowk is measured once per size and reused
+# by every engine section in this run.
 #
 # Requires: bin/gowkhtmltopdf (make build), /usr/bin/time, gs.
 # Puppeteer additionally requires node and scripts/puppeteer/node_modules
@@ -38,9 +45,10 @@ sizes=(2 10 50 100)
 runs=3
 requested_engines=()
 engines_specified=0
+gowk_baseline=
 
 usage() {
-  sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,23p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 die_usage() {
@@ -97,6 +105,15 @@ while [ "$#" -gt 0 ]; do
       runs=${1#*=}
       shift
       ;;
+    --gowk-baseline)
+      [ "$#" -ge 2 ] || die_usage "--gowk-baseline requires a file path"
+      gowk_baseline=$2
+      shift 2
+      ;;
+    --gowk-baseline=*)
+      gowk_baseline=${1#*=}
+      shift
+      ;;
     -h | --help)
       usage
       exit 0
@@ -130,6 +147,43 @@ TIMEOUT_CMD=$(command -v timeout || true)
   echo "bench-external: benchmark template not readable: $TEMPLATE" >&2
   exit 1
 }
+
+# Shared gowk baseline. With --gowk-baseline, every engine table reports the
+# same gowkhtmltopdf CLI series (the dedicated make bench-cli-compare capture)
+# instead of re-timing gowk per engine session. Without it, gowk is measured
+# once per size and reused by every engine section in this run.
+declare -A BASELINE_ELAPSED BASELINE_RSS BASELINE_BYTES
+declare -A MEASURED_ELAPSED MEASURED_RSS MEASURED_BYTES
+gowk_source='measured in this session; every engine section in this run reuses the same per-size gowk series'
+
+load_gowk_baseline() { # file -> 0/1, fills BASELINE_* keyed by pages
+  local file=$1 pages g_ms e_ms speedup g_rss e_rss g_bytes e_bytes first=1
+  while IFS=, read -r pages g_ms e_ms speedup g_rss e_rss g_bytes e_bytes; do
+    if [ "$first" -eq 1 ]; then
+      first=0
+      if [ "$pages" != "pages" ]; then
+        return 1
+      fi
+      continue
+    fi
+    [ -n "$pages" ] || continue
+    BASELINE_ELAPSED[$pages]=$(awk -v ms="$g_ms" 'BEGIN { printf "%.6f", ms / 1000 }')
+    BASELINE_RSS[$pages]=$g_rss
+    BASELINE_BYTES[$pages]=$g_bytes
+  done <"$file"
+  [ "${#BASELINE_ELAPSED[@]}" -gt 0 ]
+}
+
+if [ -n "$gowk_baseline" ]; then
+  if [ -r "$gowk_baseline" ] && load_gowk_baseline "$gowk_baseline"; then
+    gowk_source="baseline rows from $gowk_baseline (the same session's make bench-cli-compare run); engine rows are measured in this session"
+    echo "bench-external: gowk baseline loaded from $gowk_baseline"
+  else
+    echo "bench-external: WARNING: gowk baseline not readable or empty: $gowk_baseline" >&2
+    echo "bench-external: WARNING: falling back to session-local gowk timing" >&2
+    gowk_baseline=
+  fi
+fi
 
 if command -v gs >/dev/null 2>&1; then
   HAVE_GS=1
@@ -486,6 +540,7 @@ for engine in "${engines[@]}"; do
   echo "flags:   gowkhtmltopdf used \`--quiet --allow-local-files -o OUTPUT INPUT\`; $(engine_flags_note "$engine")."
   echo "rss:     $(engine_rss_note "$engine"); gowkhtmltopdf RSS is \`%M\`."
   echo "runs:    warmup + $runs timed (median)"
+  echo "gowk:    $gowk_source"
   echo "================================================================================================"
   printf '%-8s | %-12s | %-16s | %-8s | %-14s | %-20s | %-8s\n' \
     "Pages" "gowk time" "$display time" "Speedup" "gowk RSS" "$display RSS" "gowk PDF"
@@ -494,22 +549,54 @@ for engine in "${engines[@]}"; do
   for pages in "${sizes[@]}"; do
     html="$tmp/doc_${pages}.html"
     generate_report "$pages" "$html" || exit 1
-    gowk_out="$tmp/gowk_${pages}.pdf"
     engine_out="$tmp/${engine}_${pages}.pdf"
-
-    gowk_log="$tmp/gowk_${pages}.times"
     engine_log="$tmp/${engine}_${pages}.times"
-    : >"$gowk_log"
     : >"$engine_log"
 
-    echo "page size $pages: timing gowk..."
-    RUN_LOG="$gowk_log"
-    time_command 0 "$gowk_out" "gowkhtmltopdf" "$GOWK_BIN" --quiet --allow-local-files -o "$gowk_out" "$html"
-    echo "  warmup: $(format_ms "$(awk 'NR == 1 {print $1}' "$gowk_log")") ($(awk 'NR == 1 {print $3}' "$gowk_log") pages)"
-    for ((i = 1; i <= runs; i++)); do
+    if [ -n "$gowk_baseline" ]; then
+      if [ -z "${BASELINE_ELAPSED[$pages]:-}" ]; then
+        echo "bench-external: baseline $gowk_baseline has no row for $pages pages" >&2
+        exit 1
+      fi
+      gowk_elapsed=${BASELINE_ELAPSED[$pages]}
+      gowk_rss=${BASELINE_RSS[$pages]}
+      gowk_bytes=${BASELINE_BYTES[$pages]}
+      echo "page size $pages: gowk baseline from $gowk_baseline"
+    elif [ -n "${MEASURED_ELAPSED[$pages]:-}" ]; then
+      gowk_elapsed=${MEASURED_ELAPSED[$pages]}
+      gowk_rss=${MEASURED_RSS[$pages]}
+      gowk_bytes=${MEASURED_BYTES[$pages]}
+      echo "page size $pages: reusing gowk measurement from this run"
+    else
+      gowk_out="$tmp/gowk_${pages}.pdf"
+      gowk_log="$tmp/gowk_${pages}.times"
+      : >"$gowk_log"
+      echo "page size $pages: timing gowk..."
+      RUN_LOG="$gowk_log"
       time_command 0 "$gowk_out" "gowkhtmltopdf" "$GOWK_BIN" --quiet --allow-local-files -o "$gowk_out" "$html"
-      echo "  run $i/$runs: $(format_ms "$(awk 'NR == '"$((i + 1))"' {print $1}' "$gowk_log")")"
-    done
+      echo "  warmup: $(format_ms "$(awk 'NR == 1 {print $1}' "$gowk_log")") ($(awk 'NR == 1 {print $3}' "$gowk_log") pages)"
+      for ((i = 1; i <= runs; i++)); do
+        time_command 0 "$gowk_out" "gowkhtmltopdf" "$GOWK_BIN" --quiet --allow-local-files -o "$gowk_out" "$html"
+        echo "  run $i/$runs: $(format_ms "$(awk 'NR == '"$((i + 1))"' {print $1}' "$gowk_log")")"
+      done
+      gowk_pages=$(awk 'NR == 1 {print $3}' "$gowk_log")
+      if [ "$HAVE_GS" -eq 1 ]; then
+        if [ "$gowk_pages" -ne "$pages" ]; then
+          echo "  warning: gowk rendered $gowk_pages pages, requested $pages" >&2
+        fi
+        while read -r _ _ rendered_pages _; do
+          if [ "$rendered_pages" -ne "$pages" ]; then
+            echo "  warning: gowk rendered $rendered_pages pages in one run, requested $pages" >&2
+          fi
+        done <"$gowk_log"
+      fi
+      gowk_elapsed=$(awk 'NR > 1 {print $1}' "$gowk_log" >"$gowk_log.elapsed" && median_value "$gowk_log.elapsed")
+      gowk_rss=$(awk 'NR > 1 {print $2}' "$gowk_log" >"$gowk_log.rss" && median_value "$gowk_log.rss")
+      gowk_bytes=$(awk -v timed_runs="$runs" 'NR == timed_runs + 1 {print $4}' "$gowk_log")
+      MEASURED_ELAPSED[$pages]=$gowk_elapsed
+      MEASURED_RSS[$pages]=$gowk_rss
+      MEASURED_BYTES[$pages]=$gowk_bytes
+    fi
 
     echo "page size $pages: timing $display..."
     RUN_LOG="$engine_log"
@@ -520,20 +607,11 @@ for engine in "${engines[@]}"; do
       echo "  run $i/$runs: $(format_ms "$(awk 'NR == '"$((i + 1))"' {print $1}' "$engine_log")")"
     done
 
-    gowk_pages=$(awk 'NR == 1 {print $3}' "$gowk_log")
     engine_pages=$(awk 'NR == 1 {print $3}' "$engine_log")
     if [ "$HAVE_GS" -eq 1 ]; then
-      if [ "$gowk_pages" -ne "$pages" ]; then
-        echo "  warning: gowk rendered $gowk_pages pages, requested $pages" >&2
-      fi
       if [ "$engine_pages" -ne "$pages" ]; then
         echo "  warning: $display rendered $engine_pages pages, requested $pages" >&2
       fi
-      while read -r _ _ rendered_pages _; do
-        if [ "$rendered_pages" -ne "$pages" ]; then
-          echo "  warning: gowk rendered $rendered_pages pages in one run, requested $pages" >&2
-        fi
-      done <"$gowk_log"
       while read -r _ _ rendered_pages _; do
         if [ "$rendered_pages" -ne "$pages" ]; then
           echo "  warning: $display rendered $rendered_pages pages in one run, requested $pages" >&2
@@ -541,11 +619,8 @@ for engine in "${engines[@]}"; do
       done <"$engine_log"
     fi
 
-    gowk_elapsed=$(awk 'NR > 1 {print $1}' "$gowk_log" >"$gowk_log.elapsed" && median_value "$gowk_log.elapsed")
     engine_elapsed=$(awk 'NR > 1 {print $1}' "$engine_log" >"$engine_log.elapsed" && median_value "$engine_log.elapsed")
-    gowk_rss=$(awk 'NR > 1 {print $2}' "$gowk_log" >"$gowk_log.rss" && median_value "$gowk_log.rss")
     engine_rss=$(awk 'NR > 1 {print $2}' "$engine_log" >"$engine_log.rss" && median_value "$engine_log.rss")
-    gowk_bytes=$(awk -v timed_runs="$runs" 'NR == timed_runs + 1 {print $4}' "$gowk_log")
     engine_bytes=$(awk -v timed_runs="$runs" 'NR == timed_runs + 1 {print $4}' "$engine_log")
     speedup=$(awk -v e="$engine_elapsed" -v g="$gowk_elapsed" 'BEGIN { printf "%.2f", e / g }')
 
@@ -590,6 +665,7 @@ for engine in "${engines[@]}"; do
       "$host" "$cpu_count" "$toolchain" "$gowk_version"
     printf '%s\n' "$page_count_note"
     printf 'gowkhtmltopdf used `--quiet --allow-local-files -o OUTPUT INPUT`; %s.\n' "$(engine_flags_note "$engine")"
+    printf 'Gowk source: %s.\n' "$gowk_source"
     printf '%s; gowkhtmltopdf RSS is `%%M`.\n\n' "$(engine_rss_note "$engine")"
     printf -- '- gowkhtmltopdf: `%s` (generic CLI)\n' "$GOWK_BIN"
     printf -- '- %s: `%s` (%s)\n' "$display" "$script" "$version"

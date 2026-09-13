@@ -76,15 +76,15 @@
    "type": "stats",
    "items": [
     {
-     "value": "18.5x",
-     "label": "faster than wkhtmltopdf at 2 pages (2026-09-12 capture)"
+     "value": "19.7x",
+     "label": "faster than wkhtmltopdf at 2 pages (2026-09-13 capture)"
     },
     {
-     "value": "3.13x",
-     "label": "faster than wkhtmltopdf at 500 pages (2026-09-12 capture)"
+     "value": "3.00x",
+     "label": "faster than wkhtmltopdf at 500 pages (2026-09-13 capture)"
     },
     {
-     "value": "14 ms",
+     "value": "13 ms",
      "label": "2-page HTML, current generic CLI"
     },
     {

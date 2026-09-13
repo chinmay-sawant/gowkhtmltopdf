@@ -283,8 +283,14 @@ run_cli_rss() {
 }
 
 run_external() {
-  execute ./scripts/bench-external.sh "--sizes=$SIZES" "--runs=$RUNS"
-  execute make bench-cli-compare
+  if command -v wkhtmltopdf >/dev/null 2>&1; then
+    execute make bench-cli-compare
+    execute ./scripts/bench-external.sh "--sizes=$SIZES" "--runs=$RUNS" \
+      "--gowk-baseline=$ROOT/testdata/golden/benchmarks/cli-compare-results.csv"
+  else
+    echo "bench-performance-recovery: wkhtmltopdf not on PATH; external tables use session-local gowk timing" >&2
+    execute ./scripts/bench-external.sh "--sizes=$SIZES" "--runs=$RUNS"
+  fi
 }
 
 dispatch_mode() {

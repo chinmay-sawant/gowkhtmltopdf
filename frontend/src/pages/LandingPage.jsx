@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import PageTitle from '../components/PageTitle'
+import { HEADLINE } from '../data/benchmarks'
 
 const CLI_CODE = `$ gowkhtmltopdf input.html output.pdf
 # local files need explicit permission
@@ -172,7 +173,7 @@ export default function LandingPage() {
         </div>
         <div className="proof-minimal-item proof-minimal-note">
           <strong>Measured</strong>
-          <span>2-page invoice: 14 ms CLI vs 260 ms wkhtmltopdf 0.12.6.1 on the reference host. Full numbers on <Link to="/benchmarks">benchmarks</Link>.</span>
+          <span>2-page invoice: {HEADLINE.smallGowk} ms CLI vs {HEADLINE.smallWk} ms wkhtmltopdf 0.12.6.1 on the reference host. Full numbers on <Link to="/benchmarks">benchmarks</Link>.</span>
         </div>
       </section>
 

@@ -8,10 +8,13 @@ import {
   externalSpeedup,
   HEADLINE,
   HISTORY_DATE,
+  INPROC_INLINE,
   INPROC_INLINE_HISTORY,
   INPROC_PDF_GENERIC,
   INPROC_PDF_GENERIC_HISTORY,
+  INPROC_TEMPLATE_GENERIC,
   INPROC_TEMPLATE_GENERIC_HISTORY,
+  INPROC_WEB_FETCH,
   INPROC_WEB_FETCH_HISTORY,
   LIBRARY_HEADLINE,
   LIBRARY_IMAGE,
@@ -19,6 +22,8 @@ import {
   LIBRARY_PDF,
   LIBRARY_PDF_HISTORY,
   PUPPETEER_ROWS,
+  PYTHON_LIBRARY_IMAGE,
+  PYTHON_LIBRARY_PDF,
   SNAPSHOT,
   WEASYPRINT_ROWS,
   formatKiB,
@@ -62,18 +67,7 @@ function formatMb(kib) {
 
 function CompareChart({ rows, metricView }) {
   const maxMs = useMemo(() => Math.max(...rows.map((r) => r.wkMs), 1), [rows])
-  const maxSpeedup = useMemo(
-    () =>
-      Math.max(
-        ...rows.map((r) => speedup(r)),
-        ...rows.map((r) => {
-          const libraryRow = LIBRARY_PDF.find((item) => item.n === r.pages)
-          return libraryRow ? r.wkMs / libraryRow.ms : 0
-        }),
-        1,
-      ),
-    [rows],
-  )
+  const maxSpeedup = useMemo(() => Math.max(...rows.map((r) => speedup(r)), 1), [rows])
   const maxRss = useMemo(() => Math.max(...rows.map((r) => Math.max(r.gowkRss, r.wkRss)), 1), [rows])
 
   return (
@@ -84,17 +78,13 @@ function CompareChart({ rows, metricView }) {
     >
       {rows.map((row) => {
         const speed = speedup(row)
-        const libraryRow = LIBRARY_PDF.find((item) => item.n === row.pages)
-        const librarySpeed = libraryRow ? row.wkMs / libraryRow.ms : null
         const gowkRssMb = row.gowkRss / 1024
         const wkRssMb = row.wkRss / 1024
 
         let gowkWidth = '0%'
         let wkWidth = '0%'
-        let libWidth = null
         let gowkLabel = ''
         let wkLabel = ''
-        let libLabel = ''
         let note = null
 
         if (metricView === 'time') {
@@ -102,30 +92,15 @@ function CompareChart({ rows, metricView }) {
           wkWidth = `${Math.max(4, (row.wkMs / maxMs) * 100)}%`
           gowkLabel = formatMs(row.gowkMs)
           wkLabel = formatMs(row.wkMs)
-          if (libraryRow) {
-            libWidth = `${Math.max(4, (libraryRow.ms / maxMs) * 100)}%`
-            libLabel = formatMs(libraryRow.ms)
-          }
           note = (
             <p className="bench-pair-note">
               <strong>{formatSpeedup(speed)}</strong> faster CLI
-              {librarySpeed !== null && (
-                <>
-                  {' ·'}
-                  <br />
-                  <strong>{formatSpeedup(librarySpeed)}</strong> faster Go library
-                </>
-              )}
             </p>
           )
         } else if (metricView === 'speedup') {
           gowkWidth = `${Math.max(6, (speed / maxSpeedup) * 100)}%`
           wkWidth = `${Math.max(6, (1.0 / maxSpeedup) * 100)}%`
           gowkLabel = `${formatSpeedup(speed)}`
-          if (librarySpeed !== null) {
-            libWidth = `${Math.max(6, (librarySpeed / maxSpeedup) * 100)}%`
-            libLabel = formatSpeedup(librarySpeed)
-          }
           wkLabel = '1.00x baseline'
           note = (
             <p className="bench-pair-note">
@@ -153,19 +128,6 @@ function CompareChart({ rows, metricView }) {
               <span className="bench-pair-badge">{formatPdfSize(row.gowkBytes)} PDF</span>
             </div>
             <div className="bench-bars">
-              {libWidth !== null && (
-                <div className="bench-bar-row">
-                  <span className="bench-engine">gowk lib</span>
-                  <div className="bench-bar-track">
-                    <div
-                      className="bench-bar bench-bar-lib"
-                      style={{ width: libWidth }}
-                      title={`gowkhtmltopdf Go library: ${libLabel}`}
-                    />
-                  </div>
-                  <span className="bench-bar-time">{libLabel}</span>
-                </div>
-              )}
               <div className="bench-bar-row">
                 <span className="bench-engine">gowk cli</span>
                 <div className="bench-bar-track">
@@ -207,7 +169,6 @@ function SummaryCliTable({ activeFilter }) {
           <tr>
             <th scope="col">Pages</th>
             <th scope="col">gowk cli</th>
-            <th scope="col">gowk lib</th>
             <th scope="col">wkhtml</th>
             <th scope="col">Speedup</th>
           </tr>
@@ -216,7 +177,6 @@ function SummaryCliTable({ activeFilter }) {
           {rows.map((row) => {
             const isMatch = activeFilter === 'all' || activeFilter === String(row.pages)
             const isDimmed = activeFilter !== 'all' && !isMatch
-            const libraryRow = LIBRARY_PDF.find((item) => item.n === row.pages)
             return (
               <tr
                 key={row.pages}
@@ -226,7 +186,6 @@ function SummaryCliTable({ activeFilter }) {
               >
                 <td>{row.pages}</td>
                 <td>{formatMs(row.gowkMs)}</td>
-                <td>{libraryRow ? formatMs(libraryRow.ms) : '-'}</td>
                 <td>{formatMs(row.wkMs)}</td>
                 <td>
                   <span className="bench-speedup">{formatSpeedup(speedup(row))}</span>
@@ -354,6 +313,7 @@ function CompareTable({ activeFilter }) {
 }
 
 function InprocTable({ heading, rows, unit }) {
+  const hasCost = rows.every((row) => row.mb !== undefined && row.allocs !== undefined)
   return (
     <section className="table-block">
       <h3 className="table-block-heading">{heading}</h3>
@@ -374,18 +334,22 @@ function InprocTable({ heading, rows, unit }) {
                 <td key={row.n}>{formatMs(row.ms)}</td>
               ))}
             </tr>
-            <tr>
-              <td>B/op</td>
-              {rows.map((row) => (
-                <td key={row.n}>{row.mb} MB</td>
-              ))}
-            </tr>
-            <tr>
-              <td>allocs/op</td>
-              {rows.map((row) => (
-                <td key={row.n}>{row.allocs}</td>
-              ))}
-            </tr>
+            {hasCost && (
+              <tr>
+                <td>B/op</td>
+                {rows.map((row) => (
+                  <td key={row.n}>{row.mb} MB</td>
+                ))}
+              </tr>
+            )}
+            {hasCost && (
+              <tr>
+                <td>allocs/op</td>
+                {rows.map((row) => (
+                  <td key={row.n}>{row.allocs}</td>
+                ))}
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -407,7 +371,7 @@ function HardwareGrid() {
       <div className="bench-spec-item">
         <span className="bench-spec-label">gowkhtmltopdf Engine</span>
         <span className="bench-spec-value">
-          <code>CGO_ENABLED=0</code> Pure-Go generic binary (VERSION 0.2.5, go1.26.4), zero native C
+          <code>CGO_ENABLED=0</code> Pure-Go generic binary (VERSION 0.2.6, go1.26.4), zero native C
           bindings
         </span>
       </div>
@@ -502,10 +466,11 @@ export default function BenchmarksPage() {
           <div>
             <h2 id="bench-chart-heading">Direct process comparison</h2>
             <p className="section-aside bench-explanation">
-              Same HTML, same flags (<code>{SNAPSHOT.flags}</code>), median of three timed runs after
-              one warmup. {activeMetricObj.desc}. <code>gowk lib</code> is the {CURRENT_CAPTURE.date}
-              {' '}in-process capture (median of three fresh <code>1x</code> processes), not process
-              wall time.
+              Same HTML, same flags (<code>{SNAPSHOT.flags}</code>), cold full-process runs: median of
+              three timed runs after one warmup, and every engine table shares the same gowk CLI
+              column from this capture's <code>make bench-cli-compare</code> run.{' '}
+              {activeMetricObj.desc}. Library-only numbers are not mixed into this chart; they are in
+              the in-process section below.
             </p>
           </div>
         </div>
@@ -601,7 +566,7 @@ export default function BenchmarksPage() {
           <h3 className="callout-title">Faster and lighter at every size.</h3>
           <p>
             On this generic CLI path, gowkhtmltopdf beats wkhtmltopdf on wall time and uses less
-            peak RSS at every tested size, including 500 pages (79,296 KiB vs 123,076 KiB). The
+            peak RSS at every tested size, including 500 pages (80,448 KiB vs 123,068 KiB). The
             500-page PDF is also smaller (1.42 MB vs 2.04 MB). Earlier captures that showed higher
             gowk RSS from 100 pages on are historical and do not describe the current converter.
           </p>
@@ -651,9 +616,36 @@ make bench-lib`}</code>
               rows={LIBRARY_IMAGE}
               unit="Tiles"
             />
+            <InprocTable
+              heading="Template + PDF pages (make bench-engine)"
+              rows={INPROC_TEMPLATE_GENERIC}
+              unit="Pages"
+            />
+            <InprocTable
+              heading="Web-fetch image tiles (make bench-engine)"
+              rows={INPROC_WEB_FETCH}
+              unit="Tiles"
+            />
+            <InprocTable
+              heading="Inline image tiles (make bench-engine)"
+              rows={INPROC_INLINE}
+              unit="Tiles"
+            />
+            <InprocTable
+              heading="Python PDF pages (Document.pdf)"
+              rows={PYTHON_LIBRARY_PDF}
+              unit="Pages"
+            />
+            <InprocTable
+              heading="Python image tiles (ImageDocument.image)"
+              rows={PYTHON_LIBRARY_IMAGE}
+              unit="Tiles"
+            />
             <p className="section-aside">
-              The image rows trade about 50 percent more lossless PNG bytes for roughly 2x faster
-              encoding. Raw samples: <code>{CURRENT_CAPTURE.raw}</code>.
+              The bench-engine rows are the median of three fresh processes; the Python rows are
+              warm medians of 10 timed iterations, so they are not like-for-like with the fresh
+              1x rows. The image writer trades about 50 percent more lossless PNG bytes for roughly
+              2x faster encoding. Raw samples: <code>{CURRENT_CAPTURE.raw}</code>.
             </p>
           </div>
         </details>

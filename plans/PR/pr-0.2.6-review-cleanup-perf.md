@@ -1,6 +1,6 @@
 ## Summary
 
-Land the 0.2.6 review wave on top of v0.2.5: warm-path time and memory recovery, the architecture-deepening and ponytail cleanup ledgers, 24 previously demoted CSS properties re-implemented with real consumers, element transparency groups, and layout fixes, plus refreshed docs, site, samples, and WASM artifact. The 500-page warm path moves from 1,228.72 ms to 576.33 ms in the same-source phase-6 capture (2.13x), and Snapshot M records 733.48 ms / 163.02 MB B/op on the shared working tree, with B/op below the 0.2.4 baseline. The wave-2 50 percent time target for the public library path is not met and stays open in `plans/0.2.6/perf-improve/wave-2-50pct/phase-wise-checklist.md`. The tree is stamped 0.2.6 for the release cut: version files, CHANGELOG facts, docs/site content, the WASM artifact, and the samples/showcase assets are regenerated on that stamp.
+Land the 0.2.6 review wave on top of v0.2.5: warm-path time and memory recovery, the architecture-deepening and ponytail cleanup ledgers, 24 previously demoted CSS properties re-implemented with real consumers, element transparency groups, and layout fixes, plus refreshed docs, site, samples, and WASM artifact. The 500-page warm path moves from 1,228.72 ms to 576.33 ms in the same-source phase-6 capture (2.13x), and Snapshot M records 733.48 ms / 163.02 MB B/op on the shared working tree, with B/op below the 0.2.4 baseline. The wave-2 50 percent time target for the public library path is not met and stays open in `plans/0.2.6/perf-improve/wave-2-50pct/phase-wise-checklist.md`. The tree is stamped 0.2.6 for the release cut: version files, CHANGELOG facts, docs/site content, the WASM artifact, and the samples/showcase assets are regenerated on that stamp. The 2026-09-13 benchmark refresh re-bases the engine tables on one shared gowk CLI baseline and updates the docs, README, and site.
 
 ---
 
@@ -63,7 +63,7 @@ Land the 0.2.6 review wave on top of v0.2.5: warm-path time and memory recovery,
 - `documentation/benchmarks.md` added; `performance.md` re-based to the 2026-09-12 capture; architecture pages, `cli.md`, `compatibility-matrix.md`, `fonts.md`, and `samples.md` refreshed.
 - `frontend/`: content refreshed for 0.2.6, Getting Started moved to `/documentation/getting-started`, compatibility table sorted by support tier, landing hero reworked, benchmarks page consolidated. `docs/` is the generated site rebuild.
 - README performance table re-based to 2026-09-12: 562 ms vs wkhtmltopdf 1.760 s at 500 pages (3.13x), lower RSS at every measured size.
-- 0.2.6 release stamp: `VERSION`, `internal/cli/help.go`, `bindings/c/include/gowkhtmltopdf.h`, `bindings/python/pyproject.toml` + `src/gowkhtmltopdf/__init__.py` + the binding test, `README.md`, `doc.go`, `documentation/*`, and the frontend content/palette now read 0.2.6; `make check-versions` reports aligned. Dated benchmark captures (`page-performance.json`, `benchmarks.js`, `BenchmarksPage.jsx`) keep their measured 0.2.5 labels.
+- 0.2.6 release stamp: `VERSION`, `internal/cli/help.go`, `bindings/c/include/gowkhtmltopdf.h`, `bindings/python/pyproject.toml` + `src/gowkhtmltopdf/__init__.py` + the binding test, `README.md`, `doc.go`, `documentation/*`, and the frontend content/palette now read 0.2.6; `make check-versions` reports aligned. Dated benchmark captures (`page-performance.json`, `benchmarks.js`, `BenchmarksPage.jsx`) were re-based to the 2026-09-13 capture on the 0.2.6 stamp; the process charts no longer mix in-process library rows, and cold/warm rows are labeled.
 - `CHANGELOG.md` 0.2.6 facts corrected to the generated catalog: 354 implemented / 0 partial / 464 unsupported (`plans/0.2.6/catalog/coverage-summary.json`), 63-fixture corpus total, and the CSS `font-feature-settings`/`font-kerning`/`font-variant-caps` wiring bullet removed (the 2026-09-12 audit keeps those three names demoted; `internal/layout/style_font_variant_props_test.go`).
 - `docs/` rebuilt after the WASM and showcase refresh (`npm --prefix frontend run build`; frontend smoke tests green).
 
@@ -73,7 +73,7 @@ Land the 0.2.6 review wave on top of v0.2.5: warm-path time and memory recovery,
 
 | Area | Impact |
 |------|--------|
-| **Performance** | Warm 500p same-source 1,228.72 to 576.33 ms (2.13x, Snapshot M note). Snapshot M shared-tree medians: internal 695.42 ms, public library 698.79 ms, CLI 0.70 s. External 2026-09-12 capture: 14 ms vs 260 ms at 2 pages (18.50x), 562 ms vs 1.760 s at 500 pages (3.13x). Public 620 ms, CLI 0.66 s, and wave-2 50 percent targets recorded as not met. |
+| **Performance** | Warm 500p same-source 1,228.72 to 576.33 ms (2.13x, Snapshot M note). Snapshot M shared-tree medians: internal 695.42 ms, public library 698.79 ms, CLI 0.70 s. External 2026-09-13 capture with a shared gowk baseline: 13 ms vs 258 ms at 2 pages (19.68x), 573 ms vs 1.718 s at 500 pages (3.00x); WeasyPrint 49.18x to 88.33x and Puppeteer 111.73x to 17.40x over 2 to 100 pages. Public 620 ms, CLI 0.66 s, and wave-2 50 percent targets recorded as not met. |
 | **Memory** | Internal 500p B/op 321.10 MB (Snapshot K) to 234.92 MB (L) to 163.02 MB (M, warm matrix); image 500-tile B/op 94.97 MB (K) to 27.21 MB, and 26.41 MB to 10.59 MB in the wave-2 capture. PDF allocs 21.72M to 1.19M (down 94.5 percent). B/op is cumulative allocation traffic, not peak RSS. |
 | **Behavior / correctness** | Table, float, page-break, vertical-text, and containment fixes listed above; `mix-blend-mode`/`isolation` now have real group semantics; fixture-63 added; fixture-56 page count moved 20 to 21. |
 | **API / CLI** | No public Go API changes and no CLI flag changes (`cmd/` untouched); the stamped `--version` output now reports 0.2.6. Internal-only removals and signature changes (listed under Breaking changes). Library `Validate` now accepts negative top/bottom margins as the auto header/footer sentinel, matching CLI behavior. |
@@ -103,7 +103,7 @@ Land the 0.2.6 review wave on top of v0.2.5: warm-path time and memory recovery,
 - [x] `make test-race` rerun on the final tree 2026-09-13, exit 0: convert 78.256s, layout 44.174s, pdf 11.623s, imageout 11.344s, load 4.029s. Supersedes the phase-7 closure run, which predated b35dc18 and 0562c20 (log: `plans/0.2.6/perf-time/results/recheck-2026-09-13/gate-make-test-race.log`).
 - [x] `make test-race` rerun again after the strip fix (`16c46fb`), exit 0: convert 69.892s, layout 39.890s, pdf 15.092s, imageout 10.305s, load 4.047s (log: `plans/0.2.6/perf-time/results/recheck-2026-09-13/gate-make-test-race-strip-fix.log`).
 - [x] `make test-race` rerun after the JPEG restore (`84a5b68`), exit 0: convert 85.029s, layout 48.099s, pdf 18.128s, imageout 13.361s, load 4.022s (log: `plans/0.2.6/perf-time/results/recheck-2026-09-13/gate-make-test-race-ycbcr.log`).
-- [ ] `make bench` external captures not rerun; the committed 2026-09-12 capture in `documentation/benchmarks.md` is cited above
+- [x] `make bench` rerun 2026-09-13: `cli`/`weasyprint`/`puppeteer` captures regenerated (`testdata/golden/benchmarks/*-compare.{md,csv}`) with one shared gowk CLI baseline from `make bench-cli-compare`; 13 ms vs 258 ms at 2 pages (19.68x) and 573 ms vs 1.718 s at 500 pages (3.00x). `documentation/benchmarks.md`, README, `testdata/golden/benchmarks/README.md`, and the frontend carry the new capture
 - [x] 0.2.6-stamp rerun 2026-09-13, all exit 0: `make check-versions`, `make test`, `make lint`, `make golden`, `make claim-scan`, `make build` (stamp assert 0.2.6), `make python-binding-test` (c-shared `libVersion=0.2.6`, 44 tests OK), `make wasm-test` (browser smoke passed), `make samples`, `make screenshots`.
 
 ### Commands
@@ -136,9 +136,10 @@ public library image 250 tiles:   25.72 ms   14,296,096 B/op    7,204 allocs/op
 public library image 500 tiles:   44.27 ms   26,414,016 B/op   13,635 allocs/op
 CLI 500 pages: 0.70 s / 147,264 KiB RSS, 1,419,234 PDF bytes
 
-# External CLI capture, 2026-09-12 (documentation/benchmarks.md)
-2 pages:    14 ms vs wkhtmltopdf 260 ms     18.50x
-500 pages: 562 ms vs wkhtmltopdf 1.760 s   3.13x
+# External CLI capture, 2026-09-13 (shared gowk baseline, documentation/benchmarks.md)
+2 pages:    13 ms vs wkhtmltopdf 258 ms     19.68x
+100 pages: 124 ms vs wkhtmltopdf 532 ms     4.30x
+500 pages: 573 ms vs wkhtmltopdf 1.718 s   3.00x
 ```
 
 `make golden` at HEAD:
@@ -207,18 +208,18 @@ make build:               bin/gowkhtmltopdf --version -> 0.2.6 (matches VERSION)
 | `.go` | 244 | 27808 | 4540 |
 | `.h` | 1 | 1 | 1 |
 | `.html` | 7 | 1267 | 55 |
-| `.js` | 15 | 293 | 198 |
-| `.json` | 19 | 2588 | 2220 |
-| `.jsx` | 8 | 337 | 393 |
-| `.md` | 76 | 10423 | 652 |
+| `.js` | 15 | 350 | 198 |
+| `.json` | 19 | 2647 | 2220 |
+| `.jsx` | 8 | 341 | 404 |
+| `.md` | 76 | 10730 | 652 |
 | `.mjs` | 1 | 9 | 0 |
 | `.pdf` | 74 | Binary | Binary |
 | `.png` | 429 | Binary | Binary |
 | `.py` | 2 | 2 | 2 |
-| `.sh` | 2 | 490 | 0 |
+| `.sh` | 3 | 597 | 25 |
 | `.toml` | 1 | 1 | 1 |
-| `.txt` | 3 | 407 | 0 |
+| `.txt` | 3 | 561 | 0 |
 | `.wasm` | 2 | Binary | Binary |
 | `.webp` | 395 | Binary | Binary |
-| No extension | 3 | 26 | 6 |
-| **Total** | **1290** | **43784** | **8239** |
+| No extension | 3 | 42 | 14 |
+| **Total** | **1291** | **44488** | **8283** |

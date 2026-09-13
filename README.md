@@ -74,7 +74,7 @@ Browser build and preview: [wasm.md](documentation/wasm.md).
 | [documentation/fonts.md](documentation/fonts.md) | Bundled faces, `--font-path`, `@font-face` |
 | [documentation/samples.md](documentation/samples.md) | Golden fixtures and `output/` |
 | [documentation/performance.md](documentation/performance.md) | Benchmarks and how to measure |
-| [documentation/benchmarks.md](documentation/benchmarks.md) | Consolidated current benchmark capture (2026-09-12) |
+| [documentation/benchmarks.md](documentation/benchmarks.md) | Consolidated current benchmark capture (2026-09-13) |
 | [testdata/golden/benchmarks/README.md](testdata/golden/benchmarks/README.md) | Current CLI vs wkhtmltopdf snapshot |
 | [documentation/deferred.md](documentation/deferred.md) | Deferred features and next gates |
 | [documentation/THREAT-MODEL.md](documentation/THREAT-MODEL.md) | Security / ACL / network policy |
@@ -123,31 +123,35 @@ pdf_bytes = convert_html_to_pdf(
 
 ## Performance
 
-**Current snapshot (2026-09-12):** generic `bin/gowkhtmltopdf` (`VERSION`
-0.2.5 on the 0.2.6 working tree) versus installed **wkhtmltopdf 0.12.6.1
+**Current snapshot (2026-09-13):** generic `bin/gowkhtmltopdf` (`VERSION`
+0.2.6, release tree `8aab63a`) versus installed **wkhtmltopdf 0.12.6.1
 (patched Qt)** on Linux amd64 (WSL2), 13th Gen Intel Core i7-13700HX. Same
 report fixture (20 invoice rows per requested page), median of three timed
 process runs after one warmup.
 
 | Pages | gowkhtmltopdf | wkhtmltopdf | Faster by |
 |------:|--------------:|------------:|----------:|
-| 2 | 14 ms | 260 ms | **18.50x** |
-| 10 | 26 ms | 286 ms | **11.18x** |
-| 100 | 126 ms | 546 ms | **4.35x** |
-| 500 | 562 ms | 1.760 s | **3.13x** |
+| 2 | 13 ms | 258 ms | **19.68x** |
+| 10 | 24 ms | 279 ms | **11.65x** |
+| 100 | 124 ms | 532 ms | **4.30x** |
+| 500 | 573 ms | 1.718 s | **3.00x** |
 
 Faster at every tested size. Gowk also used less peak RSS at every tested
-size in this capture, including 500 pages (79,296 KiB versus 123,076 KiB).
+size in this capture, including 500 pages (80,448 KiB versus 123,068 KiB).
 
 Same host, same fixture family against other engines (default external
 matrix: 2 / 10 / 50 / 100 pages):
 
 | Pages | vs WeasyPrint | vs Puppeteer / Chrome |
 |------:|--------------:|----------------------:|
-| 2 | **40.86x** | **92.85x** |
-| 10 | **53.62x** | **57.16x** |
-| 50 | **76.88x** | **25.10x** |
-| 100 | **89.43x** | **17.16x** |
+| 2 | **49.18x** | **111.73x** |
+| 10 | **59.78x** | **61.63x** |
+| 50 | **82.04x** | **26.65x** |
+| 100 | **88.33x** | **17.40x** |
+
+The public Go library (`Document.WritePDF`) measures 5.50 ms at 2 pages (about
+47x against the same capture's 258 ms wkhtmltopdf baseline) and 554.56 ms at
+500 pages; the Python bindings measure 3.52 ms and 504.93 ms (warm medians).
 
 Full matrices, RSS, PDF sizes, internal-engine and public-library
 `go test -bench` rows, and historical snapshots:

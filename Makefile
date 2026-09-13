@@ -273,18 +273,26 @@ weasyprint:
 	ls -la output/weasyprint/ | awk '{print $$5, $$9}' | tail -30
 
 # External process benchmarks against the actual binary. `make bench` builds
-# the CLI, times bin/gowkhtmltopdf against WeasyPrint and Puppeteer through
-# scripts/bench-external.sh, then runs the dedicated wkhtmltopdf comparison.
-# The numbers include process and disk overhead; they are release/operator
-# evidence, not a default `make test` gate. Missing external engines are
-# skipped, but the target fails when none are available. Writes
-# testdata/golden/benchmarks/{weasyprint,puppeteer,cli}-compare.md and
+# the CLI, runs the dedicated wkhtmltopdf comparison first, then feeds its
+# gowkhtmltopdf column to scripts/bench-external.sh as the shared gowk
+# baseline for the WeasyPrint and Puppeteer tables, so all three engine
+# tables report the same gowk CLI series. When wkhtmltopdf is not installed
+# the comparison is skipped and the external tables fall back to session-local
+# gowk timing with a warning. The numbers include process and disk overhead;
+# they are release/operator evidence, not a default `make test` gate. Missing
+# external engines are skipped, but the target fails when none are available.
+# Writes testdata/golden/benchmarks/{weasyprint,puppeteer,cli}-compare.md and
 # -results.csv. Default external page matrix is 2/10/50/100; override with
 # --sizes=2,5,10,20,50,100,200,250,500 or select one engine with
 # --engines=weasyprint. `bench-cli-compare` remains available standalone.
 bench: build
-	./scripts/bench-external.sh
-	$(MAKE) bench-cli-compare
+	@if command -v wkhtmltopdf >/dev/null 2>&1; then \
+		$(MAKE) bench-cli-compare && \
+		./scripts/bench-external.sh --gowk-baseline=testdata/golden/benchmarks/cli-compare-results.csv; \
+	else \
+		echo "bench: wkhtmltopdf not on PATH; external tables use session-local gowk timing"; \
+		./scripts/bench-external.sh; \
+	fi
 
 # Internal engine allocation matrix (generic + certified-islands, images).
 # Measures the internal conversion pipeline directly; it is independent of
