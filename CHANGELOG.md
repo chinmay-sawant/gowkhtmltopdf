@@ -4,7 +4,7 @@ All notable changes to gowkhtmltopdf are recorded here. This project follows
 semantic versioning; `VERSION` holds the current release and is stamped into
 binaries at build time (see README "Versioning").
 
-## 0.2.6 (2026-08-29)
+## 0.2.6 (2026-09-13)
 
 ### Added
 

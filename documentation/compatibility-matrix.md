@@ -455,15 +455,16 @@ Display value aliases (also Phase 82 slice A, at `internal/layout/style_properti
 42 aliases remain **Unsupported**. They are not Implemented. Each group notes the
 blocking base. Do not claim Implemented for any of these 42.
 
-**Group B - 3 background longhands (wait Phase 80):** bases `background-clip`,
-`background-origin`, `background-size` are not yet Implemented. Aliases stay
-Unsupported until those bases ship.
+**Group B - 3 background longhands:** bases `background-clip`,
+`background-origin`, and `background-size` are Implemented. Their `-webkit-*`
+remaps are not registered, so the aliases stay Unsupported
+(`plans/0.2.6/catalog/mapping.json`).
 
-| Vendor alias | Blocking base | Reason |
-|--------------|---------------|--------|
-| `-webkit-background-clip` | `background-clip` | wait Phase 80 |
-| `-webkit-background-origin` | `background-origin` | wait Phase 80 |
-| `-webkit-background-size` | `background-size` | wait Phase 80 |
+| Vendor alias | Base | Reason |
+|--------------|------|--------|
+| `-webkit-background-clip` | `background-clip` | remap not registered |
+| `-webkit-background-origin` | `background-origin` | remap not registered |
+| `-webkit-background-size` | `background-size` | remap not registered |
 
 **Group C - 14 mask family (wait Phase 83 hard defer):** bases `mask` and
 `mask-border` families are hard-deferred. No alias flips until bases are
