@@ -40,7 +40,16 @@ func encodeInto(buf *limitedImageBuffer, img image.Image, format string, quality
 			return fmt.Errorf("png encode: %w", err)
 		}
 	case formatJPG:
-		if err := jpeg.Encode(buf, img, &jpeg.Options{Quality: clampJPEGQuality(quality)}); err != nil {
+		// Hand image/jpeg a YCbCr image when the canvas is NRGBA so the
+		// encoder reads planes instead of boxing a color per pixel through
+		// color.Color; the conversion reproduces the stdlib bytes exactly.
+		// RGBA inputs already have a stdlib plane path.
+		jpegImage := img
+		if nrgba, ok := img.(*image.NRGBA); ok {
+			jpegImage = nrgbaToYCbCr(nrgba, opaque)
+		}
+
+		if err := jpeg.Encode(buf, jpegImage, &jpeg.Options{Quality: clampJPEGQuality(quality)}); err != nil {
 			return fmt.Errorf("jpeg encode: %w", err)
 		}
 	default:

@@ -257,5 +257,19 @@ per fixture. Attribution: `output/profiles/2026-09-13/profiling-notes.md`.
   PDF and JPEG rows move with the host window only. Evidence:
   `output/profiles/2026-09-13/fix-verify.md`, `bench-*-fixed.txt`.
 
-- [ ] **follow-up, separate change** JPEG 101M allocs/op from the deleted
-  YCbCr 4:2:0 preconversion (`PT26-OUT-02`); restore decision pending.
+- [x] **PERFT-FIX-03 · imageout** Restore the JPEG YCbCr preconversion deleted
+  by PT26-OUT-02, with **full-resolution** chroma so image/jpeg's own 4:2:0
+  downsampling reproduces its NRGBA bytes for every size. `encodeInto` converts
+  NRGBA canvases through `nrgbaToYCbCr` (`internal/imageout/ycbcr.go`). A 4:2:0
+  preconversion cannot represent even-width partial-MCU edges (a 40x20 probe
+  differed by one byte), so parity tests now cover those shapes. Proof:
+  `TestNRGBAToYCbCrMatchesStdlibBytes` (13 shapes, both opaque hints),
+  `TestEncodeJPGMatchesStdlibBytes`, `TestNRGBAToYCbCrDoesNotBoxPixels`,
+  `go test ./internal/imageout -count=1`, `make golden`, `make lint`
+  exit 0. Measured: fixture-49 5,250,777 -> 7,897 allocs and 274 -> 218 ms;
+  fixture-53 5,250,984 -> 8,103 allocs and 289 -> 192 ms; JPEG corpus
+  101,272,253 -> 526,832 allocs, 6935 -> 5248 ms, 1.549 -> 1.437 GB B/op;
+  PNG and PDF unchanged within noise. Peak heap (same harness): JPEG 215.0 ->
+  171.9 MiB, PNG flat, PDF flat; fixture-61/62 image mode peaks rise 7 to 10 MiB
+  from the full-resolution planes. Evidence:
+  `output/profiles/2026-09-13/ycbcr-restore-verify.md`.
