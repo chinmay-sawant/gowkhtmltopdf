@@ -157,13 +157,14 @@ func rowOpBand(paintOp Op) (float64, float64) {
 	return paintOp.Y, opBottom
 }
 
-// rowInkBand returns the painted Y band over ops (false when empty).
+// rowInkBand returns the painted Y band over ops (false when empty). Grid
+// runs contribute each segment, so a batched row keeps the same band.
 func rowInkBand(ops []Op) (float64, float64, bool) {
 	var bandTop, bandBottom float64
 
 	banded := false
 
-	for _, paintOp := range ops {
+	visitLineOps(ops, func(paintOp Op) {
 		opTop, opBottom := rowOpBand(paintOp)
 
 		if !banded || opTop < bandTop {
@@ -175,7 +176,7 @@ func rowInkBand(ops []Op) (float64, float64, bool) {
 		}
 
 		banded = true
-	}
+	})
 
 	return bandTop, bandBottom, banded
 }
@@ -199,9 +200,9 @@ func rowVerticalBand(ops []Op) (float64, float64, bool) {
 
 	haveVert := false
 
-	for _, paintOp := range ops {
+	visitLineOps(ops, func(paintOp Op) {
 		if !isVerticalRule(paintOp) {
-			continue
+			return
 		}
 
 		opTop, opBottom := rowOpBand(paintOp)
@@ -215,7 +216,7 @@ func rowVerticalBand(ops []Op) (float64, float64, bool) {
 		}
 
 		haveVert = true
-	}
+	})
 
 	return vertTop, vertBottom, haveVert
 }

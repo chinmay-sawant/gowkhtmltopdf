@@ -1,6 +1,6 @@
-# Implemented property code evidence (2026-09-02)
+# Implemented property code evidence (2026-09-02; demotion + re-implementation update 2026-09-12)
 
-Cross-check of all **355** `engine_status: implemented` rows in `mapping.json` against **non-test** Go under `internal/layout`.
+Cross-check of the **354** current `engine_status: implemented` rows in `mapping.json` against **non-test** Go under `internal/layout`. The 3 CSS Fonts rows demoted by PT26-LAY-05 on 2026-09-12 stay in the machine-readable list with `validation: DEMOTED`; the 23 rows re-implemented the same day carry `evidence_kind: consumer-read` pointing at the layout/paint line that reads the field, and `isolation` plus `mix-blend-mode` completed 2026-09-12 with element-group consumers in layout, PDF, and imageout.
 
 Tests (`*_test.go`) were excluded.
 
@@ -8,9 +8,10 @@ Tests (`*_test.go`) were excluded.
 
 | Validation | Count | Meaning |
 |------------|------:|----------|
-| VERIFIED | 355 | apply arm: `case`, `raw["prop"]`, vendor alias, const case, or `prop ==` |
+| VERIFIED | 354 | apply arm (`case`, `raw["prop"]`, vendor alias, const case, or `prop ==`) plus a real consumer for the 26 rows re-implemented or completed on 2026-09-12 (24 re-implemented plus `isolation` and `mix-blend-mode`) |
+| DEMOTED | 3 | parsed-and-stored no-op; field and apply arm removed 2026-09-12 (PT26-LAY-05) |
 | UNVERIFIED | 0 | no non-test layout evidence |
-| **Total** | **355** | |
+| **Total** | **357** | |
 
 Machine-readable list (every property + file + line): [`implemented-code-evidence.json`](implemented-code-evidence.json).
 
@@ -20,9 +21,16 @@ Machine-readable list (every property + file + line): [`implemented-code-evidenc
 |------|----------:|
 | `internal/layout/style_properties.go` | 166 |
 | `internal/layout/style_cascade.go` | 90 |
-| `internal/layout/style_advanced_props.go` | 56 |
+| `internal/layout/style_advanced_props.go` | 31 |
 | `internal/layout/style_paint_props.go` | 37 |
 | `internal/layout/style_leftovers.go` | 6 |
+| `internal/layout/style_text_support_props.go` | 8 (consumer-read) |
+| `internal/layout/style_containment_props.go` | 7 (consumer-read) |
+| `internal/layout/style_color_adjust_props.go` | 5 (consumer-read) |
+| `internal/layout/style_image_adjust_props.go` | 3 (consumer-read) |
+| `internal/layout/style_font_variant_props.go` | 1 (consumer-read) |
+
+DEMOTED entries are not counted in this rollup.
 
 ## By primary file
 
@@ -292,7 +300,9 @@ Machine-readable list (every property + file + line): [`implemented-code-evidenc
 | `padding-inline-end` | case-string | 691 |
 | `padding-inline-start` | case-string | 689 |
 
-### `internal/layout/style_advanced_props.go` (57)
+### `internal/layout/style_advanced_props.go` (31 verified, 3 demoted)
+
+Consumer files for the two 2026-09-12 compositing rows: `layout.go` (`pushZ` group creation `:1024`, `enterBlendIsolation` `:1058`, `Isolate` `:1075`), `blend_group.go` (`BlendGroup`), `paint_groups.go` (`target`/`enter`/`closeReady` sibling routing), `pdf/content.go` (`EndTransparencyGroup` Form XObject `:377`), `pdf/pdf.go` (`finalizeForms` `:977`), `imageout/groups.go` (one group-buffer composite). Honest subset: page-split group fragments composite per page; group composite alpha is 1 (element opacity stays per descendant op, so once-at-group opacity is not implemented); group order follows the last member in the engine global paint order, not a full CSS stacking-context tree; `plus-lighter` stays unsupported; form `/BBox` is the page box; PDF/UA tagging inside forms was not veraPDF-validated.
 
 | Property | Evidence | Line |
 |----------|----------|-----:|
@@ -301,30 +311,17 @@ Machine-readable list (every property + file + line): [`implemented-code-evidenc
 | `bookmark-level` | case-string | 21 |
 | `bookmark-state` | case-string | 33 |
 | `box-decoration-break` | case-string | 84 |
-| `color-adjust` | case-string | 102 |
-| `color-scheme` | case-string | 112 |
-| `contain` | case-string | 135 |
-| `contain-intrinsic-block-size` | case-string | 132 |
-| `contain-intrinsic-height` | case-string | 126 |
-| `contain-intrinsic-inline-size` | case-string | 129 |
-| `contain-intrinsic-size` | case-string | 120 |
-| `contain-intrinsic-width` | case-string | 123 |
-| `content-visibility` | case-string | 138 |
-| `dynamic-range-limit` | case-string | 115 |
 | `empty-cells` | case-string | 50 |
-| `font-language-override` | case-string | 153 |
-| `font-optical-sizing` | case-string | 148 |
-| `font-palette` | case-string | 156 |
-| `font-variation-settings` | case-string | 145 |
+| `font-optical-sizing` | case-string (parsed, no consumer; demoted 2026-09-12) | - |
+| `font-palette` | case-string (parsed, no consumer; demoted 2026-09-12) | - |
+| `font-variation-settings` | case-string (parsed, no consumer; demoted 2026-09-12) | - |
 | `footnote-display` | case-string | 38 |
 | `footnote-policy` | case-string | 43 |
-| `forced-color-adjust` | case-string | 107 |
-| `image-orientation` | case-string | 89 |
-| `image-resolution` | case-string | 94 |
+| `isolation` | consumer-read | 89 |
 | `line-clamp` | case-string | 58 |
 | `margin-trim` | case-string | 76 |
 | `max-lines` | case-string | 67 |
-| `object-view-box` | case-string | 99 |
+| `mix-blend-mode` | consumer-read | 69 |
 | `overflow-clip-margin-block` | case-string | 234 |
 | `overflow-clip-margin-block-end` | case-string | 234 |
 | `overflow-clip-margin-block-start` | case-string | 234 |
@@ -335,23 +332,65 @@ Machine-readable list (every property + file + line): [`implemented-code-evidenc
 | `overflow-clip-margin-left` | case-string | 228 |
 | `overflow-clip-margin-right` | case-string | 222 |
 | `overflow-clip-margin-top` | case-string | 219 |
-| `print-color-adjust` | case-string | 102 |
 | `string-set` | case-string | 48 |
-| `text-combine-upright` | case-string | 170 |
-| `text-decoration-inset` | case-string | 216 |
-| `text-decoration-skip` | case-string | 199 |
-| `text-decoration-skip-box` | case-string | 207 |
 | `text-decoration-skip-ink` | case-string | 202 |
-| `text-decoration-skip-self` | case-string | 210 |
-| `text-decoration-skip-spaces` | case-string | 213 |
 | `text-emphasis` | case-string | 181 |
 | `text-emphasis-color` | case-string | 184 |
 | `text-emphasis-position` | case-string | 190 |
 | `text-emphasis-skip` | case-string | 196 |
 | `text-emphasis-style` | case-string | 193 |
-| `text-orientation` | case-string | 173 |
 | `text-overflow` | case-string | 53 |
-| `unicode-bidi` | case-string | 178 |
+
+### `internal/layout/style_text_support_props.go` (8)
+
+Consumer files: `inline_paint.go` (run rotation and decoration geometry) and `inline_collect.go` (bidi scopes).
+
+| Property | Evidence | Line |
+|----------|----------|-----:|
+| `text-combine-upright` | consumer-read | 370 |
+| `text-decoration-inset` | consumer-read | 887 |
+| `text-decoration-skip` | consumer-read | 599 |
+| `text-decoration-skip-box` | consumer-read | 599 |
+| `text-decoration-skip-self` | consumer-read | 599 |
+| `text-decoration-skip-spaces` | consumer-read | 599 |
+| `text-orientation` | consumer-read | 370 |
+| `unicode-bidi` | consumer-read | 127 |
+
+### `internal/layout/style_containment_props.go` (7)
+
+Consumer file: `layout_flow.go` (size containment, `content-visibility:hidden`, intrinsic placeholder widths).
+
+| Property | Evidence | Line |
+|----------|----------|-----:|
+| `contain` | consumer-read | 224 |
+| `contain-intrinsic-size` | consumer-read | 262 |
+| `contain-intrinsic-width` | consumer-read | 758 |
+| `contain-intrinsic-height` | consumer-read | 262 |
+| `contain-intrinsic-block-size` | consumer-read | 262 |
+| `contain-intrinsic-inline-size` | consumer-read | 758 |
+| `content-visibility` | consumer-read | 211 |
+
+### `internal/layout/style_color_adjust_props.go` (5)
+
+Consumer files: `background_image.go` (color-adjust paint gate) and `paint.go` (scheme, forced colors, sRGB clamp).
+
+| Property | Evidence | Line |
+|----------|----------|-----:|
+| `color-adjust` | consumer-read | 30 |
+| `print-color-adjust` | consumer-read | 30 |
+| `color-scheme` | consumer-read | 111 |
+| `forced-color-adjust` | consumer-read | 208 |
+| `dynamic-range-limit` | consumer-read | 223 |
+
+### `internal/layout/style_image_adjust_props.go` (3)
+
+Consumer file: `layout_images.go` (EXIF orientation, resolution scale, view-box crop).
+
+| Property | Evidence | Line |
+|----------|----------|-----:|
+| `image-orientation` | consumer-read | 219 |
+| `image-resolution` | consumer-read | 250 |
+| `object-view-box` | consumer-read | 319 |
 
 ### `internal/layout/style_paint_props.go` (37)
 
@@ -405,3 +444,9 @@ Machine-readable list (every property + file + line): [`implemented-code-evidenc
 | `scale` | case-string | 83 |
 | `transform-box` | case-string | 69 |
 | `translate` | case-string | 85 |
+
+### `internal/layout/style_font_variant_props.go` (1 verified, consumer-read)
+
+| Property | Evidence | Line |
+|----------|----------|-----:|
+| `font-language-override` | case-string | 50 |

@@ -92,6 +92,28 @@ func (e *engine) measureCellContent(n *html.Node, st ResolvedStyle) float64 {
 // as min-content so adjacent cite markers stay on one horizontal line instead
 // of wrapping into a stacked, overlapping pair in a one-marker-wide column.
 func (e *engine) measureCellMinMax(node *html.Node, style ResolvedStyle) (float64, float64) {
+	// Size containment (and content-visibility: hidden) sizes intrinsic widths
+	// as if the descendants were absent: contain-intrinsic inline size (else
+	// 0) plus box chrome. A fixed intrinsic length contributes the same to
+	// min-content and max-content.
+	if containsSize(style) || style.ContentVisibility == contentVisibilityHidden {
+		intrinsicW := containmentIntrinsicWidth(style)
+		if intrinsicW < 0 {
+			intrinsicW = 0
+		}
+
+		chrome := e.scalePt(style.PaddingLeft) + e.scalePt(style.PaddingRight) +
+			e.scalePt(style.BorderLeft.Width) + e.scalePt(style.BorderRight.Width)
+		// Inline boxes measure their own chrome while walking text.
+		if style.Display == cssDisplayInline {
+			chrome = 0
+		}
+
+		width := e.scalePt(intrinsicW) + chrome
+
+		return width, width
+	}
+
 	cellMeas := &cellMeasure{ //nolint:exhaustruct // zero fields are the flushed-line state
 		engine: e,
 		em:     style.FontSize,
@@ -307,6 +329,16 @@ func (m *cellMeasure) measureElement(nodeN *html.Node, childCS ResolvedStyle, no
 		return
 	}
 
+	// Size containment (contain: size/strict, or content-visibility: hidden)
+	// replaces the descendant-derived intrinsic width with contain-intrinsic
+	// inline size (else 0) plus box chrome, exactly like the measureCellMinMax
+	// root guard. Descendant content must not contribute.
+	if containsSize(childCS) || childCS.ContentVisibility == contentVisibilityHidden {
+		m.measureSizeContained(childCS)
+
+		return
+	}
+
 	if nodeN.Name == "br" {
 		m.flushLine()
 
@@ -373,6 +405,39 @@ func (m *cellMeasure) measureSpecifiedInlineBlock(style ResolvedStyle) bool {
 	return true
 }
 
+// measureSizeContained folds a size-contained subtree into the current
+// measure as an atomic placeholder: its contain-intrinsic inline size (else 0)
+// plus box chrome, never its descendant content. Block-level boxes occupy
+// their own measured line.
+func (m *cellMeasure) measureSizeContained(style ResolvedStyle) {
+	intrinsicW := containmentIntrinsicWidth(style)
+	if intrinsicW < 0 {
+		intrinsicW = 0
+	}
+
+	chrome := m.engine.scalePt(style.PaddingLeft) + m.engine.scalePt(style.PaddingRight) +
+		m.engine.scalePt(style.BorderLeft.Width) + m.engine.scalePt(style.BorderRight.Width)
+	if style.Display == cssDisplayInline {
+		chrome = 0
+	}
+
+	width := m.engine.scalePt(intrinsicW) + chrome
+	blockish := isCellBlockish(style.Display)
+
+	if blockish {
+		m.flushLine()
+	}
+
+	m.noteWord(width)
+	m.lineOnlyNowrap = false
+	m.lineHasInk = true
+	m.lineW += width
+
+	if blockish {
+		m.flushLine()
+	}
+}
+
 func specifiedInlineBlockOuterWidth(eng *engine, style ResolvedStyle) float64 {
 	width := eng.scalePt(style.Width)
 	if style.BoxSizing != borderBox {
@@ -413,9 +478,7 @@ func (m *cellMeasure) walkBlockChildren(nodeN *html.Node, childCS ResolvedStyle,
 		childStyle := childCS
 
 		if child.Type == html.ElementNode {
-			if resolved := m.engine.styles[child]; resolved != nil {
-				childStyle = *resolved
-			}
+			childStyle = *m.engine.stylePtr(child)
 		}
 
 		m.walk(child, childStyle, childNowrap || childStyle.WhiteSpace == cssWhiteSpaceNowrap ||
@@ -726,7 +789,7 @@ func (e *engine) measureLargestImageWidth(node *html.Node) float64 {
 
 // layoutCell measures the height of a cell's content (no ops emitted).
 func (e *engine) layoutCell(n *html.Node, sty ResolvedStyle, width float64) float64 {
-	_, contentW := e.contentBox(0, width, boxModelStyleOf(&sty))
+	_, contentW := e.contentBox(0, width, &sty)
 	curY := e.scalePt(sty.PaddingTop) + e.scalePt(sty.BorderTop.Width)
 	enclose := e.pushBFCFloats(sty, 0, contentW)
 	curY = e.flowChildren(nil, n.Children, sty, contentW, 0, 0, curY)
@@ -737,7 +800,7 @@ func (e *engine) layoutCell(n *html.Node, sty ResolvedStyle, width float64) floa
 
 	e.popBFCFloats(enclose)
 
-	return curY + e.scalePt(sty.PaddingBottom) + e.scalePt(sty.BorderBottom.Width)
+	return e.borderBoxBottom(sty, curY)
 }
 
 func colSpan(n *html.Node) int {
@@ -1106,5 +1169,5 @@ func DeactivateOp(paintOp *Op) {
 	}
 
 	paintOp.Kind = opKindNoop
-	paintOp.URI = ""
+	paintOp.setURI("")
 }

@@ -41,7 +41,6 @@ func TestLayoutBodyKeepsSmartShrinkAtAReplaceableSeam(t *testing.T) {
 
 			return &layout.Result{Width: width}, nil
 		},
-		nil,
 	)
 	if err != nil {
 		t.Fatalf("layoutBody: %v", err)
@@ -67,7 +66,7 @@ func TestLayoutBodyStopsBeforeLayoutWhenCanceled(t *testing.T) {
 			calls++
 
 			return &layout.Result{}, nil
-		}, nil)
+		})
 	if err == nil || !errors.Is(err, context.Canceled) {
 		t.Fatalf("layoutBody error = %v, want context.Canceled", err)
 	}

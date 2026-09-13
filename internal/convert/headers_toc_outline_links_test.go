@@ -192,6 +192,78 @@ func TestTOC(t *testing.T) {
 
 var destRe = regexp.MustCompile(`/Dest \[(\d+) 0 R /XYZ`)
 
+var (
+	structDestSDRe = regexp.MustCompile(`/SD \[(\d+) 0 R`)
+	structDestPgRe = regexp.MustCompile(`/Pg (\d+) 0 R`)
+)
+
+// TestTOCLinkStructDestIdentity proves one heading-to-StructElem identity rule
+// covers both callers. The cover h1 is excluded from the outline but still
+// tagged by layout, so a positional zip binds the TOC forward link to the
+// cover heading. Every UA-2 /SD must land on the body heading page instead.
+func TestTOCLinkStructDestIdentity(t *testing.T) {
+	t.Parallel()
+
+	cover := `<html><body><h1>COVERONLYMARK</h1></body></html>`
+	body := `<html><body><h1>HEADINGTITLE</h1><p>BODYONLYMARK</p></body></html>`
+
+	cmd := newCommandMulti(t, []string{cover, body}, filepath.Join(t.TempDir(), "out.pdf"))
+	cmd.Objects[0].IsCover = true
+	cmd.Objects[0].IncludeInOutline = false
+
+	toc := settings.DefaultPdfObject()
+	toc.IsTableOfContent = true
+	toc.UseOutline = false
+	cmd.Objects = append([]settings.PdfObject{toc}, cmd.Objects...)
+	cmd.Global.TOC.ForwardLinks = true
+	cmd.Global.PdfProfile = settings.ProfilePDFUA2
+	cmd.Global.Title = "TOC Identity"
+	cmd.Global.UseCompression = false
+
+	data := runPDF(t, cmd)
+
+	if !bytes.Contains(data, []byte("/SD [")) {
+		t.Fatal("UA-2 output has no structure destinations")
+	}
+
+	kids := pageKidsRefs(data)
+	if len(kids) != 3 {
+		t.Fatalf("page refs = %v, want 3 (TOC, cover, body)", kids)
+	}
+
+	// TOC pages assemble first (tocFirstOrder), then the cover, then the body
+	// heading page. UA-2 annots use named destinations, which ParseSemantic
+	// does not decode, so page order is the identity here.
+	bodyRef := kids[2]
+
+	for _, match := range structDestSDRe.FindAllStringSubmatch(string(data), -1) {
+		elemRef := match[1]
+		objStart := strings.Index(string(data), elemRef+" 0 obj")
+
+		if objStart < 0 {
+			t.Fatalf("structure element object %s not found", elemRef)
+		}
+
+		obj := string(data)[objStart:]
+		end := strings.Index(obj, "endobj")
+
+		if end >= 0 {
+			obj = obj[:end]
+		}
+
+		pgMatch := structDestPgRe.FindStringSubmatch(obj)
+		if pgMatch == nil {
+			t.Errorf("StructElem %s has no /Pg: %q", elemRef, obj)
+
+			continue
+		}
+
+		if pgMatch[1] != strconv.Itoa(bodyRef) {
+			t.Errorf("structure destination /SD [%s] points at page %s, want body page %d", elemRef, pgMatch[1], bodyRef)
+		}
+	}
+}
+
 func TestInternalLinkDest(t *testing.T) {
 	t.Parallel()
 	cmd := tocCommand(t, filepath.Join(t.TempDir(), "out.pdf"))

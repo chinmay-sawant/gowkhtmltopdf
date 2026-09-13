@@ -3,6 +3,7 @@ package imageout
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"hash/fnv"
@@ -15,7 +16,6 @@ import (
 	"math"
 	"path/filepath"
 	"strings"
-	"sync"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/convert/prepare"
 	renderpipeline "github.com/chinmay-sawant/gowkhtmltopdf/internal/convert/render"
@@ -37,8 +37,6 @@ const (
 	boxFilterHalf      = 4
 	boxFilterArea      = 4 // 2x2 block of pixels (boxFilterFactor2 squared)
 	pixelCenter        = 0.5
-	defaultViewportW   = 768.0
-	defaultViewportH   = 576.0
 	qualityMaxPercent  = 100
 	opaqueAlpha        = 255
 	formatPNG          = "png"
@@ -76,6 +74,9 @@ var (
 	// errInvalidMediaType reports a media value other than print, screen,
 	// or empty (which applies only "all" rules).
 	errInvalidMediaType = errors.New("imageout: media must be print, screen, or empty")
+	// errInvalidZoom reports a zoom other than 0 or a finite positive value,
+	// matching layout.Options' zoom contract.
+	errInvalidZoom = errors.New("imageout: zoom must be zero or a finite positive value")
 )
 
 // ptToPx maps layout canvas points to output pixels. The layout engine works
@@ -90,6 +91,24 @@ const ptToPx = 96.0 / 72.0
 // at rasterSS times the final resolution, then box-filtered down. This
 // stabilises small-text baselines and edges (stdlib has no FreeType hinting).
 const rasterSS = 2
+
+// directRasterPixels is the final-canvas pixel area at or above which
+// rasterizeContext paints directly at final resolution instead of
+// supersampling. One final pixel costs 4 bytes and the supersampled canvas
+// costs rasterSS*rasterSS pixels per final pixel, so this is the largest final
+// canvas whose 2x buffer still fits maxPooledRasterBytes (32 MiB / (4*2*2) =
+// 2 Mi pixels). At or above the threshold the direct branch avoids the 2x
+// canvas entirely and never enters supersamplePixCache (IMG-04). The public
+// 250-tile canvas (1024x2056 = 2,105,344 px) and 500-tile canvas
+// (1024x4040 = 4,136,960 px) both select the direct branch.
+const directRasterPixels = maxPooledRasterBytes / (4 * rasterSS * rasterSS)
+
+// directRaster reports whether a final canvas of finalPixels pixels takes the
+// direct final-resolution branch. Keeping the rule a single pixel-area
+// comparison makes the threshold boundary testable and auditable.
+func directRaster(finalPixels int) bool {
+	return finalPixels >= directRasterPixels
+}
 
 // screenWidthDefault is the wkhtmltoimage default viewport width in pixels
 // (settings.ImageGlobal.Width default is already 1024; this guards against
@@ -120,19 +139,26 @@ type RenderOptions struct {
 	SmartWidth  bool // grow the viewport until content fits (default on)
 	// PrintLinkUnderline mirrors --print-link-underline (opt-in).
 	PrintLinkUnderline bool
+	// Zoom scales style lengths in layout; 0 keeps the layout default of 1,
+	// matching layout.Options.Zoom. Values must be 0 or finite positive.
+	Zoom float64
 }
 
 // Validate rejects caller mistakes before any layout or rasterization
 // work: negative Width/Height (0 keeps the documented defaults), a crop
 // with negative offsets or dimensions (which would silently no-op through
-// applyCrop), and media values other than print, screen, or empty.
+// applyCrop), a zoom other than 0 or finite positive, and media values other
+// than print, screen, or empty. The dimension and crop halves share
+// validateCanvasGeometry with Request.Validate so the app preflight covers
+// the same numbers before opening the output.
 func (o RenderOptions) Validate() error {
-	if o.Width < 0 || o.Height < 0 || o.Padding < 0 {
-		return fmt.Errorf("%w: got %dx%d with %dpx padding", errNegativeDimension, o.Width, o.Height, o.Padding)
+	if err := validateCanvasGeometry(o.Width, o.Height, o.Padding,
+		[4]int{o.Crop.Min.X, o.Crop.Min.Y, o.Crop.Dx(), o.Crop.Dy()}, 0); err != nil {
+		return err
 	}
 
-	if o.Crop.Min.X < 0 || o.Crop.Min.Y < 0 || o.Crop.Dx() < 0 || o.Crop.Dy() < 0 {
-		return fmt.Errorf("%w: got %v", errInvalidCropRect, o.Crop)
+	if o.Zoom != 0 && !finitePositive(o.Zoom) {
+		return fmt.Errorf("%w: got %g", errInvalidZoom, o.Zoom)
 	}
 
 	switch strings.ToLower(strings.TrimSpace(o.Media)) {
@@ -141,6 +167,31 @@ func (o RenderOptions) Validate() error {
 	default:
 		return fmt.Errorf("%w: got %q", errInvalidMediaType, o.Media)
 	}
+}
+
+// validateCanvasGeometry rejects the negative canvas numbers shared by
+// Request.Validate and RenderOptions.Validate. cropFloor is the lowest crop
+// value the caller's layer accepts: -1 keeps CropSettings' "unset" sentinel,
+// 0 requires an already-resolved crop rectangle.
+func validateCanvasGeometry(width, height, padding int, crop [4]int, cropFloor int) error {
+	if width < 0 || height < 0 || padding < 0 {
+		return fmt.Errorf("%w: got %dx%d with %dpx padding", errNegativeDimension, width, height, padding)
+	}
+
+	for _, value := range crop {
+		if value < cropFloor {
+			return fmt.Errorf("%w: got left=%d top=%d width=%d height=%d",
+				errInvalidCropRect, crop[0], crop[1], crop[2], crop[3])
+		}
+	}
+
+	return nil
+}
+
+// finitePositive reports whether value is finite and greater than zero,
+// mirroring internal/layout's zoom and viewport predicate.
+func finitePositive(value float64) bool {
+	return !math.IsNaN(value) && !math.IsInf(value, 0) && value > 0
 }
 
 // Render lays out root and rasterizes the result. The canvas is the viewport
@@ -186,7 +237,7 @@ func RenderContext(ctx context.Context, root *html.Node, opts RenderOptions) (im
 		return nil, err
 	}
 
-	img, err := rasterizeContext(ctx, res, maxHeight(res, opts), opts.Transparent, opts.Padding)
+	img, err := rasterizeContext(ctx, res, maxHeight(res, opts), opts.Transparent, opts.Padding, opts.Zoom)
 	if err != nil {
 		return nil, err
 	}
@@ -265,6 +316,49 @@ func layoutOptions(opts RenderOptions, font *pdf.Font, viewportPx float64) layou
 		Images:             opts.Images,
 		Background:         opts.Background,
 		PrintLinkUnderline: opts.PrintLinkUnderline,
+		Zoom:               opts.Zoom,
+	}
+}
+
+// imageViewport is one resolved image-mode layout viewport in the two units
+// the pipeline needs: CSS pixels for the raster context (RenderOptions) and
+// points for prepare.BuildOptions plus media matching. HeightPt falls back to
+// WidthPt when the caller left Height unset, mirroring layoutOptions, so
+// linked and imported sheet media queries evaluate against the geometry
+// layout will actually use.
+type imageViewport struct {
+	WidthPx  float64
+	HeightPx float64 // 0 keeps content height for the raster canvas
+	WidthPt  float64
+	HeightPt float64
+}
+
+// resolveImageViewport resolves image Width/Height settings into the layout
+// viewport. WidthPx defaults to screenWidthDefault, matching RenderOptions'
+// 0-width fallback, and HeightPt defaults to WidthPt when Height is 0.
+func resolveImageViewport(width, height int) imageViewport {
+	widthPx := float64(width)
+	if widthPx <= 0 {
+		widthPx = screenWidthDefault
+	}
+
+	heightPx := float64(height)
+	if heightPx < 0 {
+		heightPx = 0
+	}
+
+	widthPt := widthPx * cssPxToPt
+
+	heightPt := heightPx * cssPxToPt
+	if heightPt <= 0 {
+		heightPt = widthPt
+	}
+
+	return imageViewport{
+		WidthPx:  widthPx,
+		HeightPx: heightPx,
+		WidthPt:  widthPt,
+		HeightPt: heightPt,
 	}
 }
 
@@ -340,91 +434,113 @@ func maxHeight(res *layout.Result, opts RenderOptions) float64 {
 	return h
 }
 
+// rasterPolicy selects the supersample strategy for one rasterization.
+// rasterPolicyAuto applies the documented directRasterPixels threshold; the
+// other values force one branch so tests and the IMG-03 comparison can hold
+// every other input constant.
+type rasterPolicy int
+
+const (
+	rasterPolicyAuto rasterPolicy = iota
+	rasterPolicyDirect
+	rasterPolicySupersample
+)
+
 // rasterizeContext paints the display list into an NRGBA canvas. The canvas is
 // white unless transparent is set, in which case it starts fully transparent
-// and only painted ops become visible. Painting uses rasterSS supersampling
-// then box-filters down to the final CSS-pixel size. Glyph bitmaps for this
-// run live on a per-rasterize atlas (P5-05) so concurrent Renders do not share
-// mutable cache state.
-type pixBuffer struct {
-	b []byte
+// and only painted ops become visible. Canvases at or above directRasterPixels
+// paint directly at final resolution; smaller canvases use rasterSS
+// supersampling then box-filter down to the final CSS-pixel size. Glyph
+// bitmaps for this run live on a per-rasterize atlas (P5-05) so concurrent
+// Renders do not share mutable cache state. zoom is the layout zoom in effect
+// (0 means the default of 1) and only feeds budget error messages.
+func rasterizeContext(
+	ctx context.Context, res *layout.Result, height float64, transparent bool, padding int, zoom float64,
+) (*image.NRGBA, error) {
+	return rasterizeContextPolicy(ctx, res, height, transparent, padding, zoom, rasterPolicyAuto)
 }
 
-//nolint:gochecknoglobals // supersample pixel buffer recycling
-var supersamplePixPool sync.Pool
-
+// rasterizeContextPolicy is rasterizeContext with an explicit raster policy.
+// The supersampled geometry and budgets are computed first so every branch
+// keeps the shipped dimension checks and error messages; the direct branch
+// then paints the smaller final-size canvas those checks already bound.
+//
 //nolint:cyclop,funlen,mnd // supersampled rasterization pipeline
-func rasterizeContext(
-	ctx context.Context, res *layout.Result, height float64, transparent bool, padding int,
+func rasterizeContextPolicy(
+	ctx context.Context, res *layout.Result, height float64, transparent bool, padding int, zoom float64,
+	policy rasterPolicy,
 ) (*image.NRGBA, error) {
-	pxPerPt := ptToPx * float64(rasterSS)
-	paddingPt := float64(padding) * cssPxToPt
-	paddingPx := paddingPt * pxPerPt
-
-	widthPx, err := rasterDimension(res.Width*pxPerPt+paddingPx*2, maxRasterWidth)
+	plan, err := planRasterCanvas(res, height, padding, zoom, policy)
 	if err != nil {
 		return nil, err
 	}
 
-	heightPx, err := rasterDimension(height*pxPerPt+paddingPx*2, maxRasterHeight)
-	if err != nil {
-		return nil, err
-	}
+	var img *image.NRGBA
 
-	if err := validateRasterSize(widthPx, heightPx); err != nil {
-		return nil, err
-	}
-
-	neededBytes := widthPx * heightPx * 4
-	pBuf, ok := supersamplePixPool.Get().(*pixBuffer)
-
-	if !ok || pBuf == nil {
-		pBuf = &pixBuffer{b: make([]byte, 0, neededBytes)}
-	}
-
-	if cap(pBuf.b) < neededBytes {
-		pBuf.b = make([]byte, neededBytes)
-	} else {
-		pBuf.b = pBuf.b[:neededBytes]
-		clear(pBuf.b)
-	}
-
-	const maxPooledRasterBytes = 32 << 20 // 32 MiB
-
-	defer func() {
-		if cap(pBuf.b) <= maxPooledRasterBytes {
-			supersamplePixPool.Put(pBuf)
+	if plan.direct {
+		// The returned canvas is the paint target: no 2x intermediate and no
+		// downscale copy. It deliberately bypasses supersamplePixCache so a
+		// large final canvas is never retained between conversions (IMG-04).
+		img, err = newRasterImage(plan.finalWidth, plan.finalHeight)
+		if err != nil {
+			return nil, err
 		}
-	}()
+	} else {
+		neededBytes := plan.ssWidth * plan.ssHeight * 4
+		pBuf := supersamplePixCache.get(neededBytes)
 
-	img := &image.NRGBA{
-		Pix:    pBuf.b,
-		Stride: widthPx * 4,
-		Rect:   image.Rect(0, 0, widthPx, heightPx),
+		switch {
+		case pBuf == nil:
+			pBuf = &pixBuffer{b: make([]byte, neededBytes)}
+
+		case cap(pBuf.b) < neededBytes:
+			// get only returns fitting buffers; keep a replaced buffer recyclable
+			// so the retention policy stays in one place if that changes.
+			supersamplePixCache.put(pBuf)
+			pBuf = &pixBuffer{b: make([]byte, neededBytes)}
+
+		default:
+			pBuf.b = pBuf.b[:neededBytes]
+			clear(pBuf.b)
+		}
+
+		defer func() {
+			supersamplePixCache.put(pBuf)
+		}()
+
+		img = &image.NRGBA{
+			Pix:    pBuf.b,
+			Stride: plan.ssWidth * 4,
+			Rect:   image.Rect(0, 0, plan.ssWidth, plan.ssHeight),
+		}
 	}
 
 	if !transparent {
 		fillNRGBAOpaque(img, img.Bounds(), color.NRGBA{R: channelMax, G: channelMax, B: channelMax, A: opaqueAlpha})
 	}
 
+	paintPxPerPt := plan.paintScale()
 	atlas := newGlyphAtlas()
 	imageCache := newRasterImageCache()
 
-	for _, opIndex := range rasterPaintOrder(res.Ops) {
-		if err := ctx.Err(); err != nil {
-			return nil, fmt.Errorf("imageout: context: %w", err)
+	if hasElementGroups(res.Ops) {
+		if err := paintWithElementGroups(ctx, img, res.Ops, plan.paddingPt, paintPxPerPt, atlas, imageCache); err != nil {
+			return nil, err
 		}
+	} else {
+		for _, opIndex := range rasterPaintOrder(res.Ops) {
+			if err := ctx.Err(); err != nil {
+				return nil, fmt.Errorf("imageout: context: %w", err)
+			}
 
-		op := res.Ops[opIndex]
-		offsetPaintOp(&op, paddingPt)
-		paint(img, &op, pxPerPt, atlas, imageCache)
+			op := res.Ops[opIndex]
+			offsetPaintOp(&op, plan.paddingPt)
+			paint(img, &op, paintPxPerPt, atlas, imageCache)
+		}
 	}
 
-	if rasterSS <= 1 {
-		outImg := image.NewNRGBA(image.Rect(0, 0, widthPx, heightPx))
-		copy(outImg.Pix, img.Pix)
-
-		return outImg, nil
+	if plan.direct {
+		return img, nil
 	}
 
 	if err := ctx.Err(); err != nil {
@@ -450,47 +566,6 @@ func offsetPaintOp(paintOp *layout.Op, paddingPt float64) {
 		paintOp.Xform.E += paddingPt
 		paintOp.Xform.F += paddingPt
 	}
-}
-
-func rasterDimension(value float64, maxVal int) (int, error) {
-	if math.IsNaN(value) || math.IsInf(value, 0) {
-		return 0, fmt.Errorf("%w: non-finite dimension", errRasterTooLarge)
-	}
-
-	if value <= 0 {
-		return 1, nil
-	}
-
-	rounded := math.Round(value)
-	if rounded < 1 {
-		return 1, nil
-	}
-
-	if rounded > float64(maxVal) {
-		return 0, fmt.Errorf("%w: dimension %.0f exceeds %d", errRasterTooLarge, rounded, maxVal)
-	}
-
-	return int(rounded), nil
-}
-
-func validateRasterSize(width, height int) error {
-	if width < 1 || height < 1 || width > maxRasterWidth || height > maxRasterHeight {
-		return fmt.Errorf(
-			"%w: dimensions %dx%d exceed %dx%d",
-			errRasterTooLarge,
-			width,
-			height,
-			maxRasterWidth,
-			maxRasterHeight,
-		)
-	}
-
-	pixels := int64(width) * int64(height)
-	if pixels > maxRasterPixels || pixels*4 > maxRasterBytes {
-		return fmt.Errorf("%w: %d pixels exceed budget", errRasterTooLarge, pixels)
-	}
-
-	return nil
 }
 
 func newRasterImage(width, height int) (*image.NRGBA, error) {
@@ -809,6 +884,8 @@ func paint(img *image.NRGBA, paintOp *layout.Op, pxPerPt float64, atlas *glyphAt
 		return
 	}
 
+	paintOp.BindEmptyExtra()
+
 	if paintOp.BlendMode != "" && paintOp.BlendMode != "normal" {
 		paintBlended(img, paintOp, pxPerPt, atlas, imageCache)
 
@@ -847,6 +924,9 @@ func paint(img *image.NRGBA, paintOp *layout.Op, pxPerPt float64, atlas *glyphAt
 	case layout.OpLine:
 		paintLine(img, &opCopy, paintStyle, pxPerPt)
 
+	case layout.OpGridRun:
+		paintGridRun(img, &opCopy, pxPerPt)
+
 	case layout.OpText, layout.OpBullet:
 		paintText(img, &opCopy, pxPerPt, atlas)
 
@@ -859,50 +939,17 @@ func paint(img *image.NRGBA, paintOp *layout.Op, pxPerPt float64, atlas *glyphAt
 
 // paintTransformedOp renders an op with CSS 2D affine transform onto img.
 //
-//nolint:cyclop,varnamelen,mnd,wsl,gosec,funlen // affine raster op transform and pixel compositing
+//nolint:varnamelen,mnd,wsl,gosec,funlen // affine raster op transform and pixel compositing
 func paintTransformedOp(
 	img *image.NRGBA, op *layout.Op, pxPerPt float64, atlas *glyphAtlas, imageCache *rasterImageCache,
 ) {
-	opX, opY, opW, opH := op.X, op.Y, op.W, op.H
-	if op.Kind == layout.OpText || op.Kind == layout.OpBullet {
-		opY -= op.Size
-		opH = op.Size * 1.5
-		if opW <= 0 {
-			opW = op.Size * float64(len(op.Text))
-		}
-	}
-
-	if opW <= 0 {
-		opW = 1
-	}
-
-	if opH <= 0 {
-		opH = 1
-	}
-
-	corners := [4][2]float64{
-		{opX, opY},
-		{opX + opW, opY},
-		{opX + opW, opY + opH},
-		{opX, opY + opH},
-	}
-	minX, minY := math.MaxFloat64, math.MaxFloat64
-	maxX, maxY := -math.MaxFloat64, -math.MaxFloat64
-
-	for _, c := range corners {
-		tx, ty := op.Xform.Apply(c[0], c[1])
-		minX = math.Min(minX, tx)
-		minY = math.Min(minY, ty)
-		maxX = math.Max(maxX, tx)
-		maxY = math.Max(maxY, ty)
-	}
-
-	dstRect := ptRectScale(minX-2, minY-2, (maxX-minX)+4, (maxY-minY)+4, pxPerPt).Intersect(img.Bounds())
+	dstRect := paintOpBounds(op, pxPerPt).Intersect(img.Bounds())
 	if dstRect.Empty() {
 		return
 	}
 
-	srcRect := ptRectScale(opX-2, opY-2, opW+4, opH+4, pxPerPt)
+	minX, minY, maxX, maxY := opRectBounds(op)
+	srcRect := ptRectScale(minX-2, minY-2, (maxX-minX)+4, (maxY-minY)+4, pxPerPt)
 	if srcRect.Dx() <= 0 || srcRect.Dy() <= 0 {
 		return
 	}
@@ -1005,12 +1052,20 @@ func paintRoundedFill(
 	col color.NRGBA,
 ) {
 	radiusX, radiusY := scaledRadiiXY(paintOp, pxPerPt)
+	// Shape geometry is the unclipped op rectangle. rect is only the paint
+	// window (canvas edge or strip), so a rounded fill that crosses a strip
+	// keeps its real corners instead of growing a new radius on the cut.
+	fullRect := ptRectScale(paintOp.X, paintOp.Y, paintOp.W, paintOp.H, pxPerPt)
 	mask := image.NewAlpha(rect)
+	originX := float64(fullRect.Min.X)
+	originY := float64(fullRect.Min.Y)
+	width := float64(fullRect.Dx())
+	height := float64(fullRect.Dy())
 
 	for y := rect.Min.Y; y < rect.Max.Y; y++ {
 		for x := rect.Min.X; x < rect.Max.X; x++ {
-			if roundedContains(float64(x)+pixelCenter, float64(y)+pixelCenter, float64(rect.Min.X),
-				float64(rect.Min.Y), float64(rect.Dx()), float64(rect.Dy()), radiusX, radiusY) {
+			if roundedContains(float64(x)+pixelCenter, float64(y)+pixelCenter,
+				originX, originY, width, height, radiusX, radiusY) {
 				mask.SetAlpha(x, y, color.Alpha{A: opaqueAlpha})
 			}
 		}
@@ -1231,41 +1286,16 @@ func pointSegmentDistance(x, y float64, start, end rasterPoint) float64 {
 	return math.Hypot(x-(start.X+t*dx), y-(start.Y+t*dy))
 }
 
-func scaledRadii(paintOp *layout.Op, pxPerPt float64) [4]float64 {
-	radii := [4]float64{paintOp.RadiusTopLeft, paintOp.RadiusTopRight, paintOp.RadiusBottomRight, paintOp.RadiusBottomLeft}
-	if radii == [4]float64{} {
-		radii = [4]float64{paintOp.Radius, paintOp.Radius, paintOp.Radius, paintOp.Radius}
-	}
-
-	for i := range radii {
-		radii[i] *= pxPerPt
-	}
-
-	return radii
-}
-
+// scaledRadiiXY resolves the op's corner radii through layout.OpRadiiXY, the
+// one owner of the shorthand, corner-longhand, and Y fallback rules, then
+// converts them from layout points to raster pixels. The resolver stays in
+// layout so a radii change lands in one package; this wrapper only scales.
 func scaledRadiiXY(paintOp *layout.Op, pxPerPt float64) ([4]float64, [4]float64) {
-	radiusX := scaledRadii(paintOp, pxPerPt)
-	radiusY := [4]float64{
-		paintOp.RadiusTopLeftY, paintOp.RadiusTopRightY,
-		paintOp.RadiusBottomRightY, paintOp.RadiusBottomLeftY,
-	}
+	radiusX, radiusY := layout.OpRadiiXY(paintOp)
 
-	if radiusY == [4]float64{} {
-		if paintOp.RadiusY > 0 {
-			radiusY = [4]float64{paintOp.RadiusY, paintOp.RadiusY, paintOp.RadiusY, paintOp.RadiusY}
-		} else {
-			return radiusX, radiusX
-		}
-	}
-
-	for idx := range radiusY {
+	for idx := range radiusX {
+		radiusX[idx] *= pxPerPt
 		radiusY[idx] *= pxPerPt
-		if radiusX[idx] <= 0 {
-			radiusY[idx] = 0
-		} else if radiusY[idx] <= 0 {
-			radiusY[idx] = radiusX[idx]
-		}
 	}
 
 	return radiusX, radiusY
@@ -1407,6 +1437,25 @@ func paintLine(img *image.NRGBA, paintOp *layout.Op, paintStyle layout.PaintStyl
 	}
 }
 
+// paintGridRun replays one batched table-row grid as individual lines, in
+// emission order, so raster output matches the pre-batch op list.
+func paintGridRun(img *image.NRGBA, runOp *layout.Op, pxPerPt float64) {
+	if runOp.Grid == nil {
+		return
+	}
+
+	for idx := range runOp.Grid.Segs {
+		seg := &runOp.Grid.Segs[idx]
+		line := layout.Op{ //nolint:exhaustruct // intentional zero fields
+			ID: runOp.ID, Kind: layout.OpLine,
+			X: seg.X, Y: seg.Y, W: seg.W, H: seg.H,
+			Width: seg.Width, R: seg.R, G: seg.G, B: seg.B, LineInset: seg.LineInset,
+		}
+
+		paintLine(img, &line, layout.StyleOf(&line), pxPerPt)
+	}
+}
+
 // paintText draws the run (and fake-bold pass) at fractional baselines.
 func paintText(img *image.NRGBA, paintOp *layout.Op, pxPerPt float64, atlas *glyphAtlas) {
 	alpha := 1.0
@@ -1436,56 +1485,18 @@ func paintText(img *image.NRGBA, paintOp *layout.Op, pxPerPt float64, atlas *gly
 	}
 
 	ttfDrawString(
-		img, baseX, baseY, paintOp.Text, paintOp.Size,
-		paintOp.LetterSpacing, paintOp.RotateDeg, face, col, pxPerPt, atlas,
+		img, baseX, baseY, paintOp.Text, paintOp.TextLanguage(), paintOp.Size,
+		paintOp.LetterSpacing, float64(paintOp.RotateDeg), face, col, pxPerPt, atlas,
 	)
-	// Latin-only fake-bold (CJK gate lives in layout.FakeBoldFor).
+	// Latin-only fake-bold (CJK gate lives in layout.FakeBoldFor). The offset
+	// is one final CSS pixel expressed in canvas pixels, so the direct branch
+	// (pxPerPt = ptToPx) shifts by one canvas pixel rather than by rasterSS.
 	if layout.FakeBoldFor(paintOp) {
+		boldOffset := pxPerPt / ptToPx
 		ttfDrawString(
-			img, baseX+float64(rasterSS), baseY, paintOp.Text, paintOp.Size,
-			paintOp.LetterSpacing, paintOp.RotateDeg, face, col, pxPerPt, atlas,
+			img, baseX+boldOffset, baseY, paintOp.Text, paintOp.TextLanguage(), paintOp.Size,
+			paintOp.LetterSpacing, float64(paintOp.RotateDeg), face, col, pxPerPt, atlas,
 		)
-	}
-}
-
-// paintImage draws a decoded paintOp image, scaled via the per-run cache.
-//
-//nolint:cyclop // raster image painting pipeline
-func paintImage(img *image.NRGBA, paintOp *layout.Op, pxPerPt float64, imageCache *rasterImageCache) {
-	decoded, err := imageCache.decode(paintOp)
-	if err != nil || paintOp.W <= 0 || paintOp.H <= 0 {
-		return // layout already validated the bytes; skip on failure
-	}
-
-	src := decoded.image
-	rect := ptRectScale(paintOp.X, paintOp.Y, paintOp.W, paintOp.H, pxPerPt).Intersect(img.Bounds())
-
-	if rect.Empty() {
-		return
-	}
-
-	sb := src.Bounds()
-	if rect.Dx() == sb.Dx() && rect.Dy() == sb.Dy() {
-		if nrgba, ok := src.(*image.NRGBA); ok && nrgba.Opaque() {
-			drawNRGBAOpaque(img, rect, nrgba, sb.Min)
-		} else {
-			draw.Draw(img, rect, src, sb.Min, draw.Over)
-		}
-
-		return
-	}
-
-	// Go 1.26 removed image/draw's scalers; nearest
-	// neighbour keeps it stdlib-only.
-	scaled := imageCache.scaledImage(decoded, rect.Dx(), rect.Dy())
-	if scaled == nil {
-		return
-	}
-
-	if scaled.Opaque() {
-		drawNRGBAOpaque(img, rect, scaled, image.Point{}) //nolint:exhaustruct // intentional zero/partial fields
-	} else {
-		draw.Draw(img, rect, scaled, image.Point{}, draw.Over) //nolint:exhaustruct // intentional zero/partial fields
 	}
 }
 
@@ -1512,20 +1523,38 @@ func ptRectScale(x, y, w, h, pxPerPt float64) image.Rectangle {
 	)
 }
 
+//nolint:mnd // bit packing for one NRGBA pixel; alpha is always opaque here
 func fillNRGBAOpaque(dst *image.NRGBA, rect image.Rectangle, col color.NRGBA) {
 	if rect.Empty() {
 		return
 	}
 
+	// Pack one 4-byte NRGBA pixel; 64-bit stores fill two pixels per write so
+	// large canvas backgrounds and tile fills move at memory speed. A is
+	// always opaque here (every caller checks opaqueAlpha first).
+	pattern := uint32(col.R) | uint32(col.G)<<8 | uint32(col.B)<<16 | uint32(opaqueAlpha)<<24
+	word := uint64(pattern) | uint64(pattern)<<32
+	rowBytes := rect.Dx() * 4 //nolint:mnd // 4 bytes per NRGBA pixel
+
 	for y := rect.Min.Y; y < rect.Max.Y; y++ {
 		offset := dst.PixOffset(rect.Min.X, y)
+		row := dst.Pix[offset : offset+rowBytes]
 
-		for x := rect.Min.X; x < rect.Max.X; x++ {
-			dst.Pix[offset] = col.R
-			dst.Pix[offset+1] = col.G
-			dst.Pix[offset+2] = col.B
-			dst.Pix[offset+3] = 255
-			offset += 4
+		index := 0
+
+		for ; index+32 <= rowBytes; index += 32 {
+			binary.LittleEndian.PutUint64(row[index:], word)
+			binary.LittleEndian.PutUint64(row[index+8:], word)
+			binary.LittleEndian.PutUint64(row[index+16:], word)
+			binary.LittleEndian.PutUint64(row[index+24:], word)
+		}
+
+		for ; index+8 <= rowBytes; index += 8 {
+			binary.LittleEndian.PutUint64(row[index:], word)
+		}
+
+		if index < rowBytes {
+			binary.LittleEndian.PutUint32(row[index:], pattern)
 		}
 	}
 }
@@ -1536,92 +1565,6 @@ func drawNRGBAOpaque(dst *image.NRGBA, rect image.Rectangle, src *image.NRGBA, s
 		srcOffset := src.PixOffset(sp.X, sp.Y+y)
 		copy(dst.Pix[dstOffset:dstOffset+4*rect.Dx()], src.Pix[srcOffset:srcOffset+4*rect.Dx()])
 	}
-}
-
-// scaleNearest resizes src to w×h with nearest-neighbour sampling. Go 1.26
-// removed image/draw's BiLinear/NearestNeighbor scalers, so a tiny scaler
-// lives here; natural-size images take the draw.Draw fast path in paint.
-func scaleNearest(src image.Image, w, h int) *image.NRGBA {
-	if nrgba, ok := src.(*image.NRGBA); ok {
-		return scaleNearestNRGBA(nrgba, w, h)
-	}
-
-	return scaleNearestGeneric(src, w, h)
-}
-
-func scaleNearestNRGBA(src *image.NRGBA, width, height int) *image.NRGBA {
-	dst, err := newRasterImage(width, height)
-	if err != nil {
-		return nil
-	}
-
-	srcBounds := src.Bounds()
-
-	if srcBounds.Dx() == 0 || srcBounds.Dy() == 0 {
-		return dst
-	}
-
-	scaleX := float64(srcBounds.Dx()) / float64(width)
-
-	scaleY := float64(srcBounds.Dy()) / float64(height)
-	for row := range height {
-		srcY := srcBounds.Min.Y + int((float64(row)+pixelCenter)*scaleY)
-		if srcY > srcBounds.Max.Y-1 {
-			srcY = srcBounds.Max.Y - 1
-		}
-
-		for col := range width {
-			srcX := srcBounds.Min.X + int((float64(col)+pixelCenter)*scaleX)
-			if srcX > srcBounds.Max.X-1 {
-				srcX = srcBounds.Max.X - 1
-			}
-
-			srcOffset := src.PixOffset(srcX, srcY)
-			dstOffset := dst.PixOffset(col, row)
-			copy(dst.Pix[dstOffset:dstOffset+4], src.Pix[srcOffset:srcOffset+4])
-		}
-	}
-
-	return dst
-}
-
-func scaleNearestGeneric(src image.Image, width, height int) *image.NRGBA {
-	dst, err := newRasterImage(width, height)
-	if err != nil {
-		return nil
-	}
-
-	srcBounds := src.Bounds()
-
-	if srcBounds.Dx() == 0 || srcBounds.Dy() == 0 {
-		return dst
-	}
-
-	scaleX := float64(srcBounds.Dx()) / float64(width)
-
-	scaleY := float64(srcBounds.Dy()) / float64(height)
-	for row := range height {
-		srcY := srcBounds.Min.Y + int((float64(row)+pixelCenter)*scaleY)
-		if srcY > srcBounds.Max.Y-1 {
-			srcY = srcBounds.Max.Y - 1
-		}
-
-		for col := range width {
-			srcX := srcBounds.Min.X + int((float64(col)+pixelCenter)*scaleX)
-			if srcX > srcBounds.Max.X-1 {
-				srcX = srcBounds.Max.X - 1
-			}
-
-			nc, ok := color.NRGBAModel.Convert(src.At(srcX, srcY)).(color.NRGBA)
-			if !ok {
-				continue
-			}
-
-			dst.SetNRGBA(col, row, nc)
-		}
-	}
-
-	return dst
 }
 
 // RunRequest drives image conversion from an image-only request. req.Output
@@ -1682,7 +1625,7 @@ func newImagePipeline(req *Request, log io.Writer) (*imagePipeline, error) {
 	registry := pdf.RegistryFromGlobal(req.Global)
 	pdf.LogFontRegistryScan(req.Global, log)
 
-	return &imagePipeline{ //nolint:exhaustruct // image is populated during RenderObjects
+	return &imagePipeline{ //nolint:exhaustruct // pending is populated during RenderObjects
 		req:      req,
 		obj:      obj,
 		loader:   loader,
@@ -1695,6 +1638,18 @@ func newImagePipeline(req *Request, log io.Writer) (*imagePipeline, error) {
 // imagePipeline adapts image-specific state to the shared render lifecycle.
 // Rendering and encoding stay private to imageout; render owns sequencing and
 // cancellation checks shared with the PDF pipeline.
+// pendingImageRaster is the laid-out display list Finalize rasterizes. Large
+// PNG output paints horizontal strips straight into the encoder; everything
+// else still builds a full canvas and goes through writeEncodedOutput.
+type pendingImageRaster struct {
+	res         *layout.Result
+	height      float64
+	transparent bool
+	padding     int
+	zoom        float64
+	crop        image.Rectangle
+}
+
 type imagePipeline struct {
 	req      *Request
 	obj      *settings.PdfObject
@@ -1703,6 +1658,7 @@ type imagePipeline struct {
 	registry *pdf.Registry
 	log      io.Writer
 	img      image.Image
+	pending  pendingImageRaster
 }
 
 // Compile-time check: imagePipeline satisfies the shared render lifecycle seam.
@@ -1720,17 +1676,20 @@ func (p *imagePipeline) RenderObjects(ctx context.Context) error {
 	sheets := prep.Sheets
 	p.registry = prep.Registry
 
+	viewport := resolveImageViewport(imgSet.Width, imgSet.Height)
+	imagesEnabled := settings.ResolveImages(p.req.Global.Web, imgSet, p.obj)
+
 	cache := map[string][]byte{}
-	imagesFn := makeImageFetcher(ctx, imgSet, prep, cache)
+	imagesFn := makeImageFetcher(ctx, imagesEnabled, prep, cache)
 	printLinkUnderline := imgSet.Web.PrintLinkUnderline ||
 		p.req.Global.Web.PrintLinkUnderline ||
 		p.obj.Web.PrintLinkUnderline
 
 	// Policy A: Quiet is Global.Quiet; body paint background is Global.Background
 	// only (single field for PDF + image; CLI --background / library Set).
-	img, err := RenderContext(ctx, root, RenderOptions{
-		Width:              imgSet.Width,
-		Height:             imgSet.Height,
+	opts := RenderOptions{
+		Width:              int(viewport.WidthPx),
+		Height:             int(viewport.HeightPx),
 		Font:               p.font,
 		Registry:           p.registry,
 		Sheets:             sheets,
@@ -1742,12 +1701,22 @@ func (p *imagePipeline) RenderObjects(ctx context.Context) error {
 		SmartWidth:         imgSet.SmartWidth,
 		Padding:            imgSet.Padding,
 		PrintLinkUnderline: printLinkUnderline,
-	})
+		Zoom:               p.obj.Load.ZoomFactor,
+	}
+
+	res, err := layoutResult(ctx, root, opts, p.font)
 	if err != nil {
 		return err
 	}
 
-	p.img = img
+	p.pending = pendingImageRaster{
+		res:         res,
+		height:      maxHeight(res, opts),
+		transparent: opts.Transparent,
+		padding:     opts.Padding,
+		zoom:        opts.Zoom,
+		crop:        opts.Crop,
+	}
 
 	return nil
 }
@@ -1757,15 +1726,75 @@ func (p *imagePipeline) Assemble(context.Context) error {
 }
 
 func (p *imagePipeline) Finalize(ctx context.Context) error {
+	if p.pending.res != nil && p.img == nil {
+		return p.encodePending(ctx)
+	}
+
 	return writeEncodedOutput(ctx, p.req, p.img, p.log)
+}
+
+func (p *imagePipeline) encodePending(ctx context.Context) error {
+	format, err := resolveFormat(p.req.Image.Format, "")
+	if err != nil {
+		return err
+	}
+
+	plan, err := planRasterCanvas(
+		p.pending.res, p.pending.height, p.pending.padding, p.pending.zoom, rasterPolicyAuto,
+	)
+	if err != nil {
+		return err
+	}
+
+	if stripRasterApplies(plan, format) {
+		return p.encodePendingStrips(ctx, plan)
+	}
+
+	img, err := rasterizeContextPolicy(
+		ctx, p.pending.res, p.pending.height, p.pending.transparent,
+		p.pending.padding, p.pending.zoom, rasterPolicyAuto,
+	)
+	if err != nil {
+		return err
+	}
+
+	cropped, err := applyCrop(img, p.pending.crop)
+	if err != nil {
+		return err
+	}
+
+	p.img = cropped
+
+	return writeEncodedOutput(ctx, p.req, p.img, p.log)
+}
+
+func (p *imagePipeline) encodePendingStrips(ctx context.Context, plan rasterCanvasPlan) error {
+	if ctx == nil {
+		return errNilContext
+	}
+
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("imageout: context: %w", err)
+	}
+
+	if p.req.Output == nil {
+		return errNilOutput
+	}
+
+	buf := acquireEncodeBuffer()
+	defer releaseEncodeBuffer(buf)
+
+	if err := encodeStripPNG(ctx, buf, p.pending, plan, rasterStripBytes); err != nil {
+		return fmt.Errorf("encode %s: %w", formatPNG, err)
+	}
+
+	return writeOutputBytes(ctx, p.req, buf)
 }
 
 // writeEncodedOutput resolves the format, composites onto white for
 // transparent JPEG, and writes the encoded bytes to req.Output. The context
 // can stop work before encoding and before the external write starts. An
 // io.Writer cannot be interrupted by this context once Write has started.
-//
-//nolint:cyclop // format, transparency, encoding, and sink contract stay together.
 func writeEncodedOutput(ctx context.Context, req *Request, img image.Image, log io.Writer) error {
 	if ctx == nil {
 		return errNilContext
@@ -1792,21 +1821,30 @@ func writeEncodedOutput(ctx context.Context, req *Request, img image.Image, log 
 		img = onWhite(img)
 	}
 
-	data, err := encode(img, format, imgSet.Quality)
-	if err != nil {
+	// The pooled scratch is written to the sink before it returns to the pool,
+	// so the encoded bytes are never copied out and a failed encode still
+	// writes nothing.
+	buf := acquireEncodeBuffer()
+	defer releaseEncodeBuffer(buf)
+
+	if err := encodeInto(buf, img, format, imgSet.Quality, !imgSet.Transparent); err != nil {
 		return fmt.Errorf("encode %s: %w", format, err)
 	}
 
+	return writeOutputBytes(ctx, req, buf)
+}
+
+func writeOutputBytes(ctx context.Context, req *Request, buf *limitedImageBuffer) error {
 	if err := ctx.Err(); err != nil {
 		return fmt.Errorf("imageout: context: %w", err)
 	}
 
-	count, err := req.Output.Write(data)
+	count, err := req.Output.Write(buf.Bytes())
 	if err != nil {
 		return fmt.Errorf("write output: %w", err)
 	}
 
-	if count != len(data) {
+	if count != buf.Len() {
 		return fmt.Errorf("write output: %w", io.ErrShortWrite)
 	}
 
@@ -1831,15 +1869,9 @@ func prepareImageDocument(
 
 	media := mediaFor(global, imageSet, obj)
 
-	viewportW := defaultViewportW
-	if imageSet.Width > 0 {
-		viewportW = float64(imageSet.Width)
-	}
-
-	viewportH := defaultViewportH
-	if imageSet.Height > 0 {
-		viewportH = float64(imageSet.Height)
-	}
+	// prepare/media matching is in points; imageSet.Width/Height are CSS
+	// pixels, so both call sites go through the same resolved viewport.
+	viewport := resolveImageViewport(imageSet.Width, imageSet.Height)
 
 	prep, err := prepare.Document(
 		ctx,
@@ -1848,8 +1880,8 @@ func prepareImageDocument(
 		obj.Load,
 		registry,
 		prepare.BuildOptions(
-			viewportW,
-			viewportH,
+			viewport.WidthPt,
+			viewport.HeightPt,
 			media,
 			1,
 			global.Web,
@@ -1870,17 +1902,19 @@ func prepareImageDocument(
 }
 
 // makeImageFetcher wraps prep.Resources.Fetch with a per-run byte cache and
-// the --no-images gate.
+// the resolved web.images gate. imagesEnabled must come from
+// settings.ResolveImages so global, image, and object layers all reach the
+// gate.
 func makeImageFetcher(
 	ctx context.Context,
-	imgSet *settings.ImageGlobal,
+	imagesEnabled bool,
 	prep *prepare.Prepared,
 	cache map[string][]byte,
 ) func(string) ([]byte, error) {
 	var cacheBytes int
 
 	return func(src string) ([]byte, error) {
-		if !imgSet.Web.Images {
+		if !imagesEnabled {
 			return nil, errImagesDisabled
 		}
 
@@ -1953,53 +1987,6 @@ func resolveFormat(flag, output string) (string, error) {
 // coupling the image engine to the CLI command type.
 func ResolveFormat(flag, output string) (string, error) {
 	return resolveFormat(flag, output)
-}
-
-// encode serializes img as PNG or JPEG. quality applies to JPEG only
-// (1..100); PNG is lossless and ignores it.
-func encode(img image.Image, format string, quality int) ([]byte, error) {
-	buf := limitedImageBuffer{Buffer: bytes.Buffer{}, limit: maxImageEncoded}
-
-	switch format {
-	case formatPNG:
-		if err := png.Encode(&buf, img); err != nil {
-			return nil, fmt.Errorf("png encode: %w", err)
-		}
-	case formatJPG:
-		if quality < 1 {
-			quality = 1
-		}
-
-		if quality > qualityMaxPercent {
-			quality = 100
-		}
-
-		if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: quality}); err != nil {
-			return nil, fmt.Errorf("jpeg encode: %w", err)
-		}
-	default:
-		return nil, fmt.Errorf("%w %q", errUnsupportedFmt, format)
-	}
-
-	return buf.Bytes(), nil
-}
-
-type limitedImageBuffer struct {
-	bytes.Buffer
-	limit int
-}
-
-func (b *limitedImageBuffer) Write(data []byte) (int, error) {
-	if len(data) > b.limit-b.Len() {
-		return 0, errEncodedTooLarge
-	}
-
-	n, err := b.Buffer.Write(data)
-	if err != nil {
-		return n, fmt.Errorf("write buffer: %w", err)
-	}
-
-	return n, nil
 }
 
 // onWhite composites img onto a white background (JPEG has no alpha).

@@ -147,6 +147,7 @@ Image flags map to ImageDocument:
 |---|---|
 | --width PX | Width |
 | --height PX | Height |
+| --zoom FLOAT | Zoom factor applied to layout; values below 1 shrink the document to fit the raster budget |
 | --format png or jpg | Format |
 | --quality 1..100 | Quality; JPEG only |
 | --smart-width, --no-smart-width | SmartWidth |
@@ -157,6 +158,24 @@ Image flags map to ImageDocument:
 
 --transparent has no effect on JPEG other than selecting a non-transparent
 canvas. Image output defaults to PNG when no format is specified.
+
+## Image raster budget
+
+Image mode renders one canvas, so it enforces a hard envelope: each side
+of the output image is at most 8,192 CSS px, and the final image is at most
+16,777,216 CSS pixels (16M). Painting runs at 2x supersampling, so the
+internal caps are 16,384 px per side, 67,108,864 px (64M), and 256 MiB of
+NRGBA backing bytes.
+
+A document that crosses the envelope fails with a resource-budget error
+("imageout: raster exceeds resource budget") that reports the size that
+overflowed. There is no tiling and no automatic zoom fallback. To fit one,
+lower --zoom (or the library ImageDocument.Zoom field); for example the
+golden template complex-css is about 11,208 CSS px tall and fits at
+--zoom 0.73 or lower. Lowering --width helps when the width is what pushes
+the canvas over. Four golden templates cross the envelope at 1x:
+complex-css, font-examples, fixture-56, and fixture-60. PDF conversion of
+the same document is not subject to this cap.
 
 ## Sources and security
 

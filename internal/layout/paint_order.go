@@ -70,7 +70,7 @@ func paintLayer(op *Op) int {
 	}
 
 	switch op.Kind {
-	case OpFillRect, OpStrokeRect, OpLine:
+	case OpFillRect, OpStrokeRect, OpLine, OpGridRun:
 		return 0
 	case OpText, OpImage, OpLinkURI, OpBullet, OpUnknown, opKindNoop:
 		return 1

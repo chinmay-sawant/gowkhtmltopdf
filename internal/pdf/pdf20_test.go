@@ -625,9 +625,10 @@ func buildPDF20RichDoc(t *testing.T, fnt *Font) []byte {
 	}
 
 	page1.AddLinkURI([4]float64{50, 600, 250, 620}, "https://example.com/pdf20")
-	page1.AddLinkDest([4]float64{50, 450, 150, 530}, 1, 50, 750)
 
 	page2 := doc.AddPage(600, 800)
+	page1.AddLinkDest([4]float64{50, 450, 150, 530}, page2, 50, 750)
+
 	content2 := page2.Content()
 	content2.UseEmbeddedFont("F1", fnt)
 	content2.BeginText()

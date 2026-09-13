@@ -223,6 +223,53 @@ func TestFloatOnTableCellBlockifies(t *testing.T) { //nolint:cyclop,funlen
 	}
 }
 
+// TestFloatRightCollapsedTableGridShiftsWithFloat: fixture-29 regression.
+// A float:right table lays out at the left content edge and placeFloat shifts
+// its box to the right afterwards. The collapsed border grid is an OpGridRun
+// inside that shifted op range, so its segments must move with the box;
+// otherwise the grid paints at the static left edge while the cell text and
+// fills sit at the right edge.
+func TestFloatRightCollapsedTableGridShiftsWithFloat(t *testing.T) {
+	t.Parallel()
+
+	cssSheet := sheet(t, `
+body { margin: 0; font-size: 10pt; width: 400pt; }
+table { float: right; width: 160pt; border-collapse: collapse; }
+td { border: 1px solid #999; padding: 3pt; }
+`)
+	res := layoutHTML(t, `<html><body>
+<table>
+<tr><td>SKU</td><td>FT-29</td></tr>
+<tr><td>Region</td><td>EMEA</td></tr>
+</table>
+<p>Body copy flows beside the floated table.</p>
+</body></html>`, cssSheet)
+
+	table := findBox(t, res, "table")
+	if table == nil {
+		t.Fatal("table box not found")
+	}
+
+	var sawLine bool
+
+	for _, line := range resLineOps(res) {
+		if line.Kind != OpLine {
+			continue
+		}
+
+		sawLine = true
+
+		if line.X+0.01 < table.x {
+			t.Fatalf("grid line x=%.2f is left of floated table x=%.2f (float shift missed Grid.Segs)",
+				line.X, table.x)
+		}
+	}
+
+	if !sawLine {
+		t.Fatal("no collapsed grid lines painted")
+	}
+}
+
 // TestFloatedTableKeepsDisplay: float on <table> keeps display:table (wrapper).
 func TestFloatedTableKeepsDisplay(t *testing.T) {
 	t.Parallel()

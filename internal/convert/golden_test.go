@@ -417,8 +417,10 @@ var fixturePageBounds = map[string]fixtureBounds{ //nolint:gochecknoglobals // i
 	},
 	"fixture-56-architecture-diagram.html": {
 		// gap and logical margin/padding now apply, but dom-foot orphans are
-		// excluded so the footer stays with its section; page count is 20.
-		minPages: 20, maxPages: 20,
+		// excluded so the footer stays with its section. ARC-37 includes the
+		// real bottom border of auto-height flex containers (border-box), so
+		// the section 07 tail spills one widow page; count is 21.
+		minPages: 21, maxPages: 21,
 	},
 	"fixture-57-vanguard-telemetry-audit.html": {
 		minPages: 9, maxPages: 9,
@@ -443,6 +445,10 @@ var fixturePageBounds = map[string]fixtureBounds{ //nolint:gochecknoglobals // i
 	"fixture-62-implemented-props-c.html": {
 		minPages: 5, maxPages: 9, images: true,
 		needles: []string{"IMPLEMENTED-PROPS-C"},
+	},
+	"fixture-63-page-level-demos.html": {
+		minPages: 6, maxPages: 8,
+		needles: []string{"FIXTURE-63-PAGE-LEVEL"},
 	},
 }
 
@@ -725,9 +731,10 @@ func TestConvertPDF17GoldenNeedles(t *testing.T) {
 		t.Error("PDF 1.7 output missing metadata stream object /Type /Metadata /Subtype /XML")
 	}
 
-	// Producer contains 1.7
-	if !strings.Contains(str17, "/Producer (gowkhtmltopdf 1.7)") {
-		t.Errorf("PDF 1.7 Info dict missing /Producer (gowkhtmltopdf 1.7)")
+	// Producer is the convert-assigned producer string; the version claim
+	// lives in the XMP packet (asserted below).
+	if !strings.Contains(str17, "/Producer (github.com/chinmay-sawant/gowkhtmltopdf)") {
+		t.Errorf("PDF 1.7 Info dict missing the convert-assigned /Producer")
 	}
 
 	if !strings.Contains(str17, "<pdf:Producer>gowkhtmltopdf 1.7</pdf:Producer>") {
@@ -775,9 +782,9 @@ func TestConvertPDF17GoldenNeedles(t *testing.T) {
 		t.Errorf("Default PDF 1.4 trailer contains /ID: %s", str14[trailerIdx14:])
 	}
 
-	// Producer contains 1.4
-	if !strings.Contains(str14, "/Producer (gowkhtmltopdf 1.4)") {
-		t.Errorf("Default PDF 1.4 Info dict missing /Producer (gowkhtmltopdf 1.4)")
+	// Producer is the convert-assigned producer string (version lives in XMP).
+	if !strings.Contains(str14, "/Producer (github.com/chinmay-sawant/gowkhtmltopdf)") {
+		t.Errorf("Default PDF 1.4 Info dict missing the convert-assigned /Producer")
 	}
 }
 
@@ -875,9 +882,10 @@ func TestConvertPDF20GoldenNeedles(t *testing.T) {
 		t.Error("PDF 2.0 output missing metadata stream object /Type /Metadata /Subtype /XML")
 	}
 
-	// Producer claims the 2.0 version.
-	if !strings.Contains(str20, "/Producer (gowkhtmltopdf 2.0)") {
-		t.Errorf("PDF 2.0 Info dict missing /Producer (gowkhtmltopdf 2.0)")
+	// Producer is the convert-assigned producer string; the version claim
+	// lives in the XMP packet.
+	if !strings.Contains(str20, "/Producer (github.com/chinmay-sawant/gowkhtmltopdf)") {
+		t.Errorf("PDF 2.0 Info dict missing the convert-assigned /Producer")
 	}
 
 	// No conformance claims (#33 boundary).

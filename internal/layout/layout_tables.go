@@ -94,10 +94,10 @@ func (e *engine) layoutTableGrid(
 	}
 
 	tableBox.rows = cellData
-	tableHeight := curY + e.scalePt(style.PaddingBottom) + e.scalePt(style.BorderBottom.Width)
+	tableHeight := e.borderBoxBottom(style, curY)
 	tableBox.height = tableY + tableHeight - tableBox.y
 
-	if style.BGColor[3] > 0 && e.opts.Background {
+	if style.BGColor[3] > 0 && e.backgroundPaintEnabled(&style) {
 		e.add(Op{ //nolint:exhaustruct // intentional zero fields
 			Kind: OpFillRect, X: posX, Y: tableY, W: tableBox.w, H: tableHeight,
 			R: style.BGColor[0], G: style.BGColor[1], B: style.BGColor[2], Alpha: style.BGColor[3],
@@ -856,17 +856,21 @@ func (e *engine) emitCollapsedRowGrid(
 	yStart := rowTops[rowIdx]
 	yEnd := yStart + rowHeights[rowIdx]
 	gridStart := len(e.ops)
-	stroke := &rowGridStroker{e: e}
-	// Top edge. Skip under rowspan continuations so a multi-row Year cell is
-	// not bisected mid-table; paint.capTablePageBreaks re-seals full tops for
-	// page fragments where those holes look open.
+	// The row's top edge, verticals, and bottom edge become one OpGridRun in
+	// emission order. Skip top segments under rowspan continuations so a
+	// multi-row Year cell is not bisected mid-table;
+	// paint.capTablePageBreaks re-seals full tops for page fragments where
+	// those holes look open.
+	stroke := &rowGridStroker{e: e, batch: true, segs: e.gridScratch[:0]}
 	emitGridTopEdges(stroke, tableBox, rowIdx, xList, yStart)
-	// Verticals only exist where an adjacent cell declares a left/right side.
 	emitGridVerticals(stroke, tableBox, rowIdx, nCols, xList, yStart, yEnd)
 
 	if lastRow {
 		emitGridBottomEdges(stroke, tableBox, rowIdx, xList, yEnd)
 	}
+
+	e.gridScratch = stroke.segs
+	e.addGridRun(stroke.segs)
 
 	gridEnd := len(e.ops) - 1
 	if gridEnd >= gridStart && rowIdx < len(tableBox.rows) {
@@ -925,16 +929,28 @@ func emitGridBottomEdges(stroke *rowGridStroker, tableBox *box, rowIdx int, xLis
 	}
 }
 
-// rowGridStroker appends horizontal/vertical grid border ops with the shared
-// engine so collapsed rows stay in the row's op span.
-type rowGridStroker struct{ e *engine }
+// rowGridStroker collects one collapsed row's vertical grid segments; when
+// batch is false it appends line ops directly (horizontal top/bottom edges,
+// which pagination treats per segment).
+type rowGridStroker struct {
+	e     *engine
+	batch bool
+	segs  []GridSeg
+}
 
 func (s *rowGridStroker) hline(x0, x1, yy float64, side border) {
 	if x1-x0 <= 0 || !borderVisible(side) {
 		return
 	}
 
-	s.e.emitBorderLine(x0, yy, x1-x0, 0,
+	if !s.batch {
+		s.e.emitBorderLine(x0, yy, x1-x0, 0,
+			s.e.scalePt(side.Width), side.Style, side.Color[0], side.Color[1], side.Color[2])
+
+		return
+	}
+
+	s.segs = appendBorderLineSegments(s.segs, x0, yy, x1-x0, 0,
 		s.e.scalePt(side.Width), side.Style, side.Color[0], side.Color[1], side.Color[2])
 }
 
@@ -943,7 +959,14 @@ func (s *rowGridStroker) vline(xx, ya, yb float64, side border) {
 		return
 	}
 
-	s.e.emitBorderLine(xx, ya, 0, yb-ya,
+	if !s.batch {
+		s.e.emitBorderLine(xx, ya, 0, yb-ya,
+			s.e.scalePt(side.Width), side.Style, side.Color[0], side.Color[1], side.Color[2])
+
+		return
+	}
+
+	s.segs = appendBorderLineSegments(s.segs, xx, ya, 0, yb-ya,
 		s.e.scalePt(side.Width), side.Style, side.Color[0], side.Color[1], side.Color[2])
 }
 
@@ -1250,7 +1273,7 @@ func (e *engine) emitCell(cell *box, skipBorders bool) {
 
 	hideEmpty := isEmptyCellHidden(e, cell, sty)
 
-	if e.opts.Background && !hideEmpty {
+	if e.backgroundPaintEnabled(&sty) && !hideEmpty {
 		if r, g, bl, a, ok := e.cellBG(cell); ok {
 			e.add(Op{ //nolint:exhaustruct // intentional zero fields
 				Kind: OpFillRect, X: cell.x, Y: cell.y, W: cell.w, H: cell.height,
@@ -1264,7 +1287,7 @@ func (e *engine) emitCell(cell *box, skipBorders bool) {
 	}
 
 	contentStart := len(e.ops)
-	curX, contentW := e.contentBox(cell.x, cell.w, boxModelStyleOf(&sty))
+	curX, contentW := e.contentBox(cell.x, cell.w, &sty)
 	curY := cell.y + e.scalePt(sty.PaddingTop) + e.scalePt(sty.BorderTop.Width)
 	curY = cellVerticalAlignOffset(cell, curY)
 	// flowChildren advances cy; cell content is rooted at absolute canvas y

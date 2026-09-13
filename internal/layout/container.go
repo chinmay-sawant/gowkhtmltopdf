@@ -45,15 +45,6 @@ func findSizeContainer(n *html.Node, name string, containers map[*html.Node]size
 // computed without children (size containment / as-if-empty for intrinsic
 // contribution), matching buildBlock's definite-width rules.
 //
-//nolint:unparam // production callers pass the viewport; tests use a fixed fixture viewport.
-func measureSizeContainers(
-	root *html.Node, styles map[*html.Node]*ResolvedStyle, viewportW float64,
-) map[*html.Node]sizeContainer {
-	containers, _ := measureSizeContainersContext(context.Background(), root, styles, viewportW)
-
-	return containers
-}
-
 //nolint:cyclop,wsl // recursive container measurement keeps the cancellation gate local.
 func measureSizeContainersContext(
 	ctx context.Context, root *html.Node, styles map[*html.Node]*ResolvedStyle, viewportW float64,

@@ -109,9 +109,10 @@ func buildSemanticPDF(t *testing.T) []byte {
 		t.Fatalf("AddPNGImage: %v", err)
 	}
 	first.AddLinkURI([4]float64{40, 700, 160, 720}, "https://example.com/report")
-	first.AddLinkDest([4]float64{40, 670, 160, 690}, 1, 20, 760)
 
 	second := doc.AddPage(300, 400)
+	first.AddLinkDest([4]float64{40, 670, 160, 690}, second, 20, 760)
+
 	secondContent := second.Content()
 	secondContent.UseEmbeddedFont("F1", fnt)
 	secondContent.BeginText()
@@ -322,9 +323,10 @@ func buildSemanticPDF17(t *testing.T) []byte {
 	}
 
 	first.AddLinkURI([4]float64{40, 700, 160, 720}, "https://example.com/report17")
-	first.AddLinkDest([4]float64{40, 670, 160, 690}, 1, 20, 760)
 
 	second := doc.AddPage(300, 400)
+	first.AddLinkDest([4]float64{40, 670, 160, 690}, second, 20, 760)
+
 	secondContent := second.Content()
 	secondContent.UseEmbeddedFont("F1", fnt)
 	secondContent.BeginText()

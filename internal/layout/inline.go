@@ -41,15 +41,19 @@ const (
 
 // inlineItem is one atomic piece of inline content.
 type inlineItem struct {
-	text       string
-	style      *ResolvedStyle
-	w, h       float64 // text: run width + line height; image: placed size
-	marginL    float64 // leading horizontal margin (e.g. span margin-left)
-	marginR    float64 // trailing horizontal margin
-	img        bool
-	thumbImg   bool // img inside a collapsed wiki figure; outer frame owns L/R/T
-	chrome     bool // text belongs to an inline element with its own decoration
-	noSplit    bool // vertical writing-mode run must remain one rotated line
+	text     string
+	style    *ResolvedStyle
+	w, h     float64 // text: run width + line height; image: placed size
+	marginL  float64 // leading horizontal margin (e.g. span margin-left)
+	marginR  float64 // trailing horizontal margin
+	img      bool
+	thumbImg bool // img inside a collapsed wiki figure; outer frame owns L/R/T
+	chrome   bool // text belongs to an inline element with its own decoration
+	noSplit  bool // vertical writing-mode run must remain one rotated line
+	// bidiScoped marks an item owned by a unicode-bidi scope (embed, isolate,
+	// override, plaintext). The run-order heuristic and reverseInlineRange
+	// leave scoped runs alone; the scope owner already ordered them.
+	bidiScoped bool
 	imgRef     *imageRef
 	alt        string
 	href       string
@@ -61,7 +65,9 @@ type inlineItem struct {
 	opEnd    int
 }
 
-func (e *engine) collectAndPrepareInlineItems(nodes []*html.Node, contentW float64) []inlineItem {
+func (e *engine) collectAndPrepareInlineItems(
+	nodes []*html.Node, contentW float64, blockStyle *ResolvedStyle,
+) []inlineItem {
 	items := e.acquireInlineItems()
 
 	oldMax := e.imgMaxW
@@ -72,7 +78,7 @@ func (e *engine) collectAndPrepareInlineItems(nodes []*html.Node, contentW float
 		e.inlineCBW = contentW
 	}
 
-	e.collectInline(nodes, &items)
+	e.collectInline(nodes, &items, blockStyle)
 	e.imgMaxW = oldMax
 	e.inlineCBW = oldCB
 
@@ -157,7 +163,12 @@ func (e *engine) layoutInlineFloats(
 	boxNode *box, nodes []*html.Node, contentW, contentX, lineY float64,
 	floats *floatState,
 ) float64 {
-	items := e.collectAndPrepareInlineItems(nodes, contentW)
+	var blockStyle *ResolvedStyle
+	if boxNode != nil {
+		blockStyle = boxNode.style
+	}
+
+	items := e.collectAndPrepareInlineItems(nodes, contentW, blockStyle)
 	defer e.releaseInlineItems(items)
 
 	items = e.injectBlockPseudos(boxNode, items)
@@ -873,6 +884,14 @@ func (e *engine) emitLine(
 		textAlign = boxNode.style.TextAlignLast
 	}
 
+	// A vertical-rl block advances columns right-to-left, so a single column
+	// anchors at the content box's right edge. text-align along the vertical
+	// axis is not implemented; justify keeps the shared path.
+	if boxNode != nil && boxNode.style != nil &&
+		boxNode.style.WritingMode == writingModeVerticalRL && textAlign != cssTextAlignJustify {
+		textAlign = floatRight
+	}
+
 	// Coalesce adjacent same-style text runs into one op so PDF/image paint
 	// advances match layout (avoids word-by-word Tj gaps). Skip when
 	// justifying — gaps are distributed between word items. Legacy
@@ -903,7 +922,7 @@ func (e *engine) emitLine(
 // emitLineItems paints each item of a line at the given baseline, flushing
 // the accumulated underline run when the styling changes.
 //
-//nolint:wsl // blend scope restoration belongs immediately after item emission
+//nolint:cyclop,wsl // blend scope restoration belongs immediately after item emission
 func (e *engine) emitLineItems(boxNode *box, line []inlineItem, leftX, baseline, lineH, lineY, justifyGap float64) {
 	var und undRun
 
@@ -927,7 +946,8 @@ func (e *engine) emitLineItems(boxNode *box, line []inlineItem, leftX, baseline,
 			continue
 		}
 
-		prevBlend := e.pushInlineBlend(item.style)
+		itemX := leftX
+		blendScope := e.pushInlineBlend(item.style)
 		switch {
 		case item.blockBox != nil:
 			leftX = e.emitInlineBlock(
@@ -938,31 +958,86 @@ func (e *engine) emitLineItems(boxNode *box, line []inlineItem, leftX, baseline,
 		default:
 			leftX = e.emitInlineText(item, leftX, baseline, justifyGap, idx < len(line)-1, &und)
 		}
-		e.blendMode = prevBlend
+		e.popInlineBlend(&blendScope)
+
+		if blendScope.markStart >= 0 {
+			e.patchGroupMark(blendScope.markStart, itemX, lineY, item.w, lineH)
+			e.patchGroupMark(blendScope.endMark, itemX, lineY, item.w, lineH)
+		}
 	}
 
 	und.flush(e)
 }
 
-// pushInlineBlend applies the compositing scope of one inline item. Inline
-// items do not get their own box-layout pushZ call, so isolation and mix-blend
-// mode must be scoped while their text and decorations are emitted.
+// inlineBlendScope captures one inline item's enclosing compositing state.
+type inlineBlendScope struct {
+	prevBlend string
+	prevGroup *BlendGroup
+	prevOwner *ResolvedStyle
+	markStart int
+	endMark   int
+}
+
+// pushInlineBlend enters the compositing scope of one inline item. Inline
+// items do not get their own box-layout pushZ call, so isolation and
+// mix-blend-mode must be scoped while their text and decorations are emitted.
+// popInlineBlend restores the previous blend mode, group, and owner.
 //
-//nolint:goconst,wsl // CSS isolation keyword and scope assignment are explicit
-func (e *engine) pushInlineBlend(style *ResolvedStyle) string {
-	prev := e.blendMode
-	if style == nil {
-		return prev
+//nolint:goconst // CSS isolation keyword and scope assignment are explicit
+func (e *engine) pushInlineBlend(style *ResolvedStyle) inlineBlendScope {
+	scope := inlineBlendScope{
+		prevBlend: e.blendMode,
+		prevGroup: e.blendGroup,
+		prevOwner: e.blendGroupOwner,
+		markStart: -1,
+		endMark:   -1,
 	}
+	if style == nil {
+		return scope
+	}
+
+	// The block's own group already owns its inherited inline runs; opening a
+	// second group for the same element would emit a duplicate nested form.
+	if e.blendGroup != nil && e.blendGroupOwner == style {
+		return scope
+	}
+
+	mode := ""
+	if style.MixBlendMode != "" && style.MixBlendMode != blendNormal {
+		mode = style.MixBlendMode
+	}
+
+	if mode == "" && style.Isolation != "isolate" {
+		return scope
+	}
+
+	e.nextGroupID++
+	e.blendGroup = &BlendGroup{ID: e.nextGroupID, Mode: mode, Isolate: true, Parent: e.blendGroup}
+	e.blendGroupOwner = style
 
 	if style.Isolation == "isolate" {
 		e.blendMode = ""
 	}
-	if mode, ok := normalizeBlendMode(style.MixBlendMode); ok && mode != blendNormal {
+
+	if mode != "" {
 		e.blendMode = mode
 	}
 
-	return prev
+	scope.markStart = e.addGroupMark(e.blendGroup, groupMarkBegin)
+
+	return scope
+}
+
+// popInlineBlend closes the inline item's group (balanced markers) and
+// restores the enclosing scope.
+func (e *engine) popInlineBlend(scope *inlineBlendScope) {
+	if scope.markStart >= 0 {
+		scope.endMark = e.addGroupMark(e.blendGroup, groupMarkEnd)
+	}
+
+	e.blendMode = scope.prevBlend
+	e.blendGroup = scope.prevGroup
+	e.blendGroupOwner = scope.prevOwner
 }
 
 // trimTrailingSpace drops trailing whitespace from the last run of a line.

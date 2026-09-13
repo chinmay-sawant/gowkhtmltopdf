@@ -47,7 +47,7 @@ func (e *engine) buildGrid(node *html.Node, sty ResolvedStyle, availW, posX, pos
 		node: node, style: e.stylePtr(node), kind: boxKindBlock, x: posX + ml, y: posY,
 	}
 	boxNode.w = resolveUsedWidth(sty, availW, e)
-	contentX, contentW := e.contentBox(boxNode.x, boxNode.w, boxModelStyleOf(&sty))
+	contentX, contentW := e.contentBox(boxNode.x, boxNode.w, &sty)
 
 	contentStart := len(e.ops)
 	curY := e.scalePt(sty.PaddingTop) + e.scalePt(sty.BorderTop.Width)
@@ -682,7 +682,7 @@ func gridStretchBuildHeight(align string, cellH float64, cstate ResolvedStyle) f
 // resolveGridUsedHeight bumps the used height to the definite height and the
 // min border-box floor.
 func resolveGridUsedHeight(eng *engine, sty ResolvedStyle, usedH, contentH float64) float64 {
-	usedH += eng.scalePt(sty.PaddingBottom)
+	usedH = eng.borderBoxBottom(sty, usedH)
 
 	if sty.Height >= 0 {
 		height := eng.scalePt(sty.Height)

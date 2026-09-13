@@ -241,7 +241,7 @@ body { margin: 0; font-family: Arial, sans-serif; font-size: 10pt; }
 			if paintOp.Width < 0.74 || paintOp.Width > 0.76 {
 				t.Fatalf("one CSS pixel border lost its 0.75pt metric: %+v", paintOp)
 			}
-		case OpFillRect, OpStrokeRect, OpImage, OpLinkURI, OpBullet, OpUnknown, opKindNoop:
+		case OpFillRect, OpStrokeRect, OpGridRun, OpImage, OpLinkURI, OpBullet, OpUnknown, opKindNoop:
 		}
 	}
 

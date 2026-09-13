@@ -12,9 +12,9 @@
       "heading": "Defaults",
       "items": [
         "Local file access is blocked by default. Use the CLI --allow-local-files flag or Document.AllowLocalFiles for authored local templates.",
-        "NetworkPolicy can keep compatible behavior or restrict private destinations and cross-host redirects.",
+        "NetworkPolicy defaults to CompatibleNetworkPolicy (localhost and private addresses allowed); RestrictedNetworkPolicy or --restrict-network blocks private destinations and cross-host redirects unless an --allow-host entry permits them (internal/load/load.go:135-153).",
         "Primary documents, CSS, images, fonts, and header/footer resources share loader ACLs, timeouts, redirect limits, and body caps.",
-        "JavaScript is not executed, and browser/process flags are not part of the v0.2.4 primary CLI surface.",
+        "JavaScript is never executed: there is no JS engine and no os/exec in the tree, and JS-related flags (--enable-javascript, --javascript-delay, --run-script, --window-status, --debug-javascript) are rejected as unknown options by the CLI (internal/cli/cli.go:238).",
         "Treat remote or untrusted HTML as an egress request. Use an isolated worker without credentials for content you did not author."
       ]
     },
@@ -23,10 +23,10 @@
       "heading": "Security controls",
       "headers": ["Control", "Default"],
       "rows": [
-        ["Local file reads", "Denied; explicitly enabled with --allow-local-files or Document.AllowLocalFiles"],
-        ["HTTP(S)", "Compatible or restricted NetworkPolicy; bounded timeouts, redirects, and body size"],
-        ["JavaScript", "Not executed; script elements are not rendered as code"],
-        ["Output", "Validate before opening the writer; callers own the selected sink"],
+        ["Local file reads", "Denied by default; --allow-local-files / Document.AllowLocalFiles enables broad reads; --allow / Document.Allow adds prefix-scoped ACL exceptions (symlinks resolved before the check)"],
+        ["HTTP(S)", "CompatibleNetworkPolicy by default (localhost and RFC1918 allowed); RestrictedNetworkPolicy or --restrict-network blocks private destinations and cross-host redirects; 30 s connect / 60 s response, 10 redirects, 100 MiB body cap"],
+        ["JavaScript", "Never executed; no JS engine and no os/exec; JS-related flags are rejected as unknown options"],
+        ["Output", "Validate runs before the writer is opened; callers own the selected sink"],
         ["Credentials", "Operator-provided configuration only; never embed secrets in untrusted jobs"]
       ]
     },
@@ -40,7 +40,7 @@
       "type": "callout",
       "variant": "warn",
       "title": "Isolation still matters",
-      "body": "No renderer can turn arbitrary remote HTML into a safe input automatically. Validate or generate HTML server-side, remove cookies and custom headers from untrusted jobs, leave local files disabled unless required, and isolate workers when the source is not trusted."
+      "body": "No renderer can turn arbitrary remote HTML into a safe input automatically. Compatible network policy reaches localhost and RFC1918 addresses; use RestrictedNetworkPolicy or --restrict-network for content you did not author. Validate or generate HTML server-side, remove cookies and custom headers from untrusted jobs, leave local files disabled unless required, and isolate workers when the source is not trusted."
     }
   ]
 }

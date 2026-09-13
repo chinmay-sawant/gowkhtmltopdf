@@ -27,7 +27,10 @@
  * @property {string} [evidence] - Concrete codebase path or test verifying the status
  * @property {string} [author] - Issue author
  * @property {string} [created_at] - Creation timestamp
+ * @property {string} [updated_at] - Last update timestamp
  * @property {number} [comments] - Comment count
+ * @property {string} [url] - Upstream GitHub issue URL
+ * @property {Array<string>} [labels] - Upstream issue labels
  */
 
 /**
@@ -42,7 +45,7 @@
  * @property {string} [heading]
  * @property {string} [body]
  * @property {string} [code]
- * @property {string} [lang]
+ * @property {string} [language]
  * @property {string} [variant]
  * @property {Array<any>} [items]
  * @property {Array<any>} [sections]
@@ -76,7 +79,11 @@
  * @property {number} pages - Document page count
  * @property {number} gowkMs - gowkhtmltopdf execution time in milliseconds
  * @property {number} wkMs - wkhtmltopdf execution time in milliseconds
- * @property {string} [notes] - Additional benchmark notes
+ * @property {number} speedup - gowkhtmltopdf speedup factor versus wkhtmltopdf
+ * @property {number} gowkRss - gowkhtmltopdf peak RSS in KiB
+ * @property {number} wkRss - wkhtmltopdf peak RSS in KiB
+ * @property {number} gowkBytes - gowkhtmltopdf output size in bytes
+ * @property {number} wkBytes - wkhtmltopdf output size in bytes
  */
 
 export {}

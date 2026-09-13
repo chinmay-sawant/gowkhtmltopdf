@@ -51,19 +51,100 @@ func shiftFlowBounded(res *Result, from, toIdx int, fromY, beforeY, deltaY float
 	shiftFlowBoxes(res, from, toIdx, fromY, beforeY, startPage, deltaY)
 }
 
-// invalidateFlowIndex drops cached page buckets so the next ensureFlowIndex
-// rebuilds from current coordinates.
+// flowIndexStorage is one retained page-index backing set: the per-page op
+// buckets, the op -> page / page-position maps, and a per-page count scratch.
+// A Result keeps one set for the live flow index, one for the box index, and
+// one scratch set for the forced fresh builds, so the four per-conversion
+// bucket computations reuse storage instead of reallocating. Every build
+// resets and refills the arrays; a bucket is reallocated only when it outgrows
+// its high-water mark.
+type flowIndexStorage struct {
+	pages  [][]int
+	pageOf []int
+	pos    []int
+	counts []int
+}
+
+// reset drops the retained backing arrays.
+func (s *flowIndexStorage) reset() {
+	*s = flowIndexStorage{} //nolint:exhaustruct // zero value clears the retained arrays
+}
+
+// resetIntBuffer reslices dst to length, allocating only when capacity is
+// short, and clears the retained prefix.
+func resetIntBuffer(dst []int, length int) []int {
+	if cap(dst) < length {
+		return make([]int, length)
+	}
+
+	dst = dst[:length]
+	clear(dst)
+
+	return dst
+}
+
+// resetPageBuckets reslices dst to length, releasing bucket references past
+// the end and truncating every retained bucket to zero length.
+func resetPageBuckets(dst [][]int, length int) [][]int {
+	if cap(dst) < length {
+		return make([][]int, length)
+	}
+
+	for page := length; page < len(dst); page++ {
+		dst[page] = nil
+	}
+
+	dst = dst[:length]
+
+	for page := range dst {
+		dst[page] = dst[page][:0]
+	}
+
+	return dst
+}
+
+// sizePageBuckets gives every bucket at least the counted capacity, reusing
+// the retained bucket when it is already large enough.
+func sizePageBuckets(pages [][]int, counts []int) {
+	for page := range pages {
+		if cap(pages[page]) < counts[page] {
+			pages[page] = make([]int, 0, counts[page])
+		} else {
+			pages[page] = pages[page][:0]
+		}
+	}
+}
+
+// invalidateFlowIndex drops the live page buckets so the next
+// ensureFlowIndex rebuilds from current coordinates. The backing arrays stay
+// in the Result stores for reuse; only the live slices are cleared, and
+// callers keep detecting a missing index by length.
 func invalidateFlowIndex(res *Result) {
 	if res == nil {
 		return
 	}
 
-	res.flowPageOf = nil
 	res.flowPages = nil
+	res.flowPageOf = nil
 	res.flowPos = nil
 	res.flowBoxes = nil
 	res.flowBoxPage = nil
 	res.flowBoxPos = nil
+}
+
+// releaseFlowIndex is the PDF-05 release point: it clears the live index and
+// drops the retained backing arrays so PDF finalization cannot retain them.
+// A later paint or pagination pass rebuilds from scratch.
+func releaseFlowIndex(res *Result) {
+	if res == nil {
+		return
+	}
+
+	invalidateFlowIndex(res)
+
+	res.flowStore.reset()
+	res.flowBoxStore.reset()
+	res.flowScratch.reset()
 }
 
 // shiftOpsRange shifts the non-fixed ops of [from,to] by deltaY.
@@ -141,7 +222,9 @@ func shiftOpsBucket(res *Result, page, from, toIdx int, fromY, beforeY, deltaY f
 		oldPage := res.flowPageOf[idx]
 		shiftIndexedOp(res, idx, deltaY)
 
-		if res.flowPageOf[idx] == oldPage {
+		// shiftIndexedOp may invalidate the flow index when the new Y leaves
+		// the representable page range; the live map is then empty.
+		if idx < len(res.flowPageOf) && res.flowPageOf[idx] == oldPage {
 			jdx++
 		}
 	}
@@ -164,6 +247,8 @@ func shiftFlowBoxes(res *Result, from, toIdx int, fromY, beforeY float64, startP
 
 // shiftBoxesBucket shifts the boxes of one page bucket whose top moved.
 // Re-reads res.flowBoxes[page] each step (same swap-remove hazard as ops).
+//
+//nolint:cyclop // stale-index guard adds one condition to the bucket walk
 func shiftBoxesBucket(res *Result, page, from, toIdx int, fromY, beforeY float64, startPage int, deltaY float64) {
 	if page < 0 || page >= len(res.flowBoxes) {
 		return
@@ -191,7 +276,9 @@ func shiftBoxesBucket(res *Result, page, from, toIdx int, fromY, beforeY float64
 		oldPage := res.flowBoxPage[boxIndex]
 		shiftIndexedBox(res, boxIndex, deltaY)
 
-		if res.flowBoxPage[boxIndex] == oldPage {
+		// shiftIndexedBox may invalidate the flow index when the new Y leaves
+		// the representable page range; the live map is then empty.
+		if boxIndex < len(res.flowBoxPage) && res.flowBoxPage[boxIndex] == oldPage {
 			jdx++
 		}
 	}
@@ -239,15 +326,16 @@ func ensureFlowIndex(res *Result, pageSize float64) {
 
 	res.flowPageSize = pageSize
 
-	var ok bool
-
-	res.flowPages, res.flowPageOf, res.flowPos, ok = buildFlowOpIndex(res.Ops, pageSize)
-	if !ok {
+	if !buildPageIndex(res.Ops, pageSize, layoutEpsilon, &res.flowStore) {
 		invalidateFlowIndex(res)
 		res.flowPageSize = pageSize
 
 		return
 	}
+
+	res.flowPages = res.flowStore.pages
+	res.flowPageOf = res.flowStore.pageOf
+	res.flowPos = res.flowStore.pos
 
 	boxes := res.boxes
 	if len(boxes) == 0 && res.root != nil {
@@ -259,23 +347,34 @@ func ensureFlowIndex(res *Result, pageSize float64) {
 	ensureFlowBoxIndex(res, boxes)
 }
 
-// buildFlowOpIndex buckets non-fixed ops by their canvas page.
-func buildFlowOpIndex(ops []Op, pageSize float64) ([][]int, []int, []int, bool) {
-	// Page numbers are dense from 0..maxP, so counts index directly instead
-	// of a per-page map (page buckets below are exact-capacity, no growth).
-	// Fixed ops leave pageOf/pos at their zero values; every reader guards
-	// Fixed before use, so no explicit fill is needed.
+// buildPageIndex maps every non-fixed op to its canvas page and fills the
+// exact-capacity page buckets into store. It is the single page-ownership
+// mapping shared by the flow index and the painted page buckets. pageOf, pos,
+// pages and the per-page buckets are reset and reused from store; only a
+// first build (or one that outgrows the retained capacity) allocates.
+//
+// edgeBias selects the boundary policy: page ownership uses layoutEpsilon so
+// a rect fragment that starts exactly at a page top (Y = k*contentH, whose
+// float division can round just below k, e.g. (21*785.197)/785.197 =
+// 20.9999...) stays on the page it starts. Fixed ops leave pageOf/pos at
+// zero; every reader guards Fixed before use.
+func buildPageIndex(ops []Op, pageSize, edgeBias float64, store *flowIndexStorage) bool {
+	if store == nil {
+		return false
+	}
+
+	pageOf := resetIntBuffer(store.pageOf, len(ops))
+
 	maxPage := 0
-	pageOf := make([]int, len(ops))
 
 	for idx := range ops {
 		if ops[idx].Fixed {
 			continue
 		}
 
-		page, ok := checkedFlowPageOfY(ops[idx].Y, pageSize)
+		page, ok := flowPageOfY(ops[idx].Y, pageSize, edgeBias)
 		if !ok {
-			return nil, nil, nil, false
+			return false
 		}
 
 		pageOf[idx] = page
@@ -285,8 +384,23 @@ func buildFlowOpIndex(ops []Op, pageSize float64) ([][]int, []int, []int, bool) 
 		}
 	}
 
-	pages := make([][]int, maxPage+1)
-	pos := make([]int, len(ops))
+	// Exact per-page capacity from a counting pass: appending into nil buckets
+	// reallocated the whole per-page payload on every rebuild. Each bucket
+	// allocates at most once, at its high-water mark, and is reused after that.
+	pages := resetPageBuckets(store.pages, maxPage+1)
+	counts := resetIntBuffer(store.counts, maxPage+1)
+
+	for idx := range ops {
+		if ops[idx].Fixed {
+			continue
+		}
+
+		counts[pageOf[idx]]++
+	}
+
+	sizePageBuckets(pages, counts)
+
+	pos := resetIntBuffer(store.pos, len(ops))
 
 	for idx := range ops {
 		if ops[idx].Fixed {
@@ -298,7 +412,12 @@ func buildFlowOpIndex(ops []Op, pageSize float64) ([][]int, []int, []int, bool) 
 		pages[page] = append(pages[page], idx)
 	}
 
-	return pages, pageOf, pos, true
+	store.pageOf = pageOf
+	store.pages = pages
+	store.pos = pos
+	store.counts = counts
+
+	return true
 }
 
 func ensureFlowBoxIndex(res *Result, boxes []*box) {
@@ -310,9 +429,11 @@ func ensureFlowBoxIndex(res *Result, boxes []*box) {
 		return
 	}
 
-	res.flowBoxes = make([][]int, len(res.flowPages))
-	res.flowBoxPage = make([]int, len(boxes))
-	res.flowBoxPos = make([]int, len(boxes))
+	store := &res.flowBoxStore
+
+	pageOf := resetIntBuffer(store.pageOf, len(boxes))
+
+	maxPage := 0
 
 	for idx, b := range boxes {
 		b.flowIndex = idx
@@ -326,14 +447,38 @@ func ensureFlowBoxIndex(res *Result, boxes []*box) {
 			return
 		}
 
-		for len(res.flowBoxes) <= page {
-			res.flowBoxes = append(res.flowBoxes, nil)
-		}
+		pageOf[idx] = page
 
-		res.flowBoxPage[idx] = page
-		res.flowBoxPos[idx] = len(res.flowBoxes[page])
-		res.flowBoxes[page] = append(res.flowBoxes[page], idx)
+		if page > maxPage {
+			maxPage = page
+		}
 	}
+
+	counts := resetIntBuffer(store.counts, maxPage+1)
+
+	for idx := range boxes {
+		counts[pageOf[idx]]++
+	}
+
+	pages := resetPageBuckets(store.pages, maxPage+1)
+	sizePageBuckets(pages, counts)
+
+	pos := resetIntBuffer(store.pos, len(boxes))
+
+	for idx := range boxes {
+		page := pageOf[idx]
+		pos[idx] = len(pages[page])
+		pages[page] = append(pages[page], idx)
+	}
+
+	store.pages = pages
+	store.pageOf = pageOf
+	store.pos = pos
+	store.counts = counts
+
+	res.flowBoxes = pages
+	res.flowBoxPage = pageOf
+	res.flowBoxPos = pos
 }
 
 func shiftIndexedOp(res *Result, index int, deltaY float64) {
@@ -342,9 +487,9 @@ func shiftIndexedOp(res *Result, index int, deltaY float64) {
 	}
 
 	oldPage := res.flowPageOf[index]
-	res.Ops[index].Y += deltaY
+	shiftOpY(&res.Ops[index], deltaY)
 
-	newPage, ok := checkedFlowPageOfY(res.Ops[index].Y, res.flowPageSize)
+	newPage, ok := flowPageOfY(res.Ops[index].Y, res.flowPageSize, layoutEpsilon)
 	if !ok {
 		invalidateFlowIndex(res)
 
@@ -381,6 +526,13 @@ func shiftIndexedBox(res *Result, index int, deltaY float64) {
 
 	removeFromFlowBucket(&res.flowBoxes, res.flowBoxPos, oldPage, index)
 	appendToFlowBucket(&res.flowBoxes, &res.flowBoxPage, &res.flowBoxPos, index, newPage)
+}
+
+// flowPageOfY is the one page-ownership mapping. edgeBias nudges a y that
+// sits a hair below a page top onto the page it starts (rect fragments split
+// at the boundary); pass zero for raw truncation.
+func flowPageOfY(yCoord, pageSize, edgeBias float64) (int, bool) {
+	return checkedFlowPageOfY(yCoord+edgeBias, pageSize)
 }
 
 // checkedFlowPageOfY maps a canvas Y to its page index and reports whether the

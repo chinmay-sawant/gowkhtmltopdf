@@ -84,7 +84,7 @@ func TestPaginateOpsHonorsCancellation(t *testing.T) {
 		},
 	}
 
-	if _, err := paginateOps(ctx, res, 100); !errors.Is(err, context.Canceled) {
+	if err := paginateOps(ctx, res, 100); !errors.Is(err, context.Canceled) {
 		t.Fatalf("paginateOps error = %v, want context.Canceled", err)
 	}
 }

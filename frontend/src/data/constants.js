@@ -1,7 +1,7 @@
 export const STATUS_ORDER = ['implemented', 'partial', 'not-implemented']
 
 export const STATUS_META = {
-  implemented: { label: 'Implemented', color: 'var(--ok-ink)', accent: 'var(--ok-bg)', text: 'var(--ok-ink)', rawColor: '#9BBF88' },
+  implemented: { label: 'Implemented / Fixed', color: 'var(--ok-ink)', accent: 'var(--ok-bg)', text: 'var(--ok-ink)', rawColor: '#9BBF88' },
   partial: { label: 'Partial', color: 'var(--warn-ink)', accent: 'var(--warn-bg)', text: 'var(--warn-ink)', rawColor: '#E7CD80' },
   'not-implemented': { label: 'Not implemented', color: 'var(--bad-ink)', accent: 'var(--bad-bg)', text: 'var(--bad-ink)', rawColor: '#D89A8B' },
 }

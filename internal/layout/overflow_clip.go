@@ -106,8 +106,8 @@ func (e *engine) computeBoxOverflowClip(boxNode *box, current *clipRect) *clipRe
 		return current
 	}
 
-	clipX := overflowClipsPaint(boxNode.style.OverflowX) || overflowClipsPaint(boxNode.style.Overflow)
-	clipY := overflowClipsPaint(boxNode.style.OverflowY) || overflowClipsPaint(boxNode.style.Overflow)
+	clipX := clipsPaintAxis(boxNode.style, boxNode.style.OverflowX)
+	clipY := clipsPaintAxis(boxNode.style, boxNode.style.OverflowY)
 
 	if !clipX && !clipY {
 		return current
@@ -131,6 +131,12 @@ func (e *engine) computeBoxOverflowClip(boxNode *box, current *clipRect) *clipRe
 	}
 
 	return &pb
+}
+
+// clipsPaintAxis reports whether one overflow axis clips paint: the axis
+// longhand, the overflow shorthand, or contain: paint.
+func clipsPaintAxis(style *ResolvedStyle, axis string) bool {
+	return overflowClipsPaint(axis) || overflowClipsPaint(style.Overflow) || containsPaint(*style)
 }
 
 func (e *engine) clipOverflowTree(boxNode *box, clip *clipRect) {
@@ -197,7 +203,7 @@ func (e *engine) clipOwnContentOps(ops []Op, boxNode *box, clip clipRect) {
 	}
 
 	for i := boxNode.opStart; i <= boxNode.opEnd && i < len(ops); i++ {
-		if opInChildRange(boxNode, i) || e.isOwnChromeOp(&ops[i], boxNode) {
+		if opInChildRange(boxNode, i) || opOwnedBy(&ops[i], boxNode, opOwnerClip) {
 			continue
 		}
 
@@ -223,56 +229,24 @@ func opInChildRange(boxNode *box, idx int) bool {
 	return false
 }
 
-func (e *engine) isOwnChromeOp(op *Op, boxNode *box) bool {
-	if op == nil || boxNode == nil {
-		return false
-	}
-
-	switch op.Kind {
-	case OpFillRect, OpStrokeRect:
-		return nearRectOp(op, boxNode.x, boxNode.y, boxNode.w, boxNode.height)
-	case OpLine:
-		if lineOnRectEdges(op, boxNode.x, boxNode.y, boxNode.w, boxNode.height) {
-			return true
-		}
-
-		return e.isOwnOutlineLine(op, boxNode)
-	case OpText, OpImage, OpLinkURI, OpBullet, OpUnknown, opKindNoop:
-		return false
-	default:
-		return false
-	}
-}
-
-func (e *engine) isOwnOutlineLine(op *Op, boxNode *box) bool {
-	if e == nil || op == nil || boxNode == nil || boxNode.style == nil || !outlinePaints(boxNode.style) {
-		return false
-	}
-
-	ow := e.scalePt(boxNode.style.OutlineWidth)
-	off := e.scalePt(boxNode.style.OutlineOffset)
-	inflate := outlineInflate(ow, off)
-
-	return lineOnRectEdges(
-		op,
-		boxNode.x-inflate, boxNode.y-inflate,
-		boxNode.w+2*inflate, boxNode.height+2*inflate,
-	)
-}
-
-func nearRectOp(op *Op, x, y, w, h float64) bool {
+func lineOnRectEdges(op *Op, x, y, w, h float64) bool {
 	if op == nil {
 		return false
 	}
 
-	return math.Abs(op.X-x) <= clipPointTolerance &&
-		math.Abs(op.Y-y) <= clipPointTolerance &&
-		math.Abs(op.W-w) <= clipPointTolerance &&
-		math.Abs(op.H-h) <= clipPointTolerance
-}
+	if op.Kind == OpGridRun {
+		onEdge := false
 
-func lineOnRectEdges(op *Op, x, y, w, h float64) bool {
-	if op == nil || op.Kind != OpLine {
+		op.forEachLine(func(line Op) {
+			if !onEdge && lineOnRectEdges(&line, x, y, w, h) {
+				onEdge = true
+			}
+		})
+
+		return onEdge
+	}
+
+	if op.Kind != OpLine {
 		return false
 	}
 
@@ -327,10 +301,46 @@ func clipPaintOp(op *Op, clip clipRect) {
 		clipRectOp(op, clip)
 	case OpLine:
 		clipLineOp(op, clip)
+	case OpGridRun:
+		clipGridRunOp(op, clip)
 	case OpText, OpBullet:
 		clipTextOp(op, clip)
 	case OpUnknown, opKindNoop:
 	}
+}
+
+// clipGridRunOp clips every segment of a batched grid run, dropping segments
+// the clip removed entirely. The run is the union of its remaining segments.
+func clipGridRunOp(op *Op, clip clipRect) {
+	if op.Grid == nil {
+		DeactivateOp(op)
+
+		return
+	}
+
+	kept := op.Grid.Segs[:0]
+
+	for idx := range op.Grid.Segs {
+		line := op.Grid.asLine(op, idx)
+		clipLineOp(&line, clip)
+
+		if line.Kind == opKindNoop {
+			continue
+		}
+
+		seg := op.Grid.Segs[idx]
+		seg.X, seg.Y, seg.W, seg.H = line.X, line.Y, line.W, line.H
+		kept = append(kept, seg)
+	}
+
+	if len(kept) == 0 {
+		DeactivateOp(op)
+
+		return
+	}
+
+	op.Grid.Segs = kept
+	recomputeGridRunBounds(op)
 }
 
 func clipRectOp(op *Op, clip clipRect) {

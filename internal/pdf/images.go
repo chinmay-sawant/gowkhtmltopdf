@@ -414,26 +414,51 @@ func (c *Content) emitPNGXObject(name string, width, height int, rgba, mask []by
 	c.imageUses[name] = ref.String()
 }
 
+// storeRGBAPixel folds one premultiplied 16-bit sample tuple into the RGB
+// output buffer, applying the grayscale luma fold when requested. Sharing
+// this math keeps the concrete fast paths bit-exact with the generic At path.
+func storeRGBAPixel(out []byte, off int, red, green, blue uint32, grayscale bool) {
+	if grayscale {
+		v := byte(lumaR*float64(red>>bitsPerByte) + lumaG*float64(green>>bitsPerByte) + lumaB*float64(blue>>bitsPerByte))
+		out[off], out[off+1], out[off+2] = v, v, v
+
+		return
+	}
+
+	out[off] = byte(red >> bitsPerByte)
+	out[off+1] = byte(green >> bitsPerByte)
+	out[off+2] = byte(blue >> bitsPerByte)
+}
+
 // renderImagePixels folds the image into an RGB byte slice, returning
-// whether any pixel has alpha below fully opaque.
+// whether any pixel has alpha below fully opaque. The decoded slice types
+// (opaque PNGs decode to *image.RGBA, alpha PNGs to *image.NRGBA) bypass the
+// boxed color.Color interface; every other image type uses the generic At
+// path with identical conversion math.
 func renderImagePixels(img image.Image, bounds image.Rectangle, grayscale bool) ([]byte, bool) {
 	width, height := bounds.Dx(), bounds.Dy()
 	rgba := make([]byte, width*height*rgbChannels)
+
+	switch src := img.(type) {
+	case *image.RGBA:
+		return rgba, renderRGBAPixels(src, bounds, rgba, grayscale)
+	case *image.NRGBA:
+		return rgba, renderNRGBAPixels(src, bounds, rgba, grayscale)
+	default:
+		return rgba, renderGenericPixels(img, bounds, rgba, grayscale)
+	}
+}
+
+// renderRGBAPixels folds an *image.RGBA into rgba, returning whether any pixel
+// has alpha below fully opaque.
+func renderRGBAPixels(src *image.RGBA, bounds image.Rectangle, rgba []byte, grayscale bool) bool {
+	width, height := bounds.Dx(), bounds.Dy()
 	hasAlpha := false
 
 	for yy := range height {
 		for xx := range width {
-			red, green, blue, alpha := img.At(bounds.Min.X+xx, bounds.Min.Y+yy).RGBA()
-			off := (yy*width + xx) * rgbChannels
-
-			if grayscale {
-				v := byte(lumaR*float64(red>>bitsPerByte) + lumaG*float64(green>>bitsPerByte) + lumaB*float64(blue>>bitsPerByte))
-				rgba[off], rgba[off+1], rgba[off+2] = v, v, v
-			} else {
-				rgba[off] = byte(red >> bitsPerByte)
-				rgba[off+1] = byte(green >> bitsPerByte)
-				rgba[off+2] = byte(blue >> bitsPerByte)
-			}
+			red, green, blue, alpha := src.RGBAAt(bounds.Min.X+xx, bounds.Min.Y+yy).RGBA()
+			storeRGBAPixel(rgba, (yy*width+xx)*rgbChannels, red, green, blue, grayscale)
 
 			if alpha < maxUint16Val {
 				hasAlpha = true
@@ -441,18 +466,77 @@ func renderImagePixels(img image.Image, bounds image.Rectangle, grayscale bool) 
 		}
 	}
 
-	return rgba, hasAlpha
+	return hasAlpha
 }
 
-// renderAlphaMask extracts an 8-bit alpha mask (0 = transparent).
+// renderNRGBAPixels folds an *image.NRGBA into rgba, returning whether any
+// pixel has alpha below fully opaque.
+func renderNRGBAPixels(src *image.NRGBA, bounds image.Rectangle, rgba []byte, grayscale bool) bool {
+	width, height := bounds.Dx(), bounds.Dy()
+	hasAlpha := false
+
+	for yy := range height {
+		for xx := range width {
+			red, green, blue, alpha := src.NRGBAAt(bounds.Min.X+xx, bounds.Min.Y+yy).RGBA()
+			storeRGBAPixel(rgba, (yy*width+xx)*rgbChannels, red, green, blue, grayscale)
+
+			if alpha < maxUint16Val {
+				hasAlpha = true
+			}
+		}
+	}
+
+	return hasAlpha
+}
+
+// renderGenericPixels folds any image.Image into rgba through the boxed
+// color.Color interface, returning whether any pixel has alpha below fully
+// opaque.
+func renderGenericPixels(img image.Image, bounds image.Rectangle, rgba []byte, grayscale bool) bool {
+	width, height := bounds.Dx(), bounds.Dy()
+	hasAlpha := false
+
+	for yy := range height {
+		for xx := range width {
+			red, green, blue, alpha := img.At(bounds.Min.X+xx, bounds.Min.Y+yy).RGBA()
+			storeRGBAPixel(rgba, (yy*width+xx)*rgbChannels, red, green, blue, grayscale)
+
+			if alpha < maxUint16Val {
+				hasAlpha = true
+			}
+		}
+	}
+
+	return hasAlpha
+}
+
+// renderAlphaMask extracts an 8-bit alpha mask (0 = transparent). The same
+// concrete fast paths as renderImagePixels apply.
 func renderAlphaMask(img image.Image, bounds image.Rectangle) []byte {
 	width, height := bounds.Dx(), bounds.Dy()
 	mask := make([]byte, width*height)
 
-	for yy := range height {
-		for xx := range width {
-			_, _, _, a := img.At(bounds.Min.X+xx, bounds.Min.Y+yy).RGBA()
-			mask[yy*width+xx] = byte(a >> bitsPerByte)
+	switch src := img.(type) {
+	case *image.RGBA:
+		for yy := range height {
+			for xx := range width {
+				_, _, _, alpha := src.RGBAAt(bounds.Min.X+xx, bounds.Min.Y+yy).RGBA()
+				mask[yy*width+xx] = byte(alpha >> bitsPerByte)
+			}
+		}
+	case *image.NRGBA:
+		for yy := range height {
+			for xx := range width {
+				_, _, _, alpha := src.NRGBAAt(bounds.Min.X+xx, bounds.Min.Y+yy).RGBA()
+				mask[yy*width+xx] = byte(alpha >> bitsPerByte)
+			}
+		}
+	default:
+		for yy := range height {
+			for xx := range width {
+				_, _, _, alpha := img.At(bounds.Min.X+xx, bounds.Min.Y+yy).RGBA()
+				mask[yy*width+xx] = byte(alpha >> bitsPerByte)
+			}
 		}
 	}
 

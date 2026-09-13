@@ -271,6 +271,59 @@ func TestLoadTimeoutZoomSetterRange(t *testing.T) {
 	}
 }
 
+func TestFiniteSetters(t *testing.T) {
+	t.Parallel()
+
+	obj := DefaultPdfObject()
+	if err := obj.Set("load.zoomfactor", "NaN"); err == nil {
+		t.Error("load.zoomfactor=NaN must be rejected at Set")
+	}
+
+	if err := obj.Set("load.zoomfactor", "Inf"); err == nil {
+		t.Error("load.zoomfactor=Inf must be rejected at Set")
+	}
+
+	if err := obj.Set("load.zoomfactor", "2"); err != nil || obj.Load.ZoomFactor != 2 {
+		t.Errorf("load.zoomfactor=2 = %v, err %v", obj.Load.ZoomFactor, err)
+	}
+
+	global := DefaultPdfGlobal()
+	if err := global.Set("margin.top", "Inf"); err == nil {
+		t.Error("margin.top=Inf must be rejected at Set")
+	}
+
+	if err := global.Set("margin.top", "NaN"); err == nil {
+		t.Error("margin.top=NaN must be rejected at Set")
+	}
+
+	if _, err := ParseUnitReal("nan", "mm"); err == nil {
+		t.Error("ParseUnitReal(nan) must error")
+	}
+}
+
+func TestMarginSetterAutoAndSides(t *testing.T) {
+	t.Parallel()
+
+	global := DefaultPdfGlobal()
+	if err := global.Set("margin.top", "-1"); err != nil || math.Abs(global.Margin.Top-(-1)) > 1e-9 {
+		t.Errorf("margin.top=-1 = %v, err %v; want -1 auto sentinel", global.Margin.Top, err)
+	}
+
+	if err := global.Set("margin.bottom", "-2"); err != nil || math.Abs(global.Margin.Bottom-(-2)) > 1e-9 {
+		t.Errorf("margin.bottom=-2 = %v, err %v; want -2 auto sentinel", global.Margin.Bottom, err)
+	}
+
+	before := global.Margin.Left
+
+	if err := global.Set("margin.left", "-1"); err == nil {
+		t.Error("margin.left=-1 must be rejected")
+	}
+
+	if global.Margin.Left != before {
+		t.Errorf("rejected margin.left mutated value to %v, want %v", global.Margin.Left, before)
+	}
+}
+
 func TestImageQualitySetterRange(t *testing.T) {
 	t.Parallel()
 
@@ -457,34 +510,61 @@ func TestParseEnums(t *testing.T) {
 		t.Error("invalid orientation must error")
 	}
 
-	if v, _ := ParseColorMode("grayscale"); v != ColorModeGrayscale {
-		t.Error("color-mode grayscale")
+	if v, _ := ParseLoadErrorHandling("skip"); v != LoadErrorSkip {
+		t.Error("load-error-handling skip")
+	}
+}
+
+// TestColorModeSetGrayscale drives the colormode key through the global key
+// table, the path flag parsing and callers use.
+func TestColorModeSetGrayscale(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		raw  string
+		want bool
+	}{
+		{name: "empty defaults to color", raw: "", want: false},
+		{name: "color", raw: "color", want: false},
+		{name: "color case-insensitive", raw: "Color", want: false},
+		{name: "grayscale", raw: "grayscale", want: true},
+		{name: "grayscale case-insensitive", raw: "GRAYSCALE", want: true},
 	}
 
-	if v, _ := ParseColorMode("GRAYSCALE"); v != ColorModeGrayscale {
-		t.Error("color-mode grayscale must be case-insensitive")
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			global := DefaultPdfGlobal()
+			global.Grayscale = !testCase.want
+
+			if err := global.Set("colormode", testCase.raw); err != nil {
+				t.Fatalf("Set(colormode, %q) error: %v", testCase.raw, err)
+			}
+
+			if global.Grayscale != testCase.want {
+				t.Errorf("Grayscale = %v, want %v", global.Grayscale, testCase.want)
+			}
+		})
 	}
 
-	if v, _ := ParseColorMode("Color"); v != ColorModeColor {
-		t.Error("color-mode color must be case-insensitive")
-	}
+	global := DefaultPdfGlobal()
+	global.Grayscale = true
 
-	if v, err := ParseColorMode("sepia"); err == nil || v != ColorModeColor {
+	if err := global.Set("colormode", "sepia"); err == nil {
 		t.Error("invalid color-mode must error")
 	}
 
-	if v, _ := ParseLoadErrorHandling("skip"); v != LoadErrorSkip {
-		t.Error("load-error-handling skip")
+	if !global.Grayscale {
+		t.Error("invalid color-mode must not change Grayscale")
 	}
 }
 
 func TestEnumStringReportsUnknownForInvalid(t *testing.T) {
 	t.Parallel()
 
-	if got := ColorMode(99).String(); got != sUnknown {
-		t.Errorf("ColorMode(99).String() = %q, want unknown", got)
-	}
-	if got := Orientation(99).String(); got != sUnknown { //nolint:wsl // test table
+	if got := Orientation(99).String(); got != sUnknown {
 		t.Errorf("Orientation(99).String() = %q, want unknown", got)
 	}
 	if got := LoadErrorHandling(42).String(); got != sUnknown { //nolint:wsl
@@ -529,10 +609,6 @@ func TestMarginEdgeUnknown(t *testing.T) {
 	ptr, ok := marginEdgePtr(&m, "side")
 	if ok || ptr != nil {
 		t.Errorf("marginEdgePtr(unknown) = (%v, %v), want (nil, false)", ptr, ok)
-	}
-
-	if _, ok := marginValue(&m, "side"); ok {
-		t.Error("marginValue(unknown) must report not-found")
 	}
 
 	if ptr, ok := marginEdgePtr(&m, "top"); !ok || ptr != &m.Top {
@@ -744,6 +820,54 @@ func TestResolveMedia(t *testing.T) {
 	// print-media-type override wins over media-type.
 	if got := ResolveMedia(base, screen, &pmt); got != sPrint {
 		t.Errorf("pmt over media-type screen = %q", got)
+	}
+}
+
+func TestResolveImages(t *testing.T) {
+	t.Parallel()
+
+	web := func(images bool) Web { return Web{Images: images} }
+	image := func(images bool) *ImageGlobal {
+		return &ImageGlobal{Web: Web{Images: images}}
+	}
+	object := func(images bool) *PdfObject {
+		return &PdfObject{Web: Web{Images: images}}
+	}
+
+	defaultImage := DefaultImageGlobal()
+	defaultObject := DefaultPdfObject()
+
+	tests := []struct {
+		name   string
+		global Web
+		image  *ImageGlobal
+		obj    *PdfObject
+		want   bool
+	}{
+		{name: "global only enabled", global: web(true), want: true},
+		{name: "global only disabled", global: web(false), want: false},
+		{name: "image layer disables", global: web(true), image: image(false), want: false},
+		{name: "image layer enables after global disables", global: web(false), image: image(true), want: false},
+		{name: "object layer disables", global: web(true), image: image(true), obj: object(false), want: false},
+		{name: "object layer with no image layer disables", global: web(true), obj: object(false), want: false},
+		{name: "all layers enabled", global: web(true), image: image(true), obj: object(true), want: true},
+		{
+			name:   "canonical defaults stay enabled",
+			global: DefaultPdfGlobal().Web,
+			image:  &defaultImage,
+			obj:    &defaultObject,
+			want:   true,
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := ResolveImages(testCase.global, testCase.image, testCase.obj); got != testCase.want {
+				t.Errorf("ResolveImages() = %v, want %v", got, testCase.want)
+			}
+		})
 	}
 }
 

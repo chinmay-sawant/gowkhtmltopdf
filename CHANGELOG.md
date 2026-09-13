@@ -8,14 +8,13 @@ binaries at build time (see README "Versioning").
 
 ### Added
 
-- **Extended CSS Coverage (356 properties implemented):** full coverage program over W3C webref catalog (818 properties), bringing pure-Go layout and paint support to 356 properties with zero partial states and honest unsupported tracking for 462 non-goals.
+- **Extended CSS Coverage (354 properties implemented):** full coverage program over W3C webref catalog (818 properties), bringing pure-Go layout and paint support to 354 properties with zero partial states and honest unsupported tracking for 464 non-goals.
 - **Logical Box & Border Radii:** full support for logical border longhands (`border-block-start/end`, `border-inline-start/end`) and logical corner radii (`border-start-start-radius`, `border-start-end-radius`, `border-end-start-radius`, `border-end-end-radius`) mapping onto physical display geometry across horizontal and vertical writing modes.
 - **Advanced Backgrounds & Borders:** support for multi-layer background images, `background-size` (`contain`, `cover`, explicit dimensions), `background-position`, `background-repeat`, `background-clip`, and `background-origin`, plus multi-layer `box-shadow` with `inset` and `border-image`.
 - **Text Styling & Typography:** added `text-shadow` rendering, `text-decoration-thickness`, `text-decoration-color`, `text-underline-offset`, `text-align-last`, `tab-size`, and `hyphens` (manual).
-- **Font Feature Settings & Kerning:** wired `font-feature-settings`, `font-kerning`, `font-variant-caps`, and synthesis weight gating directly into OpenType shaping and display lists.
 - **2D Transform Extensions:** individual transform properties (`translate`, `rotate`, `scale`, `transform-box`) alongside matrix operations with full PDF CTM integration.
 - **Vendor-Prefix Compatibility:** added automatic remaps for common `-webkit-*` prefix aliases (`-webkit-box-sizing`, `-webkit-text-fill-color`, `-webkit-box-shadow`, `-webkit-border-radius`, etc.).
-- **Golden Test Corpus:** split into fixture 57 (vanguard telemetry report proving all 356 implemented properties) and fixture 58 (unsupported worklist audit proving safe degradation for all 462 unsupported properties); total golden corpus stands at 62 verified fixtures.
+- **Golden Test Corpus:** split into fixture 57 (vanguard telemetry report proving all 354 implemented properties) and fixture 58 (unsupported worklist audit proving safe degradation for all 464 unsupported properties); total golden corpus stands at 63 verified fixtures.
 
 ### Changed
 

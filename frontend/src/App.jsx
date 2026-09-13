@@ -14,6 +14,7 @@ const BenchmarksPage = lazy(() => import('./pages/BenchmarksPage'))
 const LiveDemoPage = lazy(() => import('./pages/LiveDemoPage'))
 
 const DOC_REDIRECTS = [
+  ['getting-started', 'getting-started'],
   ['cli', 'cli'],
   ['library-api', 'library-api'],
   ['architecture', 'architecture'],
@@ -67,7 +68,6 @@ export default function App() {
         <Routes>
           <Route element={<WrapLayout />}>
             <Route path="/" element={<LandingPage />} />
-            <Route path="/getting-started" element={<ContentPage />} />
             <Route path="/about" element={<ContentPage />} />
             <Route path="/dossier" element={<DossierPage />} />
             <Route path="/showcase" element={<ShowcasePage />} />
@@ -76,7 +76,7 @@ export default function App() {
             <Route path="/wasm" element={<Navigate to="/live-demo" replace />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>
-          <Route path="/documentation" element={<Navigate to="/documentation/cli" replace />} />
+          <Route path="/documentation" element={<Navigate to="/documentation/getting-started" replace />} />
           <Route path="/documentation/:docId" element={<DocumentationPage />} />
           {DOC_REDIRECTS.map(([from, to]) => (
             <Route

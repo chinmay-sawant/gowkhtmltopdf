@@ -136,6 +136,10 @@ func TestTaggedPDFUA1Structure(t *testing.T) {
 	content.EndText()
 	content.EndArtifact()
 
+	// PDF-06: finalize releases each page's raw content buffer once its
+	// stream is materialized, so capture the builder bytes before Write.
+	contentStr := string(page.content.Bytes())
+
 	var buf bytes.Buffer
 	if err := doc.Write(&buf); err != nil {
 		t.Fatalf("doc.Write failed: %v", err)
@@ -261,8 +265,9 @@ func TestTaggedPDFUA1Structure(t *testing.T) {
 	}
 
 	// --- 7. Marked Content in Content Stream ---
-	decompressed := page.content.Bytes()
-	contentStr := string(decompressed)
+	// contentStr was captured before doc.Write: PDF-06 releases the raw
+	// builder buffer once the page stream is materialized, so reading it
+	// again here would return empty. The assertions below are unchanged.
 
 	if !strings.Contains(contentStr, "/H1 << /MCID 0 >> BDC") {
 		t.Errorf("Content stream missing /H1 << /MCID 0 >> BDC")
@@ -879,7 +884,7 @@ func TestAnnotationComplianceFlagsAndOBJR(t *testing.T) {
 	mcid1 := page.AllocMCID(linkElem1)
 
 	// Add dest annotation and attach via AddAnnot
-	ref2 := page.AddLinkDest([4]float64{50, 300, 200, 320}, 0, 50, 700)
+	ref2 := page.AddLinkDest([4]float64{50, 300, 200, 320}, page, 50, 700)
 	linkElem2 := docElem.NewChild(StructTypeLink)
 	linkElem2.AddAnnot(ref2, page)
 	mcid2 := page.AllocMCID(linkElem2)

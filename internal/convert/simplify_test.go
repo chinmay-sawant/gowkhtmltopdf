@@ -157,42 +157,39 @@ func TestAppendSimplifySheetNoopWhenOff(t *testing.T) {
 	}
 }
 
-func TestSimplifyDOMEnabled(t *testing.T) {
+func TestBuildOptionsSimplifyDOMEnabled(t *testing.T) {
 	t.Parallel()
 
-	if prepare.SimplifyDOMEnabled(settings.Web{}, settings.Web{}) {
+	if prepare.BuildOptions(200, 200, mediaPrint, 0, settings.Web{}, settings.Web{}).SimplifyDOM {
 		t.Fatal("default must be off")
 	}
 
-	if !prepare.SimplifyDOMEnabled(settings.Web{SimplifyDOM: true}, settings.Web{}) { //nolint:lll // intentional zero-value fields
+	if !prepare.BuildOptions(200, 200, mediaPrint, 0, settings.Web{SimplifyDOM: true}, settings.Web{}).SimplifyDOM {
 		t.Fatal("global on")
 	}
 
-	if !prepare.SimplifyDOMEnabled(settings.Web{}, settings.Web{
-		SimplifyDOM: true,
-	}) {
+	if !prepare.BuildOptions(200, 200, mediaPrint, 0, settings.Web{}, settings.Web{SimplifyDOM: true}).SimplifyDOM {
 		t.Fatal("object on")
 	}
 }
 
-func TestSimplifyDOMProfile(t *testing.T) {
+func TestBuildOptionsSimplifyProfile(t *testing.T) {
 	t.Parallel()
 
 	empty := settings.Web{}
-	if prepare.SimplifyDOMProfile(empty, empty) != "" {
+	if prepare.BuildOptions(200, 200, mediaPrint, 0, empty, empty).SimplifyProfile != "" {
 		t.Fatal("default profile empty")
 	}
 
-	if prepare.SimplifyDOMProfile(settings.Web{
+	if prepare.BuildOptions(200, 200, mediaPrint, 0, settings.Web{
 		SimplifyDOMProfile: mediawikiProfile,
-	}, settings.Web{},
-	) != mediawikiProfile {
+	}, empty).SimplifyProfile != mediawikiProfile {
 		t.Fatal("global mediawiki")
 	}
 
-	if prepare.SimplifyDOMProfile(settings.Web{}, settings.Web{
+	if prepare.BuildOptions(200, 200, mediaPrint, 0, empty, settings.Web{
 		SimplifyDOMProfile: "wiki",
-	}) != mediawikiProfile {
+	}).SimplifyProfile != mediawikiProfile {
 		t.Fatal("object wiki alias")
 	}
 }

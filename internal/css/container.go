@@ -114,15 +114,7 @@ const (
 // 25.4mm cancel cleanly to 72pt in IEEE float arithmetic. Precomputing
 // (72/25.4) and multiplying loses that cancellation (25.4mm → 71.999…).
 func LengthToPt(val float64, unit string, basePt float64) (float64, bool) {
-	low := unit
-
-	for i := range len(unit) {
-		if unit[i] >= 'A' && unit[i] <= 'Z' {
-			low = strings.ToLower(unit)
-
-			break
-		}
-	}
+	low := strings.ToLower(unit)
 
 	if pt, ok := absoluteLengthToPt(val, low); ok {
 		return pt, true
@@ -286,28 +278,38 @@ func isIdentStart(c byte) bool {
 
 // parseContainerCond parses a container condition with or < and < not precedence.
 func parseContainerCond(str string) (ContainerCond, bool) {
+	return parseContainerCondDepth(str, 0)
+}
+
+// parseContainerCondDepth is parseContainerCond with an explicit recursion
+// depth; nesting past maxParseDepth is rejected.
+func parseContainerCondDepth(str string, depth int) (ContainerCond, bool) {
+	if depth > maxParseDepth {
+		return ContainerCond{}, false //nolint:exhaustruct // intentional zero-value fields
+	}
+
 	str = strings.TrimSpace(str)
 	if str == "" {
 		return ContainerCond{}, false //nolint:exhaustruct // intentional zero-value fields
 	}
 
-	return parseOrCond(str)
+	return parseOrCond(str, depth)
 }
 
-func parseOrCond(s string) (ContainerCond, bool) {
+func parseOrCond(s string, depth int) (ContainerCond, bool) {
 	parts, ok := splitCondKeyword(s, "or")
 	if !ok {
 		return ContainerCond{}, false //nolint:exhaustruct // intentional zero-value fields
 	}
 
 	if len(parts) == 1 {
-		return parseAndCond(parts[0])
+		return parseAndCond(parts[0], depth)
 	}
 
 	kids := make([]ContainerCond, 0, len(parts))
 
 	for _, p := range parts {
-		c, ok := parseAndCond(p)
+		c, ok := parseAndCond(p, depth)
 		if !ok {
 			return ContainerCond{}, false //nolint:exhaustruct // intentional zero-value fields
 		}
@@ -318,20 +320,20 @@ func parseOrCond(s string) (ContainerCond, bool) {
 	return ContainerCond{Kind: "or", Kids: kids}, true //nolint:exhaustruct // intentional zero-value fields
 }
 
-func parseAndCond(s string) (ContainerCond, bool) {
+func parseAndCond(s string, depth int) (ContainerCond, bool) {
 	parts, ok := splitCondKeyword(s, condKindAnd)
 	if !ok {
 		return ContainerCond{}, false //nolint:exhaustruct // intentional zero-value fields
 	}
 
 	if len(parts) == 1 {
-		return parseNotCond(parts[0])
+		return parseNotCond(parts[0], depth)
 	}
 
 	kids := make([]ContainerCond, 0, len(parts))
 
 	for _, p := range parts {
-		c, ok := parseNotCond(p)
+		c, ok := parseNotCond(p, depth)
 		if !ok {
 			return ContainerCond{}, false //nolint:exhaustruct // intentional zero-value fields
 		}
@@ -342,7 +344,11 @@ func parseAndCond(s string) (ContainerCond, bool) {
 	return ContainerCond{Kind: condKindAnd, Kids: kids}, true //nolint:exhaustruct // intentional zero-value fields
 }
 
-func parseNotCond(str string) (ContainerCond, bool) {
+func parseNotCond(str string, depth int) (ContainerCond, bool) {
+	if depth > maxParseDepth {
+		return ContainerCond{}, false //nolint:exhaustruct // intentional zero-value fields
+	}
+
 	str = strings.TrimSpace(str)
 	low := strings.ToLower(str)
 
@@ -352,7 +358,7 @@ func parseNotCond(str string) (ContainerCond, bool) {
 			return ContainerCond{}, false //nolint:exhaustruct // intentional zero-value fields
 		}
 		// "not (...)" or "not <cond>"
-		inner, ok := parseNotCond(rest)
+		inner, ok := parseNotCond(rest, depth+1)
 		if !ok {
 			return ContainerCond{}, false //nolint:exhaustruct // intentional zero-value fields
 		}
@@ -363,10 +369,10 @@ func parseNotCond(str string) (ContainerCond, bool) {
 		return cond, true
 	}
 
-	return parseParenOrFeat(str)
+	return parseParenOrFeat(str, depth)
 }
 
-func parseParenOrFeat(str string) (ContainerCond, bool) {
+func parseParenOrFeat(str string, depth int) (ContainerCond, bool) {
 	str = strings.TrimSpace(str)
 	if !strings.HasPrefix(str, "(") {
 		return ContainerCond{}, false //nolint:exhaustruct // intentional zero-value fields
@@ -382,7 +388,7 @@ func parseParenOrFeat(str string) (ContainerCond, bool) {
 	low := strings.ToLower(found)
 	if strings.HasPrefix(found, "(") || strings.HasPrefix(low, condKindNot) ||
 		containsTopLevelKeyword(found, condKindAnd) || containsTopLevelKeyword(found, condKindOr) {
-		return parseContainerCond(found)
+		return parseContainerCondDepth(found, depth+1)
 	}
 
 	feat, okVal := parseSizeFeature(found)

@@ -37,8 +37,7 @@ Honesty that always stays true unless the engine change says otherwise:
 ## 2. Version files (must change together)
 
 These three must agree. `make test` fails if they do not
-(`TestCLIVersionMatchesVERSIONFile` in `api_test.go` and
-`internal/cli/cli_test.go`).
+(`TestCLIVersionMatchesVERSIONFile` in `internal/cli/cli_test.go`).
 
 | File | What to set |
 |------|-------------|

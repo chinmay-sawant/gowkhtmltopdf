@@ -1,7 +1,7 @@
 # Implemented props fixture authoring (60/61/62)
 
 ## Goal
-Three golden HTML fixtures, each documenting ~118-120 Implemented CSS properties with:
+Three golden HTML fixtures, each documenting ~118-120 CSS properties from the implemented split (27 entries demoted on 2026-09-12 keep their cell and are marked `status: demoted` in the JSON) with:
 - property name
 - plain-language description of the expected effect
 - a visible Effect cell that applies that property

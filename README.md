@@ -18,7 +18,7 @@ same pipeline through WebAssembly for inline HTML previews. Direct modules are a
 shaping) and [`tdewolff/canvas`](https://github.com/tdewolff/canvas) (SVG
 rasterization). The product is HTML templates and documents, not Chrome visual parity.
 
-**Status:** **v0.2.5** (current release). The native Document API and explicit
+**Status:** **v0.2.6** (current release). The native Document API and explicit
 CLI grammar are now the supported surface. Opt-in PDF 1.7 / 2.0 and PDF/A +
 PDF/UA profiles. **License:** [MIT](LICENSE).
 
@@ -74,6 +74,7 @@ Browser build and preview: [wasm.md](documentation/wasm.md).
 | [documentation/fonts.md](documentation/fonts.md) | Bundled faces, `--font-path`, `@font-face` |
 | [documentation/samples.md](documentation/samples.md) | Golden fixtures and `output/` |
 | [documentation/performance.md](documentation/performance.md) | Benchmarks and how to measure |
+| [documentation/benchmarks.md](documentation/benchmarks.md) | Consolidated current benchmark capture (2026-09-13) |
 | [testdata/golden/benchmarks/README.md](testdata/golden/benchmarks/README.md) | Current CLI vs wkhtmltopdf snapshot |
 | [documentation/deferred.md](documentation/deferred.md) | Deferred features and next gates |
 | [documentation/THREAT-MODEL.md](documentation/THREAT-MODEL.md) | Security / ACL / network policy |
@@ -122,34 +123,40 @@ pdf_bytes = convert_html_to_pdf(
 
 ## Performance
 
-**Current snapshot (2026-08-19):** freshly built generic `gowkhtmltopdf`
-**0.2.4** versus installed **wkhtmltopdf 0.12.6.1 (patched Qt)** on Linux
-amd64, 13th Gen Intel Core i7-13700HX. Same report fixture (20 invoice rows
-per requested page), median of three process runs after one warmup.
+**Current snapshot (2026-09-13):** generic `bin/gowkhtmltopdf` (`VERSION`
+0.2.6, release tree `8aab63a`) versus installed **wkhtmltopdf 0.12.6.1
+(patched Qt)** on Linux amd64 (WSL2), 13th Gen Intel Core i7-13700HX. Same
+report fixture (20 invoice rows per requested page), median of three timed
+process runs after one warmup.
 
 | Pages | gowkhtmltopdf | wkhtmltopdf | Faster by |
 |------:|--------------:|------------:|----------:|
-| 2 | 17 ms | 259 ms | **15.5x** |
-| 10 | 30 ms | 276 ms | **9.2x** |
-| 100 | 184 ms | 526 ms | **2.9x** |
-| 500 | 1.042 s | 1.671 s | **1.6x** |
+| 2 | 13 ms | 258 ms | **19.68x** |
+| 10 | 24 ms | 279 ms | **11.65x** |
+| 100 | 124 ms | 532 ms | **4.30x** |
+| 500 | 573 ms | 1.718 s | **3.00x** |
 
-Faster at every tested size. Peak RSS is lower through 100 pages and
-higher from 200 pages on the generic path.
+Faster at every tested size. Gowk also used less peak RSS at every tested
+size in this capture, including 500 pages (80,448 KiB versus 123,068 KiB).
 
 Same host, same fixture family against other engines (default external
 matrix: 2 / 10 / 50 / 100 pages):
 
 | Pages | vs WeasyPrint | vs Puppeteer / Chrome |
 |------:|--------------:|----------------------:|
-| 2 | **32x** | **77x** |
-| 10 | **44x** | **48x** |
-| 50 | **52x** | **17x** |
-| 100 | **57x** | **11x** |
+| 2 | **49.18x** | **111.73x** |
+| 10 | **59.78x** | **61.63x** |
+| 50 | **82.04x** | **26.65x** |
+| 100 | **88.33x** | **17.40x** |
+
+The public Go library (`Document.WritePDF`) measures 5.50 ms at 2 pages (about
+47x against the same capture's 258 ms wkhtmltopdf baseline) and 554.56 ms at
+500 pages; the Python bindings measure 3.52 ms and 504.93 ms (warm medians).
 
 Full matrices, RSS, PDF sizes, internal-engine and public-library
 `go test -bench` rows, and historical snapshots:
 
+- [documentation/benchmarks.md](documentation/benchmarks.md)
 - [documentation/performance.md](documentation/performance.md)
 - [testdata/golden/benchmarks/README.md](testdata/golden/benchmarks/README.md)
 - [cli-compare.md](testdata/golden/benchmarks/cli-compare.md)
@@ -159,7 +166,10 @@ Full matrices, RSS, PDF sizes, internal-engine and public-library
 Reproduce:
 
 ```sh
+make build
 make bench-cli-compare
+./scripts/bench-external.sh
+./scripts/bench-performance-recovery.sh --mode=<mode>
 make bench
 make bench-engine
 make bench-lib

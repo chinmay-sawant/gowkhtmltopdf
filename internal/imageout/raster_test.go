@@ -61,7 +61,7 @@ func TestRoundedBorderTopOverlayKeepsAccentThroughCorners(t *testing.T) {
 		},
 	}
 
-	img, err := rasterizeContext(t.Context(), res, res.Height, false, 0)
+	img, err := rasterizeContext(t.Context(), res, res.Height, false, 0, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +107,7 @@ func TestRoundedTopStrokeLeavesOutsideCornerUnpainted(t *testing.T) {
 		}},
 	}
 
-	img, err := rasterizeContext(t.Context(), res, res.Height, false, 0)
+	img, err := rasterizeContext(t.Context(), res, res.Height, false, 0, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +155,7 @@ func TestAxisAlignedBorderLinesFillOuterCorners(t *testing.T) {
 		},
 	}
 
-	img, err := rasterizeContext(t.Context(), res, res.Height, false, 0)
+	img, err := rasterizeContext(t.Context(), res, res.Height, false, 0, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -371,11 +371,11 @@ func TestRasterOpPolicyParity(t *testing.T) {
 		res := &layout.Result{
 			Width: 100, Height: 50,
 			Ops: []layout.Op{
-				{Kind: layout.OpText, X: 10, Y: 20, Text: "abc", Size: 12, TextTransform: "uppercase"},
+				textTransformedOp(layout.Op{Kind: layout.OpText, X: 10, Y: 20, Text: "abc", Size: 12}, "uppercase"),
 			},
 		}
 
-		img, err := rasterizeContext(t.Context(), res, 50, true, 0)
+		img, err := rasterizeContext(t.Context(), res, 50, true, 0, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -396,7 +396,7 @@ func TestRasterOpPolicyParity(t *testing.T) {
 				{Kind: layout.OpFillRect, X: 10, Y: 10, W: 30, H: 30, R: 1, G: 0, B: 0, Alpha: 1},
 			},
 		}
-		imgOpaque, err := rasterizeContext(t.Context(), resOpaque, 50, false, 0)
+		imgOpaque, err := rasterizeContext(t.Context(), resOpaque, 50, false, 0, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -404,10 +404,10 @@ func TestRasterOpPolicyParity(t *testing.T) {
 		resTrans := &layout.Result{
 			Width: 50, Height: 50,
 			Ops: []layout.Op{
-				{Kind: layout.OpFillRect, X: 10, Y: 10, W: 30, H: 30, R: 1, G: 0, B: 0, Alpha: 1, PaintOpacity: 0.5},
+				opacityOp(layout.Op{Kind: layout.OpFillRect, X: 10, Y: 10, W: 30, H: 30, R: 1, G: 0, B: 0, Alpha: 1}, 0.5),
 			},
 		}
-		imgTrans, err := rasterizeContext(t.Context(), resTrans, 50, false, 0)
+		imgTrans, err := rasterizeContext(t.Context(), resTrans, 50, false, 0, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -427,13 +427,12 @@ func TestRasterOpPolicyParity(t *testing.T) {
 		resRot := &layout.Result{
 			Width: 100, Height: 100,
 			Ops: []layout.Op{
-				{
+				xformedOp(layout.Op{
 					Kind: layout.OpFillRect, X: 40, Y: 40, W: 20, H: 20, R: 1, G: 0, B: 0, Alpha: 1,
-					Xform: layout.RotateDeg(45), XformSet: true,
-				},
+				}, layout.RotateDeg(45)),
 			},
 		}
-		imgRot, err := rasterizeContext(t.Context(), resRot, 100, false, 0)
+		imgRot, err := rasterizeContext(t.Context(), resRot, 100, false, 0, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -454,7 +453,7 @@ func TestRasterOpPolicyParity(t *testing.T) {
 				{Kind: layout.OpText, X: 50, Y: 20, Text: "Vertical", Size: 12, RotateDeg: -90},
 			},
 		}
-		imgVert, err := rasterizeContext(t.Context(), resVert, 100, false, 0)
+		imgVert, err := rasterizeContext(t.Context(), resVert, 100, false, 0, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -464,4 +463,16 @@ func TestRasterOpPolicyParity(t *testing.T) {
 			t.Fatal("no ink found for vertical text")
 		}
 	})
+}
+
+func textTransformedOp(op layout.Op, transform string) layout.Op {
+	op.SetTextTransform(transform)
+
+	return op
+}
+
+func opacityOp(op layout.Op, opacity float64) layout.Op {
+	op.SetPaintOpacity(opacity)
+
+	return op
 }

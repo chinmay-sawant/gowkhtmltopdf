@@ -318,7 +318,7 @@ func testBoxShadowRoundedFill(t *testing.T) {
 			continue
 		}
 
-		radiusX, radiusY := opRadiiXY(&op)
+		radiusX, radiusY := OpRadiiXY(&op)
 		if !near(radiusX[0], 8) || !near(radiusY[0], 8) {
 			t.Fatalf("rounded shadow radii = X %.1f Y %.1f, want 8/8", radiusX[0], radiusY[0])
 		}

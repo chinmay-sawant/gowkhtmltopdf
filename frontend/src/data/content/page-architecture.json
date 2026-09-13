@@ -5,16 +5,19 @@
     {
       "type": "hero",
       "title": "One pure-Go rendering pipeline",
-      "lede": "The public Document and ImageDocument models map into shared load, HTML, CSS, layout, and output stages."
+      "lede": "The public Document and ImageDocument models map into one shared pipeline: load -> html -> css -> prepare -> layout -> paginate -> paint -> write. internal/convert orchestrates PDF jobs; internal/imageout reuses the same front half for one PNG/JPEG canvas."
     },
     {
       "type": "bullets",
       "heading": "Conversion flow",
       "items": [
-        "Document / ImageDocument → Content validation and ownership boundary",
-        "load → html → css → layout",
-        "internal/pdf or internal/imageout",
-        "PDF writer or PNG/JPEG bytes"
+        "Root Document / ImageDocument -> Content validation and an owned copy at the write boundary.",
+        "Shared front half: load -> html -> css -> prepare (stylesheet collection and @font-face merge).",
+        "layout builds the display list; PaintContext paginates it for PDF while image mode rasterizes the same display-list ops onto one canvas.",
+        "PDF: internal/convert owns headers/footers, TOC, outline, links, copies, and document info over internal/pdf (PDF 1.4 default; opt-in 1.7 / 2.0 profiles).",
+        "Image: internal/imageout writes PNG/JPEG bytes; internal/svg rasterizes SVG-as-img before layout treats it as pixels.",
+        "internal/outline turns headings into an outline tree / dump XML without PDF or layout types.",
+        "Entry points: root library; cmd/gowkhtmltopdf and cmd/gowkhtmltoimage through internal/cli and internal/app; bindings/wasm for the browser; bindings/c and bindings/python for in-process embedders."
       ]
     },
     {
@@ -22,16 +25,24 @@
       "heading": "Ownership",
       "headers": ["Layer", "Responsibility"],
       "rows": [
-        ["Root package", "Typed model, source validation, callbacks, writer and byte APIs"],
-        ["CLI", "Document-shaped argv parsing and application-level output ownership"],
-        ["Engine", "Internal settings, loading policy, layout, PDF and image sinks"]
+        ["Root package", "Typed model, source validation, callbacks, writer and byte APIs (api.go, document.go, document_validate.go)"],
+        ["cmd/gowkhtmltopdf, cmd/gowkhtmltoimage", "Thin mains; argv grammar in internal/cli, command-to-engine adapters in internal/app"],
+        ["bindings/wasm", "Browser adapter: inline HTML request, browser-safe policy, JavaScript bridge; no native file or URL sources"],
+        ["bindings/c, bindings/python", "In-process C ABI v1 and ctypes Python bindings over Document.WritePDF / ImageDocument.WriteImage"],
+        ["internal/load", "Primary document and subresource fetch under ACL, NetworkPolicy, timeouts, redirect limits, and body caps"],
+        ["internal/html, internal/css", "Tolerant parse (no script execution) and CSS subset with cascade plus media/container queries"],
+        ["internal/layout", "Style resolve, block/inline/table/flex/grid/float, display list, PaintContext pagination"],
+        ["internal/convert (+ prepare, render)", "PDF hub: prepare -> render.RenderObjects -> Assemble -> Finalize; headers/footers, TOC, links, copies, document info"],
+        ["internal/pdf", "Version-aware writer: TTF subset, Type0/CID, images, annotations, outlines, tagged structure"],
+        ["internal/imageout, internal/svg", "PNG/JPEG raster sink and SVG-as-img rasterization (tdewolff/canvas)"],
+        ["internal/outline, internal/settings, internal/pdfprofile", "Heading outline tree, dotted settings and page sizes, conformance profile tokens"]
       ]
     },
     {
       "type": "callout",
       "variant": "info",
       "title": "Security boundary",
-      "body": "Local files are blocked by default. The --allow-local-files CLI flag or Document.AllowLocalFiles enables the documented local-file policy; HTTP(S) requests use the selected NetworkPolicy. JavaScript is not executed."
+      "body": "Local files are blocked by default. The --allow-local-files CLI flag or Document.AllowLocalFiles enables broad local reads; --allow / Document.Allow adds prefix-scoped exceptions; HTTP(S) requests use the selected NetworkPolicy. JavaScript is never executed, and JS-related flags are rejected as unknown options (internal/cli/cli.go:238)."
     }
   ]
 }

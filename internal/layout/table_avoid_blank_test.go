@@ -62,7 +62,7 @@ td, th { border: 1px solid #aaa; padding: 4pt; }
 
 	contentH := 700.0
 
-	opPage, err := paginateOps(t.Context(), res, contentH)
+	opPage, err := paginateOpsForTest(t.Context(), res, contentH)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,7 +132,7 @@ h2 { font-size: 14pt; margin: 8pt 0 4pt; }
 		t.Fatal(err)
 	}
 
-	opPage, err := paginateOps(t.Context(), res, pageH)
+	opPage, err := paginateOpsForTest(t.Context(), res, pageH)
 	if err != nil {
 		t.Fatal(err)
 	}

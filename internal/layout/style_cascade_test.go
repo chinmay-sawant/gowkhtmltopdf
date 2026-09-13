@@ -501,6 +501,67 @@ func TestSVGPresentationProps(t *testing.T) {
 	}
 }
 
+// TestFontLonghandAfterShorthandWins: the font shorthand must compete with
+// its longhands per property in cascade order. It used to be applied after
+// every longhand, so an earlier `font` beat a later `font-size` regardless of
+// order or specificity.
+func TestFontLonghandAfterShorthandWins(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		css  string
+		want float64
+	}{
+		{"later font-size wins", `p { font: 12pt serif } p { font-size: 20pt }`, 20},
+		{"later font shorthand wins", `p { font-size: 20pt } p { font: 12pt serif }`, 12},
+		{"specificity beats earlier shorthand", `p { font: 12pt serif } p.a { font-size: 20pt }`, 20},
+		{"specificity beats earlier longhand", `p { font-size: 20pt } p.a { font: 12pt serif }`, 12},
+		{"shorthand keeps its family", `p { font: italic 12pt serif } p { font-size: 14pt }`, 14},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			res := layoutHTML(t, `<html><body><p class="a">x</p></body></html>`, sheet(t, testCase.css))
+			op := firstText(res)
+
+			if !near(op.Size, testCase.want) {
+				t.Fatalf("text size = %.3f, want %.3f", op.Size, testCase.want)
+			}
+		})
+	}
+}
+
+// TestPseudoElementResolvesCustomProperties: generated content inherits the
+// host's custom properties and var() references resolve before parsing, so
+// p::after { color: var(--accent) } paints the host's accent color. The
+// pseudo path used to skip mergeCustomProps and resolveRawVars, leaving the
+// literal var() string for the color parser to drop.
+func TestPseudoElementResolvesCustomProperties(t *testing.T) {
+	t.Parallel()
+
+	res := layoutHTML(t, `<html><body><p class="x">base</p></body></html>`, sheet(t, `
+.x { --accent: #ff0000 }
+.x::after { content: "tail"; color: var(--accent) }
+`))
+
+	for _, oper := range res.Ops {
+		if oper.Kind != OpText || oper.Text != "tail" {
+			continue
+		}
+
+		if !(oper.R > 0.9 && oper.G < 0.1 && oper.B < 0.1) {
+			t.Fatalf("::after color = %.3f,%.3f,%.3f, want red from var(--accent)", oper.R, oper.G, oper.B)
+		}
+
+		return
+	}
+
+	t.Fatal("::after content op not found")
+}
+
 func findElementByName(root *html.Node, name string) *html.Node {
 	if root.Type == html.ElementNode && root.Name == name {
 		return root

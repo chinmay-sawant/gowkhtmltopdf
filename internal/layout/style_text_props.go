@@ -16,7 +16,7 @@ func applyTextPropsWave3(
 	case "text-align-all":
 		setTextAlignValue(style, value)
 		setTextAlignLast(style, value)
-	case "tab-size":
+	case tabSizeProperty:
 		setTabSize(style, value, fsize)
 	case "text-wrap":
 		setTextWrap(style, value)
@@ -54,46 +54,25 @@ func applyTextPropsWave3(
 		}
 	case "text-underline-position":
 		style.TextUnderlinePosition = strings.ToLower(strings.TrimSpace(value))
-	case "text-shadow":
+	case textShadowProperty:
 		applyTextShadow(style, value, fsize)
-	case "text-emphasis":
+	case textEmphasisProperty:
 		setTextEmphasis(style, value)
-	case "text-emphasis-style":
+	case textEmphasisStyleProperty:
 		setTextEmphasisStyle(style, value)
-	case "text-emphasis-color":
+	case textEmphasisColorProperty:
 		setTextEmphasisColor(style, value)
-	case "text-emphasis-position":
+	case textEmphasisPositionProperty:
 		setTextEmphasisPosition(style, value)
-	case "text-emphasis-skip":
+	case textEmphasisSkipProperty:
 		ensureEmphasisMap(style)
 		style.CustomProps["__emph_skip"] = strings.ToLower(strings.TrimSpace(value))
-	case "text-decoration-inset":
-		setTextDecorationInset(style, value, fsize)
 
 	default:
 		return false
 	}
 
 	return true
-}
-
-func setTextDecorationInset(style *ResolvedStyle, value string, fsize float64) {
-	val := strings.TrimSpace(value)
-	if val == "" {
-		return
-	}
-	low := strings.ToLower(val)
-	switch low {
-	case "auto", "initial", "inherit", "unset", "revert", "revert-layer":
-		style.TextDecorationInset = low
-		return
-	}
-	for _, tok := range strings.Fields(val) {
-		if _, ok := plainLength(tok, fsize, 0); !ok {
-			return
-		}
-	}
-	style.TextDecorationInset = low
 }
 
 func ensureEmphasisMap(style *ResolvedStyle) {

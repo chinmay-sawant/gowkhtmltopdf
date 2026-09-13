@@ -44,6 +44,8 @@ func subsetFont(fnt *Font, used []rune, scope subsetScope) (*subsetResult, error
 		return nil, errSubsetUnknownScope
 	}
 
+	fnt.ensureParsed()
+
 	accept := func(r rune) bool {
 		if scope == subsetSimple {
 			return simpleFontRune(r)

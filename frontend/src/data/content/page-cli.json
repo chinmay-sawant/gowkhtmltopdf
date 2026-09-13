@@ -5,7 +5,7 @@
     {
       "type": "hero",
       "title": "Document-shaped command line tools",
-      "lede": "gowkhtmltopdf and gowkhtmltoimage use explicit source and output arguments while retaining familiar PDF and image options."
+      "lede": "gowkhtmltopdf and gowkhtmltoimage use explicit source and output arguments while retaining familiar PDF and image options. Both write to the -o PATH given, or to stdout when the path is -."
     },
     {
       "type": "code",
@@ -17,13 +17,13 @@
       "type": "code",
       "heading": "Examples",
       "language": "bash",
-      "code": "gowkhtmltopdf --allow-local-files -o report.pdf report.html\ngowkhtmltopdf --page-size A4 --orientation Landscape -o book.pdf chapter1.html chapter2.html\ngowkhtmltopdf --html '<h1>Inline report</h1>' -o inline.pdf\ngowkhtmltoimage --format png --width 1024 -o preview.png report.html"
+      "code": "gowkhtmltopdf --allow-local-files -o report.pdf report.html\ngowkhtmltopdf --page-size A4 --orientation Landscape -o book.pdf chapter1.html chapter2.html\ngowkhtmltopdf --html '<h1>Inline report</h1>' -o inline.pdf\ngowkhtmltoimage --format png --width 1024 -o preview.png report.html\ngowkhtmltopdf --pdf-version 1.7 --allow-local-files -o report-1.7.pdf report.html\ngowkhtmltopdf --pdf-profile a3a-ua1 --allow-local-files -o report-a3a-ua1.pdf report.html\ngowkhtmltopdf --font-path ./fonts --use-system-fonts --allow-local-files -o report-cjk.pdf report.html\ngowkhtmltoimage --format jpg --quality 85 --width 800 -o preview.jpg report.html"
     },
     {
       "type": "callout",
       "variant": "warn",
       "title": "The old object grammar is removed",
-      "body": "Use --cover and --toc instead of page, cover, and toc object tokens. -o/--output is required, and --html, --url, and positional pages are mutually exclusive document sources."
+      "body": "Use --cover and --toc instead of page, cover, and toc object tokens. -o/--output is required, and --html, --url, and positional pages are mutually exclusive document sources. -o - writes raw bytes to stdout; there is no stdin HTML shorthand, so pass markup with --html."
     },
     {
       "type": "table",
@@ -34,6 +34,11 @@
         ["--html HTML", "Render one in-memory HTML document"],
         ["--url URL", "Render one HTTP(S) document"],
         ["--allow-local-files", "Opt in to local page and subresource reads"],
+        ["--pdf-version 1.4 | 1.7 | 2.0", "Set the PDF file version; a version alone is not a PDF/A or PDF/UA claim"],
+        ["--pdf-profile a3a-ua1 | a4-ua2", "Opt-in PDF/A + PDF/UA profile (implies PDF 1.7 / 2.0); aliases such as ua1 and a4 are accepted"],
+        ["--font-path PATH, --use-system-fonts", "Add a font directory (repeatable) or use fonts installed on the host"],
+        ["--format png | jpg | jpeg, --quality N", "gowkhtmltoimage output format and JPEG quality (1-100); --width and --height set the raster size"],
+        ["--transparent, --smart-width, --crop-x/-y/-w/-h", "gowkhtmltoimage canvas controls: transparency, smart width, and crop rectangle"],
         ["--help, --version, --license", "Print documentation or version metadata"]
       ]
     }

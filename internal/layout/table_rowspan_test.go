@@ -121,7 +121,7 @@ td, th { border: 1px solid #333; padding: 3pt; }
 		t.Fatal(err)
 	}
 
-	opPage, err := paginateOps(t.Context(), res, pageH)
+	opPage, err := paginateOpsForTest(t.Context(), res, pageH)
 	if err != nil {
 		t.Fatal(err)
 	}

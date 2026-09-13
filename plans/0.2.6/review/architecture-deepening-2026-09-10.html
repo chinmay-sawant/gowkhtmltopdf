@@ -1,0 +1,1084 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Architecture deepening review for gowkhtmltopdf</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+    </script>
+    <style>
+      .seam { stroke-dasharray: 4 4; }
+      .node {
+        display: inline-flex; align-items: center; padding: 2px 8px;
+        border-radius: 6px; border: 1px solid #cbd5e1; background: #fff;
+        font-size: 11px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        white-space: nowrap;
+      }
+      .node-bad { border-color: #fca5a5; background: #fef2f2; color: #991b1b; }
+      .node-good { border-color: #6ee7b7; background: #ecfdf5; color: #065f46; }
+      .node-owner { background: #0f172a; color: #f8fafc; border-color: #0f172a; }
+      .arrow { color: #94a3b8; font-size: 12px; }
+      .mermaid { background: transparent !important; }
+    </style>
+  </head>
+  <body class="bg-stone-50 text-slate-900 font-sans antialiased">
+    <main class="max-w-6xl mx-auto px-6 py-12 space-y-14">
+
+      <!-- Header -->
+      <header class="space-y-5">
+        <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Architecture deepening review</p>
+        <h1 class="font-serif text-4xl md:text-5xl font-semibold">gowkhtmltopdf</h1>
+        <p class="text-sm text-slate-600">
+          2026-09-10 · HEAD <span class="font-mono">30bd3d6</span> · branch <span class="font-mono">master</span> · clean tree
+        </p>
+        <div class="flex flex-wrap gap-2 text-xs">
+          <span class="px-3 py-1 rounded-full bg-slate-900 text-white font-semibold">Rating 6.5 / 10</span>
+          <span class="px-3 py-1 rounded-full bg-red-100 text-red-700 font-semibold">2 P0</span>
+          <span class="px-3 py-1 rounded-full bg-amber-100 text-amber-800 font-semibold">7 P1</span>
+          <span class="px-3 py-1 rounded-full bg-slate-200 text-slate-700 font-semibold">12 P2</span>
+          <span class="px-3 py-1 rounded-full bg-slate-100 text-slate-600 font-semibold">1 P3</span>
+          <span class="px-3 py-1 rounded-full bg-emerald-600 text-white font-semibold">Implemented 2026-09-10</span>
+          <span class="px-3 py-1 rounded-full bg-slate-100 text-slate-600">22 candidates</span>
+        </div>
+        <div class="flex flex-wrap gap-x-6 gap-y-2 text-xs text-slate-500 pt-1">
+          <span class="flex items-center gap-2"><span class="inline-block w-4 h-3 border border-slate-400 bg-white rounded-sm"></span> module</span>
+          <span class="flex items-center gap-2"><svg width="24" height="10"><line x1="0" y1="5" x2="24" y2="5" stroke="#64748b" stroke-width="2" class="seam"/></svg> seam</span>
+          <span class="flex items-center gap-2"><svg width="24" height="10"><line x1="0" y1="5" x2="24" y2="5" stroke="#dc2626" stroke-width="2"/></svg> competing owner / leak</span>
+          <span class="flex items-center gap-2"><span class="inline-block w-4 h-3 rounded-sm" style="background:#0f172a"></span> one owner, deep module</span>
+        </div>
+        <p class="text-xs text-slate-500">
+          Canonical ledger: <a class="underline decoration-slate-300 hover:decoration-slate-800" href="architecture-deepening-2026-09-10.md">architecture-deepening-2026-09-10.md</a>.
+          This page renders the same findings; the ledger is the source of truth. All 22 candidates
+          were implemented on 2026-09-10 and the full gate set passed.
+        </p>
+      </header>
+
+      <!-- Summary -->
+      <section id="summary" class="space-y-6">
+        <h2 class="font-serif text-2xl font-semibold">Where the score comes from</h2>
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <p class="text-2xl font-semibold">31 &rarr; 22</p>
+            <p class="text-xs text-slate-500 mt-1">raw findings in, active candidates out</p>
+          </div>
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <p class="text-2xl font-semibold">2 P0</p>
+            <p class="text-xs text-slate-500 mt-1">wrong output, process-lifetime retention</p>
+          </div>
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <p class="text-2xl font-semibold">7 parked</p>
+            <p class="text-xs text-slate-500 mt-1">weaker than the active rows</p>
+          </div>
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <p class="text-2xl font-semibold">10 refused</p>
+            <p class="text-xs text-slate-500 mt-1">decided tradeoffs, not re-litigated</p>
+          </div>
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-white p-5 space-y-3">
+          <div class="flex items-center gap-3">
+            <span class="w-56 text-xs text-slate-600">Core pipeline depth</span>
+            <div class="flex-1 h-2 rounded bg-slate-100"><div class="h-2 rounded bg-emerald-500" style="width:75%"></div></div>
+            <span class="w-10 text-right font-mono text-xs">7.5</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="w-56 text-xs text-slate-600">Output integrity</span>
+            <div class="flex-1 h-2 rounded bg-slate-100"><div class="h-2 rounded bg-amber-500" style="width:60%"></div></div>
+            <span class="w-10 text-right font-mono text-xs">6.0</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="w-56 text-xs text-slate-600">Image adapter parity</span>
+            <div class="flex-1 h-2 rounded bg-slate-100"><div class="h-2 rounded bg-red-500" style="width:55%"></div></div>
+            <span class="w-10 text-right font-mono text-xs">5.5</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="w-56 text-xs text-slate-600">Pagination ownership</span>
+            <div class="flex-1 h-2 rounded bg-slate-100"><div class="h-2 rounded bg-amber-500" style="width:60%"></div></div>
+            <span class="w-10 text-right font-mono text-xs">6.0</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="w-56 text-xs text-slate-600">Parsing and loader seam</span>
+            <div class="flex-1 h-2 rounded bg-slate-100"><div class="h-2 rounded bg-amber-400" style="width:65%"></div></div>
+            <span class="w-10 text-right font-mono text-xs">6.5</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="w-56 text-xs text-slate-600">API and entrypoint contracts</span>
+            <div class="flex-1 h-2 rounded bg-slate-100"><div class="h-2 rounded bg-emerald-500" style="width:75%"></div></div>
+            <span class="w-10 text-right font-mono text-xs">7.5</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="w-56 text-xs text-slate-600">Docs and tests as proof</span>
+            <div class="flex-1 h-2 rounded bg-slate-100"><div class="h-2 rounded bg-amber-400" style="width:65%"></div></div>
+            <span class="w-10 text-right font-mono text-xs">6.5</span>
+          </div>
+          <p class="text-xs text-slate-500 pt-2">Closing both P0s plus the phase 1 inputs lands about 7.5. Phase 2 seam work lands about 8.</p>
+        </div>
+        <div class="flex flex-wrap gap-2 text-xs font-mono">
+          <a class="px-2 py-1 rounded bg-red-50 text-red-700 border border-red-200 hover:border-red-400" href="#arc-24">ARC-24</a>
+          <a class="px-2 py-1 rounded bg-red-50 text-red-700 border border-red-200 hover:border-red-400" href="#arc-25">ARC-25</a>
+          <a class="px-2 py-1 rounded bg-amber-50 text-amber-800 border border-amber-200 hover:border-amber-400" href="#arc-26">ARC-26</a>
+          <a class="px-2 py-1 rounded bg-amber-50 text-amber-800 border border-amber-200 hover:border-amber-400" href="#arc-27">ARC-27</a>
+          <a class="px-2 py-1 rounded bg-amber-50 text-amber-800 border border-amber-200 hover:border-amber-400" href="#arc-28">ARC-28</a>
+          <a class="px-2 py-1 rounded bg-amber-50 text-amber-800 border border-amber-200 hover:border-amber-400" href="#arc-29">ARC-29</a>
+          <a class="px-2 py-1 rounded bg-amber-50 text-amber-800 border border-amber-200 hover:border-amber-400" href="#arc-30">ARC-30</a>
+          <a class="px-2 py-1 rounded bg-amber-50 text-amber-800 border border-amber-200 hover:border-amber-400" href="#arc-31">ARC-31</a>
+          <a class="px-2 py-1 rounded bg-amber-50 text-amber-800 border border-amber-200 hover:border-amber-400" href="#arc-32">ARC-32</a>
+          <a class="px-2 py-1 rounded bg-slate-100 text-slate-700 border border-slate-200 hover:border-slate-400" href="#arc-33">ARC-33</a>
+          <a class="px-2 py-1 rounded bg-slate-100 text-slate-700 border border-slate-200 hover:border-slate-400" href="#arc-34">ARC-34</a>
+          <a class="px-2 py-1 rounded bg-slate-100 text-slate-700 border border-slate-200 hover:border-slate-400" href="#arc-35">ARC-35</a>
+          <a class="px-2 py-1 rounded bg-slate-100 text-slate-700 border border-slate-200 hover:border-slate-400" href="#arc-36">ARC-36</a>
+          <a class="px-2 py-1 rounded bg-slate-100 text-slate-700 border border-slate-200 hover:border-slate-400" href="#arc-37">ARC-37</a>
+          <a class="px-2 py-1 rounded bg-slate-100 text-slate-700 border border-slate-200 hover:border-slate-400" href="#arc-38">ARC-38</a>
+          <a class="px-2 py-1 rounded bg-slate-100 text-slate-700 border border-slate-200 hover:border-slate-400" href="#arc-39">ARC-39</a>
+          <a class="px-2 py-1 rounded bg-slate-100 text-slate-700 border border-slate-200 hover:border-slate-400" href="#arc-40">ARC-40</a>
+          <a class="px-2 py-1 rounded bg-slate-100 text-slate-700 border border-slate-200 hover:border-slate-400" href="#arc-41">ARC-41</a>
+          <a class="px-2 py-1 rounded bg-slate-100 text-slate-700 border border-slate-200 hover:border-slate-400" href="#arc-42">ARC-42</a>
+          <a class="px-2 py-1 rounded bg-slate-100 text-slate-700 border border-slate-200 hover:border-slate-400" href="#arc-43">ARC-43</a>
+          <a class="px-2 py-1 rounded bg-slate-100 text-slate-700 border border-slate-200 hover:border-slate-400" href="#arc-44">ARC-44</a>
+          <a class="px-2 py-1 rounded bg-slate-100 text-slate-700 border border-slate-200 hover:border-slate-400" href="#arc-45">ARC-45</a>
+        </div>
+      </section>
+
+      <!-- Top recommendation -->
+      <section id="top-recommendation" class="space-y-4">
+        <h2 class="font-serif text-2xl font-semibold">Top recommendation</h2>
+        <div class="rounded-xl border-2 border-slate-900 bg-white p-6 space-y-3">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="font-mono text-xs px-2 py-1 rounded bg-slate-900 text-white">ARC-24</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-emerald-100 text-emerald-800 font-bold">Strong</span>
+          </div>
+          <h3 class="font-serif text-xl font-semibold">Store link destinations as identity, not position</h3>
+          <p class="text-sm text-slate-700">
+            Copies and internal links are both shipped features, and today they are unreconciled:
+            page order changes after the destination index is written, so a copied report re-aims its links.
+            <a class="underline decoration-slate-300 hover:decoration-slate-800" href="#arc-24">Open the card</a>.
+          </p>
+          <p class="text-xs text-slate-500">Pair with the other P0, <a class="underline decoration-slate-300 hover:decoration-slate-800" href="#arc-25">ARC-25</a>, and the image input cluster (ARC-26, ARC-27, ARC-28).</p>
+        </div>
+      </section>
+
+      <!-- Phase 1 -->
+      <section id="phase-1" class="space-y-6">
+        <div class="flex items-baseline gap-3">
+          <h2 class="font-serif text-2xl font-semibold">Phase 1: Integrity</h2>
+          <span class="text-xs text-slate-500">9 candidates · wrong output, dropped inputs, competing owners</span>
+        </div>
+
+        <article id="arc-24" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="font-mono text-xs px-2 py-1 rounded bg-slate-900 text-white">ARC-24</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-red-100 text-red-700 font-bold">P0 · defect</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-emerald-100 text-emerald-800 font-bold">Strong</span>
+          </div>
+          <h3 class="font-serif text-xl font-semibold">Body and TOC link destinations are positional and re-aim after copies</h3>
+          <p class="font-mono text-xs text-slate-500">internal/pdf/pdf.go:424,471,1191-1207 · internal/convert/links.go:419-421 · internal/convert/pdf_pipeline.go:50-58,179</p>
+          <div class="grid gap-3 md:grid-cols-2">
+            <div class="rounded-lg border border-red-200 bg-red-50/60 p-4">
+              <p class="text-[10px] uppercase tracking-widest text-red-600 font-bold mb-3">Before</p>
+              <pre class="mermaid">
+flowchart LR
+  L[assembleLinks] -->|AddLinkDest page int| P[page annots]
+  C[DuplicatePage] -->|copies annots| P
+  R[ReorderPages] -->|permutes pages| W[writeAnnotDest]
+  P --> W
+  W -->|resolves int late| X[wrong target page]
+  classDef bad stroke:#dc2626,stroke-width:2px;
+  class W,X bad
+              </pre>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-emerald-50/60 p-4">
+              <p class="text-[10px] uppercase tracking-widest text-emerald-700 font-bold mb-3">After</p>
+              <pre class="mermaid">
+flowchart LR
+  L[assembleLinks] -->|AddLinkDest page handle| D[destination identity]
+  C[DuplicatePage / ReorderPages] -->|move handles| D
+  D -->|resolve once at finalize| W[writeAnnotDest]
+  classDef good stroke:#059669,stroke-width:2px;
+  class D,W good
+              </pre>
+            </div>
+          </div>
+          <div class="grid gap-2 sm:grid-cols-2 text-sm">
+            <p><span class="font-semibold">Problem.</span> The destination is a page index; the page order changes after it is written, and body and TOC passes run before the page plan exists. Only the header/footer pass remaps.</p>
+            <p><span class="font-semibold">Solution.</span> Store destination identity and resolve it at finalize, or build the page plan before links and thread it through both passes as the header/footer path already does.</p>
+          </div>
+          <ul class="flex flex-wrap gap-2 text-xs text-slate-600">
+            <li class="px-2 py-1 rounded bg-slate-100">leverage: one resolution point</li>
+            <li class="px-2 py-1 rounded bg-slate-100">wrong /Dest becomes impossible under copies</li>
+            <li class="px-2 py-1 rounded bg-slate-100">header/footer remap arithmetic disappears</li>
+          </ul>
+          <p class="font-mono text-[11px] text-slate-400">Proof: new TestBodyLinkDestRemapCopiesNonCollate in internal/convert; TestLinkDestSurvivesReorder in internal/pdf.</p>
+        </article>
+
+        <article id="arc-25" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="font-mono text-xs px-2 py-1 rounded bg-slate-900 text-white">ARC-25</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-red-100 text-red-700 font-bold">P0 · defect</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-emerald-100 text-emerald-800 font-bold">Strong</span>
+          </div>
+          <h3 class="font-serif text-xl font-semibold">Make the CSS sibling index job-owned instead of process-global</h3>
+          <p class="font-mono text-xs text-slate-500">internal/css/match.go:32-63</p>
+          <div class="grid gap-3 md:grid-cols-2">
+            <div class="rounded-lg border border-red-200 bg-red-50/60 p-4 space-y-3">
+              <p class="text-[10px] uppercase tracking-widest text-red-600 font-bold">Before</p>
+              <div class="flex flex-col gap-2 text-xs">
+                <span class="node node-bad">conversion 1 DOM</span>
+                <span class="node node-bad">conversion 2 DOM</span>
+                <span class="node node-bad">conversion N DOM</span>
+                <span class="arrow">&darr; &darr; &darr;</span>
+                <span class="node node-bad">sibCache map[node]cache, no delete</span>
+                <span class="text-[11px] text-red-700">grows for the process lifetime, one global lock</span>
+              </div>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-emerald-50/60 p-4 space-y-3">
+              <p class="text-[10px] uppercase tracking-widest text-emerald-700 font-bold">After</p>
+              <div class="flex flex-col gap-2 text-xs">
+                <span class="node node-good">conversion 1 DOM</span>
+                <span class="arrow">&darr;</span>
+                <span class="node node-owner">job-owned sibling index</span>
+                <span class="arrow">&darr; released with the job &darr;</span>
+                <span class="node node-good">conversion 2 gets its own</span>
+              </div>
+            </div>
+          </div>
+          <div class="grid gap-2 sm:grid-cols-2 text-sm">
+            <p><span class="font-semibold">Problem.</span> Keys are per-parse node pointers, values hold four more node-keyed maps, and no delete, clear, or reset exists. Every document ever matched stays reachable.</p>
+            <p><span class="font-semibold">Solution.</span> Create the index per conversion and pass it to matching, or bound the global with a small eviction policy like the PDF regex cache.</p>
+          </div>
+          <ul class="flex flex-wrap gap-2 text-xs text-slate-600">
+            <li class="px-2 py-1 rounded bg-slate-100">memory tracks one document</li>
+            <li class="px-2 py-1 rounded bg-slate-100">no global lock across conversions</li>
+            <li class="px-2 py-1 rounded bg-slate-100">release is testable</li>
+          </ul>
+          <p class="font-mono text-[11px] text-slate-400">Proof: TestSiblingCacheReleasesDocuments, or a two-conversion memory check near baseline.</p>
+        </article>
+
+        <article id="arc-26" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="font-mono text-xs px-2 py-1 rounded bg-slate-900 text-white">ARC-26</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-amber-100 text-amber-800 font-bold">P1 · defect</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-emerald-100 text-emerald-800 font-bold">Strong</span>
+          </div>
+          <h3 class="font-serif text-xl font-semibold">Honor zoom in image mode</h3>
+          <p class="font-mono text-xs text-slate-500">internal/cli/flags.go:325 · document.go:533 · internal/imageout/imageout.go:251-269</p>
+          <div class="grid gap-3 md:grid-cols-2">
+            <div class="rounded-lg border border-red-200 bg-red-50/60 p-4 space-y-2 text-xs">
+              <p class="text-[10px] uppercase tracking-widest text-red-600 font-bold">Before</p>
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="node node-bad">--zoom 0.5</span><span class="arrow">&rarr;</span>
+                <span class="node node-bad">Load.ZoomFactor</span><span class="arrow">&rarr;</span>
+                <span class="node node-bad">no imageout reader</span>
+              </div>
+              <p class="text-red-700">unscaled output, no warning</p>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-emerald-50/60 p-4 space-y-2 text-xs">
+              <p class="text-[10px] uppercase tracking-widest text-emerald-700 font-bold">After</p>
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="node node-good">--zoom 0.5</span><span class="arrow">&rarr;</span>
+                <span class="node node-good">RenderOptions.Zoom</span><span class="arrow">&rarr;</span>
+                <span class="node node-owner">layout.Options.Zoom</span>
+              </div>
+              <p class="text-emerald-700">one scaling rule shared with PDF layout</p>
+            </div>
+          </div>
+          <div class="grid gap-2 sm:grid-cols-2 text-sm">
+            <p><span class="font-semibold">Problem.</span> The flag is registered Both, the library field is public, the bindings map it, and the matrix marks it supported. Image layout never reads it.</p>
+            <p><span class="font-semibold">Solution.</span> Add Zoom to RenderOptions, fill it from the object Load.ZoomFactor, pass it to layout.Options, and validate it with the layout finite-positive rule.</p>
+          </div>
+          <ul class="flex flex-wrap gap-2 text-xs text-slate-600">
+            <li class="px-2 py-1 rounded bg-slate-100">advertised option stops lying</li>
+            <li class="px-2 py-1 rounded bg-slate-100">locality: layout owns scaling</li>
+          </ul>
+          <p class="font-mono text-[11px] text-slate-400">Proof: TestRenderZoom, a text op twice as wide at zoom 2.</p>
+        </article>
+
+        <article id="arc-27" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="font-mono text-xs px-2 py-1 rounded bg-slate-900 text-white">ARC-27</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-amber-100 text-amber-800 font-bold">P1 · defect</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-emerald-100 text-emerald-800 font-bold">Strong</span>
+          </div>
+          <h3 class="font-serif text-xl font-semibold">Feed the media matcher points, not pixels</h3>
+          <p class="font-mono text-xs text-slate-500">internal/imageout/imageout.go:1834-1860 · internal/css/media.go:11-12 · internal/convert/convert.go:533-540</p>
+          <div class="grid gap-3 md:grid-cols-2">
+            <div class="rounded-lg border border-red-200 bg-red-50/60 p-4 space-y-2 text-xs">
+              <p class="text-[10px] uppercase tracking-widest text-red-600 font-bold">Before</p>
+              <div class="flex flex-col gap-2">
+                <span class="node node-bad">image width 1024 px</span>
+                <span class="arrow">&darr;</span>
+                <span class="node node-bad">MediaMatches(widthPt = 1024)</span>
+                <span class="text-red-700">link and @import eligibility gated against the wrong unit</span>
+              </div>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-emerald-50/60 p-4 space-y-2 text-xs">
+              <p class="text-[10px] uppercase tracking-widest text-emerald-700 font-bold">After</p>
+              <div class="flex flex-col gap-2">
+                <span class="node node-good">resolved viewport helper</span>
+                <span class="arrow">&darr; px and pt from one call site &darr;</span>
+                <div class="flex flex-wrap gap-2">
+                  <span class="node node-owner">raster context px</span>
+                  <span class="node node-owner">prepare/media pt</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="grid gap-2 sm:grid-cols-2 text-sm">
+            <p><span class="font-semibold">Problem.</span> PDF passes content points; image passes CSS pixels with a default height that disagrees with layout. Linked sheets are gated before fetch, so rules silently vanish.</p>
+            <p><span class="font-semibold">Solution.</span> One resolved viewport helper returning both representations, with height defaulting to width; both call sites consume it.</p>
+          </div>
+          <ul class="flex flex-wrap gap-2 text-xs text-slate-600">
+            <li class="px-2 py-1 rounded bg-slate-100">one call site converts units</li>
+            <li class="px-2 py-1 rounded bg-slate-100">shared matcher contract stays in points</li>
+          </ul>
+          <p class="font-mono text-[11px] text-slate-400">Proof: TestPrepareImageDocumentLinkMediaUsesLayoutViewport. The closed-row test could not fail.</p>
+        </article>
+
+        <article id="arc-28" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="font-mono text-xs px-2 py-1 rounded bg-slate-900 text-white">ARC-28</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-amber-100 text-amber-800 font-bold">P1 · defect</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-emerald-100 text-emerald-800 font-bold">Strong</span>
+          </div>
+          <h3 class="font-serif text-xl font-semibold">Reject bad image dimensions before opening the output</h3>
+          <p class="font-mono text-xs text-slate-500">internal/app/image.go:38-61 · internal/imageout/request.go:49-66 · internal/imageout/imageout.go:129-136 · internal/cli/cli.go:83-95</p>
+          <div class="grid gap-3 md:grid-cols-2">
+            <div class="rounded-lg border border-red-200 bg-red-50/60 p-4 space-y-2 text-xs">
+              <p class="text-[10px] uppercase tracking-widest text-red-600 font-bold">Before</p>
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="node node-bad">Request.Validate</span><span class="arrow">&rarr;</span>
+                <span class="node node-bad">os.Create truncates report.png</span><span class="arrow">&rarr;</span>
+                <span class="node node-bad">dimension check fails</span>
+              </div>
+              <p class="text-red-700">an existing output is destroyed, then the run errors</p>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-emerald-50/60 p-4 space-y-2 text-xs">
+              <p class="text-[10px] uppercase tracking-widest text-emerald-700 font-bold">After</p>
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="node node-good">Request.Validate shares predicate</span><span class="arrow">&rarr;</span>
+                <span class="node node-owner">OpenOutput never runs</span>
+              </div>
+              <p class="text-emerald-700">the documented promise holds for image mode</p>
+            </div>
+          </div>
+          <div class="grid gap-2 sm:grid-cols-2 text-sm">
+            <p><span class="font-semibold">Problem.</span> The negative dimension and crop predicate lives in RenderOptions.Validate, which runs after the app has already opened and truncated the destination.</p>
+            <p><span class="font-semibold">Solution.</span> Move the predicate into a helper that Request.Validate and RenderOptions.Validate both call, so the app preflight covers it.</p>
+          </div>
+          <ul class="flex flex-wrap gap-2 text-xs text-slate-600">
+            <li class="px-2 py-1 rounded bg-slate-100">data loss before validation removed</li>
+            <li class="px-2 py-1 rounded bg-slate-100">one predicate, two call sites</li>
+          </ul>
+          <p class="font-mono text-[11px] text-slate-400">Proof: TestRunImageRejectsNegativeWidthBeforeOpeningOutput with a pre-existing output file.</p>
+        </article>
+
+        <article id="arc-29" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="font-mono text-xs px-2 py-1 rounded bg-slate-900 text-white">ARC-29</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-amber-100 text-amber-800 font-bold">P1 · defect</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-emerald-100 text-emerald-800 font-bold">Strong</span>
+          </div>
+          <h3 class="font-serif text-xl font-semibold">Give multicol and Paint one page height</h3>
+          <p class="font-mono text-xs text-slate-500">internal/layout/multicol.go:337,552-566 · internal/layout/paint.go:152,170 · internal/layout/layout.go:97-99</p>
+          <div class="grid gap-3 md:grid-cols-2">
+            <div class="rounded-lg border border-red-200 bg-red-50/60 p-4 space-y-2 text-xs">
+              <p class="text-[10px] uppercase tracking-widest text-red-600 font-bold">Before</p>
+              <div class="flex flex-col gap-2">
+                <span class="node node-bad">multicol breaks on Options.Height</span>
+                <span class="node node-bad">Paint breaks on contentH</span>
+                <span class="text-red-700">tests keep them apart: 800 vs 842</span>
+              </div>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-emerald-50/60 p-4 space-y-2 text-xs">
+              <p class="text-[10px] uppercase tracking-widest text-emerald-700 font-bold">After</p>
+              <div class="flex flex-col gap-2">
+                <span class="node node-owner">one page content height</span>
+                <span class="arrow">&darr; consumed by both &darr;</span>
+                <span class="node node-good">multicol snap stays with its column</span>
+              </div>
+            </div>
+          </div>
+          <div class="grid gap-2 sm:grid-cols-2 text-sm">
+            <p><span class="font-semibold">Problem.</span> A column line snapped to y=800 with a tall strip crosses Paint's 842 boundary; text moves to the next page while column rules and chrome stay behind.</p>
+            <p><span class="font-semibold">Solution.</span> Record an explicit page content height on Options or Result, have Paint reject a mismatch, or emit a page-top hint that paginateOps consumes.</p>
+          </div>
+          <ul class="flex flex-wrap gap-2 text-xs text-slate-600">
+            <li class="px-2 py-1 rounded bg-slate-100">one boundary decision</li>
+            <li class="px-2 py-1 rounded bg-slate-100">layout tests and Paint agree</li>
+          </ul>
+          <p class="font-mono text-[11px] text-slate-400">Proof: TestMulticolPageHeightMustMatchPaint.</p>
+        </article>
+
+        <article id="arc-30" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="font-mono text-xs px-2 py-1 rounded bg-slate-900 text-white">ARC-30</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-amber-100 text-amber-800 font-bold">P1 · risk</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-amber-100 text-amber-800 font-bold">Worth exploring</span>
+          </div>
+          <h3 class="font-serif text-xl font-semibold">One bucketer for op-to-page membership</h3>
+          <p class="font-mono text-xs text-slate-500">internal/layout/paint.go:305 · internal/layout/paint_flow_index.go:276 · internal/layout/paint_pagination_seal.go:554,559-561</p>
+          <div class="grid gap-3 md:grid-cols-2">
+            <div class="rounded-lg border border-red-200 bg-red-50/60 p-4">
+              <p class="text-[10px] uppercase tracking-widest text-red-600 font-bold mb-3">Before</p>
+              <pre class="mermaid">
+flowchart LR
+  O[ops] --> B1[pageBuckets +epsilon]
+  O --> B2[flow index no epsilon]
+  O --> B3[seal pass no epsilon]
+  B1 --> P1[page pass]
+  B2 --> P2[shift passes]
+  B3 --> P3[seal pass]
+  classDef bad stroke:#dc2626,stroke-width:2px;
+  class B1,B2,B3 bad
+              </pre>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-emerald-50/60 p-4">
+              <p class="text-[10px] uppercase tracking-widest text-emerald-700 font-bold mb-3">After</p>
+              <pre class="mermaid">
+flowchart LR
+  O[ops] --> B[flowPageOfY + bucketOpsByPage]
+  B --> P1[page pass]
+  B --> P2[shift passes]
+  B --> P3[seal pass]
+  classDef good stroke:#059669,stroke-width:2px;
+  class B good
+              </pre>
+            </div>
+          </div>
+          <div class="grid gap-2 sm:grid-cols-2 text-sm">
+            <p><span class="font-semibold">Problem.</span> Three bucketers and fourteen raw int(Y/contentH) copies use different tolerances; an op the final pass paints on page k can be treated as page k-1 by a shift pass.</p>
+            <p><span class="font-semibold">Solution.</span> One flowPageOfY plus one bucketOpsByPage owner on Result, folding the count and fill helpers. Validate the disagreement first: this row stays a risk until the boundary table test fails.</p>
+          </div>
+          <ul class="flex flex-wrap gap-2 text-xs text-slate-600">
+            <li class="px-2 py-1 rounded bg-slate-100">one boundary rule for every pass</li>
+            <li class="px-2 py-1 rounded bg-slate-100">next fix lands once</li>
+          </ul>
+          <p class="font-mono text-[11px] text-slate-400">Validation: boundary table test at k*contentH - 1e-9, k*contentH, and 21*785.197 - 1e-6.</p>
+        </article>
+
+        <article id="arc-31" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="font-mono text-xs px-2 py-1 rounded bg-slate-900 text-white">ARC-31</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-amber-100 text-amber-800 font-bold">P1 · risk</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-amber-100 text-amber-800 font-bold">Worth exploring</span>
+          </div>
+          <h3 class="font-serif text-xl font-semibold">Bound CSS parse depth like HTML already does</h3>
+          <p class="font-mono text-xs text-slate-500">internal/css/has.go:68-88 · internal/css/selector_parser.go:397-410,141-146,317-327 · internal/css/container.go:288-394</p>
+          <div class="grid gap-3 md:grid-cols-2">
+            <div class="rounded-lg border border-red-200 bg-red-50/60 p-4 space-y-2 text-xs">
+              <p class="text-[10px] uppercase tracking-widest text-red-600 font-bold">Before</p>
+              <div class="flex flex-col gap-2">
+                <span class="node node-bad">:not( :not( :not( ... )))</span>
+                <span class="node node-bad">each level rescans to its paren</span>
+                <span class="text-red-700">O(n&sup2;) work, recursion with no cap</span>
+              </div>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-emerald-50/60 p-4 space-y-2 text-xs">
+              <p class="text-[10px] uppercase tracking-widest text-emerald-700 font-bold">After</p>
+              <div class="flex flex-col gap-2">
+                <span class="node node-owner">maxParseDepth shared by selectors, container, at-rules</span>
+                <span class="arrow">&darr;</span>
+                <span class="node node-good">over-deep rule dropped, parse bounded</span>
+              </div>
+            </div>
+          </div>
+          <div class="grid gap-2 sm:grid-cols-2 text-sm">
+            <p><span class="font-semibold">Problem.</span> HTML owns a 1024 element depth cap and CSS caps var() chains at 16 and @import at 8, but selector, :has, and container recursion has no cap and a quadratic scan.</p>
+            <p><span class="font-semibold">Solution.</span> One maxParseDepth shared by compound pseudos, container conditions, and nested at-rules, rejected before the chain split. Validate the probe first: this row stays a risk until it reproduces.</p>
+          </div>
+          <ul class="flex flex-wrap gap-2 text-xs text-slate-600">
+            <li class="px-2 py-1 rounded bg-slate-100">one owner for parse depth</li>
+            <li class="px-2 py-1 rounded bg-slate-100">large sheets bounded before work</li>
+          </ul>
+          <p class="font-mono text-[11px] text-slate-400">Validation: 200k nested :not( probe under a 20s timeout.</p>
+        </article>
+
+        <article id="arc-32" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="font-mono text-xs px-2 py-1 rounded bg-slate-900 text-white">ARC-32</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-amber-100 text-amber-800 font-bold">P1 · defect</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-emerald-100 text-emerald-800 font-bold">Strong</span>
+          </div>
+          <h3 class="font-serif text-xl font-semibold">Fold all web.images layers through one resolver</h3>
+          <p class="font-mono text-xs text-slate-500">internal/settings/reflect.go:811-840 · internal/convert/convert.go:559-560,584 · internal/imageout/imageout.go:1882-1884</p>
+          <div class="grid gap-3 md:grid-cols-2">
+            <div class="rounded-lg border border-red-200 bg-red-50/60 p-4 space-y-2 text-xs">
+              <p class="text-[10px] uppercase tracking-widest text-red-600 font-bold">Before</p>
+              <div class="flex flex-col gap-2">
+                <span class="node node-bad">registered global / object / ImageGlobal</span>
+                <span class="node node-bad">PDF reads Global only</span>
+                <span class="node node-bad">image reads ImageGlobal only</span>
+                <span class="text-red-700">object layer is a silent no-op; no flag exists</span>
+              </div>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-emerald-50/60 p-4 space-y-2 text-xs">
+              <p class="text-[10px] uppercase tracking-widest text-emerald-700 font-bold">After</p>
+              <div class="flex flex-col gap-2">
+                <span class="node node-owner">one ResolveImages fold</span>
+                <span class="arrow">&darr; consumed by three fetch closures &darr;</span>
+                <span class="node node-good">flag registered or docs corrected</span>
+              </div>
+            </div>
+          </div>
+          <div class="grid gap-2 sm:grid-cols-2 text-sm">
+            <p><span class="font-semibold">Problem.</span> The key exists on three tables but each mode reads one layer; Set("web.images") on an object silently renders images, and no CLI flag registers the key while docs describe one.</p>
+            <p><span class="font-semibold">Solution.</span> One resolver shaped like settings.ResolveMedia folding global, mode, and object layers, consumed by PDF, header/footer, and image fetch closures; register the flag or fix the docs.</p>
+          </div>
+          <ul class="flex flex-wrap gap-2 text-xs text-slate-600">
+            <li class="px-2 py-1 rounded bg-slate-100">each table gains a consumer</li>
+            <li class="px-2 py-1 rounded bg-slate-100">flag and docs match</li>
+          </ul>
+          <p class="font-mono text-[11px] text-slate-400">Proof: layer-folding table test plus object-level PDF and global-level image engine tests.</p>
+        </article>
+
+        <article id="arc-33" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="font-mono text-xs px-2 py-1 rounded bg-slate-900 text-white">ARC-33</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-slate-200 text-slate-700 font-bold">P2 · defect</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-amber-100 text-amber-800 font-bold">Worth exploring</span>
+          </div>
+          <h3 class="font-serif text-xl font-semibold">Cap the inline: loader branch like every other body</h3>
+          <p class="font-mono text-xs text-slate-500">internal/load/load.go:966-987 vs :920-923</p>
+          <div class="grid gap-3 md:grid-cols-2">
+            <div class="rounded-lg border border-red-200 bg-red-50/60 p-4 space-y-2 text-xs">
+              <p class="text-[10px] uppercase tracking-widest text-red-600 font-bold">Before</p>
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="node node-bad">InlineHTML</span><span class="arrow">&rarr;</span>
+                <span class="node node-good">checkBodyLimit</span>
+                <span class="node node-bad">inline:</span><span class="arrow">&rarr;</span>
+                <span class="node node-bad">no cap</span>
+              </div>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-emerald-50/60 p-4 space-y-2 text-xs">
+              <p class="text-[10px] uppercase tracking-widest text-emerald-700 font-bold">After</p>
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="node node-good">one inline-resource constructor</span><span class="arrow">&rarr;</span>
+                <span class="node node-owner">checkBodyLimit always</span>
+              </div>
+            </div>
+          </div>
+          <div class="grid gap-2 sm:grid-cols-2 text-sm">
+            <p><span class="font-semibold">Problem.</span> Both branches produce KindInline, but only the InlineHTML branch applies the loader body cap. The prefix is public and used.</p>
+            <p><span class="font-semibold">Solution.</span> One constructor that applies checkBodyLimit, used by both branches.</p>
+          </div>
+          <ul class="flex flex-wrap gap-2 text-xs text-slate-600">
+            <li class="px-2 py-1 rounded bg-slate-100">loader seam has one cap rule</li>
+            <li class="px-2 py-1 rounded bg-slate-100">library callers bounded</li>
+          </ul>
+          <p class="font-mono text-[11px] text-slate-400">Proof: TestInlinePrefixHonorsBodyLimit with MaxBodySize = 4.</p>
+        </article>
+      </section>
+
+      <!-- Phase 2 -->
+      <section id="phase-2" class="space-y-6">
+        <div class="flex items-baseline gap-3">
+          <h2 class="font-serif text-2xl font-semibold">Phase 2: Seams and shared forks</h2>
+          <span class="text-xs text-slate-500">7 candidates · one owner per rule</span>
+        </div>
+
+        <article id="arc-34" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="font-mono text-xs px-2 py-1 rounded bg-slate-900 text-white">ARC-34</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-slate-200 text-slate-700 font-bold">P2 · defect</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-amber-100 text-amber-800 font-bold">Worth exploring</span>
+          </div>
+          <h3 class="font-serif text-xl font-semibold">Decide shorthand precedence once, including font</h3>
+          <p class="font-mono text-xs text-slate-500">internal/layout/style_cascade.go:551-588,915-930,1002-1012,1042-1052 · internal/layout/style_values.go:47-77</p>
+          <div class="grid gap-3 md:grid-cols-2">
+            <div class="rounded-lg border border-red-200 bg-red-50/60 p-4 space-y-2 text-xs">
+              <p class="text-[10px] uppercase tracking-widest text-red-600 font-bold">Before</p>
+              <div class="flex flex-col gap-2">
+                <span class="node node-bad">font shorthand applied last, always</span>
+                <span class="node node-bad">two apply lists, already disagree</span>
+                <span class="text-red-700">font-size 20pt loses to font 12pt</span>
+              </div>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-emerald-50/60 p-4 space-y-2 text-xs">
+              <p class="text-[10px] uppercase tracking-widest text-emerald-700 font-bold">After</p>
+              <div class="flex flex-col gap-2">
+                <span class="node node-owner">one ordered declaration table</span>
+                <span class="node node-good">source order decides every longhand</span>
+              </div>
+            </div>
+          </div>
+          <div class="grid gap-2 sm:grid-cols-2 text-sm">
+            <p><span class="font-semibold">Problem.</span> Box and list-style shorthands expand before the cascade so precedence is decided once; font was never added, and the second apply pass is a copy-pasted list.</p>
+            <p><span class="font-semibold">Solution.</span> Expand font into longhands like list-style, or keep an ordered declaration record; derive the second pass from one ordered table.</p>
+          </div>
+          <ul class="flex flex-wrap gap-2 text-xs text-slate-600">
+            <li class="px-2 py-1 rounded bg-slate-100">one precedence rule</li>
+            <li class="px-2 py-1 rounded bg-slate-100">lists cannot drift again</li>
+          </ul>
+          <p class="font-mono text-[11px] text-slate-400">Proof: TestFontLonghandAfterShorthandWins.</p>
+        </article>
+
+        <article id="arc-35" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="font-mono text-xs px-2 py-1 rounded bg-slate-900 text-white">ARC-35</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-slate-200 text-slate-700 font-bold">P2 · defect</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-amber-100 text-amber-800 font-bold">Worth exploring</span>
+          </div>
+          <h3 class="font-serif text-xl font-semibold">Resolve custom properties on pseudo-element styles</h3>
+          <p class="font-mono text-xs text-slate-500">internal/layout/pseudo_content.go:96-116 · internal/layout/style.go:742-743 · internal/layout/style_cascade.go:543-548</p>
+          <div class="grid gap-3 md:grid-cols-2">
+            <div class="rounded-lg border border-red-200 bg-red-50/60 p-4 space-y-2 text-xs">
+              <p class="text-[10px] uppercase tracking-widest text-red-600 font-bold">Before</p>
+              <div class="flex flex-col gap-2">
+                <span class="node node-bad">p::after { color: var(--accent) }</span>
+                <span class="arrow">&darr;</span>
+                <span class="node node-bad">literal var(--accent) reaches the parser</span>
+                <span class="text-red-700">dropped silently</span>
+              </div>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-emerald-50/60 p-4 space-y-2 text-xs">
+              <p class="text-[10px] uppercase tracking-widest text-emerald-700 font-bold">After</p>
+              <div class="flex flex-col gap-2">
+                <span class="node node-owner">one raw-to-used apply function</span>
+                <span class="node node-good">element and pseudo paths share it</span>
+              </div>
+            </div>
+          </div>
+          <div class="grid gap-2 sm:grid-cols-2 text-sm">
+            <p><span class="font-semibold">Problem.</span> The element path merges CustomProps and expands vars; the pseudo path skips both. Generated content using tokens declares them and paints inherited values.</p>
+            <p><span class="font-semibold">Solution.</span> Extract the apply sequence from resolveElementStyle into one function both paths call.</p>
+          </div>
+          <ul class="flex flex-wrap gap-2 text-xs text-slate-600">
+            <li class="px-2 py-1 rounded bg-slate-100">generated content matches the docs</li>
+            <li class="px-2 py-1 rounded bg-slate-100">next cascade change lands once</li>
+          </ul>
+          <p class="font-mono text-[11px] text-slate-400">Proof: TestPseudoElementResolvesCustomProperties.</p>
+        </article>
+
+        <article id="arc-36" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="font-mono text-xs px-2 py-1 rounded bg-slate-900 text-white">ARC-36</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-slate-200 text-slate-700 font-bold">P2 · defect</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-amber-100 text-amber-800 font-bold">Worth exploring</span>
+          </div>
+          <h3 class="font-serif text-xl font-semibold">One viewport for the link and @import media gate</h3>
+          <p class="font-mono text-xs text-slate-500">internal/convert/convert.go:527-557 · internal/convert/prepare/styles.go:119,200-205,362-371 · internal/layout/style_cascade.go:359</p>
+          <div class="grid gap-3 md:grid-cols-2">
+            <div class="rounded-lg border border-red-200 bg-red-50/60 p-4">
+              <p class="text-[10px] uppercase tracking-widest text-red-600 font-bold mb-3">Before</p>
+              <pre class="mermaid">
+flowchart LR
+  A[prepare gate] -->|viewport before @page| L[link / @import dropped]
+  B[cascade gate] -->|viewport after @page| M[rule would match]
+  classDef bad stroke:#dc2626,stroke-width:2px;
+  class L bad
+              </pre>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-emerald-50/60 p-4">
+              <p class="text-[10px] uppercase tracking-widest text-emerald-700 font-bold mb-3">After</p>
+              <pre class="mermaid">
+flowchart LR
+  A["@page box resolved first"] --> V[one resolved viewport]
+  V --> G[prepare gate]
+  V --> C[cascade]
+  classDef good stroke:#059669,stroke-width:2px;
+  class V good
+              </pre>
+            </div>
+          </div>
+          <div class="grid gap-2 sm:grid-cols-2 text-sm">
+            <p><span class="font-semibold">Problem.</span> With @page margin: 0, the content width moves from about 538pt to 595pt. A link behind (min-width: 560px) is dropped before fetch while layout would match it.</p>
+            <p><span class="font-semibold">Solution.</span> Resolve the unnamed @page box from inline sheets before gating, or gate on media type only and let the cascade decide feature queries with the final viewport.</p>
+          </div>
+          <ul class="flex flex-wrap gap-2 text-xs text-slate-600">
+            <li class="px-2 py-1 rounded bg-slate-100">one predicate, one answer</li>
+            <li class="px-2 py-1 rounded bg-slate-100">header/footer already matches this</li>
+          </ul>
+          <p class="font-mono text-[11px] text-slate-400">Proof: TestLinkMediaGateUsesFinalPageBox.</p>
+        </article>
+
+        <article id="arc-37" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="font-mono text-xs px-2 py-1 rounded bg-slate-900 text-white">ARC-37</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-slate-200 text-slate-700 font-bold">P2 · defect</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-amber-100 text-amber-800 font-bold">Worth exploring</span>
+          </div>
+          <h3 class="font-serif text-xl font-semibold">One used-height resolver for bottom chrome</h3>
+          <p class="font-mono text-xs text-slate-500">internal/layout/layout.go:1487-1501 · flex.go:95-97 · multicol.go:227-231 · grid.go:684-710 · layout_tables.go:97 · layout_measure.go:740</p>
+          <div class="grid gap-3 md:grid-cols-2">
+            <div class="rounded-lg border border-red-200 bg-red-50/60 p-4 space-y-2 text-xs">
+              <p class="text-[10px] uppercase tracking-widest text-red-600 font-bold">Before</p>
+              <div class="flex flex-wrap gap-2">
+                <span class="node node-bad">block</span>
+                <span class="node node-bad">flex</span>
+                <span class="node node-bad">multicol</span>
+                <span class="node node-bad">grid</span>
+                <span class="node node-bad">table</span>
+              </div>
+              <p class="text-red-700">five height paths, bottom border counted three different ways</p>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-emerald-50/60 p-4 space-y-2 text-xs">
+              <p class="text-[10px] uppercase tracking-widest text-emerald-700 font-bold">After</p>
+              <div class="flex flex-col gap-2">
+                <span class="node node-good">block / flex / multicol / grid / table</span>
+                <span class="arrow">&darr;</span>
+                <span class="node node-owner">one used-height resolver</span>
+              </div>
+            </div>
+          </div>
+          <div class="grid gap-2 sm:grid-cols-2 text-sm">
+            <p><span class="font-semibold">Problem.</span> An auto-height bordered block or flex container is shorter than a bordered grid or table with identical content by the bottom border width.</p>
+            <p><span class="font-semibold">Solution.</span> One resolver that takes the content bottom and returns the border-box height for auto, definite, min, and max; every formatting context calls it.</p>
+          </div>
+          <ul class="flex flex-wrap gap-2 text-xs text-slate-600">
+            <li class="px-2 py-1 rounded bg-slate-100">geometry agrees across contexts</li>
+            <li class="px-2 py-1 rounded bg-slate-100">next height fix lands once</li>
+          </ul>
+          <p class="font-mono text-[11px] text-slate-400">Proof: TestAutoHeightIncludesBottomBorder comparing block and grid.</p>
+        </article>
+
+        <article id="arc-38" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="font-mono text-xs px-2 py-1 rounded bg-slate-900 text-white">ARC-38</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-slate-200 text-slate-700 font-bold">P2 · defect</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-amber-100 text-amber-800 font-bold">Worth exploring</span>
+          </div>
+          <h3 class="font-serif text-xl font-semibold">One ownership rule for paint ops</h3>
+          <p class="font-mono text-xs text-slate-500">internal/layout/paint_pagination_chrome.go:345-353 · overflow_clip.go:226-272 · paint_pagination_seal.go:1237-1255 · outline.go:96 · layout_chrome.go:406</p>
+          <div class="grid gap-3 md:grid-cols-2">
+            <div class="rounded-lg border border-red-200 bg-red-50/60 p-4 space-y-2 text-xs">
+              <p class="text-[10px] uppercase tracking-widest text-red-600 font-bold">Before</p>
+              <div class="flex flex-col gap-2">
+                <span class="node node-bad">overflow clip knows outline shapes</span>
+                <span class="node node-bad">chrome repair does not</span>
+                <span class="node node-bad">seal has its own predicate</span>
+                <span class="text-red-700">outline stretches the background and rails</span>
+              </div>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-emerald-50/60 p-4 space-y-2 text-xs">
+              <p class="text-[10px] uppercase tracking-widest text-emerald-700 font-bold">After</p>
+              <div class="flex flex-col gap-2">
+                <span class="node node-owner">opOwnedBy(op, box, phase)</span>
+                <span class="node node-good">three passes call one helper</span>
+              </div>
+            </div>
+          </div>
+          <div class="grid gap-2 sm:grid-cols-2 text-sm">
+            <p><span class="font-semibold">Problem.</span> The rect-proximity predicate is copied three times with different tolerances; only one copy recognizes outline ops, so chrome repair grows the box to the outline.</p>
+            <p><span class="font-semibold">Solution.</span> One helper covering rect, line, masked side, outline, and shadow shapes, called with the phase each pass needs.</p>
+          </div>
+          <ul class="flex flex-wrap gap-2 text-xs text-slate-600">
+            <li class="px-2 py-1 rounded bg-slate-100">outline no longer inflates chrome</li>
+            <li class="px-2 py-1 rounded bg-slate-100">one rule for three passes</li>
+          </ul>
+          <p class="font-mono text-[11px] text-slate-400">Proof: TestOutlineDoesNotStretchOwnedChrome.</p>
+        </article>
+
+        <article id="arc-40" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="font-mono text-xs px-2 py-1 rounded bg-slate-900 text-white">ARC-40</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-slate-200 text-slate-700 font-bold">P2 · defect</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-amber-100 text-amber-800 font-bold">Worth exploring</span>
+          </div>
+          <h3 class="font-serif text-xl font-semibold">One op-radius resolver for PDF and raster</h3>
+          <p class="font-mono text-xs text-slate-500">internal/imageout/imageout.go:1234-1272 · internal/layout/border_radius.go:340-372 · internal/layout/paint.go:1114-1120</p>
+          <div class="grid gap-3 md:grid-cols-2">
+            <div class="rounded-lg border border-red-200 bg-red-50/60 p-4 space-y-2 text-xs">
+              <p class="text-[10px] uppercase tracking-widest text-red-600 font-bold">Before</p>
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="node node-bad">layout opRadii / opRadiiXY</span>
+                <span class="node node-bad">imageout scaledRadii / scaledRadiiXY</span>
+              </div>
+              <p class="text-red-700">two resolvers, no parity test</p>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-emerald-50/60 p-4 space-y-2 text-xs">
+              <p class="text-[10px] uppercase tracking-widest text-emerald-700 font-bold">After</p>
+              <div class="flex flex-col gap-2">
+                <span class="node node-owner">layout.OpRadiiXY(op)</span>
+                <span class="arrow">&darr; scaled by pxPerPt in imageout &darr;</span>
+                <span class="node node-good">PDF and raster read one resolver</span>
+              </div>
+            </div>
+          </div>
+          <div class="grid gap-2 sm:grid-cols-2 text-sm">
+            <p><span class="font-semibold">Problem.</span> Layout owns used-value radius resolution; imageout reimplements shorthand and XY fallback. The next radii change must be edited in two packages.</p>
+            <p><span class="font-semibold">Solution.</span> Export one resolved, unscaled resolver and let imageout scale it, or stamp used radii onto Op once so both painters read the same fields.</p>
+          </div>
+          <ul class="flex flex-wrap gap-2 text-xs text-slate-600">
+            <li class="px-2 py-1 rounded bg-slate-100">raster chrome cannot drift</li>
+            <li class="px-2 py-1 rounded bg-slate-100">one clamp and fallback rule</li>
+          </ul>
+          <p class="font-mono text-[11px] text-slate-400">Proof: parity test for shorthand, corner longhand, and Y-only ops.</p>
+        </article>
+
+        <article id="arc-43" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="font-mono text-xs px-2 py-1 rounded bg-slate-900 text-white">ARC-43</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-slate-200 text-slate-700 font-bold">P2 · friction</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-amber-100 text-amber-800 font-bold">Worth exploring</span>
+          </div>
+          <h3 class="font-serif text-xl font-semibold">One way to override a node's style for one build</h3>
+          <p class="font-mono text-xs text-slate-500">internal/layout/layout.go:1124-1138,514-518 · flex.go:136-141,1139,1528 · multicol.go:163 · layout_measure.go:413-419</p>
+          <div class="grid gap-3 md:grid-cols-2">
+            <div class="rounded-lg border border-red-200 bg-red-50/60 p-4 space-y-2 text-xs">
+              <p class="text-[10px] uppercase tracking-widest text-red-600 font-bold">Before</p>
+              <div class="flex flex-col gap-2">
+                <span class="node node-bad">buildWithStyle pushes styleOverrides</span>
+                <span class="node node-bad">flex and multicol write e.styles directly</span>
+                <span class="node node-bad">six readers index e.styles[node]</span>
+                <span class="text-red-700">overrides invisible to half the readers</span>
+              </div>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-emerald-50/60 p-4 space-y-2 text-xs">
+              <p class="text-[10px] uppercase tracking-widest text-emerald-700 font-bold">After</p>
+              <div class="flex flex-col gap-2">
+                <span class="node node-owner">stylePtr is the one accessor</span>
+                <span class="node node-good">synthetic nodes on a side map</span>
+                <span class="node node-good">cascade map matches its immutable contract</span>
+              </div>
+            </div>
+          </div>
+          <div class="grid gap-2 sm:grid-cols-2 text-sm">
+            <p><span class="font-semibold">Problem.</span> Two storage conventions for one concept; readers that index the map cannot see an active override, and flex/multicol write into a map documented as immutable.</p>
+            <p><span class="font-semibold">Solution.</span> Route every reader through stylePtr and keep synthetic nodes off the cascade map.</p>
+          </div>
+          <ul class="flex flex-wrap gap-2 text-xs text-slate-600">
+            <li class="px-2 py-1 rounded bg-slate-100">locality: override behavior in one place</li>
+            <li class="px-2 py-1 rounded bg-slate-100">the next override reason cannot be missed</li>
+          </ul>
+          <p class="font-mono text-[11px] text-slate-400">Proof: production rg for .styles[ returns only store writers, plus an override measurement test.</p>
+        </article>
+      </section>
+
+      <!-- Phase 3 -->
+      <section id="phase-3" class="space-y-6">
+        <div class="flex items-baseline gap-3">
+          <h2 class="font-serif text-2xl font-semibold">Phase 3: Contracts and locality</h2>
+          <span class="text-xs text-slate-500">4 candidates · identity, metadata, and predicate drift</span>
+        </div>
+
+        <article id="arc-39" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="font-mono text-xs px-2 py-1 rounded bg-slate-900 text-white">ARC-39</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-slate-200 text-slate-700 font-bold">P2 · defect</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-amber-100 text-amber-800 font-bold">Worth exploring</span>
+          </div>
+          <h3 class="font-serif text-xl font-semibold">Stamp heading identity where the structure tree is built</h3>
+          <p class="font-mono text-xs text-slate-500">internal/pdf/structure.go:221 · internal/convert/links.go:204-208 · internal/convert/outline.go:226-244</p>
+          <div class="grid gap-3 md:grid-cols-2">
+            <div class="rounded-lg border border-red-200 bg-red-50/60 p-4 space-y-2 text-xs">
+              <p class="text-[10px] uppercase tracking-widest text-red-600 font-bold">Before</p>
+              <div class="flex flex-col gap-2">
+                <span class="node node-bad">HeadingStructElems flat slice</span>
+                <span class="node node-bad">links.go zips by raw index</span>
+                <span class="node node-bad">outline.go has a page fallback</span>
+                <span class="text-red-700">cover + TOC binds /SD to the wrong heading</span>
+              </div>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-emerald-50/60 p-4 space-y-2 text-xs">
+              <p class="text-[10px] uppercase tracking-widest text-emerald-700 font-bold">After</p>
+              <div class="flex flex-col gap-2">
+                <span class="node node-owner">StructElem stamped at tag creation</span>
+                <span class="node node-good">callers ask the heading, not the slice</span>
+              </div>
+            </div>
+          </div>
+          <div class="grid gap-2 sm:grid-cols-2 text-sm">
+            <p><span class="font-semibold">Problem.</span> Outline collection drops objects with outline flags off while layout tags every painted h1-h6, so counts diverge and two callers align them differently.</p>
+            <p><span class="font-semibold">Solution.</span> Record the association where the tree is built; tag creation already walks boxes with the heading node in hand.</p>
+          </div>
+          <ul class="flex flex-wrap gap-2 text-xs text-slate-600">
+            <li class="px-2 py-1 rounded bg-slate-100">structure order stops being a public contract</li>
+            <li class="px-2 py-1 rounded bg-slate-100">UA-2 /SD correct with cover</li>
+          </ul>
+          <p class="font-mono text-[11px] text-slate-400">Proof: TestTOCLinkStructDestIdentity under UA-2 with a cover h1.</p>
+        </article>
+
+        <article id="arc-41" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="font-mono text-xs px-2 py-1 rounded bg-slate-900 text-white">ARC-41</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-slate-200 text-slate-700 font-bold">P2 · defect</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-amber-100 text-amber-800 font-bold">Worth exploring</span>
+          </div>
+          <h3 class="font-serif text-xl font-semibold">Give every Info key one owner</h3>
+          <p class="font-mono text-xs text-slate-500">internal/pdf/pdf.go:267,1014-1020 · internal/convert/pdf_pipeline.go:198</p>
+          <div class="grid gap-3 md:grid-cols-2">
+            <div class="rounded-lg border border-red-200 bg-red-50/60 p-4 space-y-2 text-xs">
+              <p class="text-[10px] uppercase tracking-widest text-red-600 font-bold">Before</p>
+              <div class="flex flex-col gap-2">
+                <span class="node node-bad">SetInfo("Producer") stores a value</span>
+                <span class="arrow">&darr;</span>
+                <span class="node node-bad">finalize writes policy.ProducerVersion()</span>
+                <span class="text-red-700">the call can never reach the file</span>
+              </div>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-emerald-50/60 p-4 space-y-2 text-xs">
+              <p class="text-[10px] uppercase tracking-widest text-emerald-700 font-bold">After</p>
+              <div class="flex flex-col gap-2">
+                <span class="node node-owner">key table: override or reject</span>
+                <span class="node node-good">dead call deleted if rejected</span>
+              </div>
+            </div>
+          </div>
+          <div class="grid gap-2 sm:grid-cols-2 text-sm">
+            <p><span class="font-semibold">Problem.</span> SetInfo documents accepted keys; finalize overwrites Producer unconditionally. Callers cannot tell accepted keys from ignored ones.</p>
+            <p><span class="font-semibold">Solution.</span> One owner per Info key: honor a caller Producer with the policy string as fallback, or reject keys outside an allowlist and delete the dead call.</p>
+          </div>
+          <ul class="flex flex-wrap gap-2 text-xs text-slate-600">
+            <li class="px-2 py-1 rounded bg-slate-100">metadata requests stop disappearing</li>
+          </ul>
+          <p class="font-mono text-[11px] text-slate-400">Proof: TestSetInfoProducer asserting /Producer (x).</p>
+        </article>
+
+        <article id="arc-44" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="font-mono text-xs px-2 py-1 rounded bg-slate-900 text-white">ARC-44</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-slate-200 text-slate-700 font-bold">P2 · defect</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-amber-100 text-amber-800 font-bold">Worth exploring</span>
+          </div>
+          <h3 class="font-serif text-xl font-semibold">Reject NaN and Inf in the shared setters</h3>
+          <p class="font-mono text-xs text-slate-500">internal/settings/reflect.go:312-327 · internal/settings/unitreal.go:51-56 · document_validate.go:222-228 · internal/app/pdf.go:88-99</p>
+          <div class="grid gap-3 md:grid-cols-2">
+            <div class="rounded-lg border border-red-200 bg-red-50/60 p-4 space-y-2 text-xs">
+              <p class="text-[10px] uppercase tracking-widest text-red-600 font-bold">Before</p>
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="node node-bad">--zoom nan</span><span class="arrow">&rarr;</span>
+                <span class="node node-bad">OpenOutput truncates PDF</span><span class="arrow">&rarr;</span>
+                <span class="node node-bad">layout rejects later</span>
+              </div>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-emerald-50/60 p-4 space-y-2 text-xs">
+              <p class="text-[10px] uppercase tracking-widest text-emerald-700 font-bold">After</p>
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="node node-good">finite helper in settings</span><span class="arrow">&rarr;</span>
+                <span class="node node-owner">Set fails at parse</span>
+              </div>
+            </div>
+          </div>
+          <div class="grid gap-2 sm:grid-cols-2 text-sm">
+            <p><span class="font-semibold">Problem.</span> NaN compares false against the minimum and +Inf passes, so the setters store values the root API rejects; the CLI opens the output before layout fails.</p>
+            <p><span class="font-semibold">Solution.</span> Reject non-finite values in the shared setters with one finite helper, matching the root predicates.</p>
+          </div>
+          <ul class="flex flex-wrap gap-2 text-xs text-slate-600">
+            <li class="px-2 py-1 rounded bg-slate-100">parse-time failure, no data loss</li>
+            <li class="px-2 py-1 rounded bg-slate-100">one finiteness rule</li>
+          </ul>
+          <p class="font-mono text-[11px] text-slate-400">Proof: TestFiniteSetters for load.zoomfactor NaN and margin.top Inf.</p>
+        </article>
+
+        <article id="arc-45" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="font-mono text-xs px-2 py-1 rounded bg-slate-900 text-white">ARC-45</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-slate-200 text-slate-700 font-bold">P2 · defect</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-amber-100 text-amber-800 font-bold">Worth exploring</span>
+          </div>
+          <h3 class="font-serif text-xl font-semibold">Let the root API express the auto margin the engine honors</h3>
+          <p class="font-mono text-xs text-slate-500">document_validate.go:200-208 · internal/convert/hf.go:686-710 · internal/settings/reflect.go:442-472</p>
+          <div class="grid gap-3 md:grid-cols-2">
+            <div class="rounded-lg border border-red-200 bg-red-50/60 p-4 space-y-2 text-xs">
+              <p class="text-[10px] uppercase tracking-widest text-red-600 font-bold">Before</p>
+              <div class="flex flex-col gap-2">
+                <span class="node node-bad">Document{Margin: -1} rejected</span>
+                <span class="node node-bad">CLI --margin-top -1 works</span>
+                <span class="node node-bad">engine treats -1 as auto</span>
+                <span class="text-red-700">three surfaces, two answers</span>
+              </div>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-emerald-50/60 p-4 space-y-2 text-xs">
+              <p class="text-[10px] uppercase tracking-widest text-emerald-700 font-bold">After</p>
+              <div class="flex flex-col gap-2">
+                <span class="node node-owner">one margin predicate</span>
+                <span class="node node-good">library and CLI express the same job</span>
+              </div>
+            </div>
+          </div>
+          <div class="grid gap-2 sm:grid-cols-2 text-sm">
+            <p><span class="font-semibold">Problem.</span> validateMargins requires non-negative values while hf.effectiveMargins treats negative top and bottom as auto; the CLI accepts them, the library does not.</p>
+            <p><span class="font-semibold">Solution.</span> Share one predicate, accepting finite negative top and bottom as the engine sentinel, since the engine and samples already use it.</p>
+          </div>
+          <ul class="flex flex-wrap gap-2 text-xs text-slate-600">
+            <li class="px-2 py-1 rounded bg-slate-100">one contract above and below the seam</li>
+          </ul>
+          <p class="font-mono text-[11px] text-slate-400">Proof: TestDocumentAutoMargin keeps -1 in toPDFRequest.</p>
+        </article>
+      </section>
+
+      <!-- Phase 4 -->
+      <section id="phase-4" class="space-y-6">
+        <div class="flex items-baseline gap-3">
+          <h2 class="font-serif text-2xl font-semibold">Phase 4: Docs honesty</h2>
+          <span class="text-xs text-slate-500">1 candidate · claims follow source</span>
+        </div>
+
+        <article id="arc-42" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="font-mono text-xs px-2 py-1 rounded bg-slate-900 text-white">ARC-42</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-slate-100 text-slate-600 font-bold">P3 · friction</span>
+            <span class="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-amber-100 text-amber-800 font-bold">Worth exploring</span>
+          </div>
+          <h3 class="font-serif text-xl font-semibold">Refresh the architecture claims that source outgrew</h3>
+          <p class="font-mono text-xs text-slate-500">documentation/architecture/09-pdf-writer.md:361-366 · 06-css.md:355,443 · 04-load.md:50,231-235 · 01-entrypoints-cli.md:386-410 · compatibility-matrix.md:611</p>
+          <div class="grid gap-3 md:grid-cols-2">
+            <div class="rounded-lg border border-red-200 bg-red-50/60 p-4 space-y-2 text-xs">
+              <p class="text-[10px] uppercase tracking-widest text-red-600 font-bold">Before</p>
+              <div class="flex flex-col gap-2">
+                <span class="node node-bad">pdf imports "only stdlib" (it reads settings)</span>
+                <span class="node node-bad">css docs deny @import and :is()</span>
+                <span class="node node-bad">CLI doc lists twenty ghost tests</span>
+                <span class="text-red-700">an agent following docs rebuilds shipped features</span>
+              </div>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-emerald-50/60 p-4 space-y-2 text-xs">
+              <p class="text-[10px] uppercase tracking-widest text-emerald-700 font-bold">After</p>
+              <div class="flex flex-col gap-2">
+                <span class="node node-owner">each contradicted claim corrected</span>
+                <span class="node node-good">claim-scan stays green</span>
+              </div>
+            </div>
+          </div>
+          <div class="grid gap-2 sm:grid-cols-2 text-sm">
+            <p><span class="font-semibold">Problem.</span> Four architecture docs and one matrix row describe code that no longer exists, including the deliberate RegistryFromGlobal settings import and shipped @import support.</p>
+            <p><span class="font-semibold">Solution.</span> Refresh the contradicted claims only, and align the DAG note in the calibration reference.</p>
+          </div>
+          <ul class="flex flex-wrap gap-2 text-xs text-slate-600">
+            <li class="px-2 py-1 rounded bg-slate-100">claims match source</li>
+            <li class="px-2 py-1 rounded bg-slate-100">extension work stops rebuilding shipped parts</li>
+          </ul>
+          <p class="font-mono text-[11px] text-slate-400">Proof: re-grep each claim, then keep make claim-scan clean.</p>
+        </article>
+      </section>
+
+      <!-- Parked and refused -->
+      <section id="parked" class="space-y-4">
+        <h2 class="font-serif text-2xl font-semibold">Parked</h2>
+        <p class="text-sm text-slate-600">Weaker than the 22 candidates. Re-open only when a named row touches the same file.</p>
+        <ul class="grid gap-2 sm:grid-cols-2 text-sm text-slate-700">
+          <li class="rounded-lg border border-slate-200 bg-white p-3">Paint mutation contract is asserted both ways; convert clones Result and builds a scratch PDF to count pages.</li>
+          <li class="rounded-lg border border-slate-200 bg-white p-3">Two inert-op sentinels: OpUnknown and opKindNoop; DeactivateOp uses the private one.</li>
+          <li class="rounded-lg border border-slate-200 bg-white p-3">paintOrderSubset has no production caller; rasterPaintOrder is a one-line delegate.</li>
+          <li class="rounded-lg border border-slate-200 bg-white p-3">imageout.Request.Now is set by ImageDocument.Now and never read.</li>
+          <li class="rounded-lg border border-slate-200 bg-white p-3">objectRenderer and hfLoader are single-implementation interfaces with no test double.</li>
+          <li class="rounded-lg border border-slate-200 bg-white p-3">@import base rebinding and header/footer loads disassemble load.ResourceContext through accessors.</li>
+          <li class="rounded-lg border border-slate-200 bg-white p-3">Profile-to-base-version table is encoded in both convert and the writer.</li>
+        </ul>
+      </section>
+
+      <section id="refused" class="space-y-4">
+        <h2 class="font-serif text-2xl font-semibold">Refused</h2>
+        <p class="text-sm text-slate-600">Decided tradeoffs. Do not re-file without a current-source regression.</p>
+        <div class="flex flex-wrap gap-2 text-xs">
+          <span class="px-3 py-1 rounded-full bg-slate-100 text-slate-600">imageout to convert/prepare is a known live leak</span>
+          <span class="px-3 py-1 rounded-full bg-slate-100 text-slate-600">paint-sink interface</span>
+          <span class="px-3 py-1 rounded-full bg-slate-100 text-slate-600">layout/flex or layout/table packages</span>
+          <span class="px-3 py-1 rounded-full bg-slate-100 text-slate-600">second settings hierarchy</span>
+          <span class="px-3 py-1 rounded-full bg-slate-100 text-slate-600">plugin or visitor for CSS properties</span>
+          <span class="px-3 py-1 rounded-full bg-slate-100 text-slate-600">mutex on layout or pdf.Document</span>
+          <span class="px-3 py-1 rounded-full bg-slate-100 text-slate-600">pixel-diff goldens as architecture proof</span>
+          <span class="px-3 py-1 rounded-full bg-slate-100 text-slate-600">dual public stories as a bug</span>
+          <span class="px-3 py-1 rounded-full bg-slate-100 text-slate-600">x/net/html swap, CGO HarfBuzz, gofumpt</span>
+          <span class="px-3 py-1 rounded-full bg-slate-100 text-slate-600">document-global Y shifts</span>
+        </div>
+      </section>
+
+      <footer class="border-t border-slate-200 pt-6 text-xs text-slate-500 space-y-2">
+        <p>Method: six read-only explore agents, one slice each, at frozen HEAD 30bd3d6; the lead re-read every P0 and P1 in current source. Audit only, no code changed.</p>
+        <p>Canonical ledger: <a class="underline decoration-slate-300 hover:decoration-slate-800" href="architecture-deepening-2026-09-10.md">plans/0.2.6/review/architecture-deepening-2026-09-10.md</a>. All 22 rows and the gate rows are closed on 2026-09-10; `make test`, `make golden`, `make claim-scan`, and `make lint` passed.</p>
+      </footer>
+    </main>
+  </body>
+</html>

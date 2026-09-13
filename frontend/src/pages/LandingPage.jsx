@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import PageTitle from '../components/PageTitle'
+import { HEADLINE } from '../data/benchmarks'
 
 const CLI_CODE = `$ gowkhtmltopdf input.html output.pdf
 # local files need explicit permission
@@ -36,26 +37,21 @@ export default function LandingPage() {
 
       <section className="landing-hero-minimal" aria-labelledby="landing-title">
         <div className="landing-hero-main">
-          <p className="landing-kicker">HTML to PDF &middot; Pure Go &middot; No browser process, no cgo</p>
           <h1 id="landing-title">
-            Your HTML,
+            HTML -&gt; PDF,
             <br />
-            <em>as a print-ready PDF.</em>
+            <em>No Chromium and No Blink.</em>
           </h1>
           <p className="landing-lede">
-            One purpose: turn HTML you author into paginated PDFs. Invoices, reports, certificates,
-            tables and multi-page documents with headers, footers and outlines. Two surfaces, same engine.
+            More than 350 CSS properties supported: tables and flex, borders and backgrounds,
+            shadows and transforms, and more.
           </p>
           <div className="landing-actions">
-            <Link className="button button-primary" to="/getting-started">
+            <Link className="button button-primary" to="/documentation/getting-started">
               Get started <span aria-hidden="true">-&gt;</span>
             </Link>
             <Link className="button button-secondary" to="/live-demo">Try Live Demo</Link>
-            <Link className="button button-secondary" to="/showcase">View samples</Link>
           </div>
-          <p className="landing-micro">
-            Drop-in binary <code>gowkhtmltopdf</code> or native Go library <code>Document</code>. Static build with <code>CGO_ENABLED=0</code>.
-          </p>
         </div>
 
         <div className="landing-code-card" aria-label="Minimal conversion example">
@@ -154,12 +150,11 @@ export default function LandingPage() {
           <article className="fit-card fit-limit">
             <span className="fit-kicker">Not for</span>
             <h3>Any website as PDF</h3>
-            <p>Flex and grid are partial, floats are lite, and modern CSS is limited. The compatibility matrix is the contract.</p>
+            <p>
+              Flex and grid are partial, floats are lite, and modern CSS is limited. The{' '}
+              <Link to="/documentation/compatibility">compatibility matrix</Link> is the contract.
+            </p>
           </article>
-        </div>
-        <div className="fit-links">
-          <Link className="text-link" to="/documentation/compatibility">Compatibility matrix <span aria-hidden="true">-&gt;</span></Link>
-          <Link className="text-link" to="/documentation/security">Security notes <span aria-hidden="true">-&gt;</span></Link>
         </div>
       </section>
 
@@ -178,7 +173,7 @@ export default function LandingPage() {
         </div>
         <div className="proof-minimal-item proof-minimal-note">
           <strong>Measured</strong>
-          <span>2-page invoice: 17 ms CLI vs 259 ms wkhtmltopdf 0.12.6.1 on the reference host. Full numbers on <Link to="/benchmarks">benchmarks</Link>.</span>
+          <span>2-page invoice: {HEADLINE.smallGowk} ms CLI vs {HEADLINE.smallWk} ms wkhtmltopdf 0.12.6.1 on the reference host. Full numbers on <Link to="/benchmarks">benchmarks</Link>.</span>
         </div>
       </section>
 
@@ -200,10 +195,10 @@ export default function LandingPage() {
         <p>Build once, run anywhere. No browser steps.</p>
         <div className="close-code">
           <code>gowkhtmltopdf input.html output.pdf</code>
-          <Link className="button button-primary" to="/getting-started">Get started <span aria-hidden="true">-&gt;</span></Link>
+          <Link className="button button-primary" to="/documentation/getting-started">Get started <span aria-hidden="true">-&gt;</span></Link>
         </div>
         <div className="close-links">
-          <Link to="/getting-started">First conversion</Link>
+          <Link to="/documentation/getting-started">First conversion</Link>
           <span aria-hidden="true">&middot;</span>
           <Link to="/documentation/library-api">Go library</Link>
           <span aria-hidden="true">&middot;</span>

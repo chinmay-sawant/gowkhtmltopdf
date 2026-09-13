@@ -94,10 +94,15 @@ func parseSelectorCtx(str string, insideHas bool) (Selector, bool) {
 	if str == "" {
 		return sel, false
 	}
+	// Each functional-pseudo recursion level consumes one paren pair, so the
+	// scan bounds recursion before splitSelectorChain starts rescanning.
+	if parenDepthExceedsMax(str) {
+		return sel, false
+	}
 
 	parts := splitSelectorChain(str)
 	for idx, ch := range parts {
-		if ch == ">" || ch == "+" || ch == "~" || ch == " " {
+		if isChainSeparator(ch) {
 			continue
 		}
 
@@ -124,6 +129,17 @@ func parseSelectorCtx(str string, insideHas bool) (Selector, bool) {
 	sel.specValid = true
 
 	return sel, true
+}
+
+// isChainSeparator reports whether a splitSelectorChain token is a combinator
+// (>, +, ~) or the descendant-space separator instead of a compound selector.
+func isChainSeparator(tok string) bool {
+	switch tok {
+	case ">", "+", "~", " ":
+		return true
+	default:
+		return false
+	}
 }
 
 // combinatorFor maps a chain separator to the combinator stored on the part

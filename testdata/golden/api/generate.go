@@ -9,7 +9,7 @@
 //
 // It does not write testdata/golden/architecture-diagram.html or
 // testdata/golden/api/architecture-diagram.pdf. The HTML corpus fixture is
-// separate. fixture-56-architecture-diagram.html is a third, 20-page
+// separate. fixture-56-architecture-diagram.html is a third, 21-page
 // template. The only HTML this command reads is
 // testdata/golden/api/architecture-diagram.html. Pass -output to send the
 // PDF somewhere else; testdata/golden stays a source tree.

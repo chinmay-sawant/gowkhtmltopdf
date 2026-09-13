@@ -13,9 +13,10 @@ function loadContent(id) {
   return null
 }
 
-const DOCS = ['cli', 'library-api', 'architecture', 'compatibility', 'fonts', 'security', 'performance']
+const DOCS = ['getting-started', 'cli', 'library-api', 'architecture', 'compatibility', 'fonts', 'security', 'performance']
 
 const DOC_FILE_MAP = {
+  'getting-started': 'getting-started.md',
   cli: 'cli.md',
   'library-api': 'library-api.md',
   architecture: 'architecture.md',
@@ -136,7 +137,7 @@ export default function DocumentationPage() {
     }
   }, [docId, page, searchParams])
 
-  if (!page) return <Navigate to="/documentation/cli" replace />
+  if (!page) return <Navigate to="/documentation/getting-started" replace />
 
   const scrollToHeading = (id, e) => {
     if (e) e.preventDefault()

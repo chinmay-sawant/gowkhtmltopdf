@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-quick test-serial test-race lint lint-frontend build wasm wasm-test fmt golden golden-update samples samples-python screenshots weasyprint clean claim-scan bench bench-engine bench-lib bench-inprocess bench-cli-compare c-shared bindings-clean check-versions python-binding-test python-benchmarks python-api
+.PHONY: test test-unit test-quick test-serial test-race lint lint-frontend size-check build wasm wasm-test fmt golden golden-update samples samples-python screenshots weasyprint clean claim-scan bench bench-engine bench-lib bench-inprocess bench-cli-compare c-shared bindings-clean check-versions python-binding-test python-benchmarks python-api
 # Pure-Go runtime: the standard library plus the allowlisted direct modules
 # below. No cgo, browser, or native converter process is required.
 # Direct third-party requires must stay ⊆ {
@@ -52,10 +52,11 @@ test-serial:
 test-race:
 	go test -race -count=1 -p $(TEST_P) -parallel $(TEST_PARALLEL) $(GO_TEST_FLAGS) $(RACE_PKGS)
 
-# Runs every linter enabled in .golangci.yml (enable-all), then frontend
-# `npm run lint` (ESLint plus src/data content/config checks). Installs the
-# pinned golangci-lint binary into $(go env GOPATH)/bin when missing. Always
-# builds with GOTOOLCHAIN=local so the binary matches go.mod's go1.26 toolchain.
+# Runs every linter enabled in .golangci.yml (enable-all), the file-size gate
+# (scripts/check-file-size.sh), then frontend `npm run lint` (ESLint plus
+# src/data content/config checks). Installs the pinned golangci-lint binary
+# into $(go env GOPATH)/bin when missing. Always builds with GOTOOLCHAIN=local
+# so the binary matches go.mod's go1.26 toolchain.
 lint:
 	@command -v golangci-lint >/dev/null 2>&1 || { \
 		echo "golangci-lint not found; installing $(GOLANGCI_LINT_VERSION) with local Go toolchain..."; \
@@ -63,7 +64,14 @@ lint:
 	}
 	golangci-lint version
 	golangci-lint run ./...
+	$(MAKE) size-check
 	$(MAKE) lint-frontend
+
+# File-size soft-limit gate (AGENTS.md "Code structure"). Scans .go files and
+# verifies the over-limit files recorded in scripts/file-size-allowlist.txt.
+# Called by `lint`, so CI enforces it alongside golangci-lint.
+size-check:
+	bash scripts/check-file-size.sh
 
 lint-frontend:
 	@command -v npm >/dev/null 2>&1 || { echo "npm is required for frontend lint" >&2; exit 1; }
@@ -265,18 +273,26 @@ weasyprint:
 	ls -la output/weasyprint/ | awk '{print $$5, $$9}' | tail -30
 
 # External process benchmarks against the actual binary. `make bench` builds
-# the CLI, times bin/gowkhtmltopdf against WeasyPrint and Puppeteer through
-# scripts/bench-external.sh, then runs the dedicated wkhtmltopdf comparison.
-# The numbers include process and disk overhead; they are release/operator
-# evidence, not a default `make test` gate. Missing external engines are
-# skipped, but the target fails when none are available. Writes
-# testdata/golden/benchmarks/{weasyprint,puppeteer,cli}-compare.md and
+# the CLI, runs the dedicated wkhtmltopdf comparison first, then feeds its
+# gowkhtmltopdf column to scripts/bench-external.sh as the shared gowk
+# baseline for the WeasyPrint and Puppeteer tables, so all three engine
+# tables report the same gowk CLI series. When wkhtmltopdf is not installed
+# the comparison is skipped and the external tables fall back to session-local
+# gowk timing with a warning. The numbers include process and disk overhead;
+# they are release/operator evidence, not a default `make test` gate. Missing
+# external engines are skipped, but the target fails when none are available.
+# Writes testdata/golden/benchmarks/{weasyprint,puppeteer,cli}-compare.md and
 # -results.csv. Default external page matrix is 2/10/50/100; override with
 # --sizes=2,5,10,20,50,100,200,250,500 or select one engine with
 # --engines=weasyprint. `bench-cli-compare` remains available standalone.
 bench: build
-	./scripts/bench-external.sh
-	$(MAKE) bench-cli-compare
+	@if command -v wkhtmltopdf >/dev/null 2>&1; then \
+		$(MAKE) bench-cli-compare && \
+		./scripts/bench-external.sh --gowk-baseline=testdata/golden/benchmarks/cli-compare-results.csv; \
+	else \
+		echo "bench: wkhtmltopdf not on PATH; external tables use session-local gowk timing"; \
+		./scripts/bench-external.sh; \
+	fi
 
 # Internal engine allocation matrix (generic + certified-islands, images).
 # Measures the internal conversion pipeline directly; it is independent of

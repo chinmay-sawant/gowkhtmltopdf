@@ -383,31 +383,28 @@ needs process-global stdout (all sinks are explicit `io.Writer`s).
 
 ## 9. Testing & verification
 
-`internal/cli/cli_test.go` (838 lines, same-package tests reaching
-`flagTable`/`shortFlags` directly) is the primary safety net; all tests are
-table-driven and `t.Parallel()`:
+`internal/cli/cli_test.go` (379 lines, same-package tests driving `Parse`,
+`Command`, `PrintHelp`, `ExitCode`, and `OpenOutput` directly) is the primary
+safety net; every test calls `t.Parallel()`:
 
 | Test | Verifies |
 |------|----------|
-| `TestGlobalFlagsToSettings` | Exact settings fields written per flag (page-size → canonical `PageSize`, orientation enum, mm margins → mm numbers, outline-depth, grayscale, quiet) |
-| `TestShortFlags` | `-s -O -q -T -c -t` map to long-form specs. `-L` is **license**, not `--margin-left` |
-| `TestFlagEqualsSyntax` | `--flag=value` inline values |
-| `TestBoolFlagValues` | `true/1/yes/on` + `false/0/no/off` + `--no-` negation + invalid values |
-| `TestMultiObjectGrammar` | `cover … toc page … page …` object composition and order |
-| `TestImplicitFirstPageObject` | First bare positional becomes the first page |
-| `TestStdinOutputAndInput` | `-` as **output** is stdout; `-` as input is **not** stdin HTML (`GuessURL("-")` → `http://-` unless a file named `-` exists) |
-| `TestPairFlags` / `TestHeaderFooterFlags` / `TestTOCFlags` / `TestLoadFlags` | cookie/header/post/replace maps; header/footer keys; toc.* keys; zoom/auth/timeout/proxy/links |
-| `TestPageOnlyFlagPreObjectPending` | Address-remapping accumulation and promotion |
-| `TestGrayscaleSetsConvertField` / `TestSmartShrinkingEnableDisable` / `TestBackgroundPDFAndImage` / `TestDumpOutlineGlobalHome` | “One home” routing invariants |
-| `TestStubFlagsRemoved` | Policy A: ~20 inert wkhtmltopdf flags must be rejected (dpi, image-dpi, lowquality, use-xserver, cookie-jar, read-args-from-stdin, log-level, javascript-delay, window-status, run-script, debug-javascript, user-style-sheet, minimum-font-size, enable-plugins, produce-forms, enable-javascript, stop-slow-scripts, default-encoding, custom-header-propagation) |
-| `TestSimplifyDOM*`, `TestPrintLinkUnderlineFlag` | Web-behaviour flags route global + object |
-| `TestUnknownFlagErrors` / `TestDocFlags` / `TestEndOfOptions` | Unknown-flag errors, `--help/-h/-V/--version/-L/--license/-E`, `--` terminator |
-| `TestImageFlags` | Image-only flags and defaults |
-| `TestParseModeRejects/Accepts/Validation` | Mode bitmask enforcement |
-| `TestValidateNoInput` | Missing input file error |
-| `TestPageScopedBeforeTOCNoGhost` / `TestPageScopedBeforePageKeyword` | Pending promotion correctness |
-| `TestExitCode` | 0/1/2/3 mapping incl. wrapped `HttpStatusError` |
-| `TestOpenOutputWriterPrecedence` | `OutputWriter` beats `Output` path |
+| `TestDocumentGrammarBuildsPagesFromPositionalFiles` | Positional files become one page object each, in order; global flags land on settings (canonical `PageSize`, orientation enum, mm margin, title, outline depth); `--allow-local-files` dual-writes global enable + object block |
+| `TestExplicitSources` | `--html` inline and `--url` each produce one object with the right source field |
+| `TestCoverTOCAndBodyOrdering` | `cover`/`toc`/body composition and order; cover defaults (excluded from outline, empty HF stamp with `HeaderSet`/`FooterSet`, no global inheritance) and TOC defaults (`UseOutline`/`IncludeInOutline` false); global header stays for body inheritance |
+| `TestSourceConflictsAndOutputRequirement` | Missing output, conflicting sources (`--html`+`--url`, `--html`+files, `--url`+files), and duplicate output map to `ErrMissingOutput`/`ErrConflictingInputs`/`ErrDuplicateOutput` |
+| `TestRemovedObjectGrammarAndSetEscapeHatch` | Legacy `page`/`cover`/`toc` positional grammar rejected with `ErrLegacyObjectSyntax`; `--set` rejected |
+| `TestGoFriendlyGlobalFlags` | `--pdf-version`, `--pdf-profile`, header/footer text, repeated `--font-path`, `--no-outline`, `--grayscale`, `-q` |
+| `TestImageGrammarAndOptions` | Image mode width/height/quality/format/no-smart-width; `--cover` rejected in image mode |
+| `TestBooleanAndShortFlagSyntax` | `--outline=false` then `--outline`, `-s A5`, `-O Landscape`; invalid boolean error |
+| `TestImagesFlagsReachResolvedGate` | `--no-images`/`--images`/`--no-images=false` in both modes; one disabled layer disables the resolved `settings.ResolveImages` gate |
+| `TestHelpUsesDocumentGrammar` | Both modes' help lists `-o, --output`, `--html`, `--url` (PDF also `--cover`/`--toc`) and omits stale grammar markers and `--set` |
+| `TestTerminalActionsAndModeValidation` | `--dump-default-toc-xsl` sets the field, conflicts with output, objects, or another dump (`ErrTerminalConflict`), and is rejected in image mode |
+| `TestExitCodeAndOutputWriter` | Exit codes 1/2/3 including wrapped `HttpStatusError`; `OutputWriter` beats `Output` path |
+| `TestCLIVersionMatchesVERSIONFile` | `cli.Version` matches `VERSION` or a stamped `<version>-<suffix>` |
+| `TestParseModeValidation` | Zero, unknown, and multiple modes rejected |
+| `TestInvalidPDFOptions` | Invalid `--pdf-version`/`--pdf-profile` sentinels; `--dpi` rejected (Policy A) |
+| `TestErrorFormattingKeepsOffendingFlag` | Unknown-flag error text contains the offending `--flag` |
 
 Beyond unit tests: CI (`make lint`, `make test`) runs golangci-lint
 (including `exhaustruct` where intentional partial structs are annotated

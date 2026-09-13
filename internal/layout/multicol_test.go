@@ -7,6 +7,7 @@ import (
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
 )
 
 func TestMulticolParseProps(t *testing.T) { //nolint:cyclop
@@ -546,6 +547,29 @@ func TestMulticolFlexStretchBalanceNoPageSnap(t *testing.T) {
 	}
 	if pages := int(maxY/pageH) + 1; pages > 2 {
 		t.Fatalf("flex-stretched column-count probe spanned %d pages (maxY=%.1f); page-snap loop regresses fixture-57", pages, maxY)
+	}
+}
+
+// TestMulticolPageHeightMustMatchPaint: multicol snapped column lines to the
+// layout page height (Options.Height, 800 in layoutHTML), so Paint must use
+// the same content height. Painting the same result at 842 would split
+// column rules and text at a boundary the layout never snapped to.
+func TestMulticolPageHeightMustMatchPaint(t *testing.T) {
+	t.Parallel()
+
+	s := sheet(t, `.mc { column-count: 2; column-gap: 12pt } .mc p { margin: 0 }`)
+	res := layoutHTML(t, `<html><body><div class="mc"><p>alpha</p><p>beta</p></div></body></html>`, s)
+
+	if res.pageSnapHeight <= 0 {
+		t.Fatalf("layout did not record a multicol snap height: %g", res.pageSnapHeight)
+	}
+
+	if err := Paint(pdf.NewDocument(), res, paintOpts()); err == nil {
+		t.Fatal("Paint accepted a multicol result painted at content height 842 after snapping at 800")
+	}
+
+	if err := Paint(pdf.NewDocument(), res, PaintOptions{PageWidth: testViewport, PageHeight: 800}); err != nil {
+		t.Fatalf("matching paint height rejected: %v", err)
 	}
 }
 

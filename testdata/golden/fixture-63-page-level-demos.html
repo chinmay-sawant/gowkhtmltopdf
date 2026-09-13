@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<!--
+  fixture-63-page-level-demos
+  Proves: the page-level behavior that cannot show inside the audit table:
+  break-before: page, break-after: page, break-inside: avoid on normal-flow
+  blocks, footnote-display/footnote-policy inertness (no footnote area), plus
+  the root color-scheme dark canvas and light default text.
+  Fonts: Liberation Sans via --font-path testdata/fonts/implemented-audit.
+  Expected: multi-page; envelope in fixturePageBounds.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Page-level demos: fragmentation, footnotes, and color-scheme dark</title>
+  <style>
+    @page { size: A4; margin: 12mm; }
+    html { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Liberation Sans", "Liberation Serif", sans-serif;
+      font-size: 9.5pt;
+      line-height: 1.35;
+      margin: 0;
+      padding: 0;
+    }
+    h1 { font-size: 15pt; margin: 0 0 8px 0; color: #9cc2ff; }
+    h2 { font-size: 11.5pt; margin: 0 0 6px 0; color: #9cc2ff; }
+    p { margin: 0 0 8px 0; }
+    code { font-family: "Liberation Mono", monospace; font-size: 9pt; color: #ffd479; }
+    .needle {
+      display: inline-block;
+      background: #1f4b99;
+      color: #fff;
+      padding: 2px 8px;
+      border-radius: 3px;
+      letter-spacing: 0.04em;
+      margin: 0 0 12px 0;
+    }
+    .note { color: #b9c2d0; font-size: 8.5pt; }
+    .demo {
+      border: 1px dashed #6a6;
+      background: #123322;
+      padding: 6px 8px;
+      margin: 0 0 8px 0;
+    }
+    .chip { display: inline-block; padding: 3px 6px; margin-right: 6px; background: #666; }
+    .canvas-chip { background: #121212; border: 1px solid #666; }
+    .author { color: #ffb020; }
+    .nested-light { color-scheme: light; }
+    .page-start { break-before: page; }
+    .page-after { break-after: page; }
+    .keep { break-inside: avoid; }
+    .spacer { height: 470pt; }
+    .tall {
+      height: 450pt;
+      border: 1px solid #6a6;
+      background: #123322;
+      padding: 6px 8px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Page-level demos: fragmentation, footnotes, and color-scheme dark</h1>
+  <div class="needle">FIXTURE-63-PAGE-LEVEL</div>
+  <p>These properties cannot show inside the audit tables: table rows never
+  split, and only the html element's color scheme is read. The live page-level
+  behavior lives here.</p>
+
+  <h2>footnote-display / footnote-policy</h2>
+  <p>No footnote layout is rendered in print output today, so
+  <code>footnote-display: block</code> and <code>footnote-policy: line</code>
+  are inert: the marked content stays in normal flow and no footnote area is
+  collected for the page.</p>
+  <p class="demo" style="footnote-display:block;">This box declares
+  footnote-display: block and still paints as ordinary flowing text.</p>
+  <p class="demo" style="footnote-policy:line;">This box declares
+  footnote-policy: line and still paints as ordinary flowing text.</p>
+
+  <h2>color-scheme: dark on the root</h2>
+  <p>This paragraph has no author color, so the dark root paints it #e8e8e8 on
+  the #121212 canvas.</p>
+  <p style="forced-color-adjust:none;"><code>forced-color-adjust: none</code>
+  on a nested element is inherited but not read: only the html root's value is
+  consumed, so this line still renders #e8e8e8.</p>
+  <p><span class="chip canvas-chip">#121212 canvas</span><span class="chip">#e8e8e8 default text</span></p>
+  <p class="author">An author color like #ffb020 survives the dark scheme.</p>
+  <p class="nested-light">This line declares color-scheme: light and still
+  renders the root's #e8e8e8 default: only the html element's scheme is read.</p>
+  <p class="note">Documented subset: nested color-scheme values are parsed and
+  inherited but have no per-element consumer yet.</p>
+
+  <h2>break-before: page</h2>
+  <p>This paragraph is the content before the break. The box below carries
+  break-before: page and starts a new page.</p>
+  <div class="demo page-start">break-before: page puts this box at the top of the next page.</div>
+
+  <h2>break-after: page</h2>
+  <div class="demo page-after">break-after: page ends the page after this box.</div>
+  <div class="demo">This block starts the following page because of the break above it.</div>
+
+  <section class="page-start">
+    <h2>break-inside: avoid</h2>
+    <p>A 470pt spacer leaves too little room for the 450pt box below, so
+    break-inside: avoid moves it whole to the next page.</p>
+    <div class="spacer"></div>
+    <div class="tall keep">break-inside: avoid: this 450pt box stays whole on the next page.</div>
+  </section>
+
+  <section class="page-start">
+    <h2>break-inside: auto (for contrast)</h2>
+    <p>With the same spacer and box, the initial break-inside: auto lets the box
+    split across the page boundary.</p>
+    <div class="spacer"></div>
+    <div class="tall">break-inside: auto: this 450pt box splits across the boundary.</div>
+  </section>
+</body>
+</html>

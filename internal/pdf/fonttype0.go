@@ -38,6 +38,8 @@ func (d *Document) ensureFont(fnt *Font, name string, used []rune) (objRef, erro
 		return 0, errNilFont
 	}
 
+	fnt.ensureParsed()
+
 	if len(used) == 0 {
 		used = []rune{' '}
 	}
@@ -106,6 +108,8 @@ func (d *Document) ensureFont(fnt *Font, name string, used []rune) (objRef, erro
 // embedFontFile emits the FontFile2 stream and its FontDescriptor, shared by
 // the simple and Type0 tails. fontName is the /FontName token without /.
 func (d *Document) embedFontFile(fnt *Font, sub *subsetResult, fontName string) (objRef, objRef) {
+	fnt.ensureParsed()
+
 	fileRef := d.newObject()
 	descRef := d.newObject()
 

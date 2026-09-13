@@ -24,10 +24,6 @@ const SimplifyMediaWikiCSS = `
 }
 `
 
-func SimplifyDOMEnabled(global, object settings.Web) bool {
-	return global.SimplifyDOM || object.SimplifyDOM
-}
-
 func normalizeSimplifyProfile(raw string) string {
 	profile := strings.ToLower(strings.TrimSpace(raw))
 	if profile == profileMediaWiki || profile == "wiki" || profile == "mw" {
@@ -35,14 +31,6 @@ func normalizeSimplifyProfile(raw string) string {
 	}
 
 	return ""
-}
-
-func SimplifyDOMProfile(global, object settings.Web) string {
-	if profile := normalizeSimplifyProfile(object.SimplifyDOMProfile); profile != "" {
-		return profile
-	}
-
-	return normalizeSimplifyProfile(global.SimplifyDOMProfile)
 }
 
 // BuildOptions constructs shared prepare Options from viewport/media and Web

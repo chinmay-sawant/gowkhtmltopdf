@@ -1,4 +1,3 @@
-//nolint:all
 // Package html implements a tokenizer and tree builder for the HTML subset
 // gowkhtmltopdf accepts: tags, attributes, text, comments, doctype, CDATA,
 // self-closing and void elements. Script/style contents are kept as raw text
@@ -6,6 +5,8 @@
 // malformed nesting degrades to a usable tree, not a crash.
 //
 // ponytail: custom Node tree (Parent/Attrs/void); migrate to x/net/html only if layout/css rewritten, not free delete.
+//
+//nolint:all
 package html
 
 import (
@@ -582,17 +583,6 @@ func scanEndTag(src string, pos int, emit tokenSink) (int, error) {
 // lowercases it.
 func endTagName(body string) string {
 	return strings.ToLower(strings.TrimSpace(body))
-}
-
-// isTrimSpace reports whether b is one of the ASCII whitespace bytes
-// strings.TrimSpace removes.
-func isTrimSpace(b byte) bool {
-	switch b {
-	case ' ', '\t', '\n', '\v', '\f', '\r':
-		return true
-	}
-
-	return false
 }
 
 // scanPI skips a processing instruction at pos.

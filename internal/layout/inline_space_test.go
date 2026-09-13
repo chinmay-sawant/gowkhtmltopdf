@@ -131,7 +131,7 @@ p { margin: 0 0 6pt 0; }
 		t.Fatal(err)
 	}
 
-	if _, err := paginateOps(t.Context(), res, pageH); err != nil {
+	if err := paginateOps(t.Context(), res, pageH); err != nil {
 		t.Fatal(err)
 	}
 

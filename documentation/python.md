@@ -293,7 +293,7 @@ Three numbers identify what you are running:
 
 | Value | Meaning | Today |
 |-------|---------|-------|
-| `gowkhtmltopdf.__version__` | Project release, tracks the repo `VERSION` file | `0.2.4` |
+| `gowkhtmltopdf.__version__` | Project release, tracks the repo `VERSION` file | `0.2.6` |
 | `gowkhtmltopdf.library_version` | wkhtmltopdf settings-surface identifier the engine mirrors (`api.go:23`) | `0.12.7-dev` |
 | `GOWKHTMLTOPDF_ABI_VERSION` | Raw ABI level in `bindings/c/include/gowkhtmltopdf.h` | `1` |
 

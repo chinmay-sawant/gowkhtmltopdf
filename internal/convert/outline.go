@@ -208,40 +208,119 @@ func bodyStateFor(bodies []*objectState, page int) *objectState {
 	return nil
 }
 
+// headingStructIdentity maps collected outline headings to the document's
+// heading structure elements. The two lists diverge when objects opt out of
+// the outline (a cover h1 defaults IncludeInOutline=false) while layout tags
+// every painted h1-h6, so equal-length lists align positionally and unequal
+// lists align by page identity. Outline items and TOC link structure
+// destinations share this one rule.
+//
+//nolint:lll // alignment helper signature
+func headingStructIdentity(doc *pdf.Document, bodies []*objectState, tocTotal int) map[*outline.Heading]*pdf.StructElem {
+	if doc == nil {
+		return nil
+	}
+
+	allHeadings := flatHeadings(bodies)
+	if len(allHeadings) == 0 {
+		return nil
+	}
+
+	headingElems := doc.HeadingStructElems()
+	if len(headingElems) == 0 {
+		return nil
+	}
+
+	if len(allHeadings) == len(headingElems) {
+		return headingIdentityByIndex(allHeadings, headingElems)
+	}
+
+	return headingIdentityByPage(doc, allHeadings, headingElems, tocTotal)
+}
+
+// headingIdentityByIndex pairs headings with structure elements positionally
+// when the two lists are the same length.
+func headingIdentityByIndex(headings []*outline.Heading, elems []*pdf.StructElem) map[*outline.Heading]*pdf.StructElem {
+	out := make(map[*outline.Heading]*pdf.StructElem, len(headings))
+
+	for i, heading := range headings {
+		out[heading] = elems[i]
+	}
+
+	return out
+}
+
+// headingIdentityByPage aligns headings to structure elements when the lists
+// have different lengths. Counts diverge when objects opt out of the outline,
+// so both sides walk document page order: skip elements on earlier pages (an
+// excluded cover h1), match on the heading's page, and leave later-page
+// elements for the headings that own them.
+func headingIdentityByPage(
+	doc *pdf.Document, headings []*outline.Heading, elems []*pdf.StructElem, tocTotal int,
+) map[*outline.Heading]*pdf.StructElem {
+	pageOrder := make(map[*pdf.Page]int, doc.PageCount())
+
+	for i := range doc.PageCount() {
+		pageOrder[doc.PageAt(i)] = i
+	}
+
+	out := make(map[*outline.Heading]*pdf.StructElem, len(headings))
+	elemIdx := 0
+
+	for _, heading := range headings {
+		targetPos, ok := pageOrder[doc.PageAt(tocTotal+heading.DocPage)]
+		if !ok {
+			continue
+		}
+
+		elem, next := nextHeadingStructElem(elems, elemIdx, targetPos, pageOrder)
+		if elem != nil {
+			out[heading] = elem
+		}
+
+		elemIdx = next
+	}
+
+	return out
+}
+
+// nextHeadingStructElem walks elements forward from start to find the one on
+// targetPos. It returns nil when the next element is on a later page (the
+// caller retries with the following heading) or when the list is exhausted,
+// plus the index to resume from.
+func nextHeadingStructElem(
+	elems []*pdf.StructElem, start, targetPos int, pageOrder map[*pdf.Page]int,
+) (*pdf.StructElem, int) {
+	for idx := start; idx < len(elems); idx++ {
+		pos, ok := pageOrder[elems[idx].Page]
+		if !ok {
+			continue
+		}
+
+		if pos < targetPos {
+			continue
+		}
+
+		if pos == targetPos {
+			return elems[idx], idx + 1
+		}
+
+		return nil, idx
+	}
+
+	return nil, len(elems)
+}
+
 // emitOutline converts the outline tree (canvas coordinates) into pdf.Outline
 // nodes with final page refs and PDF (y-up) coordinates. The root is a
 // container for the top-level headings, as pdf.Document.SetOutline expects.
 // Tree headings retain object-local Page and carry document-global DocPage.
 // For PDF/UA-2, heading StructElems are matched in document order so outline
 // items can carry /SD (structure destination) references.
-//
-//nolint:cyclop,varnamelen,wsl // outline tree construction and structure element matching
 func emitOutline(doc *pdf.Document, tree *outline.Node, bodies []*objectState, tocTotal int) *pdf.Outline {
 	root := &pdf.Outline{} //nolint:exhaustruct // intentional zero-value fields
 
-	allHeadings := flatHeadings(bodies)
-	headingElems := doc.HeadingStructElems()
-	headingMap := make(map[*outline.Heading]*pdf.StructElem, len(allHeadings))
-
-	if len(allHeadings) == len(headingElems) {
-		for i, h := range allHeadings {
-			headingMap[h] = headingElems[i]
-		}
-	} else {
-		elemIdx := 0
-		for _, h := range allHeadings {
-			targetPage := tocTotal + h.DocPage
-			for elemIdx < len(headingElems) {
-				elem := headingElems[elemIdx]
-				elemIdx++
-				if elem.Page != nil && doc.PageAt(targetPage) == elem.Page {
-					headingMap[h] = elem
-
-					break
-				}
-			}
-		}
-	}
+	headingMap := headingStructIdentity(doc, bodies, tocTotal)
 
 	var conv func(n *outline.Node) *pdf.Outline
 

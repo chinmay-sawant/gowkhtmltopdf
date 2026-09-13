@@ -31,7 +31,6 @@ Deep-dives with `file:line` references live under
 | `internal/convert` | PDF job orchestration (HF, TOC, links, copies, document info) |
 | `internal/convert/prepare` | Shared document prep: load, parse, sheets, `@font-face` |
 | `internal/convert/render` | Mode-neutral lifecycle: `RenderObjects` → `Assemble` → `Finalize` |
-| `internal/convert/islands` | Certified page-island recognition for the **benchmark fixture only** |
 | `internal/pdf` | PDF writer (default 1.4, opt-in 1.7 / 2.0 via `WriterPolicy`; opt-in `--pdf-profile` / `Document.PDFProfile`), TTF subset, Type0/CID, images, annotations, outlines, tagged structure |
 | `internal/pdfprofile` | Leaf: canonical profile tokens, aliases, `Parse` / `IsPDFA*` / `IsPDFUA*` |
 | `internal/imageout` | Raster path for one PNG/JPEG canvas |
@@ -106,11 +105,6 @@ lives in `internal/convert/render`:
 | Copies | Materialize `--copies`; collate vs non-collate reorder |
 | Headers/footers | Final pass with real page numbers; cover pages skipped; HTML HF is a single-band clamp |
 
-Page islands are **not** a user-facing layout mode. They run only when a
-test constructs `NewBenchmarkPDFRequest` and the HTML matches the certified
-benchmark fixture. Production and CLI requests always take the generic
-document renderer.
-
 ## Image mode
 
 Image jobs use `imageout.Request` (`imageout.RunRequest`), also driven by
@@ -177,10 +171,10 @@ outline  ──► html, css                headings only (locationReader seam)
 layout   ──► html, css, pdf, errs     display list + PaintContext
 pdf      ──► pdfprofile             sink (also used by imageout for faces/shaping)
 imageout ──► prepare, render, load, layout, pdf, settings
-convert  ──► load, html, css, layout, line, outline, pdf, settings, prepare, render, islands
+convert  ──► load, html, css, layout, line, outline, pdf, settings, prepare, render
                                       the PDF hub
 
-prepare / render / islands  ──► never import convert
+prepare / render  ──► never import convert
 ```
 
 Rules that keep this sound:
@@ -226,7 +220,7 @@ Start at [architecture/README.md](architecture/README.md), then:
 | [05-html-parser.md](architecture/05-html-parser.md) | Allowlisted HTML |
 | [06-css.md](architecture/06-css.md) | Selectors, cascade, queries |
 | [07-layout.md](architecture/07-layout.md) | Formatting contexts, pagination |
-| [08-convert-pipeline.md](architecture/08-convert-pipeline.md) | `Run`, Assemble, HF/TOC/islands |
+| [08-convert-pipeline.md](architecture/08-convert-pipeline.md) | `Run`, Assemble, HF/TOC |
 | [09-pdf-writer.md](architecture/09-pdf-writer.md) | PDF 1.4 / 1.7 / 2.0 writer, `--pdf-profile` claims, fonts, images |
 | [10-imageout-svg.md](architecture/10-imageout-svg.md) | Raster path, SVG-as-img |
 

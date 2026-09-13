@@ -216,7 +216,7 @@ func ParseColor(val string) (int, int, int, float64, bool) {
 		return 0, 0, 0, 0, true
 	}
 
-	if name, found := namedColors()[low]; found {
+	if name, found := namedColorTable[low]; found {
 		return name[0], name[1], name[2], 1, true
 	}
 
@@ -846,9 +846,4 @@ var namedColorTable = map[string][3]int{ //nolint:gochecknoglobals // read-only 
 	"steelblue": {70, 130, 180}, "turquoise": {64, 224, 208}, "wheat": {245, 222, 179},
 	"orangered": {255, 69, 0}, "tomato": {255, 99, 71}, "whitesmoke": {245, 245, 245},
 	"gainsboro": {220, 220, 220}, "rebeccapurple": {102, 51, 153},
-}
-
-// namedColors returns the shared named-color table (read-only).
-func namedColors() map[string][3]int {
-	return namedColorTable
 }

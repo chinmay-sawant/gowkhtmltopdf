@@ -107,7 +107,7 @@ extern "C" {
 #endif
 
 #define GOWKHTMLTOPDF_ABI_VERSION 1
-#define GOWKHTMLTOPDF_VERSION "0.2.5"
+#define GOWKHTMLTOPDF_VERSION "0.2.6"
 #define GOWKHTMLTOPDF_LIBRARY_VERSION "0.12.7-dev"
 
 typedef struct {

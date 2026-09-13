@@ -19,6 +19,9 @@ import (
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
+// htmlSectionName is the [section] placeholder token.
+const htmlSectionName = "section"
+
 // hfParms is the per-page substitution state for header/footer text. page,
 // topage and frompage are 1-based; replaces holds the merged --replace map.
 type hfParms struct {
@@ -165,6 +168,31 @@ func measureHF(font *pdf.Font, s string, size float64) float64 {
 // headerHasContent reports whether a header/footer setting draws anything.
 func headerHasContent(hf settings.HeaderFooter) bool {
 	return hf.Left != "" || hf.Center != "" || hf.Right != "" || hf.Line || hf.HTMLURL != ""
+}
+
+// headersFootersHaveContent reports whether any global or per-object header
+// or footer would draw. Object state already includes HeaderFor/FooterFor and
+// @page margin-box text, so an empty global is not enough to skip.
+func headersFootersHaveContent(req *Request, plan *pagePlan) bool {
+	if req != nil && (headerHasContent(req.Global.Header) || headerHasContent(req.Global.Footer)) {
+		return true
+	}
+
+	if plan == nil {
+		return false
+	}
+
+	for _, own := range plan.owners {
+		if own.st == nil {
+			continue
+		}
+
+		if headerHasContent(own.st.header) || headerHasContent(own.st.footer) {
+			return true
+		}
+	}
+
+	return false
 }
 
 //nolint:mnd // 400 is default normal font weight
@@ -357,6 +385,9 @@ func loadHTMLHF(ctx context.Context, loader *load.Loader, font *pdf.Font, state 
 		ViewportH:   state.geom.contentH,
 		MediaType:   media,
 		ObjectIndex: state.idx + 1,
+		// Header/footer geometry is already post-@page, so there is no inline
+		// sheet pre-pass that would re-resolve the page box.
+		PageBoxViewport: nil,
 	}, log)
 
 	reg := resources.MergeFontFaces(ctx, state.registry, sheets, state.idx+1, log)
@@ -467,14 +498,6 @@ func (r *hfDrawResult) warn(object, page int, band string, err error) {
 		band:   band,
 		err:    err,
 	})
-}
-
-//nolint:unused // warning emitter helper for compatibility adapter
-func (r *hfDrawResult) emitWarnings(log io.Writer) {
-	for _, warning := range r.warnings {
-		line.Emit(log, line.Warn, "object %d page %d: %s header/footer: %v",
-			warning.object, warning.page+1, warning.band, warning.err)
-	}
 }
 
 // drawHTMLHF paints a cached HTML header/footer onto page, clipped to the
@@ -622,7 +645,7 @@ func paintLayoutOps(ctx context.Context, page *pdf.Page, c *pdf.Content, ops []l
 			}
 
 			dx, dy := dest.st.geom.pdfXY(dest.loc)
-			_ = page.AddLinkDest(rect, destPage, dx, dy)
+			_ = page.AddLinkDest(rect, page.Doc().PageAt(destPage), dx, dy)
 
 			continue
 		}
@@ -714,17 +737,6 @@ func effectiveMargins(ctx context.Context, loader *load.Loader, font *pdf.Font, 
 	return state.registry, nil
 }
 
-// drawHeadersFooters is the compatibility adapter for the existing caller.
-// The result-producing implementation below keeps the failure policy
-// explicit: body output remains usable, every recoverable HF error is
-// collected, and the adapter emits one warning per failed band.
-//
-//nolint:lll,unused // compatibility adapter for existing caller
-func drawHeadersFooters(ctx context.Context, hf hfLoader, doc *pdf.Document, req *Request, plan *pagePlan, headings []*outline.Heading, log io.Writer) {
-	res := drawHeadersFootersResult(ctx, hf, doc, req, plan, headings)
-	res.emitWarnings(log)
-}
-
 // drawHeadersFootersResult is the final pass that paints the effective
 // text/HTML header and footer of every page once the whole document exists
 // (so [topage] and the page indices are final). Cover pages are skipped.
@@ -733,6 +745,14 @@ func drawHeadersFooters(ctx context.Context, hf hfLoader, doc *pdf.Document, req
 // the current convert.Run signature.
 func drawHeadersFootersResult(ctx context.Context, loader hfLoader, doc *pdf.Document, req *Request, plan *pagePlan, headings []*outline.Heading) hfDrawResult { //nolint:gocognit,cyclop,funlen,lll // per-page draw dispatch with lazy HF load
 	var result hfDrawResult
+
+	if !headersFootersHaveContent(req, plan) {
+		if err := ctx.Err(); err != nil {
+			result.fatal = err
+		}
+
+		return result
+	}
 
 	total := doc.PageCount()
 	now := req.now()

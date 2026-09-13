@@ -1178,6 +1178,29 @@ func TestInlineHTMLHonorsBodyLimit(t *testing.T) {
 	}
 }
 
+func TestInlinePrefixHonorsBodyLimit(t *testing.T) {
+	t.Parallel()
+
+	loader := mustLoader(t)
+	loader.MaxBodySize = 4
+	pageLoad := defaultLP()
+
+	if _, err := loader.Load(t.Context(), "inline:12345", pageLoad); err == nil {
+		t.Fatal("oversized inline: target must be rejected")
+	} else if !strings.Contains(err.Error(), "inline HTML exceeds max body size 4") {
+		t.Fatalf("error = %v", err)
+	}
+
+	res, err := loader.Load(t.Context(), "inline:1234", pageLoad)
+	if err != nil {
+		t.Fatalf("inline: target at the body limit: %v", err)
+	}
+
+	if string(res.Body) != "1234" {
+		t.Errorf("body = %q, want 1234", res.Body)
+	}
+}
+
 func TestEmptyInlineBaseRejectsRelativeSubresources(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()

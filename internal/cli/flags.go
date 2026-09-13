@@ -68,7 +68,6 @@ func buildFlagTable() map[string]flagSpec {
 		table[name] = flagSpec{kind: kind, mod: m, app: app}
 	}
 
-	addDocFlags(add)
 	addDocumentFlags(add)
 	addGlobalFlags(add)
 	addOutlineFlags(add)
@@ -82,15 +81,6 @@ func buildFlagTable() map[string]flagSpec {
 	addImageFlags(add)
 
 	return table
-}
-
-// addDocFlags registers doc flags (handled by Parse before table lookup;
-// present so the --help listing can include them).
-func addDocFlags(add flagAdder) {
-	add("help", ModeBoth, flagBool, nopFlag)
-	add("version", ModeBoth, flagBool, nopFlag)
-	add("license", ModeBoth, flagBool, nopFlag)
-	add("extended-help", ModeBoth, flagBool, nopFlag)
 }
 
 // addGlobalFlags registers global PDF flags (engine-consumed only; Policy A).
@@ -110,7 +100,7 @@ func addGlobalFlags(add flagAdder) {
 	add("page-size", ModePDF, flagValue, func(c *Command, _ *objectCtx, vals []string) error {
 		return c.Global.Set("size.pagesize", vals[0])
 	})
-	// convert reads Global.Grayscale only (ColorMode is not a stored field).
+	// convert reads Global.Grayscale only; colormode parses into it in settings.
 	add("grayscale", ModePDF, flagBool, func(c *Command, _ *objectCtx, vals []string) error {
 		return c.Global.Set("grayscale", vals[0])
 	})
@@ -262,7 +252,7 @@ func addLocalAccessFlags(add flagAdder) {
 		return nil
 	})
 	// Exact or wildcard host allowlist entry. Sets NetworkPolicySet so
-	// NewLoader does not fall back to CompatibleNetworkPolicy.
+	// NewLoaderWithError does not fall back to CompatibleNetworkPolicy.
 	add("allow-host", ModeBoth, flagValue, func(cmd *Command, _ *objectCtx, vals []string) error {
 		cmd.Global.Load.NetworkPolicySet = true
 		cmd.Global.Load.NetworkAllowedHosts = append(cmd.Global.Load.NetworkAllowedHosts, vals[0])
@@ -279,7 +269,7 @@ func addLocalAccessFlags(add flagAdder) {
 }
 
 // addWebPageFlags registers the web engine flags (simplify-dom, link
-// underline, print media type) routed global+object.
+// underline, print media type, image fetching) and their settings routes.
 func addWebPageFlags(add flagAdder) {
 	// Opt-in chrome-strip for arbitrary websites (phase 21.4). Default off.
 	// Distinct from --print-media-type (PDF layout always uses Media:"print").
@@ -316,6 +306,15 @@ func addWebPageFlags(add flagAdder) {
 			func(o *settings.PdfObject, val string) error { return o.Set("load.mediatype", val) },
 			vals[0],
 		)
+	})
+	// Image fetch switch (wkhtmltopdf pair). Both engines gate fetches on the
+	// folded web.images layers via settings.ResolveImages, so one global write
+	// dominates a mixed set; negBool keeps --no-images=false meaningful.
+	add("images", ModeBoth, flagBool, func(c *Command, _ *objectCtx, vals []string) error {
+		return c.Global.Set("web.images", vals[0])
+	})
+	add("no-images", ModeBoth, flagBool, func(c *Command, _ *objectCtx, vals []string) error {
+		return c.Global.Set("web.images", negBool(vals[0]))
 	})
 }
 
@@ -463,8 +462,6 @@ func addImageFlags(add flagAdder) {
 		return c.Image.Set("smartwidth", "false")
 	})
 }
-
-func nopFlag(*Command, *objectCtx, []string) error { return nil }
 
 // printMediaFlag writes the print-media-type override to one field home —
 // Global.Web.PrintMediaType — plus the object loader override through the one

@@ -1,7 +1,7 @@
 package layout
 
 import (
-	"sort"
+	"maps"
 	"strconv"
 	"strings"
 
@@ -19,6 +19,14 @@ const (
 	marginProperty  = "margin"
 	paddingProperty = "padding"
 
+	textEmphasisProperty         = "text-emphasis"
+	textEmphasisStyleProperty    = "text-emphasis-style"
+	textEmphasisColorProperty    = "text-emphasis-color"
+	textEmphasisPositionProperty = "text-emphasis-position"
+	textEmphasisSkipProperty     = "text-emphasis-skip"
+	textShadowProperty           = "text-shadow"
+	tabSizeProperty              = "tab-size"
+
 	inlineStylePriority = 1 << 30
 
 	defaultRootFontPx = 16
@@ -26,9 +34,31 @@ const (
 	fontWeightNormalValue = 400
 	fontWeightBoldValue   = 700
 
+	cssFontStyleItalic  = "italic"
+	cssFontStyleOblique = "oblique"
+	cssFontWeightBold   = "bold"
+
 	boxShorthandTwoSides   = 2
 	boxShorthandThreeSides = 3
 )
+
+// internalCustomPropWriters reports whether raw declares a property whose
+// applier stores engine bookkeeping in CustomProps. An element that declares
+// no --* property inherits the parent's map; when one of these appliers runs,
+// mergeCustomProps must hand it a copy or the parent's stored style would be
+// mutated after insertion (styleStore interning shares records).
+func internalCustomPropWriters(raw map[string]string) bool {
+	for prop := range raw {
+		switch prop {
+		case textEmphasisProperty, textEmphasisStyleProperty, textEmphasisColorProperty,
+			textEmphasisPositionProperty, textEmphasisSkipProperty,
+			textShadowProperty, tabSizeProperty:
+			return true
+		}
+	}
+
+	return false
+}
 
 // mergeCustomProps inherits parent custom properties and overlays any --*
 // declarations from raw, resolving var() chains via css.ResolveCustomProps.
@@ -46,6 +76,10 @@ func mergeCustomProps(parentProps map[string]string, raw map[string]string) map[
 	}
 
 	if len(declared) == 0 {
+		if len(parentProps) > 0 && internalCustomPropWriters(raw) {
+			return maps.Clone(parentProps)
+		}
+
 		return parentProps
 	}
 
@@ -169,7 +203,7 @@ var inheritableProps = []inheritCopy{ //nolint:gochecknoglobals // static inheri
 	{[]string{"text-wrap"}, func(dst, src *ResolvedStyle) { dst.TextWrap = src.TextWrap }},
 	{[]string{"text-wrap-mode"}, func(dst, src *ResolvedStyle) { dst.TextWrapMode = src.TextWrapMode }},
 	{[]string{"text-wrap-style"}, func(dst, src *ResolvedStyle) { dst.TextWrapStyle = src.TextWrapStyle }},
-	{[]string{"tab-size"}, func(dst, src *ResolvedStyle) { dst.TabSize = src.TabSize }},
+	{[]string{tabSizeProperty}, func(dst, src *ResolvedStyle) { dst.TabSize = src.TabSize }},
 	{[]string{"hyphens"}, func(dst, src *ResolvedStyle) { dst.Hyphens = src.Hyphens }},
 	{[]string{"hyphenate-character"}, func(dst, src *ResolvedStyle) { dst.HyphenateCharacter = src.HyphenateCharacter }},
 	{[]string{"text-justify"}, func(dst, src *ResolvedStyle) { dst.TextJustify = src.TextJustify }},
@@ -247,70 +281,106 @@ var inheritableProps = []inheritCopy{ //nolint:gochecknoglobals // static inheri
 	{[]string{"stroke-dasharray"}, func(dst, src *ResolvedStyle) { dst.StrokeDashArray = src.StrokeDashArray }},
 	{[]string{"stroke-dashoffset"}, func(dst, src *ResolvedStyle) { dst.StrokeDashOffset = src.StrokeDashOffset }},
 	{[]string{"stroke-miterlimit"}, func(dst, src *ResolvedStyle) { dst.StrokeMiterLimit = src.StrokeMiterLimit }},
-	{[]string{"image-orientation"}, func(dst, src *ResolvedStyle) { dst.ImageOrientation = src.ImageOrientation }},
-	{[]string{"image-resolution"}, func(dst, src *ResolvedStyle) { dst.ImageResolution = src.ImageResolution }},
-	{[]string{"print-color-adjust", "color-adjust"}, func(dst, src *ResolvedStyle) {
-		dst.PrintColorAdjust = src.PrintColorAdjust
-	}},
-	{[]string{"forced-color-adjust"}, func(dst, src *ResolvedStyle) {
-		dst.ForcedColorAdjust = src.ForcedColorAdjust
-	}},
-	{[]string{"color-scheme"}, func(dst, src *ResolvedStyle) { dst.ColorScheme = src.ColorScheme }},
-	{[]string{"dynamic-range-limit"}, func(dst, src *ResolvedStyle) {
-		dst.DynamicRangeLimit = src.DynamicRangeLimit
-	}},
-	{[]string{"font-variation-settings"}, func(dst, src *ResolvedStyle) {
-		dst.FontVariationSettings = src.FontVariationSettings
-	}},
-	{[]string{"font-optical-sizing"}, func(dst, src *ResolvedStyle) {
-		dst.FontOpticalSizing = src.FontOpticalSizing
-	}},
-	{[]string{"font-language-override"}, func(dst, src *ResolvedStyle) {
-		dst.FontLanguageOverride = src.FontLanguageOverride
-	}},
-	{[]string{"font-palette"}, func(dst, src *ResolvedStyle) { dst.FontPalette = src.FontPalette }},
-	{[]string{"text-combine-upright"}, func(dst, src *ResolvedStyle) {
-		dst.TextCombineUpright = src.TextCombineUpright
-	}},
-	{[]string{"text-orientation"}, func(dst, src *ResolvedStyle) { dst.TextOrientation = src.TextOrientation }},
 	{[]string{"text-decoration-skip-ink"}, func(dst, src *ResolvedStyle) {
 		dst.TextDecorationSkipInk = src.TextDecorationSkipInk
 	}},
+	{[]string{"empty-cells"}, func(dst, src *ResolvedStyle) { dst.EmptyCells = src.EmptyCells }},
+	// Re-added support properties (2026-09-12 demotions): inherited per
+	// plans/0.2.6/catalog/mapping.json. The text-decoration-skip entry also
+	// copies its inherited longhands because the uint64 declared mask caps the
+	// table at 64 entries.
+	{[]string{"color-adjust", "print-color-adjust"}, func(dst, src *ResolvedStyle) {
+		dst.ColorAdjust = src.ColorAdjust
+	}},
+	{[]string{"forced-color-adjust"}, func(dst, src *ResolvedStyle) { dst.ForcedColorAdjust = src.ForcedColorAdjust }},
+	{[]string{"color-scheme"}, func(dst, src *ResolvedStyle) { dst.ColorScheme = src.ColorScheme }},
+	{[]string{"dynamic-range-limit"}, func(dst, src *ResolvedStyle) { dst.DynamicRangeLimit = src.DynamicRangeLimit }},
+	{[]string{"font-language-override"}, func(dst, src *ResolvedStyle) {
+		dst.FontLanguageOverride = src.FontLanguageOverride
+	}},
+	{[]string{"font-optical-sizing"}, func(dst, src *ResolvedStyle) { dst.FontOpticalSizing = src.FontOpticalSizing }},
+	{[]string{"font-palette"}, func(dst, src *ResolvedStyle) { dst.FontPalette = src.FontPalette }},
+	{[]string{"font-variation-settings"}, func(dst, src *ResolvedStyle) {
+		dst.FontVariationSettings = src.FontVariationSettings
+	}},
+	{[]string{"image-orientation"}, func(dst, src *ResolvedStyle) {
+		dst.ImageOrientation = src.ImageOrientation
+		dst.ImageOrientationAngle = src.ImageOrientationAngle
+	}},
+	{[]string{"image-resolution"}, func(dst, src *ResolvedStyle) {
+		dst.ImageResolution = src.ImageResolution
+		dst.ImageResolutionDPI = src.ImageResolutionDPI
+	}},
+	{[]string{"text-combine-upright"}, func(dst, src *ResolvedStyle) { dst.TextCombineUpright = src.TextCombineUpright }},
 	{[]string{"text-decoration-skip"}, func(dst, src *ResolvedStyle) {
 		dst.TextDecorationSkip = src.TextDecorationSkip
+		dst.TextDecorationSkipBox = src.TextDecorationSkipBox
+		dst.TextDecorationSkipSpaces = src.TextDecorationSkipSpaces
 	}},
-	{[]string{"empty-cells"}, func(dst, src *ResolvedStyle) { dst.EmptyCells = src.EmptyCells }},
+	{[]string{"text-orientation"}, func(dst, src *ResolvedStyle) { dst.TextOrientation = src.TextOrientation }},
+}
+
+// inheritablePropBits maps an inheritable property name to the bit set of its
+// inheritableProps entries. Names can be shared between entries (list-style
+// appears in the type and position entries), so bits are ORed. Built once from
+// the table so inheritProps can fold the element's declarations into one word
+// instead of testing every entry against the raw map (about 65 lookups per
+// element before this).
+//
+//nolint:gochecknoglobals // derived from the static inherit table
+var inheritablePropBits = func() map[string]uint64 {
+	bits := make(map[string]uint64, len(inheritableProps))
+
+	for i, entry := range inheritableProps {
+		for _, name := range entry.names {
+			bits[name] |= uint64(1) << i
+		}
+	}
+
+	return bits
+}()
+
+// declaredInheritableMask folds the raw declarations into one bit per
+// inheritableProps entry. Iterating the raw keys (about 10 per element)
+// replaces the per-entry raw map lookups.
+func declaredInheritableMask(raw map[string]string) uint64 {
+	var mask uint64
+
+	for prop := range raw {
+		if bit, ok := inheritablePropBits[prop]; ok {
+			mask |= bit
+		}
+	}
+
+	return mask
 }
 
 // inheritProps copies inheritable properties from the parent, unless the
-// element declares its own value (present in raw).
+// element declares its own value (present in raw). The declared-set mask is a
+// local word; it deliberately does not grow ResolvedStyle, whose byte size is
+// pinned by the interning and storage tests.
 func inheritProps(dst *ResolvedStyle, parent *ResolvedStyle, raw map[string]string) {
 	if parent == nil {
 		return
 	}
 
-	for _, entry := range inheritableProps {
-		declared := false
+	declared := declaredInheritableMask(raw)
 
-		if raw != nil {
-			for _, name := range entry.names {
-				if _, ok := raw[name]; ok {
-					declared = true
-
-					break
-				}
-			}
+	for i := range inheritableProps {
+		if declared&(uint64(1)<<i) != 0 {
+			continue
 		}
 
-		if !declared {
-			entry.copy(dst, parent)
-		}
+		inheritableProps[i].copy(dst, parent)
 	}
 }
 
-// ruleHit is one selector match from the shared cascade rule walk.
+// ruleHit is one selector match from the shared cascade rule walk. rule
+// points into its stylesheet, so pointer identity is the exact rule identity
+// the style memo keys on; ruleHit therefore stays comparable and comparable
+// field-for-field.
 type ruleHit struct {
-	r       css.Rule
+	rule    *css.Rule
 	a, b, c int
 }
 
@@ -343,8 +413,6 @@ func (ctx *styleContext) matchedRules(node *html.Node, pseudoElem string) []rule
 }
 
 // appendSheetRuleHits appends matches from one stylesheet into hits.
-//
-//nolint:wsl // cascade gates are intentionally evaluated in source order.
 func (ctx *styleContext) appendSheetRuleHits(
 	hits []ruleHit, sheet *css.Stylesheet, node *html.Node, pseudoElem string,
 ) []ruleHit {
@@ -352,10 +420,12 @@ func (ctx *styleContext) appendSheetRuleHits(
 		return hits
 	}
 
-	for _, rule := range sheet.Rules {
+	for idx := range sheet.Rules {
 		if ctx.pollContext() {
 			return hits
 		}
+
+		rule := &sheet.Rules[idx]
 		if !css.MediaMatches(rule.Media, ctx.media, ctx.viewportW, ctx.viewportH) {
 			continue
 		}
@@ -374,7 +444,7 @@ func (ctx *styleContext) appendSheetRuleHits(
 //
 //nolint:wsl // selector gates are intentionally evaluated in source order.
 func (ctx *styleContext) appendRuleSelectorHits(
-	hits []ruleHit, rule css.Rule, node *html.Node, pseudoElem string,
+	hits []ruleHit, rule *css.Rule, node *html.Node, pseudoElem string,
 ) []ruleHit {
 	for _, sel := range rule.Selectors {
 		if ctx.pollContext() {
@@ -385,7 +455,7 @@ func (ctx *styleContext) appendRuleSelectorHits(
 		}
 
 		a, b, c := css.Specificity(sel)
-		hits = append(hits, ruleHit{r: rule, a: a, b: b, c: c})
+		hits = append(hits, ruleHit{rule: rule, a: a, b: b, c: c})
 	}
 
 	return hits
@@ -403,7 +473,7 @@ func selectorMatches(sel css.Selector, node *html.Node, pe string) bool {
 
 // containerGateMatches checks the rule's @container query against the nearest
 // eligible size container (skipped on passes without container sizes).
-func (ctx *styleContext) containerGateMatches(node *html.Node, runic css.Rule) bool {
+func (ctx *styleContext) containerGateMatches(node *html.Node, runic *css.Rule) bool {
 	if runic.Container == nil {
 		return true
 	}
@@ -432,12 +502,14 @@ type cascadeWin struct {
 }
 
 // cascadeRaw returns the winning declaration per property for the element
-// across UA sheet, author sheets and the inline style attribute.
-// Uses one winner map (value+spec+order+important) instead of six maps.
+// across UA sheet, the already matched author rules and the inline style
+// attribute. Uses one winner map (value+spec+order+important) instead of six
+// maps. hits is the matched-rule list, passed in so the caller can reuse it as
+// the style memo key.
 //
 //nolint:cyclop // hot path; three fixed cascade tiers read clearer than one loop
 func cascadeRaw( //nolint:funlen // cascade tiers are deliberately visible in one hot-path function
-	ctx *styleContext, node *html.Node,
+	ctx *styleContext, node *html.Node, hits []ruleHit,
 ) map[string]string {
 	var wins map[string]cascadeWin
 	if ctx == nil {
@@ -458,16 +530,13 @@ func cascadeRaw( //nolint:funlen // cascade tiers are deliberately visible in on
 	}
 
 	// author sheets in source order (shared matchedRules walk)
-	if ctx != nil {
-		for _, hit := range ctx.matchedRules(node, "") {
-			rule := hit.r
-			for _, d := range rule.Decls {
-				if !supportedDeclaration(d.Value) {
-					continue
-				}
-
-				applyCascadeDeclaration(wins, d.Prop, d.Value, hit.a, hit.b, hit.c, rule.Order, d.Important)
+	for _, hit := range hits {
+		for _, d := range hit.rule.Decls {
+			if !supportedDeclaration(d.Value) {
+				continue
 			}
+
+			applyCascadeDeclaration(wins, d.Prop, d.Value, hit.a, hit.b, hit.c, hit.rule.Order, d.Important)
 		}
 	}
 
@@ -527,12 +596,12 @@ func cascadePseudoRaw(ctx *styleContext, node *html.Node, pseudoElem string) map
 	}
 
 	for _, hit := range ctx.matchedRules(node, pseudoElem) {
-		for _, d := range hit.r.Decls {
+		for _, d := range hit.rule.Decls {
 			if !supportedDeclaration(d.Value) {
 				continue
 			}
 
-			applyCascadeDeclaration(wins, d.Prop, d.Value, hit.a, hit.b, hit.c, hit.r.Order, d.Important)
+			applyCascadeDeclaration(wins, d.Prop, d.Value, hit.a, hit.b, hit.c, hit.rule.Order, d.Important)
 		}
 	}
 
@@ -559,6 +628,14 @@ func applyCascadeDeclaration(
 	ids, classes, types, order int,
 	important bool,
 ) {
+	if expanded, ok := expandFontDeclaration(prop, value); ok {
+		for _, item := range expanded {
+			applyCascadeWin(wins, item.prop, item.val, ids, classes, types, order, important)
+		}
+
+		return
+	}
+
 	if expanded, ok := expandListStyleDeclaration(prop, value); ok {
 		for _, item := range expanded {
 			applyCascadeWin(wins, item.prop, item.val, ids, classes, types, order, important)
@@ -582,8 +659,29 @@ func applyCascadeDeclaration(
 		return
 	}
 
-	for idx, side := range [...]string{"top", "right", "bottom", "left"} {
-		applyCascadeWin(wins, prop+"-"+side, values[idx], ids, classes, types, order, important)
+	// The longhand names are static per shorthand; concatenating them here
+	// used to allocate a fresh property string for every side of every
+	// shorthand declaration (6.4 MB per 500-page conversion in the profile).
+	for idx, longhand := range boxShorthandLonghands(prop) {
+		applyCascadeWin(wins, longhand, values[idx], ids, classes, types, order, important)
+	}
+}
+
+// boxShorthandLonghands returns the four physical longhand names for a box
+// shorthand, in top/right/bottom/left order, or the zero array for any other
+// property. Callers reach it only after expandBoxShorthand reported success
+// for margin, padding, or border. Literal returns keep the names static
+// without package globals.
+func boxShorthandLonghands(prop string) [4]string {
+	switch prop {
+	case marginProperty:
+		return [4]string{"margin-top", "margin-right", "margin-bottom", "margin-left"}
+	case paddingProperty:
+		return [4]string{"padding-top", "padding-right", "padding-bottom", "padding-left"}
+	case borderProperty:
+		return [4]string{"border-top", "border-right", "border-bottom", "border-left"}
+	default:
+		return [4]string{}
 	}
 }
 
@@ -633,6 +731,105 @@ func expandListStyleDeclaration(prop, value string) ([]logicalPropDecl, bool) {
 	}
 
 	return out, true
+}
+
+// expandFontDeclaration expands the font shorthand into its size,
+// line-height, style, weight, and family longhands so each component joins
+// the cascade with the shorthand's own origin, specificity, and source
+// order. The shorthand used to be applied after every longhand, so an
+// earlier `font` beat a later `font-size` regardless of order. Values the
+// expansion cannot read (var() references, system fonts) keep the raw key
+// and fall back to parseFontShorthand after resolveRawVars.
+func expandFontDeclaration(prop, value string) ([]logicalPropDecl, bool) {
+	if prop != "font" {
+		return nil, false
+	}
+
+	parts := strings.Fields(value)
+	out := make([]logicalPropDecl, 0, len(parts))
+
+	for idx := range parts {
+		tok := parts[idx]
+
+		// font-size with an attached line-height, e.g. 12pt/1.4.
+		if strings.Contains(tok, "/") {
+			return expandFontSizeToken(out, parts, idx), true
+		}
+
+		lower := strings.ToLower(tok)
+
+		if decl, handled := fontPrefixDecl(lower); handled {
+			// Style, variant, weight, or stretch keyword positions. normal is
+			// the initial value; variant and stretch have no readers.
+			if decl.prop != "" {
+				out = append(out, decl)
+			}
+
+			continue
+		}
+
+		if isFontWeightNumber(tok) {
+			out = append(out, logicalPropDecl{prop: "font-weight", val: tok})
+
+			continue
+		}
+
+		// First token that is not a prefix component starts the required size.
+		out = append(out, logicalPropDecl{prop: "font-size", val: tok})
+
+		return appendFontFamilyTail(out, parts, idx), true
+	}
+
+	// A valid font shorthand requires a size. Missing or unreadable values
+	// stay intact for the post-cascade fallback.
+	return nil, false
+}
+
+// expandFontSizeToken expands one size token that carries a line-height, e.g.
+// 12pt/1.4, plus the family tokens that follow it, onto out.
+func expandFontSizeToken(out []logicalPropDecl, parts []string, idx int) []logicalPropDecl {
+	size, line, _ := strings.Cut(parts[idx], "/")
+	out = append(out, logicalPropDecl{prop: "font-size", val: size})
+
+	if line != "" {
+		out = append(out, logicalPropDecl{prop: "line-height", val: line})
+	}
+
+	return appendFontFamilyTail(out, parts, idx)
+}
+
+// fontPrefixDecl returns the longhand a font shorthand prefix keyword sets.
+// handled reports whether lower is a prefix keyword at all; keywords whose
+// declaration is empty (normal, variant, and stretch positions) are handled
+// but contribute no longhand.
+func fontPrefixDecl(lower string) (logicalPropDecl, bool) {
+	switch lower {
+	case cssFontStyleItalic, cssFontStyleOblique:
+		return logicalPropDecl{prop: "font-style", val: lower}, true
+	case cssFontWeightBold, "bolder", "lighter":
+		return logicalPropDecl{prop: "font-weight", val: lower}, true
+	case contentNormal, "small-caps", "condensed", "expanded",
+		"semi-condensed", "semi-expanded", "ultra-condensed", "ultra-expanded":
+		return logicalPropDecl{}, true //nolint:exhaustruct // intentional empty keyword position
+	}
+
+	return logicalPropDecl{}, false //nolint:exhaustruct // intentional empty keyword position
+}
+
+// isFontWeightNumber reports whether tok is a numeric font weight 100..900.
+func isFontWeightNumber(tok string) bool {
+	n, ok := css.ParseNumber(tok)
+
+	return ok && n >= 100 && n <= 900
+}
+
+// appendFontFamilyTail appends the tokens after idx as font-family, if any.
+func appendFontFamilyTail(out []logicalPropDecl, parts []string, idx int) []logicalPropDecl {
+	if idx+1 < len(parts) {
+		out = append(out, logicalPropDecl{prop: "font-family", val: strings.Join(parts[idx+1:], " ")})
+	}
+
+	return out
 }
 
 // expandLogicalBoxDeclaration expands logical margin/padding/inset/border
@@ -972,7 +1169,7 @@ func applyFontWeightValue(style *ResolvedStyle, raw map[string]string) {
 func applyFontStyleValue(style *ResolvedStyle, raw map[string]string) {
 	val, found := raw["font-style"]
 	if found {
-		style.FontItalic = val == "italic" || val == "oblique"
+		style.FontItalic = val == cssFontStyleItalic || val == cssFontStyleOblique
 	}
 }
 
@@ -981,7 +1178,7 @@ func resolveFontWeight(current int, val string) int {
 	switch val {
 	case contentNormal:
 		return fontWeightNormalValue
-	case "bold":
+	case cssFontWeightBold:
 		return fontWeightBoldValue
 	case "bolder":
 		return current + fontWeightStep
@@ -1011,10 +1208,31 @@ var restShorthandProps = [...]string{ //nolint:gochecknoglobals // static apply 
 	cssPropBorderBlockColor, cssPropBorderInlineWidth, cssPropBorderInlineStyle, cssPropBorderInlineColor,
 }
 
+// restShorthandSet is derived from restShorthandProps so the longhand pass
+// exclusion cannot drift from the ordered shorthand pass (display used to be
+// missing from the hand-written switch and was applied twice).
+var restShorthandSet = func() map[string]struct{} { //nolint:gochecknoglobals // derived from the apply table
+	set := make(map[string]struct{}, len(restShorthandProps))
+
+	for _, prop := range restShorthandProps {
+		set[prop] = struct{}{}
+	}
+
+	return set
+}()
+
+// restLonghandStack is the stack scratch for the remaining longhands. Most
+// elements declare far fewer than this many; larger declaration sets grow
+// the slice on the heap the way any append would.
+const restLonghandStack = 32
+
 // applyRestProps resolves every non-font property once the font size is known.
-// Shorthands run first in a fixed order; remaining longhands run in any order
-// (longhands do not clobber each other via shorthand expansion). This avoids
-// sorting and intermediate prop slices on every element.
+// Shorthands run first in a fixed order. Remaining longhands still run in
+// alphabetical order because longhands can overlap: overflow and overflow-x
+// both write OverflowX, so the alphabetically later name must apply last for
+// output to stay byte-identical. The order is reproduced with an insertion
+// sort over a stack buffer, so the pass allocates no per-element key slice
+// and does not call sort.Strings.
 func applyRestProps(
 	style *ResolvedStyle, raw map[string]string, ctx *styleContext,
 	parent *ResolvedStyle,
@@ -1035,31 +1253,43 @@ func applyRestProps(
 		applyStyleProp(style, prop, value, fsize, ctx, parent, hasParent)
 	}
 
-	// Deterministic iteration for remaining longhands (map iteration is random).
-	keys := make([]string, 0, len(raw))
+	var keys [restLonghandStack]string
+
+	rest := keys[:0]
 
 	for key := range raw {
-		switch key {
-		case marginProperty, paddingProperty, borderProperty, borderTopProperty,
-			borderRightProperty, borderBottomProperty, borderLeftProperty,
-			borderWidthKeyword, borderStyleKeyword,
-			borderColorKeyword, gapKeyword, flexKeyword, containerKeyword,
-			cssPropMarginInline, cssPropMarginBlock, cssPropPaddingInline, cssPropPaddingBlock,
-			insetKeyword, cssPropInsetBlock, cssPropInsetInline, "column-rule",
-			cssPropBorderBlock, cssPropBorderInline, cssPropBorderBlockStart, cssPropBorderBlockEnd,
-			cssPropBorderInlineStart, cssPropBorderInlineEnd, cssPropBorderBlockWidth, cssPropBorderBlockStyle,
-			cssPropBorderBlockColor, cssPropBorderInlineWidth, cssPropBorderInlineStyle, cssPropBorderInlineColor:
+		if _, shorthand := restShorthandSet[key]; shorthand {
 			continue
-		default:
-			keys = append(keys, key)
 		}
+
+		rest = append(rest, key)
 	}
 
-	sort.Strings(keys)
+	rest = sortRestLonghandProps(rest)
 
-	for _, prop := range keys {
+	for _, prop := range rest {
 		applyStyleProp(style, prop, raw[prop], fsize, ctx, parent, hasParent)
 	}
+}
+
+// sortRestLonghandProps insertion-sorts property names into the byte order
+// sort.Strings produced. A typical element has about ten remaining longhands,
+// so an in-place insertion sort is cheaper than the allocation the old
+// per-element slice plus stdlib sort needed.
+func sortRestLonghandProps(props []string) []string {
+	for i := 1; i < len(props); i++ {
+		prop := props[i]
+		prev := i - 1
+
+		for prev >= 0 && props[prev] > prop {
+			props[prev+1] = props[prev]
+			prev--
+		}
+
+		props[prev+1] = prop
+	}
+
+	return props
 }
 
 // styleGroupFn is one property-group handler in the applyStyleProp dispatch.
@@ -1070,7 +1300,7 @@ type styleGroupFn func(
 ) bool
 
 // styleGroups is the immutable dispatch order for applyStyleProp.
-// Package-level so applyStyleProp does not rebuild the 11-entry array on
+// Package-level so applyStyleProp does not rebuild the 16-entry array on
 // every cascaded property of every element.
 var styleGroups = [...]styleGroupFn{ //nolint:gochecknoglobals // static dispatch table
 	applyDisplayGroup,
@@ -1084,6 +1314,13 @@ var styleGroups = [...]styleGroupFn{ //nolint:gochecknoglobals // static dispatc
 	applyTextGroup,
 	applyTableBreakGroup,
 	applyTransformGroup,
+	// Re-added support groups (2026-09-12 demotions): stubs registered here,
+	// follow-up agents fill the bodies.
+	applyContainmentProps,
+	applyColorAdjustProps,
+	applyFontVariantProps,
+	applyImageAdjustProps,
+	applyTextSupportProps,
 }
 
 //nolint:cyclop,goconst,funlen // vendor prefix lookup map

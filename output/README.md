@@ -81,7 +81,7 @@ files are skipped as bodies; fixture-36 attaches them as HTML header/footer.
 | `fixture-53-asteria-observatory-poster.pdf` | Observatory poster |
 | `fixture-54-ember-harbor-storybook.pdf` | Ember Harbor storybook (4 pages) |
 | `fixture-55-lantern-cooperative-report.pdf` | Northline operations brief |
-| `fixture-56-architecture-diagram.pdf` | Architecture diagram (20 pages) |
+| `fixture-56-architecture-diagram.pdf` | Architecture diagram (21 pages) |
 | `fixture-57-vanguard-telemetry-audit.pdf` | Vanguard Telemetry Audit (356 implemented CSS properties) |
 | `fixture-58-unsupported-worklist-audit.pdf` | Unsupported CSS worklist audit (462 unsupported CSS properties) |
 

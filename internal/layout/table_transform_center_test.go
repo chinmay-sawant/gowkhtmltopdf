@@ -60,7 +60,7 @@ func TestScaleTransformRestampAfterPagination(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := paginateOps(t.Context(), res, contentH); err != nil {
+	if err := paginateOps(t.Context(), res, contentH); err != nil {
 		t.Fatal(err)
 	}
 

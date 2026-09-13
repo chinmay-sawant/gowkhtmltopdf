@@ -26,7 +26,7 @@ func BenchmarkSupersamplePool(b *testing.B) {
 			b.ResetTimer()
 
 			for range b.N {
-				if _, err := rasterizeContext(b.Context(), result, size.height, false, 0); err != nil {
+				if _, err := rasterizeContext(b.Context(), result, size.height, false, 0, 0); err != nil {
 					b.Fatal(err)
 				}
 			}

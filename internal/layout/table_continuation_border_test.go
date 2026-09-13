@@ -143,7 +143,7 @@ td, th { border: 1px solid #333; padding: 3pt; }
 
 	var horiz []struct{ x0, x1, y float64 }
 
-	for _, paintOp := range res.Ops {
+	for _, paintOp := range resLineOps(res) {
 		if paintOp.Fixed || paintOp.Kind != OpLine {
 			continue
 		}

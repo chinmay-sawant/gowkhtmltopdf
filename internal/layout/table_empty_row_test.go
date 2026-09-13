@@ -61,7 +61,7 @@ td, th { border: 1px solid #999; padding: 2pt; }
 	// Horizontal grid: top of header, mid, bottom — no extra rule for empty tr.
 	var hlines []float64
 
-	for _, op := range res.Ops {
+	for _, op := range resLineOps(res) {
 		if op.Kind == OpLine && op.H == 0 && op.W > 30 {
 			hlines = append(hlines, op.Y)
 		}
@@ -195,7 +195,7 @@ td, th { border: 1px solid #999; padding: 2pt; }
 
 	var hlines []float64
 
-	for _, op := range res.Ops {
+	for _, op := range resLineOps(res) {
 		if op.Kind == OpLine && op.H == 0 && op.W > 50 {
 			hlines = append(hlines, op.Y)
 		}

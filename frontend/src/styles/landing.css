@@ -16,17 +16,10 @@
   border-bottom: 1px solid var(--line);
 }
 
-.landing-kicker {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 16px;
-  color: var(--muted);
-  font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+/* Keeps the headline where it sat with the old kicker line above it:
+   11px mono line at the inherited 1.65 line-height plus its 16px margin. */
+.landing-hero-main {
+  padding-top: 34px;
 }
 
 .landing-hero-minimal h1 {
@@ -58,13 +51,6 @@
   flex-wrap: wrap;
   gap: 10px;
   margin-bottom: 16px;
-}
-
-.landing-micro {
-  max-width: 72ch;
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.65;
 }
 
 .landing-micro code {
@@ -302,6 +288,10 @@
   padding: 56px 0 0;
 }
 
+.landing-fit .landing-section-head {
+  max-width: 100%;
+}
+
 .fit-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -366,10 +356,10 @@ html[data-theme='dark'] .fit-limit .fit-kicker {
   border-color: #3d3520;
 }
 
-.fit-links {
-  display: flex;
-  gap: 18px;
-  margin-top: 14px;
+.fit-card a {
+  color: var(--accent-strong);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 /* Proof strip: minimal */

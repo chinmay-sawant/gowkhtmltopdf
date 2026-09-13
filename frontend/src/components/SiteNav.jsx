@@ -7,7 +7,6 @@ import gopherStill from '../assets/brand/gopher-256.png'
 
 const LINKS = [
   { to: '/', label: 'Overview' },
-  { to: '/getting-started', label: 'Getting Started' },
   { to: '/documentation', label: 'Documentation' },
   { to: '/dossier', label: 'Issue Dossier' },
   { to: '/showcase', label: 'Showcase' },
@@ -80,7 +79,6 @@ export default function SiteNav() {
                 className={({ isActive }) => {
                   const classes = ['nav-link']
                   if (isActive) classes.push('active')
-                  if (l.to === '/getting-started') classes.push('nav-link-cta')
                   return classes.join(' ')
                 }}
               >
@@ -144,14 +142,6 @@ export default function SiteNav() {
               <path d="M13 13l4 4" />
             </svg>
           </button>
-          <NavLink
-            to="/getting-started"
-            className={({ isActive }) =>
-              isActive ? 'nav-link nav-link-cta mobile-bar-cta active' : 'nav-link nav-link-cta mobile-bar-cta'
-            }
-          >
-            Getting Started
-          </NavLink>
           <button
             type="button"
             className="mobile-menu-toggle"
@@ -216,7 +206,6 @@ export default function SiteNav() {
                 className={({ isActive }) => {
                   const classes = ['mobile-nav-link']
                   if (isActive) classes.push('active')
-                  if (l.to === '/getting-started') classes.push('mobile-nav-link-cta')
                   return classes.join(' ')
                 }}
                 onClick={() => setIsOpen(false)}

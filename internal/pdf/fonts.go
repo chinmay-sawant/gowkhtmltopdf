@@ -77,44 +77,91 @@ type Font struct {
 	rev      map[uint16]rune
 	nameOnce sync.Once
 	names    []string
+
+	// lazyParse defers the whole load (asset clone, table directory,
+	// fingerprint, metric and cmap parse) to the first accessor call, so a
+	// document pays only for the bundled faces it uses. loadData supplies the
+	// face bytes and is nil once they are owned; ParseTTF leaves lazyParse
+	// false and loads eagerly.
+	lazyParse bool
+	loadData  func() []byte
+	parseOnce sync.Once
+	parseErr  error
 }
 
 // ParseTTF parses a TrueType (or OpenType with TrueType outlines) font file.
 // CFF-based fonts return an error - this writer targets TrueType outlines.
 func ParseTTF(data []byte) (*Font, error) {
+	font := &Font{data: data} //nolint:exhaustruct // intentional zero-value fields
+
+	if err := font.initFromData(); err != nil {
+		return nil, err
+	}
+
+	return font, nil
+}
+
+// newLazyFont builds a font whose asset bytes are cloned and whose tables are
+// parsed on first use. Bundled default faces use it so a document only pays
+// for the faces it touches.
+func newLazyFont(load func() []byte) *Font {
+	return &Font{ //nolint:exhaustruct // intentional zero-value fields
+		lazyParse: true,
+		loadData:  load,
+	}
+}
+
+// initFromData validates the sfnt header and table directory, fingerprints the
+// bytes, and parses the metric and cmap tables.
+func (f *Font) initFromData() error {
+	data := f.data
+
 	if len(data) > maxFontBytes {
-		return nil, fmt.Errorf("%w: %d bytes, limit %d", errFontTooLarge, len(data), maxFontBytes)
+		return fmt.Errorf("%w: %d bytes, limit %d", errFontTooLarge, len(data), maxFontBytes)
 	}
 
 	if len(data) < sfntOffsetTableSize {
-		return nil, errFontTooShort
+		return errFontTooShort
 	}
 
 	if !bytes.Equal(data[0:4], []byte{0, 1, 0, 0}) &&
 		!bytes.Equal(data[0:4], []byte("true")) {
 		if bytes.Equal(data[0:4], []byte("OTTO")) {
-			return nil, errFontCFFNotSupported
+			return errFontCFFNotSupported
 		}
 
-		return nil, errFontNotTrueType
+		return errFontNotTrueType
 	}
 
 	tables, err := parseTableDirectory(data)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	font := &Font{ //nolint:exhaustruct // intentional zero-value fields
-		data:        data,
-		fingerprint: sha256.Sum256(data),
-		tables:      tables,
+	f.fingerprint = sha256.Sum256(data)
+	f.tables = tables
+
+	return f.parseAll()
+}
+
+// ensureParsed loads a lazy font exactly once and runs initFromData. It is a
+// no-op for eager fonts and after the first call. A failed lazy load leaves
+// the derived fields at their zero values; the bundled assets are compile-time
+// constants pinned by TestLazyFaceMatchesEager, so no runtime error path
+// exists for them.
+func (f *Font) ensureParsed() {
+	if f == nil || !f.lazyParse {
+		return
 	}
 
-	if err := font.parseAll(); err != nil {
-		return nil, err
-	}
+	f.parseOnce.Do(func() {
+		if f.loadData != nil {
+			f.data = f.loadData()
+			f.loadData = nil
+		}
 
-	return font, nil
+		f.parseErr = f.initFromData()
+	})
 }
 
 // parseAll runs the table parsers in dependency order; the first failure
@@ -484,19 +531,39 @@ func (f *Font) parseCmap12(state []byte) error {
 }
 
 // UnitsPerEm returns the font's design size.
-func (f *Font) UnitsPerEm() int16 { return f.unitsPerEm }
+func (f *Font) UnitsPerEm() int16 {
+	f.ensureParsed()
+
+	return f.unitsPerEm
+}
 
 // Ascent returns the typographic ascent in font units.
-func (f *Font) Ascent() int16 { return f.ascender }
+func (f *Font) Ascent() int16 {
+	f.ensureParsed()
+
+	return f.ascender
+}
 
 // Descent returns the typographic descent (negative) in font units.
-func (f *Font) Descent() int16 { return f.descender }
+func (f *Font) Descent() int16 {
+	f.ensureParsed()
+
+	return f.descender
+}
 
 // CapHeight returns the cap height in font units.
-func (f *Font) CapHeight() int16 { return f.capHeight }
+func (f *Font) CapHeight() int16 {
+	f.ensureParsed()
+
+	return f.capHeight
+}
 
 // BBox returns the font bounding box in font units.
-func (f *Font) BBox() (int16, int16, int16, int16) { return f.xMin, f.yMin, f.xMax, f.yMax }
+func (f *Font) BBox() (int16, int16, int16, int16) {
+	f.ensureParsed()
+
+	return f.xMin, f.yMin, f.xMax, f.yMax
+}
 
 // pdfEmScale returns the factor that converts font design units to the PDF
 // FontDescriptor 1000-unit em. Writing raw 2048-upm values made viewers treat
@@ -515,27 +582,51 @@ func (f *Font) scaleToPDFEm(v int16) int {
 }
 
 // PDFAscent is Ascent in 1000-em PDF glyph space.
-func (f *Font) PDFAscent() int { return f.scaleToPDFEm(f.ascender) }
+func (f *Font) PDFAscent() int {
+	f.ensureParsed()
+
+	return f.scaleToPDFEm(f.ascender)
+}
 
 // PDFDescent is Descent in 1000-em PDF glyph space.
-func (f *Font) PDFDescent() int { return f.scaleToPDFEm(f.descender) }
+func (f *Font) PDFDescent() int {
+	f.ensureParsed()
+
+	return f.scaleToPDFEm(f.descender)
+}
 
 // PDFCapHeight is CapHeight in 1000-em PDF glyph space.
-func (f *Font) PDFCapHeight() int { return f.scaleToPDFEm(f.capHeight) }
+func (f *Font) PDFCapHeight() int {
+	f.ensureParsed()
+
+	return f.scaleToPDFEm(f.capHeight)
+}
 
 // PDFBBox is the font bbox in 1000-em PDF glyph space.
 func (f *Font) PDFBBox() (int, int, int, int) {
+	f.ensureParsed()
+
 	return f.scaleToPDFEm(f.xMin), f.scaleToPDFEm(f.yMin), f.scaleToPDFEm(f.xMax), f.scaleToPDFEm(f.yMax)
 }
 
 // Bold reports whether the font declares a bold macStyle.
-func (f *Font) Bold() bool { return f.macStyle&1 != 0 }
+func (f *Font) Bold() bool {
+	f.ensureParsed()
+
+	return f.macStyle&1 != 0
+}
 
 // Italic reports whether the font declares an italic macStyle.
-func (f *Font) Italic() bool { return f.macStyle&2 != 0 }
+func (f *Font) Italic() bool {
+	f.ensureParsed()
+
+	return f.macStyle&2 != 0
+}
 
 // GlyphID maps a rune to its glyph id (0 = .notdef when missing).
 func (f *Font) GlyphID(r rune) uint16 {
+	f.ensureParsed()
+
 	if g, ok := f.cmap[uint32(r)]; ok {
 		return g
 	}
@@ -559,6 +650,8 @@ func (f *Font) LoadNames() []string {
 	if f == nil {
 		return nil
 	}
+
+	f.ensureParsed()
 
 	f.nameOnce.Do(func() {
 		f.names = f.loadNames()
@@ -677,6 +770,8 @@ func decodeUTF16BE(buf []byte) string {
 
 // Advance returns the horizontal advance width in font units for a rune.
 func (f *Font) Advance(r rune) float64 {
+	f.ensureParsed()
+
 	g := f.GlyphID(r)
 	if int(g) >= len(f.advance) {
 		return float64(f.advance[0])
@@ -694,6 +789,8 @@ func (f *Font) AdvanceInPoints(r rune, size float64) float64 {
 // a single cmap lookup: the same glyph table and out-of-range fallback that
 // Advance uses, so the result equals AdvanceInPoints(r, size).
 func (f *Font) GlyphAdvancePoints(r rune, size float64) float64 {
+	f.ensureParsed()
+
 	g := f.GlyphID(r)
 
 	adv := float64(f.advance[0])
@@ -706,6 +803,8 @@ func (f *Font) GlyphAdvancePoints(r rune, size float64) float64 {
 
 // glyphOutline returns the glyf bytes for a glyph id (raw, incl. header).
 func (f *Font) glyphOutline(glob uint16) []byte {
+	f.ensureParsed()
+
 	found, okVal := f.tables["glyf"]
 	if !okVal {
 		return nil
@@ -786,6 +885,8 @@ func (f *Font) compositeGlyphIDs(g uint16) []uint16 {
 
 // Runes returns all runes mapped by the font, sorted.
 func (f *Font) Runes() []rune {
+	f.ensureParsed()
+
 	out := make([]rune, 0, len(f.cmap))
 	for cp := range f.cmap {
 		out = append(out, rune(cp))

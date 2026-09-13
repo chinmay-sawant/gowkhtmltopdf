@@ -21,11 +21,11 @@ Pin the tagged release (Go 1.26+). Binaries land on `GOBIN` or
 `$(go env GOPATH)/bin`:
 
 ```sh
-go install github.com/chinmay-sawant/gowkhtmltopdf/cmd/gowkhtmltopdf@v0.2.4
-go install github.com/chinmay-sawant/gowkhtmltopdf/cmd/gowkhtmltoimage@v0.2.4
+go install github.com/chinmay-sawant/gowkhtmltopdf/cmd/gowkhtmltopdf@v0.2.6
+go install github.com/chinmay-sawant/gowkhtmltopdf/cmd/gowkhtmltoimage@v0.2.6
 gowkhtmltopdf --version
 # Name: gowkhtmltopdf
-# Version: 0.2.4
+# Version: 0.2.6
 ```
 
 ## Install prebuilt binaries
@@ -61,10 +61,10 @@ Check the stamp:
 ```sh
 ./bin/gowkhtmltopdf --version
 # Name: gowkhtmltopdf
-# Version: 0.2.4
+# Version: 0.2.6
 ```
 
-`VERSION` (currently `0.2.4`) is the project release. The library constant
+`VERSION` (currently `0.2.6`) is the project release. The library constant
 `LibraryVersion` (`0.12.7-dev`) is a **wkhtmltopdf settings-surface**
 compatibility id, not the release number. See [library-api.md](library-api.md#versioning).
 

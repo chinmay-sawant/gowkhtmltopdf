@@ -90,7 +90,7 @@ only — it does not rewrite the corpus fixture above or write a PDF under
 | Flex / grid / CSS lite | 32–42 | Flex/grid stages, nested HTML HF, CSS orphans/widows, float-in-`td`, multicol, transform, `:has()`, `@container` |
 | Business documents | 43–48 | Dossier, receipt, PO, contract, certificate, shipping |
 | Illustrated print | 49–54 | Poster, letter, storybooks, boarding pass, observatory poster, Ember Harbor |
-| Long-form | 55–56 | Operations brief, 20-page architecture diagram |
+| Long-form | 55–56 | Operations brief, 21-page architecture diagram |
 
 ### Fixture inventory
 
@@ -154,7 +154,7 @@ fixture header comments and [`testdata/golden/README.md`](../testdata/golden/REA
 | 53 | Asteria poster variant: shared theme with a different illustration and copy | 1 |
 | 54 | Ember Harbor storybook: cover + three chapter pages, shared print theme, local illustrations | 4 |
 | 55 | Self-contained operations brief: inline CSS, status cards, route table, action plan, and page breaks | 3 |
-| 56 | Architecture diagram: hero, pipeline strip, TOC, 10 domain sections (modern semantic tags and CSS with graceful-degrade fallbacks), linked `fixture-56-architecture-diagram.css` | 20 |
+| 56 | Architecture diagram: hero, pipeline strip, TOC, 10 domain sections (modern semantic tags and CSS with graceful-degrade fallbacks), linked `fixture-56-architecture-diagram.css` | 21 |
 
 Supporting assets in the same directory: `logo.png`, `certificate-background.jpg`,
 `style-05.css`, `theme-print-stories.css`, `fixture-56-architecture-diagram.css`,
