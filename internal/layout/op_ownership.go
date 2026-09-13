@@ -219,7 +219,49 @@ func opOwnsChromeHorizontalSide(oper *Op, boxNode *box, tol float64, onTop, onBo
 		return true
 	}
 
+	if opMiteredHorizontalRail(oper, boxNode, onTop) {
+		return true
+	}
+
 	return looksLikeDashSegmentLength(oper.W, oper.Width)
+}
+
+// opMiteredHorizontalRail reports a top/bottom border rail shortened by the
+// miter joints where a wider vertical border meets it (see borderOpsSides:
+// each wider vertical side pulls the rail in by (vertical+horizontal)/2).
+// The rail's stroke width recovers the engine scale from the raw style width,
+// so this comparison needs no engine. Without it, a box with a 3pt left
+// border and 1pt elsewhere fails the exact-width check, its bottom rail counts
+// as content ink, and chrome repair adds padding-bottom a second time
+// (fixture-43 page 2 "Risk boundary" callout grew 8pt below its border).
+func opMiteredHorizontalRail(oper *Op, boxNode *box, onTop bool) bool {
+	style := boxNode.style
+	if style == nil || oper.Width <= 0 {
+		return false
+	}
+
+	stroke := style.BorderBottom
+	if onTop {
+		stroke = style.BorderTop
+	}
+
+	rawStroke := borderPaint(stroke)
+	if rawStroke <= 0 {
+		return false
+	}
+
+	scale := oper.Width / rawStroke
+	inset := 0.0
+
+	if wLeft := borderPaint(style.BorderLeft) * scale; wLeft > oper.Width {
+		inset += (wLeft + oper.Width) / two
+	}
+
+	if wRight := borderPaint(style.BorderRight) * scale; wRight > oper.Width {
+		inset += (wRight + oper.Width) / two
+	}
+
+	return math.Abs(oper.W-(boxNode.w-inset)) <= opOwnerTolerance(opOwnerChrome)
 }
 
 // chromeVerticalBorderExists reports the box side a vertical rail can belong
