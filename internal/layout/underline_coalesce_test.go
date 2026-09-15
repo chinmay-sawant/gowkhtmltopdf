@@ -76,14 +76,14 @@ b { font-weight: 700; }
 	}
 }
 
-// TestUnderlineCoalesceHrefForceAcrossChunks: PDF affordance underlines
-// (href set, author decoration none) also coalesce multi-chunk same-href.
-func TestUnderlineCoalesceHrefForceAcrossChunks(t *testing.T) {
+// TestUnderlineCoalesceHrefAcrossChunks: CSS underlines on multi-chunk
+// same-href runs (italic + plain text) coalesce to one stroke per line.
+func TestUnderlineCoalesceHrefAcrossChunks(t *testing.T) {
 	t.Parallel()
 
 	cssSheet := sheet(t, `
 body { margin: 0; font-size: 11pt; }
-a { color: #0645ad; text-decoration: none; }
+a { color: #0645ad; text-decoration: underline; }
 i { font-style: italic; }
 `)
 
@@ -102,7 +102,35 @@ i { font-style: italic; }
 	// Single line (wide viewport): expect one underline for the whole link.
 	n := countHorizUnderlines(res.Ops)
 	if n != 1 {
-		t.Fatalf("href-force multi-chunk one line: want 1 underline, got %d", n)
+		t.Fatalf("href multi-chunk one line: want 1 underline, got %d", n)
+	}
+}
+
+// TestLinkTextDecorationNoneHonored: author text-decoration:none must not
+// paint underlines; clickable href remains without forced PDF affordance.
+func TestLinkTextDecorationNoneHonored(t *testing.T) {
+	t.Parallel()
+
+	cssSheet := sheet(t, `
+body { margin: 0; font-size: 12pt; }
+a { color: #1a3a6b; text-decoration: none; }
+`)
+
+	root, err := html.Parse(`<html><body><p>Contact <a href="mailto:x@y.com">x@y.com</a> and ` +
+		`<a href="https://github.com/chinmay-sawant">github.com/chinmay-sawant</a></p></body></html>`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := Layout(root, Options{
+		Width: 500, Height: 200, Sheets: []*css.Stylesheet{cssSheet}, Media: "print",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if n := countHorizUnderlines(res.Ops); n != 0 {
+		t.Fatalf("text-decoration:none links: want 0 underlines, got %d", n)
 	}
 }
 
