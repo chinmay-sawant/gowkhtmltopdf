@@ -134,6 +134,44 @@ func contentInlineSize(sty ResolvedStyle, availW float64) float64 {
 // contentBaseInlineSize resolves the specified width (auto → containing-block
 // width minus margins) and whether the width is definite.
 func contentBaseInlineSize(sty ResolvedStyle, availW float64) (float64, bool) {
+	if width, definite := definiteBaseInlineSize(sty, availW); definite {
+		return width, true
+	}
+
+	margL, margR := baseInlineMargins(sty)
+
+	width := availW - margL - margR
+	if width < 0 {
+		width = 0
+	}
+
+	return width, false
+}
+
+// definiteBaseInlineSize resolves a declared calc, percentage, or fixed width
+// and reports whether such a width exists.
+func definiteBaseInlineSize(sty ResolvedStyle, availW float64) (float64, bool) {
+	switch {
+	case sty.WidthCalc:
+		// Unscaled @container measurement (see the PT-GO-19 note above), so
+		// the deferred calc resolves here without engine zoom scaling.
+		if availW > 0 && availW < 1e12 {
+			return availW*sty.WidthPercent/oneHundred + sty.WidthCalcFixed, true
+		}
+	case sty.WidthPercent >= 0:
+		if availW > 0 && availW < 1e12 {
+			return availW * sty.WidthPercent / oneHundred, true
+		}
+	case sty.Width >= 0:
+		return sty.Width, true
+	}
+
+	return 0, false
+}
+
+// baseInlineMargins returns the horizontal margins used for an auto width,
+// treating auto margins as zero.
+func baseInlineMargins(sty ResolvedStyle) (float64, float64) {
 	margL, margR := sty.MarginLeft, sty.MarginRight
 	if sty.MarginLeftAuto {
 		margL = 0
@@ -143,21 +181,7 @@ func contentBaseInlineSize(sty ResolvedStyle, availW float64) (float64, bool) {
 		margR = 0
 	}
 
-	width := availW - margL - margR
-	if width < 0 {
-		width = 0
-	}
-
-	switch {
-	case sty.WidthPercent >= 0:
-		if availW > 0 && availW < 1e12 {
-			return availW * sty.WidthPercent / oneHundred, true
-		}
-	case sty.Width >= 0:
-		return sty.Width, true
-	}
-
-	return width, false
+	return margL, margR
 }
 
 // isSizeContainer reports whether the style establishes a size query container.

@@ -350,9 +350,83 @@ func applyBackgroundImageValue(style *ResolvedStyle, value string) {
 		return
 	}
 
-	if trimmed != "" {
+	if backgroundValueHasImage(trimmed) {
 		style.BackgroundImage = trimmed
+
+		return
 	}
+
+	// No image layer: a color-only shorthand, position/size keywords, or an
+	// unrecognized function. Clearing prevents a bare #rgb (the common
+	// `background:#f4f6fd` case) from being fetched as a relative URL.
+	style.BackgroundImage = ""
+}
+
+// backgroundValueHasImage reports whether a background or background-image
+// value contains an image layer. Multi-layer values keep their raw text (the
+// painter splits layers); a single url(...) is unwrapped by the caller.
+func backgroundValueHasImage(value string) bool {
+	lower := strings.ToLower(value)
+	if strings.Contains(lower, backgroundURLPrefix) ||
+		strings.Contains(lower, "image-set(") ||
+		isGradientFunc(value) {
+		return true
+	}
+
+	for _, layer := range splitCommaLayers(value) {
+		if backgroundBarePath(layer) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// backgroundBarePath reports whether one background layer is a bare path, the
+// non-standard form backgroundImageSrc accepts. Colors, shorthand keywords,
+// lengths, and function tokens are never paths.
+func backgroundBarePath(layer string) bool {
+	token := strings.Trim(strings.TrimSpace(layer), `"'`)
+	if token == "" || strings.ContainsAny(token, " \t\r\n\f") || strings.Contains(token, "(") {
+		return false
+	}
+
+	for _, part := range strings.Split(token, "/") {
+		if isBackgroundShorthandKeyword(part) || isBackgroundShorthandLength(part) {
+			return false
+		}
+
+		if _, _, _, _, isColor := css.ParseColor(part); isColor {
+			return false
+		}
+	}
+
+	return true
+}
+
+// isBackgroundShorthandKeyword reports whether a token is a background
+// shorthand keyword that never denotes an image: position, size, repeat,
+// attachment, box, and global keywords.
+func isBackgroundShorthandKeyword(token string) bool {
+	switch strings.ToLower(token) {
+	case "none", "auto", "cover", "contain",
+		"left", "right", "top", "bottom", "center",
+		"repeat", "repeat-x", "repeat-y", "space", borderRepeatRound, "no-repeat",
+		"scroll", "fixed", "local",
+		"border-box", "padding-box", "content-box",
+		inheritKeyword, cssKeywordInitial, cssKeywordUnset, cssKeywordRevert:
+		return true
+	default:
+		return false
+	}
+}
+
+// isBackgroundShorthandLength reports whether a token is a CSS length or
+// percentage, which in a background shorthand is a position or size value.
+func isBackgroundShorthandLength(token string) bool {
+	_, _, ok := css.ParseLength(token)
+
+	return ok
 }
 
 func firstCSSUrl(value string) (string, bool) {

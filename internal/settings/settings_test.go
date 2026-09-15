@@ -155,7 +155,7 @@ func globalDottedGeometryChecks(global *PdfGlobal) []dottedCheck {
 			check: func() bool { return !global.Grayscale },
 		},
 		{
-			key: "grayscale", val: "true", desc: "grayscale=true must set Grayscale",
+			key: "grayscale", val: sTrue, desc: "grayscale=true must set Grayscale",
 			check: func() bool { return global.Grayscale },
 		},
 		{
@@ -200,7 +200,7 @@ func globalDottedTextChecks(global *PdfGlobal) []dottedCheck {
 			check: func() bool { return len(global.Load.Allow) == 1 && global.Load.Allow[0] == "/srv/html" },
 		},
 		{
-			key: "dumpoutline", val: "true", desc: "dumpoutline must be true",
+			key: "dumpoutline", val: sTrue, desc: "dumpoutline must be true",
 			check: func() bool { return global.DumpOutline },
 		},
 	}
@@ -375,7 +375,7 @@ func TestObjectSetDottedKeys(t *testing.T) {
 		t.Error("web.images should be false")
 	}
 
-	setKey(t, &obj, "web.simplifydom", "true")
+	setKey(t, &obj, "web.simplifydom", sTrue)
 
 	if !obj.Web.SimplifyDOM {
 		t.Error("web.simplifydom should be true")
@@ -681,11 +681,11 @@ func TestImageSet(t *testing.T) {
 		t.Error("web.images should be false")
 	}
 	// Inert web key accepted into Ignored.
-	if err := img.Set("web.javascript", "true"); err != nil {
+	if err := img.Set("web.javascript", sTrue); err != nil {
 		t.Fatal(err)
 	}
 
-	if img.Ignored["web.javascript"] != "true" {
+	if img.Ignored["web.javascript"] != sTrue {
 		t.Errorf("Ignored = %v", img.Ignored)
 	}
 }
@@ -784,42 +784,197 @@ func TestBackgroundSingleFieldNoWebMirror(t *testing.T) {
 func TestResolveMedia(t *testing.T) {
 	t.Parallel()
 
-	base := sPrint
 	none := Web{}
-	pmt := Web{PrintMediaType: true}
+	printOverride := Web{PrintMediaType: MediaOverridePrint}
+	screenOverride := Web{PrintMediaType: MediaOverrideScreen}
 	screen := Web{MediaType: MediaScreen}
 	printMedia := Web{MediaType: MediaPrint}
 
-	if got := ResolveMedia(base, none, nil); got != sPrint {
-		t.Errorf("default PDF = %q", got)
+	tests := []struct {
+		name   string
+		base   string
+		global Web
+		obj    *Web
+		want   string
+	}{
+		{name: "default PDF", base: sPrint, global: none, want: sPrint},
+		{name: "default image", base: sScreen, global: none, want: sScreen},
+		{name: "global print-media-type", base: sPrint, global: printOverride, want: sPrint},
+		{name: "obj print-media-type", base: sPrint, global: none, obj: &printOverride, want: sPrint},
+		{name: "global no-print-media-type", base: sPrint, global: screenOverride, want: sScreen},
+		{name: "obj no-print-media-type", base: sPrint, global: none, obj: &screenOverride, want: sScreen},
+		{name: "global media-type screen", base: sPrint, global: screen, want: sScreen},
+		{name: "obj media-type screen", base: sPrint, global: none, obj: &screen, want: sScreen},
+		// obj wins over global media-type.
+		{name: "obj media-type print over global screen", base: sPrint, global: screen, obj: &printMedia, want: sPrint},
+		// print-media-type override wins over media-type.
+		{name: "pmt over media-type screen", base: sPrint, global: screen, obj: &printOverride, want: sPrint},
+		// The no-print override wins over media-type just like --print-media-type.
+		{
+			name:   "no-print override over media-type print",
+			base:   sPrint,
+			global: printMedia,
+			obj:    &screenOverride,
+			want:   sScreen,
+		},
+		// An explicit object override wins over the global override.
+		{
+			name:   "obj screen override over global print override",
+			base:   sPrint,
+			global: printOverride,
+			obj:    &screenOverride,
+			want:   sScreen,
+		},
+		{
+			name:   "obj print override over global screen override",
+			base:   sPrint,
+			global: screenOverride,
+			obj:    &printOverride,
+			want:   sPrint,
+		},
 	}
 
-	if got := ResolveMedia(sScreen, none, nil); got != sScreen {
-		t.Errorf("default image = %q", got)
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := ResolveMedia(testCase.base, testCase.global, testCase.obj); got != testCase.want {
+				t.Errorf("ResolveMedia(%q, %+v, %+v) = %q, want %q",
+					testCase.base, testCase.global, testCase.obj, got, testCase.want)
+			}
+		})
+	}
+}
+
+// stringSetter is Set as the reflect tables expose it on every settings layer.
+type stringSetter interface {
+	Set(name, value string) error
+}
+
+func mustSet(t *testing.T, target stringSetter, key, value string) {
+	t.Helper()
+
+	if err := target.Set(key, value); err != nil {
+		t.Fatalf("Set(%q, %q) = %v", key, value, err)
+	}
+}
+
+// pdfMediaCase is one CLI flag combination for TestResolvePDFMediaFlagMatrix:
+// optional global/object setup closures plus the media string they resolve to.
+type pdfMediaCase struct {
+	name   string
+	global func(t *testing.T, g *PdfGlobal)
+	obj    func(t *testing.T, o *PdfObject)
+	want   string
+}
+
+// pdfMediaFlagMatrix mirrors the CLI flag combinations the parser produces:
+// the default stays print, --no-print-media-type and --media-type screen
+// select screen, and the explicit print-media-type override beats media-type
+// in both directions.
+func pdfMediaFlagMatrix() []pdfMediaCase {
+	return []pdfMediaCase{
+		{name: "default print", want: sPrint},
+		{
+			name:   "media-type screen",
+			global: func(_ *testing.T, g *PdfGlobal) { g.Web.MediaType = MediaScreen },
+			want:   sScreen,
+		},
+		{
+			name: "no-print-media-type screen",
+			global: func(t *testing.T, g *PdfGlobal) {
+				t.Helper()
+				mustSet(t, g, "web.printmediatype", sFalse)
+			},
+			want: sScreen,
+		},
+		{
+			name: "object no-print-media-type screen",
+			obj: func(t *testing.T, o *PdfObject) {
+				t.Helper()
+				mustSet(t, o, "load.printmediatype", sFalse)
+			},
+			want: sScreen,
+		},
+		{
+			name: "no-print-media-type beats media-type print",
+			global: func(t *testing.T, g *PdfGlobal) {
+				t.Helper()
+				mustSet(t, g, "web.mediatype", sPrint)
+				mustSet(t, g, "web.printmediatype", sFalse)
+			},
+			want: sScreen,
+		},
+		{
+			name: "print-media-type beats media-type screen",
+			global: func(t *testing.T, g *PdfGlobal) {
+				t.Helper()
+				mustSet(t, g, "web.mediatype", sScreen)
+				mustSet(t, g, "web.printmediatype", sTrue)
+			},
+			want: sPrint,
+		},
+		{
+			name: "later print-media-type wins over earlier no-print",
+			global: func(t *testing.T, g *PdfGlobal) {
+				t.Helper()
+				mustSet(t, g, "web.printmediatype", sFalse)
+				mustSet(t, g, "web.printmediatype", sTrue)
+			},
+			want: sPrint,
+		},
+	}
+}
+
+func TestResolvePDFMediaFlagMatrix(t *testing.T) {
+	t.Parallel()
+
+	for _, testCase := range pdfMediaFlagMatrix() {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			global := DefaultPdfGlobal()
+			if apply := testCase.global; apply != nil {
+				apply(t, &global)
+			}
+
+			obj := DefaultPdfObject()
+			if apply := testCase.obj; apply != nil {
+				apply(t, &obj)
+			}
+
+			if got := ResolvePDFMedia(global, &obj); got != testCase.want {
+				t.Errorf("ResolvePDFMedia = %q, want %q", got, testCase.want)
+			}
+		})
+	}
+}
+
+// TestPrintMediaTypeSetStoresTriState pins the reflect contract the CLI relies
+// on: "false" is an explicit screen override, not an unset field.
+func TestPrintMediaTypeSetStoresTriState(t *testing.T) {
+	t.Parallel()
+
+	global := DefaultPdfGlobal()
+	if global.Web.PrintMediaType != MediaOverrideUnset {
+		t.Fatalf("default override = %v, want unset", global.Web.PrintMediaType)
 	}
 
-	if got := ResolveMedia(base, pmt, nil); got != sPrint {
-		t.Errorf("global print-media-type = %q", got)
+	mustSet(t, &global, "web.printmediatype", sFalse)
+
+	if global.Web.PrintMediaType != MediaOverrideScreen {
+		t.Errorf("Set false stored %v, want MediaOverrideScreen", global.Web.PrintMediaType)
 	}
 
-	if got := ResolveMedia(base, none, &pmt); got != sPrint {
-		t.Errorf("obj print-media-type = %q", got)
+	got, found := global.Get("web.printmediatype")
+	if !found || got != sFalse {
+		t.Errorf("Get after Set false = %q,%v want %q,true", got, found, sFalse)
 	}
 
-	if got := ResolveMedia(base, screen, nil); got != sScreen {
-		t.Errorf("global media-type screen = %q", got)
-	}
+	mustSet(t, &global, "web.printmediatype", sTrue)
 
-	if got := ResolveMedia(base, none, &screen); got != sScreen {
-		t.Errorf("obj media-type screen = %q", got)
-	}
-	// obj wins over global media-type.
-	if got := ResolveMedia(base, screen, &printMedia); got != sPrint {
-		t.Errorf("obj media-type print over global screen = %q", got)
-	}
-	// print-media-type override wins over media-type.
-	if got := ResolveMedia(base, screen, &pmt); got != sPrint {
-		t.Errorf("pmt over media-type screen = %q", got)
+	if global.Web.PrintMediaType != MediaOverridePrint {
+		t.Errorf("Set true stored %v, want MediaOverridePrint", global.Web.PrintMediaType)
 	}
 }
 
@@ -885,7 +1040,7 @@ func TestApplyImageKeyBackgroundAlias(t *testing.T) {
 		t.Error("web.background must route to PdfGlobal.Background")
 	}
 
-	if err := ApplyImageKey(&global, &img, "background", "true"); err != nil {
+	if err := ApplyImageKey(&global, &img, "background", sTrue); err != nil {
 		t.Fatal(err)
 	}
 

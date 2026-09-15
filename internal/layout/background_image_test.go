@@ -33,6 +33,9 @@ func TestBackgroundImageSrc(t *testing.T) {
 		{raw: "repeating-linear-gradient(#000, #fff)", want: ""},
 		{raw: "inherit", want: ""},
 		{raw: `url("a,b.png"), url(c.png)`, want: "a,b.png"},
+		{raw: "#f4f6fd", want: ""},
+		{raw: "red", want: ""},
+		{raw: `url("a.png"), #f4f6fd`, want: "a.png"},
 	}
 
 	for _, tc := range tests {

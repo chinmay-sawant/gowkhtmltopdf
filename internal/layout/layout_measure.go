@@ -92,6 +92,12 @@ func (e *engine) measureCellContent(n *html.Node, st ResolvedStyle) float64 {
 // as min-content so adjacent cite markers stay on one horizontal line instead
 // of wrapping into a stacked, overlapping pair in a one-marker-wide column.
 func (e *engine) measureCellMinMax(node *html.Node, style ResolvedStyle) (float64, float64) {
+	return e.measureCellMinMaxMode(node, style, false)
+}
+
+// measureCellMinMaxMode is measureCellMinMax with control over generated
+// content: includePseudo folds ::before/::after runs into the measured lines.
+func (e *engine) measureCellMinMaxMode(node *html.Node, style ResolvedStyle, includePseudo bool) (float64, float64) {
 	// Size containment (and content-visibility: hidden) sizes intrinsic widths
 	// as if the descendants were absent: contain-intrinsic inline size (else
 	// 0) plus box chrome. A fixed intrinsic length contributes the same to
@@ -115,9 +121,10 @@ func (e *engine) measureCellMinMax(node *html.Node, style ResolvedStyle) (float6
 	}
 
 	cellMeas := &cellMeasure{ //nolint:exhaustruct // zero fields are the flushed-line state
-		engine: e,
-		em:     style.FontSize,
-		style:  style,
+		engine:        e,
+		em:            style.FontSize,
+		style:         style,
+		includePseudo: includePseudo,
 	}
 	cellMeas.walk(node, style, style.WhiteSpace == cssWhiteSpaceNowrap || style.WhiteSpace == cssWhiteSpacePre)
 	cellMeas.flushLine()
@@ -153,6 +160,11 @@ type cellMeasure struct {
 	longestWord    float64
 	lineOnlyNowrap bool
 	lineHasInk     bool
+	// includePseudo folds generated ::before/::after content into the measure.
+	// Flex items need it: print CSS appends link URLs through content:attr(href),
+	// and a base width that ignores the URL crushes the item to the text width
+	// while layout then paints text plus URL inside it.
+	includePseudo bool
 }
 
 // flushLine folds the current line into maxW and resets the line state.
@@ -465,6 +477,10 @@ func (m *cellMeasure) walkBlockChildren(nodeN *html.Node, childCS ResolvedStyle,
 		m.flushLine()
 	}
 
+	if m.includePseudo {
+		m.measurePseudo(nodeN, childCS, pseudoBefore)
+	}
+
 	childNowrap := nowrap || childCS.WhiteSpace == cssWhiteSpaceNowrap || childCS.WhiteSpace == cssWhiteSpacePre
 
 	poll := newCtxPoll(m.engine.ctx)
@@ -485,9 +501,54 @@ func (m *cellMeasure) walkBlockChildren(nodeN *html.Node, childCS ResolvedStyle,
 			childStyle.WhiteSpace == cssWhiteSpacePre)
 	}
 
+	if m.includePseudo {
+		m.measurePseudo(nodeN, childCS, pseudoAfter)
+	}
+
 	if blockish {
 		m.flushLine()
 	}
+}
+
+// measurePseudo folds one generated ::before/::after run into the current
+// measured line, mirroring the inline collect path (text runs plus replaced
+// url() pseudo images).
+func (m *cellMeasure) measurePseudo(nodeN *html.Node, host ResolvedStyle, pseudoEl string) {
+	eng := m.engine
+	if eng == nil || nodeN == nil {
+		return
+	}
+
+	pstyle := eng.pseudoStyle(nodeN, pseudoEl, host)
+	// Absolutely positioned generated content is painted out of flow
+	// (paintPositionedPseudo); it must not widen the measured line.
+	if pstyle.Position == positionAbsolute || pstyle.Position == positionFixed {
+		return
+	}
+
+	if src := eng.pseudoContentURL(nodeN, pseudoEl); src != "" {
+		if ref := eng.resolveImage(src); ref != nil && ref.data != nil {
+			width := eng.scalePt(pxToPt(float64(ref.w)))
+			if width <= 0 {
+				width = eng.scalePt(pstyle.FontSize)
+			}
+
+			m.noteWord(width)
+			m.lineOnlyNowrap = false
+			m.lineHasInk = true
+			m.lineW += width
+		}
+
+		return
+	}
+
+	txt := eng.pseudoContent(nodeN, pseudoEl)
+	if txt == "" {
+		return
+	}
+
+	nowrap := pstyle.WhiteSpace == cssWhiteSpaceNowrap || pstyle.WhiteSpace == cssWhiteSpacePre
+	m.measureText(txt, pstyle, nowrap)
 }
 
 // wordBreakPolicy is the single table for "how may a token split?" —

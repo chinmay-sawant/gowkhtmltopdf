@@ -123,7 +123,7 @@ func assembleNodeResult(eng *engine, rootBox *box, opts Options, workspace *Work
 		stampBoxTransforms(rootBox, IdentityMatrix(), res.Ops)
 	}
 
-	res.MaxContentX, res.HasFragmentLinks = censusOps(res.Ops, opts.Width)
+	res.MaxContentX, res.HasFragmentLinks = censusOps(res.Ops, opts)
 	res.skipInitialBeforeAlways = true
 
 	if workspace != nil {

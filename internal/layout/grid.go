@@ -715,6 +715,10 @@ func resolveGridUsedHeight(eng *engine, sty ResolvedStyle, usedH, contentH float
 // non-positive (indefinite) availW is treated as auto (fill remaining).
 // Shared by flex/grid/multicol (block keeps its own min/max/margin-auto path).
 func resolveUsedWidth(sty ResolvedStyle, availW float64, engN *engine) float64 {
+	if width, ok := calcUsedWidth(sty, availW, engN); ok {
+		return width
+	}
+
 	ml, mr := engN.scalePt(sty.MarginLeft), engN.scalePt(sty.MarginRight)
 
 	width := availW - ml - mr

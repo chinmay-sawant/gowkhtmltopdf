@@ -73,6 +73,9 @@ type imageRef struct {
 }
 
 // resolveImage fetches (once) and decodes (once) src; nil on any failure.
+// Fetched payloads that are not an embeddable image (SVG, PNG, JPEG, or GIF
+// re-encoded to PNG) are a miss: the bytes are dropped and one warning names
+// the src so an HTML error page or WebP response cannot reach the painters.
 func (e *engine) resolveImage(src string) *imageRef {
 	if src == "" || e.checkContext() || !e.hasImageResolver() {
 		return nil
@@ -100,15 +103,53 @@ func (e *engine) resolveImage(src string) *imageRef {
 	}
 
 	ref := &imageRef{src: src, data: data} //nolint:exhaustruct // intentional zero fields
-	if png, pw, ph, err := svg.Rasterize(data, svgRasterMaxDim); err == nil {
-		ref.data, ref.w, ref.h = png, pw, ph
-	} else if w, h, jpeg, ok := imageDims(data); ok {
-		ref.w, ref.h, ref.isJPEG = w, h, jpeg
+	if !decodeImagePayload(ref) {
+		// Unsupported payload: a miss, not a zero-size image. The nil cache
+		// sentinel makes the warning fire once per src per Layout run.
+		e.warnImageMiss(src)
+		e.imgCache[src] = nil
+
+		return nil
 	}
 
 	e.imgCache[src] = ref
 
 	return ref
+}
+
+// decodeImagePayload fills ref from its fetched bytes, re-encoding SVG/GIF
+// payloads to PNG and reading intrinsic dimensions. It reports false when the
+// payload is not an embeddable image.
+func decodeImagePayload(ref *imageRef) bool {
+	if png, pw, ph, err := svg.Rasterize(ref.data, svgRasterMaxDim); err == nil && len(png) > 0 && pw > 0 && ph > 0 {
+		ref.data, ref.w, ref.h = png, pw, ph
+
+		return true
+	}
+
+	if w, h, jpeg, ok := imageDims(ref.data); ok {
+		ref.w, ref.h, ref.isJPEG = w, h, jpeg
+
+		return true
+	}
+
+	if png, w, h, ok := gifToPNG(ref.data); ok {
+		ref.data, ref.w, ref.h = png, w, h
+
+		return true
+	}
+
+	return false
+}
+
+// warnImageMiss reports one warning per src whose fetched payload is not a
+// format the painters can embed.
+func (e *engine) warnImageMiss(src string) {
+	if e.opts.Warnf == nil {
+		return
+	}
+
+	e.opts.Warnf("layout: image %q skipped: unsupported image data", truncateImageSrc(src))
 }
 
 func (e *engine) hasImageResolver() bool {
@@ -743,7 +784,7 @@ func (e *engine) applyJustifySelfFitContent(
 // justifySelfUsesFitContent reports CSS Align "auto width becomes fit-content"
 // for block-level justify-self keywords other than stretch/auto/normal.
 func justifySelfUsesFitContent(style ResolvedStyle) bool {
-	if style.Width >= 0 || style.WidthPercent >= 0 {
+	if style.Width >= 0 || style.WidthPercent >= 0 || style.WidthCalc {
 		return false
 	}
 
@@ -913,7 +954,7 @@ func (e *engine) emitListStyleImageMarker(
 		W:      imgW,
 		H:      imgH,
 		IsJPEG: ref.isJPEG,
-	}).withImage(ref.data, ref.w, ref.h, ""))
+	}).withImage(ref.data, ref.w, ref.h, "", src))
 
 	return true
 }
@@ -1090,12 +1131,14 @@ func (e *engine) placeFloat(
 
 // setFloatImgMaxW clamps replaced images inside the float to its used width
 // (extracted from placeFloat for clarity).
-func (e *engine) setFloatImgMaxW(cs ResolvedStyle, contentW, avail float64) {
+func (e *engine) setFloatImgMaxW(sty ResolvedStyle, contentW, avail float64) {
 	switch {
-	case cs.Width >= 0:
-		e.imgMaxW = e.scalePt(cs.Width)
-	case cs.WidthPercent >= 0 && contentW > 0:
-		e.imgMaxW = contentW * cs.WidthPercent / oneHundred
+	case sty.WidthCalc && contentW > 0:
+		e.imgMaxW = contentW*sty.WidthPercent/oneHundred + e.scalePt(sty.WidthCalcFixed)
+	case sty.Width >= 0:
+		e.imgMaxW = e.scalePt(sty.Width)
+	case sty.WidthPercent >= 0 && contentW > 0:
+		e.imgMaxW = contentW * sty.WidthPercent / oneHundred
 	case avail > 0 && avail < contentW:
 		e.imgMaxW = avail
 	}

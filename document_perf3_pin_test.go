@@ -8,7 +8,11 @@ import (
 )
 
 const (
-	perf3OutputBytesPin = 1420537
+	// 2026-09-16: 1420537 -> 1420623 (+86 bytes) for the v0.2.7 output changes:
+	// deterministic subset tags on embedded fonts, /Title fallback to the
+	// document <title>, and /Lang emission. Page count and text needles are
+	// unchanged; the same conversion reproduces this byte count.
+	perf3OutputBytesPin = 1420623
 	perf3PageCountPin   = 500
 )
 

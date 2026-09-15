@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -55,8 +55,9 @@ func TestType0CJKEmbedding(t *testing.T) {
 }
 
 // TestType0FontDescriptorNameMatchesBaseFont locks the Arlington rule that
-// CIDFontType2 FontDescriptor /FontName equals the CIDFont /BaseFont
-// (and the parent Type0 /BaseFont).
+// CIDFontType2 FontDescriptor /FontName equals the CIDFont /BaseFont and the
+// parent Type0 /BaseFont, with one six-letter subset tag on every name. The
+// conversion runs twice to prove the tag is stable.
 func TestType0FontDescriptorNameMatchesBaseFont(t *testing.T) {
 	t.Parallel()
 
@@ -65,70 +66,133 @@ func TestType0FontDescriptorNameMatchesBaseFont(t *testing.T) {
 		t.Skip("system CJK font not available:", err)
 	}
 
-	fVal, err := ParseTTF(data)
-	if err != nil {
+	run := func() []byte {
+		fVal, err := ParseTTF(data)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		fVal.PostScriptName = droidSansFallbackPSName
+		dVal := fixedDoc(t)
+		dVal.SetCompression(false)
+		p := dVal.AddPage(400, 200)
+		cur := p.Content()
+		cur.UseEmbeddedFont("F1", fVal)
+		cur.BeginText()
+		cur.SetFont("F1", 14)
+		cur.TextAt(20, 100)
+		cur.TextShow("你好世界")
+		cur.EndText()
+
+		return writePDF(t, dVal)
+	}
+
+	first := run()
+	if err := assertCIDFontDescriptorNamesMatch(first); err != nil {
 		t.Fatal(err)
 	}
 
-	fVal.PostScriptName = droidSansFallbackPSName
-	dVal := fixedDoc(t)
-	dVal.SetCompression(false)
-	p := dVal.AddPage(400, 200)
-	cur := p.Content()
-	cur.UseEmbeddedFont("F1", fVal)
-	cur.BeginText()
-	cur.SetFont("F1", 14)
-	cur.TextAt(20, 100)
-	cur.TextShow("你好世界")
-	cur.EndText()
-
-	out := writePDF(t, dVal)
-	if err := assertCIDFontDescriptorNamesMatch(out); err != nil {
+	second := run()
+	if err := assertCIDFontDescriptorNamesMatch(second); err != nil {
 		t.Fatal(err)
+	}
+
+	firstNames, secondNames := baseFontNames(first), baseFontNames(second)
+	if !slices.Equal(firstNames, secondNames) {
+		t.Fatalf("subset tags not stable across runs: %v != %v", firstNames, secondNames)
 	}
 }
 
-// assertCIDFontDescriptorNamesMatch verifies every CIDFontType2 FontDescriptor
-// /FontName equals that CIDFont's /BaseFont (Arlington FontDescriptorCIDType2.FontName).
+// assertCIDFontDescriptorNamesMatch verifies the subset tag contract plus the
+// Arlington rule: every CIDFontType2 /BaseFont carries a six-letter tag, equals
+// its FontDescriptor /FontName, and equals the parent Type0 /BaseFont
+// (Arlington FontDescriptorCIDType2.FontName).
 func assertCIDFontDescriptorNamesMatch(pdf []byte) error {
-	objs := map[int]string{}
+	objs := parsePDFObjects(pdf)
 
-	reObj := regexp.MustCompile(`(?s)(\d+) 0 obj\s*(.*?)\s*endobj`)
-	for _, m := range reObj.FindAllSubmatch(pdf, -1) {
-		n, _ := strconv.Atoi(string(m[1]))
-		objs[n] = string(m[2])
+	cidBase, err := collectCIDBaseFontNames(objs)
+	if err != nil {
+		return err
 	}
 
+	return assertType0MatchesCIDBase(objs, cidBase)
+}
+
+// collectCIDBaseFontNames checks every CIDFontType2 /BaseFont tag and
+// FontDescriptor /FontName agreement, returning the base name per object.
+func collectCIDBaseFontNames(objs map[int]string) (map[int]string, error) {
+	cidBase := map[int]string{}
 	checked := 0
 
-	for _, body := range objs {
+	for num, body := range objs {
 		if !strings.Contains(body, "/Subtype /CIDFontType2") {
 			continue
 		}
 
-		base := regexp.MustCompile(`/BaseFont\s*/([^\s/]+)`).FindStringSubmatch(body)
+		base := reBaseFontRef.FindStringSubmatch(body)
 
-		desc := regexp.MustCompile(`/FontDescriptor\s+(\d+)\s+0\s+R`).FindStringSubmatch(body)
+		desc := reFontDescriptorRef.FindStringSubmatch(body)
 		if base == nil || desc == nil {
-			return fmt.Errorf("%w: %s", errCIDFontType2MissingRefs, body[:min(120, len(body))])
+			return nil, fmt.Errorf("%w: %s", errCIDFontType2MissingRefs, body[:min(120, len(body))])
+		}
+
+		if !subsetNameRE.MatchString(base[1]) {
+			return nil, fmt.Errorf("%w: %s", errCIDFontBaseFontUntagged, base[1])
 		}
 
 		descBody := objs[mustAtoi(desc[1])]
 
-		fname := regexp.MustCompile(`/FontName\s*/([^\s/]+)`).FindStringSubmatch(descBody)
+		fname := reFontNameRef.FindStringSubmatch(descBody)
 		if fname == nil {
-			return fmt.Errorf("%w: %s", errFontDescriptorNoFontName, desc[1])
+			return nil, fmt.Errorf("%w: %s", errFontDescriptorNoFontName, desc[1])
 		}
 
 		if fname[1] != base[1] {
-			return fmt.Errorf("%w: %s != %s", errCIDFontDescriptorMismatch, base[1], fname[1])
+			return nil, fmt.Errorf("%w: %s != %s", errCIDFontDescriptorMismatch, base[1], fname[1])
 		}
 
+		cidBase[num] = base[1]
 		checked++
 	}
 
 	if checked == 0 {
-		return fmt.Errorf("%w", errNoCIDFontType2Objects)
+		return nil, fmt.Errorf("%w", errNoCIDFontType2Objects)
+	}
+
+	return cidBase, nil
+}
+
+// assertType0MatchesCIDBase checks every Type0 /BaseFont equals the /BaseFont
+// of the CIDFontType2 object its /DescendantFonts array points at.
+func assertType0MatchesCIDBase(objs map[int]string, cidBase map[int]string) error {
+	type0Checked := 0
+
+	for _, body := range objs {
+		if !strings.Contains(body, "/Subtype /Type0") {
+			continue
+		}
+
+		base := reBaseFontRef.FindStringSubmatch(body)
+
+		desc := reDescendantFontsRef.FindStringSubmatch(body)
+		if base == nil || desc == nil {
+			return fmt.Errorf("%w: %s", errType0MissingRefs, body[:min(120, len(body))])
+		}
+
+		cidName, ok := cidBase[mustAtoi(desc[1])]
+		if !ok {
+			return fmt.Errorf("%w: object %s", errType0DescendantNotCID, desc[1])
+		}
+
+		if base[1] != cidName {
+			return fmt.Errorf("%w: %s != %s", errType0BaseFontMismatch, base[1], cidName)
+		}
+
+		type0Checked++
+	}
+
+	if type0Checked == 0 {
+		return fmt.Errorf("%w", errNoType0Objects)
 	}
 
 	return nil
@@ -139,6 +203,11 @@ var (
 	errFontDescriptorNoFontName  = errors.New("FontDescriptor missing FontName")
 	errCIDFontDescriptorMismatch = errors.New("CIDFontType2 BaseFont != FontDescriptor FontName")
 	errNoCIDFontType2Objects     = errors.New("no CIDFontType2 objects found")
+	errCIDFontBaseFontUntagged   = errors.New("CIDFontType2 BaseFont lacks a six-letter subset tag")
+	errType0MissingRefs          = errors.New("Type0 missing BaseFont or DescendantFonts")
+	errType0DescendantNotCID     = errors.New("Type0 DescendantFonts does not reference a CIDFontType2")
+	errType0BaseFontMismatch     = errors.New("Type0 BaseFont != CIDFont BaseFont")
+	errNoType0Objects            = errors.New("no Type0 objects found")
 )
 
 func mustAtoi(s string) int {

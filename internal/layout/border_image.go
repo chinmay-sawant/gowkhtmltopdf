@@ -201,7 +201,7 @@ func (e *engine) appendBorderImage(
 
 	ref := e.resolveImage(src)
 
-	if ref == nil || ref.data == nil {
+	if ref == nil || len(ref.data) == 0 {
 		return dst
 	}
 
@@ -221,7 +221,7 @@ func (e *engine) appendBorderImage(
 	scaled := scaleBorderImageThickness(e, thick, ow, oh)
 
 	if !hasSlice {
-		return append(dst, newBorderImageOp(ox, oy, ow, oh, ref.data, ref.w, ref.h, ref.isJPEG))
+		return append(dst, newBorderImageOp(ox, oy, ow, oh, ref.data, ref.w, ref.h, ref.isJPEG, src))
 	}
 
 	return appendBorderImageByRepeat(dst, ref, ox, oy, ow, oh, scaled, sliceFracs, repeat, hasFill)
@@ -346,7 +346,7 @@ func isTiledBorderImageRepeat(repeat string) bool {
 		strings.Contains(repeat, borderRepeatSpace)
 }
 
-func newBorderImageOp(x, y, w, h float64, data []byte, imgW, imgH int, isJPEG bool) Op {
+func newBorderImageOp(x, y, w, h float64, data []byte, imgW, imgH int, isJPEG bool, src string) Op {
 	return (Op{ //nolint:exhaustruct // intentional zero fields
 		Kind:         OpImage,
 		X:            x,
@@ -355,7 +355,7 @@ func newBorderImageOp(x, y, w, h float64, data []byte, imgW, imgH int, isJPEG bo
 		H:            h,
 		IsJPEG:       isJPEG,
 		IsBackground: true,
-	}).withImage(data, imgW, imgH, "")
+	}).withImage(data, imgW, imgH, "", src)
 }
 
 // appendBorderImageStretched paints the 3x3 slice grid with each source slice
@@ -473,7 +473,7 @@ func appendBorderImagePart(
 		return dst
 	}
 
-	return append(dst, newBorderImageOp(x, y, w, h, data, src.Dx(), src.Dy(), false))
+	return append(dst, newBorderImageOp(x, y, w, h, data, src.Dx(), src.Dy(), false, ref.src))
 }
 
 // borderImageSliceBytes returns the encoded PNG for one source slice of ref,

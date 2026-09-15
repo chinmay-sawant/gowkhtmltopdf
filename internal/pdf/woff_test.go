@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -16,6 +17,19 @@ func readLiberationTTF(t *testing.T) []byte {
 	data, err := os.ReadFile(filepath.Join("assets", "LiberationSans-Regular.ttf"))
 	if err != nil {
 		t.Fatalf("read liberation: %v", err)
+	}
+
+	return data
+}
+
+// readWOFF2Fixture reads the committed fontTools-built WOFF2 (Liberation Sans
+// Latin subset). See testdata/fonts/woff2/README.md.
+func readWOFF2Fixture(t *testing.T) []byte {
+	t.Helper()
+
+	data, err := os.ReadFile(filepath.Join("..", "..", "testdata", "fonts", "woff2", "LiberationSans-Regular-latin.woff2"))
+	if err != nil {
+		t.Fatalf("read woff2 fixture: %v", err)
 	}
 
 	return data
@@ -207,15 +221,75 @@ func TestDecodeWOFFRejectsOverlap(t *testing.T) {
 	}
 }
 
-func TestDecodeWOFF2Gap(t *testing.T) {
+func TestDecodeWOFF2Fixture(t *testing.T) {
 	t.Parallel()
-	// Concrete gap: WOFF2 needs Brotli; typesetting has no WOFF2 reader and we
-	// do not add direct modules. ParseFontBytes rejects wOF2 with a clear error.
-	buf := []byte("wOF2....fake...")
 
-	_, err := ParseFontBytes(buf)
-	if !errors.Is(err, errWOFF2Unsupported) {
-		t.Fatalf("ParseFontBytes WOFF2: got %v, want errWOFF2Unsupported", err)
+	woff2 := readWOFF2Fixture(t)
+
+	sfnt, err := DecodeWOFF2(woff2)
+	if err != nil {
+		t.Fatalf("DecodeWOFF2: %v", err)
+	}
+
+	if got := binary.BigEndian.Uint32(sfnt[0:4]); got != 0x00010000 {
+		t.Fatalf("decoded sfnt magic = %#08x, want 0x00010000", got)
+	}
+
+	font, err := ParseFontBytes(woff2)
+	if err != nil {
+		t.Fatalf("ParseFontBytes WOFF2: %v", err)
+	}
+
+	if font.GlyphID('A') == 0 {
+		t.Error("expected glyph for 'A' in decoded WOFF2")
+	}
+
+	families := font.FamilyNames()
+	if len(families) == 0 || families[0] != "Liberation Sans" {
+		t.Errorf("FamilyNames = %v, want [Liberation Sans]", families)
+	}
+
+	if font.PostScriptName != "LiberationSans" {
+		t.Errorf("PostScriptName = %q, want LiberationSans", font.PostScriptName)
+	}
+}
+
+func TestDecodeWOFF2Garbage(t *testing.T) {
+	t.Parallel()
+
+	fixture := readWOFF2Fixture(t)
+
+	corrupt := bytes.Clone(fixture)
+	corrupt[len(corrupt)/2] ^= 0xFF
+
+	truncated := bytes.Clone(fixture)
+	binary.BigEndian.PutUint32(truncated[8:12], uint32(len(truncated)-1)) //nolint:gosec // test fixture size
+
+	tests := map[string][]byte{
+		"signature-only":  []byte(woff2Signature),
+		"short-header":    fixture[:40],
+		"truncated-half":  fixture[:len(fixture)/2],
+		"corrupt-body":    corrupt,
+		"length-mismatch": truncated,
+	}
+
+	for name, data := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := DecodeWOFF2(data)
+			if err == nil {
+				t.Fatal("DecodeWOFF2 accepted garbage")
+			}
+
+			if !strings.Contains(err.Error(), "woff2:") {
+				t.Errorf("DecodeWOFF2 error = %v, want a woff2: prefix", err)
+			}
+
+			if _, err := ParseFontBytes(data); err == nil {
+				t.Error("ParseFontBytes accepted garbage WOFF2")
+			}
+		})
 	}
 }
 

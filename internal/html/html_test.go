@@ -676,6 +676,32 @@ func TestParseSelfClosing(t *testing.T) {
 	if got := root.TextContent(); got != "ok" {
 		t.Errorf("TextContent = %q, want %q", got, "ok")
 	}
+
+	// An unquoted attribute value that ends in '/' keeps the slash and the tag
+	// stays open: the unquoted-value tokenizer only ends at whitespace. The
+	// learncpp TOC writes <a href=https://example.com/x/>Title</a>, and
+	// treating that as self-closing orphans the anchor text.
+	root = mustParse(t, `<div class=row><a href=https://example.com/x/>Title</a></div>`)
+
+	anchor := root.FirstChild("div").FirstChild("a")
+	if anchor == nil {
+		t.Fatalf("anchor missing:\n%s", treeString(root))
+	}
+
+	if got := anchor.Attribute("href"); got != "https://example.com/x/" {
+		t.Errorf("unquoted href = %q, want the trailing slash kept", got)
+	}
+
+	if got := anchor.TextContent(); got != "Title" {
+		t.Errorf("anchor TextContent = %q, want %q (anchor must stay open)", got, "Title")
+	}
+
+	// A quoted value ending in '/' is unaffected.
+	root = mustParse(t, `<div class=row><a href="https://example.com/y/">Quoted</a></div>`)
+
+	if got := root.FirstChild("div").FirstChild("a").Attribute("href"); got != "https://example.com/y/" {
+		t.Errorf("quoted href = %q, want %q", got, "https://example.com/y/")
+	}
 }
 
 func TestParseCommentsAndDoctype(t *testing.T) {

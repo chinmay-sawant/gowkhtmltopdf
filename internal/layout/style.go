@@ -118,6 +118,10 @@ type ResolvedStyle struct {
 	RightAuto          bool
 	BottomAuto         bool
 	LeftAuto           bool
+	TopPercent         float64 // >=0 defers top to layout: % of the containing block height
+	RightPercent       float64 // >=0 defers right to layout: % of the containing block width
+	BottomPercent      float64 // >=0 defers bottom to layout: % of the containing block height
+	LeftPercent        float64 // >=0 defers left to layout: % of the containing block width
 	FlexDirection      string  // "row" | fxCol | "row-reverse" | "column-reverse"
 	FlexWrap           string  // "nowrap" | "wrap" | "wrap-reverse"
 	JustifyContent     string  // flex-start | flex-end | center | space-between | space-around | space-evenly
@@ -166,6 +170,8 @@ type ResolvedStyle struct {
 	GridRowStart        int     // 1-based; 0 = auto
 	Width               float64 // -1 = auto; absolute length in pt when WidthPercent < 0
 	WidthPercent        float64 // >=0 means width is that % of the containing block at layout time
+	WidthCalc           bool    // width:calc() carried a percentage; defer to layout
+	WidthCalcFixed      float64 // fixed pt term of the calc expression when WidthCalc
 	Height              float64 // -1 = auto; absolute length in pt when HeightPercent < 0
 	HeightPercent       float64 // >=0 means height is that % of the CB; indefinite CB → auto (cyclic honesty)
 	MinWidth            float64 // absolute pt when MinWidthPercent < 0; 0 = auto (content min for flex)
@@ -411,6 +417,10 @@ func initialStyle() ResolvedStyle { //nolint:funlen // complete CSS initial-valu
 		RightAuto:        true,
 		BottomAuto:       true,
 		LeftAuto:         true,
+		TopPercent:       -1,
+		RightPercent:     -1,
+		BottomPercent:    -1,
+		LeftPercent:      -1,
 		FlexDirection:    "row",
 		FlexWrap:         "nowrap",
 		JustifyContent:   "flex-start",

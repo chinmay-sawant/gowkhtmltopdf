@@ -4,6 +4,7 @@
 # Direct third-party requires must stay ⊆ {
 #   github.com/go-text/typesetting,  # OpenType shaping
 #   github.com/tdewolff/canvas,      # SVG-as-image rasterization
+#   github.com/tdewolff/font,        # WOFF2 decoding (Brotli)
 # }
 # (enforced by internal/pdf.TestDirectModuleAllowlist).
 

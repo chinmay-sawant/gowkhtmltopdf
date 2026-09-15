@@ -742,14 +742,16 @@ func parseTag(body string) (string, []string, bool, error) {
 	}
 
 	name := body[:nameEnd]
-	selfClose := strings.HasSuffix(body, "/")
+	selfClose := selfClosingSlash(body, nameEnd)
 
 	const attrPairSize = 2 // attrs slice interleaves name and value
 
 	attrs := make([]string, 0, attrPairSize*strings.Count(body, "="))
 
 	rest := strings.TrimSpace(body[nameEnd:])
-	rest = strings.TrimSuffix(rest, "/")
+	if selfClose {
+		rest = strings.TrimSpace(rest[:len(rest)-1])
+	}
 
 	for rest != "" {
 		key, val, after, err := nextAttr(rest)
@@ -766,6 +768,29 @@ func parseTag(body string) (string, []string, bool, error) {
 	}
 
 	return name, attrs, selfClose, nil
+}
+
+// selfClosingSlash reports whether body's trailing '/' is the self-closing
+// marker. A '/' that ends an unquoted attribute value belongs to that value
+// (the HTML tokenizer only ends unquoted values at whitespace), so
+// <a href=http://x/> keeps the slash and is not self-closing. The marker is
+// real when the slash follows the tag name, whitespace, or a quoted value.
+func selfClosingSlash(body string, nameEnd int) bool {
+	slash := len(body) - 1
+	if slash < nameEnd || body[slash] != '/' {
+		return false
+	}
+
+	if slash == nameEnd {
+		return true
+	}
+
+	switch body[slash-1] {
+	case ' ', '\t', '\n', '\r', '"', '\'':
+		return true
+	default:
+		return false
+	}
 }
 
 // nextAttr extracts one attribute (name, value) from the front of rest. The

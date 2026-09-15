@@ -63,9 +63,8 @@ func BenchmarkHasDeepSubtreeMatch(b *testing.B) {
 	sel, outer := hasBenchSubject(b, deepHasHTML(300))
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		if !Match(sel, outer) {
 			b.Fatal("expected match")
 		}
@@ -79,9 +78,8 @@ func BenchmarkHasDeepSubtreeEarlyExit(b *testing.B) {
 	sel, outer := hasBenchSubject(b, src)
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		if !Match(sel, outer) {
 			b.Fatal("expected match")
 		}

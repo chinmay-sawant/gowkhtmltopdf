@@ -258,6 +258,52 @@ func TestImagesFlagsReachResolvedGate(t *testing.T) {
 	}
 }
 
+// TestPrintMediaTypeFlagsSelectPDFMedia drives the parsed command through the
+// same settings resolution the engine calls: --no-print-media-type must pick
+// screen media, not act as a no-op, and the print-media-type override wins
+// over --media-type in both directions.
+func TestPrintMediaTypeFlagsSelectPDFMedia(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{name: "default is print", want: "print"},
+		{name: "media-type screen", args: []string{"--media-type", "screen"}, want: "screen"},
+		{name: "no-print-media-type selects screen", args: []string{"--no-print-media-type"}, want: "screen"},
+		{
+			name: "no-print-media-type beats media-type print",
+			args: []string{"--media-type", "print", "--no-print-media-type"},
+			want: "screen",
+		},
+		{
+			name: "print-media-type beats media-type screen",
+			args: []string{"--media-type", "screen", "--print-media-type"},
+			want: "print",
+		},
+		{
+			name: "later print-media-type beats earlier no-print-media-type",
+			args: []string{"--no-print-media-type", "--print-media-type"},
+			want: "print",
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			args := append([]string{"--html", "<html></html>", "-o", outPDF}, testCase.args...)
+			cmd := parsePDF(t, args...)
+
+			if got := settings.ResolvePDFMedia(cmd.Global, &cmd.Objects[0]); got != testCase.want {
+				t.Errorf("ResolvePDFMedia = %q, want %q", got, testCase.want)
+			}
+		})
+	}
+}
+
 func TestHelpUsesDocumentGrammar(t *testing.T) {
 	t.Parallel()
 
@@ -265,7 +311,10 @@ func TestHelpUsesDocumentGrammar(t *testing.T) {
 		var help bytes.Buffer
 		PrintHelp(&help, mode)
 		got := help.String()
-		for _, want := range []string{"-o, --output", "--html", "--url"} {
+		for _, want := range []string{
+			"-o, --output", "--html", "--url",
+			"--print-media-type", "--no-print-media-type", "--media-type",
+		} {
 			if !strings.Contains(got, want) {
 				t.Errorf("mode %v help missing %q:\n%s", mode, want, got)
 			}

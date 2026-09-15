@@ -889,46 +889,139 @@ func resolvedLength(value string, fsize, containing float64) (float64, bool) { /
 // calcLength evaluates the small arithmetic subset needed by the print CSS:
 // one length plus/minus another length, or one length multiplied by a number.
 // Unsupported calc expressions remain invalid and keep the existing fallback.
-//
-//nolint:cyclop // compact calc operator grammar
+// Percentages resolve against containing here; width deferral uses
+// calcLengthParts instead so the percentage can wait for the real CB.
 func calcLength(value string, fsize, containing float64) (float64, bool) {
+	pct, fixed, ok := calcLengthParts(value, fsize)
+	if !ok {
+		return 0, false
+	}
+
+	return containing*pct/oneHundred + fixed, true
+}
+
+// calcLengthParts splits a supported calc() expression into its percentage
+// term (percent units, e.g. 100 for 100%) and its fixed point term, so a
+// percentage inside calc() can resolve against the containing block at layout
+// time instead of the viewport at cascade time.
+func calcLengthParts(value string, fsize float64) (float64, float64, bool) {
 	value = strings.TrimSpace(value)
 	if len(value) < len("calc()") || !strings.EqualFold(value[:5], "calc(") || value[len(value)-1] != ')' {
-		return 0, false
+		return 0, 0, false
 	}
 
 	parts := strings.Fields(value[5 : len(value)-1])
 	if len(parts) != calcParts {
-		return 0, false
-	}
-
-	left, ok := plainLength(parts[0], fsize, containing)
-	if !ok {
-		return 0, false
+		return 0, 0, false
 	}
 
 	switch parts[1] {
 	case "*":
 		factor, err := strconv.ParseFloat(parts[2], 64)
 		if err != nil {
-			return 0, false
+			return 0, 0, false
 		}
 
-		return left * factor, true
+		pct, fixed, ok := calcTermParts(parts[0], fsize)
+		if !ok {
+			return 0, 0, false
+		}
+
+		return pct * factor, fixed * factor, true
 	case "+", "-":
-		right, rightOK := plainLength(parts[2], fsize, containing)
-		if !rightOK {
-			return 0, false
+		leftPct, leftFixed, ok := calcTermParts(parts[0], fsize)
+		if !ok {
+			return 0, 0, false
+		}
+
+		rightPct, rightFixed, ok := calcTermParts(parts[2], fsize)
+		if !ok {
+			return 0, 0, false
 		}
 
 		if parts[1] == "-" {
-			return left - right, true
+			return leftPct - rightPct, leftFixed - rightFixed, true
 		}
 
-		return left + right, true
+		return leftPct + rightPct, leftFixed + rightFixed, true
 	default:
+		return 0, 0, false
+	}
+}
+
+// calcTermParts maps one calc() operand to a percentage term or a fixed point
+// term. Units follow plainLength so mixed-unit behavior is unchanged.
+func calcTermParts(value string, fsize float64) (float64, float64, bool) {
+	val, unit, ok := css.ParseLength(value)
+	if !ok {
+		return 0, 0, false
+	}
+
+	if unit == "%" {
+		return val, 0, true
+	}
+
+	if unit == remUnit {
+		return 0, pxToPt(16) * val, true
+	}
+
+	point, converted := lengthToPt(val, unit, fsize)
+	if !converted {
+		return 0, 0, false
+	}
+
+	return 0, point, true
+}
+
+// calcUsedWidth resolves a deferred width:calc() against the containing block
+// width. ok is false when the declaration is not a deferred calc or the
+// containing block is indefinite (cyclic percentage honesty: treat as auto).
+func calcUsedWidth(sty ResolvedStyle, availW float64, eng *engine) (float64, bool) {
+	if !sty.WidthCalc || eng == nil {
 		return 0, false
 	}
+
+	if availW <= 0 || availW >= indefiniteContentCap {
+		return 0, false
+	}
+
+	return availW*sty.WidthPercent/oneHundred + eng.scalePt(sty.WidthCalcFixed), true
+}
+
+// insetValue parses a top/right/bottom/left value. A plain percentage defers
+// to layout so it resolves against the containing block, never the viewport;
+// other lengths resolve now. auto keeps the caller's *Auto flag.
+func insetValue(value string, fsize, containing float64) (float64, float64, bool) {
+	if value == overflowAuto {
+		return 0, -1, true
+	}
+
+	if val, unit, ok := css.ParseLength(value); ok && unit == "%" {
+		return 0, val, false
+	}
+
+	return marginLen(value, fsize, containing), -1, false
+}
+
+// insetUsedPercent resolves a deferred percentage inset against base (the
+// containing block height for top/bottom, width for left/right). An indefinite
+// base keeps the static position (0), matching this engine's cyclic-% policy.
+func insetUsedPercent(pct, base float64) float64 {
+	if pct < 0 || base <= 0 {
+		return 0
+	}
+
+	return base * pct / oneHundred
+}
+
+// insetDist resolves one inset term in layout space: a deferred percentage
+// against the containing block extent, otherwise a fixed scaled length.
+func (e *engine) insetDist(pt, pct, base float64) float64 {
+	if pct >= 0 {
+		return insetUsedPercent(pct, base)
+	}
+
+	return e.scalePt(pt)
 }
 
 func plainLength(value string, fsize, containing float64) (float64, bool) {

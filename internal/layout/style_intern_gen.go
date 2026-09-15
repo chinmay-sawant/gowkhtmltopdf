@@ -109,6 +109,10 @@ func styleInternEqual(a, b *ResolvedStyle) bool {
 		a.RightAuto == b.RightAuto &&
 		a.BottomAuto == b.BottomAuto &&
 		a.LeftAuto == b.LeftAuto &&
+		a.TopPercent == b.TopPercent &&
+		a.RightPercent == b.RightPercent &&
+		a.BottomPercent == b.BottomPercent &&
+		a.LeftPercent == b.LeftPercent &&
 		a.FlexDirection == b.FlexDirection &&
 		a.FlexWrap == b.FlexWrap &&
 		a.JustifyContent == b.JustifyContent &&
@@ -155,6 +159,8 @@ func styleInternEqual(a, b *ResolvedStyle) bool {
 		a.GridRowStart == b.GridRowStart &&
 		a.Width == b.Width &&
 		a.WidthPercent == b.WidthPercent &&
+		a.WidthCalc == b.WidthCalc &&
+		a.WidthCalcFixed == b.WidthCalcFixed &&
 		a.Height == b.Height &&
 		a.HeightPercent == b.HeightPercent &&
 		a.MinWidth == b.MinWidth &&
@@ -377,6 +383,10 @@ func styleInternFingerprint(s *ResolvedStyle) uint64 {
 	h = styleInternHashBool(h, s.RightAuto)
 	h = styleInternHashBool(h, s.BottomAuto)
 	h = styleInternHashBool(h, s.LeftAuto)
+	h = styleInternHashFloat64(h, s.TopPercent)
+	h = styleInternHashFloat64(h, s.RightPercent)
+	h = styleInternHashFloat64(h, s.BottomPercent)
+	h = styleInternHashFloat64(h, s.LeftPercent)
 	h = styleInternHashString(h, s.FlexDirection)
 	h = styleInternHashString(h, s.FlexWrap)
 	h = styleInternHashString(h, s.JustifyContent)
@@ -425,6 +435,8 @@ func styleInternFingerprint(s *ResolvedStyle) uint64 {
 	h = styleInternHashInt(h, s.GridRowStart)
 	h = styleInternHashFloat64(h, s.Width)
 	h = styleInternHashFloat64(h, s.WidthPercent)
+	h = styleInternHashBool(h, s.WidthCalc)
+	h = styleInternHashFloat64(h, s.WidthCalcFixed)
 	h = styleInternHashFloat64(h, s.Height)
 	h = styleInternHashFloat64(h, s.HeightPercent)
 	h = styleInternHashFloat64(h, s.MinWidth)
@@ -667,6 +679,10 @@ func styleInternFields() []string {
 		"RightAuto",
 		"BottomAuto",
 		"LeftAuto",
+		"TopPercent",
+		"RightPercent",
+		"BottomPercent",
+		"LeftPercent",
 		"FlexDirection",
 		"FlexWrap",
 		"JustifyContent",
@@ -713,6 +729,8 @@ func styleInternFields() []string {
 		"GridRowStart",
 		"Width",
 		"WidthPercent",
+		"WidthCalc",
+		"WidthCalcFixed",
 		"Height",
 		"HeightPercent",
 		"MinWidth",

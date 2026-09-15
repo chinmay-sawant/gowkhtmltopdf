@@ -47,7 +47,9 @@ type Font struct {
 	// subset caching must not merge those faces.
 	fingerprint [32]byte
 
-	// PostScriptName is the PDF /BaseFont label (e.g. LiberationSans-Bold).
+	// PostScriptName is the base label for the PDF /BaseFont name (e.g.
+	// LiberationSans-Bold). The writer prefixes a deterministic six-letter
+	// subset tag when embedding, yielding /ABCDEF+LiberationSans-Bold.
 	// Empty when the font was loaded without a registry name.
 	PostScriptName string
 

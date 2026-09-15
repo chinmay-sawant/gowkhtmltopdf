@@ -272,7 +272,7 @@ func addLocalAccessFlags(add flagAdder) {
 // underline, print media type, image fetching) and their settings routes.
 func addWebPageFlags(add flagAdder) {
 	// Opt-in chrome-strip for arbitrary websites (phase 21.4). Default off.
-	// Distinct from --print-media-type (PDF layout always uses Media:"print").
+	// Unrelated to --print-media-type, which selects the CSS media type.
 	add("simplify-dom", ModeBoth, flagBool, func(c *Command, cur *objectCtx, vals []string) error {
 		return cur.applyPage(c,
 			func(g *settings.PdfGlobal, val string) error { return g.Set("web.simplifydom", val) },
@@ -296,8 +296,10 @@ func addWebPageFlags(add flagAdder) {
 			vals[0],
 		)
 	})
-	// Media flags: one flag writes Global.Web.PrintMediaType plus the object
-	// loader override through the router; ResolveMedia owns the resolution.
+	// Media flags: the print-media-type pair writes one tri-state override
+	// (true = print, false = explicit screen) to Global.Web.PrintMediaType plus
+	// the object loader override through the router; ResolveMedia owns the
+	// resolution.
 	add("print-media-type", ModeBoth, flagBool, printMediaFlag(true))
 	add("no-print-media-type", ModeBoth, flagBool, printMediaFlag(false))
 	add("media-type", ModeBoth, flagValue, func(c *Command, cur *objectCtx, vals []string) error {
@@ -463,10 +465,13 @@ func addImageFlags(add flagAdder) {
 	})
 }
 
-// printMediaFlag writes the print-media-type override to one field home —
-// Global.Web.PrintMediaType — plus the object loader override through the one
-// router (address remapping included). Image mode shares the global home;
-// ApplyImageKey/ImageConverter.Set route "web.printmediatype" the same way.
+// printMediaFlag writes the print-media-type override to one field home
+// (Global.Web.PrintMediaType) plus the object loader override through the one
+// router (address remapping included). enable=false writes "false", which the
+// tri-state setter stores as MediaOverrideScreen: wkhtmltopdf's
+// --no-print-media-type selects screen media even though PDF defaults to
+// print. Image mode shares the global home; ApplyImageKey/ImageConverter.Set
+// route "web.printmediatype" the same way.
 func printMediaFlag(enable bool) flagApplier {
 	return func(cmd *Command, cur *objectCtx, vals []string) error {
 		enabled := enable

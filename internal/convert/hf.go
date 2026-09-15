@@ -315,6 +315,10 @@ type htmlHFLayout struct {
 	width     float64
 	height    float64
 	media     string
+	// log and object route per-page re-layout warnings (skipped images) into
+	// the run log with the same object label as the body.
+	log    io.Writer
+	object int
 }
 
 // loadHTMLHF loads an HTML header/footer as a nested child document: fetch
@@ -420,6 +424,8 @@ func loadHTMLHF(ctx context.Context, loader *load.Loader, font *pdf.Font, state 
 		width:     state.geom.contentW,
 		height:    state.geom.contentH,
 		media:     media,
+		log:       log,
+		object:    state.idx + 1,
 	}
 	// Lay out once regardless: placeholder-free docs reuse this display list
 	// for every page; placeholder docs use it only for the natural height
@@ -427,6 +433,7 @@ func loadHTMLHF(ctx context.Context, loader *load.Loader, font *pdf.Font, state 
 	lst.res, err = layout.LayoutContext(ctx, root, layout.Options{ //nolint:exhaustruct // intentional zero-value fields
 		Width: lst.width, Height: lst.height, Font: font, Registry: lst.registry,
 		Sheets: sheets, Media: media, Images: imagesFn,
+		Warnf: layoutWarnf(log, state.idx+1),
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("header/footer html: layout: %w", err)
@@ -530,6 +537,7 @@ func drawHTMLHF(ctx context.Context, page *pdf.Page, hfL *htmlHFLayout, hfVal se
 		res, err = layout.LayoutContext(ctx, root, layout.Options{ //nolint:exhaustruct // intentional zero-value fields
 			Width: hfL.width, Height: hfL.height, Font: hfL.font, Registry: hfL.registry,
 			Sheets: hfL.sheets, Media: media, Images: hfL.imagesFn,
+			Warnf: layoutWarnf(hfL.log, hfL.object),
 		})
 		if err != nil {
 			return fmt.Errorf("header/footer html: layout: %w", err)

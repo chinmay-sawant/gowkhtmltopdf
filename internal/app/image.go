@@ -17,7 +17,10 @@ var ErrMultipleImageObjects = errors.New("app: multiple image objects")
 
 // RunImage is the command-facing image adapter. It keeps command parsing and
 // output ownership at the application boundary while imageout remains a
-// CLI-independent request engine.
+// CLI-independent request engine. File outputs follow the PDF adapter's lazy
+// contract: the path is validated up front, but the file is created or
+// truncated on the first write so a failed render leaves an existing artifact
+// untouched.
 func RunImage(ctx context.Context, cmd *cli.Command, log io.Writer) (err error) {
 	if cmd == nil {
 		return ErrNilCommand
@@ -49,7 +52,7 @@ func RunImage(ctx context.Context, cmd *cli.Command, log io.Writer) (err error) 
 		return fmt.Errorf("app: validate image: %w", err)
 	}
 
-	out, closeOut, err := cmd.OpenOutput()
+	out, closeOut, err := openLazyOutput(cmd)
 	if err != nil {
 		return fmt.Errorf("app: open image output: %w", err)
 	}

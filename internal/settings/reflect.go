@@ -94,6 +94,7 @@ var (
 // Raw string values accepted by the setter helpers.
 const (
 	sFalse     = "false"
+	sTrue      = "true"
 	sIgnore    = "ignore"
 	sScreen    = "screen"
 	sPrint     = "print"
@@ -239,12 +240,33 @@ func normalizeDots(s string) string { return strings.ToLower(strings.TrimSpace(s
 func setBool(target *bool) setter {
 	return func(raw string) error {
 		switch strings.ToLower(raw) {
-		case "", "true", "1", "yes", "on":
+		case "", sTrue, "1", "yes", "on":
 			*target = true
 
 			return nil
 		case sFalse, "0", "no", "off":
 			*target = false
+
+			return nil
+		}
+
+		return errParse("boolean", raw)
+	}
+}
+
+// setMediaOverride parses the boolean print-media-type value into the
+// tri-state override: true means --print-media-type and false means
+// --no-print-media-type (explicit screen), so an unset field stays
+// MediaOverrideUnset.
+func setMediaOverride(target *MediaOverride) setter {
+	return func(raw string) error {
+		switch strings.ToLower(raw) {
+		case "", sTrue, "1", "yes", "on":
+			*target = MediaOverridePrint
+
+			return nil
+		case sFalse, "0", "no", "off":
+			*target = MediaOverrideScreen
 
 			return nil
 		}
@@ -825,8 +847,8 @@ func registerWebKeys(globals keyTable[PdfGlobal], objects keyTable[PdfObject], i
 			func(w *Web) (string, bool) { return fmtBool(w.Images), true },
 		},
 		{"printmediatype",
-			func(w *Web, raw string) error { return setBool(&w.PrintMediaType)(raw) },
-			func(w *Web) (string, bool) { return fmtBool(w.PrintMediaType), true },
+			func(w *Web, raw string) error { return setMediaOverride(&w.PrintMediaType)(raw) },
+			func(w *Web) (string, bool) { return fmtBool(w.PrintMediaType == MediaOverridePrint), true },
 		},
 		{"mediatype",
 			func(w *Web, raw string) error { return setMediaType(&w.MediaType)(raw) },
@@ -879,8 +901,8 @@ func registerLoadPageKeys(objects keyTable[PdfObject]) {
 			func(l *LoadPage) (string, bool) { return l.MediaType.String(), true },
 		},
 		{"printmediatype",
-			func(l *LoadPage, raw string) error { return setBool(&l.PrintMediaType)(raw) },
-			func(l *LoadPage) (string, bool) { return fmtBool(l.PrintMediaType), true },
+			func(l *LoadPage, raw string) error { return setMediaOverride(&l.PrintMediaType)(raw) },
+			func(l *LoadPage) (string, bool) { return fmtBool(l.PrintMediaType == MediaOverridePrint), true },
 		},
 		{"timeout",
 			func(l *LoadPage, raw string) error { return setIntRange(&l.Timeout, minTimeout, math.MaxInt)(raw) },

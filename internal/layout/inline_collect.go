@@ -702,14 +702,34 @@ func (e *engine) appendPseudoImage(
 // inline-block: specified width when present, otherwise shrink-to-fit capped
 // at a generous max so auto-width badges size to their content.
 func (e *engine) inlineBlockAvail(nodeN *html.Node, sty ResolvedStyle, cbW float64) float64 {
+	if width, ok := e.inlineBlockSpecifiedAvail(sty, cbW); ok {
+		return width
+	}
+
+	return e.inlineBlockShrinkAvail(nodeN, sty)
+}
+
+// inlineBlockSpecifiedAvail resolves a specified calc, percentage, or fixed
+// width for an inline-block and reports whether one exists.
+func (e *engine) inlineBlockSpecifiedAvail(sty ResolvedStyle, cbW float64) (float64, bool) {
+	if sty.WidthCalc {
+		if cbW <= 0 {
+			cbW = e.opts.Width
+		}
+
+		if w, ok := calcUsedWidth(sty, cbW, e); ok {
+			return w, true
+		}
+	}
+
 	if sty.WidthPercent >= 0 {
 		// Prefer the inline formatting-context width; fall back to viewport.
 		if cbW > 0 {
-			return cbW * sty.WidthPercent / percentDivisor
+			return cbW * sty.WidthPercent / percentDivisor, true
 		}
 
 		if e.opts.Width > 0 {
-			return e.opts.Width * sty.WidthPercent / percentDivisor
+			return e.opts.Width * sty.WidthPercent / percentDivisor, true
 		}
 	}
 
@@ -722,9 +742,15 @@ func (e *engine) inlineBlockAvail(nodeN *html.Node, sty ResolvedStyle, cbW float
 				e.scalePt(sty.BorderLeft.Width) + e.scalePt(sty.BorderRight.Width)
 		}
 
-		return width + e.scalePt(sty.MarginLeft) + e.scalePt(sty.MarginRight)
+		return width + e.scalePt(sty.MarginLeft) + e.scalePt(sty.MarginRight), true
 	}
 
+	return 0, false
+}
+
+// inlineBlockShrinkAvail returns the shrink-to-fit width for an auto-width
+// inline-block, including form controls and size containers.
+func (e *engine) inlineBlockShrinkAvail(nodeN *html.Node, sty ResolvedStyle) float64 {
 	if isInputCheckbox(nodeN) {
 		return defaultCheckboxSize(e, sty) + e.scalePt(sty.MarginLeft) + e.scalePt(sty.MarginRight)
 	}

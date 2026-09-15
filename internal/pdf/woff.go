@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"math"
+
+	"github.com/tdewolff/font"
 )
 
 const (
@@ -29,15 +31,12 @@ var (
 	errWOFFSFNTTooLarge  = errors.New("woff: reconstructed SFNT too large")
 	errWOFFBadOffset     = errors.New("woff: bad table offset or length")
 	errWOFFOverlap       = errors.New("woff: overlapping compressed tables")
-	errWOFF2Unsupported  = errors.New("woff2: decode requires Brotli (not available; " +
-		"typesetting has WOFF1 only; no new direct modules)")
-	errWOFFFlavorCFF = errors.New("woff: CFF/OTTO OpenType not supported (TrueType outlines only)")
+	errWOFFFlavorCFF     = errors.New("woff: CFF/OTTO OpenType not supported (TrueType outlines only)")
 )
 
-// ParseFontBytes parses TTF/OTF (TrueType outlines) or WOFF1-wrapped SFNT.
-// WOFF2 is rejected with a clear error (Brotli not allowlisted).
-//
-// ponytail: WOFF1 in-tree only; no Brotli / WOFF2 direct dep.
+// ParseFontBytes parses TTF/OTF (TrueType outlines), WOFF1, or WOFF2-wrapped
+// SFNT. WOFF2 needs Brotli and glyf/loca reconstruction, handled by
+// github.com/tdewolff/font.
 func ParseFontBytes(data []byte) (*Font, error) {
 	if len(data) >= tagSize {
 		sig := string(data[0:4])
@@ -50,7 +49,12 @@ func ParseFontBytes(data []byte) (*Font, error) {
 
 			data = sfnt
 		case woff2Signature:
-			return nil, errWOFF2Unsupported
+			sfnt, err := DecodeWOFF2(data)
+			if err != nil {
+				return nil, err
+			}
+
+			data = sfnt
 		}
 	}
 
@@ -236,6 +240,19 @@ func validateWOFFHeader(data []byte) (uint32, int, error) {
 	}
 
 	return flavor, numTables, nil
+}
+
+// DecodeWOFF2 decompresses a WOFF2 file into SFNT (TrueType/OpenType) bytes
+// using github.com/tdewolff/font: Brotli decompression plus glyf/loca/hmtx
+// reconstruction. The decoder enforces its own 30 MiB memory cap; ParseTTF
+// still classifies CFF/OTTO output as unsupported.
+func DecodeWOFF2(data []byte) ([]byte, error) {
+	sfnt, err := font.ParseWOFF2(data)
+	if err != nil {
+		return nil, fmt.Errorf("woff2: %w", err)
+	}
+
+	return sfnt, nil
 }
 
 // DecodeWOFF decompresses a WOFF1 file into SFNT (TrueType/OpenType) bytes

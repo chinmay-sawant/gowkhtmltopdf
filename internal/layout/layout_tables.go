@@ -638,7 +638,9 @@ func distributeSpanColumns(cell *box, page tcell, colW, colMin []float64, nCols 
 // tableWidthHint resolves the definite table border-box width hint (-1 = auto).
 func (e *engine) tableWidthHint(st ResolvedStyle, availW float64) float64 {
 	var hint float64 = -1 // auto
-	if st.WidthPercent >= 0 {
+	if w, ok := calcUsedWidth(st, availW, e); ok {
+		hint = w
+	} else if st.WidthPercent >= 0 {
 		hint = availW * st.WidthPercent / 100
 	} else if st.Width >= 0 {
 		hint = e.scalePt(st.Width)

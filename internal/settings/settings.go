@@ -156,8 +156,9 @@ func ParseLoadErrorHandling(value string) (LoadErrorHandling, error) {
 	return LoadErrorAbort, errInvalid("load-error-handling", value, "abort|skip|ignore")
 }
 
-// MediaType mirrors wkhtmltopdf --print-media-type (screen|print) and the
-// --media-type override. Consumed by image mode (imageout.mediaFor).
+// MediaType is the screen/print/ignore media selector behind --media-type.
+// ResolveMedia consults it after the tri-state print-media-type override
+// (MediaOverride); image mode reaches both through ResolveImageMedia.
 type MediaType int
 
 const (
@@ -186,15 +187,56 @@ func (m MediaType) String() string {
 	return sUnknown
 }
 
+// MediaOverride is the tri-state print-media-type override. wkhtmltopdf
+// exposes one tri-state option behind --print-media-type and
+// --no-print-media-type, so "flag absent" must stay distinct from an explicit
+// screen override.
+type MediaOverride uint8
+
+const (
+	// MediaOverrideUnset is the zero value: neither flag appeared. Resolution
+	// falls through to media-type and then to the mode base (print for PDF,
+	// screen for image).
+	MediaOverrideUnset MediaOverride = iota
+	// MediaOverrideScreen is --no-print-media-type: force screen media even
+	// when the mode base is print (the PDF default).
+	MediaOverrideScreen
+	// MediaOverridePrint is --print-media-type: force print media.
+	MediaOverridePrint
+)
+
+// resolved returns the CSS media string the override forces and whether the
+// override was set at all. MediaOverrideUnset returns ok=false so ResolveMedia
+// falls through to media-type and then the mode base.
+func (o MediaOverride) resolved() (string, bool) {
+	switch o {
+	case MediaOverridePrint:
+		return sPrint, true
+	case MediaOverrideScreen:
+		return sScreen, true
+	case MediaOverrideUnset:
+	}
+
+	return "", false
+}
+
 // ResolveMedia computes the effective CSS media type: the print-media-type
-// override (either home) wins, then the object media-type, then the global
-// media-type, falling back to base (the mode default: "print" for PDF,
-// "screen" for image). MediaUnset (the zero value) means "not set" and lets
-// resolution fall through to the next source; it is never an explicit
-// ignore. obj may be nil.
+// override wins (an explicit object override over the global), then the
+// object media-type, then the global media-type, falling back to base (the
+// mode default: "print" for PDF, "screen" for image). The override is
+// tri-state, so --no-print-media-type (MediaOverrideScreen) wins over
+// media-type just like --print-media-type does. MediaUnset means "not set"
+// and lets resolution fall through to the next source; it is never an
+// explicit ignore. obj may be nil.
 func ResolveMedia(base string, global Web, obj *Web) string {
-	if global.PrintMediaType || obj != nil && obj.PrintMediaType {
-		return sPrint
+	override := global.PrintMediaType
+
+	if obj != nil && obj.PrintMediaType != MediaOverrideUnset {
+		override = obj.PrintMediaType
+	}
+
+	if media, ok := override.resolved(); ok {
+		return media
 	}
 
 	media := global.MediaType
@@ -214,14 +256,25 @@ func ResolveMedia(base string, global Web, obj *Web) string {
 	return base
 }
 
+// foldMediaOverride combines the two object homes for the print-media-type
+// override: the web home wins when set, otherwise the load home. It mirrors
+// how ResolvePDFMedia and ResolveImageMedia resolve object media-type.
+func foldMediaOverride(load, web MediaOverride) MediaOverride {
+	if web != MediaOverrideUnset {
+		return web
+	}
+
+	return load
+}
+
 // ResolvePDFMedia resolves layout CSS media for PDF mode via ResolveMedia.
-// PDF default is "print".
+// PDF default is "print"; --no-print-media-type forces "screen".
 func ResolvePDFMedia(glob PdfGlobal, obj *PdfObject) string {
 	var objWeb *Web
 
 	if obj != nil {
 		objView := Web{ //nolint:exhaustruct // intentional zero-value fields
-			PrintMediaType: obj.Load.PrintMediaType || obj.Web.PrintMediaType,
+			PrintMediaType: foldMediaOverride(obj.Load.PrintMediaType, obj.Web.PrintMediaType),
 			MediaType:      obj.Load.MediaType,
 		}
 		if obj.Web.MediaType != MediaUnset {
@@ -238,8 +291,8 @@ func ResolvePDFMedia(glob PdfGlobal, obj *PdfObject) string {
 // Image default is "screen".
 func ResolveImageMedia(global PdfGlobal, image ImageGlobal, obj *PdfObject) string {
 	web := image.Web
-	if global.Web.PrintMediaType {
-		web.PrintMediaType = true
+	if web.PrintMediaType == MediaOverrideUnset {
+		web.PrintMediaType = global.Web.PrintMediaType
 	}
 
 	if web.MediaType == MediaUnset {
@@ -250,7 +303,7 @@ func ResolveImageMedia(global PdfGlobal, image ImageGlobal, obj *PdfObject) stri
 
 	if obj != nil {
 		objView := Web{ //nolint:exhaustruct // intentional zero/partial fields
-			PrintMediaType: obj.Load.PrintMediaType || obj.Web.PrintMediaType,
+			PrintMediaType: foldMediaOverride(obj.Load.PrintMediaType, obj.Web.PrintMediaType),
 			MediaType:      obj.Load.MediaType,
 		}
 		if obj.Web.MediaType != MediaUnset {
@@ -323,9 +376,10 @@ type Size struct {
 // via Set into Ignored maps — not typed fields (Policy A).
 type Web struct {
 	Images bool
-	// PrintMediaType / MediaType: image mode media selection (imageout.mediaFor).
-	// PDF convert uses mediaFor with object/global load+web fields.
-	PrintMediaType bool
+	// PrintMediaType is the tri-state --print-media-type / --no-print-media-type
+	// override; MediaType is the --media-type override. ResolveMedia resolves
+	// both for PDF and image layout (ResolvePDFMedia / ResolveImageMedia).
+	PrintMediaType MediaOverride
 	MediaType      MediaType
 	// SimplifyDOM opts into chrome-strip heuristics for URL/print mode
 	// (--simplify-dom). Default false so invoice/report HTML is unchanged.
@@ -365,8 +419,8 @@ type LoadPage struct {
 	Cookies              map[string]string
 	Post                 []PostItem
 	MediaType            MediaType
-	PrintMediaType       bool
-	Timeout              int // seconds; 0 = default
+	PrintMediaType       MediaOverride // per-object override (see Web.PrintMediaType)
+	Timeout              int           // seconds; 0 = default
 	// InlineHTML is an in-memory HTML document source (SetBody); when set it
 	// replaces Page as the input and skips URL guessing entirely. InlineBase
 	// resolves relative subresources (load.Load).

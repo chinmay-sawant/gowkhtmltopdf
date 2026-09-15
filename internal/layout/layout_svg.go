@@ -41,13 +41,13 @@ func (e *engine) buildInlineSVG(node *html.Node, sty ResolvedStyle, posX, posY f
 	boxNode.w = size.w + padL + padR + borderL + borderR
 	boxNode.height = size.h + padT + padB + borderT + borderB
 
-	if paint && ref.data != nil && !e.noEmit {
+	if paint && len(ref.data) > 0 && !e.noEmit {
 		imgX := posX + borderL + padL
 		imgY := posY + borderT + padT
 		opStart := len(e.ops)
 		e.add((Op{ //nolint:exhaustruct // intentional zero fields
 			Kind: OpImage, X: imgX, Y: imgY, W: size.w, H: size.h,
-		}).withImage(ref.data, ref.w, ref.h, ""))
+		}).withImage(ref.data, ref.w, ref.h, "", ref.src))
 		e.prependChrome(opStart, boxNode, sty, posX, posY, boxNode.w, boxNode.height)
 	}
 
@@ -62,6 +62,8 @@ func (e *engine) usedInlineSVGSize(node *html.Node, sty ResolvedStyle, ref *imag
 	hAttr := e.scalePt(parseSVGLengthPx(node.Attribute("height")))
 	if sty.Width >= 0 {
 		wAttr = e.scalePt(sty.Width)
+	} else if w, ok := calcUsedWidth(sty, e.opts.Width, e); ok {
+		wAttr = w
 	} else if sty.WidthPercent >= 0 && e.opts.Width > 0 {
 		wAttr = e.opts.Width * sty.WidthPercent / 100
 	}

@@ -25,7 +25,7 @@ func BenchmarkParseManyAtRules(b *testing.B) {
 	b.ReportAllocs()
 	b.SetBytes(int64(len(src)))
 
-	for range b.N {
+	for b.Loop() {
 		sheet, err := Parse(src)
 		if err != nil {
 			b.Fatal(err)
@@ -56,9 +56,8 @@ func BenchmarkAttrIgnoreCaseMatch(b *testing.B) {
 	}
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		if !Match(sel, node) {
 			b.Fatal("expected match")
 		}
@@ -106,9 +105,8 @@ func BenchmarkWideTableNthLastOfType(b *testing.B) {
 	sel := attrCaseSelector(b, "tr:nth-last-of-type(odd)")
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		for _, row := range rows {
 			Match(sel, row)
 		}
@@ -122,9 +120,8 @@ func BenchmarkWideTableNthChild(b *testing.B) {
 	sel := attrCaseSelector(b, "tr:nth-child(odd)")
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		for _, row := range rows {
 			Match(sel, row)
 		}
@@ -143,9 +140,8 @@ func BenchmarkResolveVarsMany(b *testing.B) {
 	}
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		if got := ResolveVars(value, lookup); got == "" {
 			b.Fatal("no output")
 		}

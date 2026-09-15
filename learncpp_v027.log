@@ -1,0 +1,62 @@
+===== real-site drill 2026-09-16T01:09:54+0530 =====
+url: https://www.learncpp.com/
+output: learncpp.pdf
+binary: /home/chinmay/ChinmayPersonalProjects/gowkhtmltopdf/bin/gowkhtmltopdf
+baseline: plans/0.2.7/learncpp/evidence/2026-09-16-baseline-noimages.json
+cmd: /home/chinmay/ChinmayPersonalProjects/gowkhtmltopdf/bin/gowkhtmltopdf --url https://www.learncpp.com/ -o learncpp.pdf
+Loading pages (1/1)
+warning: object 1: @font-face src "https://www.learncpp.com/blog/wp-includes/fonts/dashicons.eot?99ac726223c749443b642ce33df8b800#iefix" skipped (EOT unsupported; WOFF2/WOFF1/TTF/OTF only)
+warning: object 1: @font-face src "https://www.learncpp.com/blog/wp-content/plugins/menu-icons/vendor/codeinwp/icon-picker/css/types/fontawesome-webfont.eot?#iefix&v=4.7.0" skipped (EOT unsupported; WOFF2/WOFF1/TTF/OTF only)
+warning: object 1: @font-face src "https://www.learncpp.com/blog/wp-content/plugins/menu-icons/vendor/codeinwp/icon-picker/css/types/fontawesome-webfont.svg?v=4.7.0#fontawesomeregular": font: not a TrueType font
+warning: object 1: @font-face src "https://www.learncpp.com/blog/wp-content/plugins/learncpp-prism/fonts/monaco/monaco-webfont.eot?#iefix" skipped (EOT unsupported; WOFF2/WOFF1/TTF/OTF only)
+warning: object 1: @font-face src "https://www.learncpp.com/blog/wp-content/plugins/learncpp-prism/fonts/monaco/monaco-webfont.svg#MonacoRegular": font: not a TrueType font
+warning: object 1: @font-face src "https://www.learncpp.com/blog/wp-content/themes/septera/resources/fonts/iconmeta.eot?o7tart#iefix" skipped (EOT unsupported; WOFF2/WOFF1/TTF/OTF only)
+warning: object 1: @font-face src "https://www.learncpp.com/blog/wp-content/themes/septera/resources/fonts/iconmeta.svg?o7tart#iconmeta": font: not a TrueType font
+warning: object 1: @font-face src "https://www.learncpp.com/blog/wp-content/themes/septera/resources/fonts/socials.eot?#iefix" skipped (EOT unsupported; WOFF2/WOFF1/TTF/OTF only)
+warning: object 1: @font-face src "https://www.learncpp.com/blog/wp-content/themes/septera/resources/fonts/socials.svg?#socials": font: not a TrueType font
+warning: object 1: @font-face src "https://www.learncpp.com/blog/wp-content/themes/septera/resources/fonts/blocks.eot?#iefix" skipped (EOT unsupported; WOFF2/WOFF1/TTF/OTF only)
+warning: object 1: @font-face src "https://www.learncpp.com/blog/wp-content/themes/septera/resources/fonts/blocks.svg?#blocks": font: not a TrueType font
+warning: object 1: layout: text overflows content box by 12.7pt (text right edge 551.3, content width 538.6)
+Done
+exit: 0
+elapsed: 24s
+# PDF forensics: learncpp.pdf
+
+pages: 19 | words: 2531 | link annots: 371
+fonts: AUCQNI+LiberationSans, BRGTJZ+OpenSans, SPTOVV+OpenSans, SWVYPG+LiberationSans-Bold, VGXGZY+LiberationSans, VQINZA+LiberationSans-Bold
+low-ink pages with a text layer (possible covered text): 0
+
+| page | words | coverage | drawings | links | main font |
+|------|-------|----------|----------|-------|-----------|
+| 1 | 145 | 0.594 | 54 | 8 | AUCQNI+LiberationSans |
+| 2 | 132 | 0.793 | 96 | 18 | BRGTJZ+OpenSans |
+| 3 | 153 | 0.811 | 105 | 21 | BRGTJZ+OpenSans |
+| 4 | 126 | 0.808 | 95 | 19 | AUCQNI+LiberationSans |
+| 5 | 128 | 0.809 | 108 | 21 | AUCQNI+LiberationSans |
+| 6 | 133 | 0.809 | 100 | 20 | AUCQNI+LiberationSans |
+| 7 | 137 | 0.810 | 108 | 24 | AUCQNI+LiberationSans |
+| 8 | 140 | 0.802 | 107 | 21 | AUCQNI+LiberationSans |
+| 9 | 142 | 0.810 | 112 | 21 | AUCQNI+LiberationSans |
+| 10 | 136 | 0.788 | 102 | 20 | AUCQNI+LiberationSans |
+| 11 | 144 | 0.810 | 101 | 20 | BRGTJZ+OpenSans |
+| 12 | 145 | 0.812 | 105 | 22 | AUCQNI+LiberationSans |
+| 13 | 125 | 0.810 | 105 | 19 | BRGTJZ+OpenSans |
+| 14 | 133 | 0.808 | 101 | 19 | AUCQNI+LiberationSans |
+| 15 | 131 | 0.814 | 108 | 22 | BRGTJZ+OpenSans |
+| 16 | 146 | 0.811 | 107 | 22 | AUCQNI+LiberationSans |
+| 17 | 127 | 0.811 | 108 | 22 | AUCQNI+LiberationSans |
+| 18 | 129 | 0.802 | 116 | 20 | AUCQNI+LiberationSans |
+| 19 | 79 | 0.492 | 62 | 12 | BRGTJZ+OpenSans |
+
+## comparison vs baseline: plans/0.2.7/learncpp/evidence/2026-09-16-baseline-noimages.json
+pages:            37 -> 19 (-18)
+total words:      3096 -> 2531 (-565)
+link annots:      1119 -> 371 (-748)
+fonts added:      AUCQNI+LiberationSans, BRGTJZ+OpenSans, SPTOVV+OpenSans, SWVYPG+LiberationSans-Bold, VGXGZY+LiberationSans, VQINZA+LiberationSans-Bold
+fonts removed:    LiberationSans, LiberationSans-Bold
+suspicious pages: 34 -> 0 (-34)
+  entered suspicious set: (none)
+  left suspicious set: 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21 (+14 more)
+coverage min/median/max:
+  baseline: 0.00491 / 0.00491 / 0.82021
+  current: 0.49192 / 0.80921 / 0.81379

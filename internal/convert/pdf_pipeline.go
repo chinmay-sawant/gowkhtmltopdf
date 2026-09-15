@@ -208,9 +208,9 @@ func (p *pdfPipeline) assembleDocument(ctx context.Context) error {
 
 	if run.req.Global.Title != "" {
 		run.doc.SetInfo("Title", run.req.Global.Title)
-	} else if run.doc.Policy().IsPDFUA1() || run.doc.Policy().IsPDFUA2() {
+	} else {
 		for _, b := range run.bodies {
-			if b.doctitle != "" {
+			if b != nil && b.doctitle != "" {
 				run.doc.SetInfo("Title", b.doctitle)
 
 				break

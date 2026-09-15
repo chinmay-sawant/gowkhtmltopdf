@@ -12,6 +12,7 @@ Implementation plans and roadmaps for `gowkhtmltopdf`, partitioned by release ve
 | [0.2.4/](0.2.4/README.md) | **v0.2.4** — idiomatic Document API + CLI rethink + external benches (phases 31–39) | Complete; [release notes](0.2.4/PR/release-v0.2.4.md) |
 | [0.2.5/](0.2.5/README.md) | **v0.2.5 Python cgo c-shared bindings and PyPI** — phases 40–47 (in-process, `CGO_ENABLED=0` pure-Go default kept); font track `font/` already complete | Complete (released 2026-08-26; `VERSION` 0.2.5) |
 | [0.2.6/](0.2.6/README.md) | **v0.2.6 CSS coverage and browser WASM** - catalog-driven print CSS (354 implemented / 0 partial / 464 unsupported), browser WASM output, warm-path recovery | Complete (released 2026-09-13; `VERSION` 0.2.6). [Release notes](0.2.6/PR/release-v0.2.6.md) |
+| [0.2.7/](0.2.7/README.md) | **v0.2.7 LearnCpp real-world conversion** - image payload safety, paint z-order, stylesheet base URLs, font sources, flex/calc width, media selection, PDF polish (phases 1-8) | Code wave complete 2026-09-16; gates green (run 2). Docs/frontend wave pending |
 
 ---
 
@@ -67,6 +68,11 @@ Implementation plans and roadmaps for `gowkhtmltopdf`, partitioned by release ve
 - [40-canonical-0.2.5-python-bindings.md](0.2.5/40-canonical-0.2.5-python-bindings.md) — Canonical execution ledger for python cgo bindings and PyPI (phases 40–47), issue #35
 - [phases/](0.2.5/phases) — Per-phase atomic checklists 40–47
 - `font/` — Already complete font resolution track (phases 01–08, cited in syntheses/roadmap); `VERSION` `0.2.5`
+
+## 0.2.7 (LearnCpp real-world conversion)
+
+- [0.2.7 README](0.2.7/README.md)
+- [learncpp/01-canonical-0.2.7-learncpp.md](0.2.7/learncpp/01-canonical-0.2.7-learncpp.md) - Canonical execution ledger for phases 1-8
 
 ## 0.2.6 (CSS coverage)
 

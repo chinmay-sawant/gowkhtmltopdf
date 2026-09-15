@@ -627,7 +627,7 @@ func (e *engine) flexItemBaseWidth(node *html.Node, style ResolvedStyle, mainSiz
 //
 //nolint:cyclop,wsl // intrinsic flex measurement keeps the CSS cases together
 func (e *engine) measureFlexItemMaxContent(node *html.Node, style ResolvedStyle) float64 {
-	_, maxW := e.measureCellMinMax(node, style)
+	_, maxW := e.measureCellMinMaxMode(node, style, true)
 	chrome := e.scalePt(style.PaddingLeft) + e.scalePt(style.PaddingRight) +
 		e.scalePt(style.BorderLeft.Width) + e.scalePt(style.BorderRight.Width)
 	contentW := maxW - chrome
@@ -686,6 +686,8 @@ func (e *engine) flexSpecifiedBaseWidth(style ResolvedStyle, mainSize, pad float
 		return e.flexBoxSized(style, mainSize*style.FlexBasisPercent/oneHundred, pad), true
 	case style.FlexBasis >= 0:
 		return e.flexBoxSized(style, e.scalePt(style.FlexBasis), pad), true
+	case style.WidthCalc && mainSize >= 0:
+		return e.flexBoxSized(style, mainSize*style.WidthPercent/oneHundred+e.scalePt(style.WidthCalcFixed), pad), true
 	case style.WidthPercent >= 0 && mainSize >= 0:
 		return e.flexBoxSized(style, mainSize*style.WidthPercent/oneHundred, pad), true
 	case style.Width >= 0:
@@ -732,8 +734,10 @@ func (e *engine) flexMinMainSize(item flexMeas, mainSize float64) float64 {
 		floor = e.scalePt(cstate.MinWidth)
 	}
 	// Automatic minimum (min-width:auto): min-content size suggestion. The
-	// returned width already includes the item's horizontal chrome.
-	contentSug, _ := e.measureCellMinMax(item.n, *cstate)
+	// returned width already includes the item's horizontal chrome. Generated
+	// ::before/::after runs count too: a print-only URL suffix raises the floor
+	// so the item is not crushed below the content it will actually paint.
+	contentSug, _ := e.measureCellMinMaxMode(item.n, *cstate, true)
 	pad := e.scalePt(cstate.PaddingLeft) + e.scalePt(cstate.PaddingRight) +
 		e.scalePt(cstate.BorderLeft.Width) + e.scalePt(cstate.BorderRight.Width)
 	// Specified size suggestion when width/% is definite against mainSize.
@@ -757,6 +761,8 @@ func (e *engine) flexMinMainSize(item flexMeas, mainSize float64) float64 {
 
 func (e *engine) flexSpecifiedWidthSuggestion(style ResolvedStyle, mainSize, pad float64) float64 {
 	switch {
+	case style.WidthCalc && mainSize >= 0:
+		return e.flexBoxSized(style, mainSize*style.WidthPercent/oneHundred+e.scalePt(style.WidthCalcFixed), pad)
 	case style.WidthPercent >= 0 && mainSize >= 0:
 		return e.flexBoxSized(style, mainSize*style.WidthPercent/oneHundred, pad)
 	case style.Width >= 0:
@@ -1101,6 +1107,8 @@ func (e *engine) forceFlexItemMainSize(style ResolvedStyle, forceW float64) Reso
 	}
 
 	style.WidthPercent = -1
+	style.WidthCalc = false
+	style.WidthCalcFixed = 0
 	style.FlexBasis = -1
 	style.FlexBasisPercent = -1
 

@@ -2,9 +2,9 @@
 // opt-in PDF 1.7 and 2.0, PDF/A-3a/4, and PDF/UA-1/2): indirect objects, xref,
 // catalog/pages tree, content streams (Flate), base-14 fonts, images, link
 // annotations, named destinations, outlines, trailer /ID, and conformance XMP metadata.
-// The write path uses the Go standard library plus one allowlisted exception
-// for OpenType shaping (go-text/typesetting). Deterministic output for golden
-// tests (creation date is injectable).
+// The write path uses the Go standard library plus allowlisted pure-Go modules
+// (OpenType shaping, SVG rasterization, WOFF2 decoding). Deterministic output
+// for golden tests (creation date is injectable).
 package pdf
 
 import (
@@ -463,43 +463,55 @@ func (p *Page) Content() *Content { return p.content }
 // Doc returns the parent document of this page.
 func (p *Page) Doc() *Document { return p.doc }
 
-// AddLinkURI adds an external URI annotation.
+// AddLinkURI adds an external URI annotation. Consecutive calls that share a
+// URI and overlap or touch vertically merge into one annotation (see
+// annots.go); the returned ref identifies the merged annotation.
 func (p *Page) AddLinkURI(rect [4]float64, uri string) ObjRef {
-	ref := p.doc.newObject()
-	p.annots = append(p.annots, annotation{ //nolint:exhaustruct // intentional zero-value fields
-		rect:     rect,
-		uri:      uri,
-		destPage: nil,
-		destX:    0,
-		destY:    0,
-		hasDest:  false,
-		annotRef: ref,
+	return p.addLink(annotation{ //nolint:exhaustruct // intentional zero-value fields
+		rect: rect,
+		uri:  uri,
 	})
-
-	return ref
 }
 
 // AddLinkDest adds an internal GoTo annotation targeting a page handle. The
 // target page is resolved to its current /Kids index at write time, so link
 // destinations survive ReorderPages and page copies. A nil target adds no
-// annotation and returns 0.
+// annotation and returns 0. Consecutive calls with the same target and
+// overlapping or touching rectangles merge into one annotation.
 func (p *Page) AddLinkDest(rect [4]float64, page *Page, destX, destY float64) ObjRef {
 	if page == nil {
 		return 0
 	}
 
-	ref := p.doc.newObject()
-	p.annots = append(p.annots, annotation{ //nolint:exhaustruct // intentional zero-value fields
+	return p.addLink(annotation{ //nolint:exhaustruct // intentional zero-value fields
 		rect:     rect,
-		uri:      "",
 		destPage: page,
 		destX:    destX,
 		destY:    destY,
 		hasDest:  true,
-		annotRef: ref,
 	})
+}
 
-	return ref
+// addLink appends a link annotation, or merges it into the trailing
+// annotation when both calls target the same destination and the rectangles
+// are mergeable. Documents with a tagged structure tree never merge: each
+// PDF/UA annotation owns a structure element and /StructParent entry.
+func (p *Page) addLink(candidate annotation) ObjRef {
+	if !p.doc.isUA && len(p.annots) > 0 {
+		last := &p.annots[len(p.annots)-1]
+		if last.annotRef != 0 &&
+			linkTargetsMatch(last, &candidate) &&
+			linkRectsMergeable(last.rect, candidate.rect) {
+			last.rect = unionLinkRect(last.rect, candidate.rect)
+
+			return last.annotRef
+		}
+	}
+
+	candidate.annotRef = p.doc.newObject()
+	p.annots = append(p.annots, candidate)
+
+	return candidate.annotRef
 }
 
 // RemapLinkDests rewrites every internal link destination on this page with
@@ -1046,15 +1058,18 @@ func (d *Document) catalogDict(pagesRef, metadataRef, namesRef objRef) string {
 		cat = cat.add("/OutputIntents", "["+d.outputIntentRef.String()+"]")
 	}
 
-	if d.policy.IsPDFUA1() || d.policy.IsPDFUA2() {
+	if d.policy.IsPDFUA() {
 		cat = cat.add("/MarkInfo", "<< /Marked true >>")
+	}
 
-		lang := d.lang
-		if lang == "" {
-			lang = "en-US"
-		}
-
+	// /Lang is optional in PDF 1.4+ and informational for non-tagged files;
+	// emit it whenever a language was declared and the UA default otherwise.
+	lang := d.catalogLang()
+	if lang != "" {
 		cat = cat.add("/Lang", pdfString(lang))
+	}
+
+	if d.policy.IsPDFUA() {
 		cat = cat.add("/ViewerPreferences", "<< /DisplayDocTitle true >>")
 
 		if d.structTreeRootRef != 0 {
@@ -1063,6 +1078,20 @@ func (d *Document) catalogDict(pagesRef, metadataRef, namesRef objRef) string {
 	}
 
 	return cat.String()
+}
+
+// catalogLang returns the catalog /Lang value: the language declared on the
+// document, or the PDF/UA default when tagged output declares none.
+func (d *Document) catalogLang() string {
+	if d.lang != "" {
+		return d.lang
+	}
+
+	if d.policy.IsPDFUA() {
+		return "en-US"
+	}
+
+	return ""
 }
 
 // registerDualDest records a PDF 2.0 named destination with page /D and

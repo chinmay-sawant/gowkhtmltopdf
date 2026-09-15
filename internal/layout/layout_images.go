@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"image"
 	"image/draw"
+	"image/gif"
 	"strconv"
 	"strings"
 
@@ -79,7 +80,10 @@ func (e *engine) usedImageSize(
 
 	cssW, cssH := style.Width >= 0, style.Height >= 0
 
-	if style.WidthPercent >= 0 {
+	if w, ok := calcUsedWidth(style, e.imageContainingWidth(), e); ok {
+		size.w = w
+		cssW = true
+	} else if style.WidthPercent >= 0 {
 		if cb := e.imageContainingWidth(); cb > 0 {
 			size.w = cb * style.WidthPercent / oneHundred
 			cssW = true
@@ -415,7 +419,7 @@ func (e *engine) paintReplacedImage(
 	size imageUsedSize, thumbImg bool,
 	borderL, padL, borderT, padT float64,
 ) {
-	if boxNode.img == nil || boxNode.img.data == nil {
+	if boxNode.img == nil || len(boxNode.img.data) == 0 {
 		return
 	}
 
@@ -452,7 +456,7 @@ func (e *engine) paintReplacedImage(
 		W:      imgW,
 		H:      imgH,
 		IsJPEG: isJPEG,
-	}).withImage(imgData, boxNode.img.w, boxNode.img.h, alt))
+	}).withImage(imgData, boxNode.img.w, boxNode.img.h, alt, boxNode.img.src))
 
 	if thumbImg {
 		e.emitThumbImageBottomSeparator(sty, posX, posY, size.w, size.h)
@@ -536,6 +540,29 @@ func imageDims(data []byte) (int, int, bool, bool) {
 	}
 
 	return 0, 0, false, false
+}
+
+// gifToPNG decodes the first frame of GIF bytes and re-encodes it as PNG, the
+// same conversion cropBorderImage uses for border-image slices. Painters embed
+// PNG/JPEG only, and the decoded pixel dimensions come from the frame.
+func gifToPNG(data []byte) ([]byte, int, int, bool) {
+	if !bytes.HasPrefix(data, []byte("GIF8")) {
+		return nil, 0, 0, false
+	}
+
+	img, err := gif.Decode(bytes.NewReader(data))
+	if err != nil {
+		return nil, 0, 0, false
+	}
+
+	pngData, err := encodePNGImage(img)
+	if err != nil {
+		return nil, 0, 0, false
+	}
+
+	bounds := img.Bounds()
+
+	return pngData, bounds.Dx(), bounds.Dy(), true
 }
 
 // jpegDims scans JPEG segment markers for a SOF segment carrying dimensions.

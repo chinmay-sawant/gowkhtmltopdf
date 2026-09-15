@@ -1577,19 +1577,33 @@ func drawImage(
 		name = "I0"
 	}
 
+	label := imageOpLabel(paintOp)
+
 	if paintOp.IsJPEG {
 		if err := chld.AddJPEGImage(name, posX, posY, paintOp.W, paintOp.H, paintOp.Image); err != nil {
-			return fmt.Errorf("layout: embed jpeg %s: %w", name, err)
+			return fmt.Errorf("layout: embed jpeg %s: %w", label, err)
 		}
 
 		return nil
 	}
 
 	if err := chld.AddPNGImage(name, posX, posY, paintOp.W, paintOp.H, paintOp.Image); err != nil {
-		return fmt.Errorf("layout: embed png %s: %w", name, err)
+		return fmt.Errorf("layout: embed png %s: %w", label, err)
 	}
 
 	return nil
+}
+
+// imageOpLabel names an image op in embed errors: the fetch src when the op
+// carries one, "inline" for synthetic rasters (gradients, inline SVG, border
+// slices). Sources are truncated so a data: URI cannot explode the error.
+func imageOpLabel(paintOp *Op) string {
+	src := paintOp.ImageSrc()
+	if src == "" {
+		return cssDisplayInline
+	}
+
+	return truncateImageSrc(src)
 }
 
 // drawLinkXform places a URI annotation. Annotations are page-space (not under

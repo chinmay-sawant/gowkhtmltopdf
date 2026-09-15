@@ -5,10 +5,12 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/app"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/cli"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/load"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
@@ -132,5 +134,119 @@ func TestRunImageRejectsMultipleObjectsBeforeOpeningOutput(t *testing.T) {
 
 	if _, statErr := os.Stat(output); !errors.Is(statErr, os.ErrNotExist) {
 		t.Fatalf("output stat error = %v, want os.ErrNotExist", statErr)
+	}
+}
+
+// failedImageCommand builds an image command that passes request validation
+// and fails during rendering: the loopback fetch is rejected by the network
+// policy, which is exactly the window where opening the output up front would
+// have truncated it.
+func failedImageCommand(t *testing.T, output string) *cli.Command {
+	t.Helper()
+
+	cmd, err := cli.Parse([]string{
+		"--restrict-network",
+		"--quiet",
+		"http://127.0.0.1/",
+		"--output", output,
+	}, cli.ModeImage)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+
+	return cmd
+}
+
+func TestRunImageFailurePreservesExistingOutput(t *testing.T) {
+	t.Parallel()
+
+	output := filepath.Join(t.TempDir(), "out.png")
+	previous := []byte("previous artifact bytes that a failed conversion must not clobber")
+
+	if err := os.WriteFile(output, previous, 0o600); err != nil {
+		t.Fatalf("seed output: %v", err)
+	}
+
+	runErr := app.RunImage(t.Context(), failedImageCommand(t, output), nil)
+	if !errors.Is(runErr, load.ErrNetworkPolicy) {
+		t.Fatalf("RunImage = %v, want errors.Is(..., load.ErrNetworkPolicy)", runErr)
+	}
+
+	got, err := os.ReadFile(output)
+	if err != nil {
+		t.Fatalf("ReadFile(%q): %v", output, err)
+	}
+
+	if !bytes.Equal(got, previous) {
+		t.Fatalf("a failed conversion clobbered the output: got %d bytes %q, want %d bytes",
+			len(got), got, len(previous))
+	}
+}
+
+func TestRunImageFailureDoesNotCreateOutput(t *testing.T) {
+	t.Parallel()
+
+	output := filepath.Join(t.TempDir(), "out.png")
+
+	runErr := app.RunImage(t.Context(), failedImageCommand(t, output), nil)
+	if !errors.Is(runErr, load.ErrNetworkPolicy) {
+		t.Fatalf("RunImage = %v, want errors.Is(..., load.ErrNetworkPolicy)", runErr)
+	}
+
+	if _, statErr := os.Stat(output); !errors.Is(statErr, os.ErrNotExist) {
+		t.Fatalf("failed conversion left an artifact at %q (stat error = %v)", output, statErr)
+	}
+}
+
+func TestRunImageSuccessReplacesExistingOutput(t *testing.T) {
+	t.Parallel()
+
+	output := filepath.Join(t.TempDir(), "out.png")
+
+	if err := os.WriteFile(output, []byte("stale bytes"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := &cli.Command{
+		Global: settings.DefaultPdfGlobal(),
+		Image:  settings.DefaultImageGlobal(),
+		Objects: []settings.PdfObject{{
+			Load: settings.LoadPage{InlineHTML: []byte("<h1>overwrite</h1>")},
+		}},
+		Output: output,
+	}
+
+	if err := app.RunImage(t.Context(), cmd, nil); err != nil {
+		t.Fatalf("RunImage: %v", err)
+	}
+
+	png, err := os.ReadFile(output)
+	if err != nil {
+		t.Fatalf("ReadFile(%q): %v", output, err)
+	}
+
+	if !bytes.HasPrefix(png, []byte("\x89PNG")) {
+		t.Fatalf("output is not PNG after a successful run: %q", png[:min(len(png), 8)])
+	}
+}
+
+// TestRunImageRejectsBadOutputPathBeforeConversion keeps the early destination
+// check: a missing parent directory fails before the render starts even though
+// the file itself is no longer opened up front.
+func TestRunImageRejectsBadOutputPathBeforeConversion(t *testing.T) {
+	t.Parallel()
+
+	cmd := &cli.Command{
+		Global: settings.DefaultPdfGlobal(),
+		Image:  settings.DefaultImageGlobal(),
+		Objects: []settings.PdfObject{{
+			Load: settings.LoadPage{InlineHTML: []byte("<h1>output preflight</h1>")},
+		}},
+		Output: filepath.Join(t.TempDir(), "missing-dir", "out.png"),
+	}
+
+	err := app.RunImage(t.Context(), cmd, nil)
+	if err == nil || !strings.HasPrefix(err.Error(), "app: open image output:") {
+		t.Fatalf("RunImage() = %v, want app: open image output error", err)
 	}
 }

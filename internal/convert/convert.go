@@ -572,10 +572,11 @@ func (run *runContext) renderObject(ctx context.Context, obj *settings.PdfObject
 		doctitle:      docTitle(root),
 	}
 
-	if run.doc.Policy().IsPDFUA1() || run.doc.Policy().IsPDFUA2() {
-		if l := docLang(root); l != "" {
-			run.doc.SetLanguage(l)
-		}
+	// A declared document language is metadata for every PDF version; the
+	// writer emits the catalog /Lang entry. PDF/UA defaults to en-US when the
+	// document is silent.
+	if l := docLang(root); l != "" {
+		run.doc.SetLanguage(l)
 	}
 
 	reg, err := effectiveMargins(ctx, run.loader, run.font, run.req.Global, state, run.log)
@@ -595,6 +596,7 @@ func (run *runContext) renderObject(ctx context.Context, obj *settings.PdfObject
 		zoom:               obj.Load.ZoomFactor,
 		imagesFn:           imagesFn,
 		printLinkUnderline: printUL,
+		log:                run.log,
 	}
 
 	layoutOpts := state.bodyLayoutOpts(objectRender)
@@ -726,6 +728,7 @@ type objectRenderContext struct {
 	zoom               float64
 	imagesFn           func(string) ([]byte, error)
 	printLinkUnderline bool
+	log                io.Writer
 }
 
 func (st *objectState) bodyLayoutOpts(render objectRenderContext) layout.Options {
@@ -745,6 +748,20 @@ func (st *objectState) bodyLayoutOpts(render objectRenderContext) layout.Options
 		Images:             render.imagesFn,
 		Background:         render.global.Background,
 		PrintLinkUnderline: render.printLinkUnderline,
+		Warnf:              layoutWarnf(render.log, st.idx+1),
+	}
+}
+
+// layoutWarnf adapts the run log to layout.Options.Warnf so skipped-image
+// warnings reach the CLI log through the engine's severity protocol. A nil
+// log keeps layout silent.
+func layoutWarnf(log io.Writer, object int) func(format string, args ...any) {
+	if log == nil {
+		return nil
+	}
+
+	return func(format string, args ...any) {
+		line.Emit(log, line.Warn, "object %d: "+format, append([]any{object}, args...)...)
 	}
 }
 

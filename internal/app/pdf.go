@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/cli"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/convert"
@@ -53,7 +55,8 @@ func BuildPDFRequest(cmd *cli.Command, output, outline io.Writer) (*convert.Requ
 // RunPDF is the command-facing adapter. It validates the request before
 // opening the document sink and receives the optional outline sink explicitly.
 // convert.Run only receives explicit writers and never reaches into
-// process-global stdout.
+// process-global stdout. File outputs are opened on the first write, so a
+// conversion that fails during render leaves an existing artifact untouched.
 func RunPDF(
 	ctx context.Context,
 	cmd *cli.Command,
@@ -77,15 +80,15 @@ func RunPDF(
 		return err
 	}
 
-	// OpenOutput maps an empty path and "-" to os.Stdout. Reject both forms
-	// when dump-outline also targets stdout; a single stream cannot be both a
-	// standalone XML document and a valid PDF. OutputWriter is an explicit
-	// library sink and therefore bypasses this CLI-path guard.
+	// Output resolution maps an empty path and "-" to os.Stdout. Reject both
+	// forms when dump-outline also targets stdout; a single stream cannot be
+	// both a standalone XML document and a valid PDF. OutputWriter is an
+	// explicit library sink and therefore bypasses this CLI-path guard.
 	if req.Global.DumpOutline && cmd.OutputWriter == nil && (cmd.Output == "" || cmd.Output == "-") {
 		return ErrConflictingOutputSinks
 	}
 
-	out, closeOut, err := cmd.OpenOutput()
+	out, closeOut, err := openLazyOutput(cmd)
 	if err != nil {
 		return fmt.Errorf("app: open output: %w", err)
 	}
@@ -98,6 +101,96 @@ func RunPDF(
 
 	if err = convert.Run(ctx, req, log, progress); err != nil {
 		return fmt.Errorf("app: pdf conversion: %w", err)
+	}
+
+	return nil
+}
+
+// openLazyOutput resolves the output destination for both the PDF and image
+// adapters without creating or truncating a file up front. A path is validated
+// now (unwritable file, missing parent directory) so destination mistakes
+// still surface before a long render, but the file itself is opened on the
+// first write: a conversion that fails while rendering must not clobber an
+// existing artifact or leave a 0-byte file.
+func openLazyOutput(cmd *cli.Command) (io.Writer, func() error, error) {
+	if cmd.OutputWriter != nil {
+		return cmd.OutputWriter, func() error { return nil }, nil
+	}
+
+	if cmd.Output == "" || cmd.Output == "-" {
+		return os.Stdout, func() error { return nil }, nil
+	}
+
+	if err := checkOutputPath(cmd.Output); err != nil {
+		return nil, nil, err
+	}
+
+	out := &lazyFileWriter{path: cmd.Output, file: nil}
+
+	return out, out.Close, nil
+}
+
+// checkOutputPath rejects destinations that cannot receive bytes without
+// touching the destination itself: an existing path must be openable for
+// writing, and a new path's parent directory must exist.
+func checkOutputPath(path string) error {
+	_, err := os.Stat(path)
+
+	switch {
+	case err == nil:
+		f, openErr := os.OpenFile(path, os.O_WRONLY, 0)
+		if openErr != nil {
+			return fmt.Errorf("output %q: %w", path, openErr)
+		}
+
+		if closeErr := f.Close(); closeErr != nil {
+			return fmt.Errorf("output %q: %w", path, closeErr)
+		}
+
+		return nil
+	case errors.Is(err, os.ErrNotExist):
+		if _, statErr := os.Stat(filepath.Dir(path)); statErr != nil {
+			return fmt.Errorf("output %q: %w", path, statErr)
+		}
+
+		return nil
+	default:
+		return fmt.Errorf("output %q: %w", path, err)
+	}
+}
+
+// lazyFileWriter opens its path with os.Create on the first write. Close is a
+// no-op when nothing was written, so a failed conversion leaves no file.
+type lazyFileWriter struct {
+	path string
+	file *os.File
+}
+
+func (w *lazyFileWriter) Write(data []byte) (int, error) {
+	if w.file == nil {
+		f, err := os.Create(w.path)
+		if err != nil {
+			return 0, fmt.Errorf("output %q: %w", w.path, err)
+		}
+
+		w.file = f
+	}
+
+	n, err := w.file.Write(data)
+	if err != nil {
+		return n, fmt.Errorf("output %q: %w", w.path, err)
+	}
+
+	return n, nil
+}
+
+func (w *lazyFileWriter) Close() error {
+	if w.file == nil {
+		return nil
+	}
+
+	if err := w.file.Close(); err != nil {
+		return fmt.Errorf("output %q: %w", w.path, err)
 	}
 
 	return nil

@@ -12,3 +12,6 @@ font-family fallback can supply them. Full Noto CJK is not vendored (size).
 `--font-path testdata/fonts/implemented-audit`. Includes Sans Regular/Bold/
 Italic, Serif Regular/Bold/Italic/BoldItalic, and Mono Regular (prop 60 needs
 Serif BoldItalic for `font: italic 700 ... "Liberation Serif"`).
+
+`woff2/` — Liberation Sans Latin subset in WOFF2 form (via fontTools), used by
+the WOFF2 decoder tests. See `woff2/README.md` for the regeneration command.

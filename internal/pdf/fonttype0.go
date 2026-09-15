@@ -1,6 +1,7 @@
 package pdf
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"sort"
 	"strconv"
@@ -10,6 +11,30 @@ import (
 // fallbackFontName is the PostScript name substituted when a loaded face has
 // none (the embedded default face uses the same name).
 const fallbackFontName = "LiberationSans"
+
+const (
+	// subsetTagLen is the number of uppercase letters in a PDF subset tag.
+	subsetTagLen = 6
+	// subsetTagAlphabet is the number of letters the tag hashes fold into.
+	subsetTagAlphabet = 26
+)
+
+// subsetTag returns the deterministic subset tag for one embedded font, e.g.
+// the "ABCDEF" in /ABCDEF+LiberationSans. It hashes the exact subset program
+// bytes written into the PDF: those bytes are built deterministically from the
+// source font plus the used rune set, so the same input always yields the same
+// tag (no clock, no randomness) and two different subsets of one face cannot
+// share a name.
+func subsetTag(sub *subsetResult) string {
+	sum := sha256.Sum256(sub.data)
+
+	tag := make([]byte, subsetTagLen)
+	for i := range tag {
+		tag[i] = 'A' + sum[i]%subsetTagAlphabet
+	}
+
+	return string(tag)
+}
 
 // needsType0 reports whether the rune set requires a CID/Type0 font
 // (any code point outside the Latin-1 simple-font range).
@@ -86,7 +111,9 @@ func (d *Document) ensureFont(fnt *Font, name string, used []rune) (objRef, erro
 
 	// Arlington / ISO 32000: FontDescriptor /FontName must equal the
 	// owning font's /BaseFont (CIDFontType2 parent for Type0 descendants).
-	pdfName := pdfNameToken(baseName)
+	// The subset tag is prefixed once here so every dict that names the font
+	// carries the same tag.
+	pdfName := subsetTag(sub) + "+" + pdfNameToken(baseName)
 	if type0 {
 		pdfName += "Identity"
 	}

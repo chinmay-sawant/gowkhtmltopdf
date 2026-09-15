@@ -171,6 +171,87 @@ func TestRunPDFRestrictNetworkBlocksLoopback(t *testing.T) {
 	}
 }
 
+// failedConversionCommand builds a command that passes request validation and
+// fails during conversion (the loopback fetch is rejected by the network
+// policy), which is exactly the window where the old adapter had already
+// truncated the output path.
+func failedConversionCommand(t *testing.T, output string) *cli.Command {
+	t.Helper()
+
+	cmd, err := cli.Parse([]string{
+		"--restrict-network",
+		"--quiet",
+		"http://127.0.0.1/",
+		"--output", output,
+	}, cli.ModePDF)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+
+	return cmd
+}
+
+func TestRunPDFFailurePreservesExistingOutput(t *testing.T) {
+	t.Parallel()
+
+	output := filepath.Join(t.TempDir(), "out.pdf")
+	previous := []byte("previous artifact bytes that a failed conversion must not clobber")
+
+	if err := os.WriteFile(output, previous, 0o600); err != nil {
+		t.Fatalf("seed output: %v", err)
+	}
+
+	runErr := app.RunPDF(t.Context(), failedConversionCommand(t, output), nil, nil, nil)
+	if !errors.Is(runErr, load.ErrNetworkPolicy) {
+		t.Fatalf("RunPDF = %v, want errors.Is(..., load.ErrNetworkPolicy)", runErr)
+	}
+
+	got, err := os.ReadFile(output)
+	if err != nil {
+		t.Fatalf("ReadFile(%q): %v", output, err)
+	}
+
+	if !bytes.Equal(got, previous) {
+		t.Fatalf("a failed conversion clobbered the output: got %d bytes %q, want %d bytes",
+			len(got), got, len(previous))
+	}
+}
+
+func TestRunPDFFailureDoesNotCreateOutput(t *testing.T) {
+	t.Parallel()
+
+	output := filepath.Join(t.TempDir(), "out.pdf")
+
+	runErr := app.RunPDF(t.Context(), failedConversionCommand(t, output), nil, nil, nil)
+	if !errors.Is(runErr, load.ErrNetworkPolicy) {
+		t.Fatalf("RunPDF = %v, want errors.Is(..., load.ErrNetworkPolicy)", runErr)
+	}
+
+	if _, statErr := os.Stat(output); !errors.Is(statErr, os.ErrNotExist) {
+		t.Fatalf("failed conversion left an artifact at %q (stat error = %v)", output, statErr)
+	}
+}
+
+// TestRunPDFRejectsBadOutputPathBeforeConversion keeps the early destination
+// check: a missing parent directory fails before the render starts even though
+// the file itself is no longer opened up front.
+func TestRunPDFRejectsBadOutputPathBeforeConversion(t *testing.T) {
+	t.Parallel()
+
+	cmd := &cli.Command{
+		Global: settings.DefaultPdfGlobal(),
+		Objects: []settings.PdfObject{{
+			Page: "inline:<html><body>output preflight</body></html>",
+		}},
+		Output: filepath.Join(t.TempDir(), "missing-dir", "out.pdf"),
+	}
+
+	err := app.RunPDF(t.Context(), cmd, nil, nil, nil)
+	if err == nil || !strings.HasPrefix(err.Error(), "app: open output:") {
+		t.Fatalf("RunPDF() = %v, want app: open output error", err)
+	}
+}
+
 func TestDefaultTOCXSLDelegatesToConvert(t *testing.T) {
 	t.Parallel()
 

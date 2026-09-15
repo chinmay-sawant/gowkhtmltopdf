@@ -168,7 +168,7 @@ func (e *engine) emitInlineImage(
 	top := e.alignedInlineTop(item, lineY, lineH, baseline)
 	imgX, imgY, imgW, imgH := e.applyInlineImageBorders(item, leftX, top)
 
-	if item.imgRef != nil && item.imgRef.data != nil && imgW > 0 && imgH > 0 {
+	if item.imgRef != nil && len(item.imgRef.data) > 0 && imgW > 0 && imgH > 0 {
 		imgData := item.imgRef.data
 		isJPEG := item.imgRef.isJPEG
 
@@ -180,7 +180,7 @@ func (e *engine) emitInlineImage(
 
 		e.add((Op{ //nolint:exhaustruct // intentional zero fields
 			Kind: OpImage, X: imgX, Y: imgY, W: imgW, H: imgH, IsJPEG: isJPEG,
-		}).withImage(imgData, item.imgRef.w, item.imgRef.h, item.alt))
+		}).withImage(imgData, item.imgRef.w, item.imgRef.h, item.alt, item.imgRef.src))
 	}
 
 	if item.href != "" {

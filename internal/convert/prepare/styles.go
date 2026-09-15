@@ -193,6 +193,11 @@ func (collector *sheetCollector) collectLink(ctx context.Context, node *html.Nod
 // addWithImports appends imported sheets (recursively) before sheet so @import
 // rules precede the importer, matching CSS cascade order.
 //
+// base is the sheet's source URL. Imports resolve against it, and the sheet's
+// own url() values are absolutized against it before the sheet is added, so
+// font and image consumers stay base-agnostic. <base href> is deliberately
+// ignored (see css.Stylesheet.ResolveURLs).
+//
 //nolint:wsl // collector import flow
 func (collector *sheetCollector) addWithImports(ctx context.Context, sheet *css.Stylesheet, base string, depth int) {
 	if sheet == nil || collector.err != nil {
@@ -202,6 +207,7 @@ func (collector *sheetCollector) addWithImports(ctx context.Context, sheet *css.
 	if collector.err != nil {
 		return
 	}
+	sheet.ResolveURLs(base)
 	collector.add(sheet)
 }
 
@@ -462,28 +468,95 @@ func mergeFontFace(ctx context.Context, resources load.ResourceContext, registry
 	return registry
 }
 
-//nolint:wsl,nlreturn,lll // font-face collection flow
-func fetchFontFace(ctx context.Context, resources load.ResourceContext, uri string, idx int, log io.Writer) (*pdf.Font, bool) {
-	lower := strings.ToLower(uri)
-	if strings.HasSuffix(lower, ".woff2") || strings.HasSuffix(lower, ".eot") {
-		line.Emit(log, line.Warn,
-			"object %d: @font-face src %q skipped (WOFF2/EOT unsupported; WOFF1/TTF/OTF only)", idx, uri)
-		return nil, false
+func fetchFontFace(
+	ctx context.Context,
+	resources load.ResourceContext,
+	uri string,
+	idx int,
+	log io.Writer,
+) (*pdf.Font, bool) {
+	if strings.HasPrefix(strings.ToLower(uri), "data:") {
+		return fetchDataFontFace(ctx, resources, uri, idx, log)
 	}
-	if strings.HasPrefix(lower, "data:") {
-		line.Emit(log, line.Warn, "object %d: @font-face data: src skipped", idx, uri)
+
+	if path := fontURIPath(uri); strings.HasSuffix(path, ".eot") {
+		line.Emit(log, line.Warn,
+			"object %d: @font-face src %q skipped (EOT unsupported; WOFF2/WOFF1/TTF/OTF only)", idx, uri)
+
 		return nil, false
 	}
 
+	font, err := fetchAndParseFont(ctx, resources, uri)
+	if err != nil {
+		line.Emit(log, line.Warn, "object %d: @font-face src %q: %v", idx, uri, err)
+
+		return nil, false
+	}
+
+	return font, true
+}
+
+// fetchDataFontFace decodes and registers a data: font src when the payload is
+// a supported format. Warnings never carry the payload: scheme, media type,
+// and URI length only.
+func fetchDataFontFace(
+	ctx context.Context,
+	resources load.ResourceContext,
+	uri string,
+	idx int,
+	log io.Writer,
+) (*pdf.Font, bool) {
+	font, err := fetchAndParseFont(ctx, resources, uri)
+	if err != nil {
+		line.Emit(log, line.Warn, "object %d: @font-face data: src skipped (%s, %d chars)",
+			idx, dataURIMeta(uri), len(uri))
+
+		return nil, false
+	}
+
+	return font, true
+}
+
+// fetchAndParseFont fetches uri and parses the body as TTF/OTF, WOFF1, or WOFF2.
+func fetchAndParseFont(ctx context.Context, resources load.ResourceContext, uri string) (*pdf.Font, error) {
 	resource, err := resources.Fetch(ctx, uri)
 	if err != nil {
-		line.Emit(log, line.Warn, "object %d: @font-face src %q: %v", idx, uri, err)
-		return nil, false
+		return nil, fmt.Errorf("fetch font %q: %w", uri, err)
 	}
+
 	font, err := pdf.ParseFontBytes(resource.Body)
 	if err != nil {
-		line.Emit(log, line.Warn, "object %d: @font-face src %q: %v", idx, uri, err)
-		return nil, false
+		return nil, fmt.Errorf("parse font %q: %w", uri, err)
 	}
-	return font, true
+
+	return font, nil
+}
+
+// fontURIPath is the lowercased URL path of a font src. Format policy ignores
+// query and fragment so `woff2?v=1` is still a WOFF2 file and `ttf?x` is not
+// misclassified.
+func fontURIPath(uri string) string {
+	parsed, err := url.Parse(uri)
+	if err != nil {
+		return strings.ToLower(uri)
+	}
+
+	return strings.ToLower(parsed.Path)
+}
+
+// dataURIMeta returns a data URI's header (scheme and media type, before the
+// payload comma), capped so a base64 body never reaches a log line.
+func dataURIMeta(uri string) string {
+	const metaCap = 64
+
+	meta := uri
+	if i := strings.IndexByte(meta, ','); i >= 0 {
+		meta = meta[:i]
+	}
+
+	if len(meta) > metaCap {
+		meta = meta[:metaCap] + "..."
+	}
+
+	return meta
 }

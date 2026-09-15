@@ -11,8 +11,12 @@ var emptyExtra = &opExtra{} //nolint:exhaustruct,gochecknoglobals // immutable z
 // ops). Embedding it keeps field names (op.URI, op.Image) while the hot Op
 // record stays at 256 bytes.
 type opExtra struct {
-	URI           string
-	Image         []byte
+	URI   string
+	Image []byte
+	// Src is the fetch source of Image. Synthetic rasters (gradients, inline
+	// SVG, border-image slices) leave it empty; paint then labels the op
+	// "inline" instead of naming a fetched resource.
+	Src           string
 	ImgW, ImgH    int
 	Alt           string
 	Xform         Matrix2D
@@ -26,6 +30,59 @@ type opExtra struct {
 	// carry the group without painting.
 	BlendGroup *BlendGroup
 	GroupMark  uint8
+	// ZChain is the op's innermost stacking-context frame (nil in the root
+	// context). paint_order.go compares these chains so ancestor chrome
+	// paints below descendant content.
+	ZChain *paintCtxFrame
+	// IsChrome marks background/border/shadow ops emitted by prependChrome.
+	IsChrome bool
+	// ChromeDepth counts the stacking contexts active when the chrome was
+	// emitted (0 for root-level chrome and for every non-chrome op).
+	ChromeDepth int
+}
+
+// setZChain records the op's innermost stacking-context frame. Root-context
+// ops keep a nil chain.
+func (op *Op) setZChain(frame *paintCtxFrame) {
+	if frame == nil {
+		return
+	}
+
+	op.detachExtra().ZChain = frame
+}
+
+// zChain returns the op's innermost stacking-context frame, or nil when the
+// op was emitted in the root context.
+func (op Op) zChain() *paintCtxFrame {
+	if op.opExtra == nil {
+		return nil
+	}
+
+	return op.opExtra.ZChain
+}
+
+// setChrome marks the op as element chrome and records the stacking-context
+// depth it was emitted at for diagnostics.
+func (op *Op) setChrome(depth int) {
+	extra := op.detachExtra()
+	extra.IsChrome = true
+	extra.ChromeDepth = depth
+}
+
+// isChrome reports whether the op is element chrome (background, border, or
+// box shadow emitted by prependChrome).
+func (op Op) isChrome() bool {
+	return op.opExtra != nil && op.opExtra.IsChrome
+}
+
+// chromeDepth returns the stacked-context depth recorded for chrome ops; 0
+// for non-chrome ops and root-level chrome.
+func (op Op) chromeDepth() int {
+	if op.opExtra == nil {
+		return 0
+	}
+
+	return op.opExtra.ChromeDepth
 }
 
 func (op *Op) detachExtra() *opExtra {
@@ -115,12 +172,13 @@ func (op Op) Clone() Op {
 	return op
 }
 
-func (op *Op) setImage(data []byte, width, height int, alt string) {
+func (op *Op) setImage(data []byte, width, height int, alt, src string) {
 	extra := op.detachExtra()
 	extra.Image = data
 	extra.ImgW = width
 	extra.ImgH = height
 	extra.Alt = alt
+	extra.Src = src
 }
 
 func (op *Op) setBlendMode(mode string) {
@@ -201,15 +259,39 @@ func (op *Op) setStructElem(elem *pdf.StructElem) {
 	op.detachExtra().StructElem = elem
 }
 
-func (op Op) withImage(data []byte, width, height int, alt string) Op {
+func (op Op) withImage(data []byte, width, height int, alt, src string) Op {
 	extra := op.detachedExtraCopy()
 	extra.Image = data
 	extra.ImgW = width
 	extra.ImgH = height
 	extra.Alt = alt
+	extra.Src = src
 	op.opExtra = extra
 
 	return op
+}
+
+// ImageSrc returns the fetch source of the op's image payload, or "" when the
+// payload was generated in-process (gradients, inline SVG, border slices).
+func (op Op) ImageSrc() string {
+	if op.opExtra == nil {
+		return ""
+	}
+
+	return op.opExtra.Src
+}
+
+// imageSrcLogLimit caps a src echoed into warnings and embed errors so a
+// data: URI cannot write a megabyte-scale log line.
+const imageSrcLogLimit = 200
+
+// truncateImageSrc caps src for log and error text.
+func truncateImageSrc(src string) string {
+	if len(src) <= imageSrcLogLimit {
+		return src
+	}
+
+	return src[:imageSrcLogLimit] + "..."
 }
 
 func (op Op) withURI(uri string) Op {

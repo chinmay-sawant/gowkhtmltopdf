@@ -1,0 +1,473 @@
+{
+  "pdf": "learncpp.pdf",
+  "pages": 19,
+  "total_words": 2531,
+  "total_link_annots": 371,
+  "fonts": [
+    "AUCQNI+LiberationSans",
+    "BRGTJZ+OpenSans",
+    "SPTOVV+OpenSans",
+    "SWVYPG+LiberationSans-Bold",
+    "VGXGZY+LiberationSans",
+    "VQINZA+LiberationSans-Bold"
+  ],
+  "suspicious_pages": [],
+  "per_page": [
+    {
+      "page": 1,
+      "words": 145,
+      "text_box": [
+        39.3,
+        68.9,
+        577.5,
+        799.1
+      ],
+      "coverage": 0.59423,
+      "drawings": 54,
+      "annots": 0,
+      "link_annots": 8,
+      "fonts": [
+        "AUCQNI+LiberationSans",
+        "BRGTJZ+OpenSans",
+        "SPTOVV+OpenSans",
+        "VQINZA+LiberationSans-Bold"
+      ],
+      "page_size": [
+        595.3,
+        841.9
+      ]
+    },
+    {
+      "page": 2,
+      "words": 132,
+      "text_box": [
+        58.6,
+        58.6,
+        574.7,
+        778.8
+      ],
+      "coverage": 0.79269,
+      "drawings": 96,
+      "annots": 0,
+      "link_annots": 18,
+      "fonts": [
+        "BRGTJZ+OpenSans",
+        "SPTOVV+OpenSans",
+        "VGXGZY+LiberationSans",
+        "VQINZA+LiberationSans-Bold"
+      ],
+      "page_size": [
+        595.3,
+        841.9
+      ]
+    },
+    {
+      "page": 3,
+      "words": 153,
+      "text_box": [
+        58.6,
+        45.8,
+        574.7,
+        795.6
+      ],
+      "coverage": 0.81089,
+      "drawings": 105,
+      "annots": 0,
+      "link_annots": 21,
+      "fonts": [
+        "BRGTJZ+OpenSans",
+        "SPTOVV+OpenSans",
+        "VGXGZY+LiberationSans",
+        "VQINZA+LiberationSans-Bold"
+      ],
+      "page_size": [
+        595.3,
+        841.9
+      ]
+    },
+    {
+      "page": 4,
+      "words": 126,
+      "text_box": [
+        58.6,
+        75.6,
+        577.1,
+        812.3
+      ],
+      "coverage": 0.80804,
+      "drawings": 95,
+      "annots": 0,
+      "link_annots": 19,
+      "fonts": [
+        "AUCQNI+LiberationSans",
+        "BRGTJZ+OpenSans",
+        "SPTOVV+OpenSans",
+        "VQINZA+LiberationSans-Bold"
+      ],
+      "page_size": [
+        595.3,
+        841.9
+      ]
+    },
+    {
+      "page": 5,
+      "words": 128,
+      "text_box": [
+        58.6,
+        33.5,
+        576.2,
+        811.3
+      ],
+      "coverage": 0.80904,
+      "drawings": 108,
+      "annots": 0,
+      "link_annots": 21,
+      "fonts": [
+        "AUCQNI+LiberationSans",
+        "BRGTJZ+OpenSans",
+        "SPTOVV+OpenSans",
+        "VQINZA+LiberationSans-Bold"
+      ],
+      "page_size": [
+        595.3,
+        841.9
+      ]
+    },
+    {
+      "page": 6,
+      "words": 133,
+      "text_box": [
+        58.6,
+        33.4,
+        576.2,
+        790.8
+      ],
+      "coverage": 0.80921,
+      "drawings": 100,
+      "annots": 0,
+      "link_annots": 20,
+      "fonts": [
+        "AUCQNI+LiberationSans",
+        "BRGTJZ+OpenSans",
+        "SPTOVV+OpenSans",
+        "VQINZA+LiberationSans-Bold"
+      ],
+      "page_size": [
+        595.3,
+        841.9
+      ]
+    },
+    {
+      "page": 7,
+      "words": 137,
+      "text_box": [
+        58.6,
+        29.0,
+        574.7,
+        785.2
+      ],
+      "coverage": 0.81044,
+      "drawings": 108,
+      "annots": 0,
+      "link_annots": 24,
+      "fonts": [
+        "AUCQNI+LiberationSans",
+        "BRGTJZ+OpenSans",
+        "SPTOVV+OpenSans",
+        "VQINZA+LiberationSans-Bold"
+      ],
+      "page_size": [
+        595.3,
+        841.9
+      ]
+    },
+    {
+      "page": 8,
+      "words": 140,
+      "text_box": [
+        58.6,
+        21.1,
+        574.7,
+        808.7
+      ],
+      "coverage": 0.80238,
+      "drawings": 107,
+      "annots": 0,
+      "link_annots": 21,
+      "fonts": [
+        "AUCQNI+LiberationSans",
+        "BRGTJZ+OpenSans",
+        "SPTOVV+OpenSans",
+        "VQINZA+LiberationSans-Bold"
+      ],
+      "page_size": [
+        595.3,
+        841.9
+      ]
+    },
+    {
+      "page": 9,
+      "words": 142,
+      "text_box": [
+        58.6,
+        32.4,
+        576.2,
+        787.6
+      ],
+      "coverage": 0.80993,
+      "drawings": 112,
+      "annots": 0,
+      "link_annots": 21,
+      "fonts": [
+        "AUCQNI+LiberationSans",
+        "BRGTJZ+OpenSans",
+        "SPTOVV+OpenSans",
+        "VQINZA+LiberationSans-Bold"
+      ],
+      "page_size": [
+        595.3,
+        841.9
+      ]
+    },
+    {
+      "page": 10,
+      "words": 136,
+      "text_box": [
+        58.6,
+        21.1,
+        578.8,
+        782.3
+      ],
+      "coverage": 0.7884,
+      "drawings": 102,
+      "annots": 0,
+      "link_annots": 20,
+      "fonts": [
+        "AUCQNI+LiberationSans",
+        "BRGTJZ+OpenSans",
+        "SPTOVV+OpenSans",
+        "VQINZA+LiberationSans-Bold"
+      ],
+      "page_size": [
+        595.3,
+        841.9
+      ]
+    },
+    {
+      "page": 11,
+      "words": 144,
+      "text_box": [
+        58.6,
+        30.4,
+        574.7,
+        803.8
+      ],
+      "coverage": 0.81003,
+      "drawings": 101,
+      "annots": 0,
+      "link_annots": 20,
+      "fonts": [
+        "BRGTJZ+OpenSans",
+        "SPTOVV+OpenSans",
+        "VGXGZY+LiberationSans",
+        "VQINZA+LiberationSans-Bold"
+      ],
+      "page_size": [
+        595.3,
+        841.9
+      ]
+    },
+    {
+      "page": 12,
+      "words": 145,
+      "text_box": [
+        58.6,
+        36.9,
+        574.7,
+        812.5
+      ],
+      "coverage": 0.81157,
+      "drawings": 105,
+      "annots": 0,
+      "link_annots": 22,
+      "fonts": [
+        "AUCQNI+LiberationSans",
+        "BRGTJZ+OpenSans",
+        "SPTOVV+OpenSans",
+        "VQINZA+LiberationSans-Bold"
+      ],
+      "page_size": [
+        595.3,
+        841.9
+      ]
+    },
+    {
+      "page": 13,
+      "words": 125,
+      "text_box": [
+        58.6,
+        25.0,
+        575.4,
+        801.5
+      ],
+      "coverage": 0.81008,
+      "drawings": 105,
+      "annots": 0,
+      "link_annots": 19,
+      "fonts": [
+        "BRGTJZ+OpenSans",
+        "SPTOVV+OpenSans",
+        "VGXGZY+LiberationSans",
+        "VQINZA+LiberationSans-Bold"
+      ],
+      "page_size": [
+        595.3,
+        841.9
+      ]
+    },
+    {
+      "page": 14,
+      "words": 133,
+      "text_box": [
+        58.6,
+        41.6,
+        574.7,
+        809.4
+      ],
+      "coverage": 0.80834,
+      "drawings": 101,
+      "annots": 0,
+      "link_annots": 19,
+      "fonts": [
+        "AUCQNI+LiberationSans",
+        "BRGTJZ+OpenSans",
+        "SPTOVV+OpenSans",
+        "SWVYPG+LiberationSans-Bold"
+      ],
+      "page_size": [
+        595.3,
+        841.9
+      ]
+    },
+    {
+      "page": 15,
+      "words": 131,
+      "text_box": [
+        58.6,
+        21.9,
+        574.7,
+        799.2
+      ],
+      "coverage": 0.81379,
+      "drawings": 108,
+      "annots": 0,
+      "link_annots": 22,
+      "fonts": [
+        "BRGTJZ+OpenSans",
+        "SPTOVV+OpenSans",
+        "VGXGZY+LiberationSans",
+        "VQINZA+LiberationSans-Bold"
+      ],
+      "page_size": [
+        595.3,
+        841.9
+      ]
+    },
+    {
+      "page": 16,
+      "words": 146,
+      "text_box": [
+        58.6,
+        47.6,
+        574.7,
+        810.1
+      ],
+      "coverage": 0.81093,
+      "drawings": 107,
+      "annots": 0,
+      "link_annots": 22,
+      "fonts": [
+        "AUCQNI+LiberationSans",
+        "BRGTJZ+OpenSans",
+        "SPTOVV+OpenSans",
+        "VQINZA+LiberationSans-Bold"
+      ],
+      "page_size": [
+        595.3,
+        841.9
+      ]
+    },
+    {
+      "page": 17,
+      "words": 127,
+      "text_box": [
+        58.6,
+        32.2,
+        574.7,
+        801.5
+      ],
+      "coverage": 0.81138,
+      "drawings": 108,
+      "annots": 0,
+      "link_annots": 22,
+      "fonts": [
+        "AUCQNI+LiberationSans",
+        "BRGTJZ+OpenSans",
+        "SPTOVV+OpenSans",
+        "VQINZA+LiberationSans-Bold"
+      ],
+      "page_size": [
+        595.3,
+        841.9
+      ]
+    },
+    {
+      "page": 18,
+      "words": 129,
+      "text_box": [
+        58.6,
+        39.3,
+        579.6,
+        792.6
+      ],
+      "coverage": 0.8017,
+      "drawings": 116,
+      "annots": 0,
+      "link_annots": 20,
+      "fonts": [
+        "AUCQNI+LiberationSans",
+        "BRGTJZ+OpenSans",
+        "SPTOVV+OpenSans",
+        "VQINZA+LiberationSans-Bold"
+      ],
+      "page_size": [
+        595.3,
+        841.9
+      ]
+    },
+    {
+      "page": 19,
+      "words": 79,
+      "text_box": [
+        58.6,
+        30.4,
+        574.7,
+        498.9
+      ],
+      "coverage": 0.49192,
+      "drawings": 62,
+      "annots": 0,
+      "link_annots": 12,
+      "fonts": [
+        "BRGTJZ+OpenSans",
+        "SPTOVV+OpenSans",
+        "VGXGZY+LiberationSans",
+        "VQINZA+LiberationSans-Bold"
+      ],
+      "page_size": [
+        595.3,
+        841.9
+      ]
+    }
+  ]
+}

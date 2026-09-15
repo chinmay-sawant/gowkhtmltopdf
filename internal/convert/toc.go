@@ -199,6 +199,7 @@ func layoutTOC(ctx context.Context, font *pdf.Font, state *objectState, entries 
 		Height: state.geom.contentH,
 		Font:   font,
 		Media:  media,
+		Warnf:  layoutWarnf(log, state.idx+1),
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("object %d: toc: layout: %w", state.idx+1, err)

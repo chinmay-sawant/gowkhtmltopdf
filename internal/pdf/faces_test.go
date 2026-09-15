@@ -155,12 +155,15 @@ func TestMultiFacePDFEmbed(t *testing.T) {
 	}
 
 	out := buf.Bytes()
-	if !bytes.Contains(out, []byte("/BaseFont /LiberationSans")) {
-		t.Error("missing regular BaseFont")
-	}
+	// Both faces embed as subsets, so every /BaseFont reference must name the
+	// face with its deterministic six-letter tag, never the bare name.
+	assertTaggedBaseFontName(t, out, "LiberationSans")
+	assertTaggedBaseFontName(t, out, "LiberationSans-Bold")
 
-	if !bytes.Contains(out, []byte("/BaseFont /LiberationSans-Bold")) {
-		t.Error("missing bold BaseFont")
+	for _, name := range baseFontNames(out) {
+		if !subsetNameRE.MatchString(name) {
+			t.Errorf("BaseFont %q is missing a six-letter subset tag", name)
+		}
 	}
 	// two FontFile2 streams
 	if n := bytes.Count(out, []byte("/FontFile2")); n < 2 {

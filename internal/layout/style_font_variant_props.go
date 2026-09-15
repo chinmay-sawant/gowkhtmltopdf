@@ -366,8 +366,7 @@ func isASCIIDigit(c byte) bool {
 // fontShapingLanguage returns the language tag shaping must use for sty.
 // font-language-override wins over the document language for the element. The
 // document language is not available in the layout engine today (convert
-// reads <html lang> only for the PDF/UA /Lang tag), so an unset override
-// yields "".
+// reads <html lang> for the PDF /Lang tag), so an unset override yields "".
 //
 // internal/layout attaches the result to each OpText and the shaper consumes
 // it in internal/pdf/shape_gotext.go (shapingInput).

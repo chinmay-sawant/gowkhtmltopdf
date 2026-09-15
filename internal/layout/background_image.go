@@ -83,12 +83,12 @@ func (e *engine) appendBackgroundImage(
 					H:            destH,
 					IsJPEG:       false,
 					IsBackground: true,
-				}).withImage(pngData, imgW, imgH, "").withBlendMode(
+				}).withImage(pngData, imgW, imgH, "", "").withBlendMode(
 					backgroundBlendModeForLayer(sty.BackgroundBlendMode, i),
 				)
 				if sty.Filter != "" {
 					filters := parseFilterList(sty.Filter, sty.Color, sty.FontSize)
-					baseOp.setImage(applyImageFilterToImage(baseOp.Image, filters), imgW, imgH, "")
+					baseOp.setImage(applyImageFilterToImage(baseOp.Image, filters), imgW, imgH, "", "")
 				}
 				dst = tileBackgroundRepeat(
 					dst, baseOp, repeatX, repeatY, clip, destX, destY, destW, destH,
@@ -103,7 +103,7 @@ func (e *engine) appendBackgroundImage(
 		}
 
 		ref := e.resolveImage(src)
-		if ref == nil || ref.data == nil {
+		if ref == nil || len(ref.data) == 0 {
 			continue
 		}
 
@@ -138,12 +138,12 @@ func (e *engine) appendBackgroundImage(
 			H:            destH,
 			IsJPEG:       ref.isJPEG,
 			IsBackground: true,
-		}).withImage(ref.data, ref.w, ref.h, "").withBlendMode(
+		}).withImage(ref.data, ref.w, ref.h, "", src).withBlendMode(
 			backgroundBlendModeForLayer(sty.BackgroundBlendMode, i),
 		)
 		if sty.Filter != "" {
 			filters := parseFilterList(sty.Filter, sty.Color, sty.FontSize)
-			baseOp.setImage(applyImageFilterToImage(baseOp.Image, filters), ref.w, ref.h, "")
+			baseOp.setImage(applyImageFilterToImage(baseOp.Image, filters), ref.w, ref.h, "", src)
 		}
 
 		dst = tileBackgroundRepeat(
@@ -487,7 +487,14 @@ func backgroundImageSrc(layer string) string {
 		return ""
 	}
 
-	return strings.Trim(layer, `"'`)
+	target := strings.Trim(layer, `"'`)
+	// A bare token that parses as a CSS color is a background color leaking
+	// through a multi-layer value or a non-url source: never a fetch target.
+	if _, _, _, _, isColor := css.ParseColor(target); isColor {
+		return ""
+	}
+
+	return target
 }
 
 // splitCommaLayers splits raw by top-level commas, not splitting commas inside

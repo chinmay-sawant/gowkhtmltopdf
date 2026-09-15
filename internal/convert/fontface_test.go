@@ -3,14 +3,26 @@ package convert
 import (
 	"bytes"
 	"compress/zlib"
+	"encoding/base64"
 	"encoding/binary"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
+
+// hasBaseFont reports whether data references a /BaseFont named Custom, the
+// font-family this file's fixtures register. The writer prefixes embedded fonts
+// with a PDF subset tag (six uppercase letters plus "+"), so both
+// "/BaseFont /Custom" and "/BaseFont /ABCDEF+Custom" match.
+func hasBaseFont(data []byte) bool {
+	re := regexp.MustCompile(`/BaseFont /(?:[A-Z]{6}\+)?Custom[^A-Za-z]`)
+
+	return re.Match(data)
+}
 
 // copyTestdataTTF copies a known TTF into dir as Custom.ttf for @font-face fixtures.
 // Prefer Liberation (full Latin cmap) so ASCII body text actually uses the face.
@@ -59,8 +71,9 @@ func TestFontFaceLocalEmbed(t *testing.T) {
 	if !bytes.Contains(data, []byte("/FontFile2")) {
 		t.Error("expected embedded subset font (/FontFile2)")
 	}
-	// MergeFontFaces sets PostScriptName from font-family → /BaseFont /Custom
-	if !bytes.Contains(data, []byte("/BaseFont /Custom")) {
+	// MergeFontFaces sets PostScriptName from font-family; the writer may add
+	// a six-letter subset tag in front of it.
+	if !hasBaseFont(data) {
 		t.Errorf("expected /BaseFont /Custom from @font-face; log=%q", log.String())
 	}
 }
@@ -108,7 +121,7 @@ func TestFontFaceACLDeny(t *testing.T) {
 		t.Errorf("expected @font-face ACL warning; log=%q", warn)
 	}
 	// Face must not register under Custom when FetchSub is denied.
-	if bytes.Contains(data, []byte("/BaseFont /Custom")) {
+	if hasBaseFont(data) {
 		t.Error("ACL deny must not embed /BaseFont /Custom")
 	}
 
@@ -135,18 +148,18 @@ func TestFontFaceWOFFEmbed(t *testing.T) {
 	var log bytes.Buffer
 	data := runPDFWithLog(t, cmd, &log)
 
-	if !bytes.Contains(data, []byte("/BaseFont /Custom")) {
+	if !hasBaseFont(data) {
 		t.Errorf("expected WOFF1 @font-face embed /BaseFont /Custom; log=%q", log.String())
 	}
 }
 
-func TestFontFaceWOFF2Skipped(t *testing.T) {
+func TestFontFaceBadWOFF2Skipped(t *testing.T) {
 	t.Parallel()
 
 	html := `<html><head><style>
 @font-face { font-family: Custom; src: url(Custom.woff2); }
 body { font-family: Custom, sans-serif; }
-</style></head><body><p>WOFF2 skip</p></body></html>`
+</style></head><body><p>WOFF2 bad</p></body></html>`
 
 	cmd, dir := newCommand(t, html, filepath.Join(t.TempDir(), "out.pdf"))
 	if err := os.WriteFile(filepath.Join(dir, "Custom.woff2"), []byte("wOF2not-real"), 0o600); err != nil {
@@ -156,8 +169,38 @@ body { font-family: Custom, sans-serif; }
 	var log bytes.Buffer
 	data := runPDFWithLog(t, cmd, &log)
 
-	if bytes.Contains(data, []byte("/BaseFont /Custom")) {
-		t.Error("WOFF2 src must not register Custom")
+	if hasBaseFont(data) {
+		t.Error("undecodable WOFF2 src must not register Custom")
+	}
+
+	if !strings.Contains(log.String(), "woff2: invalid font data") {
+		t.Errorf("expected a decode failure warning; log=%q", log.String())
+	}
+}
+
+// TestFontFaceWOFF2Embed proves a real WOFF2 source registers in the full
+// convert pipeline (decode + face lookup), not just in the prepare unit test.
+func TestFontFaceWOFF2Embed(t *testing.T) {
+	t.Parallel()
+
+	cmd, dir := newCommand(t, fontFaceHTML("Custom.woff2"), filepath.Join(t.TempDir(), "out.pdf"))
+
+	woff2Path := filepath.Join("..", "..", "testdata", "fonts", "woff2", "LiberationSans-Regular-latin.woff2")
+
+	fixture, err := os.ReadFile(woff2Path)
+	if err != nil {
+		t.Fatalf("read woff2 fixture: %v", err)
+	}
+
+	if err := os.WriteFile(filepath.Join(dir, "Custom.woff2"), fixture, 0o600); err != nil {
+		t.Fatalf("write woff2: %v", err)
+	}
+
+	var log bytes.Buffer
+	data := runPDFWithLog(t, cmd, &log)
+
+	if !hasBaseFont(data) {
+		t.Errorf("expected WOFF2 @font-face embed /BaseFont /Custom; log=%q", log.String())
 	}
 }
 
@@ -177,7 +220,7 @@ body { font-family: Custom, sans-serif; }
 	var log bytes.Buffer
 	data := runPDFWithLog(t, cmd, &log)
 
-	if bytes.Contains(data, []byte("/BaseFont /Custom")) {
+	if hasBaseFont(data) {
 		t.Error("bad WOFF must not register Custom")
 	}
 }
@@ -195,12 +238,12 @@ body { font-family: Custom, sans-serif; }
 	var log bytes.Buffer
 	data := runPDFWithLog(t, cmd, &log)
 
-	if bytes.Contains(data, []byte("/BaseFont /Custom")) {
+	if hasBaseFont(data) {
 		t.Error("failed https @font-face must not register Custom")
 	}
 }
 
-func TestFontFaceDataSkipped(t *testing.T) {
+func TestFontFaceUndecodableDataSkipped(t *testing.T) {
 	t.Parallel()
 
 	html := `<html><head><style>
@@ -212,8 +255,120 @@ body { font-family: Custom, sans-serif; }
 	var log bytes.Buffer
 	data := runPDFWithLog(t, cmd, &log)
 
-	if bytes.Contains(data, []byte("/BaseFont /Custom")) {
-		t.Error("data: @font-face src must not register Custom")
+	if hasBaseFont(data) {
+		t.Error("undecodable data: @font-face src must not register Custom")
+	}
+
+	if !strings.Contains(log.String(), "src skipped (data:font/ttf;base64,") {
+		t.Errorf("expected a data: skip warning naming the media type; log=%q", log.String())
+	}
+}
+
+// TestFontFaceMissingWOFF2WithTTFFallback proves a missing WOFF2 source falls
+// through to a later TTF source in the same src (fetch failure, then parse the
+// next candidate). Format policy no longer skips .woff2 outright.
+func TestFontFaceMissingWOFF2WithTTFFallback(t *testing.T) {
+	t.Parallel()
+
+	srcs := map[string]string{
+		"plain": `url(Custom.woff2) format("woff2"), url(Custom.ttf)`,
+		"query": `url(Custom.woff2?v=9) format("woff2"), url(Custom.ttf)`,
+	}
+
+	for name, src := range srcs {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			html := `<html><head><style>
+@font-face { font-family: Custom; src: ` + src + `; }
+body { font-family: Custom, sans-serif; font-size: 14pt; }
+</style></head><body><p>woff2 fallback</p></body></html>`
+			cmd, dir := newCommand(t, html, filepath.Join(t.TempDir(), "out.pdf"))
+			// No Custom.woff2 on disk: the fetch fails and the later TTF must
+			// still register.
+			copyTestdataTTF(t, dir)
+
+			var log bytes.Buffer
+			data := runPDFWithLog(t, cmd, &log)
+
+			if !hasBaseFont(data) {
+				t.Errorf("TTF fallback after a missing WOFF2 did not register; log=%q", log.String())
+			}
+
+			if !strings.Contains(log.String(), "Custom.woff2") {
+				t.Errorf("expected a WOFF2 failure warning naming the source; log=%q", log.String())
+			}
+		})
+	}
+}
+
+func TestFontFaceDataURIRegistersSupportedPayload(t *testing.T) {
+	t.Parallel()
+
+	ttfPath := copyTestdataTTF(t, t.TempDir())
+
+	ttf, err := os.ReadFile(ttfPath)
+	if err != nil {
+		t.Fatalf("read ttf: %v", err)
+	}
+
+	tests := []struct {
+		name string
+		uri  string
+	}{
+		{"woff1", "data:font/woff;base64," + base64.StdEncoding.EncodeToString(encodeWOFF1Test(t, ttf))},
+		{"ttf", "data:font/ttf;base64," + base64.StdEncoding.EncodeToString(ttf)},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			cmd, _ := newCommand(t, fontFaceHTML(test.uri), filepath.Join(t.TempDir(), "out.pdf"))
+
+			var log bytes.Buffer
+			data := runPDFWithLog(t, cmd, &log)
+
+			if !hasBaseFont(data) {
+				t.Errorf("data: %s payload did not register /BaseFont /Custom; log=%q", test.name, log.String())
+			}
+		})
+	}
+}
+
+// TestFontFaceDataURILogHygiene pins the log contract for data: font srcs: no
+// printf format leftovers and no line carrying the base64 payload (the old
+// skip warning formatted a 42KB data URI into the next warning line).
+func TestFontFaceDataURILogHygiene(t *testing.T) {
+	t.Parallel()
+
+	payload := bytes.Repeat([]byte{0xAB}, 32*1024)
+	encoded := base64.StdEncoding.EncodeToString(payload)
+	uri := "data:font/woff2;base64," + encoded
+
+	cmd, _ := newCommand(t, fontFaceHTML(uri), filepath.Join(t.TempDir(), "out.pdf"))
+
+	var log bytes.Buffer
+
+	runPDFWithLog(t, cmd, &log)
+
+	output := log.String()
+	if strings.Contains(output, "%!(EXTRA") {
+		t.Errorf("format/arg mismatch leaked into the log; log=%q", output)
+	}
+
+	if strings.Contains(output, encoded[:64]) {
+		t.Error("base64 payload leaked into the log")
+	}
+
+	for _, line := range strings.Split(output, "\n") {
+		if len(line) > 1024 {
+			t.Errorf("log line is %d bytes, want <= 1024: %.80q...", len(line), line)
+		}
+	}
+
+	if !strings.Contains(output, "src skipped (data:font/woff2;base64,") {
+		t.Errorf("expected a data: skip warning naming scheme and media type; log=%q", output)
 	}
 }
 

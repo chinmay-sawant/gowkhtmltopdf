@@ -70,6 +70,11 @@ type Stylesheet struct {
 	// Imports are @import url/media pairs in source order. Parse fills this;
 	// convert.prepare fetches each under the same ACL as <link rel=stylesheet>.
 	Imports []ImportRule
+	// Base is the URL the sheet was loaded from ("" for sheets that were
+	// never fetched). ResolveURLs records it and rewrites relative url()
+	// values against it. Inline <style> sheets carry the document base;
+	// <base href> is not consulted.
+	Base string
 }
 
 // ImportRule is one @import. URL is the raw url("...") or unquoted path.

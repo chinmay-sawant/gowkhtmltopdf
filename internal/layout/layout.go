@@ -107,9 +107,13 @@ type Options struct {
 	// takes precedence over Images.
 	ImagesContext func(ctx context.Context, src string) ([]byte, error)
 	Images        func(src string) ([]byte, error)
-	Background    bool    // paint background colors
-	DebugBoxes    bool    // outline every box for test/golden output
-	Zoom          float64 // zoom factor; style lengths are scaled by it (any positive value, < 1 shrinks)
+	// Warnf, when non-nil, receives deduplicated layout warnings, such as one
+	// message per image src whose fetched payload cannot be embedded. Nil is
+	// silent.
+	Warnf      func(format string, args ...any)
+	Background bool    // paint background colors
+	DebugBoxes bool    // outline every box for test/golden output
+	Zoom       float64 // zoom factor; style lengths are scaled by it (any positive value, < 1 shrinks)
 	// PrintLinkUnderline is an opt-in operator policy (--print-link-underline):
 	// after cascade, force text-decoration:underline on a[href]. Default off
 	// so author CSS (including inherit → none) is honored.
@@ -569,6 +573,8 @@ type engine struct {
 	zIndex          int
 	zIndexSet       bool
 	positioned      bool
+	zFrame          *paintCtxFrame // innermost stacking context (nil at root)
+	nextCtxSeq      int            // stacking-context frame creation order
 	blendMode       string
 	// blendGroup is the CSS element group that owns newly emitted ops
 	// (mix-blend-mode or isolation: isolate). nil means page-level paint.
@@ -954,10 +960,7 @@ func (e *engine) add(paintOp Op) {
 	}
 
 	if !e.noEmit {
-		paintOp.bindEmptyExtra()
-		paintOp.ZIndex = e.zIndex
-		paintOp.ZIndexSet = e.zIndexSet
-		paintOp.Positioned = e.positioned
+		e.stampPaintState(&paintOp)
 
 		if e.blendGroup != nil {
 			// Group members carry the group pointer, not the inherited blend
@@ -992,161 +995,6 @@ func (e *engine) checkContext() bool {
 	}
 
 	return false
-}
-
-// blendScope captures the state pushZ overrides for one element so popZ can
-// restore it and close the element's group.
-type blendScope struct {
-	prevZ          int
-	prevZSet       bool
-	prevPositioned bool
-	prevBlendMode  string
-	prevGroup      *BlendGroup
-	prevGroupOwner *ResolvedStyle
-	// beginMark is the op index of this element's begin marker, -1 when the
-	// element creates no group.
-	beginMark int
-}
-
-// pushZ enters one element's stacking and compositing scope, emitting the
-// group begin marker when mix-blend-mode or isolation creates a group. owner
-// is the resolved style pointer that identifies the element.
-func (e *engine) pushZ(style ResolvedStyle, owner *ResolvedStyle) blendScope {
-	prev := blendScope{
-		prevZ:          e.zIndex,
-		prevZSet:       e.zIndexSet,
-		prevPositioned: e.positioned,
-		prevBlendMode:  e.blendMode,
-		prevGroup:      e.blendGroup,
-		prevGroupOwner: e.blendGroupOwner,
-		beginMark:      -1,
-	}
-	createsBlendContext := style.MixBlendMode != blendNormal || style.Isolation == "isolate"
-
-	if style.Position == positionAbsolute || style.Position == positionFixed {
-		e.positioned = true
-	}
-
-	e.enterStackingContext(style, createsBlendContext)
-	e.enterBlendIsolation(style, owner)
-
-	if e.blendGroup != prev.prevGroup {
-		prev.beginMark = e.addGroupMark(e.blendGroup, groupMarkBegin)
-	}
-
-	return prev
-}
-
-// enterStackingContext applies CSS stacking-context creation: an explicit
-// z-index wins, otherwise transform, opacity, blend, or isolation reset the
-// level to zero.
-func (e *engine) enterStackingContext(style ResolvedStyle, createsBlendContext bool) {
-	if style.ZIndexSet {
-		e.zIndex = style.ZIndex
-		e.zIndexSet = true
-	} else if style.HasTransform || style.Opacity < 1 || createsBlendContext {
-		// CSS: transform, opacity, blend, and isolation create a stacking context.
-		e.zIndex = 0
-		e.zIndexSet = true
-	}
-}
-
-// enterBlendIsolation applies the transform stamp and enters the element's
-// blend group. An HTML element that blends, or that isolates, is an isolated
-// group per CSS Compositing 3.2, so the group starts on a transparent
-// backdrop; descendants inherit the group membership instead of the mode.
-func (e *engine) enterBlendIsolation(style ResolvedStyle, owner *ResolvedStyle) {
-	if style.HasTransform || style.Opacity < 1 {
-		e.needsXformStamp = true
-	}
-
-	// normalizeBlendMode accepts the CSS vocabulary; the style apply arm
-	// already normalized MixBlendMode, so only "normal"/empty skip.
-	mode := ""
-	if style.MixBlendMode != "" && style.MixBlendMode != blendNormal {
-		mode = style.MixBlendMode
-	}
-
-	if mode == "" && style.Isolation != "isolate" {
-		return
-	}
-
-	e.nextGroupID++
-	e.blendGroup = &BlendGroup{
-		ID:      e.nextGroupID,
-		Mode:    mode,
-		Isolate: true,
-		Parent:  e.blendGroup,
-	}
-	e.blendGroupOwner = owner
-
-	if style.Isolation == "isolate" {
-		e.blendMode = ""
-	}
-
-	if mode != "" {
-		e.blendMode = mode
-	}
-}
-
-// addGroupMark appends a begin/end boundary op for group and returns its op
-// index, or -1 when emission is suppressed.
-func (e *engine) addGroupMark(group *BlendGroup, mark uint8) int {
-	if group == nil || e.checkContext() || e.noEmit {
-		return -1
-	}
-
-	e.nextOpID++
-
-	markOp := Op{ //nolint:exhaustruct // marker ops carry only identity and scope
-		ID:         e.nextOpID,
-		Kind:       OpUnknown,
-		ZIndex:     e.zIndex,
-		ZIndexSet:  e.zIndexSet,
-		Positioned: e.positioned,
-	}
-	markOp.setGroupMark(group, mark)
-	e.ops = append(e.ops, markOp)
-
-	return len(e.ops) - 1
-}
-
-// patchGroupMark stamps the owning element's geometry onto a boundary marker.
-// Flow scans (table sliver repair, row tops, page buckets) read op Y, so a
-// zero-height marker at the canvas origin would move unrelated boxes.
-func (e *engine) patchGroupMark(idx int, posX, posY, width, height float64) {
-	if idx < 0 || idx >= len(e.ops) {
-		return
-	}
-
-	e.ops[idx].X = posX
-	e.ops[idx].Y = posY
-	e.ops[idx].W = width
-	e.ops[idx].H = height
-}
-
-// popZ restores the scope pushZ saved. When the element created a group, the
-// end marker is emitted here so the markers stay balanced even when the
-// subtree build emitted no paint operations.
-func (e *engine) popZ(scope blendScope, boxNode *box) {
-	if scope.beginMark >= 0 {
-		if boxNode != nil {
-			e.patchGroupMark(scope.beginMark, boxNode.x, boxNode.y, boxNode.w, boxNode.height)
-		}
-
-		endMark := e.addGroupMark(e.blendGroup, groupMarkEnd)
-
-		if boxNode != nil {
-			e.patchGroupMark(endMark, boxNode.x, boxNode.y, boxNode.w, boxNode.height)
-		}
-	}
-
-	e.zIndex = scope.prevZ
-	e.zIndexSet = scope.prevZSet
-	e.positioned = scope.prevPositioned
-	e.blendMode = scope.prevBlendMode
-	e.blendGroup = scope.prevGroup
-	e.blendGroupOwner = scope.prevGroupOwner
 }
 
 // Layout renders the document into a display list.
@@ -1281,34 +1129,9 @@ func finalizeResult(eng *engine, root *html.Node, opts Options) (*Result, error)
 		stampBoxTransforms(boxNode, IdentityMatrix(), res.Ops)
 	}
 
-	res.MaxContentX, res.HasFragmentLinks = censusOps(res.Ops, opts.Width)
+	res.MaxContentX, res.HasFragmentLinks = censusOps(res.Ops, opts)
 
 	return res, nil
-}
-
-// censusOps records the right edge of fill/stroke/image ops and whether any
-// link URI is a same-document fragment. Width is the floor so MaxContentX is
-// never zero after a real Layout (zero stays the hand-built Result signal).
-func censusOps(ops []Op, width float64) (float64, bool) {
-	maxX := width
-	hasFrag := false
-
-	for idx := range ops {
-		switch ops[idx].Kind {
-		case OpFillRect, OpStrokeRect, OpImage:
-			if ext := ops[idx].X + ops[idx].W; ext > maxX {
-				maxX = ext
-			}
-		case OpLinkURI:
-			if !hasFrag && strings.HasPrefix(ops[idx].URI, "#") {
-				hasFrag = true
-			}
-		case OpLine, OpGridRun, OpText, OpBullet, OpUnknown, opKindNoop:
-			continue
-		}
-	}
-
-	return maxX, hasFrag
 }
 
 // resolveStylesForLayout runs the cascade, re-cascading once when @container
@@ -2238,6 +2061,12 @@ func resolveAutoMargins(style *ResolvedStyle, definiteW bool, width, availW, mar
 // resolveDefiniteWidth applies the width/width% to *w. Returns false when the
 // width resolves to auto (cyclic % honesty: indefinite containing block).
 func resolveDefiniteWidth(eng *engine, style *ResolvedStyle, availW float64, width *float64) bool {
+	if w, ok := calcUsedWidth(*style, availW, eng); ok {
+		*width = w
+
+		return true
+	}
+
 	definiteW := style.Width >= 0 || style.WidthPercent >= 0
 
 	switch {
@@ -2386,9 +2215,9 @@ func (e *engine) buildOutOfFlow(node *html.Node, sty ResolvedStyle, availW, x, y
 
 	absX := cbX
 	if !sty.LeftAuto {
-		absX = cbX + e.scalePt(sty.Left)
+		absX = cbX + e.insetDist(sty.Left, sty.LeftPercent, cbW)
 	} else if !sty.RightAuto {
-		absX = cbX + cbW - boxNode.w - e.scalePt(sty.Right)
+		absX = cbX + cbW - boxNode.w - e.insetDist(sty.Right, sty.RightPercent, cbW)
 	}
 
 	cbH := e.absCBHeights[node]
@@ -2406,12 +2235,12 @@ func (e *engine) buildOutOfFlow(node *html.Node, sty ResolvedStyle, availW, x, y
 // right are both set, width fills the remaining space. Otherwise width is
 // shrink-to-fit capped by the remaining CB space (CSS 2.1 §10.3.7).
 func (e *engine) absoluteBuildWidth(node *html.Node, sty ResolvedStyle, cbW float64) float64 {
-	if sty.Width >= 0 || sty.WidthPercent >= 0 {
+	if sty.Width >= 0 || sty.WidthPercent >= 0 || sty.WidthCalc {
 		return cbW
 	}
 
 	if !sty.LeftAuto && !sty.RightAuto {
-		buildW := cbW - e.scalePt(sty.Left+sty.Right)
+		buildW := cbW - e.insetDist(sty.Left, sty.LeftPercent, cbW) - e.insetDist(sty.Right, sty.RightPercent, cbW)
 		if buildW < 0 {
 			return 0
 		}
@@ -2421,11 +2250,11 @@ func (e *engine) absoluteBuildWidth(node *html.Node, sty ResolvedStyle, cbW floa
 
 	avail := cbW
 	if !sty.LeftAuto {
-		avail -= e.scalePt(sty.Left)
+		avail -= e.insetDist(sty.Left, sty.LeftPercent, cbW)
 	}
 
 	if !sty.RightAuto {
-		avail -= e.scalePt(sty.Right)
+		avail -= e.insetDist(sty.Right, sty.RightPercent, cbW)
 	}
 
 	if avail < 0 {
@@ -2442,6 +2271,15 @@ func (e *engine) absoluteBuildWidth(node *html.Node, sty ResolvedStyle, cbW floa
 //nolint:wsl // ordered absolute-positioning cases mirror CSS precedence
 func (e *engine) resolveAbsY(sty ResolvedStyle, boxNode *box, cbY float64, viewportFixed bool, cbH float64) float64 {
 	if !sty.TopAuto {
+		if sty.TopPercent >= 0 {
+			base := cbH
+			if viewportFixed {
+				base = e.opts.Height
+			}
+
+			return cbY + insetUsedPercent(sty.TopPercent, base)
+		}
+
 		return cbY + e.scalePt(sty.Top)
 	}
 
@@ -2449,19 +2287,26 @@ func (e *engine) resolveAbsY(sty ResolvedStyle, boxNode *box, cbY float64, viewp
 		return cbY
 	}
 
+	base := cbH
 	if viewportFixed {
-		absY := e.opts.Height - boxNode.height - e.scalePt(sty.Bottom)
+		base = e.opts.Height
+	}
+
+	bottom := e.insetDist(sty.Bottom, sty.BottomPercent, base)
+
+	if viewportFixed {
+		absY := e.opts.Height - boxNode.height - bottom
 		if absY < 0 {
-			return e.scalePt(sty.Bottom)
+			return bottom
 		}
 
 		return absY
 	}
 	if cbH > 0 {
-		return cbY + cbH - boxNode.height - e.scalePt(sty.Bottom)
+		return cbY + cbH - boxNode.height - bottom
 	}
 
-	return cbY + e.scalePt(sty.Bottom)
+	return cbY + bottom
 }
 
 // buildInFlowDisplay builds flex/grid/multicol/table/block ignoring position.
