@@ -60,13 +60,14 @@ a { text-decoration: none; color: #36c }
 	}
 	// color:inherit still paints black; decoration none/inherit stays un-underlined
 	// unless --print-link-underline is set.
-	for _, op := range res.Ops {
-		if op.Kind == OpText && strings.Contains(op.Text, "Cuba") {
-			if op.R > 0.15 || op.G > 0.15 || op.B > 0.35 {
-				t.Errorf("Cuba link rgb=(%.2f,%.2f,%.2f), want black (color:inherit)", op.R, op.G, op.B)
+	for _, textOp := range res.Ops {
+		if textOp.Kind == OpText && strings.Contains(textOp.Text, "Cuba") {
+			if textOp.R > 0.15 || textOp.G > 0.15 || textOp.B > 0.35 {
+				t.Errorf("Cuba link rgb=(%.2f,%.2f,%.2f), want black (color:inherit)", textOp.R, textOp.G, textOp.B)
 			}
 		}
-		if op.Kind == OpLine {
+
+		if textOp.Kind == OpLine {
 			t.Fatal("unexpected underline OpLine when text-decoration resolves to none")
 		}
 	}
