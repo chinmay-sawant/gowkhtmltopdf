@@ -157,8 +157,8 @@ func (e *engine) applyInlineImageBorders(item *inlineItem, leftX, top float64) (
 }
 
 // emitInlineImage places an image (or inline-block) item on the line and
-// returns the updated x cursor. Replaced content never receives the href
-// force-underline used for text links (that was the thumb hairline source).
+// returns the updated x cursor. Replaced content never receives text
+// underline decorations (that was the thumb hairline source).
 func (e *engine) emitInlineImage(
 	item *inlineItem, leftX, lineY, lineH, baseline, justifyGap float64,
 	gapAfter bool, und *undRun,
@@ -255,12 +255,11 @@ func (e *engine) emitInlineText(
 
 	leftX, runSpan = e.emitTextRuns(item, leftX, textBaseline, shiftedBaseline, size, ascent, descent)
 
-	// Decoration: one stroke per logical link run on this line (not per
+	// Decorations: one stroke per logical link run on this line (not per
 	// face-run / nested style chunk). Thin stroke ~5% em, clamped for
-	// dense reference print (min 0.25pt, max 0.45pt).
-	// Force-underline a[href] for PDF affordance. Bare URL strings
-	// (https://…, archive fragments) never get underlines — multi-line
-	// ref lists were a forest of rules; titles/prose links still underline.
+	// dense reference print (min 0.25pt, max 0.45pt). Cascade wins:
+	// text-decoration:none stays none; --print-link-underline sets
+	// underline after cascade when operators want PDF link affordance.
 	e.paintDecoration(item, runStart, runSpan, size, ascent, descent, shiftedBaseline, child, und)
 	e.paintEmphasis(item, runStart, runSpan, shiftedBaseline, ascent, descent, size)
 
@@ -786,12 +785,11 @@ func (e *engine) paintDecoration(
 		return
 	}
 
-	// A visible border-bottom is already the link affordance (wiki
-	// `.mw-body a:not(.image){border-bottom:1px solid #aaa}`). Painting the
-	// forced href underline on top makes every link look double.
+	// A visible border-bottom is already a link affordance (wiki
+	// `.mw-body a:not(.image){border-bottom:1px solid #aaa}`). Skip the
+	// CSS underline when a bottom border is already painted.
 	hasBottomBorder := inlineBorderVisible(item.style.BorderBottom)
-	wantUnderline := !hasBottomBorder &&
-		(item.style.TextDecoration == cssTextDecorationUnderline || forceLinkUnderline(item))
+	wantUnderline := !hasBottomBorder && hasUnderline(item.style)
 	wsOnly := strings.TrimSpace(item.text) == ""
 	wantLineThrough := hasLineThrough(item.style)
 	wantOverline := hasOverline(item.style)
@@ -901,23 +899,27 @@ func (e *engine) paintDecoration(
 	}
 }
 
-// forceLinkUnderline reports whether a bare href forces an underline for PDF
-// link affordance. Struck-through and overlined links keep only their own
-// decoration.
-func forceLinkUnderline(item *inlineItem) bool {
-	if item.href == "" {
+// hasUnderline reports whether cascade resolved an underline decoration.
+// Struck-through / overlined links keep only those decorations; author
+// text-decoration:none is honored (use --print-link-underline to force).
+func hasUnderline(style *ResolvedStyle) bool {
+	if style == nil {
 		return false
 	}
 
-	if item.style.TextDecoration == cssTextDecorationLineThrough {
+	if style.TextDecoration == cssTextDecorationLineThrough {
 		return false
 	}
 
-	if item.style.TextDecoration == cssTextDecorationOverline || hasOverline(item.style) {
+	if style.TextDecoration == cssTextDecorationOverline || hasOverline(style) {
 		return false
 	}
 
-	return true
+	if style.TextDecoration == cssTextDecorationUnderline {
+		return true
+	}
+
+	return strings.Contains(strings.ToLower(style.TextDecorationLine), "underline")
 }
 
 func hasOverline(style *ResolvedStyle) bool {
