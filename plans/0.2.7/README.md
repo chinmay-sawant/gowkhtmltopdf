@@ -1,9 +1,11 @@
-# Plans - v0.2.7 (LearnCpp real-world conversion)
+# Plans - v0.2.7 (real-world conversion)
 
 | File / Folder | Role |
 |---------------|------|
 | [learncpp/01-canonical-0.2.7-learncpp.md](learncpp/01-canonical-0.2.7-learncpp.md) | Canonical v0.2.7 execution ledger, phases 1-8: learncpp.com conversion fixes |
 | [learncpp/02-canonical-0.2.7-learncpp-visual.md](learncpp/02-canonical-0.2.7-learncpp-visual.md) | Canonical visual ledger, phases 9-15: wkhtmltopdf comparison defects (header branding, chapter badge, print URL spam, pagination paint) plus the mandatory catalogue JSON refresh. Complete 2026-09-16; gates green, 3 deferred rows |
+| [real-sites/01-canonical-0.2.7-real-sites.md](real-sites/01-canonical-0.2.7-real-sites.md) | Real-sites comparison wave, 7 sites vs wkhtmltopdf 0.12.6.1 and Chrome: findings complete and fix wave landed 2026-09-16 - 60 findings (35 engine defects, 8 probes, 17 reference artifacts), 30+ defects fixed with red-first tests, 8 rows deferred with next gates, all site PDFs regenerated, gates green (lint / test / golden / catalogue / claim-scan) |
+| [real-sites/README.md](real-sites/README.md) | Wave index: site table, method, media caveat, evidence map, validation record |
 
 Workflow: [`../../skills/phase-wise-checklist/SKILLS.md`](../../skills/phase-wise-checklist/SKILLS.md)
 
@@ -21,6 +23,17 @@ tagline on one line, `Chapter N` badge inside the card with its number, zero URL
 suffixes in print (19 -> 13 pages), row 21.2 inside its band, catalogue re-pointed
 with no status moves, and `make test` / `make lint` / `make golden` green.
 
+Real-sites wave (`real-sites/01-canonical-0.2.7-real-sites.md`): the same
+picture-diagnosis method applied to seven new sites (Wikipedia Ana de Armas, Go by
+Example, learn-cpp.org, cplusplus.com tutorial, Programiz, TutorialsPoint,
+GeeksforGeeks), one read-only comparison agent per pair against wkhtmltopdf
+0.12.6.1 and Chrome print. Findings complete and fixed 2026-09-16: 60 findings
+(35 engine defects, 8 probes, 17 reference artifacts), 30+ defects fixed across
+`internal/layout`, `internal/pdf`, and `internal/svg` with red-first tests, 8 rows
+deferred with next gates, all seven site PDFs regenerated plus a new w3schools PDF.
+Gates: `make lint` exit 0, `make test` exit 0, `make golden` exit 0 (71 pass),
+catalogue check exit 0, claim-scan clean.
+
 ## Verification
 
 Baseline captured 2026-09-16 on `master` (VERSION 0.2.6):
@@ -36,8 +49,14 @@ After the fix wave (2026-09-16, same VERSION 0.2.6 tree plus the 0.2.7 changes):
 
 After the visual wave (2026-09-16, final tree):
 
-- Print `learncpp.pdf` 226,441 bytes / 13 pages (was 19), no-images 13 pages, screen render 13 pages; all with 0 URL suffixes, 0 literal `()`, 0 covered-text pages
+- Print `real-sites/learncpp/evidence/learncpp.pdf` 226,441 bytes / 13 pages (was 19), no-images 13 pages, screen render 13 pages; all with 0 URL suffixes, 0 literal `()`, 0 covered-text pages. (PDFs moved out of the repo root on 2026-09-16; the command lines above keep their historical output names.)
 - Picture verification (V8/V9): tagline one line 125.65pt, `Chapter 0` digit 6.0pt inside the pill, all 310 row numbers inside their bands, 55 headings / 310 rows intact, fonts subset-tagged
 - Gates run 4 (post-lint): TEST_EXIT=0, LINT_EXIT=0, GOLDEN_EXIT=0
 - Catalogue: `scripts/css-catalog-map.py --check` exit 0, counts unchanged 354/0/464/0
 - Deferred: 9.4c fixed-header chain offset, catalogue map-scan extension (240 of 354 arms)
+
+Real-sites wave (findings only, 2026-09-16):
+
+- Seven gowk artifacts and six wkhtmltopdf references produced; Wikipedia wk segfaults (exit 139, five configs) and Chrome print is the fallback reference; GeeksforGeeks is a bot wall on both sides
+- 60 findings with per-site reports, findings JSON, forensics JSON, probes, and crops under [real-sites/](real-sites/)
+- No engine code changed, no builds, no test or lint runs in this wave

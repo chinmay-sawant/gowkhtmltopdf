@@ -363,6 +363,8 @@ func setFour(_ *ResolvedStyle, value string, top, right, bottom, left *float64, 
 func parseBorder(value string, fsize float64, current [3]float64) (border, bool) { //nolint:cyclop
 	var boxNode border
 
+	widthSet := false
+
 	for start := 0; ; {
 		face, next, ok := nextSpaceToken(value, start)
 		if !ok {
@@ -380,7 +382,11 @@ func parseBorder(value string, fsize float64, current [3]float64) (border, bool)
 			} else if r, g, bb, _, ok := css.ParseColor(face); ok {
 				boxNode.Color = [3]float64{float64(r) / 255, float64(g) / 255, float64(bb) / 255}
 			} else if v, unit, ok := css.ParseLength(face); ok {
+				// An explicit 0 width is a real width (tutorialspoint's
+				// reset `border:0 solid`); only an absent width token takes
+				// the engine's 1pt fallback.
 				boxNode.Width = v
+				widthSet = true
 				if pt, converted := lengthToPt(v, unit, fsize); converted {
 					boxNode.PaintWidth = pt
 				}
@@ -394,7 +400,7 @@ func parseBorder(value string, fsize float64, current [3]float64) (border, bool)
 		boxNode.Style = solidKeyword
 	}
 
-	if boxNode.Width == 0 {
+	if !widthSet {
 		boxNode.Width = 1
 		boxNode.PaintWidth = 1
 	}
@@ -1899,6 +1905,14 @@ var uaDecls = map[string][]css.Declaration{ //nolint:gochecknoglobals // static 
 	},
 	"big": {
 		{Prop: "font-size", Value: "larger"}, //nolint:exhaustruct // intentional zero fields
+	},
+	"sup": {
+		{Prop: "vertical-align", Value: "super"}, //nolint:exhaustruct // intentional zero fields
+		{Prop: "font-size", Value: "smaller"},    //nolint:exhaustruct // intentional zero fields
+	},
+	"sub": {
+		{Prop: "vertical-align", Value: "sub"}, //nolint:exhaustruct // intentional zero fields
+		{Prop: "font-size", Value: "smaller"},  //nolint:exhaustruct // intentional zero fields
 	},
 	"center": {
 		{Prop: "text-align", Value: "center"}, //nolint:exhaustruct // intentional zero fields

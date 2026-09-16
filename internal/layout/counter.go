@@ -18,6 +18,8 @@ const (
 	cssContentNoCloseQuote  = "no-close-quote"
 	defaultQuoteOpen        = "\u201c"
 	defaultQuoteClose       = "\u201d"
+	defaultQuoteOpen2       = "\u2018"
+	defaultQuoteClose2      = "\u2019"
 	counterResetDefault     = 0
 	counterIncrementDefault = 1
 	cssKeywordInitial       = "initial"
@@ -181,8 +183,8 @@ type quoteStyle struct {
 
 func defaultQuotes() quoteStyle {
 	return quoteStyle{
-		opens:  []string{defaultQuoteOpen},
-		closes: []string{defaultQuoteClose},
+		opens:  []string{defaultQuoteOpen, defaultQuoteOpen2},
+		closes: []string{defaultQuoteClose, defaultQuoteClose2},
 		none:   false,
 	}
 }

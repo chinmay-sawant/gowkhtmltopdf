@@ -39,13 +39,17 @@ func paginateOps(ctx context.Context, res *Result, contentH float64) error {
 	// Lift aside callouts that do not fit the remaining Y on this page
 	// before snapCrossingTextOps splits their last lines off to the next
 	// page top (that snap-then-shift left an internal gap in the card).
-	for range 10 {
-		if err := ctx.Err(); err != nil {
-			return fmt.Errorf("layout: paginate ops: %w", err)
-		}
+	if err := liftToFixpoint(ctx, res, contentH, keepImplicitAsides); err != nil {
+		return err
+	}
 
-		if !keepImplicitAsides(res, contentH) {
-			break
+	// Explicit page-break-inside:avoid boxes lift here for the same reason:
+	// snapping their text to the next page first would split the text off its
+	// chrome and leave a gap inside a card that then moves whole anyway
+	// (Programiz pre code cards, real-sites evidence 2026-09-16).
+	if res.hasAvoidInside {
+		if err := liftToFixpoint(ctx, res, contentH, avoidInside); err != nil {
+			return err
 		}
 	}
 
@@ -74,6 +78,23 @@ func paginateOps(ctx context.Context, res *Result, contentH float64) error {
 		return err
 	}
 	// Sticky is applied in Paint after rect splitting (see splitCrossingRects).
+
+	return nil
+}
+
+// liftToFixpoint repeats a lift pass until it reports no change, capped at ten
+// passes. ctx is checked once per pass, so cancellation abandons the partially
+// shifted display list within one pass.
+func liftToFixpoint(ctx context.Context, res *Result, contentH float64, lift func(*Result, float64) bool) error {
+	for range 10 {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("layout: paginate ops: %w", err)
+		}
+
+		if !lift(res, contentH) {
+			break
+		}
+	}
 
 	return nil
 }

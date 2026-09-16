@@ -414,6 +414,13 @@ func (e *engine) prependChrome(insertAt int, boxNode *box, sty ResolvedStyle, po
 		clipOpsSlice(e.ops[insertAt:], e.paddingBoxRect(posX, posY, width, height, sty))
 	}
 
+	// CSS visibility: hidden suppresses this box's own chrome (CSS 2.1
+	// 11.2). An overriding visible descendant still paints, and the
+	// overflow clip above still applies to it.
+	if hidesPaint(&sty) {
+		return
+	}
+
 	var chrome []Op
 	radii, radiiY := usedBorderRadiiXY(sty, width, height)
 	radius := uniformRadius(radii)

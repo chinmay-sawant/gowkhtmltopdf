@@ -75,15 +75,18 @@ func (d *Document) ensureFont(fnt *Font, name string, used []rune) (objRef, erro
 	}
 
 	// The finalize-time rune union makes the cache key and the Type0
-	// decision identical for every page, so both are precomputed once per
-	// document (unionFontRunes) and reused on the hot path.
+	// decision identical for every page that registered this face under this
+	// resource name, so both are precomputed once per document
+	// (unionFontRunes) and reused on the hot path.
 	var key string
 
 	var type0 bool
 
-	if pre, ok := d.fontKeys[name]; ok && d.fontKeyFonts[name] == fnt {
+	union := fontUnionKey{name: name, face: fnt}
+
+	if pre, ok := d.fontKeys[union]; ok {
 		key = pre
-		type0 = d.fontType0[name]
+		type0 = d.fontType0[union]
 	} else {
 		type0 = needsType0(used)
 		mode := 0

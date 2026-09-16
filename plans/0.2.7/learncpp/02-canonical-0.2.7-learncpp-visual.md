@@ -5,6 +5,8 @@
 > **Estimated effort:** 4-6 days across 4 fix waves plus catalogue and closure
 > **Depends on:** `01-canonical-0.2.7-learncpp.md` code wave (complete, gates green); `plans/0.2.6/catalog/` snapshot
 > **Evidence:** `learncpp/evidence/2026-09-16-visual-diagnosis.md`, reference PNGs in the same folder
+>
+> **Artifact paths:** `learncpp.pdf` and `learncpp_noimages.pdf` moved from the repo root to `real-sites/learncpp/evidence/` on 2026-09-16; command lines below keep their historical output names.
 
 ---
 

@@ -423,6 +423,10 @@ func (e *engine) paintReplacedImage(
 		return
 	}
 
+	if hidesPaint(&sty) {
+		return
+	}
+
 	inlineLevel := sty.Display == cssDisplayInline || sty.Display == cssDisplayInlineBlock ||
 		sty.Display == displayInlineFlex || sty.Display == displayInlineGrid || sty.Display == ""
 	if sty.Float == cssDisplayNone && inlineLevel && !e.isGridOrFlexItem(boxNode.node) {
@@ -460,11 +464,18 @@ func (e *engine) paintReplacedImage(
 
 	if thumbImg {
 		e.emitThumbImageBottomSeparator(sty, posX, posY, size.w, size.h)
-
-		return
+	} else {
+		e.prependChrome(len(e.ops)-1, boxNode, sty, posX, posY, boxNode.w, boxNode.height)
 	}
 
-	e.prependChrome(len(e.ops)-1, boxNode, sty, posX, posY, boxNode.w, boxNode.height)
+	// A block-level replaced image emits no inline item, so its link op comes
+	// from the nearest enclosing anchor in the DOM (blockified anchors never
+	// reach collectInlineSpan).
+	if href := enclosingAnchorHref(boxNode.node); href != "" {
+		e.add((Op{ //nolint:exhaustruct // intentional zero fields
+			Kind: OpLinkURI, X: posX, Y: posY, W: boxNode.w, H: boxNode.height,
+		}).withURI(href))
+	}
 }
 
 // emitThumbImageBottomSeparator paints the single bottom rule between a
@@ -519,7 +530,7 @@ func (e *engine) buildHR(n *html.Node, sty ResolvedStyle, availW, posX, posY flo
 		child = sty.BorderTop.Color
 	}
 
-	if boxNode.height > 0 {
+	if boxNode.height > 0 && !hidesPaint(&sty) {
 		e.add(Op{ //nolint:exhaustruct // intentional zero fields
 			Kind: OpFillRect, X: posX, Y: posY, W: boxNode.w, H: boxNode.height,
 			R: child[0], G: child[1], B: child[2],

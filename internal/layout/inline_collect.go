@@ -191,6 +191,8 @@ func bidiScopeReverses(sty ResolvedStyle, items []inlineItem, start int) bool {
 func (e *engine) collectInlineNode(node *html.Node, out *[]inlineItem) {
 	sty := e.styleVal(node)
 
+	before := len(*out)
+
 	switch node.Type {
 	case html.TextNode:
 		e.collectInlineText(node, sty, out)
@@ -198,6 +200,17 @@ func (e *engine) collectInlineNode(node *html.Node, out *[]inlineItem) {
 		e.collectInlineElement(node, sty, out)
 	case html.CommentNode, html.DoctypeNode, html.NodeUnknown:
 		return
+	}
+
+	// Text and images under a blockified anchor are collected without the
+	// inline span flatten that stamps href per item (collectInlineSpan), so
+	// recover the nearest enclosing anchor from the DOM parent chain.
+	if href := enclosingAnchorHref(node); href != "" {
+		for idx := before; idx < len(*out); idx++ {
+			if (*out)[idx].href == "" {
+				(*out)[idx].href = href
+			}
+		}
 	}
 }
 
@@ -310,7 +323,7 @@ func (e *engine) inlineChromeIsAtomic(node *html.Node) bool {
 // wraps; pre-line collapses spaces, preserves newlines, and wraps.
 func (e *engine) collectPreservingNewlines(node *html.Node, sty ResolvedStyle, out *[]inlineItem) {
 	style := e.stylePtr(node)
-	text := node.Text
+	text := normalizeHTMLNewlines(node.Text)
 	collapse := sty.WhiteSpace == cssWhiteSpacePreLine
 	wrap := sty.WhiteSpace != cssWhiteSpacePre
 
@@ -334,6 +347,19 @@ func (e *engine) collectPreservingNewlines(node *html.Node, sty ResolvedStyle, o
 		*out = append(*out, inlineItem{forceBreak: true}) //nolint:exhaustruct // intentional zero fields
 		start += end + 1
 	}
+}
+
+// normalizeHTMLNewlines turns carriage returns into line feeds, matching the
+// HTML input preprocessing rules (CR and CRLF become LF). A preserved CR has
+// no font glyph and painted as a U+FFFD tofu box in pre blocks.
+func normalizeHTMLNewlines(text string) string {
+	if strings.IndexByte(text, '\r') < 0 {
+		return text
+	}
+
+	text = strings.ReplaceAll(text, "\r\n", "\n")
+
+	return strings.ReplaceAll(text, "\r", "\n")
 }
 
 func (e *engine) emitWhiteSpaceLine(line string, style *ResolvedStyle, collapse, wrap bool, out *[]inlineItem) {
@@ -623,14 +649,7 @@ func (e *engine) collectInlineBlockItem(node *html.Node, sty ResolvedStyle, out 
 // collectInlineSpan flattens a display:inline element (e.g. <a>), applying
 // hrefs, pseudo-content and horizontal margins to the generated items.
 func (e *engine) collectInlineSpan(node *html.Node, sty ResolvedStyle, out *[]inlineItem) {
-	href := ""
-
-	if node.Name == cssTagA {
-		h := strings.TrimSpace(node.Attribute("href"))
-		if isLinkHref(h) {
-			href = h
-		}
-	}
+	href := anchorHref(node)
 
 	before := len(*out)
 
@@ -759,11 +778,12 @@ func (e *engine) inlineBlockShrinkAvail(nodeN *html.Node, sty ResolvedStyle) flo
 		return e.containmentInlineBlockAvail(sty)
 	}
 
-	// measureCellContent already returns the max-content border-box width,
-	// including horizontal padding and borders. Add only the outer margins;
-	// adding the chrome again makes inline-block pills grow by a second set of
-	// padding/border widths and leaves misleading empty space on the right.
-	intr := e.measureCellContent(nodeN, sty) +
+	// measureInlineBlockContent already returns the max-content border-box
+	// width, including horizontal padding and borders and any generated
+	// content. Add only the outer margins; adding the chrome again makes
+	// inline-block pills grow by a second set of padding/border widths and
+	// leaves misleading empty space on the right.
+	intr := e.measureInlineBlockContent(nodeN, sty) +
 		e.scalePt(sty.MarginLeft) + e.scalePt(sty.MarginRight) +
 		e.nestedBlockHChrome(nodeN)
 

@@ -245,60 +245,48 @@ func TestRowPaintBandPrefersVerticalRules(t *testing.T) {
 }
 
 // Last body row on a page whose next row continues on the following page must
-// get a full-width bottom seal (fixture-60 pages ending at props 31 and 46).
+// get a full-width bottom seal. Page-ending row indexes move whenever line
+// breaking changes (fixture-60 pages previously ended at props 31 and 46), so
+// derive them from the packed layout instead of pinning prop numbers.
 func TestFixture60PageBottomRowsAreSealed(t *testing.T) {
 	t.Parallel()
 
-	res, table, _ := layoutFixture60(t)
+	res, table, contentH := layoutFixture60(t)
 
-	assertBottomRowsSealed(t, table, res)
-}
+	lastByPage := map[int]int{}
 
-func assertBottomRowsSealed(t *testing.T, table *box, res *Result) {
-	t.Helper()
-
-	for _, want := range []string{"31", "46"} {
-		assertBottomRowSealed(t, table, res, want)
-	}
-}
-
-func assertBottomRowSealed(t *testing.T, table *box, res *Result, want string) {
-	t.Helper()
-
-	rowIdx := findRowWithText(table, res, want)
-	if rowIdx < 0 {
-		t.Fatalf("idx %s not found", want)
-	}
-
-	bandFirst, bandLast, bandTop, bot, ok := rowPaintBand(table.rows[rowIdx], res)
-	_ = bandFirst
-	_ = bandLast
-	_ = bandTop
-
-	if !ok {
-		t.Fatalf("idx %s: no paint band", want)
-	}
-
-	if !hasFullWidthSeal(res, bot) {
-		t.Fatalf("idx %s: missing full-width bottom seal at y=%.2f", want, bot)
-	}
-}
-
-func findRowWithText(table *box, res *Result, want string) int {
-	for rowIdx, row := range table.rows {
-		first, last, _, _, ok := rowPaintBand(row, res)
+	for rowIdx := table.headerRows; rowIdx+1 < len(table.rows); rowIdx++ {
+		_, _, top, _, ok := rowPaintBand(table.rows[rowIdx], res)
 		if !ok {
 			continue
 		}
 
-		for i := first; i <= last && i < len(res.Ops); i++ {
-			if res.Ops[i].Kind == OpText && res.Ops[i].Text == want {
-				return rowIdx
-			}
-		}
+		lastByPage[int(top/contentH)] = rowIdx
 	}
 
-	return -1
+	checked := 0
+
+	for page, rowIdx := range lastByPage {
+		_, _, _, bot, ok := rowPaintBand(table.rows[rowIdx], res)
+		if !ok {
+			continue
+		}
+
+		_, _, nextTop, _, nextOK := rowPaintBand(table.rows[rowIdx+1], res)
+		if !nextOK || int(nextTop/contentH) == page {
+			continue // the next row stays on this page: no bottom seal expected
+		}
+
+		if !hasFullWidthSeal(res, bot) {
+			t.Fatalf("page %d bottom row idx %d: missing full-width seal at y=%.2f", page, rowIdx, bot)
+		}
+
+		checked++
+	}
+
+	if checked < 2 {
+		t.Fatalf("checked %d page-bottom rows, want at least 2", checked)
+	}
 }
 
 func hasFullWidthSeal(res *Result, bot float64) bool {

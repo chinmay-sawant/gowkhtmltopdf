@@ -236,7 +236,7 @@ func TestPDF20InfoAndOutlineUTF8(t *testing.T) {
 		t.Error("PDF 2.0 title was corrupted with '?'")
 	}
 
-	if strings.Contains(outStr, "/Title (Annual Report \\227 2026)") {
+	if strings.Contains(outStr, "/Title (Annual Report \\204 2026)") {
 		t.Error("PDF 2.0 title was folded to Latin-1 instead of UTF-8")
 	}
 
@@ -779,7 +779,7 @@ func TestPDF20FontCacheKeysVersionIndependent(t *testing.T) {
 
 		out := writePDF(t, docObj)
 
-		return docObj.fontKeys["F1"], out
+		return docObj.fontKeys[fontUnionKey{name: "F1", face: fnt}], out
 	}
 
 	key14, out14 := build(WriterPolicy{Version: PDF14})

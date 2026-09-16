@@ -289,21 +289,25 @@ func glyphFaceScore(fnt *Font, codePoint rune, bold, italic bool) int {
 	return score
 }
 
-func pickFace(faces []*Font, weight int, italic bool) *Font {
-	bold := weight >= fontWeightBoldMin
+// italicMatchScore outweighs one weight step so an italic request prefers the
+// family's italic face over a same-weight upright, and vice versa.
+const italicMatchScore = 4
 
+// pickFace selects the face closest to the requested CSS weight and style.
+// Weight comes from the OS/2 usWeightClass, so a family that ships separate
+// 400/500/700 files is not forced onto whichever face registered first; a
+// face without usable OS/2 data reports the CSS default 400. Equal scores
+// keep registration order, which keeps the result deterministic.
+func pickFace(faces []*Font, weight int, italic bool) *Font {
 	var best *Font
 
 	bestScore := -1
 
 	for _, fnt := range faces {
-		score := 0
-		if fnt.Bold() == bold {
-			score += 2
-		}
+		score := weightMatchScore(fnt.WeightClass(), weight)
 
 		if fnt.Italic() == italic {
-			score += 2
+			score += italicMatchScore
 		}
 
 		if score > bestScore {
@@ -313,6 +317,28 @@ func pickFace(faces []*Font, weight int, italic bool) *Font {
 	}
 
 	return best
+}
+
+// weightMatchScore ranks a declared weight against a CSS weight request: an
+// exact match scores highest, then the closest 100-unit step. Distances of
+// four steps or more score zero, so the italic match decides those pairs.
+func weightMatchScore(faceWeight, requested int) int {
+	const (
+		exactScore = 4
+		step       = 100
+	)
+
+	distance := faceWeight - requested
+	if distance < 0 {
+		distance = -distance
+	}
+
+	steps := distance / step
+	if steps >= exactScore {
+		return 0
+	}
+
+	return exactScore - steps
 }
 
 // HasVariationAxes reports whether the face carries an fvar table, that is,

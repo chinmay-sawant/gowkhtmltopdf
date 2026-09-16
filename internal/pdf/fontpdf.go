@@ -102,12 +102,20 @@ func (d *Document) ensureToUnicode(sub *subsetResult, codeBytes int) objRef {
 	}
 
 	buf.WriteString("endcodespacerange\n")
-	// code → unicode (code == rune for both simple Latin-1 and Identity-H CIDs)
+	// code → unicode. Type0 CIDs are the Unicode code points themselves; a
+	// simple font's keys are WinAnsi codes, which decode back to the code
+	// point the glyph was chosen for (bullet code 0x95 → U+2022).
 	type m struct{ code, r rune }
 
 	maps := make([]m, 0, len(sub.glyphIDs))
-	for r := range sub.glyphIDs {
-		maps = append(maps, m{code: r, r: r})
+
+	for runeValue := range sub.glyphIDs {
+		unicode := runeValue
+		if codeBytes < codeBytesTwo {
+			unicode = winAnsiDecode(byte(runeValue))
+		}
+
+		maps = append(maps, m{code: runeValue, r: unicode})
 	}
 
 	sort.Slice(maps, func(a, b int) bool { return maps[a].code < maps[b].code })

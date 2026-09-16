@@ -81,6 +81,17 @@ func (e *engine) measureCellContent(n *html.Node, st ResolvedStyle) float64 {
 	return maxW
 }
 
+// measureInlineBlockContent returns the max-content width of an auto-width
+// inline-block's content. Generated ::before/::after content paints inside
+// the box, so it participates in the shrink-to-fit width; measureCellContent
+// leaves it out (tables and floats measure in-flow content only).
+func (e *engine) measureInlineBlockContent(n *html.Node, st ResolvedStyle) float64 {
+	minW, maxW := e.measureCellMinMaxMode(n, st, true)
+	_ = minW
+
+	return maxW
+}
+
 // measureCellMinMax returns min-content and max-content border-box widths.
 // min-content ≈ longest unbreakable word; max-content ≈ widest line if soft
 // wraps are not taken (hard breaks from <br>/blocks still split lines).
@@ -210,9 +221,17 @@ func (m *cellMeasure) walk(nodeN *html.Node, cstate ResolvedStyle, nowrap bool) 
 // measureText accumulates a text run into the current line, using the same
 // face selection as paint (measureTextFace) - mismatched metrics undersize
 // columns and force emergency wraps on words that should fit.
+func (m *cellMeasure) measureText(text string, cstate *ResolvedStyle, nowrap bool) {
+	m.measureTextBoundary(text, cstate, nowrap, false)
+}
+
+// measureTextBoundary is measureText with control over collapsible spaces at
+// the run's edges. Generated content keeps them: they separate the run from
+// the text on either side, and browsers keep that separation in intrinsic
+// sizes (breadcrumb li::after " : ").
 //
 //nolint:cyclop,funlen // word-scan and nowrap paths share state; splitting hurts readability
-func (m *cellMeasure) measureText(text string, cstate *ResolvedStyle, nowrap bool) {
+func (m *cellMeasure) measureTextBoundary(text string, cstate *ResolvedStyle, nowrap, keepEdges bool) {
 	if cstate == nil {
 		return
 	}
@@ -249,7 +268,7 @@ func (m *cellMeasure) measureText(text string, cstate *ResolvedStyle, nowrap boo
 		chromeW := inlineMeasurementChromeWidth(eng, *cstate)
 		m.lineW += chromeW
 
-		spaceW := m.engine.measureTextFace(" ", cstate)
+		spaceW := eng.measureTextFace(" ", cstate)
 
 		// Leading space if original had leading WS and line already started.
 		if m.lineW > 0 && len(text) > 0 && isHTMLSpace(text[0]) {
@@ -287,16 +306,56 @@ func (m *cellMeasure) measureText(text string, cstate *ResolvedStyle, nowrap boo
 			wStart = wEnd
 		}
 
+		// A collapsible trailing space in generated content separates the run
+		// from the inline content after it; regular text drops it at the line
+		// edge instead.
+		if keepEdges && isHTMLSpace(text[len(text)-1]) {
+			m.lineW += spaceW
+		}
+
 		return
 	}
 
-	full := eng.measureTextFace(transformInlineText(text, cstate.TextTransform), cstate) +
-		inlineMeasurementChromeWidth(eng, *cstate)
+	// white-space:nowrap keeps the run unbreakable but still collapses
+	// whitespace; pre preserves it. Measuring the raw run inflated
+	// pretty-printed inline-block content: the learn-cpp.org dock's indented
+	// Run button measured 2.4x to 6x its one-line width.
+	raw := text
+	preserved := cstate.WhiteSpace == cssWhiteSpacePre
+
+	if !preserved {
+		text = collapseWS(text)
+	}
+
+	if text == "" {
+		return
+	}
+
+	chromeW := inlineMeasurementChromeWidth(eng, *cstate)
+
+	// keepEdges is set for generated content only, so the space advance is
+	// measured here rather than on every nowrap text run.
+	keepEdgeSpaces := keepEdges && !preserved
+	edgeSpaceW := 0.0
+
+	if keepEdgeSpaces {
+		edgeSpaceW = eng.measureTextFace(" ", cstate)
+	}
+
+	if keepEdgeSpaces && len(raw) > 0 && isHTMLSpace(raw[0]) && m.lineW > 0 {
+		m.lineW += edgeSpaceW
+	}
+
+	full := eng.measureTextFace(transformInlineText(text, cstate.TextTransform), cstate) + chromeW
 	m.lineW += full
 	m.noteWord(eng.minContentWidth(text, cstate, full))
 
 	if hasNonHTMLSpace(text) {
 		m.lineHasInk = true
+	}
+
+	if keepEdgeSpaces && isHTMLSpace(raw[len(raw)-1]) {
+		m.lineW += edgeSpaceW
 	}
 }
 
@@ -548,7 +607,7 @@ func (m *cellMeasure) measurePseudo(nodeN *html.Node, host ResolvedStyle, pseudo
 	}
 
 	nowrap := pstyle.WhiteSpace == cssWhiteSpaceNowrap || pstyle.WhiteSpace == cssWhiteSpacePre
-	m.measureText(txt, pstyle, nowrap)
+	m.measureTextBoundary(txt, pstyle, nowrap, true)
 }
 
 // wordBreakPolicy is the single table for "how may a token split?" —

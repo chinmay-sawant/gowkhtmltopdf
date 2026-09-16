@@ -1641,15 +1641,17 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 	return boxNode
 }
 
-// paintWidgetControl paints the native control face for value and checkbox
-// widgets after the box height is final.
-func (e *engine) paintWidgetControl(
-	node *html.Node, style ResolvedStyle, boxNode *box, widget, chkWidget bool, posY float64,
-) {
-	if widget {
+// paintWidgetControl paints the native control face for value, text, and
+// checkbox widgets after the box height is final.
+func (e *engine) paintWidgetControl(node *html.Node, style ResolvedStyle, boxNode *box,
+	widget, chkWidget bool, posY float64) {
+	switch hidden := hidesPaint(&style); {
+	case widget && !hidden:
 		e.paintValueWidget(node, style, boxNode.x, posY, boxNode.w, boxNode.height)
-	} else if chkWidget {
+	case chkWidget && !hidden:
 		e.paintCheckboxWidget(node, style, boxNode.x, posY, boxNode.w, boxNode.height)
+	case !hidden && isTextInputControl(node):
+		e.paintInputText(node, style, boxNode.x, posY, boxNode.w, boxNode.height)
 	}
 }
 
@@ -1720,7 +1722,7 @@ func (e *engine) paintPositionedPseudo( //nolint:cyclop
 	}
 
 	style := e.pseudoStyle(node, pseudoElem, host)
-	if style.Position != positionAbsolute && style.Position != positionFixed {
+	if hidesPaint(style) || (style.Position != positionAbsolute && style.Position != positionFixed) {
 		return
 	}
 
@@ -1992,19 +1994,18 @@ func (e *engine) borderBoxBottom(style ResolvedStyle, contentBottom float64) flo
 }
 
 // resolveBorderBoxHeight is the used border-box height resolver: bottom
-// chrome, then height/min-height/max-height. A definite height floors the
-// content height instead of capping it, so CSS overflow keeps taller content
-// visible.
+// chrome, then height/min-height/max-height. A definite height caps the
+// content height (CSS 2.1 10.6.3); content still paints outside the box.
 func (e *engine) resolveBorderBoxHeight(style ResolvedStyle, contentBottom float64) float64 {
 	return e.applyHeightConstraints(style, e.borderBoxBottom(style, contentBottom))
 }
 
 // applyHeightConstraintsWithCB is the definite-CB form for min/max percent.
 func (e *engine) applyHeightConstraintsWithCB(style *ResolvedStyle, curY float64, cbH float64) float64 {
+	// A definite height caps the content (CSS 2.1 10.6.3); explicit height:0
+	// boxes (cplusplus sidebar, Programiz accordion) rely on it.
 	if h, ok := resolveUsedHeight(style, cbH, e); ok {
-		if curY < h {
-			curY = h
-		}
+		curY = h
 	}
 
 	vChrome := 0.0

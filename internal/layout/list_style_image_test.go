@@ -219,7 +219,11 @@ func testListStyleImagePosition(t *testing.T) {
 		t.Fatalf("outside image X=%.3f should hang left of inside X=%.3f", outside.X, inside.X)
 	}
 
-	wantOutside := listMarkerX(listPosOutside, 40, 12, 7.5)
+	wantOutside, ok := listMarkerX(listPosOutside, 40, 12, 7.5)
+	if !ok {
+		t.Fatal("outside marker at contentX 40 must stay visible")
+	}
+
 	if !near(outside.X, wantOutside) {
 		t.Fatalf("outside image X=%.3f, want %.3f", outside.X, wantOutside)
 	}

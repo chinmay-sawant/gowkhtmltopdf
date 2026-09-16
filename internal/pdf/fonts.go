@@ -62,6 +62,7 @@ type Font struct {
 	xMin, yMin    int16
 	xMax, yMax    int16
 	macStyle      uint16
+	weightClass   int // OS/2 usWeightClass (100..1000); 0 when OS/2 is absent
 	italicAngle   int16
 	capHeight     int16
 
@@ -306,9 +307,17 @@ func (f *Font) parseHmtx() error {
 }
 
 func (f *Font) parseOS2() {
-	tbl, ok := f.tables["OS/2"]
-	if !ok || len(tbl) < 90 {
-		// OS/2 optional; use hhea for cap height fallback
+	tbl, present := f.tables["OS/2"]
+
+	// usWeightClass (offset 4) exists in every OS/2 version, including the
+	// 86-byte version 1 table DejaVu Sans ships, so it is parsed before the
+	// capHeight length gate below.
+	if present && len(tbl) >= os2WeightClassEnd {
+		f.weightClass = int(binary.BigEndian.Uint16(tbl[4:6]))
+	}
+
+	if !present || len(tbl) < 90 {
+		// OS/2 optional (or version 1); use hhea for cap height fallback
 		f.capHeight = f.ascender
 
 		return
@@ -611,11 +620,31 @@ func (f *Font) PDFBBox() (int, int, int, int) {
 	return f.scaleToPDFEm(f.xMin), f.scaleToPDFEm(f.yMin), f.scaleToPDFEm(f.xMax), f.scaleToPDFEm(f.yMax)
 }
 
-// Bold reports whether the font declares a bold macStyle.
+// Bold reports whether the face declares bold weight: the OS/2 usWeightClass
+// at or above 700, or the macStyle bold bit for faces without usable OS/2
+// data. Webfonts often ship a 700 file without the macStyle bit, and both CSS
+// face selection and the layout fake-bold gate need the declared weight, not
+// only macStyle.
 func (f *Font) Bold() bool {
+	return f.WeightClass() >= fontWeightBoldMin
+}
+
+// WeightClass returns the CSS weight used for face matching, in steps of 100.
+// The OS/2 usWeightClass is authoritative; when it is absent or out of range,
+// the macStyle bold bit selects 700 (legacy TrueType) and everything else
+// reports the CSS default 400.
+func (f *Font) WeightClass() int {
 	f.ensureParsed()
 
-	return f.macStyle&1 != 0
+	if f.weightClass >= fontWeightMin && f.weightClass <= fontWeightMax {
+		return f.weightClass
+	}
+
+	if f.macStyle&1 != 0 {
+		return fontWeightBoldMin
+	}
+
+	return fontWeightDefault
 }
 
 // Italic reports whether the font declares an italic macStyle.

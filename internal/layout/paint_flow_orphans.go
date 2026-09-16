@@ -90,7 +90,12 @@ func enforceOrphansWidows(res *Result, boxNode *box, lines []float64, contentH f
 	}
 
 	remaining := float64(layoutOut+1)*contentH - boxNode.y
-	if !hasRoundedOwnChrome(res, boxNode) && preferSplitOverBlank(remaining, boxNode.height, contentH) {
+	// The blank-band guard trades off *legal* splits. A block with fewer
+	// lines than orphans+widows admits no legal Class B break at all, so the
+	// keep-together rule is not a policy choice: shift the whole block when
+	// it fits one page even if that leaves a blank band.
+	if len(lines) >= orphans+widows &&
+		!hasRoundedOwnChrome(res, boxNode) && preferSplitOverBlank(remaining, boxNode.height, contentH) {
 		return false
 	}
 

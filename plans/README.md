@@ -12,7 +12,7 @@ Implementation plans and roadmaps for `gowkhtmltopdf`, partitioned by release ve
 | [0.2.4/](0.2.4/README.md) | **v0.2.4** — idiomatic Document API + CLI rethink + external benches (phases 31–39) | Complete; [release notes](0.2.4/PR/release-v0.2.4.md) |
 | [0.2.5/](0.2.5/README.md) | **v0.2.5 Python cgo c-shared bindings and PyPI** — phases 40–47 (in-process, `CGO_ENABLED=0` pure-Go default kept); font track `font/` already complete | Complete (released 2026-08-26; `VERSION` 0.2.5) |
 | [0.2.6/](0.2.6/README.md) | **v0.2.6 CSS coverage and browser WASM** - catalog-driven print CSS (354 implemented / 0 partial / 464 unsupported), browser WASM output, warm-path recovery | Complete (released 2026-09-13; `VERSION` 0.2.6). [Release notes](0.2.6/PR/release-v0.2.6.md) |
-| [0.2.7/](0.2.7/README.md) | **v0.2.7 LearnCpp real-world conversion** - image payload safety, paint z-order, stylesheet base URLs, font sources, flex/calc width, media selection, PDF polish (phases 1-8); visual wave phases 9-15 (header branding, chapter badge, print URL spam, pagination) plus catalogue JSON refresh | Complete 2026-09-16: code, visual, and docs waves closed with gates green (`make test` / `make lint` / `make golden`). Deferred: 9.4c fixed-header chain offset, catalogue map-scan extension |
+| [0.2.7/](0.2.7/README.md) | **v0.2.7 real-world conversion** - LearnCpp: image payload safety, paint z-order, stylesheet base URLs, font sources, flex/calc width, media selection, PDF polish (phases 1-8); visual wave phases 9-15 (header branding, chapter badge, print URL spam, pagination) plus catalogue JSON refresh; real-sites wave: 7 sites vs wkhtmltopdf 0.12.6.1 and Chrome, 60 findings, 30+ fixed, 8 deferred, artifacts regenerated | LearnCpp code, visual, and docs waves complete 2026-09-16 with gates green (`make test` / `make lint` / `make golden`); real-sites findings and fix waves complete 2026-09-16 with gates green (lint / test / golden / catalogue check / claim-scan). Deferred: 9.4c fixed-header chain offset, catalogue map-scan extension, 8 real-sites rows with next gates |
 
 ---
 
@@ -69,10 +69,13 @@ Implementation plans and roadmaps for `gowkhtmltopdf`, partitioned by release ve
 - [phases/](0.2.5/phases) — Per-phase atomic checklists 40–47
 - `font/` — Already complete font resolution track (phases 01–08, cited in syntheses/roadmap); `VERSION` `0.2.5`
 
-## 0.2.7 (LearnCpp real-world conversion)
+## 0.2.7 (real-world conversion)
 
 - [0.2.7 README](0.2.7/README.md)
 - [learncpp/01-canonical-0.2.7-learncpp.md](0.2.7/learncpp/01-canonical-0.2.7-learncpp.md) - Canonical execution ledger for phases 1-8
+- [learncpp/02-canonical-0.2.7-learncpp-visual.md](0.2.7/learncpp/02-canonical-0.2.7-learncpp-visual.md) - Visual ledger, phases 9-15 (wkhtmltopdf side-by-side, catalogue refresh), complete 2026-09-16
+- [real-sites/01-canonical-0.2.7-real-sites.md](0.2.7/real-sites/01-canonical-0.2.7-real-sites.md) - Real-sites comparison and fix wave: 7 sites vs wkhtmltopdf 0.12.6.1 and Chrome, 60 findings, 30+ defects fixed with red-first tests, 8 deferred with next gates, all site PDFs regenerated; gates green (2026-09-16)
+- [real-sites/](0.2.7/real-sites/) - Wave index and per-site evidence (forensics JSON, findings JSON, reports, probes, crops)
 
 ## 0.2.6 (CSS coverage)
 

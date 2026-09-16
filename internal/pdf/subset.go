@@ -54,13 +54,21 @@ func subsetFont(fnt *Font, used []rune, scope subsetScope) (*subsetResult, error
 		return r <= maxBMPCode
 	}
 
-	glyphSet := collectUsedGlyphs(fnt, used, accept)
+	// A simple-font union holds WinAnsi char codes; the face's cmap is keyed
+	// by the Unicode code point each code decodes to (bullet 0x95 → U+2022).
+	// Type0 unions already hold Unicode code points.
+	decode := func(r rune) rune { return r }
+	if scope == subsetSimple {
+		decode = decodeWinAnsiCode
+	}
+
+	glyphSet := collectUsedGlyphs(fnt, used, accept, decode)
 	glyphs := sortedGlyphs(glyphSet)
 	oldToNew := make(map[uint16]uint16, len(glyphs))
 	advances, lsbs, outlines := collectGlyphData(fnt, glyphs, oldToNew)
 	outlines = cloneOutlines(outlines, oldToNew)
 
-	res := buildSubsetResult(fnt, used, accept, oldToNew)
+	res := buildSubsetResult(fnt, used, accept, decode, oldToNew)
 
 	sub := &subsetter{
 		f:        fnt,
@@ -68,7 +76,7 @@ func subsetFont(fnt *Font, used []rune, scope subsetScope) (*subsetResult, error
 		outlines: outlines,
 		advances: advances,
 		lsbs:     lsbs,
-		mappings: glyphMappings(res.glyphIDs),
+		mappings: glyphMappings(res.glyphIDs, scope),
 	}
 
 	data, err := sub.build()
@@ -99,7 +107,11 @@ func cloneOutlines(outlines [][]byte, oldToNew map[uint16]uint16) [][]byte {
 }
 
 // buildSubsetResult maps the accepted runes to their renumbered glyph ids.
-func buildSubsetResult(fnt *Font, used []rune, accept func(rune) bool, oldToNew map[uint16]uint16) *subsetResult {
+// decode turns a recorded simple-font char code into the Unicode code point
+// the face's cmap is keyed by; it is the identity for Type0.
+func buildSubsetResult(
+	fnt *Font, used []rune, accept func(rune) bool, decode func(rune) rune, oldToNew map[uint16]uint16,
+) *subsetResult {
 	res := &subsetResult{glyphIDs: map[rune]uint16{}} //nolint:exhaustruct // intentional zero-value fields
 
 	for _, rVal := range used {
@@ -107,7 +119,7 @@ func buildSubsetResult(fnt *Font, used []rune, accept func(rune) bool, oldToNew 
 			continue
 		}
 
-		old := fnt.GlyphID(rVal)
+		old := fnt.GlyphID(decode(rVal))
 		if old == 0 {
 			continue
 		}
@@ -120,11 +132,28 @@ func buildSubsetResult(fnt *Font, used []rune, accept func(rune) bool, oldToNew 
 	return res
 }
 
-// glyphMappings builds the sorted rune→glyph mapping table for the cmap.
-func glyphMappings(glyphIDs map[rune]uint16) []codeGlyph {
-	mappings := make([]codeGlyph, 0, len(glyphIDs))
+// glyphMappings builds the sorted code→glyph mapping table for the cmap. For
+// simple fonts it also maps the Unicode code point each WinAnsi code decodes
+// to (bullet code 0x95 → U+2022), so viewers that index the cmap by char code
+// and viewers that decode the code first both find the glyph.
+func glyphMappings(glyphIDs map[rune]uint16, scope subsetScope) []codeGlyph {
+	const aliasSlots = 2 // a glyph may add its decoded Unicode alias
+
+	codes := make(map[rune]uint16, len(glyphIDs)*aliasSlots)
 
 	for r, g := range glyphIDs {
+		codes[r] = g
+
+		if scope == subsetSimple {
+			if decoded := winAnsiDecode(byte(r)); decoded != r {
+				codes[decoded] = g
+			}
+		}
+	}
+
+	mappings := make([]codeGlyph, 0, len(codes))
+
+	for r, g := range codes {
 		mappings = append(mappings, codeGlyph{code: uint16(r), glyph: g})
 	}
 
@@ -133,7 +162,7 @@ func glyphMappings(glyphIDs map[rune]uint16) []codeGlyph {
 	return mappings
 }
 
-func collectUsedGlyphs(fnt *Font, used []rune, accept func(rune) bool) map[uint16]bool {
+func collectUsedGlyphs(fnt *Font, used []rune, accept func(rune) bool, decode func(rune) rune) map[uint16]bool {
 	// .notdef always included
 	glyphSet := map[uint16]bool{0: true}
 
@@ -142,7 +171,7 @@ func collectUsedGlyphs(fnt *Font, used []rune, accept func(rune) bool) map[uint1
 			continue
 		}
 
-		g := fnt.GlyphID(r)
+		g := fnt.GlyphID(decode(r))
 		if g == 0 {
 			continue
 		}
@@ -152,6 +181,11 @@ func collectUsedGlyphs(fnt *Font, used []rune, accept func(rune) bool) map[uint1
 
 	return glyphSet
 }
+
+// decodeWinAnsiCode maps a simple-font char code to the Unicode code point
+// the embedded subset cmap is keyed by. Only codes accepted by simpleFontRune
+// reach it, so the byte cast never truncates.
+func decodeWinAnsiCode(r rune) rune { return winAnsiDecode(byte(r)) }
 
 func sortedGlyphs(set map[uint16]bool) []uint16 {
 	// sort glyphs by original id for deterministic output
@@ -606,8 +640,9 @@ func writeCmap4Arrays(buf []byte, segs []cmap4Seg) {
 	}
 }
 
-// simpleFontRune reports whether r can be encoded as a single-byte char code
-// in a simple PDF font (Latin-1 range; Type0/CID is deferred).
+// simpleFontRune reports whether r can be a single-byte char code in a simple
+// PDF font (0x00-0xFF; Type0/CID is deferred). Recorded simple-font values are
+// WinAnsi codes, which range over the same bytes.
 func simpleFontRune(r rune) bool { return r >= 0 && r <= 0xFF }
 
 // buildFontFile assembles an sfnt with the given tables, sorted by tag, with

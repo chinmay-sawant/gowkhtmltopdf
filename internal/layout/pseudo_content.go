@@ -121,11 +121,12 @@ type contentHit struct {
 }
 
 // selectContentDecl picks the winning content declaration for the pseudo
-// element pe on n.
-func selectContentDecl(ctx *styleContext, n *html.Node, pseudoEl string) *contentHit {
+// element pe on n. When no author rule declares content, the UA quoting rule
+// applies: q::before{content:open-quote}, q::after{content:close-quote}.
+func selectContentDecl(ctx *styleContext, node *html.Node, pseudoEl string) *contentHit {
 	var best *contentHit
 
-	for _, rowH := range ctx.matchedRules(n, pseudoEl) {
+	for _, rowH := range ctx.matchedRules(node, pseudoEl) {
 		for _, d := range rowH.rule.Decls {
 			if !strings.EqualFold(d.Prop, "content") {
 				continue
@@ -139,7 +140,31 @@ func selectContentDecl(ctx *styleContext, n *html.Node, pseudoEl string) *conten
 		}
 	}
 
+	if best == nil {
+		best = uaQuoteContent(node, pseudoEl)
+	}
+
 	return best
+}
+
+// uaQuoteContent is the user-agent generated content for element n's pseudo
+// element, matching the browser UA sheet's sole quoting rule: q::before and
+// q::after generate open-quote and close-quote. An author content declaration
+// always wins because this is consulted only when no rule matched.
+func uaQuoteContent(n *html.Node, pseudoEl string) *contentHit {
+	if n == nil || n.Name != "q" {
+		return nil
+	}
+
+	if pseudoEl == pseudoBefore {
+		return &contentHit{value: cssContentOpenQuote} //nolint:exhaustruct // UA origin has no order fields
+	}
+
+	if pseudoEl == pseudoAfter {
+		return &contentHit{value: cssContentCloseQuote} //nolint:exhaustruct // UA origin has no order fields
+	}
+
+	return nil
 }
 
 // betterContentHit reports whether candidate outranks best by importance,

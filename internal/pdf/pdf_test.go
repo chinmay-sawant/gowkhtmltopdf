@@ -350,9 +350,14 @@ func TestPDFStringLatin1NotUTF8(t *testing.T) {
 	if got != "(\\267x)" {
 		t.Errorf("pdfString(bullet) = %q, want (\\267x)", got)
 	}
-	// Em dash uses the PDFDocEncoding 0x97 byte rather than an ASCII hyphen.
-	if pdfString("\u2014") != "(\\227)" {
+	// Dashes use their PDFDocEncoding bytes (em dash 0x84, en dash 0x85)
+	// rather than an ASCII hyphen; 0x96/0x97 would be OE/Scaron.
+	if pdfString("\u2014") != "(\\204)" {
 		t.Errorf("pdfString(emdash) = %q", pdfString("\u2014"))
+	}
+
+	if pdfString("\u2013") != "(\\205)" {
+		t.Errorf("pdfString(endash) = %q", pdfString("\u2013"))
 	}
 }
 

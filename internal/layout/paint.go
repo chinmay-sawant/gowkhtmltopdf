@@ -341,8 +341,6 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 
 	stretchPaginatedChrome(res)
 
-	fixedIdx := fixedOpIndices(res)
-
 	// Split rect ops at page boundaries first so sticky clamps the natural
 	// fragment geometry that will actually be painted (fixture-31).
 	splitCrossingRects(res, contentH)
@@ -359,6 +357,12 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 	// continuation clones.
 	applyStickyPrint(res, contentH)
 	stretchPaginatedChrome(res)
+
+	// The passes above insert fragments ahead of later fixed ops (a crossed
+	// fixed background shifts the text that follows it), so the fixed index
+	// must be collected after the display list has settled. A stale index
+	// dropped the last fixed label from every page (learn-cpp.org dock).
+	fixedIdx := fixedOpIndices(res)
 
 	if err := validatePaintPageIndices(res.Ops, contentH); err != nil {
 		return err

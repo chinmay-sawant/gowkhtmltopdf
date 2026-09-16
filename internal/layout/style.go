@@ -90,10 +90,6 @@ func hashFontFamily(fams []string) uint64 {
 	return hash
 }
 
-// fontWeightStep is the bolder/lighter adjustment applied to the current
-// weight (CSS Fonts 3 §3.3; clamped by the 100..900 numeric range).
-const fontWeightStep = 100
-
 // asciiFoldBit is the single-bit mask that lowercases an ASCII letter
 // (s[i]|asciiFoldBit maps 'A'-'Z' to 'a'-'z').
 const asciiFoldBit = 0x20
@@ -878,9 +874,11 @@ func resolveElementStyleWithHits(
 }
 
 // hasExplicitLineHeight reports whether a declaration sets line-height either
-// directly or through a font shorthand containing a slash value.
+// directly or through a font shorthand containing a slash value. An inherit
+// declaration does not count: the copied unitless value still has to rescale
+// when the element's own font-size differs from its parent's.
 func hasExplicitLineHeight(raw map[string]string) bool {
-	if _, ok := raw["line-height"]; ok {
+	if lh, ok := raw["line-height"]; ok && !isInheritDeclaration(lh) {
 		return true
 	}
 

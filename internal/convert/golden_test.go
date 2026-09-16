@@ -439,7 +439,9 @@ var fixturePageBounds = map[string]fixtureBounds{ //nolint:gochecknoglobals // i
 		needles: []string{"IMPLEMENTED-PROPS-A"},
 	},
 	"fixture-61-implemented-props-b.html": {
-		minPages: 5, maxPages: 8, images: true,
+		// The repeated-thead continuation fixpoint moved the `left` prop row
+		// to page 8, spilling the footer to page 9 (real-sites wave, 8 -> 9).
+		minPages: 5, maxPages: 9, images: true,
 		needles: []string{"IMPLEMENTED-PROPS-B"},
 	},
 	"fixture-62-implemented-props-c.html": {

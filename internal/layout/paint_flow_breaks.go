@@ -287,8 +287,13 @@ func nextForcedBreakY(res *Result, afterY float64) float64 {
 
 // rejectKeepTogetherShift reports that moving the box would leave too much
 // empty space on the current page. Atomic cards only lift when they start
-// in the last keepTogetherMaxBlankRatio of the page; short avoid list items
-// keep preferSplitOverBlank so wiki-style reference lists do not cascade.
+// in the last keepTogetherMaxBlankRatio of the page; explicit avoid boxes
+// follow preferSplitOverBlank so dense lists do not cascade.
+//
+// An explicit page-break-inside:avoid box that fits one page always moves
+// whole: splitting it is exactly what the declaration forbids. The former
+// "large avoid box" split preference made tall pre/card blocks (a third of a
+// page and up) split at the boundary (Programiz code cards).
 func rejectKeepTogetherShift(boxNode *box, remaining, contentH float64) bool {
 	if implicitAtomicBox(boxNode) {
 		// Only lift a card that starts in the last band of the page.
@@ -297,13 +302,7 @@ func rejectKeepTogetherShift(boxNode *box, remaining, contentH float64) bool {
 		return remaining > contentH*0.2
 	}
 
-	if preferSplitOverBlank(remaining, boxNode.height, contentH) {
-		return true
-	}
-
-	// Large explicit-avoid boxes: prefer split when less than half the box
-	// fits (rowspan tables / tall avoid blocks).
-	return remaining < boxNode.height*keepTogetherHalfRatio && boxNode.height > contentH*0.35
+	return preferSplitOverBlank(remaining, boxNode.height, contentH)
 }
 
 // boxInkExtent returns the bottom edge of the box's ink ops (boxNode.y when

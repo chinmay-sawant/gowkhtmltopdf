@@ -876,6 +876,10 @@ func (e *engine) popBFCFloats(enclose bool) {
 // at contentX (start of the first line box). outside and empty hang in the
 // gutter at contentX - gap - marker width.
 func (e *engine) emitListMarker(node *html.Node, style ResolvedStyle, contentX, baseline float64) {
+	if hidesPaint(&style) {
+		return
+	}
+
 	size := e.scalePt(style.FontSize)
 	if e.emitListStyleImageMarker(style, contentX, baseline, size) {
 		return
@@ -906,7 +910,10 @@ func (e *engine) emitListMarker(node *html.Node, style ResolvedStyle, contentX, 
 		minW = size * float64(len([]rune(text))) * markerHalfWidth
 	}
 
-	posX := listMarkerX(style.ListStylePosition, contentX, size, minW)
+	posX, visible := listMarkerX(style.ListStylePosition, contentX, size, minW)
+	if !visible {
+		return
+	}
 
 	e.add(Op{ //nolint:exhaustruct // intentional zero fields
 		Kind: OpBullet, X: posX, Y: baseline, Text: text, Font: face, Size: size,
@@ -945,7 +952,12 @@ func (e *engine) emitListStyleImageMarker(
 		imgH = size
 	}
 
-	posX := listMarkerX(style.ListStylePosition, contentX, size, imgW)
+	posX, visible := listMarkerX(style.ListStylePosition, contentX, size, imgW)
+	if !visible {
+		// The image marker is clipped at the page edge; the type glyph is
+		// not a fallback for a marker that exists (CSS replaces the type).
+		return true
+	}
 
 	e.add((Op{ //nolint:exhaustruct // intentional zero fields
 		Kind:   OpImage,
@@ -960,18 +972,25 @@ func (e *engine) emitListStyleImageMarker(
 }
 
 // listMarkerX is the left edge of a list marker of width markerW. inside sits
-// at the content edge; outside hangs in the gutter, clamped at 0.
-func listMarkerX(position string, contentX, emSize, markerW float64) float64 {
+// at the content edge; outside hangs in the gutter. The reference clips
+// content left of the page content box (layout x=0), so a marker entirely
+// past the edge is not painted (ok false) and a partially visible one is
+// clamped to the clip edge.
+func listMarkerX(position string, contentX, emSize, markerW float64) (float64, bool) {
 	if position == listPosInside {
-		return contentX
+		return contentX, true
 	}
 
 	posX := contentX - emSize*0.35 - markerW
-	if posX < 0 {
-		return 0
+	if posX+markerW <= 0 {
+		return 0, false
 	}
 
-	return posX
+	if posX < 0 {
+		return 0, true
+	}
+
+	return posX, true
 }
 
 // markerText returns the glyph/string for a list-style-type keyword.

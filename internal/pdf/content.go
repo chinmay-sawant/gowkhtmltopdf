@@ -493,9 +493,6 @@ func (c *Content) SetFont(name string, size float64) {
 // with this font are subset-embedded into the PDF.
 func (c *Content) UseEmbeddedFont(name string, f *Font) {
 	c.fontFiles[name] = f
-	if c.doc != nil && f != nil {
-		c.doc.recordFontFace(name, f)
-	}
 
 	if c.fontUses[name] == "" {
 		c.fontUses[name] = ""
@@ -760,23 +757,20 @@ func appendHex4(dst []byte, rVal rune) []byte {
 	)
 }
 
-// textShowSimple appends str as a Latin-1 literal string, folding and
-// escaping in the same pass that records the used runes for subsetting.
+// textShowSimple appends str as a WinAnsi literal string, folding and
+// escaping in the same pass that records the used char codes for subsetting.
 func (c *Content) textShowSimple(str string) {
 	out := c.buf.AvailableBuffer()
 	out = append(out, '(')
 
 	for _, rVal := range str {
-		if rVal > maxLatin1Code {
-			rVal = winAnsiFold(rVal)
+		code, ok := winAnsiFoldCode(rVal)
+		if !ok {
+			code = '?'
 		}
 
-		if rVal > maxLatin1Code {
-			rVal = '?'
-		}
-
-		c.recordFontRune(c.curFont, rVal)
-		out = appendPDFLiteralByte(out, byte(rVal))
+		c.recordFontRune(c.curFont, rune(code))
+		out = appendPDFLiteralByte(out, code)
 	}
 
 	out = append(out, ')', ' ', 'T', 'j', '\n')
@@ -789,11 +783,7 @@ func (c *Content) textNeedsType0(s string) bool {
 	}
 
 	for _, r := range s {
-		if r > maxLatin1Code {
-			r = winAnsiFold(r)
-		}
-
-		if r > maxLatin1Code {
+		if _, ok := winAnsiFoldCode(r); !ok {
 			return true
 		}
 	}
@@ -834,18 +824,21 @@ func (c *Content) textShowType0(str string) {
 }
 
 func (c *Content) recordFontRune(name string, rVal rune) {
-	if c.doc == nil {
+	face := c.fontFiles[name]
+	if c.doc == nil || face == nil {
 		return
 	}
 
+	key := fontUnionKey{name: name, face: face}
+
 	if c.doc.fontRuneSet == nil {
-		c.doc.fontRuneSet = make(map[string]map[rune]struct{})
+		c.doc.fontRuneSet = make(map[fontUnionKey]map[rune]struct{})
 	}
 
-	used := c.doc.fontRuneSet[name]
+	used := c.doc.fontRuneSet[key]
 	if used == nil {
 		used = make(map[rune]struct{}, fontRuneInitialCapacity)
-		c.doc.fontRuneSet[name] = used
+		c.doc.fontRuneSet[key] = used
 	}
 
 	used[rVal] = struct{}{}
@@ -857,7 +850,11 @@ func (c *Content) recordFontRune(name string, rVal rune) {
 // font objects and their dicts lazily. Embedded fonts are subset for the
 // runes used on this content. A font whose subset fails the page: text
 // that names a missing /Resources entry renders invisible, so the error is
-// propagated instead of dropped.
+// propagated instead of dropped. The one recoverable failure is a face that
+// maps none of the runes recorded for it (a broken @font-face whose cmap is
+// empty, or a face the document-wide rune union leaves with no glyphs): the
+// resource is re-pointed at the Liberation fallback paint already uses for
+// missing glyphs, so the document stays writable and the text stays visible.
 func (c *Content) fonts() (map[string]string, error) {
 	for _, name := range sortedStringKeys(c.fontUses) {
 		face, ok := c.fontFiles[name]
@@ -872,11 +869,16 @@ func (c *Content) fonts() (map[string]string, error) {
 		}
 
 		// Subset from the document-wide rune union when the document has
-		// been finalized (unionFontRunes): one subset per font, shared by
-		// every page, instead of a near-identical subset per page.
-		used := c.doc.fontRunes[name]
+		// been finalized (unionFontRunes): one subset per (face, resource
+		// name), shared by every page that registered the face, instead of a
+		// near-identical subset per page.
+		used := c.doc.fontRunes[fontUnionKey{name: name, face: face}]
 
 		ref, err := c.doc.ensureFont(face, name, used)
+		if errors.Is(err, errSubsetNoMaps) {
+			ref, err = c.embedFallbackFont(name, used)
+		}
+
 		if err != nil {
 			return nil, fmt.Errorf("embed font %s: %w", name, err)
 		}
@@ -885,6 +887,28 @@ func (c *Content) fonts() (map[string]string, error) {
 	}
 
 	return c.fontUses, nil
+}
+
+// embedFallbackFont embeds the bundled Liberation face under name when the
+// face registered for name cannot build a subset: its cmap maps none of the
+// recorded runes. Paint already substitutes this fallback for missing glyphs
+// (runFallbackFont), so re-pointing the resource keeps the text visible
+// instead of failing the write or dropping the /Resources entry that /name Tf
+// refers to. The last resort is a space-only subset, which keeps the resource
+// entry valid even when the recorded runes include no code point Liberation
+// maps.
+func (c *Content) embedFallbackFont(name string, used []rune) (objRef, error) {
+	fallback, err := DefaultFont()
+	if err != nil || fallback == nil {
+		return 0, errSubsetNoMaps
+	}
+
+	ref, err := c.doc.ensureFont(fallback, name, used)
+	if errors.Is(err, errSubsetNoMaps) {
+		ref, err = c.doc.ensureFont(fallback, name, nil)
+	}
+
+	return ref, err
 }
 
 // imageResources returns the map of image resource name to object ref.

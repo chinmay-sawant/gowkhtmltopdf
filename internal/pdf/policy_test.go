@@ -568,12 +568,12 @@ func TestPDF17InfoAndOutlineUnicodeUTF16BE(t *testing.T) {
 		t.Errorf("PDF 1.7 info dict Title should be encoded as UTF-16BE hex string, got:\n%s", str17)
 	}
 
-	// Check that em dash 2014 is present in the hex string and not folded to ? or Latin1 \227.
+	// Check that em dash 2014 is present in the hex string and not folded to ? or a Latin1 byte.
 	if strings.Contains(str17, "/Title (Annual Report ? 2026)") {
 		t.Errorf("PDF 1.7 title was corrupted with '?'")
 	}
 
-	if strings.Contains(str17, "/Title (Annual Report \\227 2026)") {
+	if strings.Contains(str17, "/Title (Annual Report \\204 2026)") {
 		t.Errorf("PDF 1.7 title was folded to Latin-1 instead of UTF-16BE")
 	}
 
@@ -587,7 +587,7 @@ func TestPDF17InfoAndOutlineUnicodeUTF16BE(t *testing.T) {
 		t.Errorf("PDF 1.7 Info dictionary missing /Producer (gowkhtmltopdf 1.7)")
 	}
 
-	// 2. PDF 1.4 with em dash folds to Latin-1 \227.
+	// 2. PDF 1.4 with em dash folds to the PDFDocEncoding 0x84 byte.
 	doc14 := NewDocument()
 	doc14.SetInfo("Title", "Annual Report — 2026")
 	doc14.AddPage(200, 200)
@@ -598,8 +598,8 @@ func TestPDF17InfoAndOutlineUnicodeUTF16BE(t *testing.T) {
 	}
 
 	str14 := buf14.String()
-	if !strings.Contains(str14, "/Title (Annual Report \\227 2026)") {
-		t.Errorf("PDF 1.4 title should fold to Latin-1 \\227, got:\n%s", str14)
+	if !strings.Contains(str14, "/Title (Annual Report \\204 2026)") {
+		t.Errorf("PDF 1.4 title should fold to \\204, got:\n%s", str14)
 	}
 
 	if !strings.Contains(str14, "/Producer (gowkhtmltopdf 1.4)") {

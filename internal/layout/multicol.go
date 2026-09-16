@@ -740,7 +740,7 @@ func (e *engine) emitColumnRules(style ResolvedStyle, contentX, colW, gap float6
 		return
 	}
 
-	if style.ColumnRuleStyle == "" || style.ColumnRuleStyle == cssDisplayNone {
+	if style.ColumnRuleStyle == "" || style.ColumnRuleStyle == cssDisplayNone || hidesPaint(&style) {
 		return
 	}
 

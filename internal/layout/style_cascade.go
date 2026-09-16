@@ -31,8 +31,16 @@ const (
 
 	defaultRootFontPx = 16
 
+	fontWeightThinValue   = 100
 	fontWeightNormalValue = 400
 	fontWeightBoldValue   = 700
+	fontWeightBlackValue  = 900
+
+	// CSS Fonts 3 relative-weight table cutoffs used by bolderWeight and
+	// lighterWeight below.
+	fontWeightBolderMidCutoff   = 600
+	fontWeightLighterThinCutoff = 550
+	fontWeightLighterBoldCutoff = 750
 
 	cssFontStyleItalic  = "italic"
 	cssFontStyleOblique = "oblique"
@@ -342,17 +350,29 @@ var inheritablePropBits = func() map[string]uint64 {
 
 // declaredInheritableMask folds the raw declarations into one bit per
 // inheritableProps entry. Iterating the raw keys (about 10 per element)
-// replaces the per-entry raw map lookups.
+// replaces the per-entry raw map lookups. An explicit inherit value does not
+// count as a declaration here: the property must copy from the parent like an
+// unspecified one, and the longhand appliers keep the copied value.
 func declaredInheritableMask(raw map[string]string) uint64 {
 	var mask uint64
 
-	for prop := range raw {
+	for prop, val := range raw {
+		if isInheritDeclaration(val) {
+			continue
+		}
+
 		if bit, ok := inheritablePropBits[prop]; ok {
 			mask |= bit
 		}
 	}
 
 	return mask
+}
+
+// isInheritDeclaration reports whether a cascaded value is the inherit
+// keyword, case-insensitively.
+func isInheritDeclaration(value string) bool {
+	return len(value) == len(inheritKeyword) && strings.EqualFold(value, inheritKeyword)
 }
 
 // declarationKeyword returns the first lowercased keyword of a cascaded
@@ -791,6 +811,20 @@ func expandFontDeclaration(prop, value string) ([]logicalPropDecl, bool) {
 		return nil, false
 	}
 
+	// font: inherit resets every font longhand to the parent value. Emitting
+	// the five longhands lets them claim the cascade win over lower-origin
+	// rules (the UA h2{font-weight:bold}); declaredInheritableMask then copies
+	// the parent values and the appliers keep them.
+	if isInheritDeclaration(strings.TrimSpace(value)) {
+		return []logicalPropDecl{
+			{prop: "font-weight", val: inheritKeyword},
+			{prop: "font-style", val: inheritKeyword},
+			{prop: "font-size", val: inheritKeyword},
+			{prop: "line-height", val: inheritKeyword},
+			{prop: "font-family", val: inheritKeyword},
+		}, true
+	}
+
 	parts := strings.Fields(value)
 	out := make([]logicalPropDecl, 0, len(parts))
 
@@ -1196,7 +1230,9 @@ func applyFontSizeValue(
 
 func applyFontFamilyValue(style *ResolvedStyle, raw map[string]string) {
 	val, found := raw["font-family"]
-	if !found {
+	// inherit copies the parent family in inheritProps; keep it instead of
+	// parsing the keyword as a family name.
+	if !found || isInheritDeclaration(val) {
 		return
 	}
 
@@ -1214,12 +1250,17 @@ func applyFontWeightValue(style *ResolvedStyle, raw map[string]string) {
 
 func applyFontStyleValue(style *ResolvedStyle, raw map[string]string) {
 	val, found := raw["font-style"]
-	if found {
-		style.FontItalic = val == cssFontStyleItalic || val == cssFontStyleOblique
+	// inherit copies the parent style in inheritProps; keep it instead of
+	// clearing the italic flag.
+	if !found || isInheritDeclaration(val) {
+		return
 	}
+
+	style.FontItalic = val == cssFontStyleItalic || val == cssFontStyleOblique
 }
 
 // resolveFontWeight maps a font-weight keyword/number onto a weight value.
+// bolder/lighter use the CSS Fonts 3 relative-weight table, not a fixed step.
 func resolveFontWeight(current int, val string) int {
 	switch val {
 	case contentNormal:
@@ -1227,9 +1268,9 @@ func resolveFontWeight(current int, val string) int {
 	case cssFontWeightBold:
 		return fontWeightBoldValue
 	case "bolder":
-		return current + fontWeightStep
+		return bolderWeight(current)
 	case "lighter":
-		return current - fontWeightStep
+		return lighterWeight(current)
 	default:
 		if n, ok := css.ParseNumber(val); ok && n >= 100 && n <= 900 {
 			return int(n)
@@ -1237,6 +1278,34 @@ func resolveFontWeight(current int, val string) int {
 	}
 
 	return current
+}
+
+// bolderWeight maps bolder onto the CSS Fonts 3 relative-weight table:
+// below 400 to 400, 400..599 to 700, 600 and above to 900.
+func bolderWeight(current int) int {
+	if current < fontWeightNormalValue {
+		return fontWeightNormalValue
+	}
+
+	if current < fontWeightBolderMidCutoff {
+		return fontWeightBoldValue
+	}
+
+	return fontWeightBlackValue
+}
+
+// lighterWeight maps lighter onto the CSS Fonts 3 relative-weight table:
+// below 550 to 100, 550..749 to 400, 750 and above to 700.
+func lighterWeight(current int) int {
+	if current < fontWeightLighterThinCutoff {
+		return fontWeightThinValue
+	}
+
+	if current < fontWeightLighterBoldCutoff {
+		return fontWeightNormalValue
+	}
+
+	return fontWeightBoldValue
 }
 
 // restShorthandProps are applied before other cascaded properties so a winning

@@ -41,7 +41,7 @@ func (e *engine) buildInlineSVG(node *html.Node, sty ResolvedStyle, posX, posY f
 	boxNode.w = size.w + padL + padR + borderL + borderR
 	boxNode.height = size.h + padT + padB + borderT + borderB
 
-	if paint && len(ref.data) > 0 && !e.noEmit {
+	if paint && len(ref.data) > 0 && !e.noEmit && !hidesPaint(&sty) {
 		imgX := posX + borderL + padL
 		imgY := posY + borderT + padT
 		opStart := len(e.ops)

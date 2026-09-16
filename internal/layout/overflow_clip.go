@@ -162,7 +162,7 @@ func (e *engine) clipOverflowTree(boxNode *box, clip *clipRect) {
 }
 
 func (e *engine) clipBoxContents(boxNode *box, clip clipRect) {
-	if boxNode == nil || clip.empty() {
+	if boxNode == nil {
 		return
 	}
 
@@ -178,7 +178,7 @@ func (e *engine) clipBoxContents(boxNode *box, clip clipRect) {
 }
 
 func clipOpsRange(ops []Op, start, end int, clip clipRect) {
-	if end < start || start < 0 || clip.empty() {
+	if end < start || start < 0 {
 		return
 	}
 
@@ -188,10 +188,6 @@ func clipOpsRange(ops []Op, start, end int, clip clipRect) {
 }
 
 func clipOpsSlice(ops []Op, clip clipRect) {
-	if clip.empty() {
-		return
-	}
-
 	for i := range ops {
 		clipPaintOp(&ops[i], clip)
 	}
@@ -292,7 +288,15 @@ func verticalOnRectEdges(op *Op, x, y, w, h float64) bool {
 }
 
 func clipPaintOp(op *Op, clip clipRect) {
-	if op == nil || clip.empty() || op.Kind == opKindNoop {
+	if op == nil || op.Kind == opKindNoop {
+		return
+	}
+
+	// A zero-area clip keeps no ink: height:0 (or width:0) overflow boxes
+	// collapse to nothing instead of leaking their whole subtree.
+	if clip.empty() {
+		DeactivateOp(op)
+
 		return
 	}
 

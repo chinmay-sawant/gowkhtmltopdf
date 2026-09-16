@@ -6,6 +6,13 @@ import (
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
 
+// Input type keywords handled by the native widget painters.
+const (
+	inputTypeCheckbox = "checkbox"
+	inputTypeRadio    = "radio"
+	inputTypeColor    = "color"
+)
+
 // isInputCheckbox reports whether node is an input checkbox or radio control.
 func isInputCheckbox(node *html.Node) bool {
 	if node == nil || node.Name != htmlInput {
@@ -14,7 +21,7 @@ func isInputCheckbox(node *html.Node) bool {
 
 	t := strings.ToLower(node.Attribute("type"))
 
-	return t == "checkbox" || t == "radio"
+	return t == inputTypeCheckbox || t == inputTypeRadio
 }
 
 // defaultCheckboxSize returns the outer square size of a checkbox or radio.
@@ -203,7 +210,7 @@ func (e *engine) paintCheckboxWidget(
 	node *html.Node, style ResolvedStyle, leftX, topY, width, height float64,
 ) {
 	t := strings.ToLower(node.Attribute("type"))
-	isRadio := t == "radio"
+	isRadio := t == inputTypeRadio
 
 	_, isChecked := node.Attrs["checked"]
 	if !isChecked {
@@ -220,4 +227,84 @@ func (e *engine) paintCheckboxWidget(
 	} else {
 		e.paintUncheckedCheckbox(geo)
 	}
+}
+
+// placeholderInkGray is the UA ::placeholder color (#757575), so placeholder
+// text reads as a hint instead of authored value text.
+const placeholderInkGray = 0.46
+
+// inputPaintText returns the string an <input> shows and whether it is the
+// placeholder. Value text wins over the placeholder when both are present.
+func inputPaintText(node *html.Node) (string, bool) {
+	if v := node.Attribute("value"); v != "" {
+		return v, false
+	}
+
+	if p := node.Attribute("placeholder"); p != "" {
+		return p, true
+	}
+
+	return "", false
+}
+
+// isTextInputControl reports an <input> whose value/placeholder paints as
+// text. Native checkbox/radio/range/color/file controls paint their own face,
+// hidden inputs paint nothing, and submit-like controls fall through to the
+// value-only path.
+func isTextInputControl(node *html.Node) bool {
+	if node == nil || node.Name != htmlInput {
+		return false
+	}
+
+	switch strings.ToLower(strings.TrimSpace(node.Attribute("type"))) {
+	case "hidden", inputTypeCheckbox, inputTypeRadio, "file", "image", "range", inputTypeColor:
+		return false
+	default:
+		return true
+	}
+}
+
+// paintInputText paints the value or placeholder of a text input inside its
+// content box. An empty input has no child nodes, so no inline pass would ever
+// emit the string (Programiz search field, real-sites evidence 2026-09-16).
+func (e *engine) paintInputText(
+	node *html.Node, style ResolvedStyle, leftX, topY, width, height float64,
+) {
+	text, placeholder := inputPaintText(node)
+	if text == "" {
+		return
+	}
+
+	face := e.faceFor(&style)
+
+	size := e.scalePt(style.FontSize)
+	if face == nil || size <= 0 {
+		return
+	}
+
+	contentX, _ := e.contentBox(leftX, width, &style)
+	contentY := topY + e.scalePt(style.BorderTop.Width) + e.scalePt(style.PaddingTop)
+	contentH := height - e.scalePt(style.BorderTop.Width+style.BorderBottom.Width) -
+		e.scalePt(style.PaddingTop+style.PaddingBottom)
+
+	ascent := e.fontAscentFace(face, size)
+	descent := e.fontDescentFace(face, size)
+
+	baseline := contentY + ascent
+	if contentH > ascent+descent {
+		baseline += (contentH - ascent - descent) / two
+	}
+
+	color := style.Color
+	if placeholder {
+		color = [3]float64{placeholderInkGray, placeholderInkGray, placeholderInkGray}
+	}
+
+	e.add(Op{ //nolint:exhaustruct // intentional zero fields
+		Kind: OpText, X: contentX, Y: baseline, W: e.measureTextFace(text, &style),
+		H: style.LineHeight * e.scale, Text: text, Font: face, Size: size,
+		InkDescent: descent,
+		Bold:       style.FontWeight >= fontWeightBoldValue,
+		R:          color[0], G: color[1], B: color[2],
+	})
 }

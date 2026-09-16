@@ -107,6 +107,8 @@ func rasterizeCanvas(data []byte, maxSide int) (pngBytes []byte, w, h int, err e
 		}
 	}()
 
+	data = prepareCanvasInput(data)
+
 	svgCanvas, err := canvas.ParseSVG(bytes.NewReader(data))
 	if err != nil {
 		return nil, 0, 0, fmt.Errorf("svg canvas: %w", err)

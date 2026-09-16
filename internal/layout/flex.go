@@ -65,19 +65,14 @@ func (e *engine) buildFlex(node *html.Node, sty ResolvedStyle, availW, x, posY f
 		node: node, style: e.stylePtr(node), kind: boxKindBlock, x: x + ml, y: posY,
 	}
 	boxNode.w = resolveUsedWidth(sty, availW, e)
-
-	if sty.IsWebkitBox && sty.Width < 0 && sty.WidthPercent < 0 {
-		if intr := e.measureFlexItemMaxContent(node, sty); intr > 0 && intr < boxNode.w {
-			boxNode.w = intr
-		}
-	}
+	boxNode.w = e.flexWebkitIntrinsicWidth(node, sty, boxNode.w)
 
 	contentX, contentW := e.contentBox(boxNode.x, boxNode.w, &sty)
 
 	contentStart := len(e.ops)
 	curY := e.scalePt(sty.PaddingTop) + e.scalePt(sty.BorderTop.Width)
 
-	kids := e.flexChildren(node, sty)
+	kids, deferred := e.flexChildren(node, sty)
 
 	rowGap, colGap := e.styleGaps(sty)
 
@@ -97,24 +92,66 @@ func (e *engine) buildFlex(node *html.Node, sty ResolvedStyle, availW, x, posY f
 	curY = e.resolveBorderBoxHeight(sty, curY)
 
 	boxNode.height = curY
+
+	// Absolutes are out of flow: place them against the container's
+	// containing block after the in-flow items settled the used height.
+	if len(deferred) > 0 {
+		absOriginY := posY + e.scalePt(sty.PaddingTop) + e.scalePt(sty.BorderTop.Width)
+		absCBX, absCBW, absOriginY := e.flowAbsCB(sty, node.Children, contentX, contentW, absOriginY)
+
+		cbHeight := boxNode.height - (absOriginY - posY)
+		if cbHeight < 0 {
+			cbHeight = 0
+		}
+
+		e.flushDeferredFlowChildren(boxNode, deferred, cbHeight, absCBW, absCBX, absOriginY)
+	}
+
 	e.prependChrome(contentStart, boxNode, sty, boxNode.x, posY, boxNode.w, boxNode.height)
 
 	return boxNode
 }
 
+// flexWebkitIntrinsicWidth narrows an auto-width -webkit-box to its max-content
+// width; explicit widths win over the intrinsic measurement.
+func (e *engine) flexWebkitIntrinsicWidth(node *html.Node, sty ResolvedStyle, usedWidth float64) float64 {
+	if !sty.IsWebkitBox || sty.Width >= 0 || sty.WidthPercent >= 0 {
+		return usedWidth
+	}
+
+	if intr := e.measureFlexItemMaxContent(node, sty); intr > 0 && intr < usedWidth {
+		return intr
+	}
+
+	return usedWidth
+}
+
 // flexChildren returns the element flex items plus anonymous flex items for
-// direct text runs. CSS turns non-whitespace text directly under a flex
-// container into anonymous block-level flex items; dropping those nodes makes
-// prose after an inline marker disappear from the display list.
-func (e *engine) flexChildren(node *html.Node, parentStyle ResolvedStyle) []*html.Node {
+// direct text runs, and the out-of-flow children deferred to the container's
+// containing block. CSS flexbox takes absolutely positioned children out of
+// flow; treating one as a flex item let it consume the row and squeeze the
+// remaining items (Programiz header: the app-link wrapper painted as a
+// full-width blue block and collapsed the search field).
+func (e *engine) flexChildren(node *html.Node, parentStyle ResolvedStyle) ([]*html.Node, []*html.Node) {
 	kids := make([]*html.Node, 0, len(node.Children))
+
+	var deferred []*html.Node
 
 	for idx := 0; idx < len(node.Children); idx++ {
 		child := node.Children[idx]
 		if child.Type == html.ElementNode {
-			if cs := e.stylePtr(child); cs.Display != cssDisplayNone {
-				kids = append(kids, child)
+			cs := e.stylePtr(child)
+			if cs.Display == cssDisplayNone {
+				continue
 			}
+
+			if isOutOfFlowNode(child, cs) {
+				deferred = append(deferred, child)
+
+				continue
+			}
+
+			kids = append(kids, child)
 
 			continue
 		}
@@ -141,7 +178,7 @@ func (e *engine) flexChildren(node *html.Node, parentStyle ResolvedStyle) []*htm
 		kids = append(kids, anonymous)
 	}
 
-	return kids
+	return kids, deferred
 }
 
 // anonymousFlexItemStyle preserves inherited text properties while removing

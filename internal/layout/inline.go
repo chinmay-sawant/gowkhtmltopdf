@@ -328,9 +328,14 @@ func (e *engine) packInlineLine(
 		// Exception: never break before attaching punctuation / mid-cite
 		// (")[37]" → ")\n[" or "[\n37]" or "saying.[\n7]").
 		if lineAdv > 0 && lineAdv+adv > lineW+1e-6 {
-			idx, _ = e.glueStickyTail(*items, idx, start, adv)
+			// Collapsible trailing spaces hang at the line edge; only their
+			// word decides the wrap. Measure the hang lazily: most items fit
+			// on the raw advance.
+			if lineAdv+e.hangingFitAdvance(*item, adv) > lineW+1e-6 {
+				idx, _ = e.glueStickyTail(*items, idx, start, adv, lineW)
 
-			break
+				break
+			}
 		}
 		// Empty line beside a float too narrow for this item: CSS2.1 §9.5
 		// pushes the line box below the float and recomputes width.
@@ -348,6 +353,34 @@ func (e *engine) packInlineLine(
 	}
 
 	return idx, lineX, lineW, leftY
+}
+
+// hangingFitAdvance returns the advance that counts against the line width
+// when deciding whether a run fits on the current line. Collapsible spaces at
+// the end of the candidate run hang at the line edge and must not push the
+// run's last word to the next line: the gobyexample intro wrapped "to" early
+// although the text fit by 1.13pt because the trailing space was counted
+// (313.875pt text + 3.0pt space vs the 315.00pt content box). Preserved
+// white-space modes (pre / pre-wrap) keep their spaces. The subtraction
+// mirrors trimTrailingSpace, which drops the same spaces at emit.
+func (e *engine) hangingFitAdvance(item inlineItem, adv float64) float64 {
+	if item.img || item.blockBox != nil || item.text == "" || item.style == nil {
+		return adv
+	}
+
+	switch item.style.WhiteSpace {
+	case cssWhiteSpacePre, cssWhiteSpacePreWrap:
+		return adv
+	}
+
+	trimmed := strings.TrimRight(item.text, " ")
+	if trimmed == item.text {
+		return adv
+	}
+
+	spaces := len(item.text) - len(trimmed)
+
+	return adv - float64(spaces)*e.measureRuneFace(' ', item.style)
 }
 
 // lineBounds returns the line origin and width under float exclusion at y.
@@ -411,7 +444,7 @@ func (e *engine) maybeSplitOverflow(item inlineItem, lineW, lineAdv, contentW fl
 // glueStickyTail advances idx across consecutive no-break items (cite
 // clusters, IPA fragments) that may stick to the current line even when they
 // overflow slightly; returns the new idx and accumulated line advance.
-func (e *engine) glueStickyTail(items []inlineItem, idx, start int, adv float64) (int, float64) {
+func (e *engine) glueStickyTail(items []inlineItem, idx, start int, adv, lineW float64) (int, float64) {
 	if idx <= start || !noBreakBefore(items[idx-1], items[idx]) {
 		return idx, adv
 	}
@@ -432,7 +465,49 @@ func (e *engine) glueStickyTail(items []inlineItem, idx, start int, adv float64)
 		return idx, adv
 	}
 
+	// An unbreakable chain that fits a fresh line moves down whole instead of
+	// gluing its tail past the line edge: a nowrap citation whose "[" fit
+	// used to glue "41]" and paint 15.6pt into the margin where Chrome breaks
+	// before the cluster. Chains wider than a full line (narrow nowrap ref
+	// cells) keep the old glue behavior.
+	if chainStart, chainAdv := stickyChainRange(items, idx, start, lineW); chainStart > start &&
+		chainAdv <= lineW+inlineFitEpsilon {
+		return chainStart, 0
+	}
+
 	return stickChain(items, idx+1, emSize, adv)
+}
+
+// stickyChainRange returns the start index of the maximal no-break chain that
+// contains idx on this line and the chain's total advance. The forward scan
+// stops once the advance exceeds limit, so a nowrap paragraph cannot make
+// packing quadratic; callers only need to know whether the chain fits.
+func stickyChainRange(items []inlineItem, idx, lineStart int, limit float64) (int, float64) {
+	start := idx
+
+	for start > lineStart && noBreakBefore(items[start-1], items[start]) {
+		start--
+	}
+
+	adv := 0.0
+
+	for end := start; end < len(items); end++ {
+		if items[end].forceBreak {
+			break
+		}
+
+		if end > start && !noBreakBefore(items[end-1], items[end]) {
+			break
+		}
+
+		adv += items[end].marginL + items[end].w + items[end].marginR
+
+		if adv > limit {
+			break
+		}
+	}
+
+	return start, adv
 }
 
 // glueLimit returns the max advance that may stick to the current line for

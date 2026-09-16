@@ -120,6 +120,19 @@ func (d dict) add(k string, v ...string) dict {
 
 func (d dict) String() string { return "<< " + strings.Join(d, " ") + " >>" }
 
+// fontUnionKey identifies one document-wide rune union: a page-local resource
+// name paired with the face registered under it. Resource names are reused
+// across pages (every page has an F1) and different pages may register
+// different faces as F1; keying by name alone let one face's runes leak into
+// another face's subset, so the face is part of the key. Pairing instead of
+// keying by face alone also keeps a face's simple and Identity-H runs apart:
+// those live under separate names (F1 and F1_u) and must not share one mode
+// decision.
+type fontUnionKey struct {
+	name string
+	face *Font
+}
+
 // Document is a PDF under construction.
 //
 // Document and its Page/Content values have single-goroutine ownership during
@@ -141,23 +154,21 @@ type Document struct {
 	pages             []*Page
 	pendingForms      []pendingForm // transparency groups buffered until finalize (see finalizeForms)
 	outlineRoot       *Outline
-	fontCache         map[string]objRef // subset key -> font dict ref
-	fontRuneSet       map[string]map[rune]struct{}
-	fontRunes         map[string][]rune // font resource name -> document-wide rune union (finalize-time)
-	fontKeys          map[string]string // font resource name -> precomputed subset cache key
-	fontKeyFonts      map[string]*Font  // font resource name -> the face the precomputed key belongs to
-	fontFaces         map[string]*Font  // font resource name -> font face (registered during painting)
-	fontType0         map[string]bool   // font resource name -> precomputed needsType0(union)
-	catalogRef        objRef            // set by finalize
-	infoRef           objRef            // set by finalize
-	metadataRef       objRef            // set by finalize
-	iccRef            objRef            // set by finalize (PDF/A-3, PDF/A-4 sRGB)
-	grayIccRef        objRef            // set by finalize (PDF/A-4 Gray)
-	outputIntentRef   objRef            // set by finalize (PDF/A-3, PDF/A-4)
-	namespaceRef      objRef            // set by finalizeStructure (PDF/UA-2)
-	structTreeRootRef objRef            // set by finalizeStructure
-	parentTreeRef     objRef            // set by finalizeStructure
-	parentTreeNextKey int               // set by finalizeStructure
+	fontCache         map[string]objRef                  // subset key -> font dict ref
+	fontRuneSet       map[fontUnionKey]map[rune]struct{} // runes collected during painting
+	fontRunes         map[fontUnionKey][]rune            // document-wide rune union (finalize-time)
+	fontKeys          map[fontUnionKey]string            // precomputed subset cache key
+	fontType0         map[fontUnionKey]bool              // precomputed needsType0(union)
+	catalogRef        objRef                             // set by finalize
+	infoRef           objRef                             // set by finalize
+	metadataRef       objRef                             // set by finalize
+	iccRef            objRef                             // set by finalize (PDF/A-3, PDF/A-4 sRGB)
+	grayIccRef        objRef                             // set by finalize (PDF/A-4 Gray)
+	outputIntentRef   objRef                             // set by finalize (PDF/A-3, PDF/A-4)
+	namespaceRef      objRef                             // set by finalizeStructure (PDF/UA-2)
+	structTreeRootRef objRef                             // set by finalizeStructure
+	parentTreeRef     objRef                             // set by finalizeStructure
+	parentTreeNextKey int                                // set by finalizeStructure
 	structTreeRoot    *StructTreeRoot
 	namedDests        []namedDestEntry // dual page+/SD destinations for PDF/UA-2
 	lang              string           // document language (default "en-US")
@@ -198,14 +209,6 @@ func (d *Document) IsPDFA3() bool { return d.isPDFA3 }
 // IsPDFA4 reports whether the document is configured for PDF/A-4.
 func (d *Document) IsPDFA4() bool { return d.isPDFA4 }
 
-func (d *Document) recordFontFace(name string, f *Font) {
-	if d.fontFaces == nil {
-		d.fontFaces = map[string]*Font{}
-	}
-
-	d.fontFaces[name] = f
-}
-
 // NewDocument creates an empty PDF document with the default PDF 1.4 policy.
 func NewDocument() *Document {
 	doc := &Document{ //nolint:exhaustruct // intentional zero-value fields
@@ -213,8 +216,7 @@ func NewDocument() *Document {
 		info:           map[string]string{},
 		useCompression: true,
 		fontCache:      map[string]objRef{},
-		fontRuneSet:    map[string]map[rune]struct{}{},
-		fontFaces:      map[string]*Font{},
+		fontRuneSet:    map[fontUnionKey]map[rune]struct{}{},
 	}
 	doc.updatePolicyFlags()
 
@@ -923,20 +925,21 @@ func (d *Document) failFinalize(err error) error {
 }
 
 // unionFontRunes materializes the document-wide rune sets collected while
-// content streams were painted. Keeping one set on Document avoids retaining
-// a duplicate rune slice on every page until finalization.
+// content streams were painted. One union per (resource name, face) keeps a
+// subset shared by every page that registered the face under that name, while
+// a different face under the same name on another page gets its own subset
+// (the face is part of the key; see fontUnionKey). Keeping one set on Document
+// avoids retaining a duplicate rune slice on every page until finalization.
 func (d *Document) unionFontRunes() {
 	if len(d.fontRuneSet) == 0 {
 		return
 	}
 
-	d.fontRunes = make(map[string][]rune, len(d.fontRuneSet))
-	d.fontKeys = make(map[string]string, len(d.fontRuneSet))
-	d.fontKeyFonts = make(map[string]*Font, len(d.fontRuneSet))
-	d.fontType0 = make(map[string]bool, len(d.fontRuneSet))
+	d.fontRunes = make(map[fontUnionKey][]rune, len(d.fontRuneSet))
+	d.fontKeys = make(map[fontUnionKey]string, len(d.fontRuneSet))
+	d.fontType0 = make(map[fontUnionKey]bool, len(d.fontRuneSet))
 
-	for _, name := range sortedStringKeys(d.fontRuneSet) {
-		used := d.fontRuneSet[name]
+	for key, used := range d.fontRuneSet {
 		runes := make([]rune, 0, len(used))
 
 		for rVal := range used {
@@ -944,17 +947,9 @@ func (d *Document) unionFontRunes() {
 		}
 
 		sort.Slice(runes, func(i, j int) bool { return runes[i] < runes[j] })
-		d.fontRunes[name] = runes
+		d.fontRunes[key] = runes
 
-		fnt := d.fontFaces[name]
-		if fnt == nil {
-			for _, page := range d.pages {
-				if fnt = page.content.fontFiles[name]; fnt != nil {
-					break
-				}
-			}
-		}
-
+		fnt := key.face
 		if fnt == nil {
 			continue
 		}
@@ -962,7 +957,7 @@ func (d *Document) unionFontRunes() {
 		fnt.ensureParsed()
 
 		type0 := needsType0(runes)
-		d.fontType0[name] = type0
+		d.fontType0[key] = type0
 
 		mode := 0
 		if type0 {
@@ -974,8 +969,7 @@ func (d *Document) unionFontRunes() {
 			baseName = fallbackFontName
 		}
 
-		d.fontKeyFonts[name] = fnt
-		d.fontKeys[name] = fmt.Sprintf("v%d|%x|%s|%s", mode, fnt.fingerprint, baseName, runesKey(runes))
+		d.fontKeys[key] = fmt.Sprintf("v%d|%x|%s|%s", mode, fnt.fingerprint, baseName, runesKey(runes))
 	}
 }
 
@@ -1402,7 +1396,7 @@ func (d *Document) buildAnnots(page *Page) {
 		if arg.hasDest {
 			writeAnnotDest(&buf, d, arg)
 		} else {
-			fmt.Fprintf(&buf, " /A << /S /URI /URI %s >>", pdfString(arg.uri))
+			fmt.Fprintf(&buf, " /A << /S /URI /URI %s >>", uriString(arg.uri))
 		}
 
 		buf.WriteString(" >>")
@@ -1554,7 +1548,7 @@ func outlineCount(root *Outline) int {
 // pdfString encodes s as a PDF literal string for a simple WinAnsi/Latin-1
 // font. It walks runes (not UTF-8 bytes): each code point ≤ U+00FF becomes
 // one string byte so it matches the subset cmap and /Widths indices. Code
-// points above U+00FF are folded via winAnsiFold (common punctuation) or
+// points above U+00FF are folded via pdfDocPunctFold (common punctuation) or
 // replaced with '?'; emitting raw UTF-8 bytes made viewers show mojibake
 // and missing glyphs (e.g. "·" as "\302\267").
 func pdfString(s string) string {
@@ -1563,10 +1557,12 @@ func pdfString(s string) string {
 	return string(appendPDFString(make([]byte, 0, len(s)+literalDelims), s))
 }
 
-// winAnsiFold maps common Unicode punctuation that appears in HTML/CSS to a
-// simple-font stand-in. Dashes outside Latin-1 remain unchanged so visible
-// text uses the Type0 path and retains the actual em/en dash glyph.
-func winAnsiFold(rVal rune) rune {
+// pdfDocPunctFold maps common Unicode punctuation that appears in HTML/CSS to
+// a PDFDocEncoding stand-in for metadata and outline strings. Unlike visible
+// text (winAnsiFoldCode, which keeps real WinAnsi codes such as the bullet
+// 0x95), these strings carry no font subset, so a lossy ASCII stand-in is the
+// safe representation. Dashes are handled by pdfDocEncodingFold.
+func pdfDocPunctFold(rVal rune) rune {
 	switch rVal {
 	case '\u2018', '\u2019': // curly single quotes
 		return '\''
@@ -1590,10 +1586,13 @@ func winAnsiFold(rVal rune) rune {
 // pdfDocEncodingFold maps punctuation to PDF document-string bytes. Unlike
 // visible page text, metadata and outline strings do not have a font subset,
 // so their standard PDFDocEncoding dash bytes are the lossless representation.
+// PDFDocEncoding (ISO 32000-1 Annex D.2) puts em dash at 0x84 and en dash at
+// 0x85; 0x96/0x97 are OE/Scaron, so folding dashes there made readers show
+// "Œ" (U+0152) in outline titles (Wikipedia 2006–2013 etc.).
 func pdfDocEncodingFold(rVal rune) rune {
 	const (
-		pdfDocEnDash = 0x96
-		pdfDocEmDash = 0x97
+		pdfDocEmDash = 0x84
+		pdfDocEnDash = 0x85
 	)
 
 	switch rVal {
@@ -1603,7 +1602,7 @@ func pdfDocEncodingFold(rVal rune) rune {
 		return pdfDocEmDash
 	}
 
-	return winAnsiFold(rVal)
+	return pdfDocPunctFold(rVal)
 }
 
 func pdfDate(t time.Time) string {

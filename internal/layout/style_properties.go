@@ -1513,6 +1513,12 @@ func applyTextGroup(
 func applyTextLayoutProps(style *ResolvedStyle, prop, value string) bool {
 	switch prop {
 	case "line-height":
+		// inherit copied the parent computed line height in inheritProps;
+		// inheritUnitlessLineHeight rescales it after the font pass.
+		if isInheritDeclaration(value) {
+			return true
+		}
+
 		style.LineHeightUnitless = 0
 		if ratio, ok := css.ParseNumber(value); ok {
 			style.LineHeightUnitless = ratio

@@ -275,22 +275,40 @@ func TestFamilyNamesLiberation(t *testing.T) {
 	}
 }
 
-func TestFontEmbedErrorPropagates(t *testing.T) {
+// TestFontEmptyCmapEmbedFallsBackToLiberation: a face that cannot build a
+// non-empty subset (an empty cmap) must not abort the write. Paint already
+// substitutes the Liberation fallback for glyphs a primary face lacks
+// (Content.runFallbackFont), so the writer re-points the resource at that
+// same fallback. Regression for w3schools.com/cpp, which died at
+// "embed font F1: font: empty cmap mappings" after a clean layout.
+//
+// History: P5-07 made font-embed errors propagate instead of dropping the
+// resource (dropping it renders /name Tf text invisible). Substituting the
+// fallback keeps both properties: no silent drop, no aborted document.
+func TestFontEmptyCmapEmbedFallsBackToLiberation(t *testing.T) {
 	t.Parallel()
-	// error, not silently drop the resource (which renders text invisible).
+
 	data := fixedDoc(t)
-	p := data.AddPage(100, 100)
-	p.Content().UseEmbeddedFont("F1", &Font{})
+	data.SetCompression(false)
 
-	var buf bytes.Buffer
+	p := data.AddPage(200, 100)
+	cur := p.Content()
+	// &Font{} has the empty cmap: no rune maps to a glyph.
+	cur.UseEmbeddedFont("F1", &Font{})
+	cur.BeginText()
+	cur.SetFont("F1", 12)
+	cur.TextAt(10, 50)
+	cur.TextShow("hello")
+	cur.EndText()
 
-	err := data.Write(&buf)
-	if err == nil {
-		t.Fatal("expected Write error for unembeddable font")
+	out := string(writePDF(t, data))
+
+	if !strings.Contains(out, "+LiberationSans") {
+		t.Fatalf("empty-cmap face did not fall back to LiberationSans:\n%s", out)
 	}
 
-	if !strings.Contains(err.Error(), "embed font F1") {
-		t.Errorf("Write error = %q, want it to wrap %q", err, "embed font F1")
+	if !strings.Contains(out, "/F1 ") {
+		t.Error("expected the F1 resource entry to survive the fallback")
 	}
 }
 

@@ -16,7 +16,8 @@ all content, and four secondary defect classes. This ledger turns the 2026-09-16
 reconnaissance into ordered, atomic work. Code changes only; docs and the product site
 are explicitly out of scope here.
 
-Baseline artifacts (repo root, untracked by design):
+Baseline artifacts (untracked by design; PDFs moved 2026-09-16 to
+`real-sites/learncpp/evidence/`, logs stay in the repo root):
 
 - `learncpp_conversion.log` - failed run, exit 1, 89s, 0-byte `learncpp.pdf`
 - `learncpp_noimages.log`, `learncpp_noimages.pdf` - `--no-images` run, exit 0, 37 pages

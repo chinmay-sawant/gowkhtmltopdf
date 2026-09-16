@@ -75,3 +75,15 @@ plans/0.2.6/perf-review/results/*
 /plans/0.2.6/perf-improve/results/*
 plans/0.2.6/perf-time/profiles/raw/*
 /plans/0.2.6/perf-time/results/*
+
+# Generated conversion artifacts: repo-root PDFs and drill logs. Real-site
+# conversions land under plans/0.2.7/real-sites/ now; this keeps stray root
+# output from being committed.
+/*.pdf
+/*.log
+
+# Real-sites forensics output (PDF, JSON, PNG crops, comparison Markdown, probe
+# HTML/CSS, logs, text dumps). Everything generated under a site's evidence/
+# folder is ignored; generate probes and reports there only, never in the repo
+# root.
+plans/0.2.7/real-sites/*/evidence/

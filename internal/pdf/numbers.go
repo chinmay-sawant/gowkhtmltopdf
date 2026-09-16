@@ -11,6 +11,9 @@ const (
 
 	// PDF / font metrics.
 	pdfUnitsPerEm      = 1000
+	fontWeightDefault  = 400
+	fontWeightMin      = 100
+	fontWeightMax      = 1000
 	fontWeightBoldMin  = 700
 	defaultItalicAngle = -12
 	fixed14Divisor     = 64 // TrueType F2DOT14 / fixed-point style scales often /64 for degrees-ish
@@ -69,10 +72,11 @@ const (
 	cmapPlatformWin      = 3
 	cmapWinUnicodeBMP    = 1
 
-	// hhea / maxp / head minimum sizes.
-	hheaMinSize = 36
-	maxpMinSize = 6
-	headMinSize = 52
+	// hhea / maxp / head / OS/2 minimum sizes.
+	hheaMinSize       = 36
+	maxpMinSize       = 6
+	headMinSize       = 52
+	os2WeightClassEnd = 6 // OS/2 usWeightClass is bytes 4-5 in every version
 
 	// Content stream / operators.
 	pdfFloatPrec     = 3
