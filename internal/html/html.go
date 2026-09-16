@@ -407,11 +407,13 @@ func findImplicit(top *Node, name string) *Node {
 // shouldAutoClose reports whether a start tag next closes the open element
 // open.
 func shouldAutoClose(open, next string) bool {
+	if open == "p" && closesOpenParagraph(next) {
+		return true
+	}
+
 	switch next {
 	case "li":
 		return open == "li"
-	case "p":
-		return open == "p"
 	case "tr":
 		return open == "tr" || open == "td" || open == "th"
 	case "td", "th":
@@ -431,6 +433,23 @@ func shouldAutoClose(open, next string) bool {
 	default:
 		return false
 	}
+}
+
+// closesOpenParagraph reports whether a start tag for next implicitly closes
+// an open <p> (HTML5 tree construction: the "in body" start tags that close a
+// p element). The learncpp home page opens six <p> tags and closes none;
+// without this rule anchors in its lesson table stay descendants of an open
+// <p> and match print rules like `.cryout p a::after`.
+func closesOpenParagraph(name string) bool {
+	switch name {
+	case "address", "article", "aside", "blockquote", "details", "div",
+		"dl", "fieldset", "figcaption", "figure", "footer", "form",
+		"h1", "h2", "h3", "h4", "h5", "h6", "header", "hgroup", "hr",
+		"main", "menu", "nav", "ol", "p", "pre", "section", "table", "ul":
+		return true
+	}
+
+	return false
 }
 
 // tokenKind discriminates token types.

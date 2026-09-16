@@ -236,9 +236,12 @@ that fails if `docs/` goes dirty.
   `compliance/README.md` do not exist yet. When two validators disagree,
   both are suspect until explained.
 - **Dependency allowlist is mechanically enforced.** Direct third-party
-  modules may only be `github.com/go-text/typesetting` (OpenType shaping) and
-  `github.com/tdewolff/canvas` (SVG rasterization), checked by
-  `TestDirectModuleAllowlist`. Everything else stays `// indirect`.
+  modules may only be `github.com/go-text/typesetting` (OpenType shaping),
+  `github.com/tdewolff/canvas` (SVG rasterization), and
+  `github.com/tdewolff/font` (WOFF2/Brotli font decoding, user-approved
+  2026-09-16). `TestDirectModuleAllowlist` (`internal/pdf/shape_test.go`)
+  checks the module graph, and the Makefile header comment repeats the list.
+  Everything else stays `// indirect`.
 - **Version discipline.** `VERSION` is injected via ldflags; the release
   workflow hard-fails if `VERSION` does not match the pushed tag. Version
   bumps change VERSION + CHANGELOG together and pass `make test` first.
@@ -311,11 +314,15 @@ PR bodies live in `plans/PR/`. Phase checklist format comes from
 
 ## Dependency policy
 
-Exactly two direct dependencies are allowed (`go-text/typesetting` for text
-shaping, `tdewolff/canvas` for SVG rasterization), and the allowlist is
-enforced by a test. Any dependency addition is a project-policy change:
-announce its purpose, amend the Makefile allowlist, update the affected
-plan, and get explicit user sign-off. No silent additions.
+Exactly three direct dependencies are allowed: `go-text/typesetting` for
+text shaping, `tdewolff/canvas` for SVG rasterization, and `tdewolff/font`
+for WOFF2/Brotli font decoding (user-approved 2026-09-16; decision record
+in `plans/0.2.7/learncpp/01-canonical-0.2.7-learncpp.md` section 4.3). The
+allowlist is enforced by `TestDirectModuleAllowlist`
+(`internal/pdf/shape_test.go`) and mirrored in the Makefile header comment.
+Any dependency addition is a project-policy change: announce its purpose,
+amend the Makefile allowlist, update the affected plan, and get explicit
+user sign-off. No silent additions.
 
 ---
 

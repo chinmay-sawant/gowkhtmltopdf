@@ -858,10 +858,17 @@ func (e *engine) enableInlineChrome(item *inlineItem) {
 	item.h += e.inlineChromeTop(item.style) + e.inlineChromeBottom(item.style)
 }
 
-func (e *engine) inlineTextWidth(text string, st *ResolvedStyle, chrome bool) float64 {
-	w := e.measureTextFace(text, st)
+func (e *engine) inlineTextWidth(text string, style *ResolvedStyle, chrome bool) float64 {
+	if style != nil && style.TextTransform != "" && style.TextTransform != textTransformNone {
+		// Match textItem/paint: a recomputed item width must measure the
+		// transformed text or placement and paint drift apart
+		// (learncpp uppercase link advance).
+		text = transformInlineText(text, style.TextTransform)
+	}
+
+	w := e.measureTextFace(text, style)
 	if chrome {
-		w += e.inlineChromeLeft(st) + e.inlineChromeRight(st)
+		w += e.inlineChromeLeft(style) + e.inlineChromeRight(style)
 	}
 
 	return w

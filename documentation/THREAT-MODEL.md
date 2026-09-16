@@ -117,14 +117,17 @@ processes. The trust envelope of any local reader applies.
 - Local file reads are the only sensitive channel and are gated by the ACL
   (section 3). With default flags, no document-reachable path reads any
   local file.
-- **Fonts:** TTF/OTF/WOFF1 bytes loaded via `@font-face` `url(...)` are
-  untrusted parse input under the same ACL as other subresources; WOFF1
+- **Fonts:** TTF/OTF/WOFF1/WOFF2 bytes loaded via `@font-face` `url(...)`
+  are untrusted parse input under the same ACL as other subresources; WOFF1
   decompress uses size caps (table count, per-table / reconstructed SFNT
-  limits, overlap rejection) before `ParseTTF`. `--font-path` /
-  `--use-system-fonts` are operator-controlled discovery (not HTML ACL).
-  Remote `https://` `@font-face` **is fetched** via `FetchSub` (same ACL
-  and `NetworkPolicy` as `img` / `link`). `.woff2`, `.eot`, and `data:`
-  src are skipped. WOFF2 is rejected (Brotli not allowlisted).
+  limits, overlap rejection) before `ParseTTF`, and WOFF2 goes through the
+  allowlisted `github.com/tdewolff/font` decoder, which caps memory at
+  30 MiB. `--font-path` / `--use-system-fonts` are operator-controlled
+  discovery (not HTML ACL). Remote `https://` `@font-face` **is fetched**
+  via `FetchSub` (same ACL and `NetworkPolicy` as `img` / `link`). EOT
+  sources are skipped; `data:` payloads are decoded and registered when the
+  embedded format is supported, and skipped with a metadata-only warning
+  otherwise.
 - Operator credentials (custom headers, basic auth, cookies) are attached
   to the requests the operator configured them for. Cross-host auth and
   cookie headers are stripped by `net/http` on redirects, but custom

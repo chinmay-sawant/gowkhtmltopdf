@@ -56,9 +56,10 @@ the dotted settings shown in engine tables below are internal only.
 
 **Non-negotiable constraints** (enforced at the module boundary):
 
-- **No cgo** — `CGO_ENABLED=0`; only Go stdlib plus a narrow, allowlisted pair
-  of direct dependencies: `github.com/go-text/typesetting` (OpenType shaping)
-  and `github.com/tdewolff/canvas` (SVG rasterization).
+- **No cgo** - `CGO_ENABLED=0`; only Go stdlib plus a narrow, allowlisted set
+  of direct dependencies: `github.com/go-text/typesetting` (OpenType shaping),
+  `github.com/tdewolff/canvas` (SVG rasterization), and
+  `github.com/tdewolff/font` (WOFF2/Brotli font decoding).
 - **No browser or native converter process** — everything (load → parse →
   style → layout → paginate → paint → write) runs inside the Go binary.
 - **No third-party PDF/HTML/CSS APIs or services.**

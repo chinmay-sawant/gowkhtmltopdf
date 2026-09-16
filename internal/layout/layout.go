@@ -568,14 +568,18 @@ type engine struct {
 	ops             []Op
 	gridScratch     []GridSeg // reusable row-grid collector storage
 	noEmit          bool      // measurement mode: compute geometry without emitting ops
-	height          float64
-	scale           float64 // zoom factor applied to style lengths (>= 1)
-	zIndex          int
-	zIndexSet       bool
-	positioned      bool
-	zFrame          *paintCtxFrame // innermost stacking context (nil at root)
-	nextCtxSeq      int            // stacking-context frame creation order
-	blendMode       string
+	// pendingRelPct holds position:relative boxes with deferred percentage
+	// insets; resolveRelativePercents runs them after the document build when
+	// the containing block's final content box is known.
+	pendingRelPct []*box
+	height        float64
+	scale         float64 // zoom factor applied to style lengths (>= 1)
+	zIndex        int
+	zIndexSet     bool
+	positioned    bool
+	zFrame        *paintCtxFrame // innermost stacking context (nil at root)
+	nextCtxSeq    int            // stacking-context frame creation order
+	blendMode     string
 	// blendGroup is the CSS element group that owns newly emitted ops
 	// (mix-blend-mode or isolation: isolate). nil means page-level paint.
 	// blendGroupOwner is the style that created the innermost group, so the
@@ -1100,6 +1104,9 @@ func finalizeResult(eng *engine, root *html.Node, opts Options) (*Result, error)
 	if eng.err != nil {
 		return nil, eng.err
 	}
+	// Percentage insets deferred by the build resolve against the containing
+	// block's final content box before chrome ops and transforms are stamped.
+	eng.resolveRelativePercents(boxNode)
 	// Merge deferred background/border ops before stamping sticky/fixed flags
 	// and CSS transforms (those passes need final op indices).
 	eng.finalizeChrome(boxNode)

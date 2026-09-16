@@ -457,5 +457,117 @@ func clipTextOp(op *Op, clip clipRect) {
 	outside := right <= clip.x || left >= clip.x+clip.w || bottom <= clip.y || top >= clip.y+clip.h
 	if outside {
 		DeactivateOp(op)
+
+		return
 	}
+
+	clampTextOpToClip(op, clip)
+}
+
+// clampTextOpToClip keeps only the runes whose advance boxes lie fully inside
+// the clip horizontally, dropping whole runes instead of cutting glyphs, so
+// no ink survives past the clip. Ops under a CSS transform or rotation, ops
+// without a resolved font, and vertical partial overlaps keep the previous
+// whole-op behavior: their painted geometry is not the axis-aligned advance
+// box, and display-list text cannot be cut vertically. Full clip parity would
+// need a PDF clip path op shared with the raster adapter; this clamp is
+// layout-only and covers the learncpp badge overflow.
+func clampTextOpToClip(op *Op, clip clipRect) {
+	if !clampableTextOp(op) {
+		return
+	}
+
+	if textOpFullyInsideClip(op, clip) {
+		return
+	}
+
+	op.bindEmptyExtra()
+
+	runes := []rune(transformInlineText(op.Text, op.TextTransform))
+
+	start, startX := firstRuneInsideClip(op, runes, clip)
+	if start == len(runes) {
+		DeactivateOp(op)
+
+		return
+	}
+
+	end, keptW := lastRuneInsideClip(op, runes, start, startX, clip)
+	if start == 0 && end == len(runes) {
+		return
+	}
+
+	// The kept run is already text-transformed; clear the transform so paint
+	// does not apply it twice.
+	op.SetTextTransform("")
+	op.Text = string(runes[start:end])
+	op.X = startX
+	op.W = keptW
+}
+
+// clampableTextOp reports whether op is text whose painted geometry is the
+// axis-aligned advance box: no transform or rotation, a resolved font, a
+// positive size and width, and non-empty text. Other ops keep the previous
+// whole-op behavior.
+func clampableTextOp(op *Op) bool {
+	if op.Kind != OpText && op.Kind != OpBullet {
+		return false
+	}
+
+	return !op.XformSet && op.RotateDeg == 0 && op.Font != nil &&
+		op.Size > 0 && op.Text != "" && op.W > 0
+}
+
+// textOpFullyInsideClip reports whether the whole advance box already sits
+// inside the clip horizontally.
+func textOpFullyInsideClip(op *Op, clip clipRect) bool {
+	return op.X >= clip.x-clipPointTolerance &&
+		op.X+op.W <= clip.x+clip.w+clipPointTolerance
+}
+
+// firstRuneInsideClip skips leading runes whose advance box starts left of the
+// clip and returns the index of the first fully visible rune plus the x its
+// advance starts at. start == len(runes) means none survive.
+func firstRuneInsideClip(op *Op, runes []rune, clip clipRect) (int, float64) {
+	start := 0
+	x := op.X
+
+	for start < len(runes) {
+		runeW := textOpRuneAdvance(op, runes[start])
+		if x >= clip.x-clipPointTolerance && x+runeW <= clip.x+clip.w+clipPointTolerance {
+			break
+		}
+
+		x += runeW
+		start++
+	}
+
+	return start, x
+}
+
+// lastRuneInsideClip extends the kept run from start while each rune's advance
+// still ends inside the clip, returning the exclusive end index and the kept
+// advance width.
+func lastRuneInsideClip(op *Op, runes []rune, start int, x float64, clip clipRect) (int, float64) {
+	end := start
+	keptW := 0.0
+	clipRight := clip.x + clip.w
+
+	for end < len(runes) {
+		runeW := textOpRuneAdvance(op, runes[end])
+		if x+keptW+runeW > clipRight+clipPointTolerance {
+			break
+		}
+
+		keptW += runeW
+		end++
+	}
+
+	return end, keptW
+}
+
+// textOpRuneAdvance returns the advance width of one rune under op's font and
+// letter spacing.
+func textOpRuneAdvance(op *Op, r rune) float64 {
+	return op.Font.GlyphAdvancePoints(r, op.Size) + op.LetterSpacing
 }

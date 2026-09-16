@@ -60,3 +60,58 @@ suspicious pages: 34 -> 0 (-34)
 coverage min/median/max:
   baseline: 0.00491 / 0.00491 / 0.82021
   current: 0.49192 / 0.80921 / 0.81379
+===== real-site drill 2026-09-16T10:46:12+0530 =====
+url: https://www.learncpp.com/
+output: learncpp.pdf
+binary: /home/chinmay/ChinmayPersonalProjects/gowkhtmltopdf/bin/gowkhtmltopdf
+baseline: plans/0.2.7/learncpp/evidence/2026-09-16-baseline-noimages.json
+cmd: /home/chinmay/ChinmayPersonalProjects/gowkhtmltopdf/bin/gowkhtmltopdf --url https://www.learncpp.com/ -o learncpp.pdf
+Loading pages (1/1)
+warning: object 1: @font-face src "https://www.learncpp.com/blog/wp-includes/fonts/dashicons.eot?99ac726223c749443b642ce33df8b800#iefix" skipped (EOT unsupported; WOFF2/WOFF1/TTF/OTF only)
+warning: object 1: @font-face src "https://www.learncpp.com/blog/wp-content/plugins/menu-icons/vendor/codeinwp/icon-picker/css/types/fontawesome-webfont.eot?#iefix&v=4.7.0" skipped (EOT unsupported; WOFF2/WOFF1/TTF/OTF only)
+warning: object 1: @font-face src "https://www.learncpp.com/blog/wp-content/plugins/menu-icons/vendor/codeinwp/icon-picker/css/types/fontawesome-webfont.svg?v=4.7.0#fontawesomeregular": parse font "https://www.learncpp.com/blog/wp-content/plugins/menu-icons/vendor/codeinwp/icon-picker/css/types/fontawesome-webfont.svg?v=4.7.0#fontawesomeregular": font: not a TrueType font
+warning: object 1: @font-face src "https://www.learncpp.com/blog/wp-content/plugins/learncpp-prism/fonts/monaco/monaco-webfont.eot?#iefix" skipped (EOT unsupported; WOFF2/WOFF1/TTF/OTF only)
+warning: object 1: @font-face src "https://www.learncpp.com/blog/wp-content/plugins/learncpp-prism/fonts/monaco/monaco-webfont.svg#MonacoRegular": parse font "https://www.learncpp.com/blog/wp-content/plugins/learncpp-prism/fonts/monaco/monaco-webfont.svg#MonacoRegular": font: not a TrueType font
+warning: object 1: @font-face src "https://www.learncpp.com/blog/wp-content/themes/septera/resources/fonts/iconmeta.eot?o7tart#iefix" skipped (EOT unsupported; WOFF2/WOFF1/TTF/OTF only)
+warning: object 1: @font-face src "https://www.learncpp.com/blog/wp-content/themes/septera/resources/fonts/iconmeta.svg?o7tart#iconmeta": parse font "https://www.learncpp.com/blog/wp-content/themes/septera/resources/fonts/iconmeta.svg?o7tart#iconmeta": font: not a TrueType font
+warning: object 1: @font-face src "https://www.learncpp.com/blog/wp-content/themes/septera/resources/fonts/socials.eot?#iefix" skipped (EOT unsupported; WOFF2/WOFF1/TTF/OTF only)
+warning: object 1: @font-face src "https://www.learncpp.com/blog/wp-content/themes/septera/resources/fonts/socials.svg?#socials": parse font "https://www.learncpp.com/blog/wp-content/themes/septera/resources/fonts/socials.svg?#socials": font: not a TrueType font
+warning: object 1: @font-face src "https://www.learncpp.com/blog/wp-content/themes/septera/resources/fonts/blocks.eot?#iefix" skipped (EOT unsupported; WOFF2/WOFF1/TTF/OTF only)
+warning: object 1: @font-face src "https://www.learncpp.com/blog/wp-content/themes/septera/resources/fonts/blocks.svg?#blocks": parse font "https://www.learncpp.com/blog/wp-content/themes/septera/resources/fonts/blocks.svg?#blocks": font: not a TrueType font
+Done
+exit: 0
+elapsed: 7s
+# PDF forensics: learncpp.pdf
+
+pages: 13 | words: 2129 | link annots: 357
+fonts: BRGTJZ+OpenSans, OTXDNS+LiberationSans, PASJDT+LiberationSans-Bold, SPTOVV+OpenSans, VQINZA+LiberationSans-Bold
+low-ink pages with a text layer (possible covered text): 0
+
+| page | words | coverage | drawings | links | main font |
+|------|-------|----------|----------|-------|-----------|
+| 1 | 200 | 0.564 | 72 | 18 | BRGTJZ+OpenSans |
+| 2 | 182 | 0.788 | 114 | 30 | BRGTJZ+OpenSans |
+| 3 | 153 | 0.788 | 116 | 28 | BRGTJZ+OpenSans |
+| 4 | 173 | 0.788 | 116 | 28 | BRGTJZ+OpenSans |
+| 5 | 169 | 0.788 | 114 | 30 | BRGTJZ+OpenSans |
+| 6 | 160 | 0.787 | 119 | 28 | BRGTJZ+OpenSans |
+| 7 | 179 | 0.787 | 114 | 30 | BRGTJZ+OpenSans |
+| 8 | 176 | 0.787 | 114 | 30 | BRGTJZ+OpenSans |
+| 9 | 152 | 0.754 | 111 | 27 | BRGTJZ+OpenSans |
+| 10 | 161 | 0.794 | 112 | 29 | BRGTJZ+OpenSans |
+| 11 | 159 | 0.787 | 114 | 28 | BRGTJZ+OpenSans |
+| 12 | 139 | 0.783 | 111 | 27 | BRGTJZ+OpenSans |
+| 13 | 126 | 0.757 | 108 | 24 | BRGTJZ+OpenSans |
+
+## comparison vs baseline: plans/0.2.7/learncpp/evidence/2026-09-16-baseline-noimages.json
+pages:            37 -> 13 (-24)
+total words:      3096 -> 2129 (-967)
+link annots:      1119 -> 357 (-762)
+fonts added:      BRGTJZ+OpenSans, OTXDNS+LiberationSans, PASJDT+LiberationSans-Bold, SPTOVV+OpenSans, VQINZA+LiberationSans-Bold
+fonts removed:    LiberationSans, LiberationSans-Bold
+suspicious pages: 34 -> 0 (-34)
+  entered suspicious set: (none)
+  left suspicious set: 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21 (+14 more)
+coverage min/median/max:
+  baseline: 0.00491 / 0.00491 / 0.82021
+  current: 0.56376 / 0.78730 / 0.79450

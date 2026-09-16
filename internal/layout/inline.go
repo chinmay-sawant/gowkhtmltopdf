@@ -2,6 +2,7 @@ package layout
 
 import (
 	"strings"
+	"unicode"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
@@ -12,6 +13,7 @@ const (
 	cssTagImg                    = "img"
 	cssDisplayInline             = "inline"
 	cssDisplayInlineBlock        = "inline-block"
+	cssDisplayInlineTable        = "inline-table"
 	cssDisplayNone               = "none"
 	cssWhiteSpaceNowrap          = "nowrap"
 	cssWhiteSpacePre             = "pre"
@@ -780,7 +782,8 @@ func (e *engine) splitTextToWidth(
 
 // fittingPrefix returns the rune count of the longest prefix of runes that
 // fits within limit using the style's font-size. Takes at least 1 rune so
-// we always make progress.
+// we always make progress. Advances are measured as painted (text-transform
+// applied), so emergency chunk boundaries match the painted widths.
 func (e *engine) fittingPrefix(runes []rune, limit float64, style *ResolvedStyle) int {
 	if style == nil {
 		return 1
@@ -788,10 +791,11 @@ func (e *engine) fittingPrefix(runes []rune, limit float64, style *ResolvedStyle
 
 	node := 0
 	width := 0.0
+	upperNext := true
 
 	for node < len(runes) {
 		// measureRuneFace avoids per-rune string(r) allocations.
-		rowW := e.measureRuneFace(runes[node], style)
+		rowW := e.paintedRuneAdvance(runes[node], style, &upperNext)
 		if node > 0 && width+rowW > limit+0.01 {
 			break
 		}
@@ -809,6 +813,33 @@ func (e *engine) fittingPrefix(runes []rune, limit float64, style *ResolvedStyle
 	}
 
 	return node
+}
+
+// paintedRuneAdvance returns the advance of one rune as painted under the
+// style's text-transform. upperNext tracks the capitalize word-start state
+// exactly like capitalizeInlineText so chunk widths match paint. The
+// identity transform keeps the allocation-free measureRuneFace fast path.
+func (e *engine) paintedRuneAdvance(curRune rune, sty *ResolvedStyle, upperNext *bool) float64 {
+	switch sty.TextTransform {
+	case textTransformUppercase:
+		return e.measureTextFace(strings.ToUpper(string(curRune)), sty)
+	case textTransformLowercase:
+		return e.measureTextFace(strings.ToLower(string(curRune)), sty)
+	case textTransformCapitalize:
+		if unicode.IsLetter(curRune) {
+			if *upperNext {
+				*upperNext = false
+
+				return e.measureTextFace(strings.ToUpper(string(curRune)), sty)
+			}
+
+			return e.measureRuneFace(curRune, sty)
+		}
+
+		*upperNext = unicode.IsSpace(curRune)
+	}
+
+	return e.measureRuneFace(curRune, sty)
 }
 
 // lastSoftBreak returns a split index after a soft-wrap character near the

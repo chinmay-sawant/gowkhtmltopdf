@@ -159,7 +159,7 @@
      "Text",
      "font-family",
      "Implemented",
-     "Named and generic families; embedded Liberation Sans plus `--font-path`, `--use-system-fonts`, and `@font-face` TTF/OTF/WOFF1 from local paths or `https://`; missing faces fall back through the author stack to Liberation"
+     "Named and generic families; embedded Liberation Sans plus `--font-path`, `--use-system-fonts`, and `@font-face` TTF/OTF/WOFF1/WOFF2 from local paths or `https://`; missing faces fall back through the author stack to Liberation"
     ],
     [
      "Text",
@@ -328,7 +328,7 @@
     "Browser parity: full WebKit or Chrome print parity is an explicit non-milestone; banned claims include pixel-perfect output, full CSS, and browser replacement (`documentation/fidelity.md`, Claims language).",
     "WebP and AVIF are not implemented: the image is skipped or a broken-image placeholder is painted. SVG-as-`<img>` is implemented through `internal/svg` (allowlisted `tdewolff/canvas`, rect/circle/path subset); the remaining 53 SVG presentation properties stay unsupported (matrix 5.2).",
     "PDF encryption, duplex, and AcroForm: out of scope; `--produce-forms` is not registered and is rejected as an unknown option, and the PDF writer has no form model. PDF/A-3a, PDF/A-4, PDF/UA-1, and PDF/UA-2 shipped in 0.2.2 as opt-in `--pdf-profile` / `Document.PDFProfile` (default remains unclaimed PDF 1.4; version alone is not a claim). Older PDF/A-1 / A-2 and PDF/X stay absent.",
-    "`@font-face`: TTF/OTF (TrueType outlines) and WOFF1 load from local paths or `https://` through the `FetchSub` ACL and `NetworkPolicy` on PDF and image paths. WOFF2, EOT, and `data:` sources are skipped; CFF/`OTTO` fonts are rejected.",
+    "`@font-face`: TTF/OTF (TrueType outlines), WOFF1, and WOFF2 load from local paths or `https://` through the `FetchSub` ACL and `NetworkPolicy` on PDF and image paths. EOT sources are skipped; `data:` payloads load when the embedded format is supported; CFF/`OTTO` fonts are rejected.",
     "Complex-script shaping is partial: Arabic OT via `go-text/typesetting` (GSUB) with presentation-form fallback, CJK via Type0/CID; no CGO HarfBuzz."
    ]
   },

@@ -390,35 +390,20 @@ func findBoxPathForOp(boxNode *box, opIndex int, path *[]*box) bool {
 	return true
 }
 
-// rowChromeAbove collects fill/stroke rects whose band touches oldY, with
-// their minimum top Y. Chrome is row-tight (rows never split), so when the
-// flow index is available the scan is limited to the op's page bucket; the
-// page above is scanned too when the band reaches across the page top. A full
-// display-list scan is the fallback.
+// rowChromeAbove collects chrome and same-line runs whose band touches oldY,
+// with their minimum chrome top Y. Chrome is row-tight (rows never split), so
+// when the flow index is available the scan is limited to the op's page bucket;
+// the page above is scanned too when the band reaches across the page top. A
+// full display-list scan is the fallback.
 func rowChromeAbove(res *Result, idx int, oldY float64) ([]int, float64) {
 	chrome := make([]int, 0, rowChromeCap)
 
 	minY := oldY
 
-	//nolint:nestif // row chrome candidate resolution
 	if res.flowPageSize > 0 {
-		page, ok := checkedFlowPageOfY(oldY, res.flowPageSize)
-		if !ok {
-			return chrome, minY
-		}
-
-		if page < 0 {
-			page = 0
-		}
-
-		if page < len(res.flowPages) {
-			if page > 0 && oldY-float64(page)*res.flowPageSize < rowChromeBandTolerance {
-				chrome, minY = appendRowChromeCandidates(chrome, res.Ops, res.flowPages[page-1], idx, oldY, minY)
-			}
-
-			chrome, minY = appendRowChromeCandidates(chrome, res.Ops, res.flowPages[page], idx, oldY, minY)
-
-			return chrome, minY
+		flowChrome, flowMinY, handled := rowChromeAboveFlow(res, idx, oldY, chrome, minY)
+		if handled {
+			return flowChrome, flowMinY
 		}
 	}
 
@@ -430,7 +415,9 @@ func rowChromeAbove(res *Result, idx int, oldY float64) ([]int, float64) {
 
 		chrome = append(chrome, jdx)
 
-		if obj.Y < minY {
+		// Only chrome sets the lead Y; a same-line text run above the snapped
+		// op must not change how far the snapped line moves.
+		if (obj.Kind == OpFillRect || obj.Kind == OpStrokeRect) && obj.Y < minY {
 			minY = obj.Y
 		}
 	}
@@ -438,8 +425,34 @@ func rowChromeAbove(res *Result, idx int, oldY float64) ([]int, float64) {
 	return chrome, minY
 }
 
+// rowChromeAboveFlow scans the flow page bucket around oldY. handled=false
+// means the flow index cannot cover this band (the page bucket is missing) and
+// the caller must fall back to the full display-list scan.
+func rowChromeAboveFlow(res *Result, idx int, oldY float64, chrome []int, minY float64) ([]int, float64, bool) {
+	page, ok := checkedFlowPageOfY(oldY, res.flowPageSize)
+	if !ok {
+		return chrome, minY, true
+	}
+
+	if page < 0 {
+		page = 0
+	}
+
+	if page >= len(res.flowPages) {
+		return chrome, minY, false
+	}
+
+	if page > 0 && oldY-float64(page)*res.flowPageSize < rowChromeBandTolerance {
+		chrome, minY = appendRowChromeCandidates(chrome, res.Ops, res.flowPages[page-1], idx, oldY, minY)
+	}
+
+	chrome, minY = appendRowChromeCandidates(chrome, res.Ops, res.flowPages[page], idx, oldY, minY)
+
+	return chrome, minY, true
+}
+
 // appendRowChromeCandidates appends the band candidates of idxs to chrome,
-// lowering minY for candidates whose top sits above oldY.
+// lowering minY for chrome whose top sits above oldY.
 func appendRowChromeCandidates(chrome []int, ops []Op, idxs []int, idx int, oldY, minY float64) ([]int, float64) {
 	for _, jdx := range idxs {
 		obj := &ops[jdx]
@@ -449,7 +462,7 @@ func appendRowChromeCandidates(chrome []int, ops []Op, idxs []int, idx int, oldY
 
 		chrome = append(chrome, jdx)
 
-		if obj.Y < minY {
+		if (obj.Kind == OpFillRect || obj.Kind == OpStrokeRect) && obj.Y < minY {
 			minY = obj.Y
 		}
 	}
@@ -457,14 +470,20 @@ func appendRowChromeCandidates(chrome []int, ops []Op, idxs []int, idx int, oldY
 	return chrome, minY
 }
 
-// rowChromeBandCandidate reports whether obj is a one-row fill/stroke rect
-// sitting on the same band as the op at oldY (not the op itself).
+// rowChromeBandCandidate reports whether obj sits on the same visual row band
+// as the op at oldY (not the op itself): one-row fill/stroke chrome, or a
+// text/bullet/link/image run on the same line. A single line can hold several
+// runs (a lesson badge number and its row title share a baseline within a
+// point); they must travel with the snap or the number is left behind in the
+// previous page's gap while the row's chrome moves on.
 func rowChromeBandCandidate(obj *Op, jdx, idx int, oldY float64) bool {
 	if obj.Fixed || jdx == idx {
 		return false
 	}
 
-	if obj.Kind != OpFillRect && obj.Kind != OpStrokeRect {
+	switch obj.Kind {
+	case OpFillRect, OpStrokeRect, OpText, OpBullet, OpImage, OpLinkURI:
+	case OpLine, OpGridRun, OpUnknown, opKindNoop:
 		return false
 	}
 

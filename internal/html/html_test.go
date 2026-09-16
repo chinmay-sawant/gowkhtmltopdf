@@ -440,7 +440,9 @@ func TestParseParentPointers(t *testing.T) {
 
 func TestParseVoidElements(t *testing.T) {
 	t.Parallel()
-	root := mustParse(t, `<p>a<br>x<img src="y.png" alt="y"><input type="text" disabled><hr></p>`)
+	// <hr> is block-level and closes the open <p> (browser behavior), so it
+	// sits outside the paragraph; br/img/input stay void inside it.
+	root := mustParse(t, `<p>a<br>x<img src="y.png" alt="y"><input type="text" disabled></p><hr>`)
 	para := root.FirstChild("p")
 
 	if para == nil {
@@ -448,12 +450,16 @@ func TestParseVoidElements(t *testing.T) {
 
 		return
 	}
-	// text a, br, text x, img, input, hr - br/img/input/hr must not consume the following content
-	if len(para.Children) != 6 {
-		t.Fatalf("<p> has %d children, want 6:\n%s", len(para.Children), treeString(para))
+	// text a, br, text x, img, input - br/img/input must not consume the following content
+	if len(para.Children) != 5 {
+		t.Fatalf("<p> has %d children, want 5:\n%s", len(para.Children), treeString(para))
 	}
 
-	assertChildren(t, para, "br", "img", "input", "hr")
+	assertChildren(t, para, "br", "img", "input")
+
+	if hr := root.FirstChild("hr"); hr == nil {
+		t.Errorf("<hr> not a <p> sibling:\n%s", treeString(root))
+	}
 
 	if got := para.TextContent(); got != "ax" {
 		t.Errorf("TextContent = %q, want %q", got, "ax")
@@ -502,6 +508,88 @@ func TestParseAutoCloseP(t *testing.T) {
 
 	if got := div.TextContent(); got != "ab" {
 		t.Errorf("TextContent = %q, want %q", got, "ab")
+	}
+}
+
+// Browser behavior (HTML5 tree construction): a block-level start tag closes
+// an open <p> before the new element is inserted. The learncpp home page has
+// six <p> opens and zero </p> closes; without this rule every lesson-row
+// anchor becomes a descendant of an open <p> and matches print rules like
+// `.cryout p a::after`.
+func TestParseImplicitCloseParagraphAtBlockStart(t *testing.T) {
+	t.Parallel()
+
+	root := mustParse(t, `<p>text<div class="lessontable-row-title"><a href="/lesson">link</a></div>`)
+	assertBlockDivSiblingOfPPara(t, root)
+
+	// The site shape: unclosed <p> runs followed by block siblings. No anchor
+	// may end up a descendant of any <p>.
+	site := `<p>intro<div class="row"><a href="/a">a</a></div>` +
+		`<div class="row"><a href="/b">b</a></div><p>next<p>last`
+	root = mustParse(t, site)
+	assertNoAnchorsUnderP(t, root)
+
+	// The rule must stay live where it should apply: an anchor inside a real
+	// closed <p> stays a <p> descendant, and inline children of <p> are kept.
+	root = mustParse(t, `<p>see <a href="/x">here</a></p><p>a<b>b</b><em>c</em></p>`)
+
+	anchor := root.FindFirst(func(n *Node) bool { return n.Type == ElementNode && n.Name == "a" })
+	if anchor == nil || anchor.Parent == nil || anchor.Parent.Name != "p" {
+		t.Errorf("anchor not inside closed <p>:\n%s", treeString(root))
+	}
+
+	if got := root.TextContent(); got != "see hereabc" {
+		t.Errorf("inline <p> TextContent = %q, want %q:\n%s", got, "see hereabc", treeString(root))
+	}
+}
+
+// assertBlockDivSiblingOfPPara checks the browser rule for the first case: the
+// block start tag closes the <p>, so the <div> and its anchor become siblings
+// of the <p> rather than descendants.
+func assertBlockDivSiblingOfPPara(t *testing.T, root *Node) {
+	t.Helper()
+
+	para := root.FirstChild("p")
+	if para == nil {
+		t.Fatalf("no <p>:\n%s", treeString(root))
+	}
+
+	if para.FirstChild("div") != nil {
+		t.Errorf("<div> nested in <p>, want block sibling:\n%s", treeString(root))
+	}
+
+	div := root.FirstChild("div")
+	if div == nil {
+		t.Fatalf("<div> not a root child:\n%s", treeString(root))
+	}
+
+	if div.FirstChild("a") == nil {
+		t.Fatalf("<a> not under <div>:\n%s", treeString(root))
+	}
+}
+
+// assertNoAnchorsUnderP fails when any <a> has a <p> ancestor.
+func assertNoAnchorsUnderP(t *testing.T, root *Node) {
+	t.Helper()
+
+	var underP int
+
+	root.Walk(func(n *Node) {
+		if n.Type != ElementNode || n.Name != "a" {
+			return
+		}
+
+		for ancestor := n.Parent; ancestor != nil; ancestor = ancestor.Parent {
+			if ancestor.Name == "p" {
+				underP++
+
+				break
+			}
+		}
+	})
+
+	if underP != 0 {
+		t.Errorf("%d anchors under <p>, want 0:\n%s", underP, treeString(root))
 	}
 }
 

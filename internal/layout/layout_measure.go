@@ -820,6 +820,49 @@ func (e *engine) measureImageWidth(n *html.Node, st ResolvedStyle) float64 {
 	return e.usedImageSize(n, st, e.resolveImage(n.Attribute("src"))).w
 }
 
+// measureLargestFloatImageWidth walks n for the widest descendant <img> that
+// lives inside a floated subtree. Such an image is laid out beside the float's
+// in-flow text, not in its max-content line, so the float's shrink-to-fit
+// width has to reserve the image width separately (see floatIntrinsicAvail).
+// In-flow images keep the plain measureLargestImageWidth policy.
+func (e *engine) measureLargestFloatImageWidth(node *html.Node) float64 {
+	if node == nil {
+		return 0
+	}
+
+	var best float64
+
+	var walk func(*html.Node, bool)
+
+	walk = func(node *html.Node, inFloat bool) {
+		if node.Type != html.ElementNode {
+			return
+		}
+
+		st := e.styleVal(node)
+		selfInFloat := inFloat
+		if st.Float != cssDisplayNone {
+			selfInFloat = true
+		}
+
+		if node.Name == cssTagImg && selfInFloat {
+			if w := e.measureImageWidth(node, st); w > best {
+				best = w
+			}
+		}
+
+		for _, c := range node.Children {
+			walk(c, selfInFloat)
+		}
+	}
+
+	for _, c := range node.Children {
+		walk(c, false)
+	}
+
+	return best
+}
+
 // measureLargestImageWidth walks n for the widest descendant <img>.
 func (e *engine) measureLargestImageWidth(node *html.Node) float64 {
 	if node == nil {

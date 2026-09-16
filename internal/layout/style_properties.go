@@ -42,9 +42,9 @@ const (
 )
 
 func applyDisplayGroup(
-	style *ResolvedStyle, prop, value string, _ float64, _ *styleContext, _ *ResolvedStyle, _ bool,
+	style *ResolvedStyle, prop, value string, _ float64, _ *styleContext, parent *ResolvedStyle, hasParent bool,
 ) bool {
-	if applyDisplayFlowProps(style, prop, value) {
+	if applyDisplayFlowProps(style, prop, value, parent, hasParent) {
 		return true
 	}
 
@@ -55,7 +55,9 @@ func applyDisplayGroup(
 // writing-mode/overflow keyword properties.
 //
 //nolint:cyclop // display/flow keyword properties
-func applyDisplayFlowProps(style *ResolvedStyle, prop, value string) bool {
+func applyDisplayFlowProps(
+	style *ResolvedStyle, prop, value string, parent *ResolvedStyle, hasParent bool,
+) bool {
 	switch prop {
 	case "display":
 		setDisplayKeyword(style, value)
@@ -66,7 +68,15 @@ func applyDisplayFlowProps(style *ResolvedStyle, prop, value string) bool {
 	case clearKeyword:
 		setClearKeyword(style, value)
 	case "box-sizing":
-		setBoxSizingKeyword(style, value)
+		// box-sizing is not inherited, but the inherit keyword is: the
+		// learncpp.com sheet pairs html{box-sizing:border-box} with
+		// *{box-sizing:inherit}. Dropping the keyword made .main content-box
+		// and pushed the chapter card past the page clip.
+		if value == inheritKeyword && hasParent && parent != nil {
+			style.BoxSizing = parent.BoxSizing
+		} else {
+			setBoxSizingKeyword(style, value)
+		}
 	case "writing-mode":
 		setWritingModeKeyword(style, value)
 	case "direction":

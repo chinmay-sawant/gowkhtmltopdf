@@ -5020,8 +5020,8 @@
         "CSS Positioned Layout"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "code_path": "internal/layout/style_properties.go:238",
+      "notes": "Fixed lengths shift a position:relative box at build (applyRelativeOffset, flex.go:1631); percentage values resolve against the containing block in the post-build resolveRelativePercents pass (relative_percent.go:33)."
     },
     {
       "property": "box-decoration-break",
@@ -5200,8 +5200,8 @@
         "CSS Box Sizing"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "code_path": "internal/layout/style_properties.go:70",
+      "notes": "The inherit keyword resolves the parent's value (html{box-sizing:border-box} with *{box-sizing:inherit}); content-box/border-box parsed otherwise."
     },
     {
       "property": "box-snap",
@@ -7974,7 +7974,7 @@
         "CSS Flexible Box Layout"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
+      "code_path": "internal/layout/style_flex_props.go",
       "notes": ""
     },
     {
@@ -7997,7 +7997,7 @@
         "CSS Flexible Box Layout"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
+      "code_path": "internal/layout/style_flex_props.go",
       "notes": ""
     },
     {
@@ -8020,7 +8020,7 @@
         "CSS Flexible Box Layout"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go:177",
+      "code_path": "internal/layout/style_flex_props.go",
       "notes": ""
     },
     {
@@ -8046,7 +8046,7 @@
         "CSS Flexible Box Layout"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
+      "code_path": "internal/layout/style_flex_props.go",
       "notes": ""
     },
     {
@@ -8069,7 +8069,7 @@
         "CSS Flexible Box Layout"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
+      "code_path": "internal/layout/style_flex_props.go",
       "notes": ""
     },
     {
@@ -8115,7 +8115,7 @@
         "CSS Flexible Box Layout"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
+      "code_path": "internal/layout/style_flex_props.go",
       "notes": ""
     },
     {
@@ -8138,7 +8138,7 @@
         "CSS Flexible Box Layout"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
+      "code_path": "internal/layout/style_flex_props.go",
       "notes": ""
     },
     {
@@ -8161,8 +8161,8 @@
         "CSS Positioned Layout"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go:36",
-      "notes": ""
+      "code_path": "internal/layout/style_properties.go:66",
+      "notes": "Text floats size with min/max-content: shrink-to-fit uses text max-content (plus a nested float image width when both exist) and floors at min-content per CSS 2.1 10.3.5; image floats keep image sizing (layout_flow.go:1197 floatIntrinsicAvail, layout_measure.go:828 measureLargestFloatImageWidth)."
     },
     {
       "property": "float-defer",
@@ -9977,8 +9977,8 @@
         "CSS Positioned Layout"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "code_path": "internal/layout/style_properties.go:1014",
+      "notes": "Fixed lengths shift a position:relative box at build (applyRelativeOffset, flex.go:1631); percentage values resolve against the containing block in the post-build resolveRelativePercents pass (relative_percent.go:33)."
     },
     {
       "property": "inset-block",
@@ -10004,8 +10004,8 @@
         "CSS Positioned Layout"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "code_path": "internal/layout/style_properties.go:1014",
+      "notes": "Fixed lengths shift a position:relative box at build (applyRelativeOffset, flex.go:1631); percentage values resolve against the containing block in the post-build resolveRelativePercents pass (relative_percent.go:33)."
     },
     {
       "property": "inset-block-end",
@@ -10028,8 +10028,8 @@
         "CSS Positioned Layout"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "code_path": "internal/layout/style_properties.go:1014",
+      "notes": "Fixed lengths shift a position:relative box at build (applyRelativeOffset, flex.go:1631); percentage values resolve against the containing block in the post-build resolveRelativePercents pass (relative_percent.go:33)."
     },
     {
       "property": "inset-block-start",
@@ -10052,8 +10052,8 @@
         "CSS Positioned Layout"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "code_path": "internal/layout/style_properties.go:1014",
+      "notes": "Fixed lengths shift a position:relative box at build (applyRelativeOffset, flex.go:1631); percentage values resolve against the containing block in the post-build resolveRelativePercents pass (relative_percent.go:33)."
     },
     {
       "property": "inset-inline",
@@ -10079,8 +10079,8 @@
         "CSS Positioned Layout"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "code_path": "internal/layout/style_properties.go:1014",
+      "notes": "Fixed lengths shift a position:relative box at build (applyRelativeOffset, flex.go:1631); percentage values resolve against the containing block in the post-build resolveRelativePercents pass (relative_percent.go:33)."
     },
     {
       "property": "inset-inline-end",
@@ -10103,8 +10103,8 @@
         "CSS Positioned Layout"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "code_path": "internal/layout/style_properties.go:1014",
+      "notes": "Fixed lengths shift a position:relative box at build (applyRelativeOffset, flex.go:1631); percentage values resolve against the containing block in the post-build resolveRelativePercents pass (relative_percent.go:33)."
     },
     {
       "property": "inset-inline-start",
@@ -10127,8 +10127,8 @@
         "CSS Positioned Layout"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "code_path": "internal/layout/style_properties.go:1014",
+      "notes": "Fixed lengths shift a position:relative box at build (applyRelativeOffset, flex.go:1631); percentage values resolve against the containing block in the post-build resolveRelativePercents pass (relative_percent.go:33)."
     },
     {
       "property": "interactivity",
@@ -10362,8 +10362,8 @@
         "CSS Positioned Layout"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "code_path": "internal/layout/style_properties.go:240",
+      "notes": "Fixed lengths shift a position:relative box at build (applyRelativeOffset, flex.go:1631); percentage values resolve against the containing block in the post-build resolveRelativePercents pass (relative_percent.go:33)."
     },
     {
       "property": "letter-spacing",
@@ -10735,7 +10735,7 @@
         "CSS Box Model"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go:521",
+      "code_path": "internal/layout/style_properties.go:509",
       "notes": ""
     },
     {
@@ -11020,7 +11020,7 @@
       ],
       "engine_status": "implemented",
       "code_path": "internal/layout/style_advanced_props.go + internal/layout/layout_flow.go",
-      "notes": "Implemented (lite) - trims block-start/block-end margins at container edges (none/block). Parsed, stored at style.go:334 (ResolvedStyle.MarginTrim) via style_advanced_props.go:44, consumed in layout_flow.go (flowChildren margin collapse trim)."
+      "notes": "Implemented (lite) - trims block-start/block-end margins at container edges (none/block). Parsed, stored at style.go:353 (ResolvedStyle.MarginTrim) via style_advanced_props.go:49, consumed in layout_flow.go (flowChildren margin collapse trim, applyMarginTrimSides at :740)."
     },
     {
       "property": "marker",
@@ -12374,7 +12374,7 @@
         "CSS Overflow"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go:44",
+      "code_path": "internal/layout/style_properties.go:87",
       "notes": ""
     },
     {
@@ -12448,8 +12448,8 @@
         "CSS Overflow"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "code_path": "internal/layout/style_advanced_props.go:111",
+      "notes": "Shorthand and logical variants map to the four physical OverflowClipMargin* fields; the stamping clip rect is grown by them in overflow_clip.go:59-63."
     },
     {
       "property": "overflow-clip-margin-block",
@@ -12734,7 +12734,7 @@
       ],
       "engine_status": "implemented",
       "code_path": "internal/layout/overflow_clip.go",
-      "notes": "Independent horizontal clipping to padding box for hidden, clip, auto, and scroll."
+      "notes": "Independent horizontal clipping to padding box for hidden, clip, auto, and scroll. Text ops outside the clip are clamped rune-wise (clipTextOp, overflow_clip.go:432), so no ink paints past the clip."
     },
     {
       "property": "overflow-y",
@@ -12757,7 +12757,7 @@
       ],
       "engine_status": "implemented",
       "code_path": "internal/layout/overflow_clip.go",
-      "notes": "Independent vertical clipping to padding box for hidden, clip, auto, and scroll."
+      "notes": "Independent vertical clipping to padding box for hidden, clip, auto, and scroll. Text ops outside the clip are clamped rune-wise (clipTextOp, overflow_clip.go:432), so no ink paints past the clip."
     },
     {
       "property": "overlay",
@@ -12925,7 +12925,7 @@
         "CSS Box Model"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go:529",
+      "code_path": "internal/layout/style_properties.go:515",
       "notes": ""
     },
     {
@@ -13601,7 +13601,7 @@
         "CSS Positioned Layout"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go:34",
+      "code_path": "internal/layout/style_properties.go:64",
       "notes": ""
     },
     {
@@ -13991,8 +13991,8 @@
         "CSS Positioned Layout"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "code_path": "internal/layout/style_properties.go:236",
+      "notes": "Fixed lengths shift a position:relative box at build (applyRelativeOffset, flex.go:1631); percentage values resolve against the containing block in the post-build resolveRelativePercents pass (relative_percent.go:33)."
     },
     {
       "property": "rotate",
@@ -16737,8 +16737,8 @@
         "CSS Text Decoration"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": "Phase 57 catch-up: matrix already Implemented; mapping lagged."
+      "code_path": "internal/layout/style_properties.go:1636",
+      "notes": "Phase 57 catch-up: matrix already Implemented; mapping lagged. v0.2.7: decoration does not propagate to floats, absolutely positioned, inline-block, or inline-table boxes (CSS 2.1 16.3.1) - decorationBlocked veto in style_cascade.go:375, applied by inheritProps (:398)."
     },
     {
       "property": "text-decoration-color",
@@ -17741,8 +17741,8 @@
         "CSS Positioned Layout"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "code_path": "internal/layout/style_properties.go:234",
+      "notes": "Fixed lengths shift a position:relative box at build (applyRelativeOffset, flex.go:1631); percentage values resolve against the containing block in the post-build resolveRelativePercents pass (relative_percent.go:33)."
     },
     {
       "property": "touch-action",
@@ -18636,7 +18636,7 @@
       ],
       "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "notes": "calc() with percentages is deferred at cascade and resolved at layout against the containing block (calcUsedWidth, style_values.go:979)."
     },
     {
       "property": "will-change",
@@ -18967,7 +18967,7 @@
       ],
       "engine_status": "implemented",
       "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "notes": "Creates a stacking context; paint order is stacking-context aware (layout_stacking.go), so ancestor chrome paints before descendant content even at equal z."
     },
     {
       "property": "zoom",

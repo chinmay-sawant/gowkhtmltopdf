@@ -92,6 +92,7 @@ func NodeWithWorkspace(
 		return nil, eng.err
 	}
 
+	eng.resolveRelativePercents(rootBox)
 	eng.finalizeChrome(rootBox)
 
 	return assembleNodeResult(eng, rootBox, opts, workspace), nil

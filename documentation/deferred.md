@@ -87,7 +87,7 @@ arbitrary network, or Chrome-parity behavior. See [wasm.md](wasm.md).
 | Browser WASM preview | **Shipped in 0.2.6**: opt-in `make wasm` build and `/live-demo` frontend route for inline HTML PDF, PNG, and JPEG output. The adapter runs in a worker with bounded input, output, image dimensions, and request lifetime. | Future resource bridge with explicit origin, CORS, size, timeout, and cancellation rules |
 | `--read-args-from-stdin` | **Not implemented.** The flag is not a working batch loop (rejected / unused). | Not planned |
 | Stdin HTML input (`-`) | **Not implemented.** CLI parse stores `Page: "-"`, but `load.GuessURL("-")` falls through to **`http://-`**. Library callers should pass inline HTML; do not document CLI `-` as stdin. | Document honestly; not a hidden feature |
-| WOFF2 / `data:` `@font-face` | Skipped (WOFF2 needs Brotli, not allowlisted; `data:` src rejected). Local TTF/OTF/WOFF1 under ACL works. | No Brotli module |
+| EOT / SVG-font `@font-face` sources | **Skipped.** EOT is rejected by an explicit policy check; SVG font payloads do not parse. WOFF2/WOFF1/TTF/OTF load from local paths and `https://` under the ACL; `data:` payloads register when supported. WOFF2 decision: [plans/0.2.7/learncpp section 4.3](../plans/0.2.7/learncpp/01-canonical-0.2.7-learncpp.md). | Not planned |
 | `[subject]` placeholder | Expands **empty** (no subject setting field). | Not planned |
 | HTML header / footer | **Partial** nested child layout (body CSS subset, flex/grid/images, local `@font-face`), clipped to the reserved margin band. Not a browser nested browsing context; no CSS running elements. | Browser HF out |
 | `:hover` / `:focus` / `:active` | Parsed onto the compound; `matchPseudo` **never matches** (print has no pointer/focus). | - |

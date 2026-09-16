@@ -25,7 +25,7 @@ pipeline `load → parse → style → layout → paginate → paint → write`:
   vector graphics, images, and clipping, with fonts/images registered into
   per-page `/Resources`;
 - the **font pipeline**: parsing TrueType/OpenType (TrueType outlines only),
-  WOFF1 unwrapping, rune-set subsetting, simple WinAnsi/Latin-1 fonts and
+  WOFF1 and WOFF2 unwrapping, rune-set subsetting, simple WinAnsi/Latin-1 fonts and
   **Type0 / CIDFontType2** fonts with Identity-H encoding, `/Widths` in the
   PDF 1000-unit em glyph space, and `ToUnicode` CMaps;
 - **text shaping** for emission: OpenType (GSUB/GPOS) via the pure-Go
@@ -93,11 +93,11 @@ Two invariants shape everything in this package:
 | `semantic_test.go` | 120 | Tests for semantic parser against PDF 1.4, 1.7, and 2.0 emitted files |
 | `structure_test.go` / `compliance_test.go` | — | MCR, list `L`/`LI`/`LBody`, `/Namespace`, OutputIntent, claiming XMP |
 | `struct_test.go` | 283 | `TestRichDocStructure`, `TestWriteToContract`, `TestWriteRejectsShortWriter`, `TestSubsetGlyfFourByteAligned` |
-| `font_test.go` | 415 | Parse defaults, cmap formats, subsetting/checksum, font cache identity, mixed Latin/CJK, `TestDirectModuleAllowlist` |
+| `font_test.go` | 415 | Parse defaults, cmap formats, subsetting/checksum, font cache identity, mixed Latin/CJK |
 | `fonttype0_test.go` | 245 | Type0 CJK embedding, mixed Latin fallback, `ToUnicode` coverage |
 | `shape_test.go` | 276 | RTL/Arabic/lam-alef, OT-vs-fallback behavior, feature parsing, module allowlist |
 | `image_test.go` | 475 | JPEG scan, PNG/JPEG embedding, resource-name collision, grayscale folds |
-| `woff_test.go` | 235 | WOFF round-trip, OTTO rejection, overlap rejection, WOFF2 gap |
+| `woff_test.go` | 235 | WOFF round-trip, OTTO rejection, overlap rejection, WOFF2 fixture decode + garbage rejection |
 | `subset_align_test.go` | 73 | 4-byte glyf alignment of subsets (CJK viewer correctness) |
 | `faces_test.go` | 159 | Default faces load, resolution aliases, Unicode fallback coverage |
 | `registry_lookup_test.go` | 58 | Family matching order (exact before generic) |
@@ -163,7 +163,7 @@ writer does not expose a partially synchronized concurrency contract.
 | `(f) GlyphID / Advance / AdvanceInPoints / GlyphAdvancePoints` | `fonts.go:530-684` | Rune → glyph id, advances in font units and points — the shared metrics surface for layout and both output sinks |
 | `(f) LoadNames / FamilyNames` | `fonts.go:550/541` | Name-table decode (NameIDs 1/4/6/16, UTF-16BE); fills `PostScriptName` from ID 4/6 when empty |
 | `(f) GlyphContours / FlattenContour` | `glyph.go:15/291` | Outline decoding used by the image rasterizer (`ttfraster`), not the PDF writer |
-| `ParseFontBytes` | `woff.go:41` | Dispatch: TTF/OTF unchanged, WOFF1 → `DecodeWOFF`, WOFF2 → explicit error (no Brotli in the allowlist) |
+| `ParseFontBytes` | `woff.go:40` | Dispatch: TTF/OTF unchanged, WOFF1 → `DecodeWOFF` (stdlib zlib), WOFF2 → `DecodeWOFF2` (Brotli + `glyf`/`loca` reconstruction via `github.com/tdewolff/font`); TrueType outlines only |
 | `DecodeWOFF` | `woff.go:243` | stdlib-zlib WOFF1 → SFNT with hard caps: table count ≤ 1024, per-table ≤ 16 MiB, reconstructed ≤ 32 MiB, overlap rejection |
 | `FaceSet` / `LoadDefaultFaces` / `DefaultFont` | `faces.go:14/42/205` | Bundled Liberation + DejaVu faces, lazily parsed once (process-wide cache via `sync.Once`) |
 | `Registry` / `Lookup` / `FindWithGlyph` | `registry.go:16/71/120` | Opt-in family index for `--font-path`/`--use-system-fonts`; last-resort glyph fallback |
@@ -338,12 +338,14 @@ ensureFont(fnt, name, used)
   `image/png`, `os`, `path/filepath`, `sort`, `strconv`, `strings`, `sync`,
   `time`, `errors`, `fmt`, `io`, `math`, `slices`, `unicode`, `unicode/utf8`,
   `unicode/utf16`.
-- **One external direct dependency**: `github.com/go-text/typesetting`
-  (`di`, `font`, `font/opentype`, `shaping`) — the repo's fixed, allowlisted
-  text-shaping exception (see `shape_gotext.go` import nolint and
-  `go.mod:8`). `TestDirectModuleAllowlist` (`shape_test.go:187`) enforces
-  that only `go-text/typesetting` and `tdewolff/canvas` are direct requires
-  anywhere in the module and documents the CGO-HarfBuzz rejection.
+- **External direct dependencies** (module-wide allowlist, not all imported
+  here): `github.com/go-text/typesetting` (`di`, `font`, `font/opentype`,
+  `shaping`) is the text-shaping module (see `shape_gotext.go` import nolint
+  and `go.mod:8`); `github.com/tdewolff/font` decodes WOFF2 in `woff.go`;
+  `github.com/tdewolff/canvas` serves `internal/svg`.
+  `TestDirectModuleAllowlist` (`shape_test.go:186`) enforces that only those
+  three are direct requires anywhere in the module and documents the
+  CGO-HarfBuzz rejection.
 - **`internal/pdf/assets`** (embedded font bytes) and **`internal/pdfprofile`**
   (canonical profile tokens / aliases; `policy.go` re-exports). No new
   flavours live in the writer.
@@ -366,7 +368,7 @@ Non-test importers:
 ### Import-direction rule
 
 `internal/pdf` sits below `layout` / `convert` and imports only stdlib, the
-one allowlisted shaping module, `internal/pdf/assets`, and the
+allowlisted shaping and WOFF2 modules, `internal/pdf/assets`, and the
 `internal/pdfprofile` leaf. The single deliberate exception is
 `registry.go:11-12`, which imports `internal/line` and `internal/settings` for
 `RegistryFromGlobal` (`registry.go:364`) and `LogFontRegistryScan`
@@ -389,7 +391,7 @@ foundation.
 | **`countingWriter` for xref offsets** | Streams output without a second in-memory copy; turns silent short writes into errors so a truncated stream never gets a "valid" xref. |
 | **RFC 1950 zlib for all `/FlateDecode`** | PDF spec requires zlib wrapper, not raw DEFLATE; raw streams made pages render empty. Compressors are pooled per page (`flatePool`). |
 | **TrueType outlines only; CFF/`OTTO` rejected** | Subsetting re-quires glyf/loca surgery; CFF hinting is out of scope. Clear, early error instead of a broken embed. |
-| **WOFF1 in-tree, WOFF2 rejected** | WOFF1 needs only stdlib zlib; WOFF2 needs Brotli (not allowlisted). Hard decompress-bomb caps + overlap rejection treat fonts as untrusted input (THREAT-MODEL §fonts). |
+| **WOFF1 in-tree, WOFF2 via an allowlisted decoder** | WOFF1 needs only stdlib zlib. WOFF2 needs Brotli plus `glyf`/`loca` reconstruction, handled by `github.com/tdewolff/font` (user-approved 2026-09-16). Hard decompress-bomb caps, overlap rejection, and the decoder's own 30 MiB memory cap treat fonts as untrusted input (THREAT-MODEL §fonts). |
 | **Subset at finalize, one subset per font per document** | Document-wide rune union (instead of per-page subsets) minimizes embedded font size and makes subset cache keys stable/deterministic. |
 | **Simple Latin-1 fonts + Type0/CIDFontType2 for anything above U+00FF** | Latin-1 path: small, golden-test-friendly, WinAnsi single-byte codes, `/Widths` indexed by char code. Higher Unicode: Identity-H CIDs equal to Unicode code points — no CID renumbering, but requires `CIDToGIDMap` + `ToUnicode`. |
 | **`winAnsiFold` + `?` fallback instead of raw UTF-8 bytes** | Literal strings are byte-oriented; emitting UTF-8 made viewers show mojibake and missing glyphs. Folding common punctuation (en/em dash → `-`, curly quotes, bullets → middle dot) keeps the subset cmap and `/Widths` consistent with the emitted bytes. |
@@ -440,18 +442,22 @@ Security posture for fonts/images is specified in
 `internal/pdf` is where the technical enforcement lives:
 
 - **Fonts are untrusted parse input.** `@font-face` `url(...)` bytes, WOFF1
-  payloads, and `--font-path` files all pass through size-bounded parsers:
+  and WOFF2 payloads, and `--font-path` files all pass through size-bounded
+  parsers:
   - WOFF1: table-count ≤ 1024, per-table ≤ 16 MiB, reconstructed SFNT ≤
     32 MiB, **overlapping compressed tables are rejected**, decompressed
     length must exactly equal the declared `origLength`
     (`woff.go`, caps at `woff.go:15-20`).
-  - WOFF2 is rejected outright — no Brotli in the module allowlist
-    (`errWOFF2Unsupported`).
+  - WOFF2: Brotli decompression plus `glyf`/`loca` reconstruction through
+    `github.com/tdewolff/font`, whose decoder enforces its own 30 MiB memory
+    cap; the resulting SFNT is still classified by `ParseTTF` (CFF/`OTTO`
+    rejected) (`woff.go`, `DecodeWOFF2`).
   - TrueType tables are bounds-checked on every read
     (`errFontTooShort/TruncatedDirectory/TruncatedHmtx/…`); malformed fonts
     fail the conversion rather than corrupting the PDF.
-  - Remote `https://` `@font-face` is **not fetched** (product policy,
-    THREAT-MODEL); only local/`file:`/`data:` under the ACL.
+  - Remote `https://` `@font-face` is fetched through the same `FetchSub`
+    ACL and `NetworkPolicy` as other subresources; local/`file:`/`data:`
+    stay under the ACL.
 - **System-font discovery is opt-in only** (`--use-system-fonts`,
   `DefaultSystemFontDirs`): nothing is scanned at startup (privacy + startup
   cost + avoids surprise opens of proprietary trees).
@@ -487,8 +493,8 @@ The package is validated at three levels:
      `TestAddPNGNoAlpha`, `TestImageResourceNamesDoNotCollideAcrossBands`,
      `TestAddInvalidImage`, `TestGrayscalePNGFold/JPEGFold/PNGAlphaKept`.
    - WOFF: `TestDecodeWOFFRoundTripParseTTF`, `TestDecodeWOFFRejectsOTTO`,
-     `TestDecodeWOFFRejectsOverlap`, `TestDecodeWOFF2Gap`,
-     `TestParseFontBytesTTFUnchanged`.
+     `TestDecodeWOFFRejectsOverlap`, `TestDecodeWOFF2Fixture`,
+     `TestDecodeWOFF2Garbage`, `TestParseFontBytesTTFUnchanged`.
    - Shaping: `TestShapeTextRTLReverse`, `TestArabicJoiningBehProducesConnectedForms`,
      `TestArabicLamAlefLigature`, `TestShapeTextFontArabicOTJoining`,
      `TestShapeTextFontArabicOTLamAlef`, `TestShapeTextFontFallsBackWithoutFace`,
@@ -496,7 +502,7 @@ The package is validated at three levels:
      `TestCJKPunctFontFeatures`, `TestParseFontFeatureSettings`.
    - Policy: `TestDirectModuleAllowlist` shells out to `go list -m` and
      fails if any third-party direct require appears beyond
-     `go-text/typesetting` and `tdewolff/canvas`.
+     `go-text/typesetting`, `tdewolff/canvas`, and `tdewolff/font`.
    - Pages/annotations: `TestLinkAnnotations`, `TestOutlines`,
      `TestOutlineBadPageRefFails`, `TestReorderPagesKidsOrder`,
      `TestDuplicatePageOwnsResourceMaps`, `TestReorderPagesValidation`,
@@ -534,8 +540,9 @@ Cross-reference [`documentation/deferred.md`](../deferred.md),
   only TrueType outlines embed or subset. OTF-flavored fonts can only be
   used accidentally-fail today — a deliberate scope cut, documented in
   `fonts.md`.
-- **WOFF2 not supported** (Brotli not allowlisted); WOFF1 only. Remote
-  `https://` `@font-face` is never fetched.
+- **WOFF1 and WOFF2 decode** (WOFF2 via the allowlisted `tdewolff/font`);
+  CFF/`OTTO` OpenType is still rejected. Remote
+  `https://` `@font-face` is fetched through the subresource ACL.
 - **Simple fonts are WinAnsi/Latin-1 single-byte** with punctuation folding;
   code points that fold or hit `?` lose fidelity. Full
   PDFDocEncoding/TrueType-encoding tables are not implemented.

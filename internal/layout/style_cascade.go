@@ -355,6 +355,42 @@ func declaredInheritableMask(raw map[string]string) uint64 {
 	return mask
 }
 
+// declarationKeyword returns the first lowercased keyword of a cascaded
+// declaration value, or "" when the property is absent.
+func declarationKeyword(raw map[string]string, prop string) string {
+	fields := strings.Fields(raw[prop])
+	if len(fields) == 0 {
+		return ""
+	}
+
+	return strings.ToLower(fields[0])
+}
+
+// decorationBlocked reports whether an element must not receive the parent's
+// text decoration. CSS 2.1 16.3.1 propagates decorations to in-flow
+// descendants only: floating, absolutely positioned, and atomic inline-level
+// boxes (inline-block / inline-table) are excluded. The gate reads the
+// element's cascaded declarations because inheritProps runs before
+// applyRestProps writes float/position/display into dst.
+func decorationBlocked(raw map[string]string) bool {
+	switch declarationKeyword(raw, "float") {
+	case floatLeft, floatRight:
+		return true
+	}
+
+	switch declarationKeyword(raw, "position") {
+	case positionAbsolute, positionFixed:
+		return true
+	}
+
+	switch declarationKeyword(raw, "display") {
+	case cssDisplayInlineBlock, cssDisplayInlineTable:
+		return true
+	}
+
+	return false
+}
+
 // inheritProps copies inheritable properties from the parent, unless the
 // element declares its own value (present in raw). The declared-set mask is a
 // local word; it deliberately does not grow ResolvedStyle, whose byte size is
@@ -365,13 +401,23 @@ func inheritProps(dst *ResolvedStyle, parent *ResolvedStyle, raw map[string]stri
 	}
 
 	declared := declaredInheritableMask(raw)
+	// Text decoration is copied through the table below, but CSS 2.1 16.3.1
+	// excludes out-of-flow and atomic inline boxes from propagation. The
+	// predicate is evaluated once per element and only when the parent
+	// paints a decoration, so the common undecorated path stays free.
+	skipDecoration := parent.TextDecoration != "" && parent.TextDecoration != cssDisplayNone &&
+		decorationBlocked(raw)
 
-	for i := range inheritableProps {
-		if declared&(uint64(1)<<i) != 0 {
+	for propIdx := range inheritableProps {
+		if declared&(uint64(1)<<propIdx) != 0 {
 			continue
 		}
 
-		inheritableProps[i].copy(dst, parent)
+		if skipDecoration && inheritableProps[propIdx].names[0] == "text-decoration" {
+			continue
+		}
+
+		inheritableProps[propIdx].copy(dst, parent)
 	}
 }
 
@@ -1260,6 +1306,16 @@ func applyRestProps(
 	for key := range raw {
 		if _, shorthand := restShorthandSet[key]; shorthand {
 			continue
+		}
+
+		// A vendor-prefixed alias must not apply on top of its canonical
+		// property when a rule carries both (common prefix-then-standard
+		// authoring). Without this, -webkit-transform plus transform
+		// accumulate the same transform twice.
+		if canonical := normalizeVendorPrefix(key); canonical != key {
+			if _, hasCanonical := raw[canonical]; hasCanonical {
+				continue
+			}
 		}
 
 		rest = append(rest, key)

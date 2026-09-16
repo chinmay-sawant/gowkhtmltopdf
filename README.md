@@ -15,8 +15,9 @@ native converter process. Two static binaries (`gowkhtmltopdf`,
 style → layout → paginate → paint → write). An opt-in browser build runs the
 same pipeline through WebAssembly for inline HTML previews. Direct modules are allowlisted:
 [`go-text/typesetting`](https://github.com/go-text/typesetting) (OpenType
-shaping) and [`tdewolff/canvas`](https://github.com/tdewolff/canvas) (SVG
-rasterization). The product is HTML templates and documents, not Chrome visual parity.
+shaping), [`tdewolff/canvas`](https://github.com/tdewolff/canvas) (SVG
+rasterization), and [`tdewolff/font`](https://github.com/tdewolff/font)
+(WOFF2/Brotli font decoding). The product is HTML templates and documents, not Chrome visual parity.
 
 **Status:** **v0.2.6** (current release). The native Document API and explicit
 CLI grammar are now the supported surface. Opt-in PDF 1.7 / 2.0 and PDF/A +

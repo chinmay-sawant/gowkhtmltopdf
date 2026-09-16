@@ -8,9 +8,10 @@ Related: [CLI reference](cli.md) · [Library API](library-api.md) ·
 ## Requirements
 
 - Go **1.26+** (the module pins `toolchain go1.26.4`)
-- The first build may download the two allowlisted direct modules in
-  [`go.mod`](../go.mod) (`go-text/typesetting`, `tdewolff/canvas`) and their
-  transitive graph. After that, builds can run offline from the module cache.
+- The first build may download the three allowlisted direct modules in
+  [`go.mod`](../go.mod) (`go-text/typesetting`, `tdewolff/canvas`,
+  `tdewolff/font`) and their transitive graph. After that, builds can run
+  offline from the module cache.
 - Native CLI builds require no browser process, native converter, Qt, or cgo
   toolchain. The optional browser preview uses the WASM build in
   [wasm.md](wasm.md).

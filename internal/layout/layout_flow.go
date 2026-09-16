@@ -1191,9 +1191,11 @@ func packFloatPosition(
 
 // floatIntrinsicAvail measures the shrink-to-fit width of a float without a
 // definite width: size containment, the widest descendant image, or the
-// cell content max-content (plus chrome and margins).
+// cell content max-content (plus chrome and margins). When the max-content
+// text is wider than a descendant float image, the image width is reserved
+// on top of the text (the two sit side by side).
 func (e *engine) floatIntrinsicAvail(node *html.Node, style ResolvedStyle, avail float64) float64 {
-	var intr float64
+	var intr, minIntr float64
 
 	if isSizeContainer(style) || containsSize(style) {
 		// Size containment: intrinsic inline size as-if-empty plus any
@@ -1215,16 +1217,36 @@ func (e *engine) floatIntrinsicAvail(node *html.Node, style ResolvedStyle, avail
 			e.scalePt(style.PaddingLeft) + e.scalePt(style.PaddingRight) +
 			e.scalePt(style.BorderLeft.Width) + e.scalePt(style.BorderRight.Width) +
 			e.scalePt(style.MarginLeft) + e.scalePt(style.MarginRight)
-	} else {
-		// measureCellContent is already the border-box max-content (content +
-		// padding + border). Only add outer margins (and nested block chrome).
-		intr = e.measureCellContent(node, style) +
+		// A nested float image sits beside the float's in-flow text, so it
+		// is not part of that text's max-content line. When the text is
+		// wider than the nested image, the shrink-to-fit width must reserve
+		// both. learncpp #branding: a 32px logo float beside the tagline;
+		// capping the tagline at the logo width collapsed it to one
+		// fragment per line.
+		textW := e.measureCellContent(node, style) +
 			e.scalePt(style.MarginLeft) + e.scalePt(style.MarginRight) +
 			e.nestedBlockHChrome(node)
+		if floatImgW := e.measureLargestFloatImageWidth(node); floatImgW > 0 && textW > floatImgW {
+			intr = textW + floatImgW
+		}
+	} else {
+		// measureCellMinMax is already the border-box min/max content. Only
+		// add outer margins (and nested block chrome).
+		minW, maxW := e.measureCellMinMax(node, style)
+		chrome := e.scalePt(style.MarginLeft) + e.scalePt(style.MarginRight) +
+			e.nestedBlockHChrome(node)
+		intr = maxW + chrome
+		minIntr = minW + chrome
 	}
 
 	if intr > 0 && intr < avail {
 		return intr
+	}
+	// CSS 2.1 10.3.5 shrink-to-fit: min(max(min-content, available),
+	// max-content). Below min-content the float keeps the unbreakable run and
+	// overflows instead of splitting it (learncpp "Chapter\xa00").
+	if minIntr > avail {
+		return minIntr
 	}
 
 	return avail

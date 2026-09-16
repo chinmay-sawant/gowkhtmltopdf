@@ -178,7 +178,7 @@ Goal: supported font formats are used when available; logs stay small and honest
   - Evidence 2026-09-16 (F11): `internal/pdf/woff.go` `wOF2` branch calls `DecodeWOFF2` (`tdewolff/font.ParseWOFF2`) then the existing `ParseTTF`; `errWOFF2Unsupported` removed; `internal/convert/prepare/styles.go` now skips only `.eot`. Fixture `testdata/fonts/woff2/LiberationSans-Regular-latin.woff2` (30,576 B, sha256 `14088dcd...`, generated from the bundled Liberation TTF with `pyftsubset` + fontTools `flavor="woff2"`, commands recorded in `testdata/fonts/README.md`). Tests: fixture decode, garbage/truncated errors, prepare registration for plain/`?v=`/data-URI WOFF2; `go test ./internal/pdf ./internal/convert/prepare ./internal/convert -count=1` ok; size-check exit 0.
   - Real-font proof: learncpp Open Sans woff2 downloaded to /tmp, converted with `--allow-local-files`; `scripts/inspect_pdf_fonts.py` prints `OpenSans` and PyMuPDF sees `MTEHER+OpenSans` (3580 B subset). Full learncpp selection is re-verified in Phase 8.
   - [~] Dependency-version finding: the previously pinned `font@...-20260424...` cannot decode real WOFF2 (its own `TestParseWOFF2` fails: parse/v2 exact-EOF change). F11 pinned the upstream-fixed `font@...-20260809...`, and `go mod tidy` bumped 9 indirect modules (`parse/v2 2.8.15`, `brotli 1.2.2`, `minify 2.24.16`, `goldmark 1.8.5`, `x/image 0.44.0`, `x/net 0.57.0`, `x/text 0.40.0`, `fpdf 0.12.0`, `go-latex 0.3.0`). The alternative (old font + parse 2.8.15) keeps known decoder bugs; rejected.
-  - Docs wave TODO: update AGENTS.md lines 238-241 and 314-318 (two-direct-dependency wording) plus stale WOFF2-skip claims in `documentation/{compatibility-matrix,fonts,fidelity,deferred,THREAT-MODEL,integration-security}.md`, `documentation/architecture/{04,08,09}.md`, and `frontend/src/data/content/page-fonts.json`. AGENTS.md was not edited in this wave.
+  - Docs wave done 2026-09-16 (V7): AGENTS.md dependency policy now lists three direct modules (`go-text/typesetting`, `tdewolff/canvas`, `tdewolff/font`); WOFF2 claims corrected in `documentation/` (compatibility-matrix, fonts, fidelity, deferred, THREAT-MODEL, integration-security, architecture 04/08/09, README, overview, getting-started) and `frontend/src/data/content/` (page-fonts, page-compatibility, page-dossier, page-about, page-overview, page-getting-started); `make claim-scan` clean, frontend lint clean, frontend build regenerated `docs/` (13 path changes).
 
 ### 4.4 Closure gates
 
@@ -306,7 +306,7 @@ Goal: prove the fix wave on the real URL, re-run the forensics, and close the le
 
 ### 8.5 Deferred items
 
-- [ ] `[~]` Docs and frontend updates for v0.2.7 (separate wave, not started here).
+- [x] `[~]` Docs and frontend updates for v0.2.7: completed 2026-09-16 (V7), see the Phase 4.3 evidence above; 20 source files plus the regenerated `docs/`.
 - [x] WOFF2 dependency decision: approved 2026-09-16; implemented by F11 under Phase 4.3.
 - [x] Media default decision: keep print default with screen selectable (Phase 6.2).
 - [x] PDF 1.4 metadata decision: keep output as-is; version-gated metadata unchanged.

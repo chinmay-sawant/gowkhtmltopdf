@@ -191,7 +191,8 @@ Consumers of this seam:
 - **Fonts** — `@font-face` `url(...)` bodies are fetched through the same
   `ResourceContext` in `prepare.go` (`mergeFontFaces`), under the same ACL and
   body cap; WOFF1 decompression caps are applied by `internal/pdf` after the
-  bytes arrive.
+  bytes arrive (`woff.go`), and WOFF2 goes through the allowlisted
+  `github.com/tdewolff/font` decoder with its own 30 MiB cap.
 
 ### 4.3 Header/footer HTML
 
@@ -409,9 +410,10 @@ pins it). `--restrict-network` opts into `RestrictedNetworkPolicy` (private and
 link-local destinations plus cross-host redirects denied), and `--allow-host`
 adds exact or wildcard host exceptions. The only sensitive channel is local
 file reads, gated by the ACL. `@font-face` TTF/OTF/
-WOFF1 bytes are untrusted parse input under the same ACL; WOFF2 is rejected
-(Brotli not allowlisted); remote `https://` `@font-face` is not fetched
-(product policy).
+WOFF1/WOFF2 bytes are untrusted parse input under the same ACL; WOFF2 is
+decoded through the allowlisted `github.com/tdewolff/font` (30 MiB cap);
+remote `https://` `@font-face` is fetched through the same `FetchSub` seam
+as other subresources.
 
 **Credential hygiene (§5).** Custom headers follow cross-host redirects while
 `net/http` strips `Authorization`/`Cookie` on redirects — operators must not

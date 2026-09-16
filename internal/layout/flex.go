@@ -1623,33 +1623,63 @@ func (e *engine) alignColumnItem(cblock *box, st ResolvedStyle, cs ResolvedStyle
 }
 
 // applyRelativeOffset shifts a position:relative box and its ops by top/left
-// (right/bottom when the corresponding auto flags are set). position:sticky
-// uses tagSticky + applyStickyPrint instead (print scrollport clamp).
+// (right/bottom when the corresponding auto flags are set). Percentage terms
+// defer to resolveRelativePercents (relative_percent.go) because the
+// containing block's final height/width is unknown during the build.
+// position:sticky uses tagSticky + applyStickyPrint instead (print scrollport
+// clamp).
 func (e *engine) applyRelativeOffset(boxNode *box) {
-	if boxNode == nil || boxNode.style.Position != "relative" {
+	if boxNode == nil || boxNode.style.Position != positionRelative {
 		return
 	}
 
 	sty := boxNode.style
-	deltaX, deltaY := 0.0, 0.0
+	deltaX := e.relativeDeltaX(sty)
+	deltaY := e.relativeDeltaY(sty)
 
-	if !sty.LeftAuto {
-		deltaX = e.scalePt(sty.Left)
-	} else if !sty.RightAuto {
-		deltaX = -e.scalePt(sty.Right)
+	if deltaX != 0 || deltaY != 0 {
+		boxNode.x += deltaX
+		boxNode.y += deltaY
+		e.shiftBoxOps(boxNode, deltaX, deltaY)
 	}
 
-	if !sty.TopAuto {
-		deltaY = e.scalePt(sty.Top)
-	} else if !sty.BottomAuto {
-		deltaY = -e.scalePt(sty.Bottom)
+	if relativeOffsetHasPercent(sty) {
+		e.registerRelativePct(boxNode)
+	}
+}
+
+// relativeDeltaX resolves the horizontal position:relative shift from left or
+// right when the value is a length. Percentage terms stay at 0 and are applied
+// later by registerRelativePct.
+func (e *engine) relativeDeltaX(sty *ResolvedStyle) float64 {
+	if !sty.LeftAuto && sty.LeftPercent < 0 {
+		return e.scalePt(sty.Left)
 	}
 
-	if deltaX == 0 && deltaY == 0 {
-		return
+	if !sty.RightAuto && sty.RightPercent < 0 {
+		return -e.scalePt(sty.Right)
 	}
 
-	boxNode.x += deltaX
-	boxNode.y += deltaY
-	e.shiftBoxOps(boxNode, deltaX, deltaY)
+	return 0
+}
+
+// relativeDeltaY resolves the vertical position:relative shift from top or
+// bottom when the value is a length.
+func (e *engine) relativeDeltaY(sty *ResolvedStyle) float64 {
+	if !sty.TopAuto && sty.TopPercent < 0 {
+		return e.scalePt(sty.Top)
+	}
+
+	if !sty.BottomAuto && sty.BottomPercent < 0 {
+		return -e.scalePt(sty.Bottom)
+	}
+
+	return 0
+}
+
+// relativeOffsetHasPercent reports whether any relative offset is a percentage
+// that registerRelativePct must resolve once the containing block is known.
+func relativeOffsetHasPercent(sty *ResolvedStyle) bool {
+	return sty.TopPercent >= 0 || sty.RightPercent >= 0 ||
+		sty.BottomPercent >= 0 || sty.LeftPercent >= 0
 }

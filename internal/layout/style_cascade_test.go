@@ -421,13 +421,30 @@ func TestWebkitPrefixAliases(t *testing.T) {
 	}
 }
 
-//nolint:wsl // test helper
+func TestWebkitTransformAliasDoesNotAccumulateWithCanonical(t *testing.T) {
+	t.Parallel()
+
+	both := styleForDecl(t, `-webkit-transform: translateY(-10pt); transform: translateY(-10pt)`)
+	canonical := styleForDecl(t, `transform: translateY(-10pt)`)
+	webkitOnly := styleForDecl(t, `-webkit-transform: translateY(-10pt)`)
+
+	if both.Transform != canonical.Transform {
+		t.Fatalf("prefixed + canonical transform accumulated: both=%+v canonical=%+v", both.Transform, canonical.Transform)
+	}
+
+	if webkitOnly.Transform != canonical.Transform {
+		t.Fatalf("webkit-only transform differs: webkitOnly=%+v canonical=%+v", webkitOnly.Transform, canonical.Transform)
+	}
+}
+
 func styleForDecl(t *testing.T, decl string) *ResolvedStyle {
 	t.Helper()
+
 	root, err := html.Parse(`<html><body><div style="` + decl + `">x</div></body></html>`)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
+
 	styles := resolveStyles(root, nil, "print", testViewport, 800)
 
 	body := findElementByName(root, "body")

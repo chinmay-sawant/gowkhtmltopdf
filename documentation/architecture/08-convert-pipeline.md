@@ -89,7 +89,7 @@ test files where listed.
 | File | Responsibility | Lines |
 |------|----------------|-------|
 | `prepare.go` | `Options` / `Prepared` types; `Document()` load→parse→sheets→fonts; `ResourceContext` (fetch seam, `CollectSheets`, `MergeFontFaces`) | 200 |
-| `styles.go` | Sheet collector (`<style>` + `<link>` in document order), media gating, rule-count limits, @font-face fetching (WOFF1/TTF/OTF; WOFF2/EOT/data: rejected) | 243 |
+| `styles.go` | Sheet collector (`<style>` + `<link>` in document order), media gating, rule-count limits, @font-face fetching (WOFF2/WOFF1/TTF/OTF; EOT skipped by policy; `data:` decoded when supported) | 243 |
 | `simplify.go` | `SimplifyDOM` Chrome/MediaWiki hide-sheet profiles | 61 |
 
 This package is shared verbatim by the image pipeline (`internal/imageout`
@@ -494,8 +494,9 @@ constructs, but it is the enforcement point for several security rules:
 - **HTML headers/footers are single-band clamps.** Content taller than the
   margin band is clipped; no independent multi-page HF (hf.go:209 comment).
 - **Fonts**: only the embedded Liberation Sans for general text; `@font-face`
-  supports WOFF1/TTF/OTF and rejects WOFF2/EOT/`data:` (prepare/styles.go
-  `fetchFontFace`) with warnings. See [../fonts.md](../fonts.md).
+  supports WOFF2/WOFF1/TTF/OTF, skips EOT by policy, and decodes `data:` when
+  the embedded format is supported (prepare/styles.go `fetchFontFace`) with
+  warnings. See [../fonts.md](../fonts.md).
 - **Controlled-report scope**: per [../deferred.md](../deferred.md) and the
   fidelity tiers in [../fidelity.md](../fidelity.md) (Tier 1 closed, Tier 2
   core shipped), the pipeline is not optimized for JavaScript-heavy SPAs;

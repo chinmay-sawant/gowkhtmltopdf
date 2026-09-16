@@ -83,11 +83,12 @@ image** paths.
 
 | `src` | Behavior |
 |-------|----------|
-| `.woff2`, `.eot` | **Skipped** (warning). WOFF2 needs Brotli; not allowlisted |
-| `data:` | **Skipped** (warning) |
-| `https://` / `http://` TTF, OTF, WOFF1 | **Fetched** via `Fetch` → `load.FetchSub` — **same ACL, network policy, timeout, and body cap** as CSS/images |
-| Local `url(...ttf\|otf\|woff)` | Fetched under `--allow-local-files` / `--allow` |
+| `https://` / `http://` TTF, OTF, WOFF1, WOFF2 | **Fetched** via `Fetch` → `load.FetchSub` - **same ACL, network policy, timeout, and body cap** as CSS/images |
+| Local `url(...ttf\|otf\|woff\|woff2)` | Fetched under `--allow-local-files` / `--allow` |
+| `data:` | Decoded and registered when the embedded format is WOFF2/WOFF1/TTF/OTF; skipped with a metadata-only warning otherwise |
 | WOFF1 | Decompress → `ParseTTF` (TrueType outlines only) |
+| WOFF2 | Brotli decompress plus `glyf`/`loca` reconstruction via `github.com/tdewolff/font`, then `ParseTTF` (TrueType outlines only); the decoder caps memory at 30 MiB |
+| `.eot`, SVG fonts | **Skipped** (warning). `.eot` has an explicit policy check; SVG font payloads do not parse as TTF/OTF/WOFF |
 
 `font-weight` / `font-style` on `@font-face` are parsed but **ignored at
 register time**. The alias is the family name only.

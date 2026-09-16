@@ -273,23 +273,25 @@ func (e *engine) emitInlineText(
 
 // emitInlineFaceRuns paints the primary face run (or the per-face fallback
 // runs) of one text item and returns the updated x cursor and total span.
+// The cursor advances by each run's painted advance, not the pre-transform
+// measurement: text-transform can widen a fallback-split run ("Learn" ->
+// "LEARN"), and advancing by the raw run width painted the next run on top
+// of the transformed glyphs (learncpp "LEARN"/"C++" overlap).
 func (e *engine) emitInlineFaceRuns(
 	item *inlineItem, leftX, textBaseline, size, ascent, descent float64,
 ) (float64, float64) {
 	var runSpan float64
 
 	if run, ok := e.primaryFaceRun(item.text, item.style); ok {
-		e.emitInlineTextRun(item, run, leftX, textBaseline, size, ascent, descent)
-		leftX += run.w
-		runSpan = run.w
+		painted := e.emitInlineTextRun(item, run, leftX, textBaseline, size, ascent, descent)
 
-		return leftX, runSpan
+		return leftX + painted, painted
 	}
 
 	for _, run := range e.splitTextByFace(item.text, item.style) {
-		e.emitInlineTextRun(item, run, leftX, textBaseline, size, ascent, descent)
-		leftX += run.w
-		runSpan += run.w
+		painted := e.emitInlineTextRun(item, run, leftX, textBaseline, size, ascent, descent)
+		leftX += painted
+		runSpan += painted
 	}
 
 	return leftX, runSpan
@@ -421,12 +423,16 @@ func inlineBorderVisible(side border) bool {
 	return side.Width > 0 && side.Style != cssDisplayNone
 }
 
+// emitInlineTextRun paints one face run and returns its painted advance, so
+// the caller's cursor matches the op width even when text-transform changes
+// the run's measurement.
+//
 //nolint:wsl // transform width and alignment are one geometry decision
 func (e *engine) emitInlineTextRun(
 	item *inlineItem,
 	run faceRun,
 	leftX, baseline, size, ascent, descent float64,
-) {
+) float64 {
 	child := item.style.Color
 	text := transformInlineText(run.text, item.style.TextTransform)
 	textWidth := run.w
@@ -463,6 +469,8 @@ func (e *engine) emitInlineTextRun(
 			H: ascent + descent,
 		}).withURI(item.href))
 	}
+
+	return textWidth
 }
 
 // emitTextShadowRuns paints one soft text-shadow copy per collected shadow.

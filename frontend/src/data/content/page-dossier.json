@@ -66,7 +66,7 @@
     },
     {
      "title": "Partial",
-      "body": "The behavior is covered but not fully replicated. Typical residual edges: `--header-html`/`--footer-html` clipped to the margin band, `@font-face` local and https TTF/OTF/WOFF1 with WOFF2 / eot / data: sources skipped, collapsed table borders, per-corner/% border-radius, and complex-script shaping such as Thai or Arabic."
+      "body": "The behavior is covered but not fully replicated. Typical residual edges: `--header-html`/`--footer-html` clipped to the margin band, `@font-face` local and https TTF/OTF/WOFF1/WOFF2 (eot sources skipped; `data:` decoded when supported), collapsed table borders, per-corner/% border-radius, and complex-script shaping such as Thai or Arabic."
     },
     {
      "title": "Not implemented",

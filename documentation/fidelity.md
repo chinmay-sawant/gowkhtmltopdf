@@ -187,7 +187,7 @@ or converting untrusted HTML: [cli.md](cli.md#remote-url-security),
 | PDF images (logos/grids) | PNG/JPEG path + golden fixtures solid | 14 (docs polish remain) |
 | SVG-as-`<img>` | **Shipped** — rasterized via `internal/svg` then painted as PNG | 14+ |
 | Pagination / thead repeat | **Shipped** breaks + thead repeat; CSS `orphans`/`widows` parsed + Rule 3 (heuristic fallback) | 5, 18 |
-| Fonts / CJK / discovery | **Partial** — Type0/CID + `--font-path` / registry; Arabic OT (`go-text/typesetting`); `@font-face` **https** TTF/OTF/WOFF1 fetched via `FetchSub` (same ACL as other subresources). `.woff2` / `.eot` / `data:` skipped | 12, 19 |
+| Fonts / CJK / discovery | **Partial** - Type0/CID + `--font-path` / registry; Arabic OT (`go-text/typesetting`); `@font-face` **https** TTF/OTF/WOFF1/WOFF2 fetched via `FetchSub` (same ACL as other subresources); `data:` registers when the embedded format is supported. `.eot` skipped; SVG fonts and CFF/`OTTO` rejected. WOFF2 decision: [plans/0.2.7/learncpp section 4.3](../plans/0.2.7/learncpp/01-canonical-0.2.7-learncpp.md) | 12, 19 |
 | `writing-mode` vertical | **Not implemented** — `vertical-rl` / `vertical-lr` parsed but lay out **horizontal** only | 19 |
 | HF / links edges | Body GoTo + HF URI + HF fragment GoTo (copies-aware) | 6, 20 |
 | PDF version / PDF/A / PDF/UA | **Shipped opt-in** — default unclaimed 1.4; version flags are not claims; profiles emit claiming XMP + tagging | — |

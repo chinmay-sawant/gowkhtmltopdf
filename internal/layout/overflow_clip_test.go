@@ -2,6 +2,7 @@
 package layout
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -78,6 +79,95 @@ func testOverflowClipRectIntersect(t *testing.T) {
 	clipPaintOp(&outside, clipRect{x: 0, y: 0, w: 50, h: 50})
 	if outside.Kind != opKindNoop {
 		t.Fatalf("outside fill kind = %v, want noop", outside.Kind)
+	}
+}
+
+// Text ops paint whole runs, so a partially clipped op used to survive past
+// the clip (a white-on-white "0" on the learncpp chapter badge). The clamp
+// must keep only the runes inside the clip; overflow:visible must not clamp.
+func TestOverflowClipTextOps(t *testing.T) {
+	t.Parallel()
+
+	t.Run("hidden trims the run", func(t *testing.T) { t.Parallel(); assertOverflowTextClamped(t, true) })
+	t.Run("visible keeps the run", func(t *testing.T) { t.Parallel(); assertOverflowTextClamped(t, false) })
+}
+
+func assertOverflowTextClamped(t *testing.T, clip bool) {
+	t.Helper()
+
+	texts, clipBox := overflowClipTexts(t, clip)
+
+	for _, text := range texts {
+		if clip {
+			if text.X+text.W > clipBox.x+clipBox.w+0.01 {
+				t.Fatalf("overflow:hidden text %q right edge %.2f past clip %.2f",
+					text.Text, text.X+text.W, clipBox.x+clipBox.w)
+			}
+
+			continue
+		}
+
+		if text.X+text.W <= clipBox.x+clipBox.w {
+			t.Fatalf("overflow:visible text %q right edge %.2f clamped to %.2f, want unclipped",
+				text.Text, text.X+text.W, clipBox.x+clipBox.w)
+		}
+	}
+
+	if clip {
+		assertClampedPrefix(t, texts)
+	}
+}
+
+// overflowClipTexts lays out the overflowing nowrap child and returns its text
+// ops and the parent's padding box.
+func overflowClipTexts(t *testing.T, clip bool) ([]Op, clipRect) {
+	t.Helper()
+
+	overflow := visibleKeyword
+	if clip {
+		overflow = overflowHidden
+	}
+
+	cssSheet := sheet(t, `
+body { margin: 0; font-size: 16px }
+.parent { overflow: `+overflow+`; width: 60pt; height: 40pt }
+.child { width: 400pt; white-space: nowrap }
+`)
+	src := `<html><body><div class="parent">` +
+		`<div class="child">Chapter zero stays inside the clip</div></div></body></html>`
+	res := layoutHTML(t, src, cssSheet)
+	parent := findBoxByClass(t, res, "parent")
+	clipBox := paddingBoxOfTest(parent)
+
+	var texts []Op
+
+	for _, paintedOp := range res.Ops {
+		if paintedOp.Kind == OpText {
+			texts = append(texts, paintedOp)
+		}
+	}
+
+	if len(texts) == 0 {
+		t.Fatal("missing text ops")
+	}
+
+	return texts, clipBox
+}
+
+// assertClampedPrefix checks the clamped run painted exactly a non-empty
+// prefix of the original text.
+func assertClampedPrefix(t *testing.T, texts []Op) {
+	t.Helper()
+
+	painted := ""
+
+	for _, text := range texts {
+		painted += text.Text
+	}
+
+	const fullRun = "Chapter zero stays inside the clip"
+	if !strings.HasPrefix(fullRun, painted) || painted == "" {
+		t.Fatalf("clamped text %q is not a visible prefix of the run", painted)
 	}
 }
 

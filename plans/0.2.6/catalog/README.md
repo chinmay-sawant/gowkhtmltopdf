@@ -1,6 +1,6 @@
 # Catalog snapshot for v0.2.6 CSS coverage
 
-Counts from `coverage-summary.json`, refreshed 2026-09-12 by walking `webref-css.json` plus the apply groups under `internal/layout/` (including `style_containment_props.go`, `style_color_adjust_props.go`, `style_image_adjust_props.go`, `style_text_support_props.go`, and `style_font_variant_props.go`). Phase 48.2 reclassified print-noop UI and SVG fill/stroke. The same day completed `isolation` and `mix-blend-mode` with element-level transparency groups.
+Counts from `coverage-summary.json`, refreshed 2026-09-12 by walking `webref-css.json` plus the apply groups under `internal/layout/` (including `style_containment_props.go`, `style_color_adjust_props.go`, `style_image_adjust_props.go`, `style_text_support_props.go`, and `style_font_variant_props.go`). Phase 48.2 reclassified print-noop UI and SVG fill/stroke. The same day completed `isolation` and `mix-blend-mode` with element-level transparency groups. The engine `file:line` evidence in `mapping.json` and `implemented-code-evidence.json` was refreshed 2026-09-16 after the v0.2.7 code wave (float sizing, `text-decoration` propagation, overflow text clamping, `box-sizing:inherit`, flex parsing moved to `style_flex_props.go`, relative percentage insets via `relative_percent.go`).
 
 | Kind | Total | implemented | partial | unsupported | ignored |
 |------|------:|------------:|--------:|------------:|--------:|
@@ -14,7 +14,7 @@ Counts from `coverage-summary.json`, refreshed 2026-09-12 by walking `webref-css
 
 `unsupported` is the work list. The current catalog snapshot has 354 implemented, 464 unsupported, and 0 partial properties; `goal: implement` remains set on all 818 inventory rows. `mix-blend-mode` and `isolation` moved from partial to implemented on 2026-09-12 with element-level transparency groups (PDF Form XObjects carrying `/Group /S /Transparency /I true`, PNG group buffers); `plus-lighter` stays unsupported.
 
-Engine apply arms: 258 mapped by `python3 scripts/css-catalog-map.py --check` (2026-09-12). Custom properties (`--*`) are a separate map.
+Engine apply arms: 240 mapped by `python3 scripts/css-catalog-map.py --check` (2026-09-16). The script scans `style_properties.go` and `style_paint_props.go`; the count fell from 258 because the v0.2.7 wave moved apply arms into extracts the script does not scan (for example the flex/gap family in `style_flex_props.go`). Custom properties (`--*`) are a separate map.
 
 Check the mapping against apply arms: `python3 scripts/css-catalog-map.py --check`. After a reclassify, rewrite mapping counts with `--write`.
 
