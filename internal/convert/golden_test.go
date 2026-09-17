@@ -450,6 +450,10 @@ var fixturePageBounds = map[string]fixtureBounds{ //nolint:gochecknoglobals // i
 		minPages: 6, maxPages: 8,
 		needles: []string{"FIXTURE-63-PAGE-LEVEL"},
 	},
+	"fixture-64-next-72-props.html": {
+		minPages: 5, maxPages: 6, images: true,
+		needles: []string{"NEXT-72-PROPS"},
+	},
 }
 
 // fixtureHeaderOK enforces the corpus hygiene rule: every fixture starts
