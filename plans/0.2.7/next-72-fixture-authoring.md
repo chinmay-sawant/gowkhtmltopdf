@@ -54,3 +54,7 @@ sentence that Chrome will not paint a visible change.
 
 ## Output path
 - `testdata/golden/fixture-64-next-72-props.html`
+
+## Implementation ledger
+Phase-wise batches live in `87-canonical-0.2.7-next-72.md` and `phases/phase-87.*.md`.
+Full `make test` / `make golden` only in `phases/phase-87.8-closure-integration.md`.
