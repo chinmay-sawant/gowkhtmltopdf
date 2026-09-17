@@ -20,29 +20,31 @@
     "properties_goal_implement": 818,
     "atrules": 55,
     "atrules_by_engine_status": {
-      "ignored": 10,
+      "implemented": 0,
+      "partial": 11,
       "unsupported": 34,
-      "partial": 11
+      "ignored": 10
     },
     "selectors": 158,
     "selectors_by_engine_status": {
-      "partial": 14,
-      "unsupported": 411,
-      "ignored": 21,
-      "implemented": 393
+      "implemented": 14,
+      "partial": 10,
+      "unsupported": 113,
+      "ignored": 21
     },
     "functions": 162,
     "functions_by_engine_status": {
-      "ignored": 24,
-      "unsupported": 411,
-      "partial": 14,
-      "implemented": 393
+      "implemented": 5,
+      "partial": 24,
+      "unsupported": 109,
+      "ignored": 24
     },
     "units": 30,
     "units_by_engine_status": {
-      "unsupported": 411,
-      "partial": 14,
-      "implemented": 393
+      "implemented": 7,
+      "partial": 8,
+      "unsupported": 15,
+      "ignored": 0
     }
   },
   "policy": {

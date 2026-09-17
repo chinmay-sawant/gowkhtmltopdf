@@ -11,38 +11,40 @@
     "webref_properties": 818,
     "mapped_properties": 818,
     "properties_by_engine_status": {
-      "implemented": 393,
+      "implemented": 397,
+      "partial": 10,
       "unsupported": 411,
-      "ignored": 0,
-      "partial": 14
+      "ignored": 0
     },
     "properties_print_relevant": 818,
     "properties_goal_implement": 818,
     "atrules": 55,
     "atrules_by_engine_status": {
-      "ignored": 10,
+      "implemented": 0,
+      "partial": 11,
       "unsupported": 34,
-      "partial": 11
+      "ignored": 10
     },
     "selectors": 158,
     "selectors_by_engine_status": {
+      "implemented": 14,
       "partial": 10,
       "unsupported": 113,
-      "ignored": 21,
-      "implemented": 14
+      "ignored": 21
     },
     "functions": 162,
     "functions_by_engine_status": {
-      "ignored": 24,
-      "unsupported": 109,
+      "implemented": 5,
       "partial": 24,
-      "implemented": 5
+      "unsupported": 109,
+      "ignored": 24
     },
     "units": 30,
     "units_by_engine_status": {
-      "unsupported": 15,
+      "implemented": 7,
       "partial": 8,
-      "implemented": 7
+      "unsupported": 15,
+      "ignored": 0
     }
   },
   "policy": {

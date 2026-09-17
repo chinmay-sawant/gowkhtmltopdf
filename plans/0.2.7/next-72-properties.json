@@ -1447,5 +1447,11 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/counter-set",
       "notes": "Walk order reset \u2192 set \u2192 increment. TestCounterSetBeforeIncrement."
     }
-  ]
+  ],
+  "implemented": 43,
+  "partial": 10,
+  "unsupported": 19,
+  "catalog_implemented": 397,
+  "catalog_partial": 10,
+  "catalog_unsupported": 411
 }
