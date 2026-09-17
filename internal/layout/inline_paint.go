@@ -1618,8 +1618,9 @@ func (e *engine) accumulateTextFaceWidth(
 	var prev rune
 
 	for _, runic := range cssSheet {
-		if runic == softHyphenRune {
+		if runic == softHyphenRune || isVariationSelector(runic) {
 			// Soft hyphens are invisible unless a break occurs at that point.
+			// Variation selectors have no glyf in bundled faces; skip .notdef.
 			continue
 		}
 
@@ -1639,7 +1640,12 @@ func (e *engine) accumulateTextFaceWidth(
 			}
 		}
 
-		total += face.GlyphAdvancePoints(runic, size)
+		adv := face.GlyphAdvancePoints(runic, size)
+		if em := emojiPresentationAdvance(sty, runic, size); em > adv {
+			adv = em
+		}
+
+		total += adv
 		total += textAutospaceGap(sty, prev, runic, size)
 		runeCount++
 
@@ -1680,7 +1686,7 @@ func (e *engine) measureRuneFace(curRune rune, sty *ResolvedStyle) float64 {
 		return 0
 	}
 
-	if curRune == softHyphenRune {
+	if curRune == softHyphenRune || isVariationSelector(curRune) {
 		return 0
 	}
 
@@ -1711,6 +1717,9 @@ func (e *engine) measureRuneFace(curRune rune, sty *ResolvedStyle) float64 {
 	}
 
 	advance := face.GlyphAdvancePoints(curRune, size)
+	if em := emojiPresentationAdvance(sty, curRune, size); em > advance {
+		advance = em
+	}
 	if sty.LetterSpacing != 0 {
 		advance += sty.LetterSpacing * e.scale
 	}

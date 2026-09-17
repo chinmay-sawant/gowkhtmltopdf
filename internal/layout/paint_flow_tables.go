@@ -2,6 +2,7 @@ package layout
 
 import (
 	"math"
+	"slices"
 	"sort"
 )
 
@@ -697,12 +698,16 @@ func cloneHeaderOps(res *Result, hdrFirst, hdrLast int, hdrTop, pageTop float64)
 	res.Ops = append(res.Ops, make([]Op, hdrLast-hdrFirst+1)...)
 
 	for hdrIndex := hdrFirst; hdrIndex <= hdrLast; hdrIndex++ {
-		op := res.Ops[hdrIndex]
-		op.Y = pageTop + (op.Y - hdrTop)
-		op.Pinned = true
+		headerOp := res.Ops[hdrIndex]
+		if headerOp.Grid != nil {
+			headerOp.Grid = &GridRun{Segs: slices.Clone(headerOp.Grid.Segs)}
+		}
+
+		shiftOpY(&headerOp, pageTop-hdrTop)
+		headerOp.Pinned = true
 		// Clones are in-flow page furniture, not position:fixed stamps.
-		op.Fixed = false
-		res.Ops[start+hdrIndex-hdrFirst] = op
+		headerOp.Fixed = false
+		res.Ops[start+hdrIndex-hdrFirst] = headerOp
 	}
 
 	// Header clones extend the display list after the page index was built.

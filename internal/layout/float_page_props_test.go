@@ -129,6 +129,87 @@ body { margin: 0; font-size: 10pt; }
 	}
 }
 
+// float-reference:page uses the page content box, so a nested 50% float is
+// wider (or further left) than the same float with float-reference:inline.
+func TestFloatReferencePageVsInline(t *testing.T) {
+	t.Parallel()
+
+	layoutRef := func(ref string) (x, w float64, stored string) {
+		t.Helper()
+
+		cssSheet := sheet(t, `
+body { margin: 0; font-size: 10pt; }
+.box { display: flow-root; width: 100pt; margin-left: 80pt; border: 1px dashed #888; }
+.f {
+  float: left;
+  width: 50%;
+  height: 24pt;
+  background: #9cf;
+  float-reference: `+ref+`;
+}
+`)
+		root, err := html.Parse(`<html><body>
+<div class="box"><div class="f">F</div><span>beside</span></div>
+</body></html>`)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		res, err := Layout(root, Options{
+			Width: 300, Height: 200, Sheets: []*css.Stylesheet{cssSheet}, Background: true,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		styles := resolveStylesWith(root, Options{
+			Sheets: []*css.Stylesheet{cssSheet}, Media: "print", Width: 300, Height: 200,
+		}, nil)
+		stored = styleRecordsByClass(t, root, styles, "f")[0].FloatReference
+
+		var textX float64
+		var boxW float64
+		var sawF bool
+
+		for _, op := range res.Ops {
+			if op.Kind == OpText && strings.TrimSpace(op.Text) == "F" {
+				textX = op.X
+				sawF = true
+			}
+
+			if op.Kind == OpFillRect && op.H > 20 && op.H < 28 {
+				if op.W > boxW {
+					boxW = op.W
+				}
+			}
+		}
+
+		if !sawF {
+			t.Fatalf("missing float text F for float-reference:%s", ref)
+		}
+
+		return textX, boxW, stored
+	}
+
+	inX, inW, inRef := layoutRef("inline")
+	pgX, pgW, pgRef := layoutRef("page")
+
+	if inRef != floatRefInline {
+		t.Fatalf("inline FloatReference=%q", inRef)
+	}
+
+	if pgRef != floatRefPage {
+		t.Fatalf("page FloatReference=%q", pgRef)
+	}
+
+	widthDiffers := pgW > inW+20
+	xDiffers := pgX < inX-20
+	if !widthDiffers && !xDiffers {
+		t.Fatalf("page vs inline: page x=%.1f w=%.1f, inline x=%.1f w=%.1f; want page left of BFC or wider page CB",
+			pgX, pgW, inX, inW)
+	}
+}
+
 func TestFloatPagePropsApply(t *testing.T) {
 	t.Parallel()
 

@@ -318,6 +318,11 @@ func decorateTextOp(op Op, sty *ResolvedStyle) Op {
 	if needsFakeOblique(sty, op.Font) {
 		op.FakeOblique = true
 	}
+	if r, g, b, ok := fontPaletteFill(sty, op.Font); ok {
+		op.R, op.G, op.B = r, g, b
+	} else if r, g, b, ok := fontVariantEmojiFill(sty, op.Text); ok {
+		op.R, op.G, op.B = r, g, b
+	}
 
 	return op
 }

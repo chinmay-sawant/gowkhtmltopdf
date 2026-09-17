@@ -88,6 +88,12 @@ type Font struct {
 	loadData  func() []byte
 	parseOnce sync.Once
 	parseErr  error
+
+	// instances caches static faces produced by Instance. The source Font
+	// stays the default instance; derived faces have their own glyf/hmtx.
+	instMu     sync.Mutex
+	instances  map[string]*Font
+	isInstance bool
 }
 
 // ParseTTF parses a TrueType (or OpenType with TrueType outlines) font file.

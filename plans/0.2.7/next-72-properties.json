@@ -4,7 +4,7 @@
   "branch": "feature/027-next-72",
   "total": 72,
   "baseline_implemented": 354,
-  "total_after_phase": 397,
+  "total_after_phase": 407,
   "catalog_total": 818,
   "golden_fixture": "testdata/golden/fixture-64-next-72-props.html",
   "needle": "NEXT-72-PROPS",
@@ -68,10 +68,10 @@
       "kind": "longhand",
       "group": "CSS Fonts",
       "syntax": "auto | none",
-      "code_path": "internal/layout/style_font_variant_props.go; internal/layout/layout.go:resolveFontVariants",
+      "code_path": "internal/layout/style_font_variant_props.go; internal/layout/font_variation.go:resolveFontVariants; internal/pdf/font_instance.go:Instance",
       "demo_value": "none",
       "description": "With `font-optical-sizing: none` the effect should match none.",
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "goal": "implement",
       "mdn_status": "standard",
       "chrome_support": "yes",
@@ -79,7 +79,7 @@
       "chrome_detail": "since 79",
       "bcd_name": "font-optical-sizing",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/font-optical-sizing",
-      "notes": "Partial (Path A / phase 87.3): parsed and inherited; face consumer resolveFontVariants keeps the default instance. PDF embeds default glyf/hmtx only; no opsz/wght/wdth instancing and no COLR/CPAL palette paint. Not Implemented until embed/shape change glyphs, metrics, or paint."
+      "notes": "Implemented subset: auto instances opsz from used font-size (pt) when the face has opsz; none keeps the fvar default. Static faces are a spec no-op. Tests TestOpticalSizingAutoSetsOpsz, TestOpticalSizingNoneKeepsDefaultOpsz."
     },
     {
       "index": 4,
@@ -88,10 +88,10 @@
       "kind": "longhand",
       "group": "CSS Fonts",
       "syntax": "normal | light | dark | <palette-identifier> | <palette-mix()>",
-      "code_path": "internal/layout/style_font_variant_props.go; internal/layout/layout.go:resolveFontVariants",
+      "code_path": "internal/layout/style_font_variant_props.go; internal/layout/font_palette.go; internal/pdf/cpal.go",
       "demo_value": "dark",
       "description": "With `font-palette: dark` the effect should match dark.",
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "goal": "implement",
       "mdn_status": "standard",
       "chrome_support": "yes",
@@ -99,7 +99,7 @@
       "chrome_detail": "since 101",
       "bcd_name": "font-palette",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/font-palette",
-      "notes": "Partial (Path A / phase 87.3): parsed and inherited; face consumer resolveFontVariants keeps the default instance. PDF embeds default glyf/hmtx only; no opsz/wght/wdth instancing and no COLR/CPAL palette paint. Not Implemented until embed/shape change glyphs, metrics, or paint."
+      "notes": "Implemented lite: COLR+CPAL faces select light/dark/integer palettes; paint uses the first CPAL color as a solid fill (not layered COLR). normal keeps CSS color. Static faces are a spec no-op. Test TestFontPaletteCPALFillDiffersFromNormal. Fixture-64 row 4."
     },
     {
       "index": 5,
@@ -128,10 +128,10 @@
       "kind": "legacy-alias",
       "group": "CSS Fonts",
       "syntax": "normal | <percentage [0,\u221e]> | ultra-condensed | extra-condensed | condensed | semi-condensed | semi-expanded | expanded | extra-expanded | ultra-expanded",
-      "code_path": "internal/layout/style_font_width_props.go",
+      "code_path": "internal/layout/style_font_width_props.go; internal/layout/font_synthesis_geom.go fontWidthScale; measureRuneFace/emit",
       "demo_value": "condensed",
       "description": "With `font-stretch: condensed` glyphs should narrow when a matching face exists.",
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "goal": "implement",
       "mdn_status": "obsolete",
       "chrome_support": "yes",
@@ -139,7 +139,7 @@
       "chrome_detail": "since 60",
       "bcd_name": "font-stretch",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/font-stretch",
-      "notes": "Partial: alias of font-width; stored percent, no width-master consumer on bundled faces. Test TestFontStretchAliasesToWidth."
+      "notes": "Implemented lite: alias of font-width; FontWidth percent scales advances via fontWidthScale. No width-master face pick. Tests TestFontStretchAliasesToWidth, TestFontStretchCondensesAdvance. | flipped Implemented after geometric consumer 2026-09-17"
     },
     {
       "index": 7,
@@ -268,10 +268,10 @@
       "kind": "longhand",
       "group": "CSS Fonts",
       "syntax": "normal | [ stylistic(<font-feature-value-name>) || historical-forms || styleset(<font-feature-value-name>#) || character-variant(<font-feature-value-name>#) || swash(<font-feature-value-name>) || ornaments(<font-feature-value-name>) || annotation(<font-feature-value-name>) ]",
-      "code_path": "internal/layout/style_font_feature_props.go",
+      "code_path": "internal/layout/style_font_feature_props.go; internal/layout/style_font_variant_alternates.go appendAlternateOTTags; fontShapingFeatureSettings",
       "demo_value": "historical-forms",
       "description": "With `font-variant-alternates: historical-forms` the effect should match historical-forms.",
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "goal": "implement",
       "mdn_status": "standard",
       "chrome_support": "yes",
@@ -279,7 +279,7 @@
       "chrome_detail": "since 111",
       "bcd_name": "font-variant-alternates",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/font-variant-alternates",
-      "notes": "hist OT tag mapped; needs @font-feature-values / capable face for visible glyph swap"
+      "notes": "Implemented subset: historical-forms->hist; stylistic()/swash()/styleset(N)->salt/swsh/ssNN. Named args default to 1 (no @font-feature-values). DejaVu salt substitutes a->\u0251. hist no-op on Liberation. Tests TestFontVariantAlternatesMapsToHist, TestParseFontFeatureSettingsHist. | flipped Implemented after OT consumer 2026-09-17"
     },
     {
       "index": 14,
@@ -328,10 +328,10 @@
       "kind": "longhand",
       "group": "CSS Fonts",
       "syntax": "normal | text | emoji | unicode",
-      "code_path": "internal/layout/style_font_feature_props.go",
+      "code_path": "internal/layout/style_font_feature_props.go; internal/layout/font_variant_emoji.go",
       "demo_value": "text",
       "description": "With `font-variant-emoji: text` the effect should match text.",
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "goal": "implement",
       "mdn_status": "standard",
       "chrome_support": "yes",
@@ -339,7 +339,7 @@
       "chrome_detail": "since 131",
       "bcd_name": "font-variant-emoji",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/font-variant-emoji",
-      "notes": "no color-font / presentation consumer"
+      "notes": "Implemented lite: text vs emoji presentation on emoji-candidate runes. text keeps CSS color and glyph advance; emoji applies U+FE0F semantics (solid gold fill + 1em min advance). VS not embedded in PDF text. Test TestFontVariantEmojiTextVsEmojiDiffers. Fixture-64 row 16."
     },
     {
       "index": 17,
@@ -408,10 +408,10 @@
       "kind": "longhand",
       "group": "CSS Fonts",
       "syntax": "normal | [ <opentype-tag> <number> ]#",
-      "code_path": "internal/layout/style_font_variant_props.go; internal/layout/layout.go:resolveFontVariants",
+      "code_path": "internal/layout/style_font_variant_props.go; internal/layout/font_variation.go:resolveFontVariants; internal/pdf/font_instance.go:Instance",
       "demo_value": "'wght' 700",
       "description": "With `font-variation-settings: 'wght' 700` the effect should match 'wght' 700.",
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "goal": "implement",
       "mdn_status": "standard",
       "chrome_support": "yes",
@@ -419,7 +419,7 @@
       "chrome_detail": "since 62",
       "bcd_name": "font-variation-settings",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/font-variation-settings",
-      "notes": "PDF embeds default instance only (Path A)"
+      "notes": "Implemented subset: quoted 4-letter tags instance into glyf/hmtx when the face has fvar. Static faces are a spec no-op. Tests TestVariationSettingsChangesAdvance, TestResolveFontVariantsInstancesAxes."
     },
     {
       "index": 21,
@@ -1214,10 +1214,10 @@
       "kind": "longhand",
       "group": "(ungrouped)",
       "syntax": "inline | column | region | page",
-      "code_path": "internal/layout/style_float_page_props.go",
+      "code_path": "internal/layout/style_float_page_props.go;internal/layout/layout_flow.go",
       "demo_value": "inline",
       "description": "With `float-reference: inline` the effect should match inline. Chrome does not support this property (no MDN BCD entry), so the Effect cell may look unchanged in Chrome.",
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "goal": "implement",
       "mdn_status": null,
       "chrome_support": "no",
@@ -1225,7 +1225,7 @@
       "chrome_detail": "no MDN BCD entry",
       "bcd_name": "float-reference",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/float-reference",
-      "notes": "Partial: inline documents current BFC (CSS2 floats). page/column/region parse and store only; no pagination relocation. Test TestFloatReferenceInline."
+      "notes": "Implemented lite: inline = current BFC. page = page content box (x=0, width=viewport) so a page-referenced float packs relative to the page, not the nested BFC; % widths resolve against page width. column lite uses the parent BFC when nested inside a multicol ancestor. region stored, treated as inline. Test TestFloatReferencePageVsInline."
     },
     {
       "index": 62,
@@ -1257,7 +1257,7 @@
       "code_path": "internal/layout/style_initial_letter_props.go;internal/layout/inline_initial_letter.go",
       "demo_value": "alphabetic",
       "description": "With `initial-letter-align: alphabetic` the effect should match alphabetic. Chrome does not support this property (no MDN BCD entry), so the Effect cell may look unchanged in Chrome.",
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "goal": "implement",
       "mdn_status": "experimental",
       "chrome_support": "no",
@@ -1265,7 +1265,7 @@
       "chrome_detail": "no MDN BCD entry",
       "bcd_name": "initial-letter-align",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/initial-letter-align",
-      "notes": "Partial: parsed/stored/inherited; drop-cap path uses alphabetic hanging. ideographic/hanging/leading keywords accepted without distinct metrics. Chrome has no BCD support."
+      "notes": "Implemented: alphabetic / hanging / leading / ideographic use distinct synthesized Y offsets when initial-letter: N is set on the same element. Test TestInitialLetterAlignHangingShiftsY."
     },
     {
       "index": 64,
@@ -1277,7 +1277,7 @@
       "code_path": "internal/layout/style_initial_letter_props.go;internal/layout/inline_initial_letter.go",
       "demo_value": "all",
       "description": "With `initial-letter-wrap: all` the effect should match all. Chrome does not support this property (no MDN BCD entry), so the Effect cell may look unchanged in Chrome.",
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "goal": "implement",
       "mdn_status": null,
       "chrome_support": "no",
@@ -1285,7 +1285,7 @@
       "chrome_detail": "no MDN BCD entry",
       "bcd_name": "initial-letter-wrap",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/initial-letter-wrap",
-      "notes": "Partial: parsed/stored/inherited; exclusion uses the rectangular letter box for all keywords. Glyph-contour wrap (all/grid) not implemented. Chrome has no BCD support."
+      "notes": "Implemented rectangular: none = no exclusion, first = first line only, all/grid = sink-depth band. Requires initial-letter: N on the same element. No glyph-contour wrap. Test TestInitialLetterWrapNoneDoesNotExclude."
     },
     {
       "index": 65,
@@ -1317,7 +1317,7 @@
       "code_path": "internal/layout/style_multicol_props.go;internal/layout/multicol.go",
       "demo_value": "wrap",
       "description": "With `column-wrap: wrap` multicol content should wrap into additional column rows.",
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "goal": "implement",
       "mdn_status": "standard",
       "chrome_support": "yes",
@@ -1325,7 +1325,7 @@
       "chrome_detail": "since 145",
       "bcd_name": "column-wrap",
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/column-wrap",
-      "notes": "Partial: wrap and auto (when column-height set) open multicol rows in the block direction. nowrap stops after one row; overflow columns in the inline direction are not implemented. Test TestColumnWrapCreatesRow."
+      "notes": "Implemented lite: wrap and auto (when column-height is set) open extra multicol rows in the block direction. nowrap stops after one row. Overflow columns in the inline direction are not shipped. Tests TestColumnWrapCreatesRow, TestColumnWrapNowrapStopsAfterOneRow, TestColumnWrapAutoCreatesRowWhenHeightSet."
     },
     {
       "index": 67,
@@ -1448,10 +1448,10 @@
       "notes": "Walk order reset \u2192 set \u2192 increment. TestCounterSetBeforeIncrement."
     }
   ],
-  "implemented": 43,
-  "partial": 10,
+  "implemented": 53,
+  "partial": 0,
   "unsupported": 19,
-  "catalog_implemented": 397,
-  "catalog_partial": 10,
+  "catalog_implemented": 407,
+  "catalog_partial": 0,
   "catalog_unsupported": 411
 }

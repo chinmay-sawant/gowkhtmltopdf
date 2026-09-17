@@ -80,6 +80,22 @@ func TestFontWidthCondensesAdvance(t *testing.T) {
 	}
 }
 
+func TestFontStretchCondensesAdvance(t *testing.T) {
+	t.Parallel()
+
+	cssSheet := sheet(t, `
+.wide { font-size: 20pt; font-stretch: normal; }
+.nar { font-size: 20pt; font-stretch: condensed; }
+`)
+	resW := layoutHTML(t, `<html><body><span class="wide">MMMM</span></body></html>`, cssSheet)
+	resN := layoutHTML(t, `<html><body><span class="nar">MMMM</span></body></html>`, cssSheet)
+	wW := textOpWidth(t, resW, "MMMM")
+	wN := textOpWidth(t, resN, "MMMM")
+	if wN >= wW*0.9 {
+		t.Fatalf("font-stretch condensed width=%.1f should be < normal=%.1f", wN, wW)
+	}
+}
+
 func layoutHTMLRegistry(t *testing.T, src string, reg *pdf.Registry, sheets ...*css.Stylesheet) *Result {
 	t.Helper()
 	root, err := html.Parse(src)

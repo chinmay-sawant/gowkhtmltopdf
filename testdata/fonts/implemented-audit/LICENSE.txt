@@ -10,3 +10,12 @@ Cactus Classical Serif subset (CactusClassicalSerif-Subset.ttf)
 License: SIL Open Font License 1.1 (OFL-1.1)
 Upstream: https://github.com/googlefonts/cactusclassicalserif (Google Fonts)
 Purpose: tiny glyph subset for fixture-64 CJK/fullwidth punctuation Effect demos.
+
+Gowk Var (GowkVar-VF.ttf)
+License: CC0 1.0
+Purpose: tiny variable test face (wght/opsz/wdth) for font-optical-sizing and
+font-variation-settings instancing tests and fixture-64 Effect cells.
+
+Palette Demo (PaletteDemo-Regular.ttf)
+License: CC0 1.0
+Purpose: tiny COLR/CPAL test face for font-palette lite solid-fill demos.

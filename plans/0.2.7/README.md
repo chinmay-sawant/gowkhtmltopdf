@@ -3,7 +3,7 @@
 > **Branch:** `feature/027-next-72` (next-100 authored on `docs/027-next-100` then merged)
 > **Status:** next-72 complete (87.1-87.8 closed 2026-09-17); next-100 planned (88.1-88.9)
 > **Baseline:** 354 Implemented / 0 Partial / 464 Unsupported (v0.2.6 catalog)
-> **After next-72 honest flips:** 397 Implemented / 10 Partial / 411 Unsupported of 818 (43 of 72 Implemented; 10 Partial; 19 Unsupported by choice)
+> **After next-72 honest flips:** 407 Implemented / 0 Partial / 411 Unsupported of 818 (53 of 72 Implemented; 0 Partial; 19 Unsupported by choice)
 
 ## What this folder is
 

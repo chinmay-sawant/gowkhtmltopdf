@@ -403,8 +403,8 @@ type ResolvedStyle struct {
 	FontVariantNumeric       string  // "normal" | keyword list
 	FontVariantPosition      string  // "normal" | "sub" | "super"
 	FontVariantEastAsian     string  // "normal" | keyword list
-	FontVariantAlternates    string  // stored; Partial without @font-feature-values
-	FontVariantEmoji         string  // stored; Partial without color-font path
+	FontVariantAlternates    string  // historical-forms / stylistic() / styleset() / swash(); OT tags
+	FontVariantEmoji         string  // normal|text|emoji|unicode; presentation consumer
 	// Image adjustment.
 	ImageOrientation      string  // "from-image" | "none" | raw angle
 	ImageOrientationAngle float64 // degrees; 0 = unset

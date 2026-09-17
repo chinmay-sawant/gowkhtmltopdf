@@ -1041,22 +1041,28 @@ func romanMarker(node int, upper bool) string {
 func (e *engine) placeFloat(
 	node *html.Node, cstate ResolvedStyle, floats *floatState, contentW, contentX, posY, curY float64,
 ) *box {
-	avail := contentW
+	flowY := posY + curY
+	refX, refW, refY := e.floatReferenceBox(node, cstate, contentX, contentW, flowY)
+	pinRef := pinFloatToReference(cstate, refX, refW, contentX, contentW)
+
+	avail := refW
 	if cstate.Width < 0 && cstate.WidthPercent < 0 {
 		avail = e.floatIntrinsicAvail(node, cstate, avail)
 	}
 
-	flowY := posY + curY
+	fixX, fromY := refX, refY
 
-	fixX, fromY := contentX, flowY
-
-	switch cstate.Float {
-	case floatLeft, floatRight:
-		fixX, fromY, avail = packFloatPosition(floats, contentX, contentW, flowY, avail, cstate.Float == floatLeft)
+	if !pinRef {
+		switch cstate.Float {
+		case floatLeft, floatRight:
+			fixX, fromY, avail = packFloatPosition(
+				floats, contentX, contentW, flowY, avail, cstate.Float == floatLeft,
+			)
+		}
 	}
 
 	oldMax := e.imgMaxW
-	e.setFloatImgMaxW(cstate, contentW, avail)
+	e.setFloatImgMaxW(cstate, refW, avail)
 
 	fbox := e.build(node, avail, fixX, fromY)
 	e.imgMaxW = oldMax
@@ -1065,7 +1071,12 @@ func (e *engine) placeFloat(
 		return nil
 	}
 
-	if cstate.Float == floatLeft && floats.hasLeft && fbox.x+fbox.w > contentX+contentW {
+	packX, packW := contentX, contentW
+	if pinRef {
+		packX, packW = refX, refW
+	}
+
+	if !pinRef && cstate.Float == floatLeft && floats.hasLeft && fbox.x+fbox.w > contentX+contentW {
 		// Overflowed the pack attempt — stack below.
 		fromY = maxY(floats.leftBottom, flowY)
 		dx, dy := contentX-fbox.x, fromY-fbox.y
@@ -1076,8 +1087,14 @@ func (e *engine) placeFloat(
 	margL := e.scalePt(cstate.MarginLeft)
 	margR := e.scalePt(cstate.MarginRight)
 
+	if pinRef && cstate.Float == floatLeft && fbox.x != packX {
+		dx := packX - fbox.x
+		fbox.x = packX
+		e.shiftBoxOps(fbox, dx, 0)
+	}
+
 	if cstate.Float == floatRight {
-		wantX := contentX + contentW - fbox.w - margR
+		wantX := packX + packW - fbox.w - margR
 		dx := wantX - fbox.x
 		fbox.x = wantX
 		e.shiftBoxOps(fbox, dx, 0)

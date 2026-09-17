@@ -6,8 +6,9 @@ import (
 )
 
 // applyFontWidthProps owns font-width and the legacy font-stretch alias.
-// Bundled Liberation faces have no width masters, so lookup ignores the stored
-// percent today; the field is still inherited for cascade honesty (Partial).
+// Both write FontWidth percent; fontWidthScale then scales measure/paint
+// advances. Bundled Liberation faces have no width masters, so face lookup
+// still ignores the percent.
 func applyFontWidthProps(
 	style *ResolvedStyle, prop, value string, _ float64, _ *styleContext,
 	_ *ResolvedStyle, _ bool,

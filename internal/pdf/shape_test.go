@@ -262,6 +262,48 @@ func TestParseFontFeatureSettings(t *testing.T) {
 	}
 }
 
+func TestParseFontFeatureSettingsHist(t *testing.T) {
+	t.Parallel()
+
+	feats := ParseFontFeatureSettings(`"hist" 1`)
+	if len(feats) != 1 || feats[0].Tag.String() != "hist" || feats[0].Value != 1 {
+		t.Fatalf("hist = %+v, want hist=1", feats)
+	}
+
+	swsh := ParseFontFeatureSettings(`"swsh" 1, "salt" 1`)
+	if len(swsh) != 2 {
+		t.Fatalf("swsh/salt count = %d", len(swsh))
+	}
+
+	if swsh[0].Tag.String() != "swsh" || swsh[0].Value != 1 {
+		t.Errorf("swsh = %+v", swsh[0])
+	}
+
+	if swsh[1].Tag.String() != "salt" || swsh[1].Value != 1 {
+		t.Errorf("salt = %+v", swsh[1])
+	}
+}
+
+func TestParseFontFeatureSettingsSaltChangesDejaVuGlyph(t *testing.T) {
+	t.Parallel()
+
+	fnt := bundledDejaVu(t)
+	plain := ShapeTextFontWithFeatures("a", fnt, nil)
+	salt := ShapeTextFontWithFeatures("a", fnt, ParseFontFeatureSettings(`"salt" 1`))
+	if salt == plain {
+		t.Fatalf("DejaVu salt should substitute glyph/text, plain=%q salt=%q", plain, salt)
+	}
+
+	if salt != "ɑ" {
+		t.Fatalf("DejaVu salt a = %q, want ɑ", salt)
+	}
+
+	hist := ShapeTextFontWithFeatures("a", fnt, ParseFontFeatureSettings(`"hist" 1`))
+	if hist != plain {
+		t.Fatalf("DejaVu has no hist; hist a = %q, want %q", hist, plain)
+	}
+}
+
 func TestShapeTextFontWithFeaturesCJKStillSafe(t *testing.T) {
 	t.Parallel()
 	// Face may lack halt/palt tables; requesting features must not panic

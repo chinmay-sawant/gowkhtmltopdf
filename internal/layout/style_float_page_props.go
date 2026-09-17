@@ -3,12 +3,16 @@ package layout
 
 import (
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
 
 // CSS Page Floats apply group (css-page-floats-3 lite):
 //   - float-offset: <length-percentage> — length nudge on placeFloat
-//   - float-reference: inline | column | region | page — inline documents the
-//     current BFC; page/column/region store as Partial (no pagination change)
+//   - float-reference: inline | column | region | page
+//       inline  = current BFC (CSS2 floats)
+//       page    = page content box (x=0, width=viewport)
+//       column  = parent BFC when nested inside a multicol ancestor
+//       region  = stored; treated as inline (no CSS Regions)
 //
 // float-defer stays Unsupported (no apply arm, no defer model).
 
@@ -99,4 +103,85 @@ func nudgeFloatOffset(e *engine, fbox *box, sty ResolvedStyle) {
 
 	fbox.y += dy
 	e.shiftBoxOps(fbox, 0, dy)
+}
+
+// floatReferenceBox returns the containing block used to place a float.
+// inline / region: current BFC. page: page content box. column: parent BFC
+// when the float sits in a nested BFC inside a multicol ancestor.
+func (e *engine) floatReferenceBox(
+	node *html.Node, sty ResolvedStyle, contentX, contentW, flowY float64,
+) (x, w, y float64) {
+	switch sty.FloatReference {
+	case floatRefPage:
+		w = 0
+		if e != nil {
+			w = e.opts.Width
+		}
+
+		if w <= 0 {
+			w = contentW
+		}
+
+		return 0, w, flowY
+	case floatRefColumn:
+		if x, w, ok := e.columnReferenceBox(node, contentX, contentW); ok {
+			return x, w, flowY
+		}
+	}
+
+	return contentX, contentW, flowY
+}
+
+// columnReferenceBox reports the parent BFC (the column box) when the float
+// is nested inside a multicol ancestor. Direct-in-column floats already use
+// the column BFC, so this is a no-op unless a nested formatting context
+// pushed a tighter box.
+func (e *engine) columnReferenceBox(
+	node *html.Node, contentX, contentW float64,
+) (x, w float64, ok bool) {
+	if e == nil || !hasMulticolAncestor(e, node) {
+		return 0, 0, false
+	}
+
+	if n := len(e.bfcStack); n > 0 {
+		parent := e.bfcStack[n-1]
+		if parent != nil && parent.contentW > 0 &&
+			(parent.contentX != contentX || parent.contentW != contentW) {
+			return parent.contentX, parent.contentW, true
+		}
+	}
+
+	return 0, 0, false
+}
+
+func hasMulticolAncestor(e *engine, n *html.Node) bool {
+	if e == nil || n == nil {
+		return false
+	}
+
+	for p := n.Parent; p != nil; p = p.Parent {
+		st := e.stylePtr(p)
+		if st == nil {
+			continue
+		}
+
+		if st.ColumnCount > 1 || st.ColumnWidth >= 0 || st.ColumnHeight >= 0 {
+			return true
+		}
+	}
+
+	return false
+}
+
+// pinFloatToReference reports whether placeFloat should pack against the
+// resolved reference box instead of the current BFC edges.
+func pinFloatToReference(sty ResolvedStyle, refX, refW, contentX, contentW float64) bool {
+	switch sty.FloatReference {
+	case floatRefPage:
+		return true
+	case floatRefColumn:
+		return refX != contentX || refW != contentW
+	default:
+		return false
+	}
 }

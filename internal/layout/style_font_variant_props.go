@@ -15,9 +15,10 @@ import (
 //     subset is 1-4 ASCII letters or digits; empty strings, escapes, and
 //     BCP 47 forms longer than four characters are dropped.
 //   - font-optical-sizing: auto | none, lowercased.
-//   - font-palette: normal | light | dark | <dashed-ident>. Keywords are
-//     lowercased, identifiers keep their case. palette-mix() is not
-//     supported and is dropped.
+//   - font-palette: normal | light | dark | <integer> | <dashed-ident>.
+//     Keywords are lowercased, identifiers keep their case. Integer indexes
+//     select a CPAL palette (lite, matching @font-palette-values base-palette).
+//     palette-mix() is not supported and is dropped.
 //   - font-variation-settings: normal | [ <string tag> <number> ]#. Tags must
 //     be quoted and exactly four ASCII letters or digits. The stored value is
 //     canonical (`"wght" 700, "wdth" 87.5`); a repeated axis keeps the last
@@ -107,6 +108,10 @@ func normalizeFontPalette(raw string) (string, bool) {
 		return fontPaletteLight, true
 	case fontPaletteDark:
 		return fontPaletteDark, true
+	}
+
+	if n, err := strconv.Atoi(value); err == nil && n >= 0 {
+		return strconv.Itoa(n), true
 	}
 
 	if len(value) <= len(fontDashedIdentPrefix) || !strings.HasPrefix(value, fontDashedIdentPrefix) {

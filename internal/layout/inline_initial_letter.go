@@ -6,11 +6,16 @@ package layout
 // <span class="drop">T</span>ext...). The CSS selector parser rejects
 // :first-letter, so the engine does not synthesize a first-letter box.
 //
-// Model: the sized letter is taken out of the inline stream, painted at the
-// content origin, and registered as a left float-like exclusion so the next
-// sink-1 lines shorten beside it. initial-letter-wrap:none disables the
-// exclusion (letter still paints oversized). Align keywords other than
-// alphabetic are stored; alphabetic is the only alignment used here.
+// Model: the sized letter is taken out of the inline stream and painted at
+// the content origin. initial-letter-wrap chooses the rectangular exclusion:
+// none = no side wrap, first = first line only, all/grid = every overlapping
+// sink line. initial-letter-align picks the vertical metric (alphabetic,
+// hanging, leading, ideographic). Both require initial-letter: N on the
+// same element; :first-letter is not synthesized.
+
+// initialLetterCapRatio is the synthesized Latin cap-height fraction of the
+// sized letter box. Alphabetic hanging uses this as the ascent.
+const initialLetterCapRatio = 0.8
 
 // prepareInitialLetter extracts and sizes a leading initial-letter run.
 // Returns (letter items, remaining items, ok).
@@ -125,10 +130,67 @@ func initialLetterSinkLines(sty *ResolvedStyle) int {
 	return 0
 }
 
-// placeInitialLetter paints the sized letter at the content origin and
-// records a left float-like exclusion for the sink depth so following lines
-// shorten beside the letter. initial-letter-wrap contour modes are stored
-// but all use the rectangular letter box (lite).
+// initialLetterAlignOffset is the extra block-axis shift (positive = lower)
+// so alphabetic / hanging / leading / ideographic land on distinct metrics.
+// Requires initial-letter: N (the caller already sized the letter).
+func initialLetterAlignOffset(align string, letterH, parentLH float64) float64 {
+	if parentLH <= 0 {
+		parentLH = 12 * defaultLineHeightRatio
+	}
+
+	if letterH <= 0 {
+		letterH = parentLH
+	}
+
+	switch align {
+	case initialLetterAlignHanging:
+		// Hanging baseline sits near the top of the em (~0.2em from over).
+		// Matching first-line hanging to the large letter hanging raises it.
+		return 0.2 * (parentLH - letterH)
+	case initialLetterAlignLeading:
+		// Leading edges include half-leading, so the letter sits lower than
+		// a cap-height hang.
+		return 0.25 * parentLH
+	case initialLetterAlignIdeo:
+		// Ideographic face is the em box, not cap-height; center in the
+		// N-line band relative to an alphabetic cap hang.
+		return 0.12 * parentLH
+	default:
+		return 0
+	}
+}
+
+// initialLetterExclusionHeight is the rectangular wrap band. none is 0 (no
+// side wrap); first is one line; all/grid and stored <length> cover the sink.
+func initialLetterExclusionHeight(sty *ResolvedStyle, parentLH float64) float64 {
+	if sty == nil || parentLH <= 0 {
+		return 0
+	}
+
+	wrap := sty.InitialLetterWrap
+	if wrap == "" {
+		wrap = initialLetterWrapNone
+	}
+
+	switch wrap {
+	case initialLetterWrapNone:
+		return 0
+	case initialLetterWrapFirst:
+		return parentLH
+	default:
+		// all, grid, and stored <length-percentage>: rectangular sink band.
+		sink := initialLetterSinkLines(sty)
+		if sink < 1 {
+			sink = 1
+		}
+
+		return float64(sink) * parentLH
+	}
+}
+
+// placeInitialLetter paints the sized letter at the content origin using the
+// chosen align metric, then records a rectangular left exclusion whose height
+// follows initial-letter-wrap (none/first/all).
 func (e *engine) placeInitialLetter(
 	boxNode *box, letter []inlineItem, contentX, lineY, parentLH float64, floats *floatState,
 ) float64 {
@@ -143,30 +205,28 @@ func (e *engine) placeInitialLetter(
 		letterW += letter[i].marginL + letter[i].w + letter[i].marginR
 	}
 
-	sink := initialLetterSinkLines(sty)
 	if parentLH <= 0 {
 		parentLH = surroundingLineHeight(nil, sty) * e.scale
 	}
 
-	bandH := float64(sink) * parentLH
-	if bandH <= 0 {
-		bandH = letter[0].h
+	align := initialLetterAlignAlpha
+	if sty != nil && sty.InitialLetterAlign != "" {
+		align = sty.InitialLetterAlign
 	}
 
-	// Align alphabetic (and other stored keywords, lite): hang the glyph so
-	// its top meets the first line top and it sinks into following lines.
-	_ = sty.InitialLetterAlign
-	ascent := letter[0].h * 0.8
-	baseline := lineY + ascent
+	letterTop := lineY + initialLetterAlignOffset(align, letter[0].h, parentLH)
+	ascent := letter[0].h * initialLetterCapRatio
+	baseline := letterTop + ascent
 
 	leftX := contentX
 	for i := range letter {
 		leftX += letter[i].marginL
-		e.emitLineItems(boxNode, letter[i:i+1], leftX, baseline, parentLH, lineY, 0)
+		e.emitLineItems(boxNode, letter[i:i+1], leftX, baseline, parentLH, letterTop, 0)
 		leftX += letter[i].w + letter[i].marginR
 	}
 
-	if floats != nil {
+	bandH := initialLetterExclusionHeight(sty, parentLH)
+	if floats != nil && bandH > 0 && letterW > 0 {
 		fbox := &box{ //nolint:exhaustruct // float exclusion geometry only
 			x: contentX, y: lineY, w: letterW, height: bandH,
 		}

@@ -159,9 +159,13 @@ func applyColumnFillSpanProps(style *ResolvedStyle, prop, value string) bool {
 
 // columnWrapCreatesRows reports whether overflow past column-height (or a
 // definite container height) should open a new multicol row in the block
-// direction. Multicol-2: auto behaves as wrap when column-height is set,
-// otherwise nowrap. nowrap overflow columns (inline direction) are not
-// implemented; nowrap still caps height but does not open further rows.
+// direction.
+//
+// Multicol-2:
+//   - wrap: always open further rows
+//   - nowrap: one row only (overflow columns in the inline direction are not
+//     shipped; leftover items are not packed into a second block-direction row)
+//   - auto: wrap when column-height is definite, otherwise nowrap
 func columnWrapCreatesRows(style ResolvedStyle) bool {
 	switch style.ColumnWrap {
 	case columnWrapWrap:

@@ -9,14 +9,17 @@ import (
 // selector parser, so authors must put initial-letter on a real leading
 // element (typically a <span> wrapping the first letter or word).
 const (
-	initialLetterNormal     = "normal"
-	initialLetterDrop       = "drop"
-	initialLetterRaise      = "raise"
-	initialLetterAlignAlpha = "alphabetic"
-	initialLetterWrapNone   = "none"
-	initialLetterWrapFirst  = "first"
-	initialLetterWrapAll    = "all"
-	initialLetterWrapGrid   = "grid"
+	initialLetterNormal       = "normal"
+	initialLetterDrop         = "drop"
+	initialLetterRaise        = "raise"
+	initialLetterAlignAlpha   = "alphabetic"
+	initialLetterAlignHanging = "hanging"
+	initialLetterAlignLeading = "leading"
+	initialLetterAlignIdeo    = "ideographic"
+	initialLetterWrapNone     = "none"
+	initialLetterWrapFirst    = "first"
+	initialLetterWrapAll      = "all"
+	initialLetterWrapGrid     = "grid"
 )
 
 // applyInitialLetterProps owns initial-letter, initial-letter-align, and
@@ -102,7 +105,7 @@ func applyInitialLetterAlignValue(style *ResolvedStyle, value string) bool {
 	}
 
 	switch val {
-	case initialLetterAlignAlpha, "ideographic", "hanging", "leading":
+	case initialLetterAlignAlpha, initialLetterAlignIdeo, initialLetterAlignHanging, initialLetterAlignLeading:
 		style.InitialLetterAlign = val
 
 		return true

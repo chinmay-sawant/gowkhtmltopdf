@@ -324,18 +324,7 @@ func normalizeFontVariantEastAsian(raw string) (string, bool) {
 }
 
 func normalizeFontVariantAlternates(raw string) (string, bool) {
-	v := strings.TrimSpace(raw)
-	low := strings.ToLower(v)
-	if low == fontVariantNormal || low == "historical-forms" {
-		return low, true
-	}
-	// Named alternates need @font-feature-values; store the raw token list for
-	// honesty as Partial rather than inventing OT tags.
-	if v != "" {
-		return low, true
-	}
-
-	return "", false
+	return canonicalFontVariantAlternates(raw)
 }
 
 func normalizeFontVariantEmoji(raw string) (string, bool) {
@@ -523,10 +512,7 @@ func appendVariantFeatureTags(sty *ResolvedStyle, put func(string, uint32)) {
 		put("sups", 1)
 	}
 
-	switch sty.FontVariantAlternates {
-	case "historical-forms":
-		put("hist", 1)
-	}
+	appendAlternateOTTags(sty.FontVariantAlternates, put)
 
 	for _, tok := range strings.Fields(sty.FontVariantEastAsian) {
 		switch tok {

@@ -11,8 +11,8 @@
     "webref_properties": 818,
     "mapped_properties": 818,
     "properties_by_engine_status": {
-      "implemented": 397,
-      "partial": 10,
+      "implemented": 407,
+      "partial": 0,
       "unsupported": 411,
       "ignored": 0
     },
@@ -6124,9 +6124,9 @@
         "CSS Box Sizing",
         "CSS Multi-column Layout"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_multicol_props.go;internal/layout/multicol.go",
-      "notes": "Partial: wrap and auto (when column-height set) open multicol rows in the block direction. nowrap stops after one row; overflow columns in the inline direction are not implemented. Test TestColumnWrapCreatesRow."
+      "notes": "Implemented lite: wrap and auto (when column-height is set) open extra multicol rows in the block direction. nowrap stops after one row. Overflow columns in the inline direction are not shipped. Tests TestColumnWrapCreatesRow, TestColumnWrapNowrapStopsAfterOneRow, TestColumnWrapAutoCreatesRowWhenHeightSet."
     },
     {
       "property": "columns",
@@ -8225,9 +8225,9 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/float-reference",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "partial",
-      "code_path": "internal/layout/style_float_page_props.go",
-      "notes": "Partial: inline documents current BFC (CSS2 floats). page/column/region parse and store only; no pagination relocation. Test TestFloatReferenceInline."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_float_page_props.go;internal/layout/layout_flow.go",
+      "notes": "Implemented lite: inline = current BFC. page = page content box (x=0, width=viewport) so a page-referenced float packs relative to the page, not the nested BFC; % widths resolve against page width. column lite uses the parent BFC when nested inside a multicol ancestor. region stored, treated as inline. Test TestFloatReferencePageVsInline."
     },
     {
       "property": "flood-color",
@@ -8480,9 +8480,9 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "partial",
-      "code_path": "internal/layout/style_font_variant_props.go; internal/layout/layout.go:resolveFontVariants",
-      "notes": "Partial (Path A / phase 87.3): parsed and inherited; face consumer resolveFontVariants keeps the default instance. PDF embeds default glyf/hmtx only; no opsz/wght/wdth instancing and no COLR/CPAL palette paint. Not Implemented until embed/shape change glyphs, metrics, or paint."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_font_variant_props.go; internal/layout/font_variation.go:resolveFontVariants; internal/pdf/font_instance.go:Instance",
+      "notes": "Implemented subset: auto|none. auto instances opsz from used font-size (pt) when the face has an opsz axis; none leaves the fvar default. Static bundled faces are a spec no-op. Consumer resolveFontVariants -> pdf.Font.Instance rewrites glyf/hmtx. Tests TestOpticalSizingAutoSetsOpsz, TestOpticalSizingNoneKeepsDefaultOpsz. font-palette stays Partial."
     },
     {
       "property": "font-palette",
@@ -8503,9 +8503,9 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "partial",
-      "code_path": "internal/layout/style_font_variant_props.go; internal/layout/layout.go:resolveFontVariants",
-      "notes": "Partial (Path A / phase 87.3): parsed and inherited; face consumer resolveFontVariants keeps the default instance. PDF embeds default glyf/hmtx only; no opsz/wght/wdth instancing and no COLR/CPAL palette paint. Not Implemented until embed/shape change glyphs, metrics, or paint."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_font_variant_props.go; internal/layout/font_palette.go; internal/pdf/cpal.go",
+      "notes": "Implemented lite: COLR+CPAL faces select light/dark/integer palettes; paint uses the first CPAL color as a solid fill (not layered COLR). normal keeps CSS color. Static faces are a spec no-op. palette-mix() and @font-palette-values dropped. Test TestFontPaletteCPALFillDiffersFromNormal."
     },
     {
       "property": "font-size",
@@ -8572,9 +8572,9 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "partial",
-      "code_path": "internal/layout/style_font_width_props.go",
-      "notes": "Partial: alias of font-width; stored percent, no width-master consumer on bundled faces. Test TestFontStretchAliasesToWidth."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_font_width_props.go; internal/layout/font_synthesis_geom.go fontWidthScale; measureRuneFace/emit",
+      "notes": "Implemented lite: font-stretch aliases font-width into FontWidth percent; fontWidthScale condenses advances. No width-master face pick. Tests TestFontStretchAliasesToWidth, TestFontStretchCondensesAdvance. | flipped Implemented after geometric consumer 2026-09-17"
     },
     {
       "property": "font-style",
@@ -8768,9 +8768,9 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "partial",
-      "code_path": "internal/layout/style_font_feature_props.go",
-      "notes": "Partial: normal|historical-forms|named tokens stored; named alternates need @font-feature-values (no OT consumer)."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_font_feature_props.go; internal/layout/style_font_variant_alternates.go appendAlternateOTTags; fontShapingFeatureSettings",
+      "notes": "Implemented subset: historical-forms->hist; stylistic()/swash()/styleset(N)->salt/swsh/ssNN. Named args default to 1 (no @font-feature-values). DejaVu salt substitutes a->\u0251. hist no-op on Liberation. Tests TestFontVariantAlternatesMapsToHist, TestParseFontFeatureSettingsHist, TestParseFontFeatureSettingsSaltChangesDejaVuGlyph. | flipped Implemented after OT consumer 2026-09-17"
     },
     {
       "property": "font-variant-caps",
@@ -8837,9 +8837,9 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "partial",
-      "code_path": "internal/layout/style_font_feature_props.go",
-      "notes": "Partial: normal|text|emoji|unicode stored; no COLR/CPAL emoji presentation consumer."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_font_feature_props.go; internal/layout/font_variant_emoji.go",
+      "notes": "Implemented lite: text vs emoji presentation on emoji-candidate runes. text keeps CSS color and glyph advance; emoji applies U+FE0F semantics (solid gold fill + 1em min advance). Variation selectors are not embedded in PDF text (bundled faces map FE0E/FE0F to .notdef). Test TestFontVariantEmojiTextVsEmojiDiffers."
     },
     {
       "property": "font-variant-ligatures",
@@ -8929,9 +8929,9 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "partial",
-      "code_path": "internal/layout/style_font_variant_props.go; internal/layout/layout.go:resolveFontVariants",
-      "notes": "Partial (Path A / phase 87.3): parsed and inherited; face consumer resolveFontVariants keeps the default instance. PDF embeds default glyf/hmtx only; no opsz/wght/wdth instancing and no COLR/CPAL palette paint. Not Implemented until embed/shape change glyphs, metrics, or paint."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_font_variant_props.go; internal/layout/font_variation.go:resolveFontVariants; internal/pdf/font_instance.go:Instance",
+      "notes": "Implemented subset: normal | [ quoted 4-letter tag <number> ]#. Instanced into glyf outlines and hmtx advances for faces with fvar (wght/opsz/wdth and any other requested axis). Repeated tags keep last value. Static bundled faces are a spec no-op. Consumer resolveFontVariants -> pdf.Font.Instance. Tests TestVariationSettingsChangesAdvance, TestResolveFontVariantsInstancesAxes."
     },
     {
       "property": "font-weight",
@@ -9863,9 +9863,9 @@
       "groups": [
         "CSS Inline"
       ],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_initial_letter_props.go;internal/layout/inline_initial_letter.go",
-      "notes": "Partial: parsed/stored/inherited; drop-cap path uses alphabetic hanging. ideographic/hanging/leading keywords accepted without distinct metrics. Chrome has no BCD support."
+      "notes": "Implemented: alphabetic / hanging / leading / ideographic use distinct synthesized Y offsets when initial-letter: N is set on the same element. Test TestInitialLetterAlignHangingShiftsY."
     },
     {
       "property": "initial-letter-wrap",
@@ -9884,9 +9884,9 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/initial-letter-wrap",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "partial",
+      "engine_status": "implemented",
       "code_path": "internal/layout/style_initial_letter_props.go;internal/layout/inline_initial_letter.go",
-      "notes": "Partial: parsed/stored/inherited; exclusion uses the rectangular letter box for all keywords. Glyph-contour wrap (all/grid) not implemented. Chrome has no BCD support."
+      "notes": "Implemented rectangular: none = no exclusion, first = first line only, all/grid = sink-depth band. Requires initial-letter: N on the same element. No glyph-contour wrap. Test TestInitialLetterWrapNoneDoesNotExclude."
     },
     {
       "property": "inline-size",

@@ -166,3 +166,142 @@ func TestColumnWrapCreatesRow(t *testing.T) {
 		t.Fatalf("column-wrap:wrap Y span=%.1f; want a second multicol row", maxY-minY)
 	}
 }
+
+func TestColumnWrapNowrapStopsAfterOneRow(t *testing.T) {
+	t.Parallel()
+
+	cssSheet := sheet(t, `
+.mc {
+  column-count: 2;
+  column-gap: 8pt;
+  column-height: 36pt;
+  column-wrap: nowrap;
+  column-fill: auto;
+  width: 200pt;
+  font-size: 9pt;
+}
+.mc p { margin: 0 0 1pt 0; }
+`)
+	root := mustParse(t, `<html><body><div class="mc">x</div></body></html>`)
+	styles := resolveStyles(root, []*css.Stylesheet{cssSheet}, "print", 500, 800)
+	st := styleByClass(t, styles, "mc")
+	if st.ColumnWrap != columnWrapNowrap {
+		t.Fatalf("column-wrap=%q, want nowrap", st.ColumnWrap)
+	}
+
+	if columnWrapCreatesRows(*st) {
+		t.Fatal("nowrap must not open extra block-direction rows")
+	}
+
+	res := layoutHTML(t, `<html><body>
+<div class="mc">
+  <p>Alpha one.</p>
+  <p>Bravo two.</p>
+  <p>Charlie three.</p>
+  <p>Delta four.</p>
+  <p>Echo five.</p>
+  <p>Foxtrot six.</p>
+  <p>Golf seven.</p>
+  <p>Hotel eight.</p>
+  <p>India nine.</p>
+  <p>Juliet ten.</p>
+</div>
+</body></html>`, cssSheet)
+
+	minY, maxY, n := columnWrapLabelYSpan(t, res)
+	if n < 2 {
+		t.Fatalf("nowrap produced %d labels", n)
+	}
+
+	if maxY-minY > 40 {
+		t.Fatalf("column-wrap:nowrap Y span=%.1f; want one ~36pt row", maxY-minY)
+	}
+}
+
+func TestColumnWrapAutoCreatesRowWhenHeightSet(t *testing.T) {
+	t.Parallel()
+
+	cssSheet := sheet(t, `
+.mc {
+  column-count: 2;
+  column-gap: 8pt;
+  column-height: 36pt;
+  column-wrap: auto;
+  column-fill: auto;
+  width: 200pt;
+  font-size: 9pt;
+}
+.mc p { margin: 0 0 1pt 0; }
+`)
+	root := mustParse(t, `<html><body><div class="mc">x</div></body></html>`)
+	styles := resolveStyles(root, []*css.Stylesheet{cssSheet}, "print", 500, 800)
+	st := styleByClass(t, styles, "mc")
+	if st.ColumnWrap != columnWrapAuto {
+		t.Fatalf("column-wrap=%q, want auto", st.ColumnWrap)
+	}
+
+	if !columnWrapCreatesRows(*st) {
+		t.Fatal("auto with column-height must wrap to extra rows")
+	}
+
+	res := layoutHTML(t, `<html><body>
+<div class="mc">
+  <p>Alpha one.</p>
+  <p>Bravo two.</p>
+  <p>Charlie three.</p>
+  <p>Delta four.</p>
+  <p>Echo five.</p>
+  <p>Foxtrot six.</p>
+  <p>Golf seven.</p>
+  <p>Hotel eight.</p>
+  <p>India nine.</p>
+  <p>Juliet ten.</p>
+</div>
+</body></html>`, cssSheet)
+
+	minY, maxY, n := columnWrapLabelYSpan(t, res)
+	if n < 6 {
+		t.Fatalf("auto produced %d labels", n)
+	}
+
+	if maxY-minY < 30 {
+		t.Fatalf("column-wrap:auto Y span=%.1f; want a second multicol row", maxY-minY)
+	}
+}
+
+func columnWrapLabelYSpan(t *testing.T, res *Result) (minY, maxY float64, n int) {
+	t.Helper()
+
+	ys := map[string]float64{}
+	for _, op := range res.Ops {
+		if op.Kind != OpText {
+			continue
+		}
+
+		for _, key := range []string{
+			"Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot",
+			"Golf", "Hotel", "India", "Juliet",
+		} {
+			if len(op.Text) >= len(key) && op.Text[:len(key)] == key {
+				ys[key] = op.Y
+			}
+		}
+	}
+
+	if len(ys) == 0 {
+		return 0, 0, 0
+	}
+
+	minY, maxY = math.Inf(1), math.Inf(-1)
+	for _, y := range ys {
+		if y < minY {
+			minY = y
+		}
+
+		if y > maxY {
+			maxY = y
+		}
+	}
+
+	return minY, maxY, len(ys)
+}
