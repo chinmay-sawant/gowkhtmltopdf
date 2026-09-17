@@ -1,7 +1,11 @@
 //nolint:varnamelen // clip math uses compact x/y/w/h/op geometry names
 package layout
 
-import "math"
+import (
+	"math"
+
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
+)
 
 // clipRect is an axis-aligned padding-box clip in canvas points.
 type clipRect struct {
@@ -106,6 +110,12 @@ func (e *engine) computeBoxOverflowClip(boxNode *box, current *clipRect) *clipRe
 		return current
 	}
 
+	// Root overflow is viewport policy (CSS Overflow 3 / CSS 2.1 11.1.1), not
+	// a padding-box clip on the continuous multi-page display list.
+	if e.isViewportPropagatingOverflowRoot(boxNode) {
+		return current
+	}
+
 	clipX := clipsPaintAxis(boxNode.style, boxNode.style.OverflowX)
 	clipY := clipsPaintAxis(boxNode.style, boxNode.style.OverflowY)
 
@@ -131,6 +141,54 @@ func (e *engine) computeBoxOverflowClip(boxNode *box, current *clipRect) *clipRe
 	}
 
 	return &pb
+}
+
+// isViewportPropagatingOverflowRoot reports html, and body when body's
+// overflow applies to the viewport because html's overflow is still visible.
+func (e *engine) isViewportPropagatingOverflowRoot(boxNode *box) bool {
+	if boxNode == nil || boxNode.node == nil {
+		return false
+	}
+
+	switch boxNode.node.Name {
+	case htmlRootName:
+		return true
+	case htmlBodyName:
+		return e.bodyPropagatesOverflowToViewport(boxNode.node)
+	default:
+		return false
+	}
+}
+
+// bodyPropagatesOverflowToViewport is true when the html root does not already
+// own non-visible overflow, so body's overflow becomes the viewport's.
+func (e *engine) bodyPropagatesOverflowToViewport(body *html.Node) bool {
+	if body == nil {
+		return false
+	}
+
+	htmlEl := body
+	for htmlEl != nil && htmlEl.Name != htmlRootName {
+		htmlEl = htmlEl.Parent
+	}
+
+	if htmlEl == nil {
+		// Fragment layouts rooted at body: treat body as the viewport root.
+		return true
+	}
+
+	sty := e.stylePtr(htmlEl)
+	if sty == nil {
+		return true
+	}
+
+	if overflowClipsPaint(sty.Overflow) ||
+		overflowClipsPaint(sty.OverflowX) ||
+		overflowClipsPaint(sty.OverflowY) {
+		return false
+	}
+
+	return true
 }
 
 // clipsPaintAxis reports whether one overflow axis clips paint: the axis

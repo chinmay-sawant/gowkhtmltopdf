@@ -179,7 +179,9 @@ under mutation races (validated with `-race`).
   `--pdf-version` is a **version**, not a PDF/A or PDF/UA claim. `--pdf-profile`
   is the claim: `a3a` / `ua1` / `a3a-ua1` (PDF 1.7) and `a4` / `ua2` / `a4-ua2`
   (PDF 2.0); `Get("pdfprofile")` returns canonical tokens (`PDF/A-3a+PDF/UA-1`
-  after `a3a-ua1`). Info `/Title` comes from `--title`, not `<title>`.
+  after `a3a-ua1`). Info `/Title` comes from `--title` when set; otherwise the
+  first document's `<title>` is used (`internal/convert/pdf_pipeline.go:209`),
+  on every PDF version.
 - Image mode: one canvas (`Assemble` is a no-op), `--transparent` support
   (only fill-alpha diverges from PDF paint semantics), no temp files; the
   only third-party raster call in the project is the allowlisted

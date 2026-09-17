@@ -101,7 +101,7 @@ lives in `internal/convert/render`:
 | TOC | Two-pass page-count fixpoint; paint TOC pages; `ReorderPages` so TOC is first |
 | Outline | Heading tree → PDF bookmarks; optional `--dump-outline` XML |
 | Links | Body `#id` / `#name` GoTo, TOC entry targets, URI annotations |
-| Document | Page/copy plan; **Info `/Title` from `--title` / `PdfGlobal.Title` only** (HTML `<title>` feeds HF `[doctitle]`, not the PDF Info dict); Producer, compression, grayscale, creation time |
+| Document | Page/copy plan; **Info `/Title` from `--title` / `PdfGlobal.Title` when set, otherwise the first body document's HTML `<title>`** (`convert/pdf_pipeline.go:209`); `<title>` also feeds HF `[doctitle]`; Producer, compression, grayscale, creation time |
 | Copies | Materialize `--copies`; collate vs non-collate reorder |
 | Headers/footers | Final pass with real page numbers; cover pages skipped; HTML HF is a single-band clamp |
 
@@ -137,7 +137,7 @@ Image jobs use `imageout.Request` (`imageout.RunRequest`), also driven by
 | Images | JPEG bytes as DCTDecode; PNG → Flate RGB + `/SMask` for alpha |
 | Links | URI annotations and GoTo destinations; PDF/UA-2 also emits structure destinations (`/SD`) on internal named dests |
 | Outlines | Catalog `/Outlines` after outline object refs exist; UA-2 outline dests can carry `/SD` |
-| Info Title | `--title` / settings only - **not** `<title>` |
+| Info Title | `--title` / settings when set; otherwise the first body document's `<title>` (`pdf_pipeline.go:209`) |
 | Profiles | Empty `--pdf-profile` is unclaimed PDF (default still 1.4). `--pdf-version` is **not** a PDF/A or PDF/UA claim. `--pdf-profile` is: `PDF/A-3a`, `PDF/UA-1`, `PDF/A-3a+PDF/UA-1` (imply 1.7); `PDF/A-4`, `PDF/UA-2`, `PDF/A-4+PDF/UA-2` (imply 2.0). `Get("pdfprofile")` returns those canonical tokens (alias `a3a-ua1` stores `PDF/A-3a+PDF/UA-1`) |
 
 Explicit out-of-scope boundaries: `--pdf-version` alone is a **version**

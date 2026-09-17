@@ -39,6 +39,12 @@ type opExtra struct {
 	// ChromeDepth counts the stacking contexts active when the chrome was
 	// emitted (0 for root-level chrome and for every non-chrome op).
 	ChromeDepth int
+	// FloatOp marks operations owned by a float box. CSS 2.1 Appendix E
+	// paints non-positioned floats as a group after in-flow block
+	// backgrounds/borders and before in-flow inline content, so a footer's
+	// background cannot cover a float that precedes it (w3schools footer).
+	// Kept on the rare extra so the hot Op record stays at 256 bytes.
+	FloatOp bool
 }
 
 // setZChain records the op's innermost stacking-context frame. Root-context
@@ -83,6 +89,17 @@ func (op Op) chromeDepth() int {
 	}
 
 	return op.opExtra.ChromeDepth
+}
+
+// setFloatOp marks the op as owned by a float box's subtree. The flag lives on
+// the rare extra so the hot Op record stays within its size budget.
+func (op *Op) setFloatOp() {
+	op.detachExtra().FloatOp = true
+}
+
+// isFloatOp reports whether the op belongs to a float box's subtree.
+func (op Op) isFloatOp() bool {
+	return op.opExtra != nil && op.opExtra.FloatOp
 }
 
 func (op *Op) detachExtra() *opExtra {

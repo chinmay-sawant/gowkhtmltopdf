@@ -580,6 +580,27 @@ func lineHeight(value string, fsize float64) float64 {
 	return 0
 }
 
+// explicitZeroLineHeight reports that a line-height declaration resolves to
+// zero (0, 0pt, 0%). LineHeight uses 0 as the "normal" sentinel, so the
+// resolver records the explicit zero separately; lineHeightOf then collapses
+// the line box instead of falling back to 1.2 x font-size.
+func explicitZeroLineHeight(value string) bool {
+	trimmed := strings.TrimSpace(value)
+	if strings.EqualFold(trimmed, contentNormal) || trimmed == "" {
+		return false
+	}
+
+	if v, ok := css.ParseNumber(trimmed); ok {
+		return v == 0
+	}
+
+	if v, _, ok := css.ParseLength(trimmed); ok {
+		return v == 0
+	}
+
+	return false
+}
+
 // parseOverflowKeyword accepts CSS overflow keywords used for sticky scrollport
 // detection. clip is treated like hidden (scroll container, no user scroll).
 func parseOverflowKeyword(value string) (string, bool) {

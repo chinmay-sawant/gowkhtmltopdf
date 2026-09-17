@@ -744,13 +744,17 @@ func ResolveCustomProps(declared, inherited map[string]string) map[string]string
 
 func isHex(s string) bool {
 	for i := range len(s) {
-		c := s[i]
-		if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f' || c >= 'A' && c <= 'F') {
+		if !isHexChar(s[i]) {
 			return false
 		}
 	}
 
 	return true
+}
+
+// isHexChar reports whether c is an ASCII hex digit.
+func isHexChar(c byte) bool {
+	return c >= '0' && c <= '9' || c >= 'a' && c <= 'f' || c >= 'A' && c <= 'F'
 }
 
 func hexNibble(buf byte) int {

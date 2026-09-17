@@ -393,8 +393,8 @@ enough to run per build call).
   previous cascade value.
 - `height:%` with indefinite containing block → treated as `auto`
   ("cyclic % honesty"), same for `width:%` in indefinite CBs.
-- SVG images rasterize at ≤1024 px (`svgRasterMax`), SVG failures fall back
-  to PNG/JPEG sniffing, then to no image.
+- SVG images rasterize at ≤1024 px (`svgRasterMaxDim`, `layout_flow.go:28`),
+  SVG failures fall back to PNG/JPEG sniffing, then to no image.
 - `border-collapse: collapse` parsed but modeled as spacing suppression
   (separate-border machinery, `tableSpacing`).
 
@@ -415,7 +415,7 @@ ACL (`documentation/THREAT-MODEL.md`):
   injected `Options.Images` callback (`layout_flow.go:31`), which
   `internal/convert` wires to the ACL-gated loader. SVG rasterization
   (`internal/svg.Rasterize`) runs on bytes that already passed the ACL and
-  size caps (`svgRasterMax = 1024`).
+  size caps (`svgRasterMaxDim = 1024`).
 - **HTML parsing** is allowlisted (`internal/html`): scripts and active
   content are dropped before layout; layout therefore never executes JS or
   fetches at CSS time.

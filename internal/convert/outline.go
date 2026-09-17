@@ -73,6 +73,12 @@ type objectState struct {
 	navigation bodyNavigation
 	headings   []*outline.Heading
 
+	// textOps / imageOps census painted body ops (post-paint). Used by
+	// Finalize to warn when a document has no extractable text and no
+	// images (JS-shell pages). Independent-block paint accumulates both.
+	textOps  int
+	imageOps int
+
 	// TOC objects:
 	tocPages int
 	tocRoot  *html.Node

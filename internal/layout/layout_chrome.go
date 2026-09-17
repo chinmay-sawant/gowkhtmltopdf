@@ -410,7 +410,9 @@ func (e *engine) prependChrome(insertAt int, boxNode *box, sty ResolvedStyle, po
 		sty.BorderTop = sty.BorderBottom
 	}
 
-	if overflowClipsPaint(sty.Overflow) && insertAt >= 0 && insertAt <= len(e.ops) {
+	if overflowClipsPaint(sty.Overflow) &&
+		!e.isViewportPropagatingOverflowRoot(boxNode) &&
+		insertAt >= 0 && insertAt <= len(e.ops) {
 		clipOpsSlice(e.ops[insertAt:], e.paddingBoxRect(posX, posY, width, height, sty))
 	}
 
@@ -725,7 +727,32 @@ func (e *engine) finalizeChrome(root *box) {
 		restampStickyFixed(root, e.ops)
 	}
 
+	restampFloatOps(root, e.ops)
 	e.applyOverflowClips(root)
+}
+
+// restampFloatOps marks every op inside a float box's final range as a float
+// op. Ranges are remapped by mergeDeferredChrome, so this runs after the
+// merge; ops copy their flags through pagination and cloning unchanged.
+func restampFloatOps(boxNode *box, ops []Op) {
+	if boxNode == nil {
+		return
+	}
+
+	if boxNode.style != nil &&
+		(boxNode.style.Float == floatLeft || boxNode.style.Float == floatRight) {
+		for i := boxNode.opStart; i <= boxNode.opEnd && i < len(ops); i++ {
+			if i >= 0 {
+				ops[i].setFloatOp()
+			}
+		}
+
+		return
+	}
+
+	for _, child := range boxNode.children {
+		restampFloatOps(child, ops)
+	}
 }
 
 // chromeSpan is an inclusive op range owned by one box's chrome.

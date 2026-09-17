@@ -103,3 +103,60 @@ func TestSkippedImagePayloadWarnsThroughHTMLLog(t *testing.T) {
 		t.Errorf("HTML header skipped image did not warn through the run log; log=%q", log.String())
 	}
 }
+
+const noExtractableTextWarn = "document contains no extractable text (page may require JavaScript)"
+
+// TestVisibilityHiddenBodyWarnsNoExtractableText covers JS-shell pages where
+// every body glyph is visibility:hidden: conversion still succeeds and the
+// run log carries exactly one empty-shell warning.
+func TestVisibilityHiddenBodyWarnsNoExtractableText(t *testing.T) {
+	t.Parallel()
+
+	cmd, _ := newCommand(t,
+		`<html><body><div style="visibility:hidden"><p>secret shell copy</p></div></body></html>`,
+		filepath.Join(t.TempDir(), "out.pdf"))
+
+	var log bytes.Buffer
+	data := runPDFWithLog(t, cmd, &log)
+
+	if !bytes.HasPrefix(data, []byte("%PDF-")) {
+		t.Fatal("output is not a PDF")
+	}
+
+	var warnings []string
+
+	for _, line := range strings.Split(log.String(), "\n") {
+		if strings.Contains(line, noExtractableTextWarn) {
+			warnings = append(warnings, line)
+		}
+	}
+
+	if len(warnings) != 1 {
+		t.Fatalf("empty-shell warnings = %d, want exactly 1; log=%q", len(warnings), log.String())
+	}
+
+	if !strings.HasPrefix(warnings[0], "warning: ") {
+		t.Errorf("empty-shell line is not a warning: %q", warnings[0])
+	}
+}
+
+// TestNormalBodyDoesNotWarnNoExtractableText proves ordinary prose does not
+// trip the empty-shell Finalize warning.
+func TestNormalBodyDoesNotWarnNoExtractableText(t *testing.T) {
+	t.Parallel()
+
+	cmd, _ := newCommand(t,
+		`<html><body><p>hello</p></body></html>`,
+		filepath.Join(t.TempDir(), "out.pdf"))
+
+	var log bytes.Buffer
+	data := runPDFWithLog(t, cmd, &log)
+
+	if !bytes.HasPrefix(data, []byte("%PDF-")) {
+		t.Fatal("output is not a PDF")
+	}
+
+	if strings.Contains(log.String(), noExtractableTextWarn) {
+		t.Errorf("normal body unexpectedly warned; log=%q", log.String())
+	}
+}

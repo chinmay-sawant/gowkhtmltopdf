@@ -37,15 +37,42 @@ const (
 )
 
 // imageContainingWidth is the width used by percentage/max-width image
-// constraints. imgMaxW is set by inline, float, and table-cell layout; the
-// viewport is the fallback for ordinary block images.
+// constraints. imgCBW is the current block/flex containing block; imgMaxW is
+// set by inline, float, and table-cell layout. Without either there is no
+// definite containing block, so a percentage image size is indefinite (CSS
+// intrinsic sizing) and the caller falls back to the attribute/intrinsic
+// size. Returning the page viewport here made `img{width:100%}` measure as
+// wide as the page during flex/table intrinsic sizing, which inflated the
+// owning flex item (Programiz header brand) and squeezed its siblings.
 func (e *engine) imageContainingWidth() float64 {
+	if e.imgCBW > 0 {
+		return e.imgCBW
+	}
+
 	if e.imgMaxW > 0 {
 		return e.imgMaxW
 	}
 
-	return e.opts.Width
+	return 0
 }
+
+// pushReplacedCBW installs the containing block content width for one build
+// of an in-flow replaced element (img/svg) and returns a restore function.
+// Non-replaced nodes and non-positive widths are a no-op.
+func (e *engine) pushReplacedCBW(node *html.Node, cbw float64) func() {
+	if cbw <= 0 || node == nil || (node.Name != cssTagImg && node.Name != cssTagSVG) {
+		return noopCBWRestore
+	}
+
+	prev := e.imgCBW
+	e.imgCBW = cbw
+
+	return func() { e.imgCBW = prev }
+}
+
+// noopCBWRestore keeps pushReplacedCBW allocation-free for the common
+// non-replaced build path.
+func noopCBWRestore() {}
 
 // usedImageSize is the single sizing policy for replaced images. It starts
 // from intrinsic dimensions, applies HTML attributes, then CSS dimensions and

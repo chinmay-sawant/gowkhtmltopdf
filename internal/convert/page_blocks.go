@@ -92,6 +92,10 @@ func paintIndependentResult(
 		state.geom.contentH,
 	)
 
+	textOps, imageOps := countPaintTextAndImages(res)
+	state.textOps += textOps
+	state.imageOps += imageOps
+
 	return nil
 }
 

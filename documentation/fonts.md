@@ -88,10 +88,21 @@ image** paths.
 | `data:` | Decoded and registered when the embedded format is WOFF2/WOFF1/TTF/OTF; skipped with a metadata-only warning otherwise |
 | WOFF1 | Decompress → `ParseTTF` (TrueType outlines only) |
 | WOFF2 | Brotli decompress plus `glyf`/`loca` reconstruction via `github.com/tdewolff/font`, then `ParseTTF` (TrueType outlines only); the decoder caps memory at 30 MiB |
+| WOFF2 (known upstream gap) | Some bitmap-heavy faces fail to decode: tdewolff/parse refuses the last bit of a bitmap whose length is an exact multiple of 8, so the trailing composite glyph loses its bbox and tdewolff/font rejects the glyph. The Roboto Mono fixture (224 glyphs) is pinned as a graceful skip: warning, no panic, no partially decoded face (`internal/pdf/woff_test.go:270`) |
 | `.eot`, SVG fonts | **Skipped** (warning). `.eot` has an explicit policy check; SVG font payloads do not parse as TTF/OTF/WOFF |
 
-`font-weight` / `font-style` on `@font-face` are parsed but **ignored at
-register time**. The alias is the family name only.
+`font-weight` / `font-style` / `unicode-range` on `@font-face` are parsed
+(`css.go:567`, `fontface_descriptors.go:39`) and now select faces instead of
+being dropped. The descriptors travel as a `pdf.FaceSpec` (`face_spec.go:19`)
+through `prepare.mergeFontFace` (`styles.go:451`) into
+`Registry.AddFamilyAliasSpec` (`registry.go:115`). `Registry.LookupRune`
+(`registry.go:200`) resolves one code point at a time: faces whose declared
+range excludes it are not candidates, and a face that actually maps it beats
+one that only declares it. That per-code-point path is the mechanism a family
+split into `unicode-range` partitions (the Google Fonts `latin` and
+`latin-ext` pattern) needs to paint each rune with its declared face. Absent
+descriptors keep the old behavior: the face's file-declared weight/style and
+full coverage.
 
 ## Honest shaping limits
 

@@ -280,6 +280,8 @@ func (p *pdfPipeline) Finalize(ctx context.Context) error {
 		return fmt.Errorf("finalize write: %w", err)
 	}
 
+	warnIfNoExtractableText(run.log, run.bodies)
+
 	run.report("Done", progressComplete)
 
 	if err := run.doc.Write(run.req.Output); err != nil {

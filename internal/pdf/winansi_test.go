@@ -24,6 +24,27 @@ func TestWinAnsiFoldBulletsKeepDisc(t *testing.T) {
 	}
 }
 
+// TestWinAnsiFoldCurlyQuotesKeepCodePoints pins the fold for the curly quotes
+// WinAnsiEncoding carries at 0x91-0x94. They must stay on those exact codes so
+// the painted glyph is the curly one and /ToUnicode extracts U+2018-U+201D.
+// The old fold wrote ASCII ' and ", which painted straight glyphs and made
+// every extractor report straight quotes for source text with curly ones.
+func TestWinAnsiFoldCurlyQuotesKeepCodePoints(t *testing.T) {
+	t.Parallel()
+
+	for rVal, want := range map[rune]byte{
+		'\u2018': 0x91, // left single quotation mark
+		'\u2019': 0x92, // right single quotation mark
+		'\u201C': 0x93, // left double quotation mark
+		'\u201D': 0x94, // right double quotation mark
+	} {
+		code, ok := winAnsiFoldCode(rVal)
+		if !ok || code != want {
+			t.Errorf("winAnsiFoldCode(%U) = (%#x, %v), want (0x%X, true)", rVal, code, ok, want)
+		}
+	}
+}
+
 // TestWinAnsiDecodePunctuationBlock pins a sample of the WinAnsi 0x80-0x9F
 // decode table used by the simple-font subset cmap and /ToUnicode, plus the
 // Latin-1 pass-through either side of the block.
@@ -95,6 +116,92 @@ func TestBulletPaintsDiscAndToUnicode(t *testing.T) {
 		if merged.GlyphID(r) == 0 {
 			t.Errorf("subset cmap lost the bullet glyph for %U", r)
 		}
+	}
+}
+
+// TestCurlyQuotesPaintRealCodesAndToUnicode converts the four curly quotes and
+// walks the fold/ToUnicode path end to end: the content stream carries WinAnsi
+// bytes 0x91-0x94, /ToUnicode maps each byte back to its curly code point, and
+// the subset keeps the curly glyph. The old fold wrote ASCII ' and " in all
+// three places.
+func TestCurlyQuotesPaintRealCodesAndToUnicode(t *testing.T) {
+	t.Parallel()
+
+	fnt, err := DefaultFont()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	doc := NewDocument()
+	doc.SetCompression(false)
+	page := doc.AddPage(200, 200)
+	content := page.Content()
+	content.UseEmbeddedFont("F1", fnt)
+	content.BeginText()
+	content.SetFont("F1", 12)
+	content.TextAt(10, 50)
+	content.TextShow("\u2018\u2019\u201C\u201D")
+	content.EndText()
+
+	out := string(writePDF(t, doc))
+
+	assertCurlyQuoteContentStream(t, out)
+
+	// Glyph lookup runs on the decoded code point, so the subset keeps the
+	// curly quote glyphs instead of the ASCII ones.
+	quotes := []rune{
+		winAnsiQuoteSingleLeft,
+		winAnsiQuoteSingleRight,
+		winAnsiQuoteDoubleLeft,
+		winAnsiQuoteDoubleRight,
+	}
+
+	sub, err := subsetFont(fnt, quotes, subsetSimple)
+	if err != nil {
+		t.Fatalf("subsetFont: %v", err)
+	}
+
+	for _, rVal := range quotes {
+		if sub.glyphIDs[rVal] == 0 {
+			t.Errorf("subset dropped the curly quote glyph for code 0x%X", rVal)
+		}
+	}
+
+	// The subset cmap maps both the char code and its decoded code point, so
+	// viewers that index the cmap by code and viewers that decode first both
+	// find the glyph.
+	merged, err := ParseTTF(sub.data)
+	if err != nil {
+		t.Fatalf("ParseTTF(subset): %v", err)
+	}
+
+	for _, rVal := range []rune{'\u2018', '\u2019', '\u201C', '\u201D'} {
+		if merged.GlyphID(rVal) == 0 {
+			t.Errorf("subset cmap lost the curly quote glyph for %U", rVal)
+		}
+	}
+}
+
+// assertCurlyQuoteContentStream pins the content-stream and /ToUnicode choices
+// for the curly quotes: bytes 0x91-0x94 escape as octal literals, /ToUnicode
+// maps each byte back to its curly code point, and the simple WinAnsi path
+// stays in use.
+func assertCurlyQuoteContentStream(t *testing.T, out string) {
+	t.Helper()
+
+	// The four quotes are one string, so one literal carries all four bytes.
+	if !strings.Contains(out, `(\221\222\223\224) Tj`) {
+		t.Error(`content stream must carry the WinAnsi curly bytes (\221\222\223\224) Tj`)
+	}
+
+	for _, want := range []string{"<91> <2018>", "<92> <2019>", "<93> <201C>", "<94> <201D>"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("/ToUnicode must map %s", want)
+		}
+	}
+
+	if strings.Contains(out, "/Identity-H") {
+		t.Error("curly quotes must stay on the simple WinAnsi path, not Type0")
 	}
 }
 

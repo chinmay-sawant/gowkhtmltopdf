@@ -6,41 +6,65 @@ package pdf
 // /Encoding /WinAnsiEncoding. The embedded subset cmap is indexed by the
 // Unicode code point each byte decodes to (ISO 32000-1 Annex D), so a fold has
 // to keep track of both the byte written and the code point the subset maps.
-// Bullets are the case where the two differ: WinAnsi byte 0x95 shows the disc,
-// and folding it to the middle dot (0xB7) shrank every disc list marker to the
-// 0.277em middle-dot advance.
+// Curly quotes and bullets are the cases where the two differ: WinAnsi bytes
+// 0x91-0x94 show the curly quotes, and byte 0x95 shows the disc. Folding the
+// disc to the middle dot (0xB7) shrank every disc list marker to the 0.277em
+// middle-dot advance, and folding the curly quotes to ASCII painted straight
+// glyphs and flattened the extracted text.
 
 // winAnsiBulletByte is the WinAnsiEncoding code for the bullet glyphs: 0x95,
 // the disc (U+2022). U+2023, U+25E6 and U+2043 fold to it because the simple
 // path cannot show their exact forms; a disc beats a middle dot.
 const winAnsiBulletByte = 0x95
 
+// WinAnsiEncoding codes for the curly quotes (ISO 32000-1 Annex D.2). Folding
+// them to ASCII painted straight glyphs and made extractors report straight
+// quotes; these codes keep both the curly glyph and the curly /ToUnicode map.
+const (
+	winAnsiQuoteSingleLeft  = 0x91 // U+2018 left single quotation mark
+	winAnsiQuoteSingleRight = 0x92 // U+2019 right single quotation mark
+	winAnsiQuoteDoubleLeft  = 0x93 // U+201C left double quotation mark
+	winAnsiQuoteDoubleRight = 0x94 // U+201D right double quotation mark
+)
+
+// winAnsiFoldAboveLatin1 maps common HTML/CSS punctuation above Latin-1 to the
+// WinAnsi byte a simple text run shows it with. Curly quotes and bullets keep
+// their real WinAnsi codes; other marks fold to an ASCII stand-in.
+//
+//nolint:gochecknoglobals // immutable fold table, same pattern as winAnsiPunct
+var winAnsiFoldAboveLatin1 = map[rune]byte{
+	'\u2018': winAnsiQuoteSingleLeft,
+	'\u2019': winAnsiQuoteSingleRight,
+	'\u201C': winAnsiQuoteDoubleLeft,
+	'\u201D': winAnsiQuoteDoubleRight,
+	'\u2022': winAnsiBulletByte, // disc
+	'\u2023': winAnsiBulletByte, // triangular bullet → disc
+	'\u25E6': winAnsiBulletByte, // white bullet → disc
+	'\u2043': winAnsiBulletByte, // hyphen bullet → disc
+	'\u2026': '.',               // ellipsis
+	'\u2009': ' ',               // thin space
+	'\u200A': ' ',               // hair space
+	'\u2008': ' ',               // punctuation space
+	'\u2002': ' ',               // en space
+	'\u2003': ' ',               // em space
+	'\u2715': 'x',               // multiplication x
+	'\u2716': 'x',               // heavy multiplication x
+}
+
 // winAnsiFoldCode maps r to the WinAnsi code a simple text run shows it with.
-// Latin-1 passes through unchanged. Common HTML/CSS punctuation above Latin-1
-// folds to an ASCII stand-in; bullets keep their real WinAnsi code (0x95)
-// instead of the middle dot the PDFDocEncoding fold uses. ok is false when no
-// WinAnsi code represents r; the simple emitter then writes '?'.
+// Latin-1 passes through unchanged. Curly quotes and bullets keep their real
+// WinAnsi codes (0x91-0x94, 0x95) instead of the ASCII and middle dot folds
+// the PDFDocEncoding path uses; other common HTML/CSS punctuation above
+// Latin-1 folds to an ASCII stand-in. ok is false when no WinAnsi code
+// represents r; the simple emitter then writes '?'.
 func winAnsiFoldCode(r rune) (byte, bool) {
 	if r >= 0 && r <= maxLatin1Code {
 		return byte(r), true
 	}
 
-	switch r {
-	case '\u2018', '\u2019': // curly single quotes
-		return '\'', true
-	case '\u201C', '\u201D': // curly double quotes
-		return '"', true
-	case '\u2022', '\u2023', '\u25E6', '\u2043': // bullets → disc byte
-		return winAnsiBulletByte, true
-	case '\u2026': // ellipsis
-		return '.', true
-	case '\u2009', '\u200A', '\u2008', '\u2002', '\u2003': // thin/space runs
-		return ' ', true
-	case '\u2715', '\u2716': // cross marks → ASCII x
-		return 'x', true
-	}
+	code, ok := winAnsiFoldAboveLatin1[r]
 
-	return 0, false
+	return code, ok
 }
 
 // winAnsiPunct maps the WinAnsiEncoding 0x80-0x9F block to the Unicode code

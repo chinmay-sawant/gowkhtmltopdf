@@ -14,11 +14,20 @@ layout display list into an in-memory `image.NRGBA` canvas** and encodes it as
 a single PNG or JPEG image. It exists because wkhtmltopdf ships a sibling
 `wkhtmltoimage` tool and this project mirrors that surface.
 
-`internal/svg` is a small (450-line) satellite package that converts **SVG
-images referenced by `<img src="*.svg">`** into raster PNG bytes so the
+`internal/svg` is a ~1,770-line satellite package (plus tests) that converts
+**SVG images referenced by `<img src="*.svg">`** into raster PNG bytes so the
 layout/paint stages can treat every image uniformly as PNG/JPEG pixels. It is
 the one place the project calls into a third-party rasterizer
 (`github.com/tdewolff/canvas`), which is allowlisted in the Makefile.
+
+Before canvas parses the bytes, `prepareCanvasInput` (`preprocess.go:33`)
+rewrites the markup so canvas can resolve all of it: lowercased `defs` and
+gradient element names are restored to SVG case, paint servers are hoisted
+ahead of the shapes that reference them, a lowercased root `viewbox` becomes
+`viewBox`, `font-family` lists that match no installed host family gain a
+`sans-serif` fallback, and styled `<text>` elements become outline `<path>`
+data (`raster.go:110`). Each rewrite is a no-op on input that does not need
+it.
 
 Positioning:
 
@@ -76,15 +85,21 @@ Total: ~2,998 lines.
 
 | File | Lines | Responsibility |
 |------|------:|----------------|
-| `raster.go` | 274 | `Rasterize` via tdewolff/canvas only; size parsing (viewBox/width/height), DPMM resolution, panic recovery |
+| `raster.go` | 335 | `Rasterize` via tdewolff/canvas only; `prepareCanvasInput` call, input cap, bounded `looksLikeSVG` probe, size parsing (viewBox/width/height), DPMM resolution, panic recovery |
+| `preprocess.go` | 613 | Byte-level rewrites ahead of canvas: `normalizePaintServerCase`, `hoistPaintServers`, `normalizeRootViewBox`, `withFontFallbacks` (`fontFamilyResolves`); each pass returns the input unchanged when it has nothing to do |
+| `text_outline.go` | 825 | Styled `<text>` to outline `<path>`: `outlineStyledText`, inherited family/size/weight/style/anchor, shaping through canvas's own font machinery, plain text left byte-identical |
+| `text_outline_test.go` | 252 | Styled-text outlining, inheritance, weight mapping, plain-text no-op |
+| `gradient_paint_test.go` | 247 | Gradient paint servers (case restoration + hoisting) raster to their declared colors |
+| `review_regression_test.go` | 60 | Supersampled PNG logical size, oversized input rejection, bounded SVG probe |
 | `raster_test.go` | 79 | Rect/path rasterization, not-SVG and broken-SVG error behavior |
 | `wiki_logo_smoke_test.go` | 97 | Host-cached Wikipedia logo SVGs (gradients/groups/clipPaths/arcs) sanity rasterization |
 
-Total: 450 lines.
+Total: 2,508 lines (1,773 non-test).
 
 Related files owned by other domains (consumed, not part of this package):
-`internal/layout/layout_flow.go:53` (calls `svg.Rasterize` during image
-resolution), `internal/layout/mnd_const.go:62` (`svgRasterMax = 1024`),
+`internal/layout/layout_flow.go:124` (calls `svg.Rasterize` during image
+resolution; `svgRasterMaxDim = 1024` at `layout_flow.go:28`),
+`internal/layout/layout_svg.go:27` (inline `<svg>` rasterization),
 `internal/convert/render/pipeline.go` (lifecycle seam), `internal/app/image.go`
 (`RunImage`), `internal/pdf/shape_gotext.go` (`ShapeRun`/`ShapeTextFont`),
 `internal/pdf/glyph.go` (`GlyphContours`, `FlattenContour`, `ContourBounds`),
@@ -159,11 +174,14 @@ resolution), `internal/layout/mnd_const.go:62` (`svgRasterMax = 1024`),
 
 | Symbol | Location | Purpose |
 |--------|----------|---------|
-| `Rasterize(data, maxSide)` | `raster.go:45` | Public: sniff SVG (BOM/`<svg`/`<?xml`), default `maxSide` 512, then `rasterizeCanvas` |
-| `rasterizeCanvas` | `raster.go:67` | `canvas.ParseSVG` → `rasterizer.Draw` at computed DPMM → PNG bytes; `defer recover()` turns canvas panics into `errCanvasPanic` |
-| `svgCSSPixelSize` | `raster.go:131` | Intrinsic CSS-pixel size from root `viewBox` (win) or `width/height` attrs, capped at `maxSide` (≤4096), min 100 default |
-| `rootSVGSize` / `svgSizeAttrs` | `raster.go:171/204` | XML-decode only the first `<svg>` start tag; lenient decoder for malformed markup |
-| `canvasDPMM` | `raster.go:108` | Resolution mapping (canvas mm → CSS px, 96 dpi fallback) so the longer edge fits `target` |
+| `Rasterize(data, maxSide)` | `raster.go:55` | Public: cap input at 32 MiB, sniff SVG from a bounded 4 KiB prefix (BOM/`<svg`/`<?xml`), default `maxSide` 512, then `rasterizeCanvas` |
+| `rasterizeCanvas` | `raster.go:99` | `prepareCanvasInput` → `canvas.ParseSVG` → `rasterizer.Draw` at computed DPMM → PNG bytes; `defer recover()` turns canvas panics into `errCanvasPanic`; a package mutex (`canvasMu`, `raster.go:45`) serializes the draw because canvas touches package-level globals |
+| `prepareCanvasInput` | `preprocess.go:33` | The rewrite chain: case restoration → paint-server hoist → root viewBox → font fallback → styled-text outline |
+| `withFontFallbacks` / `fontFamilyResolves` | `preprocess.go:572/559` | Appends `,sans-serif` to a `font-family` list no installed host family resolves, because canvas panics instead of falling back |
+| `outlineStyledText` | `text_outline.go:132` | Replaces styled `<text>` elements with outlined `<path>` data; the outline comes from `outlineStyledTextPath` (`text_outline.go:370`) |
+| `svgCSSPixelSize` | `raster.go:172` | Intrinsic CSS-pixel size from root `viewBox` (win) or `width/height` attrs, capped at `maxSide` (≤4096), min 100 default |
+| `rootSVGSize` / `svgSizeAttrs` | `raster.go:212/245` | XML-decode only the first `<svg>` start tag; lenient decoder for malformed markup |
+| `canvasDPMM` | `raster.go:149` | Resolution mapping (canvas mm → CSS px, 96 dpi fallback) so the longer edge fits `target` |
 
 ## 4. Data & control flow
 
@@ -234,19 +252,30 @@ The root `ImageDocument` adapter builds an internal image request and calls
 
 ### 4.4 SVG flow (inside layout)
 
-`internal/layout/layout_flow.go:53` `resolveImage`: for each `<img src>`,
+`internal/layout/layout_flow.go:124` `decodeImagePayload`: for each `<img src>`,
 fetch bytes once (per-run cache), then:
 
 ```
-if png, pw, ph, err := svg.Rasterize(data, svgRasterMax /*1024*/); err == nil {
+if png, pw, ph, err := svg.Rasterize(data, svgRasterMaxDim /*1024*/); err == nil && len(png) > 0 {
     → ref.data, w, h = png, pw, ph     // SVG → PNG at intrinsic size
 } else if w, h, jpeg, ok := imageDims(data); ok {
     → ref.w, h, isJPEG = w, h, jpeg    // PNG/JPEG dimensions from headers
 }
 ```
 
+Inline `<svg>` markup takes the same route through `layout_svg.go:27` (fixed
+1024 cap). Inside `rasterizeCanvas` the bytes first pass through
+`prepareCanvasInput` (`raster.go:110`): case restoration for lowercased
+gradient/`defs` tags, hoisting of paint servers, root `viewBox`
+normalization, a `sans-serif` fallback for unresolvable `font-family` lists,
+and outlining of styled `<text>` (`text_outline.go:132`). `<text>` rasterization
+therefore depends on **fonts installed on the host**, not on document
+`@font-face` faces: canvas loads system families (`canvas.FindSystemFont`,
+`preprocess.go:564`, `text_outline.go:416`), and styled text falls back to the
+regular host face (faux bold/slant) when no bold/italic file is installed.
+
 So SVG reaches `imageout` only as already-rasterized PNG bytes. `svg.Rasterize`
-is a **one-way dependency of layout**, not of imageout — PDF mode benefits too
+is a **one-way dependency of layout**, not of imageout; PDF mode benefits too
 (SVG-as-image in PDF pages). Any rasterization failure is a clean `error`
 ("no image"): the `<img>` is skipped at paint time, never a process crash.
 
@@ -274,8 +303,9 @@ Production `imageout` does **not** import `internal/convert` (hub) or
 
 `github.com/tdewolff/canvas` + `github.com/tdewolff/canvas/renderers/rasterizer`
 (sole SVG render path, allowlisted in `TestDirectModuleAllowlist` and the Makefile), plus
-stdlib `encoding/xml`, `image/png`. **No imageout or layout import** — layout
-imports svg, making svg the lower layer.
+stdlib `bytes`, `encoding/xml`, `html`, `image`, `image/png`, `sort`,
+`strconv`, `strings`. **No imageout or layout import**; layout imports svg,
+making svg the lower layer.
 
 ### Import direction rule
 
@@ -474,9 +504,16 @@ contract (the P1-1 engine-seam goal).
   rasterizer means no fallback for exotic SVG (fonts in SVG, filters, complex
   animations); see `documentation/deferred.md` for the URL-printing roadmap
   that keeps this posture.
+- **SVG `<text>` depends on host fonts:** canvas resolves `font-family`
+  against installed system families and has no access to document `@font-face`
+  faces; styled text is outlined through those same host families, falling
+  back to the regular face for faux bold/slant when no styled file is
+  installed (`preprocess.go:559`, `text_outline.go:415`). `withFontFallbacks`
+  appends `,sans-serif` when the declared list matches no installed family,
+  so the draw does not panic into a lost image.
 - **SVG size heuristic** — `svgCSSPixelSize` scans only the root `<svg>`
   viewBox/width/height; CSS-sized SVG (no intrinsic size) defaults to 100px;
-  `maxSide` 512 default / 1024 via layout's `svgRasterMax`, 4096 hard cap.
+  `maxSide` 512 default / 1024 via layout's `svgRasterMaxDim`, 4096 hard cap.
 - **Canvas panic containment is best-effort** — `recover` covers the draw
   call, but a hypothetical future canvas release could panic outside the
   protected frame; tests (`TestRasterizeBrokenSVG`) pin current behavior.

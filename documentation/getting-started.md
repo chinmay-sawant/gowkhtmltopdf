@@ -179,8 +179,9 @@ Placeholders: `[page]`, `[topage]`, `[frompage]`, `[date]`, `[time]`,
 `[title]`, `[doctitle]`, `[webpage]`, `[section]`, `[subsection]`.
 `[subject]` expands empty. Custom substitutions: `--replace key value`.
 
-Outlines are **on by default** (depth 4). PDF `/Title` comes from `--title`,
-not from the HTML `<title>` (`<title>` feeds `[doctitle]` only).
+Outlines are **on by default** (depth 4). PDF `/Title` comes from `--title`
+when set; otherwise it falls back to the first document's HTML `<title>`
+(`<title>` also feeds `[doctitle]` placeholders).
 
 ## Library (0.2.4 target)
 

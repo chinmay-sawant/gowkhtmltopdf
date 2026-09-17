@@ -1520,6 +1520,8 @@ func applyTextLayoutProps(style *ResolvedStyle, prop, value string) bool {
 		}
 
 		style.LineHeightUnitless = 0
+		style.LineHeightZero = explicitZeroLineHeight(value)
+
 		if ratio, ok := css.ParseNumber(value); ok {
 			style.LineHeightUnitless = ratio
 		}

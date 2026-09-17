@@ -19,12 +19,17 @@ type Registry struct {
 	byFamily      map[string][]*Font // family → faces (any weight/style)
 	exactByFamily map[string][]*Font // exact family tokens only (bundled aliases)
 	faces         []*Font            // stable registration order for fallback scans
+	// specByFace carries the @font-face descriptors (weight, style, unicode
+	// range) of webfont registrations. Faces without an entry fall back to
+	// their own OS/2 and macStyle metadata.
+	specByFace map[*Font]FaceSpec
 }
 
 // NewRegistry returns an empty font registry.
 func NewRegistry() *Registry {
 	return &Registry{ //nolint:exhaustruct // intentional zero-value mu field
-		byFamily: map[string][]*Font{},
+		byFamily:   map[string][]*Font{},
+		specByFace: map[*Font]FaceSpec{},
 	}
 }
 
@@ -95,10 +100,19 @@ func normalizeFamilyKey(family string) string {
 	return strings.Trim(key, `"'`)
 }
 
-// AddFamilyAlias registers f under an explicit CSS family name.
+// AddFamilyAlias registers f under an explicit CSS family name. The face
+// keeps its own weight/style/glyph metadata: use AddFamilyAliasSpec to attach
+// @font-face descriptors.
+func (r *Registry) AddFamilyAlias(family string, font *Font) {
+	r.AddFamilyAliasSpec(family, font, FaceSpec{}) //nolint:exhaustruct // zero spec means file metadata
+}
+
+// AddFamilyAliasSpec registers font under an explicit CSS family name with the
+// @font-face descriptors that select it. Selection looks the spec up per face,
+// so a face registered earlier by AddFont picks it up too.
 //
 //nolint:wsl // lock initialization and registration must remain one critical section.
-func (r *Registry) AddFamilyAlias(family string, font *Font) {
+func (r *Registry) AddFamilyAliasSpec(family string, font *Font, spec FaceSpec) {
 	if r == nil || font == nil {
 		return
 	}
@@ -108,6 +122,13 @@ func (r *Registry) AddFamilyAlias(family string, font *Font) {
 	if r.byFamily == nil {
 		r.byFamily = map[string][]*Font{}
 	}
+
+	if r.specByFace == nil {
+		r.specByFace = map[*Font]FaceSpec{}
+	}
+
+	r.specByFace[font] = spec
+
 	r.registerFaceLocked(font)
 
 	key := normalizeFamilyKey(family)
@@ -159,22 +180,56 @@ func (r *Registry) Lookup(families []string, weight int, italic bool) *Font {
 	defer r.mu.RUnlock()
 
 	for _, fam := range families {
-		keys := fontFamilyKeys(fam)
-		for _, key := range keys {
-			faces := r.byFamily[key]
-			if len(faces) == 0 && len(keys) == 1 {
-				// A single key means the token is a named family, not one of
-				// the generic expansions: bundled exact aliases are visible.
-				faces = r.exactByFamily[key]
-			}
-
-			if len(faces) == 0 {
-				continue
-			}
-
-			if f := pickFace(faces, weight, italic); f != nil {
+		if faces := r.familyFaces(fam); len(faces) > 0 {
+			if f := r.pickFace(faces, weight, italic); f != nil {
 				return f
 			}
+		}
+	}
+
+	return nil
+}
+
+// LookupRune returns the face that covers codePoint for the first matching CSS
+// family, or nil when no face of any family declares coverage. Faces whose
+// declared unicode-range excludes the code point are not candidates; among the
+// rest, a face that actually maps the code point beats one that only declares
+// it, then weight/style match decides, then registration order. Per-code-point
+// lookup is what lets one family split into unicode-range partitions (Google
+// Fonts latin and latin-ext) paint each rune with its declared face.
+func (r *Registry) LookupRune(families []string, weight int, italic bool, codePoint rune) *Font {
+	if r == nil {
+		return nil
+	}
+
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	for _, fam := range families {
+		if faces := r.familyFaces(fam); len(faces) > 0 {
+			if f := r.pickFaceRune(faces, weight, italic, codePoint); f != nil {
+				return f
+			}
+		}
+	}
+
+	return nil
+}
+
+// familyFaces returns the candidate faces for one CSS family token: the exact
+// registry key first, then the generic expansions. Bundled exact aliases are
+// visible only for named tokens, never for a generic expansion.
+func (r *Registry) familyFaces(fam string) []*Font {
+	keys := fontFamilyKeys(fam)
+
+	for _, key := range keys {
+		faces := r.byFamily[key]
+		if len(faces) == 0 && len(keys) == 1 {
+			faces = r.exactByFamily[key]
+		}
+
+		if len(faces) > 0 {
+			return faces
 		}
 	}
 
@@ -219,7 +274,7 @@ func (r *Registry) FindWithGlyph(codePoint rune, weight int, italic bool) *Font 
 	bestScore := -1
 
 	for _, fnt := range r.faces {
-		score := glyphFaceScore(fnt, codePoint, bold, italic)
+		score := r.glyphFaceScore(fnt, codePoint, bold, italic)
 		if score < 0 {
 			continue
 		}
@@ -254,21 +309,24 @@ func fontIdentityLess(left, right *Font) bool {
 }
 
 // glyphFaceScore scores a face for ch: -1 when it lacks the glyph, plus
-// weight/italic match bonuses and a premium for known Unicode-capable
-// families (DejaVu/Noto/FreeSans).
+// weight/italic match bonuses from the @font-face spec (falling back to the
+// file's own metadata) and a premium for known Unicode-capable families
+// (DejaVu/Noto/FreeSans).
 //
 //nolint:cyclop // glyph scoring logic
-func glyphFaceScore(fnt *Font, codePoint rune, bold, italic bool) int {
+func (r *Registry) glyphFaceScore(fnt *Font, codePoint rune, bold, italic bool) int {
 	if fnt == nil || fnt.GlyphID(codePoint) == 0 {
 		return -1
 	}
 
+	spec := r.specByFace[fnt]
+
 	score := 1
-	if fnt.Bold() == bold {
+	if r.faceBold(fnt, spec) == bold {
 		score += 2
 	}
 
-	if fnt.Italic() == italic {
+	if r.faceItalic(fnt, spec) == italic {
 		score += 2
 	}
 
@@ -294,29 +352,106 @@ func glyphFaceScore(fnt *Font, codePoint rune, bold, italic bool) int {
 const italicMatchScore = 4
 
 // pickFace selects the face closest to the requested CSS weight and style.
-// Weight comes from the OS/2 usWeightClass, so a family that ships separate
-// 400/500/700 files is not forced onto whichever face registered first; a
-// face without usable OS/2 data reports the CSS default 400. Equal scores
-// keep registration order, which keeps the result deterministic.
-func pickFace(faces []*Font, weight int, italic bool) *Font {
+// Weight comes from the @font-face font-weight descriptor when declared, then
+// from the OS/2 usWeightClass, so a family that ships separate 400/500/700
+// files is not forced onto whichever face registered first; a face without
+// usable OS/2 data reports the CSS default 400. Equal scores are broken by
+// unicode-range coverage of the primary probe runes, then by the face's own
+// glyph coverage, then by registration order, which keeps the result
+// deterministic.
+func (r *Registry) pickFace(faces []*Font, weight int, italic bool) *Font {
 	var best *Font
 
-	bestScore := -1
+	bestScore, bestRange, bestGlyph := -1, -1, -1
 
 	for _, fnt := range faces {
-		score := weightMatchScore(fnt.WeightClass(), weight)
+		spec := r.specByFace[fnt]
 
-		if fnt.Italic() == italic {
-			score += italicMatchScore
-		}
+		score := r.styleMatchScore(fnt, spec, weight, italic)
+		ranges := spec.rangeProbeScore()
+		glyphs := glyphProbeScore(fnt)
 
-		if score > bestScore {
-			bestScore = score
+		if score > bestScore ||
+			(score == bestScore && ranges > bestRange) ||
+			(score == bestScore && ranges == bestRange && glyphs > bestGlyph) {
 			best = fnt
+			bestScore, bestRange, bestGlyph = score, ranges, glyphs
 		}
 	}
 
 	return best
+}
+
+// pickFaceRune selects the face for one code point: faces whose declared
+// unicode-range excludes it are not candidates, and among the rest a face that
+// actually maps the code point outranks one that only declares it. Returns nil
+// when no face of the family covers the code point.
+func (r *Registry) pickFaceRune(faces []*Font, weight int, italic bool, codePoint rune) *Font {
+	var best *Font
+
+	bestGlyph, bestScore := -1, -1
+
+	for _, fnt := range faces {
+		spec := r.specByFace[fnt]
+		if !spec.covers(codePoint) {
+			continue
+		}
+
+		glyph := 0
+		if fnt.GlyphID(codePoint) != 0 {
+			glyph = 1
+		}
+
+		score := r.styleMatchScore(fnt, spec, weight, italic)
+
+		if glyph > bestGlyph || (glyph == bestGlyph && score > bestScore) {
+			best = fnt
+			bestGlyph, bestScore = glyph, score
+		}
+	}
+
+	return best
+}
+
+// styleMatchScore ranks one face against a weight/style request using the
+// @font-face descriptors when declared and the file's own metadata otherwise.
+func (r *Registry) styleMatchScore(fnt *Font, spec FaceSpec, weight int, italic bool) int {
+	score := weightMatchScore(r.faceWeight(fnt, spec), weight)
+
+	if r.faceItalic(fnt, spec) == italic {
+		score += italicMatchScore
+	}
+
+	return score
+}
+
+// faceWeight returns the face's declared CSS weight: the @font-face
+// font-weight descriptor when present, else the OS/2/macStyle weight class.
+func (r *Registry) faceWeight(fnt *Font, spec FaceSpec) int {
+	if spec.Weight > 0 {
+		return spec.Weight
+	}
+
+	return fnt.WeightClass()
+}
+
+// faceBold reports whether the face matches a bold request.
+func (r *Registry) faceBold(fnt *Font, spec FaceSpec) bool {
+	if spec.Weight > 0 {
+		return spec.Weight >= fontWeightBoldMin
+	}
+
+	return fnt.Bold()
+}
+
+// faceItalic returns the face's declared style: the @font-face font-style
+// descriptor when present, else the macStyle italic bit.
+func (r *Registry) faceItalic(fnt *Font, spec FaceSpec) bool {
+	if spec.StyleSet {
+		return spec.Italic
+	}
+
+	return fnt.Italic()
 }
 
 // weightMatchScore ranks a declared weight against a CSS weight request: an

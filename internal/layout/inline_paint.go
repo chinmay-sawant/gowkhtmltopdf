@@ -1609,12 +1609,9 @@ func (e *engine) accumulateTextFaceWidth(
 			continue
 		}
 
-		face := primary
-		if !isRuneWhitespace(runic) && primary.GlyphID(runic) == 0 {
-			face = e.faceForRuneFallback(sty, runic, primary)
-			if face == nil {
-				face = e.font
-			}
+		face := e.runeFace(sty, primary, runic)
+		if face == nil {
+			face = e.font
 		}
 
 		total += face.GlyphAdvancePoints(runic, size)
@@ -1732,14 +1729,9 @@ func (e *engine) splitTextByFace(cssSheet string, sty *ResolvedStyle) []faceRun 
 	spaceCount := 0
 
 	for idx, runic := range cssSheet {
-		face := primary
-		if isRuneWhitespace(runic) {
-			face = primary
-		} else if primary.GlyphID(runic) == 0 {
-			face = e.faceForRuneFallback(sty, runic, primary)
-			if face == nil {
-				face = e.font
-			}
+		face := e.runeFace(sty, primary, runic)
+		if face == nil {
+			face = e.font
 		}
 
 		if current != nil && face != current {
@@ -1786,6 +1778,13 @@ func (e *engine) splitTextByFace(cssSheet string, sty *ResolvedStyle) []faceRun 
 func (e *engine) primaryFaceRun(cssSheet string, sty *ResolvedStyle) (faceRun, bool) {
 	if cssSheet == "" || sty == nil {
 		return faceRun{}, false //nolint:exhaustruct // intentional zero fields
+	}
+
+	// With an opt-in registry, face selection is descriptor-aware per code
+	// point (unicode-range partitions): glyph coverage alone cannot prove a
+	// single run, so splitTextByFace makes the per-rune decision.
+	if e.registry != nil {
+		return faceRun{}, false //nolint:exhaustruct // fast path declined
 	}
 
 	primary := e.faceFor(sty)

@@ -339,7 +339,7 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 		return err
 	}
 
-	stretchPaginatedChrome(res)
+	stretchPaginatedChrome(res, true, contentH)
 
 	// Split rect ops at page boundaries first so sticky clamps the natural
 	// fragment geometry that will actually be painted (fixture-31).
@@ -348,7 +348,7 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 	// Drop row shells left behind when text snapped to the next page
 	// (fixture-31: empty white rows after Row 27 on page 1).
 	stripOrphanRowChrome(res, contentH)
-	stretchPaginatedChrome(res)
+	stretchPaginatedChrome(res, false, contentH)
 
 	// Close open tops on table continuations after rowspan/vertical splits.
 	capTablePageBreaks(res, contentH)
@@ -356,7 +356,7 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 	// Print-scoped sticky: clamp the natural fragment without fixed-style
 	// continuation clones.
 	applyStickyPrint(res, contentH)
-	stretchPaginatedChrome(res)
+	stretchPaginatedChrome(res, false, contentH)
 
 	// The passes above insert fragments ahead of later fixed ops (a crossed
 	// fixed background shifts the text that follows it), so the fixed index

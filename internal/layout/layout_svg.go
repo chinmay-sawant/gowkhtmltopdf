@@ -22,7 +22,7 @@ func (e *engine) buildInlineSVG(node *html.Node, sty ResolvedStyle, posX, posY f
 		node: node, style: e.stylePtr(node), kind: boxKindReplaced, x: posX, y: posY,
 	}
 
-	data := e.serializeInlineSVG(node)
+	data := e.resolveSVGUseRefs(e.serializeInlineSVG(node))
 	ref := &imageRef{src: "#inline-svg"} //nolint:exhaustruct // synthetic raster
 	if png, pw, ph, err := svg.Rasterize(data, 1024); err == nil && len(png) > 0 {
 		ref.data, ref.w, ref.h = png, pw, ph
@@ -60,13 +60,17 @@ func (e *engine) usedInlineSVGSize(node *html.Node, sty ResolvedStyle, ref *imag
 	// Attribute lengths are CSS px → pt, then zoomed like other style lengths.
 	wAttr := e.scalePt(parseSVGLengthPx(node.Attribute("width")))
 	hAttr := e.scalePt(parseSVGLengthPx(node.Attribute("height")))
+
+	cb := e.imageContainingWidth()
+
 	if sty.Width >= 0 {
 		wAttr = e.scalePt(sty.Width)
-	} else if w, ok := calcUsedWidth(sty, e.opts.Width, e); ok {
+	} else if w, ok := calcUsedWidth(sty, cb, e); ok {
 		wAttr = w
-	} else if sty.WidthPercent >= 0 && e.opts.Width > 0 {
-		wAttr = e.opts.Width * sty.WidthPercent / 100
+	} else if sty.WidthPercent >= 0 && cb > 0 {
+		wAttr = cb * sty.WidthPercent / oneHundred
 	}
+
 	if sty.Height >= 0 {
 		hAttr = e.scalePt(sty.Height)
 	}
@@ -76,6 +80,25 @@ func (e *engine) usedInlineSVGSize(node *html.Node, sty ResolvedStyle, ref *imag
 		intrW = e.scalePt(pxToPt(float64(ref.w)))
 		intrH = e.scalePt(pxToPt(float64(ref.h)))
 	}
+	// SVG 2: the root svg defaults width/height to auto, which is 100% of its
+	// containing block. The engine tracks the used width only, so the missing
+	// axis comes from the viewBox ratio (Chrome: a viewBox-only svg in a
+	// 64x24px div is 64x19.2px). An explicit containing block is required:
+	// during measure passes that only have the viewport fallback, the
+	// intrinsic viewBox size stays authoritative.
+	explicitCB := e.imgCBW > 0 || e.imgMaxW > 0 || e.inlineCBW > 0
+	switch {
+	case wAttr > 0 && hAttr <= 0 && intrW > 0 && intrH > 0:
+		hAttr = wAttr * intrH / intrW
+	case wAttr <= 0 && hAttr > 0 && intrW > 0 && intrH > 0:
+		wAttr = hAttr * intrW / intrH
+	case wAttr <= 0 && hAttr <= 0 && explicitCB && cb > 0:
+		wAttr = cb
+		if intrW > 0 && intrH > 0 {
+			hAttr = wAttr * intrH / intrW
+		}
+	}
+
 	if wAttr <= 0 {
 		wAttr = intrW
 	}

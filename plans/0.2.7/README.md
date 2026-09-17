@@ -4,7 +4,8 @@
 |---------------|------|
 | [learncpp/01-canonical-0.2.7-learncpp.md](learncpp/01-canonical-0.2.7-learncpp.md) | Canonical v0.2.7 execution ledger, phases 1-8: learncpp.com conversion fixes |
 | [learncpp/02-canonical-0.2.7-learncpp-visual.md](learncpp/02-canonical-0.2.7-learncpp-visual.md) | Canonical visual ledger, phases 9-15: wkhtmltopdf comparison defects (header branding, chapter badge, print URL spam, pagination paint) plus the mandatory catalogue JSON refresh. Complete 2026-09-16; gates green, 3 deferred rows |
-| [real-sites/01-canonical-0.2.7-real-sites.md](real-sites/01-canonical-0.2.7-real-sites.md) | Real-sites comparison wave, 7 sites vs wkhtmltopdf 0.12.6.1 and Chrome: findings complete and fix wave landed 2026-09-16 - 60 findings (35 engine defects, 8 probes, 17 reference artifacts), 30+ defects fixed with red-first tests, 8 rows deferred with next gates, all site PDFs regenerated, gates green (lint / test / golden / catalogue / claim-scan) |
+| [real-sites/01-canonical-0.2.7-real-sites.md](real-sites/01-canonical-0.2.7-real-sites.md) | Real-sites comparison wave, 7 sites vs wkhtmltopdf 0.12.6.1 and Chrome: findings complete and fix wave landed 2026-09-16 - 60 findings (35 engine defects, 8 probes, 17 reference artifacts), 30+ defects fixed with red-first tests, deferred rows recorded with next gates (several closed later in audit2), all site PDFs regenerated, gates green (lint / test / golden / catalogue / claim-scan). Wave 2 corrections are in a marked addendum |
+| [real-sites/02-canonical-0.2.7-real-sites-audit2.md](real-sites/02-canonical-0.2.7-real-sites-audit2.md) | Second real-sites audit wave (2026-09-16/17), 10 regenerated PDFs re-audited: 5 high, 22 medium, 14 low/info across nine sites; pre-gate and deferred close-out landed 2026-09-17; Phase 7 and Phase 8 green (`verify.py` 23/23 PASS); w3schools-6 CLOSED AS UPSTREAM PIN (no `go.mod` replace) |
 | [real-sites/README.md](real-sites/README.md) | Wave index: site table, method, media caveat, evidence map, validation record |
 
 Workflow: [`../../skills/phase-wise-checklist/SKILLS.md`](../../skills/phase-wise-checklist/SKILLS.md)
@@ -33,6 +34,21 @@ GeeksforGeeks), one read-only comparison agent per pair against wkhtmltopdf
 deferred with next gates, all seven site PDFs regenerated plus a new w3schools PDF.
 Gates: `make lint` exit 0, `make test` exit 0, `make golden` exit 0 (71 pass),
 catalogue check exit 0, claim-scan clean.
+
+Audit wave 2 (`real-sites/02-canonical-0.2.7-real-sites-audit2.md`): ten
+read-only agents re-audited the 10 regenerated PDFs from scratch and found 5
+high, 22 medium, and 14 low/info issues across nine sites plus a site-side
+classification (geeksforgeeks, no engine defect). Pre-gate and deferred
+close-out landed 2026-09-17 (LookupRune wiring, root overflow, flex pseudo,
+ANA-17/18, LCO-13, body wash, ICO, sprite `<use>`, 0-word warn). Phase 7 gates
+green (`make test` / `golden` / `lint` / `claim-scan` exit 0). Phase 8
+regen+verify green 2026-09-17 (`REGEN2_FORCE=1`, `verify.py` 23/23 PASS;
+live learncpp paints Open Sans). w3schools-6 is CLOSED AS UPSTREAM PIN
+(WOFF2 decode bound; LiberationMono fallback; no `go.mod` replace). Wave 1
+rows that wave 2 contradicted (cplusplus-tutorial-3) are annotated in the wave
+1 ledger's addendum; several wave 1 deferred rows (sprite `<use>`, ICO,
+learn-cpp-org-3 proof, FontAwesome empty-block pseudo) closed in audit2.
+Working tree left uncommitted for user review.
 
 ## Verification
 

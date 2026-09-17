@@ -42,14 +42,35 @@ func isBoxChromeEligible(res *Result, boxNode *box) bool {
 		return false
 	}
 
-	if boxInsideTable(boxNode) || !hasOwnVerticalChrome(res.Ops, boxNode) {
+	if boxInsideTable(boxNode) {
 		return false
 	}
 
-	return true
+	return hasOwnVerticalChrome(res.Ops, boxNode) || hasOwnCardFace(res.Ops, boxNode)
 }
 
-func calculateChromeContentBottom(boxNode *box, oldBottom, inkBottom float64, hasInk bool) float64 {
+// hasOwnCardFace reports a box that paints its own background or box-shadow.
+// Split cards whose face is a background color or a shadow layer need the same
+// post-pagination stretch as callouts with side rails, or the card fill stops
+// at the stale layout height while the rows shifted below its bottom keep
+// painting (learncpp lesson cards).
+func hasOwnCardFace(ops []Op, boxNode *box) bool {
+	if boxNode.style == nil || (boxNode.style.BGColor[3] <= 0 && !boxNode.style.BoxShadowSet) {
+		return false
+	}
+
+	for idx := boxNode.opStart; idx <= boxNode.opEnd && idx < len(ops); idx++ {
+		if opOwnedBy(&ops[idx], boxNode, opOwnerChrome) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func calculateChromeContentBottom(
+	boxNode *box, oldBottom, inkBottom float64, hasInk bool, contentH float64,
+) float64 {
 	if !hasInk {
 		return oldBottom
 	}
@@ -59,6 +80,19 @@ func calculateChromeContentBottom(boxNode *box, oldBottom, inkBottom float64, ha
 	}
 
 	desiredBottom := inkBottom + boxNode.style.PaddingBottom
+	// html/body paper wash fills unused page tail on the last page that has
+	// ink (gobyexample continuation pages; fixture-56 short page-2 wash).
+	if contentH > 0 && isPaperWashRoot(boxNode) {
+		pageBot := math.Ceil((inkBottom-layoutCoordEpsilon)/contentH) * contentH
+		if pageBot < contentH {
+			pageBot = contentH
+		}
+
+		if pageBot > desiredBottom {
+			desiredBottom = pageBot
+		}
+	}
+
 	if desiredBottom > oldBottom {
 		return desiredBottom
 	}
@@ -66,7 +100,26 @@ func calculateChromeContentBottom(boxNode *box, oldBottom, inkBottom float64, ha
 	return oldBottom
 }
 
-func stretchBoxChrome(res *Result, boxNode *box) {
+// isPaperWashRoot reports the viewport paper elements whose background must
+// cover each page's content box, including empty tails after the last ink.
+func isPaperWashRoot(boxNode *box) bool {
+	if boxNode == nil || boxNode.node == nil || boxNode.style == nil {
+		return false
+	}
+
+	if boxNode.style.BGColor[3] <= 0 {
+		return false
+	}
+
+	switch boxNode.node.Name {
+	case htmlRootName, htmlBodyName:
+		return true
+	default:
+		return false
+	}
+}
+
+func stretchBoxChrome(res *Result, boxNode *box, growShadowLayers bool, contentH float64) {
 	if !isBoxChromeEligible(res, boxNode) {
 		return
 	}
@@ -75,7 +128,7 @@ func stretchBoxChrome(res *Result, boxNode *box) {
 	normalizeOwnVerticalChrome(res.Ops, boxNode)
 
 	inkBottom, hasInk := calculateChromeInkBottom(res, boxNode, oldBottom)
-	contentBottom := calculateChromeContentBottom(boxNode, oldBottom, inkBottom, hasInk)
+	contentBottom := calculateChromeContentBottom(boxNode, oldBottom, inkBottom, hasInk, contentH)
 
 	if contentBottom > oldBottom+1e-6 {
 		boxNode.height = contentBottom - boxNode.y
@@ -84,7 +137,7 @@ func stretchBoxChrome(res *Result, boxNode *box) {
 	normalizeOwnVerticalChrome(res.Ops, boxNode)
 
 	for idx := boxNode.opStart; idx <= boxNode.opEnd; idx++ {
-		stretchOwnBoxChrome(&res.Ops[idx], boxNode, oldBottom, contentBottom)
+		stretchOwnBoxChrome(&res.Ops[idx], boxNode, oldBottom, contentBottom, growShadowLayers)
 	}
 }
 
@@ -92,7 +145,13 @@ func stretchBoxChrome(res *Result, boxNode *box) {
 // descendant past the block's original bottom. The layout box is built before
 // page-break fixups, so its background and side rails otherwise stop at the
 // stale natural height while the moved footer/text continues below it.
-func stretchPaginatedChrome(res *Result) {
+//
+// growShadowLayers is set on the pre-split call only, while a box-shadow layer
+// still covers the whole box. Page-split fragments end at a page boundary and
+// must stay open, so the post-split calls never grow shadow layers.
+// contentH is the page content-box height used to extend html/body paper wash
+// to the last page bottom.
+func stretchPaginatedChrome(res *Result, growShadowLayers bool, contentH float64) {
 	if res == nil || res.root == nil {
 		return
 	}
@@ -103,7 +162,7 @@ func stretchPaginatedChrome(res *Result) {
 			walk(child)
 		}
 
-		stretchBoxChrome(res, boxNode)
+		stretchBoxChrome(res, boxNode, growShadowLayers, contentH)
 	}
 
 	walk(res.root)
@@ -355,7 +414,7 @@ func opInkBottom(operation Op) float64 {
 const boxBottomMatchSlack = 1.5
 
 //nolint:cyclop // mutate owned paint
-func stretchOwnBoxChrome(operation *Op, boxNode *box, oldBottom, newBottom float64) {
+func stretchOwnBoxChrome(operation *Op, boxNode *box, oldBottom, newBottom float64, growShadowLayers bool) {
 	if operation == nil || boxNode == nil {
 		return
 	}
@@ -374,6 +433,26 @@ func stretchOwnBoxChrome(operation *Op, boxNode *box, oldBottom, newBottom float
 			if operation.H < 0 {
 				operation.H = 0
 			}
+
+			return
+		}
+	}
+
+	// Box-shadow layers (the core and its blur steps) never match the frame's
+	// top or width, so the branch above leaves them at the stale layout
+	// height. Grow every owned layer by the bottom delta instead: a split
+	// card whose rows moved below the layout bottom keeps its face covering
+	// them (learncpp lesson cards are shadow-only, no background color).
+	// Classify against the pre-stretch height: box height already grew above,
+	// which makes every layer look shorter than the box and unmatched.
+	if growShadowLayers && newBottom > oldBottom+1e-6 &&
+		(operation.Kind == OpFillRect || operation.Kind == OpStrokeRect) &&
+		style != nil && style.BoxShadowSet {
+		staleBox := *boxNode
+		staleBox.height = oldBottom - boxNode.y
+
+		if opOwnedBy(operation, &staleBox, opOwnerChrome) {
+			operation.H += newBottom - oldBottom
 
 			return
 		}

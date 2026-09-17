@@ -99,7 +99,7 @@ The two complementary roles are worth distinguishing early:
 | `PseudoClass` | css.go:123 | Named pseudo with optional `Arg` (`:nth-child`), `Has []RelativeSelector`, `Not []Selector`, and a pre-parsed integer `nth nthForm` |
 | `Declaration` | css.go:134 | `Prop`, `Value`, `Important` — the raw wire form of a `prop: value[!important]` pair |
 | `PageStyle` | css.go:59 | `@page` margin/size declarations kept as raw strings, resolved at the PDF boundary |
-| `FontFace` | css.go:66 | `@font-face` local subset: `Family` + raw `Src` (consumed by `prepare.ResourceContext.MergeFontFaces`) |
+| `FontFace` | css.go:109 | `@font-face` local subset: `Family` + raw `Src` + parsed weight/style/unicode-range descriptors (consumed by `prepare.ResourceContext.MergeFontFaces`) |
 
 ### 3.2 Public entry points (exported functions)
 
@@ -238,7 +238,9 @@ pseudo-elements inside `:has()` are rejected at parse time (has.go's
   (parseFontFaceRule, css.go:275; `parseFontFace`, css.go:371). Conversion
   (`convert/prepare/styles.go:191`) iterates these and calls
   `css.FontFaceURLs` (css.go:392) to fetch each `src` through the document's
-  resource policy. Font weight/style are intentionally ignored (css.go:66).
+  resource policy. Font weight/style/unicode-range are parsed into `FontFace`
+  (`css.go:109`, `fontface_descriptors.go:39`) and carried into face selection
+  as a `pdf.FaceSpec` by `prepare.fontFaceSpec` (`styles.go:476`).
 - Unnamed `@page` declarations keep raw `margin`/`size` strings in
   `PageStyle` (css.go:59, parsePageRule css.go:192) so physical units resolve
   at the PDF boundary.

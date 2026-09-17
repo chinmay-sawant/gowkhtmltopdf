@@ -212,6 +212,7 @@ func styleInternEqual(a, b *ResolvedStyle) bool {
 		a.FontWeight == b.FontWeight &&
 		a.FontItalic == b.FontItalic &&
 		a.LineHeight == b.LineHeight &&
+		a.LineHeightZero == b.LineHeightZero &&
 		a.LineHeightUnitless == b.LineHeightUnitless &&
 		a.TextAlign == b.TextAlign &&
 		a.TextAlignLast == b.TextAlignLast &&
@@ -494,6 +495,7 @@ func styleInternFingerprint(s *ResolvedStyle) uint64 {
 	h = styleInternHashInt(h, s.FontWeight)
 	h = styleInternHashBool(h, s.FontItalic)
 	h = styleInternHashFloat64(h, s.LineHeight)
+	h = styleInternHashBool(h, s.LineHeightZero)
 	h = styleInternHashFloat64(h, s.LineHeightUnitless)
 	h = styleInternHashString(h, s.TextAlign)
 	h = styleInternHashString(h, s.TextAlignLast)
@@ -782,6 +784,7 @@ func styleInternFields() []string {
 		"FontWeight",
 		"FontItalic",
 		"LineHeight",
+		"LineHeightZero",
 		"LineHeightUnitless",
 		"TextAlign",
 		"TextAlignLast",

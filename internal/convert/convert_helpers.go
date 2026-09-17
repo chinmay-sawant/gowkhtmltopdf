@@ -2,11 +2,13 @@ package convert
 
 import (
 	"fmt"
+	"io"
 	"net/url"
 	"strings"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/layout"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/line"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
 )
 
@@ -242,6 +244,57 @@ func tryApplyPageMargin(geom hfGeom, rawMargin string) (hfGeom, bool) {
 	geom.marginLeft = left
 
 	return geom, true
+}
+
+// countPaintTextAndImages returns how many non-empty OpText ops and how many
+// OpImage ops a layout result carries. Used to detect empty JS-shell pages.
+func countPaintTextAndImages(res *layout.Result) (int, int) {
+	if res == nil {
+		return 0, 0
+	}
+
+	var textOps, imageOps int
+
+	for _, op := range res.Ops {
+		switch op.Kind {
+		case layout.OpText:
+			if op.Text != "" {
+				textOps++
+			}
+		case layout.OpImage:
+			imageOps++
+		case layout.OpUnknown, layout.OpFillRect, layout.OpStrokeRect, layout.OpLine,
+			layout.OpLinkURI, layout.OpBullet, layout.OpGridRun: // not text/image for empty-page heuristic
+		}
+	}
+
+	return textOps, imageOps
+}
+
+// warnIfNoExtractableText emits one run-log warning when every body object
+// painted zero non-empty OpText and the document also has no OpImage.
+// Image-only documents are exempt so certificates/logos do not false-positive.
+func warnIfNoExtractableText(log io.Writer, bodies []*objectState) {
+	if len(bodies) == 0 {
+		return
+	}
+
+	var textOps, imageOps int
+
+	for _, body := range bodies {
+		if body == nil {
+			continue
+		}
+
+		textOps += body.textOps
+		imageOps += body.imageOps
+	}
+
+	if textOps > 0 || imageOps > 0 {
+		return
+	}
+
+	line.Emit(log, line.Warn, "document contains no extractable text (page may require JavaScript)")
 }
 
 // measuredWidth returns the effective content width of a layout result: the

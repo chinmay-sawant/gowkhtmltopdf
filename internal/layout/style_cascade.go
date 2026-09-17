@@ -200,6 +200,7 @@ var inheritableProps = []inheritCopy{ //nolint:gochecknoglobals // static inheri
 	{[]string{"font-style"}, func(dst, src *ResolvedStyle) { dst.FontItalic = src.FontItalic }},
 	{[]string{"line-height"}, func(dst, src *ResolvedStyle) {
 		dst.LineHeight = src.LineHeight
+		dst.LineHeightZero = src.LineHeightZero
 		dst.LineHeightUnitless = src.LineHeightUnitless
 	}},
 	{[]string{"text-align"}, func(dst, src *ResolvedStyle) { dst.TextAlign = src.TextAlign }},

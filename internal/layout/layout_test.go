@@ -968,7 +968,9 @@ func TestImageIntrinsicAndWidth(t *testing.T) {
 	}
 }
 
-func layoutHTMLWithImages(t *testing.T, src string, img []byte, imgSrc string) *Result {
+func layoutHTMLWithImages(
+	t *testing.T, src string, img []byte, imgSrc string, sheets ...*css.Stylesheet,
+) *Result {
 	t.Helper()
 	root := mustParse(t, src)
 	provider := func(src string) ([]byte, error) {
@@ -980,7 +982,7 @@ func layoutHTMLWithImages(t *testing.T, src string, img []byte, imgSrc string) *
 	}
 
 	res, err := Layout(root, Options{
-		Width: testViewport, Height: 800, Images: provider, Background: true,
+		Width: testViewport, Height: 800, Sheets: sheets, Images: provider, Background: true,
 	})
 	if err != nil {
 		t.Fatalf("Layout: %v", err)

@@ -25,13 +25,23 @@ func (e *engine) alignedInlineTop(item *inlineItem, lineY, lineH, baseline float
 
 	switch item.style.VerticalAlign {
 	case cssVerticalAlignTop:
-		return lineY
+		return lineY + item.marginT
 	case cssVerticalAlignMiddle:
-		return lineY + (lineH-item.h)/2
+		boxH := item.h + item.marginT + item.marginB
+
+		return lineY + (lineH-boxH)/2 + item.marginT
 	case cssVerticalAlignBottom:
-		return lineY + lineH - item.h
+		boxH := item.h + item.marginT + item.marginB
+
+		return lineY + lineH - boxH + item.marginT
 	default:
-		return baseline - item.h - e.scalePt(e.effectiveVerticalAlignShift(item.style))
+		ascent := item.h
+		if item.blockBox != nil && item.blockBox.firstBaseline > 0 && item.blockBox.firstBaseline < ascent {
+			// Inline-blocks sit on their internal text baseline.
+			ascent = item.blockBox.firstBaseline
+		}
+
+		return baseline - ascent - e.scalePt(e.effectiveVerticalAlignShift(item.style))
 	}
 }
 

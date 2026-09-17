@@ -2,10 +2,49 @@
 
 > **Parent:** `plans/0.2.7/README.md`
 > **Status:** fix wave complete 2026-09-16. Findings: 60 (35 engine defects, 8 probes, 17 reference artifacts). Fixes landed: 30 engine defects and 3 probes, plus the cross-site empty-cmap blocker; 8 rows deferred with reasons (`[~]`); reference artifacts registered (no action). Gates: `make lint` exit 0, `make test` exit 0, `make golden` exit 0 (71 pass), catalogue check ok, claim-scan clean.
+> **Follow-up wave:** [`02-canonical-0.2.7-real-sites-audit2.md`](02-canonical-0.2.7-real-sites-audit2.md) re-audited the 10 regenerated PDFs from scratch on 2026-09-16. 5 high, 22 medium, 14 low/info findings across nine sites plus a site-side classification (geeksforgeeks). Pre-gate and deferred close-out landed 2026-09-17; Phase 7 gates green; Phase 8 regen/verify still open; w3schools-6 CLOSED AS UPSTREAM PIN (WOFF2 decode bound). Where wave 1 rows were wrong, read the addendum below.
 > **Estimated effort:** delivered in one day with 10 agents across 5 fix waves plus 3 gate agents
 > **Depends on:** [`../learncpp/02-canonical-0.2.7-learncpp-visual.md`](../learncpp/02-canonical-0.2.7-learncpp-visual.md) (method), `scripts/pdf_page_forensics.py`, `wkhtmltopdf 0.12.6.1`, Chrome headless
 > **Companion:** [`README.md`](README.md) (wave index, method, validation record)
 > **Evidence:** per-site folders in this directory. `evidence/` paths below are relative to `real-sites/`. Post-fix artifacts: `evidence/2026-09-16-forensics-gowk-after.{json,md}` in each site folder.
+
+---
+
+## Addendum 2026-09-17: audit wave 2 corrections
+
+Second audit wave (2026-09-16/17): ten read-only agents re-audited the ten
+regenerated PDFs, one per artifact, against wkhtmltopdf 0.12.6.1 print
+references (Chrome fallback for ana-de-armas; fresh wk references for learncpp
+and w3schools). Counts: 5 high, 22 medium, 14 low/info across nine sites, plus
+one site-side classification (geeksforgeeks). The silent 0-word conversion
+now warns through convert. Pre-gate and deferred close-out landed 2026-09-17;
+Phase 7 gates green; Phase 8 regen/verify still open. Ledger:
+[`02-canonical-0.2.7-real-sites-audit2.md`](02-canonical-0.2.7-real-sites-audit2.md).
+
+Rows this addendum corrects. The history above stays as written; read the
+marked rows with this note:
+
+- **Phase 2, `cplusplus-3` breadcrumb shrink-to-fit (re-marked `[~]` then
+  fixed in audit2 §3.3).** The wave 1 close rested on a hand-compacted probe
+  that could not reproduce the real markup, so calling it resolved by the
+  hidden-sidebar fix was wrong. The real page still wrapped. Wave 2 section
+  3.3 found the causes: intrinsic max-content measurement skipped
+  whitespace-only text nodes (`cellMeasure.measureTextBoundary`,
+  `internal/layout/layout_measure.go:179`) plus inline-blocks aligned by their
+  bottom edge on the baseline (`internal/layout/inline_vertical_align.go:33`).
+  Fixed with `TestInlineBlockBreadcrumbWhitespaceStaysOnOneLine`; live
+  `#I_bar` is 32.0pt with `Tutorials : C++ Language` on one line (was 94.70pt,
+  two rows). The phantom pages are still gone, so the page-count facts above
+  hold.
+
+All other wave 1 fix rows re-checked by wave 2 still pass (gobyexample
+font-inherit and wrap, ana-de-armas superscripts and overflow,
+cplusplus-tutorial borders and visibility, programiz accordion and tofu,
+tutorialspoint border count, and more). Wave 1 deferred rows closed later in
+audit2 (2026-09-17): `learn-cpp-org-3` percent columns proof, FontAwesome
+empty-block pseudo (`learn-cpp-org-5`), external sprite `<use>`
+(`programiz-8`), ICO favicon (`learn-cpp-org-7`), Wikipedia infobox marriage
+gap (`ana-de-armas-12` / ANA-17). Remaining open gate is Phase 8 regen only.
 
 ---
 
@@ -100,8 +139,14 @@ Findings ledger:
 ## Phase 2: Width and line measurement
 
 - [x] Collapse/trim whitespace in inline-level form controls: `TestInlineBlockNowrapWhitespaceDoesNotInflateWidth` (69.451 -> 34.014pt); learn-cpp.org words 177 -> 181.
-- [x] Percentage columns in flex/grid rows: NOT fixed. Deferred `learn-cpp-org-3` (`.col-3` collapses to an 11-15pt column). Next probe: fixture `.row > .col-3 + .col-9` asserting 25 percent of the row; suspects `internal/layout/flex.go`, `layout_flow.go`.
-- [x] Breadcrumb bar shrink-to-fit (`cplusplus-3`): resolved by the Phase 1 hidden-sidebar fix; live page 1 renders the breadcrumb on one line and the phantom pages are gone.
+- [x] Percentage columns in flex/grid rows: closed later in audit2 §4.3
+  (`forceFlexItemMainSize` percent base; `TestFlexPercentColumnKeepsWordWhole`).
+  Wave 1 left this deferred; do not treat the historical "NOT fixed" prose as
+  current.
+- [x] Breadcrumb bar shrink-to-fit (`cplusplus-3`): wave 1 close used a
+  hand-compacted probe and was wrong; audit2 §3.3 fixed the real causes
+  (`TestInlineBlockBreadcrumbWhitespaceStaysOnOneLine`). Phantom pages remain
+  gone from the Phase 1 hidden-sidebar fix.
 - [x] Line fit excludes the trailing space: `TestLineFitExcludesTrailingSpace`; live gobyexample keeps `upgrade to` on one line (both words y=239.2). Probes: `gobyexample/evidence/2026-09-16-probes/probe-wrap-420.html` (keeps `to`) through `probe-wrap-424.html` (sweep).
 - [x] Pseudo-element trailing space: `TestGeneratedContentTrailingSpaceSeparatesInlineBlocks` (gap -86.074 -> +3.334pt).
 - [x] `vertical-align: super` raises the run: `TestSupElementRaisesRunBaseline` (23.360 -> 19.362pt origin, 12.0 -> 9.996pt size). Residual: the raise uses 0.4em of the run size vs Chrome's ~0.48em parent-em; acceptable, next probe is parent-em parity.
@@ -120,7 +165,10 @@ Findings ledger:
 - [x] Weight-matching face selection: `TestRegistryLookupSelectsFaceByWeight`, `TestWeightClassParsesShortOS2Table` (86-byte version-1 OS/2 tables were read as 400); one subset at 700 -> three at 400/500/700.
 - [x] Empty-cmap face no longer aborts the write: `TestFontEmptyCmapEmbedFallsBackToLiberation`; live `w3schools.com/cpp` converts (7 pages, 469,491 bytes, 729 words) and its PDF is archived in `w3schools/evidence/`.
 - [~] Droid Sans Mono `@font-face` probe (`programiz-9`). Reason: not attempted in this wave; code remains on LiberationMono. Next gate: fixture with the exact face, then bisect fetch vs registry.
-- [~] FontAwesome pseudo-element glyphs (`learn-cpp-org-5`). Reason: not attempted; requires pseudo content plus face alias resolution. Next gate: `.fa-play::before{content:"\f04b"; font-family:"Font Awesome 5 Free"; font-weight:900}` fixture.
+- [x] FontAwesome pseudo-element glyphs (`learn-cpp-org-5`). Closed in audit2
+  §2.4 (`emptyFlowRendersPseudo`; `TestEmptyInlineBlockPseudoContentPaints`).
+  Flex-host pseudos closed separately in audit2 §5.1
+  (`TestFlexPseudoContentPaints`).
 - [~] Deferred cosmetic seam: `internal/convert/prepare/styles.go:458` overwrites each `@font-face` PostScript name with the family name; subsets are fingerprint-distinct but share a BaseFont stem. Next gate: assert `/BaseFont` carries the real PS name per weight.
 
 ## Phase 5: List markers and pseudo content
@@ -133,8 +181,13 @@ Findings ledger:
 
 - [x] SVG gradient paint servers resolve: `TestRasterizeResolvesForwardReferencedLinearGradient` (objectBoundingBox and userSpaceOnUse), `TestRasterizeResolvesLooseGradientOutsideDefs`, `TestRasterizeResolvesForwardReferencedRadialGradient`, `TestRasterizeResolvesLowercasedInlineGradient`; Programiz logo pixels `(0,0,0)` -> `(101,1,229)` / `(4,152,236)`.
 - [x] Inline SVG wordmark and burger (`cplusplus-5`, `cplusplus-6`): `TestRasterizeNormalizesLowercasedRootViewbox` (the HTML pipeline lowercases `viewBox`) and `TestRasterizeFallsBackForUnresolvableFontFamily`; burger 96x64 white blob -> 96x96 bars (dark fraction 0.615), wordmark raster 480x144.
-- [~] External sprite `<use>` and `object-fit`/`object-position` (`programiz-8`, `GFG-CPP-05`). Reason: needs layout-side sprite resolution plus object-fit support; deferred. Next gate: HTTP-served `sprite.svg#search` fixture plus an object-fit sprite fixture.
-- [~] ICO favicon (`learn-cpp-org-7`). Reason: not attempted; decode support only. Next gate: small ICO with embedded PNG payload.
+- [x] External sprite `<use>` (`programiz-8`): closed in audit2 Phase 6 via
+  `svg.ResolveUseReferences` (`internal/svg/use_resolve_test.go`).
+  `object-fit`/`object-position` (`GFG-CPP-05`) remains deferred; next gate:
+  object-fit sprite fixture.
+- [x] ICO favicon (`learn-cpp-org-7`): closed in audit2 Phase 6 with
+  hand-written PNG-in-ICO + 32bpp BMP (`layout_ico.go`;
+  `TestICOToPNGExtractsEmbeddedPNG`).
 - [~] Stray 1x1 spacer image (`ana-de-armas-11`). Reason: low visual impact; not traced. Next gate: grep the HTML for data-URI/1x1 images and assert hidden or zero-area images do not paint.
 
 ## Phase 7: Link annotations and URI encoding
@@ -151,7 +204,8 @@ Findings ledger:
 - [x] Fixed-chrome labels on every page: `TestFixedFooterLabelPaintsOnEveryPage`.
 - [~] Fixed dock repetition/overlap probe (`learn-cpp-org-9`). Reason: repeat semantics unchanged; label fix landed, overlap probe not run. Next gate: Chrome A4 print of the live page vs the post-fix artifact.
 - [x] Form controls: `TestInputPlaceholderPaintsTextOnce`, `TestInputValueBeatsPlaceholder`, `TestInputPlaceholderInsideContentBox`, `TestInputNonTextTypesSkipPlaceholder`; live Programiz header paints `Search` and field backgrounds. `programiz-1` is PARTIAL: a 369x26pt `#0556f3` fill remains at the header (wk print has no wide blue fill). Next gate: A/B the real header subtree with `.get-app-link-wrapper{display:none}` and an explicit field background; archived variants: `programiz-cpp/evidence/2026-09-16-probes/programiz-{hide,mark}.html`.
-- [~] Wikipedia infobox line-gap probe (`ana-de-armas-12`). Reason: not attempted. Next gate: infobox-style cell fixture with `<br>`, second line within 1pt of Chrome.
+- [x] Wikipedia infobox line-gap probe (`ana-de-armas-12` / ANA-17): closed in
+  audit2 §3.2; `TestInfoboxMarriageLineStaysCompact` gap <= 12pt.
 - [~] Wikipedia anniversary globe probe (`ana-de-armas-7`). Reason: not attempted; may be a print `display:none` or `<picture>`/srcset selection. Next gate: fetch the logo markup and print rules.
 - [x] Golden corpus follows the fixed pagination: `fixture-61-implemented-props-b.html` envelope [5, 8] -> [5, 9] (fresh conversion verified 9 pages; repeated-thead continuation moved the `left` row to page 8 and the footer to page 9); `fixture-60` moved 8 -> 7 within its [7, 9] envelope. No needles changed.
 

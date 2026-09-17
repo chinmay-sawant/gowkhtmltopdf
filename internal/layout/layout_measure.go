@@ -176,10 +176,18 @@ type cellMeasure struct {
 	// and a base width that ignores the URL crushes the item to the text width
 	// while layout then paints text plus URL inside it.
 	includePseudo bool
+	// pendingSpace holds a collapsed space contributed by an all-whitespace
+	// text node. It counts toward max-content width when inline content
+	// follows, but a line-ending collapsible space hangs and must not widen
+	// the measured line, so flushLine drops it again.
+	pendingSpace float64
 }
 
 // flushLine folds the current line into maxW and resets the line state.
 func (m *cellMeasure) flushLine() {
+	m.lineW -= m.pendingSpace
+	m.pendingSpace = 0
+
 	if m.lineW > m.maxW {
 		m.maxW = m.lineW
 	}
@@ -246,6 +254,7 @@ func (m *cellMeasure) measureTextBoundary(text string, cstate *ResolvedStyle, no
 			return
 		}
 
+		m.pendingSpace = 0
 		col := verticalWritingColumnWidth(eng, cstate)
 		chromeW := inlineMeasurementChromeWidth(eng, *cstate)
 		m.lineW += col + chromeW
@@ -260,9 +269,19 @@ func (m *cellMeasure) measureTextBoundary(text string, cstate *ResolvedStyle, no
 		// Walk words without strings.Fields: no []string or word copies.
 		// Matching white-space:normal - runs of HTML space collapse to one gap.
 		if !hasNonHTMLSpace(text) {
+			// An all-whitespace text node still separates adjacent inline
+			// boxes ("</li>\n<li>"): its collapsed space widens max-content
+			// when content follows on the same line. A leading space has no
+			// effect, and flushLine drops a trailing one.
+			if text != "" && (m.lineW > 0 || m.lineHasInk) && m.pendingSpace == 0 {
+				m.pendingSpace = eng.measureTextFace(" ", cstate)
+				m.lineW += m.pendingSpace
+			}
+
 			return
 		}
 
+		m.pendingSpace = 0
 		m.lineOnlyNowrap = false
 		m.lineHasInk = true
 		chromeW := inlineMeasurementChromeWidth(eng, *cstate)
@@ -331,6 +350,7 @@ func (m *cellMeasure) measureTextBoundary(text string, cstate *ResolvedStyle, no
 		return
 	}
 
+	m.pendingSpace = 0
 	chromeW := inlineMeasurementChromeWidth(eng, *cstate)
 
 	// keepEdges is set for generated content only, so the space advance is
@@ -418,6 +438,7 @@ func (m *cellMeasure) measureElement(nodeN *html.Node, childCS ResolvedStyle, no
 	// Replaced images contribute their used CSS-pixel width (wiki thumbs).
 	if nodeN.Name == cssTagImg {
 		innerW := m.engine.measureImageWidth(nodeN, childCS)
+		m.pendingSpace = 0
 		m.noteWord(innerW)
 		m.lineOnlyNowrap = false
 		m.lineHasInk = true
@@ -433,6 +454,7 @@ func (m *cellMeasure) measureElement(nodeN *html.Node, childCS ResolvedStyle, no
 		if innerW <= 0 {
 			innerW = m.engine.scalePt(pxToPt(64))
 		}
+		m.pendingSpace = 0
 		m.noteWord(innerW)
 		m.lineOnlyNowrap = false
 		m.lineHasInk = true
@@ -443,6 +465,7 @@ func (m *cellMeasure) measureElement(nodeN *html.Node, childCS ResolvedStyle, no
 
 	if isInputCheckbox(nodeN) {
 		innerW := defaultCheckboxSize(m.engine, childCS)
+		m.pendingSpace = 0
 		m.noteWord(innerW)
 		m.lineOnlyNowrap = false
 		m.lineHasInk = true
@@ -468,6 +491,7 @@ func (m *cellMeasure) measureSpecifiedInlineBlock(style ResolvedStyle) bool {
 	}
 
 	width := specifiedInlineBlockOuterWidth(m.engine, style)
+	m.pendingSpace = 0
 	m.noteWord(width)
 	m.lineOnlyNowrap = false
 	m.lineHasInk = true
@@ -499,6 +523,7 @@ func (m *cellMeasure) measureSizeContained(style ResolvedStyle) {
 		m.flushLine()
 	}
 
+	m.pendingSpace = 0
 	m.noteWord(width)
 	m.lineOnlyNowrap = false
 	m.lineHasInk = true
@@ -622,11 +647,12 @@ func (m *cellMeasure) measurePseudo(nodeN *html.Node, host ResolvedStyle, pseudo
 type wordBreakPolicy int
 
 const (
-	breakNormal  wordBreakPolicy = iota
-	breakAll                     // word-break:break-all / overflow-wrap:anywhere
-	breakWord                    // overflow-wrap:break-word (soft only)
-	breakNever                   // white-space:nowrap|pre
-	breakKeepAll                 // word-break:keep-all
+	breakNormal   wordBreakPolicy = iota
+	breakAll                      // word-break:break-all / line-break:anywhere
+	breakWord                     // overflow-wrap:break-word (soft only)
+	breakAnywhere                 // overflow-wrap:anywhere: min-content per rune, whole-word wrap first
+	breakNever                    // white-space:nowrap|pre
+	breakKeepAll                  // word-break:keep-all
 )
 
 func wordBreakOf(sty ResolvedStyle) wordBreakPolicy {
@@ -634,15 +660,22 @@ func wordBreakOf(sty ResolvedStyle) wordBreakPolicy {
 		return breakNever
 	}
 
-	// line-break:anywhere allows breaks between any typographic units, same
-	// practical effect as overflow-wrap:anywhere for our line breaker.
-	if sty.WordBreak == "break-all" || sty.OverflowWrap == overflowWrapAnywhere ||
-		sty.LineBreak == overflowWrapAnywhere {
+	// word-break:break-all and line-break:anywhere allow a break between any
+	// two characters, including mid-line to fill the remaining space.
+	if sty.WordBreak == "break-all" || sty.LineBreak == overflowWrapAnywhere {
 		return breakAll
 	}
 
 	if sty.WordBreak == "keep-all" {
 		return breakKeepAll
+	}
+
+	// overflow-wrap:anywhere and the legacy word-break:break-word change the
+	// min-content size (any character may break) but still wrap a normal word
+	// whole when it fits the next line, exactly like break-word. Chrome wraps
+	// Wikipedia figcaptions whole even though they set word-break:break-word.
+	if sty.OverflowWrap == overflowWrapAnywhere {
+		return breakAnywhere
 	}
 
 	if sty.OverflowWrap == overflowWrapBreakWord {
@@ -659,7 +692,7 @@ func softModeOf(pol wordBreakPolicy) softBreakMode {
 	switch pol {
 	case breakAll:
 		return softBreakNone
-	case breakWord:
+	case breakWord, breakAnywhere:
 		return softBreakWord
 	case breakNever, breakKeepAll:
 		return softBreakURL
@@ -684,7 +717,7 @@ func (e *engine) minContentWidth(cssSheet string, sty *ResolvedStyle, full float
 	switch wordBreakOf(*sty) {
 	case breakNever:
 		return full
-	case breakAll:
+	case breakAll, breakAnywhere:
 		return e.maxRuneWidth(cssSheet, sty)
 	case breakWord:
 		// Soft opportunities (/, ?, &, ...) split the token for min-content.

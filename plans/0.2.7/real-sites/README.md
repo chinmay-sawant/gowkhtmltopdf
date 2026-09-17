@@ -1,7 +1,7 @@
 # Plans - v0.2.7 real-sites wave
 
 > **Parent:** [`../README.md`](../README.md) (v0.2.7 real-world conversion)
-> **Status:** fix wave complete 2026-09-16. 60 findings (35 engine defects, 8 probes, 17 reference artifacts); 30+ defects fixed across `internal/layout`, `internal/pdf`, and `internal/svg` with red-first tests; 8 rows deferred with next gates; all seven site PDFs regenerated plus a new w3schools PDF. Fix ledger: [`01-canonical-0.2.7-real-sites.md`](01-canonical-0.2.7-real-sites.md). Gates: `make lint` 0, `make test` 0, `make golden` 0 (71 pass), catalogue check 0, claim-scan clean.
+> **Status:** wave 1 fix complete 2026-09-16 (ledger [`01-canonical-0.2.7-real-sites.md`](01-canonical-0.2.7-real-sites.md)). Audit wave 2 ledger [`02-canonical-0.2.7-real-sites-audit2.md`](02-canonical-0.2.7-real-sites-audit2.md): pre-gate and deferred clusters closed 2026-09-17 (LookupRune wiring, root overflow, flex pseudo, ANA-17/18, LCO-13, body wash, ICO, sprite `<use>`, 0-word warn; w3schools-6 upstream pin, no `go.mod` replace). Phase 7 gates green. Phase 8 regen+verify green (`verify.py` 23/23 PASS). Working tree uncommitted for user review.
 > **Estimated effort:** delivered in one day with 10 agents across 5 fix waves plus 3 gate agents
 > **Depends on:** [`../learncpp/02-canonical-0.2.7-learncpp-visual.md`](../learncpp/02-canonical-0.2.7-learncpp-visual.md) (method), `scripts/real_site_drill.sh`, `scripts/pdf_page_forensics.py`
 > **Evidence:** per-site `evidence/` folders (before and after forensics, findings JSON, reports, probes, crops); post-fix artifacts are `2026-09-16-forensics-gowk-after.{json,md}` in each folder.

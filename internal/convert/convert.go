@@ -635,6 +635,7 @@ func (run *runContext) renderObject(ctx context.Context, obj *settings.PdfObject
 	state.offset = before
 	state.headings = collectObjectHeadings(root, lres, *obj)
 	state.navigation = collectBodyNavigation(lres)
+	state.textOps, state.imageOps = countPaintTextAndImages(lres)
 
 	return state, nil
 }

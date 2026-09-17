@@ -72,18 +72,20 @@ Two invariants shape everything in this package:
 | File | Lines | Responsibility |
 |------|------:|----------------|
 | `policy.go` | 210 | `WriterPolicy` (`policy.go:89`), `PDFVersion` (`PDF14`, `PDF17`, `PDF20`), profile aliases re-exported from `pdfprofile`, `Validate`, header/producer version resolution, feature gates |
-| `pdf.go` | 1198 | Document object model, page objects, `finalize` (catalog/pages/info/outlines/XMP metadata), serialization with counting xref offsets, RFC 1950 flate pool, `ReorderPages`/`DuplicatePage`, outline tree finalization, `pdfString`/`utf16BEString`/`winAnsiFold` encoding, trailer `/ID` |
+| `pdf.go` | 1764 | Document object model, page objects, `finalize` (catalog/pages/info/outlines/XMP metadata), serialization with counting xref offsets, RFC 1950 flate pool, `ReorderPages`/`DuplicatePage`, outline tree finalization, `pdfString`/`encodeTextString`/`pdfDocEncodingFold` document-string encoding, trailer `/ID` |
 | `structure.go` | 734 | Tagged PDF: `StructElem` / `StructTreeRoot`, `AllocMCID`, MCR vs bare MCID (`formatStructKids` / `contentNeedsMCR`), `/Namespace` (UA-2), `ListNumbering` on `/L` |
 | `outputintent.go` / `icc.go` / `metadata.go` | — | PDF/A OutputIntent + embedded sRGB; claiming vs non-claiming XMP (`pdfaid` / `pdfuaid` only when a profile is set) |
 | `semantic.go` | 275 | In-tree semantic PDF parser for structural testing and validation of emitted output |
 | `content.go` | 672 | Content-stream builder: every PDF operator (`q/Q`, `rg/RG`, `m/l/c/re/f/S/W n`, `cm`, `BT/ET/Td/Tm/TL/Tc/T*`, `Tj`, `Tr`), font rune recording for subsetting, mixed Latin/CJK run splitting, image-resource registration |
 | `fonts.go` | 777 | TrueType/OpenType table-directory parsing (`head`, `maxp`, `hhea`, `hmtx`, `OS/2`, `post`, `name`, `cmap` formats 0/4/6/12), the `Font` struct (metrics, advances, composite-glyph traversal, fingerprint), PDF-em metric conversion |
+| `winansi.go` | 107 | Visible-text WinAnsi folding (`winAnsiFoldCode`): Latin-1 passes through, curly quotes keep their real codes 0x91-0x94, bullets fold to the disc byte 0x95, and the 0x80-0x9F decode table (`winAnsiPunct`/`winAnsiDecode`) feeds subset glyph lookup and `/ToUnicode` |
 | `subset.go` | 758 | The subsetter: collect used glyphs (incl. composite children), strip hinting bytecode, remap composite references, rebuild cmap format 4 with delta segments, assemble a minimal SFNT with correct `checksumAdjustment` and 4-byte-aligned `loca` |
 | `images.go` | 441 | JPEG pass-through embedding (`jpegScan` for SOF dimensions), PNG decode → RGB Flate XObject with alpha `SMask`, grayscale Rec.601 fold at embed time, size caps (`maxEmbedded*`) |
 | `shape.go` | 377 | No-face shaping fallback: combining-mark strip, Arabic presentation-form joining (incl. Lam-Alef), RTL run reversal; `ShapeNeeded` heuristic |
 | `shape_gotext.go` | 462 | OpenType shaping via `go-text/typesetting` (`shaping.HarfbuzzShaper`, `Segmenter` pools), reverse cmap glyph→Unicode mapping, CJK `halt`/`palt` font features, CSS `font-feature-settings` parser |
 | `glyph.go` | 409 | `glyf` outline decoding to contour points (simple + composite, incl. F2DOT14 scales), `FlattenContour` quadratic-to-polyline conversion |
-| `registry.go` | 326 | Opt-in font registry: family-name index, CSS-lookup (`Lookup`), last-resort glyph fallback (`FindWithGlyph`), system font-dir scanning (`ScanFontDirs`, depth-limited) |
+| `registry.go` | 634 | Opt-in font registry: family-name index, CSS lookup (`Lookup`), per-code-point selection (`LookupRune`), `@font-face` descriptor registration (`AddFamilyAliasSpec`), last-resort glyph fallback (`FindWithGlyph`), system font-dir scanning (`ScanFontDirs`, depth-limited) |
+| `face_spec.go` | 84 | `FaceSpec` / `UnicodeRange`: the `@font-face` weight/style/unicode-range descriptors a registered face carries; zero values keep the file-declared weight/style and "covers everything" |
 | `fonttype0.go` | 225 | `ensureFont` dispatch (simple vs Type0), `FontFile2` + `FontDescriptor` embedding, Type0/CIDFontType2 + Identity-H + `CIDToGIDMap` emission, `/W` width runs |
 | `faces.go` | 212 | `FaceSet` (Liberation Sans/Serif/Mono + DejaVu fallback), lazy `LoadDefaultFaces` via `sync.Once`, CSS family/weight/italic resolution |
 | `fontpdf.go` | 185 | PDF name tokens, 1000-em width conversion (`widthsInEm`, `subsetWidths`), `ToUnicode` CMap emission, rune-set cache keys |
@@ -151,7 +153,7 @@ writer does not expose a partially synchronized concurrency contract.
 | Text ops | `content.go:269-333` | `SetFont` (`Tf`, dedupes identical state), `BeginText/EndText`, `TextAt` (`Td`), `TextMatrix` (`Tm`), `TextLeading` (`TL`), `SetCharSpacing` (`Tc`), `TextNextLine` (`T*`), `TextRenderMode` (`Tr`, mode 2 = fake bold) |
 | `UseEmbeddedFont` | `content.go:302` | Registers a parsed TTF under a resource name; runes drawn under it are subset into the PDF |
 | `TextShow` | `content.go:414` | The text emitter: ASCII fast path; otherwise shape, decide Type0, split mixed runs; records runes for the subsetter |
-| `(c) fonts()` | `content.go:635` | Lazy font-object allocation — **one subset per font per document** via `ensureFont`; a subset failure propagates (text naming a missing `/Resources` entry is invisible) |
+| `(c) fonts()` | `content.go:858` | Lazy font-object allocation: rune unions are keyed per **(page-local resource name, face)** pair (`fontUnionKey`), so one face registered as `F1` across pages embeds one subset while the same face under `F1_u` keeps its own Type0 subset; a subset failure propagates (text naming a missing `/Resources` entry is invisible) |
 | `uniqueImageName` | `images.go:438` | Suffix-collision-free page-local image names for body + header/footer bands |
 
 ### Fonts (`fonts.go`, `faces.go`, `registry.go`, `woff.go`)
@@ -166,7 +168,8 @@ writer does not expose a partially synchronized concurrency contract.
 | `ParseFontBytes` | `woff.go:40` | Dispatch: TTF/OTF unchanged, WOFF1 → `DecodeWOFF` (stdlib zlib), WOFF2 → `DecodeWOFF2` (Brotli + `glyf`/`loca` reconstruction via `github.com/tdewolff/font`); TrueType outlines only |
 | `DecodeWOFF` | `woff.go:243` | stdlib-zlib WOFF1 → SFNT with hard caps: table count ≤ 1024, per-table ≤ 16 MiB, reconstructed ≤ 32 MiB, overlap rejection |
 | `FaceSet` / `LoadDefaultFaces` / `DefaultFont` | `faces.go:14/42/205` | Bundled Liberation + DejaVu faces, lazily parsed once (process-wide cache via `sync.Once`) |
-| `Registry` / `Lookup` / `FindWithGlyph` | `registry.go:16/71/120` | Opt-in family index for `--font-path`/`--use-system-fonts`; last-resort glyph fallback |
+| `Registry` / `Lookup` / `LookupRune` / `FindWithGlyph` | `registry.go:17/174/200/262` | Opt-in family index for `--font-path`/`--use-system-fonts`; `LookupRune` picks per code point (a face whose declared `unicode-range` excludes the rune is not a candidate, and a face that maps it beats one that only declares it); `FindWithGlyph` is the last-resort glyph fallback |
+| `FaceSpec` / `UnicodeRange` | `face_spec.go:19/5` | The `@font-face` weight/style/unicode-range descriptors a registered face carries. `internal/css/fontface_descriptors.go` parses the CSS side (`ParseUnicodeRanges` `:39`, `fontWeightDescriptor` `:125`, `italicDescriptor` `:146`) and `prepare.mergeFontFace` registers them (`styles.go:467`) |
 | `ScanFontDirs` / `DefaultSystemFontDirs` | `registry.go:270/241` | Depth-limited directory scan (`.ttf`/`.otf`), **opt-in only** — nothing is scanned by default |
 
 ### Shaping (`shape.go`, `shape_gotext.go`)
@@ -183,7 +186,7 @@ writer does not expose a partially synchronized concurrency contract.
 
 | Symbol | Location | Purpose |
 |--------|----------|---------|
-| `(d) ensureFont` | `fonttype0.go:34` | Subsets `f` for `used` once per document (cache key = mode + fingerprint + base name + rune key), then dispatches to simple or Type0 emission |
+| `(d) ensureFont` | `fonttype0.go:61` | Subsets `f` for the `used` rune union of one (page-local resource name, face) pair (cache key = mode + fingerprint + base name + rune key, with no resource name in it), then dispatches to simple or Type0 emission |
 | `(d) embedFontFile` | `fonttype0.go:89` | Shared `FontFile2` (Flate) + `FontDescriptor` used by both font modes |
 | `(d) emitSimple` | `fonttype0.go:118` | Simple TrueType: `/FirstChar /LastChar /Widths []` (char-code indexed, 0 for missing), `/Encoding /WinAnsiEncoding`, `/ToUnicode` |
 | `(d) emitType0` | `fonttype0.go:140` | Type0 + CIDFontType2: Identity-H, `CIDToGIDMap` (kept **uncompressed** — some viewers mishandle Flate maps), `/W` width runs, `/ToUnicode` |
@@ -191,7 +194,8 @@ writer does not expose a partially synchronized concurrency contract.
 | `(s) build` | `subset.go:372` | Table assembly: head (indexToLocFormat=1), hhea/maxp (patched counts), hmtx, cmap4, **long loca always**, glyf 4-byte padded, OS/2, post |
 | `widthsInEm` / `subsetWidths` | `fontpdf.go:18/35` | The single home of font-units → PDF 1000-em conversion for both simple `/Widths` and Type0 `/W` |
 | `(d) ensureToUnicode` | `fontpdf.go:60` | `Adobe-Identity-UCS` CMap; 1-byte codespace for simple, 2-byte for Identity-H; bfchar chunks of 100 |
-| `pdfString` | `pdf.go:809` | Literal-string encoding: code points ≤ U+00FF become single bytes (matches subset cmap + widths); above folds via `winAnsiFold` or `?` — raw UTF-8 bytes caused mojibake |
+| `pdfString` | `pdf.go:1554` | Document-string encoding (Info, outline titles, dest names): code points ≤ U+00FF become single bytes; above folds via `pdfDocEncodingFold` (curly quotes → ASCII, bullets → middle dot, en/em dash → PDFDocEncoding 0x85/0x84, `pdf.go:1592`); raw UTF-8 bytes caused mojibake |
+| `winAnsiFoldCode` | `winansi.go:36` | Visible simple-text fold: curly quotes keep WinAnsi codes 0x91-0x94, bullets fold to the disc byte 0x95 (`winAnsiBulletByte`), unmapped code points report `ok=false` and the emitter writes `?` |
 
 ### Images (`images.go`)
 
@@ -247,10 +251,15 @@ Notes on that seam:
 1. **Preflight**: error if already finalized or zero pages (`errPDFNoPages`).
 2. **Allocate** `catalogRef`, `infoRef`, `pagesRef` first — page dicts
    reference `/Parent` (`pagesRef`), so the ref must exist.
-3. **`unionFontRunes`**: consolidates the per-page rune sets recorded during
-   painting into a document-wide sorted rune union per font resource, and
-   precomputes each font's subset cache key + Type0 decision. One subset per
-   font across all pages instead of near-identical per-page subsets.
+3. **`unionFontRunes`** (`pdf.go:933`): consolidates the per-page rune sets
+   recorded during painting into one sorted union per **(page-local resource
+   name, face)** pair (`fontUnionKey`, `pdf.go:131`), and precomputes each
+   union's subset cache key + Type0 decision. A face registered as `F1` on
+   many pages shares one subset; the same face under `F1_u` keeps its own
+   Type0 subset. The cache key itself is name-independent
+   (`v{mode}|{fingerprint}|{baseName}|{runesKey}`, `pdf.go:972`), so unions
+   with identical rune sets collapse to one embedded object. One union per
+   pair replaces near-identical per-page subsets.
 4. **Pages tree**: flat single-level `/Kids [pageRefs…]` + `/Count`.
 5. **Outlines before Catalog** (explicit ordering constraint, commented in
    code): `finalizeOutlines` assigns each node its ref and serializes
@@ -311,7 +320,7 @@ subset tied to the original Unicode face (not `FL`).
 
 ```
 ensureFont(fnt, name, used)
-  key := v{0|1}|{fingerprint:%x}|{baseName}|{runesKey}      // cache identity
+  key := v{0|1}|{fingerprint:%x}|{baseName}|{runesKey}      // identity without the resource name
   fontCache[key] hit? ──► return existing ref
   scope := subsetSimple | subsetUnicode
   subsetFont(fnt, used, scope)
@@ -392,14 +401,15 @@ foundation.
 | **RFC 1950 zlib for all `/FlateDecode`** | PDF spec requires zlib wrapper, not raw DEFLATE; raw streams made pages render empty. Compressors are pooled per page (`flatePool`). |
 | **TrueType outlines only; CFF/`OTTO` rejected** | Subsetting re-quires glyf/loca surgery; CFF hinting is out of scope. Clear, early error instead of a broken embed. |
 | **WOFF1 in-tree, WOFF2 via an allowlisted decoder** | WOFF1 needs only stdlib zlib. WOFF2 needs Brotli plus `glyf`/`loca` reconstruction, handled by `github.com/tdewolff/font` (user-approved 2026-09-16). Hard decompress-bomb caps, overlap rejection, and the decoder's own 30 MiB memory cap treat fonts as untrusted input (THREAT-MODEL §fonts). |
-| **Subset at finalize, one subset per font per document** | Document-wide rune union (instead of per-page subsets) minimizes embedded font size and makes subset cache keys stable/deterministic. |
+| **Subset at finalize, one subset per (resource name, face) union** | The document-wide rune union (instead of per-page subsets) minimizes embedded font size and makes subset cache keys stable/deterministic. Splitting the union by resource name keeps a face's simple and Type0 runs from sharing one mode decision, while the name-independent cache key still collapses identical unions into one embedded font (`pdf.go:123`, `fonttype0.go:98`). |
 | **Simple Latin-1 fonts + Type0/CIDFontType2 for anything above U+00FF** | Latin-1 path: small, golden-test-friendly, WinAnsi single-byte codes, `/Widths` indexed by char code. Higher Unicode: Identity-H CIDs equal to Unicode code points — no CID renumbering, but requires `CIDToGIDMap` + `ToUnicode`. |
-| **`winAnsiFold` + `?` fallback instead of raw UTF-8 bytes** | Literal strings are byte-oriented; emitting UTF-8 made viewers show mojibake and missing glyphs. Folding common punctuation (en/em dash → `-`, curly quotes, bullets → middle dot) keeps the subset cmap and `/Widths` consistent with the emitted bytes. |
+| **`winAnsiFoldCode` + `?` fallback instead of raw UTF-8 bytes** | Literal strings are byte-oriented; emitting UTF-8 made viewers show mojibake and missing glyphs. Visible simple text keeps the WinAnsi codes that have real glyphs there: curly quotes stay 0x91-0x94 and bullets fold to the disc 0x95, not the middle dot, so the painted glyph, advance, and `/ToUnicode` extraction all match the input (`winansi.go:36`). Code points with no WinAnsi code route to the Type0 sibling when the run needs it, else `?`. Document strings (Info, outline titles, dest names) carry no font subset, so they deliberately keep the PDFDocEncoding fold: curly quotes become ASCII, bullets the middle dot, en/em dash bytes 0x85/0x84 (`pdfDocEncodingFold`, `pdf.go:1592`). |
 | **Hinting stripped from subsets; long `loca` always** | Subsets omit `fpgm`/`prep`/`cvt`, so leftover instructions garbled CJK composites (broken 東京都 in PDFium); unaligned glyf offsets had the same effect. 4-byte alignment + format-1 loca fixed viewer rendering. |
 | **Mixed Latin/CJK run splitting with Liberation fallback** | CJK faces often lack Latin glyphs; ASCII that maps to `.notdef` would become tofu. Runs are split (`splitType0Runs`) and missing Latin falls back to the embedded Liberation face (`FL`), all within one `Tj` sequence. |
 | **OT shaping via pure-Go HarfBuzz port, only when GSUB present** | Real CGO HarfBuzz is explicitly out of scope (`CGO_ENABLED=0`); reverse-cmap restores Unicode CIDs; manual presentation-form Arabic/RTL fallback covers no-GSUB faces. Indic remains Partial. |
 | **JPEG pass-through vs PNG re-encode** | JPEG bytes are embedded as-is (`/DCTDecode`) — no decode/re-encode loss in the normal path; PNG is decoded and re-encoded as Flate RGB (with `SMask` when alpha), bounded by strict caps. Grayscale folds Rec.601 luma at embed/paint time. |
 | **Flat, single-level pages tree + page permutation** | TOC-first ordering and copies/collate become a simple `ReorderPages` permutation; pages own their content/annots so duplication doesn't need deep tree surgery. |
+| **Webfont descriptors become face-selection metadata** | `@font-face` weight/style/unicode-range are parsed in `internal/css` (`fontface_descriptors.go`), carried through `prepare.mergeFontFace` (`styles.go:467`) into a per-face `FaceSpec`, and consulted by `Registry.LookupRune` per code point: a face whose declared range excludes the rune is not a candidate, which is what a family split into `unicode-range` partitions (Google Fonts `latin` + `latin-ext`) needs. Zero descriptors keep the file-declared weight/style and full coverage. |
 | **Bundled Liberation + opt-in system fonts** | Product rule: dependable Latin output with zero system-font dependence; `--font-path`/`--use-system-fonts` are operator-controlled and skip proprietary trees (privacy + licensing). |
 | **Deterministic by default, time injectable** | Zero `creationTime` pins 2000-01-01; typed requests inject `Now` for byte-stable CI/golden output. |
 
@@ -544,8 +554,10 @@ Cross-reference [`documentation/deferred.md`](../deferred.md),
   CFF/`OTTO` OpenType is still rejected. Remote
   `https://` `@font-face` is fetched through the subresource ACL.
 - **Simple fonts are WinAnsi/Latin-1 single-byte** with punctuation folding;
-  code points that fold or hit `?` lose fidelity. Full
-  PDFDocEncoding/TrueType-encoding tables are not implemented.
+  curly quotes and bullets keep their real WinAnsi codes (`winansi.go:36`),
+  while code points with no WinAnsi code either take the Type0 path or hit
+  `?` and lose fidelity. Full PDFDocEncoding/TrueType-encoding tables are not
+  implemented.
 - **Complex scripts are Partial**: Arabic/Hebrew work via OT (GSUB) or
   presentation-form fallback; **Indic shaping is Partial** without a GSUB
   face; no CGO HarfBuzz ever.
@@ -558,7 +570,9 @@ Cross-reference [`documentation/deferred.md`](../deferred.md),
 - **Transparency**: alpha soft masks exist; PDF 1.4 transparency *groups*
   (blend modes) are not implemented — only per-image `SMask`.
 - **No real text extraction fidelity beyond `ToUnicode`**: extraction works
-  for the covered runes; folded punctuation extracts as its ASCII stand-in.
+  for the covered runes; folded punctuation extracts as its ASCII stand-in,
+  while the preserved WinAnsi codes (curly quotes, disc) decode back to their
+  original code points through `/ToUnicode` (`fontpdf.go:115`).
 - **Deterministic default date is a fixed constant (2000-01-01)**: consumers
   who want wall-clock dates must set `CreationTime`/inject `Now`, otherwise
   two conversions of the same input are byte-identical but "stale" dated.

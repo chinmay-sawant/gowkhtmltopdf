@@ -449,6 +449,8 @@ func mergeFontFaces(ctx context.Context, resources load.ResourceContext, registr
 
 //nolint:wsl,nlreturn,lll // font-face collection flow
 func mergeFontFace(ctx context.Context, resources load.ResourceContext, registry *pdf.Registry, face css.FontFace, idx int, log io.Writer) *pdf.Registry {
+	spec := fontFaceSpec(face)
+
 	for _, uri := range css.FontFaceURLs(face.Src) {
 		font, ok := fetchFontFace(ctx, resources, uri, idx, log)
 		if !ok {
@@ -462,10 +464,28 @@ func mergeFontFace(ctx context.Context, resources load.ResourceContext, registry
 		}
 		registry.AddFont(font)
 		if face.Family != "" {
-			registry.AddFamilyAlias(face.Family, font)
+			registry.AddFamilyAliasSpec(face.Family, font, spec)
 		}
 	}
 	return registry
+}
+
+// fontFaceSpec translates parsed @font-face descriptors into the selection
+// metadata the PDF registry keeps. Zero values mean "no descriptor": the face
+// keeps its file-declared weight/style and covers every code point.
+func fontFaceSpec(face css.FontFace) pdf.FaceSpec {
+	ranges := make([]pdf.UnicodeRange, 0, len(face.UnicodeRanges))
+
+	for _, span := range face.UnicodeRanges {
+		ranges = append(ranges, pdf.UnicodeRange{Lo: span.Lo, Hi: span.Hi})
+	}
+
+	return pdf.FaceSpec{
+		Weight:   face.Weight,
+		Italic:   face.Italic,
+		StyleSet: face.StyleSet,
+		Ranges:   ranges,
+	}
 }
 
 func fetchFontFace(

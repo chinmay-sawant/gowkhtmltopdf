@@ -73,9 +73,9 @@ type imageRef struct {
 }
 
 // resolveImage fetches (once) and decodes (once) src; nil on any failure.
-// Fetched payloads that are not an embeddable image (SVG, PNG, JPEG, or GIF
-// re-encoded to PNG) are a miss: the bytes are dropped and one warning names
-// the src so an HTML error page or WebP response cannot reach the painters.
+// Fetched payloads that are not an embeddable image (SVG, PNG, JPEG, GIF, or
+// ICO re-encoded to PNG) are a miss: the bytes are dropped and one warning
+// names the src so an HTML error page or WebP response cannot reach the painters.
 func (e *engine) resolveImage(src string) *imageRef {
 	if src == "" || e.checkContext() || !e.hasImageResolver() {
 		return nil
@@ -103,7 +103,7 @@ func (e *engine) resolveImage(src string) *imageRef {
 	}
 
 	ref := &imageRef{src: src, data: data} //nolint:exhaustruct // intentional zero fields
-	if !decodeImagePayload(ref) {
+	if !e.decodeImagePayload(ref) {
 		// Unsupported payload: a miss, not a zero-size image. The nil cache
 		// sentinel makes the warning fire once per src per Layout run.
 		e.warnImageMiss(src)
@@ -117,11 +117,12 @@ func (e *engine) resolveImage(src string) *imageRef {
 	return ref
 }
 
-// decodeImagePayload fills ref from its fetched bytes, re-encoding SVG/GIF
+// decodeImagePayload fills ref from its fetched bytes, re-encoding SVG/GIF/ICO
 // payloads to PNG and reading intrinsic dimensions. It reports false when the
 // payload is not an embeddable image.
-func decodeImagePayload(ref *imageRef) bool {
-	if png, pw, ph, err := svg.Rasterize(ref.data, svgRasterMaxDim); err == nil && len(png) > 0 && pw > 0 && ph > 0 {
+func (e *engine) decodeImagePayload(ref *imageRef) bool {
+	data := e.resolveSVGUseRefs(ref.data)
+	if png, pw, ph, err := svg.Rasterize(data, svgRasterMaxDim); err == nil && len(png) > 0 && pw > 0 && ph > 0 {
 		ref.data, ref.w, ref.h = png, pw, ph
 
 		return true
@@ -139,7 +140,29 @@ func decodeImagePayload(ref *imageRef) bool {
 		return true
 	}
 
+	if png, w, h, ok := icoToPNG(ref.data); ok {
+		ref.data, ref.w, ref.h = png, w, h
+
+		return true
+	}
+
 	return false
+}
+
+// resolveSVGUseRefs inlines external and same-document <use href="#id">
+// before canvas parse. Uses the layout image resolver for sprite URLs.
+func (e *engine) resolveSVGUseRefs(data []byte) []byte {
+	var fetch func(string) ([]byte, error)
+	if e.hasImageResolver() {
+		fetch = e.resolveImageData
+	}
+
+	resolved, err := svg.ResolveUseReferences(data, fetch)
+	if err != nil || resolved == nil {
+		return data
+	}
+
+	return resolved
 }
 
 // warnImageMiss reports one warning per src whose fetched payload is not a
@@ -319,6 +342,15 @@ func (e *engine) flowChildren(
 		}
 	}
 
+	// An empty block (or one whose only children are skipped) still renders
+	// its generated ::before/::after content. Font Awesome icons are empty
+	// <i class="fas fa-play"> hosts with a :before glyph, and .fas makes them
+	// display:inline-block, which routes them through this block path where
+	// no inline run would otherwise inject the pseudo items.
+	if !sizeContained && e.emptyFlowRendersPseudo(parent, children) {
+		curY += e.layoutInlineFloats(parent, nil, contentW, contentX, posY+curY, floats)
+	}
+
 	parentHeight := e.applyHeightConstraints(sty, curY+e.scalePt(sty.PaddingBottom))
 	cbHeight := parentHeight - (absOriginY - posY)
 
@@ -328,13 +360,20 @@ func (e *engine) flowChildren(
 
 	e.flushDeferredFlowChildren(parent, deferred, cbHeight, absCBW, absCBX, absOriginY)
 
-	// A final child margin is inside a parent that has bottom padding or a
-	// bottom border. Without this, the margin disappears from the parent's
-	// used height, making padded cards and diagram boxes shorter than HTML.
-	// A size-contained box is sized as empty, so that trailing margin does
-	// not apply either.
-	if !sizeContained && (sty.PaddingBottom > 0 || sty.BorderBottom.Width > 0) {
+	// A final child margin is inside a parent that has bottom padding, a
+	// bottom border, or a BFC (CSS 2.1 8.3.1). Without that, the margin
+	// collapses through a borderless auto-height parent and escapes via
+	// parent.escapeMarginBottom for the next sibling. A size-contained box
+	// is sized as empty, so that trailing margin does not apply either.
+	absorbsBottom := sty.PaddingBottom > 0 || sty.BorderBottom.Width > 0 || establishesBFC(sty)
+
+	switch {
+	case sizeContained:
+		// as-if-empty: ignore trailing child margin
+	case absorbsBottom:
 		curY += prevBottom
+	case parent != nil:
+		parent.escapeMarginBottom = prevBottom
 	}
 
 	return curY
@@ -423,11 +462,14 @@ func (e *engine) flushDeferredFlowChildren(
 		}
 
 		e.absCBHeights[target] = cbHeight
-		ab := e.build(target, absCBW, absCBX, absOriginY)
+		restoreCBW := e.pushReplacedCBW(target, absCBW)
+		absChild := e.build(target, absCBW, absCBX, absOriginY)
+
+		restoreCBW()
 		delete(e.absCBHeights, target)
 
-		if ab != nil && parent != nil {
-			parent.children = append(parent.children, ab)
+		if absChild != nil && parent != nil {
+			parent.children = append(parent.children, absChild)
 		}
 	}
 }
@@ -673,18 +715,7 @@ func (e *engine) layoutBlockChild(
 
 	curY = floats.clearFloats(clearVal, posY, curY)
 	curY += collapseMargins(prevBottom, e.scalePt(cstate.MarginTop))
-	// CSS2.1 §9.5: line boxes next to floats are shortened, not the
-	// block box — so normal paragraphs get full content width and
-	// re-query exclusion per line (wiki "Leading roles" reclaim).
-	// §9.5 / BFC: flow-root, overflow≠visible, flex, etc. must not
-	// overlap float margin boxes — otherwise heading border-bottom
-	// paints through the infobox (wiki .mw-heading{display:flow-root}).
-	// Layout containment makes the box an independent formatting context,
-	// so it avoids active floats the same way.
-	boxX, boxW := contentX, contentW
-	if establishesBFC(cstate) || containsLayout(cstate) {
-		boxX, boxW = floats.exclusion(contentX, contentW, posY, curY)
-	}
+	boxX, boxW, curY := e.placeBesideFloats(node, cstate, floats, contentX, contentW, posY, curY)
 
 	if node.Name == cssTagImg {
 		marginL := e.scalePt(cstate.MarginLeft)
@@ -702,12 +733,137 @@ func (e *engine) layoutBlockChild(
 	// (Chrome 130+; fixture-61 #102 justify-self:center in a table cell).
 	boxX, boxW = e.applyJustifySelfFitContent(node, cstate, boxX, boxW)
 
+	// Replaced children resolve percent/calc() widths against the containing
+	// block content width, not the page frame (tutorialspoint banner).
+	restoreCBW := e.pushReplacedCBW(node, contentW)
 	cblock := e.build(node, boxW, boxX, posY+curY)
+
+	restoreCBW()
+
 	if cblock == nil {
 		return curY, 0, nil
 	}
 
-	return curY + cblock.height, e.scalePt(cstate.MarginBottom), cblock
+	// Collapse this box's own bottom margin with any margin that escaped
+	// through it from a last child (borderless auto-height parent).
+	outgoing := collapseMargins(e.scalePt(cstate.MarginBottom), cblock.escapeMarginBottom)
+
+	return curY + cblock.height, outgoing, cblock
+}
+
+// placeBesideFloats applies CSS2.1 §9.5 float exclusion for one block child:
+// clear below when the slot is too narrow, or squeeze a BFC root into the slot.
+// Line boxes next to floats are shortened, not the block box, so normal
+// paragraphs keep full content width and re-query exclusion per line. BFC
+// roots (flow-root, overflow!=visible, flex, layout containment) must not
+// overlap float margin boxes. When the slot cannot hold the box's minimum
+// content width, §9.5 clears the block below preceding floats.
+func (e *engine) placeBesideFloats(
+	node *html.Node, cstate ResolvedStyle, floats *floatState,
+	contentX, contentW, posY, curY float64,
+) (float64, float64, float64) {
+	boxX, boxW := contentX, contentW
+	bfcRoot := establishesBFC(cstate) || containsLayout(cstate)
+	slotX, slotW := floats.exclusion(contentX, contentW, posY, curY)
+
+	if slotW >= contentW-bfcSlotEpsilon {
+		return boxX, boxW, curY
+	}
+
+	needed := e.flowSlotWidthNeeded(node, cstate)
+	if bfcRoot {
+		needed = e.bfcSlotWidthNeeded(node, cstate, contentW)
+	}
+
+	switch {
+	case needed > slotW+bfcSlotEpsilon:
+		// Advance past the floats without dropping them: the parent BFC
+		// still encloses their extents (root height) and later siblings
+		// are already at or below their bottoms.
+		if bottom := floats.clearY(posY + curY); bottom > posY+curY {
+			curY = bottom - posY
+		}
+	case bfcRoot:
+		// A BFC root may use the narrowed slot: its border box must not
+		// overlap the float margin boxes (CSS2.1 §9.5).
+		boxX, boxW = slotX, slotW
+	}
+
+	return boxX, boxW, curY
+}
+
+// emptyFlowRendersPseudo reports whether a block with no renderable in-flow
+// children should still lay out its generated ::before/::after content.
+//
+//nolint:cyclop // empty-flow pseudo eligibility gates
+func (e *engine) emptyFlowRendersPseudo(parent *box, children []*html.Node) bool {
+	if parent == nil || parent.node == nil || parent.style == nil {
+		return false
+	}
+
+	for _, child := range children {
+		if child.Type == html.CommentNode || child.Type == html.DoctypeNode {
+			continue
+		}
+
+		if isSkippableFlowNode(child, e.stylePtr(child)) {
+			continue
+		}
+
+		return false
+	}
+
+	for _, pseudoEl := range []string{pseudoBefore, pseudoAfter} {
+		if e.pseudoContentURL(parent.node, pseudoEl) != "" {
+			return true
+		}
+
+		if e.pseudoContent(parent.node, pseudoEl) != "" {
+			return true
+		}
+	}
+
+	return false
+}
+
+// bfcSlotEpsilon absorbs measurement rounding when comparing the exclusion
+// slot against the width a BFC root needs.
+const bfcSlotEpsilon = 0.5
+
+// bfcSlotWidthNeeded returns the margin-box width a BFC root needs before it
+// must clear below floats (CSS2.1 §9.5): the specified width when definite,
+// otherwise the box's min-content width. Percent widths resolve against the
+// full containing block, not the narrowed exclusion slot. Flex and grid
+// containers shrink to the slot, so their non-negotiable width is just the
+// box chrome; min-content would overestimate them.
+func (e *engine) bfcSlotWidthNeeded(node *html.Node, style ResolvedStyle, containingW float64) float64 {
+	margins := e.scalePt(style.MarginLeft) + e.scalePt(style.MarginRight)
+
+	if style.Width >= 0 || style.WidthPercent >= 0 || style.WidthCalc {
+		w, _ := resolveBlockWidth(e, &style, containingW)
+
+		return w + margins
+	}
+
+	switch style.Display {
+	case displayFlex, displayInlineFlex, displayGrid, displayInlineGrid:
+		return style.horizontalChrome(e) + margins
+	}
+
+	minW, _ := e.measureCellMinMax(node, style)
+
+	return minW + margins
+}
+
+// flowSlotWidthNeeded returns the narrowest exclusion slot a normal in-flow
+// block can use before its line boxes must shift below the floats (CSS2.1
+// §9.5): the width of its widest unbreakable word (min-content) plus margins.
+// A normal block's border box is not narrowed by floats, so its specified
+// width does not participate here; only the line boxes avoid the float.
+func (e *engine) flowSlotWidthNeeded(node *html.Node, style ResolvedStyle) float64 {
+	minW, _ := e.measureCellMinMax(node, style)
+
+	return minW + e.scalePt(style.MarginLeft) + e.scalePt(style.MarginRight)
 }
 
 // marginTrimOverride returns the margin-trimmed style override for a block
@@ -894,6 +1050,12 @@ func (e *engine) emitListMarker(node *html.Node, style ResolvedStyle, contentX, 
 		return
 	}
 
+	if typ == listStyleSquare {
+		e.emitSquareListMarker(style, contentX, baseline, size)
+
+		return
+	}
+
 	face := e.faceFor(&style)
 
 	text := markerText(node, typ)
@@ -919,6 +1081,29 @@ func (e *engine) emitListMarker(node *html.Node, style ResolvedStyle, contentX, 
 		Kind: OpBullet, X: posX, Y: baseline, Text: text, Font: face, Size: size,
 		InkDescent: e.fontDescentFace(face, size),
 		R:          style.Color[0], G: style.Color[1], B: style.Color[2],
+	})
+}
+
+// listSquareMarkerEm is Chrome's filled-square list marker side length in em.
+const listSquareMarkerEm = 0.3125
+
+// emitSquareListMarker paints list-style-type:square as a filled vector square
+// (OpFillRect) instead of the U+25AA glyph, matching Chrome's 0.3125em side
+// and ~0.66em outside gutter.
+func (e *engine) emitSquareListMarker(style ResolvedStyle, contentX, baseline, emSize float64) {
+	side := emSize * listSquareMarkerEm
+	posX, visible := listMarkerX(style.ListStylePosition, contentX, emSize, side)
+
+	if !visible {
+		return
+	}
+
+	// Center the square on the mid-em above the baseline (print disc optical center).
+	posY := baseline - emSize*half - side*half
+
+	e.add(Op{ //nolint:exhaustruct // intentional zero fields
+		Kind: OpFillRect, X: posX, Y: posY, W: side, H: side,
+		R: style.Color[0], G: style.Color[1], B: style.Color[2], Alpha: 1,
 	})
 }
 
@@ -1001,6 +1186,8 @@ func markerText(node *html.Node, typ string) string {
 	case listStyleCircle:
 		return "\u25E6"
 	case listStyleSquare:
+		// Square uses emitSquareListMarker (OpFillRect); keep a glyph only as
+		// a defensive fallback if a caller still asks for marker text.
 		return "\u25AA"
 	case listStyleDecimal, listStyleDecimalZero:
 		return strconv.Itoa(listItemIndex(node)) + "."

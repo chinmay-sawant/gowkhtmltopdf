@@ -11,9 +11,13 @@ For every page it reports:
   - drawing count, link annotation count
   - embedded font base names used by the page
 
-It flags pages where a real text layer exists but almost no ink is visible,
-which is the signature of text painted under an opaque fill (the LearnCpp
-34/37 blank pages defect).
+It flags pages that contain text spans with (near) zero rendered ink while
+the text layer still reports their words: the signature of text painted under
+an opaque fill (the LearnCpp 34/37 blank pages defect). The check is per span
+on purpose. Page-level coverage alone false-positived on genuinely sparse
+pages (a TOC tail or a footer-only page carries little ink overall but every
+span is rendered), so coverage is reported for context and does not decide
+the flag.
 
 Usage:
   python3 scripts/pdf_page_forensics.py file.pdf [--json out.json] [--dpi 80]
@@ -39,11 +43,18 @@ except ImportError:
     print("need pymupdf: pip install pymupdf", file=sys.stderr)
     raise SystemExit(2)
 
-# A page with at least this many words but less than this visible coverage is
-# almost certainly covered by an opaque fill. Learned from the LearnCpp run:
-# covered pages reported a full text layer and ~1-4 percent ink.
-LOW_INK_WORD_FLOOR = 20
-LOW_INK_COVERAGE = 0.02
+# A pixel counts as ink when any RGB channel is below this, for both the page
+# coverage raster and the per-span check.
+INK_CHANNEL = 250
+
+# A page is flagged only when a text span's own region shows (near) zero
+# rendered ink while the text layer still reports its characters: the real
+# covered-text signal. The old page-level test (>= 20 words and coverage <
+# 0.02) false-positived on genuinely sparse pages, where every span is
+# rendered but the page as a whole carries little ink. Coverage stays in the
+# report for context; it no longer decides the flag.
+SPAN_INK_FLOOR = 0.01  # non-white fraction below this counts as no ink
+SPAN_MIN_PIXELS = 4  # skip spans that rasterize to a sub-glyph sliver
 
 # Keys a comparable report must carry. Both this script's --json output and
 # the committed LearnCpp evidence files use them.
@@ -141,7 +152,53 @@ def print_comparison(current: dict, baseline: dict, baseline_path: Path) -> None
             print(f"  {label}: {stats[0]:.5f} / {stats[1]:.5f} / {stats[2]:.5f}")
 
 
-def page_metrics(page: fitz.Page, dpi: int) -> dict:
+def spans_missing_ink(page: fitz.Page, pix: fitz.Pixmap) -> int:
+    """Count text spans whose rendered bbox shows (near) zero non-white ink.
+
+    `pix` is a raster of `page`. Whitespace-only spans are skipped: they sit
+    on the page background and a blank region around a space is not evidence
+    of covered text. The bbox is inset by one pixel so anti-aliased edges of a
+    neighbouring glyph cannot lend ink to a covered span.
+    """
+    scale = pix.width / page.rect.width if page.rect.width else 0.0
+    if scale <= 0:
+        return 0
+    samples = memoryview(pix.samples)
+    step = pix.n
+    missing = 0
+    for block in page.get_text("dict")["blocks"]:
+        if block.get("type") != 0:
+            continue
+        for line in block.get("lines", []):
+            for span in line.get("spans", []):
+                if not any(ch.isalnum() for ch in span.get("text", "")):
+                    continue
+                x0, y0, x1, y1 = span["bbox"]
+                ix0 = max(int(x0 * scale) + 1, 0)
+                iy0 = max(int(y0 * scale) + 1, 0)
+                ix1 = min(int(x1 * scale), pix.width)
+                iy1 = min(int(y1 * scale), pix.height)
+                area = (ix1 - ix0) * (iy1 - iy0)
+                if area < SPAN_MIN_PIXELS:
+                    continue
+                lit = 0
+                for y in range(iy0, iy1):
+                    base = y * pix.width * step
+                    for x in range(ix0, ix1):
+                        i = base + x * step
+                        if (
+                            samples[i] < INK_CHANNEL
+                            or samples[i + 1] < INK_CHANNEL
+                            or samples[i + 2] < INK_CHANNEL
+                        ):
+                            lit += 1
+                if lit / area < SPAN_INK_FLOOR:
+                    missing += 1
+    return missing
+
+
+def page_metrics(page: fitz.Page, dpi: int) -> tuple[dict, int]:
+    """Per-page metrics and the count of text spans with no visible ink."""
     words = page.get_text("words")
     drawings = page.get_drawings()
     # page.annots() misses the writer's link objects in this PDF; get_links()
@@ -166,11 +223,17 @@ def page_metrics(page: fitz.Page, dpi: int) -> dict:
     samples = memoryview(pix.samples)
     step = pix.n
     for i in range(0, total * step, step):
-        if samples[i] < 250 or samples[i + 1] < 250 or samples[i + 2] < 250:
+        if (
+            samples[i] < INK_CHANNEL
+            or samples[i + 1] < INK_CHANNEL
+            or samples[i + 2] < INK_CHANNEL
+        ):
             lit += 1
     coverage = round(lit / total, 5) if total else 0.0
 
-    return {
+    missing_ink = spans_missing_ink(page, pix)
+
+    row = {
         "page": page.number + 1,
         "words": len(words),
         "text_box": text_box,
@@ -181,6 +244,7 @@ def page_metrics(page: fitz.Page, dpi: int) -> dict:
         "fonts": fonts,
         "page_size": [round(page.rect.width, 1), round(page.rect.height, 1)],
     }
+    return row, missing_ink
 
 
 def main() -> int:
@@ -193,7 +257,12 @@ def main() -> int:
         metavar="BASELINE.json",
         help="previous report JSON; print a delta summary against it",
     )
-    ap.add_argument("--dpi", type=int, default=80, help="raster DPI for coverage (default 80)")
+    ap.add_argument(
+        "--dpi",
+        type=int,
+        default=80,
+        help="raster DPI for coverage and the per-span ink check (default 80)",
+    )
     ap.add_argument("--thumb-dir", type=Path, help="write page PNGs here")
     ap.add_argument("--contact", type=Path, help="write a contact sheet PNG here")
     args = ap.parse_args()
@@ -206,7 +275,8 @@ def main() -> int:
         args.thumb_dir.mkdir(parents=True, exist_ok=True)
 
     doc = fitz.open(args.pdf)
-    rows = [page_metrics(page, args.dpi) for page in doc]
+    metrics = [page_metrics(page, args.dpi) for page in doc]
+    rows = [row for row, _ in metrics]
 
     if args.thumb_dir:
         for row in rows:
@@ -235,11 +305,7 @@ def main() -> int:
 
     total_words = sum(r["words"] for r in rows)
     total_links = sum(r["link_annots"] for r in rows)
-    suspicious = [
-        r["page"]
-        for r in rows
-        if r["words"] >= LOW_INK_WORD_FLOOR and r["coverage"] < LOW_INK_COVERAGE
-    ]
+    suspicious = [row["page"] for row, missing_ink in metrics if missing_ink]
     all_fonts = sorted({f for r in rows for f in r["fonts"]})
     current = {
         "pdf": str(args.pdf),

@@ -349,12 +349,70 @@ func snapOpForward(res *Result, idx int, paintOp *Op, boundary float64) {
 	deltaY := boundary + lead - minY
 	shiftFlowY(res, idx, idx, oldY-layoutCoordEpsilon, deltaY)
 	shiftNearestOwnedChrome(res, idx, oldY, deltaY)
+	moveSnappedRowBoxes(res, idx, minY, deltaY)
 
 	for _, j := range chrome {
 		o := &res.Ops[j]
 		if o.Y < oldY-layoutCoordEpsilon {
 			shiftOpY(o, deltaY)
 		}
+	}
+}
+
+// initialBoxPathCap sizes the box-path buffer used by the snap repair.
+const initialBoxPathCap = 8
+
+// moveSnappedRowBoxes moves the boxes on the snapped op's own row with the
+// snap delta. The op that crosses the boundary can be the row's underline or
+// text baseline while the row band top sits above it, so shiftFlowY leaves the
+// row's box at its stale layout top. The orphans/widows pass then reads the
+// stale top, sees the row straddling the boundary, and shifts it a second time
+// (learncpp lesson cards: a 48pt blank band on the continuation page).
+// Ancestors (the card and its list) stay in place.
+func moveSnappedRowBoxes(res *Result, opIndex int, rowTop, deltaY float64) {
+	if res == nil || res.root == nil || deltaY == 0 {
+		return
+	}
+
+	path := make([]*box, 0, initialBoxPathCap)
+	if !findBoxPathForOp(res.root, opIndex, &path) {
+		return
+	}
+
+	var row *box
+
+	for pathIndex := len(path) - 1; pathIndex >= 0; pathIndex-- {
+		if path[pathIndex].y < rowTop-layoutCoordEpsilon {
+			break
+		}
+
+		row = path[pathIndex]
+	}
+	// No box starts at the snapped line's band: the op is one line inside a
+	// taller block, so the block top must stay where it is.
+	if row == nil {
+		return
+	}
+	// Table rows have their own snap repair (rowsIntact and
+	// normalizeTableRowGaps); moving their boxes here would feed those passes
+	// a second, conflicting top.
+	if boxInsideTable(row) {
+		return
+	}
+
+	shiftBoxTreeY(row, deltaY)
+}
+
+// shiftBoxTreeY moves a box subtree by deltaY without touching the ops.
+func shiftBoxTreeY(boxNode *box, deltaY float64) {
+	if boxNode == nil {
+		return
+	}
+
+	boxNode.y += deltaY
+
+	for _, child := range boxNode.children {
+		shiftBoxTreeY(child, deltaY)
 	}
 }
 
@@ -497,6 +555,8 @@ func appendRowChromeCandidates(chrome []int, ops []Op, idxs []int, idx int, oldY
 // runs (a lesson badge number and its row title share a baseline within a
 // point); they must travel with the snap or the number is left behind in the
 // previous page's gap while the row's chrome moves on.
+//
+//nolint:cyclop // row-band membership gates for snap co-travel
 func rowChromeBandCandidate(obj *Op, jdx, idx int, oldY float64) bool {
 	if obj.Fixed || jdx == idx {
 		return false
@@ -513,6 +573,17 @@ func rowChromeBandCandidate(obj *Op, jdx, idx int, oldY float64) bool {
 	}
 
 	if obj.Y > oldY+0.5 || obj.Y+obj.H < oldY-0.5 {
+		return false
+	}
+
+	// A text run belongs to the snapped op's line only when its box reaches
+	// past the snapped baseline. Adjacent line boxes touch: the previous
+	// line's box ends exactly on this line's baseline, and an inline-chrome
+	// bottom border extends a link run's op box one point past its own line
+	// box. Accepting that touch dragged the previous line's link runs onto the
+	// snapped line while the rest of their line stayed (ana-de-armas p5 and
+	// the citation lists p11-p20).
+	if (obj.Kind == OpText || obj.Kind == OpBullet) && obj.Y+obj.H <= oldY+0.5 {
 		return false
 	}
 

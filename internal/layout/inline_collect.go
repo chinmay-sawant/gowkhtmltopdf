@@ -563,6 +563,8 @@ func (e *engine) preserveTrailingGap(node *html.Node, out *[]inlineItem) {
 }
 
 // collectInlineElement flattens one element node into inline items.
+//
+//nolint:cyclop // element kind dispatch for inline collection
 func (e *engine) collectInlineElement(node *html.Node, sty ResolvedStyle, out *[]inlineItem) {
 	if sty.Display == cssDisplayNone {
 		return
@@ -598,17 +600,58 @@ func (e *engine) collectInlineElement(node *html.Node, sty ResolvedStyle, out *[
 
 		return
 	}
-	// block-level element inside inline context: lay out at a throwaway
-	// offset, then shift its ops into the line when placed.
+	// Block-level element inside an inline context (CSS 2.1 9.2.1.1): it
+	// splits the inline formatting context, so force a line break before and
+	// after. Drop trailing collapsible spaces so they cannot strut the line
+	// above the block with the parent's line-height. Build against the inline
+	// CB width, not an unconstrained 1<<30 measure width, and carry vertical
+	// margins like inline-block.
+	trimTrailingCollapsibleSpaces(out)
+	*out = append(*out, inlineItem{forceBreak: true}) //nolint:exhaustruct // block-in-inline split
+
+	avail := e.inlineCBW
+	if avail <= 0 {
+		avail = availWForInline()
+	}
+
 	opStart := len(e.ops)
-	cblock := e.build(node, availWForInline(), 0, 0)
+	cblock := e.build(node, avail, 0, 0)
 	opEnd := len(e.ops)
 
 	if cblock != nil {
 		*out = append(*out, inlineItem{ //nolint:exhaustruct // intentional zero fields
 			img: true, w: cblock.w, h: cblock.height, style: e.stylePtr(node),
 			blockBox: cblock, opStart: opStart, opEnd: opEnd,
+			marginL: e.scalePt(sty.MarginLeft), marginR: e.scalePt(sty.MarginRight),
+			marginT: e.scalePt(sty.MarginTop), marginB: e.scalePt(sty.MarginBottom),
 		})
+	}
+
+	*out = append(*out, inlineItem{forceBreak: true}) //nolint:exhaustruct // block-in-inline split
+}
+
+// trimTrailingCollapsibleSpaces drops pure-whitespace text items at the end of
+// out so a following block-in-inline break does not leave a line-height strut
+// on the preceding line.
+func trimTrailingCollapsibleSpaces(out *[]inlineItem) {
+	for len(*out) > 0 {
+		last := &(*out)[len(*out)-1]
+		if last.forceBreak || last.img || last.blockBox != nil || last.style == nil {
+			return
+		}
+
+		switch last.style.WhiteSpace {
+		case cssWhiteSpacePre, cssWhiteSpacePreWrap, cssWhiteSpacePreLine:
+			return
+		}
+
+		if last.text == "" || isAllWhitespace(last.text) {
+			*out = (*out)[:len(*out)-1]
+
+			continue
+		}
+
+		return
 	}
 }
 
@@ -642,6 +685,7 @@ func (e *engine) collectInlineBlockItem(node *html.Node, sty ResolvedStyle, out 
 			img: true, w: cblock.w, h: cblock.height, style: e.stylePtr(node),
 			blockBox: cblock, opStart: opStart, opEnd: opEnd,
 			marginL: e.scalePt(sty.MarginLeft), marginR: e.scalePt(sty.MarginRight),
+			marginT: e.scalePt(sty.MarginTop), marginB: e.scalePt(sty.MarginBottom),
 		})
 	}
 }
@@ -660,6 +704,16 @@ func (e *engine) collectInlineSpan(node *html.Node, sty ResolvedStyle, out *[]in
 	}
 
 	e.appendPseudoItem(node, sty, pseudoAfter, out)
+
+	// An empty inline box with horizontal padding or border still takes
+	// horizontal space (Wikipedia cs1-kern-left: <span></span> with
+	// padding-left:0.2em keeps adjacent quote glyphs apart). Emit a
+	// zero-content item that carries the chrome so following content shifts.
+	if before == len(*out) && e.inlineChromeLeft(&sty)+e.inlineChromeRight(&sty) > 0 {
+		item := e.textItem("", &sty)
+		e.enableInlineChrome(&item)
+		*out = append(*out, item)
+	}
 
 	// Horizontal margins on inline elements (e.g. .co { margin-left: 10px }
 	// after a logo) apply to the first/last generated items.
@@ -985,7 +1039,9 @@ func dropSpaceItem(items []inlineItem, idx int, out []inlineItem) bool {
 		return false
 	}
 
-	if strings.TrimSpace(item.text) != "" {
+	// A zero-content placeholder (empty padded inline span) is not a
+	// collapsible space: it must keep its chrome and stay in the stream.
+	if item.text == "" || strings.TrimSpace(item.text) != "" {
 		return false
 	}
 	// Pure space item.
@@ -1001,7 +1057,7 @@ func dropSpaceItem(items []inlineItem, idx int, out []inlineItem) bool {
 }
 
 // dropBeforeNext reports that the space item at items[i] is followed by
-// attaching punctuation or a citation bracket that should not be spaced.
+// attaching punctuation that should not be spaced.
 func dropBeforeNext(items []inlineItem, i int) bool {
 	if i+1 >= len(items) {
 		return false
@@ -1012,7 +1068,7 @@ func dropBeforeNext(items []inlineItem, i int) bool {
 		return true
 	}
 
-	return strings.HasPrefix(strings.TrimSpace(next.text), "[")
+	return false
 }
 
 // isJustifyGapAfter reports whether CSS text-align:justify may expand after it.
@@ -1048,13 +1104,16 @@ func noBreakBefore(prev, cur inlineItem) bool {
 	if cur.forceBreak || prev.forceBreak {
 		return false
 	}
+	// Keep nowrap runs together (wiki .reference / .IPA pieces, and nowrap
+	// chains of inline-block links). This comes before the replaced-content
+	// check: nowrap suppresses the wrap opportunity at an atomic inline
+	// boundary too.
+	if isNowrapCluster(prev, cur) {
+		return true
+	}
 
 	if isReplacedContent(prev) || isReplacedContent(cur) {
 		return false
-	}
-	// Keep nowrap runs together (wiki .reference / .IPA pieces).
-	if isNowrapCluster(prev, cur) {
-		return true
 	}
 
 	count := strings.TrimSpace(cur.text)
@@ -1221,6 +1280,7 @@ func sameInlineStyle(acc, boxN *ResolvedStyle) bool {
 		acc.FontItalic == boxN.FontItalic &&
 		acc.famHash == boxN.famHash &&
 		acc.LineHeight == boxN.LineHeight &&
+		acc.LineHeightZero == boxN.LineHeightZero &&
 		acc.TextTransform == boxN.TextTransform &&
 		acc.LetterSpacing == boxN.LetterSpacing &&
 		acc.WordSpacing == boxN.WordSpacing &&
@@ -1246,12 +1306,16 @@ func sameInlineStyle(acc, boxN *ResolvedStyle) bool {
 		acc.VerticalAlignShift == boxN.VerticalAlignShift
 }
 
-func lineHeightOf(st *ResolvedStyle) float64 {
-	if st.LineHeight > 0 {
-		return st.LineHeight
+func lineHeightOf(style *ResolvedStyle) float64 {
+	if style.LineHeightZero {
+		return 0
 	}
 
-	return defaultLineHeightRatio * st.FontSize
+	if style.LineHeight > 0 {
+		return style.LineHeight
+	}
+
+	return defaultLineHeightRatio * style.FontSize
 }
 
 func borderPaint(side border) float64 {

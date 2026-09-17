@@ -192,18 +192,25 @@ func divergentFrames(left, right *paintCtxFrame) (*paintCtxFrame, *paintCtxFrame
 	return leftDiv, rightDiv
 }
 
-// paintLayer orders ops within a z-index band: chrome under content.
-func paintLayer(op *Op) int {
-	if op.IsBackground {
-		return 0
-	}
-
-	switch op.Kind {
-	case OpFillRect, OpStrokeRect, OpLine, OpGridRun:
-		return 0
-	case OpText, OpImage, OpLinkURI, OpBullet, OpUnknown, opKindNoop:
+// paintLayer orders ops within a z-index band. CSS 2.1 Appendix E paints
+// in-flow block backgrounds/borders first, then non-positioned floats as a
+// group, then in-flow inline content (text, replaced elements). Floats must
+// therefore sit above in-flow chrome but below in-flow content.
+func paintLayer(paintOp *Op) int {
+	if paintOp.isFloatOp() {
 		return 1
 	}
 
-	return 1
+	if paintOp.IsBackground {
+		return 0
+	}
+
+	switch paintOp.Kind {
+	case OpFillRect, OpStrokeRect, OpLine, OpGridRun:
+		return 0
+	case OpText, OpImage, OpLinkURI, OpBullet, OpUnknown, opKindNoop:
+		return two
+	}
+
+	return two
 }

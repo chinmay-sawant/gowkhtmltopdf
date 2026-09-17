@@ -24,15 +24,24 @@ import (
 // the caller.
 //
 // prepareCanvasInput rewrites the bytes so canvas can resolve all of it:
-// gradient element names are restored to SVG case, defs and loose gradients
-// are hoisted ahead of the shapes, the root viewbox is normalized, and
-// unresolvable font-family lists gain a generic fallback. Each rewrite is a
-// no-op on input that does not need it.
+// same-document <use href="#id"> is inlined (external sprites need a fetch
+// via ResolveUseReferences before Rasterize), gradient element names are
+// restored to SVG case, defs and loose gradients are hoisted ahead of the
+// shapes, the root viewbox is normalized, unresolvable font-family lists gain
+// a generic fallback, and <text> elements with a bold or italic style become
+// outline paths (canvas's parser ignores font-style and font-weight). Each
+// rewrite is a no-op on input that does not need it.
 func prepareCanvasInput(data []byte) []byte {
+	// Same-document fragments only; nil fetch leaves external <use> alone.
+	if resolved, err := ResolveUseReferences(data, nil); err == nil {
+		data = resolved
+	}
+
 	data = normalizePaintServerCase(data)
 	data = hoistPaintServers(data)
 	data = normalizeRootViewBox(data)
 	data = withFontFallbacks(data)
+	data = outlineStyledText(data)
 
 	return data
 }

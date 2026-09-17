@@ -220,6 +220,7 @@ type ResolvedStyle struct {
 	FontWeight         int
 	FontItalic         bool
 	LineHeight         float64 // pts; 0 = "normal"
+	LineHeightZero     bool    // line-height resolved to an explicit 0 (collapses the line box)
 	LineHeightUnitless float64 // multiplier when line-height was unitless; 0 otherwise
 	TextAlign          string  // floatLeft | floatRight | "center" | "justify"
 	TextAlignLast      string  // "auto" | "left" | "right" | "center" | "justify"

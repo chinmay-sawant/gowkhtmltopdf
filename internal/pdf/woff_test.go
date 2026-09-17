@@ -35,6 +35,19 @@ func readWOFF2Fixture(t *testing.T) []byte {
 	return data
 }
 
+// readRobotoMonoWOFF2Fixture reads the exact Roboto Mono face served by
+// w3schools.com. See testdata/fonts/woff2/README.md.
+func readRobotoMonoWOFF2Fixture(t *testing.T) []byte {
+	t.Helper()
+
+	data, err := os.ReadFile(filepath.Join("..", "..", "testdata", "fonts", "woff2", "roboto-mono-v13-latin-500.woff2"))
+	if err != nil {
+		t.Fatalf("read roboto mono woff2 fixture: %v", err)
+	}
+
+	return data
+}
+
 // woffTestTable mirrors one SFNT table directory record.
 type woffTestTable struct {
 	tag            [4]byte
@@ -251,6 +264,28 @@ func TestDecodeWOFF2Fixture(t *testing.T) {
 
 	if font.PostScriptName != "LiberationSans" {
 		t.Errorf("PostScriptName = %q, want LiberationSans", font.PostScriptName)
+	}
+}
+
+// TestDecodeWOFF2W3SchoolsRobotoMono pins the w3schools-6 upstream decoder
+// gap. The face is valid; tdewolff/parse v2.8.15 BitmapReader.Read refuses
+// the last bit of a full-byte bbox bitmap (224 glyphs => bit 223 unread),
+// and tdewolff/font treats the missing bbox as fatal. Engine fallback to
+// LiberationMono stays graceful. Flip this test to assert successful decode
+// when upstream ships the bound fix. See
+// plans/0.2.7/real-sites/w3schools/evidence/2026-09-16-audit2/fix-report-woff2.md.
+func TestDecodeWOFF2W3SchoolsRobotoMono(t *testing.T) {
+	t.Parallel()
+
+	woff2 := readRobotoMonoWOFF2Fixture(t)
+
+	_, err := DecodeWOFF2(woff2)
+	if err == nil {
+		t.Fatal("DecodeWOFF2 succeeded; flip this pin to assert SFNT decode once upstream BitmapReader is fixed")
+	}
+
+	if !strings.Contains(err.Error(), "composite glyph must have bbox definition") {
+		t.Fatalf("DecodeWOFF2 error = %v, want bbox-definition failure from upstream parse/font", err)
 	}
 }
 

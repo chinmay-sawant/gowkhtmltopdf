@@ -107,6 +107,9 @@ func (e *engine) buildFlex(node *html.Node, sty ResolvedStyle, availW, x, posY f
 		e.flushDeferredFlowChildren(boxNode, deferred, cbHeight, absCBW, absCBX, absOriginY)
 	}
 
+	e.paintPositionedPseudo(node, sty, boxNode, pseudoBefore)
+	e.paintPositionedPseudo(node, sty, boxNode, pseudoAfter)
+
 	e.prependChrome(contentStart, boxNode, sty, boxNode.x, posY, boxNode.w, boxNode.height)
 
 	return boxNode
@@ -127,15 +130,23 @@ func (e *engine) flexWebkitIntrinsicWidth(node *html.Node, sty ResolvedStyle, us
 }
 
 // flexChildren returns the element flex items plus anonymous flex items for
-// direct text runs, and the out-of-flow children deferred to the container's
-// containing block. CSS flexbox takes absolutely positioned children out of
-// flow; treating one as a flex item let it consume the row and squeeze the
-// remaining items (Programiz header: the app-link wrapper painted as a
-// full-width blue block and collapsed the search field).
+// direct text runs and in-flow ::before/::after, and the out-of-flow children
+// deferred to the container's containing block. CSS flexbox takes absolutely
+// positioned children out of flow; treating one as a flex item let it consume
+// the row and squeeze the remaining items (Programiz header: the app-link
+// wrapper painted as a full-width blue block and collapsed the search field).
+// Abs/fixed generated content is skipped here and painted by
+// paintPositionedPseudo from buildFlex.
+//
+//nolint:cyclop // abspos deferral + anonymous text coalescing
 func (e *engine) flexChildren(node *html.Node, parentStyle ResolvedStyle) ([]*html.Node, []*html.Node) {
-	kids := make([]*html.Node, 0, len(node.Children))
+	kids := make([]*html.Node, 0, len(node.Children)+two)
 
 	var deferred []*html.Node
+
+	if before := e.makeInflowPseudoFlexItem(node, parentStyle, pseudoBefore); before != nil {
+		kids = append(kids, before)
+	}
 
 	for idx := 0; idx < len(node.Children); idx++ {
 		child := node.Children[idx]
@@ -178,7 +189,84 @@ func (e *engine) flexChildren(node *html.Node, parentStyle ResolvedStyle) ([]*ht
 		kids = append(kids, anonymous)
 	}
 
+	if after := e.makeInflowPseudoFlexItem(node, parentStyle, pseudoAfter); after != nil {
+		kids = append(kids, after)
+	}
+
 	return kids, deferred
+}
+
+// makeInflowPseudoFlexItem builds a synthetic flex item for in-flow
+// ::before/::after on a flex host. Abs/fixed pseudos return nil so
+// paintPositionedPseudo can place them against the container.
+func (e *engine) makeInflowPseudoFlexItem(
+	host *html.Node, hostStyle ResolvedStyle, pseudoEl string,
+) *html.Node {
+	if host == nil {
+		return nil
+	}
+
+	pstyle := e.pseudoStyle(host, pseudoEl, hostStyle)
+	if pstyle.Position == positionAbsolute || pstyle.Position == positionFixed {
+		return nil
+	}
+
+	if src := e.pseudoContentURL(host, pseudoEl); src != "" {
+		if ref := e.resolveImage(src); ref != nil && ref.data != nil {
+			img := &html.Node{ //nolint:exhaustruct // synthetic pseudo image flex item
+				Type: html.ElementNode, Name: "img", Parent: host,
+				Attrs: map[string]string{"src": src},
+			}
+			style := blockifyFlexItemStyle(*pstyle)
+
+			if style.Display == cssDisplayNone {
+				return nil
+			}
+
+			e.setSyntheticStyle(img, &style)
+
+			return img
+		}
+	}
+
+	txt := e.pseudoContent(host, pseudoEl)
+	if txt == "" {
+		return nil
+	}
+
+	textNode := &html.Node{Type: html.TextNode, Text: txt} //nolint:exhaustruct // text leaf
+	anonymous := &html.Node{                               //nolint:exhaustruct // synthetic pseudo text flex item
+		Type: html.ElementNode, Name: "span", Parent: host,
+		Children: []*html.Node{textNode},
+	}
+	style := blockifyFlexItemStyle(*pstyle)
+
+	if style.Display == cssDisplayNone {
+		return nil
+	}
+
+	e.setSyntheticStyle(anonymous, &style)
+
+	return anonymous
+}
+
+// blockifyFlexItemStyle applies CSS Flexbox §4 blockification so a generated
+// inline pseudo becomes a proper flex item under buildBlock.
+func blockifyFlexItemStyle(style ResolvedStyle) ResolvedStyle {
+	switch style.Display {
+	case cssDisplayNone:
+		return style
+	case displayInlineFlex:
+		style.Display = displayFlex
+	case displayInlineGrid:
+		style.Display = displayGrid
+	case displayFlex, displayGrid, displayTable:
+		// already a formatting-context root
+	default:
+		style.Display = displayBlock
+	}
+
+	return style
 }
 
 // anonymousFlexItemStyle preserves inherited text properties while removing
@@ -580,7 +668,7 @@ func (e *engine) flexLineNaturalCross(
 		flexMainJustify(style), contentX, contentW, sumW, gaps, gap, len(items),
 	)
 
-	return e.measureFlexCrossMax(items, widths, startX, topY, curY, justifyGap)
+	return e.measureFlexCrossMax(items, widths, contentW, startX, topY, curY, justifyGap)
 }
 
 func (e *engine) shiftPlacedChildren(parent *box, startChild, endChild int, deltaY float64) {
@@ -931,10 +1019,10 @@ func (e *engine) placeFlexLineMeasured(
 
 	targetCross := lineCross
 	if targetCross < 0 {
-		targetCross = e.measureFlexCrossMax(items, widths, startX, topY, curY, justifyGap)
+		targetCross = e.measureFlexCrossMax(items, widths, contentW, startX, topY, curY, justifyGap)
 	}
 
-	built, rowH := e.buildRowItems(parent, style, items, widths, topY, curY, startX, justifyGap, targetCross)
+	built, rowH := e.buildRowItems(parent, style, items, widths, contentW, topY, curY, startX, justifyGap, targetCross)
 
 	alignH := rowH
 	if lineCross > alignH {
@@ -1075,7 +1163,7 @@ func justifyDistributed(justify string, contentX, contentW, sumW, gap float64, c
 // measureFlexCrossMax measures the tallest item to get the cross size for a
 // line when the container cross size is indefinite (noEmit measure pass).
 func (e *engine) measureFlexCrossMax(
-	items []flexMeas, widths []float64, startX, topY, curY, justifyGap float64,
+	items []flexMeas, widths []float64, contentW, startX, topY, curY, justifyGap float64,
 ) float64 {
 	was := e.noEmit
 	e.noEmit = true
@@ -1083,7 +1171,14 @@ func (e *engine) measureFlexCrossMax(
 	maxX := startX
 
 	for idx, it := range items {
+		// A direct flex item's containing block is the flex container content
+		// box, so percentage image sizes resolve against it (a replaced item
+		// with width:100% and height:auto keeps its ratio here).
+		restoreCBW := e.pushReplacedCBW(it.n, contentW)
 		cb := e.build(it.n, widths[idx], maxX, topY+curY)
+
+		restoreCBW()
+
 		if cb != nil && cb.height > maxH {
 			maxH = cb.height
 		}
@@ -1122,13 +1217,52 @@ func (e *engine) forceFlexItemCrossSize(style ResolvedStyle, forceH float64) Res
 	return style
 }
 
+// flexReplacedAutoHeight reports a replaced flex item whose block size is
+// auto and comes from the intrinsic ratio. Flexbox keeps the ratio for these
+// items, so the column main-size override must not force a height that the
+// ratio then contradicts.
+func (e *engine) flexReplacedAutoHeight(node *html.Node, style ResolvedStyle) bool {
+	if node == nil || (node.Name != cssTagImg && node.Name != cssTagSVG) {
+		return false
+	}
+
+	if style.Height >= 0 || style.HeightPercent >= 0 {
+		return false
+	}
+
+	if node.Name == cssTagImg {
+		return hasIntrinsic(e.resolveImage(node.Attribute("src")))
+	}
+
+	return true
+}
+
 // forceFlexItemMainSize preserves the used row-axis size selected by flexbox
 // through the child build. Without the override, a percentage-sized item is
 // resolved a second time against its already-assigned flex width (46% of 46%
 // in fixture-56's gauge row).
-func (e *engine) forceFlexItemMainSize(style ResolvedStyle, forceW float64) ResolvedStyle {
+//
+// Percent min/max-width on the item resolve against the flex container's
+// content box (the item's containing block), not against the assigned width.
+// They are converted to lengths here so the child build does not apply them a
+// second time against the assigned width: Bootstrap's .col-3 (flex-basis 25%,
+// max-width 25%) collapsed to max-width 25% of 25% and wrapped its heading
+// letter by letter.
+func (e *engine) forceFlexItemMainSize(style ResolvedStyle, forceW, pctBase float64) ResolvedStyle {
 	if e.scale <= 0 {
 		return style
+	}
+
+	if pctBase > 0 && pctBase < 1e12 {
+		if style.MaxWidthPercent >= 0 {
+			style.MaxWidth = pctBase * style.MaxWidthPercent / oneHundred / e.scale
+			style.MaxWidthPercent = -1
+		}
+
+		if style.MinWidthPercent >= 0 {
+			style.MinWidth = pctBase * style.MinWidthPercent / oneHundred / e.scale
+			style.MinWidthPercent = -1
+		}
 	}
 
 	if style.BoxSizing == borderBox {
@@ -1154,9 +1288,9 @@ func (e *engine) forceFlexItemMainSize(style ResolvedStyle, forceW float64) Reso
 
 func (e *engine) buildFlexRowItem(
 	node *html.Node, style *ResolvedStyle, forceStretch bool,
-	targetCross, availW, posX, posY float64,
+	targetCross, availW, pctBase, posX, posY float64,
 ) *box {
-	override := e.forceFlexItemMainSize(*style, availW)
+	override := e.forceFlexItemMainSize(*style, availW, pctBase)
 	if forceStretch {
 		override = e.forceFlexItemCrossSize(override, targetCross)
 	}
@@ -1165,7 +1299,7 @@ func (e *engine) buildFlexRowItem(
 }
 
 func (e *engine) buildRowItems(
-	parent *box, style ResolvedStyle, items []flexMeas, widths []float64,
+	parent *box, style ResolvedStyle, items []flexMeas, widths []float64, contentW float64,
 	topY, curY, startX, justifyGap, targetCross float64,
 ) ([]flexPlacedItem, float64) {
 	built := make([]flexPlacedItem, 0, len(items))
@@ -1183,7 +1317,7 @@ func (e *engine) buildRowItems(
 		cstate := e.stylePtr(item.n)
 
 		forceStretch := flexItemCrossStretch(style, *cstate) && targetCross > 0
-		cblock := e.buildFlexRowItem(item.n, cstate, forceStretch, targetCross, widths[idx], leftX, topY+curY)
+		cblock := e.buildFlexRowItem(item.n, cstate, forceStretch, targetCross, widths[idx], contentW, leftX, topY+curY)
 
 		if cblock == nil {
 			built = append(built, flexPlacedItem{n: item.n}) //nolint:exhaustruct // intentional zero fields
@@ -1291,7 +1425,9 @@ func (e *engine) flexItemBaseHeight(node *html.Node, style ResolvedStyle, conten
 
 	was := e.noEmit
 	e.noEmit = true
+	restoreCBW := e.pushReplacedCBW(node, contentW)
 	measured := e.build(node, contentW, 0, 0)
+	restoreCBW()
 	e.noEmit = was
 	height := 0.0
 	if measured != nil {
@@ -1322,6 +1458,8 @@ func (e *engine) flexSpecifiedBaseHeight(style ResolvedStyle, mainSize, padV flo
 
 // flexMinCrossMainSize is the column-axis content-based min-height floor
 // (Flexbox §4.5 lite). mainSize is the definite flex container content height.
+//
+//nolint:cyclop // Flexbox §4.5 min-size decision tree
 func (e *engine) flexMinCrossMainSize(node *html.Node, baseH, mainSize float64) float64 {
 	cstate := e.stylePtr(node)
 	floor := 0.0
@@ -1344,6 +1482,18 @@ func (e *engine) flexMinCrossMainSize(node *html.Node, baseH, mainSize float64) 
 
 	if contentSug < padV {
 		contentSug = padV + e.scalePt(cstate.FontSize)*textLineHeightFactor
+	}
+
+	// A text block that wraps to N lines cannot render shorter than those N
+	// lines: its content height at the used cross size (baseH) is the real
+	// floor. layoutCell at an indefinite width measures one long line, which
+	// understates the wrapped height and let a column-flex item squeeze a
+	// paragraph under its last line (Programiz related-course card: the Learn
+	// more button painted over the paragraph). Replaced items keep their own
+	// ratio-driven shrink behavior.
+	if node.Name != cssTagImg && node.Name != cssTagSVG &&
+		cstate.Height < 0 && cstate.HeightPercent < 0 && baseH > contentSug {
+		contentSug = baseH
 	}
 
 	specSug := e.flexSpecifiedHeightSuggestion(*cstate, baseH, mainSize, padV)
@@ -1553,7 +1703,7 @@ func justifyColumnStart(justify string, contentH, curY, totalH, sumH, gap float6
 	return curY, gap
 }
 
-//nolint:cyclop,funlen,wsl // column placement keeps CSS auto-margin and alignment phases together
+//nolint:cyclop,funlen,gocognit,wsl // column placement keeps CSS auto-margin and alignment phases together
 func (e *engine) buildColumnItems(
 	parent *box, style ResolvedStyle, items []flexColMeas, heights []float64,
 	contentW, contentX, topY, curY, startY, justifyGap, contentH float64,
@@ -1595,8 +1745,18 @@ func (e *engine) buildColumnItems(
 			leftY += autoUnit
 		}
 		// Force border-box height so grow/shrink targets stick through build.
-		override := e.forceFlexItemCrossSize(*cstate, heights[idx])
+		// A replaced item with an auto block size keeps its intrinsic ratio
+		// instead: forcing the height would scale the width twice (the
+		// measured height already comes from the used width) and distort the
+		// image.
+		override := *cstate
+		if !e.flexReplacedAutoHeight(item.n, *cstate) {
+			override = e.forceFlexItemCrossSize(*cstate, heights[idx])
+		}
+
+		restoreCBW := e.pushReplacedCBW(item.n, contentW)
 		cblock := e.buildWithStyle(item.n, &override, contentW, contentX, topY+leftY)
+		restoreCBW()
 
 		if cblock == nil {
 			leftY += heights[idx]

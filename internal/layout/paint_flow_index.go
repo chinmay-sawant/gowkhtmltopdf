@@ -213,7 +213,24 @@ func shiftOpsBucket(res *Result, page, from, toIdx int, fromY, beforeY, deltaY f
 			continue
 		}
 
-		if (idx >= from && idx <= toIdx) || res.Ops[idx].Y <= fromY || res.Ops[idx].Y >= beforeY {
+		if idx >= from && idx <= toIdx {
+			jdx++
+
+			continue
+		}
+
+		// A box that starts exactly at the shift origin moves whole: its top
+		// chrome shares the origin Y, so leaving that op behind would detach
+		// a border from its content (Programiz pre columns after a flex-row
+		// page break). Ops strictly before the origin keep the old guard so
+		// collapsed-margin neighbors do not drag along every iteration.
+		if idx > toIdx {
+			if res.Ops[idx].Y < fromY-layoutCoordEpsilon || res.Ops[idx].Y >= beforeY {
+				jdx++
+
+				continue
+			}
+		} else if res.Ops[idx].Y <= fromY || res.Ops[idx].Y >= beforeY {
 			jdx++
 
 			continue
@@ -301,6 +318,15 @@ func skipBoxShift(res *Result, boxIndex, from, toIdx int, fromY, beforeY float64
 	}
 
 	if targetBox.y == fromY && targetBox.opStart >= from && targetBox.opEnd <= toIdx {
+		return false
+	}
+
+	// A box that starts exactly at the shift origin and follows the target
+	// range in document order moves with the following flow: shiftFlowOps
+	// moves its interior ops, so leaving the box (and its top chrome) behind
+	// would detach the border from the content. Preceding boxes at the same Y
+	// are collapsed-margin neighbors and stay put so the fixpoint converges.
+	if targetBox.y == fromY && targetBox.opStart > toIdx {
 		return false
 	}
 

@@ -189,6 +189,8 @@ func TestResolveImageRejectsNonImagePayloads(t *testing.T) {
 	t.Parallel()
 
 	webp := append([]byte("RIFF\x24\x00\x00\x00WEBP"), make([]byte, 32)...)
+	// ICO magic with a truncated/garbage directory must still reject.
+	garbageICO := []byte{0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x10, 0x10}
 	tests := []struct {
 		name string
 		data []byte
@@ -196,6 +198,7 @@ func TestResolveImageRejectsNonImagePayloads(t *testing.T) {
 		{name: "html page", data: []byte("<!doctype html><html><body>homepage</body></html>")},
 		{name: "webp", data: webp},
 		{name: "empty", data: nil},
+		{name: "garbage ico", data: garbageICO},
 	}
 
 	for _, testCase := range tests {
@@ -239,6 +242,8 @@ func TestResolveImageKeepsEmbeddablePayloads(t *testing.T) {
 	t.Parallel()
 
 	gifData := mustEncodeGIF(t, image.Rect(0, 0, 3, 2))
+	pngPayload := tinyPNG(4, 3)
+	icoData := buildTestPNGICO(pngPayload, 4, 3)
 
 	tests := []struct {
 		name      string
@@ -248,8 +253,9 @@ func TestResolveImageKeepsEmbeddablePayloads(t *testing.T) {
 		wantH     int
 		wantBytes string
 	}{
-		{name: "png", src: "x.png", data: tinyPNG(4, 3), wantW: 4, wantH: 3, wantBytes: "\x89PNG"},
+		{name: "png", src: "x.png", data: pngPayload, wantW: 4, wantH: 3, wantBytes: "\x89PNG"},
 		{name: "gif", src: "x.gif", data: gifData, wantW: 3, wantH: 2, wantBytes: "\x89PNG"},
+		{name: "png-in-ico", src: "x.ico", data: icoData, wantW: 4, wantH: 3, wantBytes: "\x89PNG"},
 		{
 			name: "svg", src: "x.svg", wantW: 20, wantH: 20, wantBytes: "\x89PNG",
 			data: []byte(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><rect width="10" height="10"/></svg>`),

@@ -3,6 +3,7 @@ package layout
 const (
 	two        = 2
 	three      = 3
+	half       = 0.5
 	oneHundred = 100
 
 	layoutEpsilon         = 1e-6

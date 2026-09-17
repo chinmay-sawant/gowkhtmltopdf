@@ -12,6 +12,10 @@ const (
 	yBucketScale       = 2
 	trailingBandSlack  = 8.0
 	minInkHeight       = 4
+	// rowChromeMaxHeight is the tallest fill still treated as a single row's
+	// shell; taller fills are section washes (orphan-row strip vs
+	// stripEmptyLeadingWashes).
+	rowChromeMaxHeight = 40.0
 
 	// bandClusterMinColumns is the smallest vertical-segment count that seals
 	// a table edge; narrower clusters are text rules, not grid borders.
@@ -607,13 +611,24 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 		pageBot := pageTop + contentH
 
 		lastInkBot, hasInk := lastInkBottom(res, pageOps[page], pageTop, pageBot)
+		if hasInk {
+			if stripOrphanRows(res, pageOps[page], pageTop, pageBot, lastInkBot) {
+				tightenLastRowChrome(res, pageOps[page], pageTop, pageBot, lastInkBot)
+			}
+		} else {
+			// No ink on this page: a wash that starts at the page top can still
+			// be the leading fragment of a block whose content is on a later
+			// page (the empty-fragment strip below). Treat the page top as the
+			// ink bottom so only a wash wholly below it is considered.
+			lastInkBot = pageTop
+		}
+
+		stripEmptyLeadingWashes(res, pageOps[page], pageTop, pageBot, lastInkBot, contentH)
+
 		if !hasInk {
 			continue
 		}
 
-		if stripOrphanRows(res, pageOps[page], pageTop, pageBot, lastInkBot) {
-			tightenLastRowChrome(res, pageOps[page], pageTop, pageBot, lastInkBot)
-		}
 		// Pull section washes / borders up to the last row chrome / ink so grey
 		// does not pad an empty band to the page bottom (fixture-31 page 1).
 		// Only section-colored chrome is clipped - arbitrary tall fills
@@ -632,6 +647,140 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 	}
 
 	closePageLeadingSectionChromeWithTargets(res, contentH, stickyTargets)
+}
+
+// stripEmptyLeadingWashes zeroes a leading background fragment that sits
+// entirely below the page's last ink while the owning block's first content
+// ink is on a later page. The block's content moved on (page-break snap or
+// orphans/widows keep-together) but its unsplit fill still had a slice on this
+// page: painting it reads as an empty colored band at the foot of the page
+// (programiz .faq-section; the audit's programiz-cpp-15).
+//
+// Only fills larger than a row are handled here; row-sized shells are
+// stripOrphanRows' job. Standalone decorative fills (no content anywhere in
+// the owning box) keep their authored geometry, and a fragment that overlaps
+// the page's ink or belongs to a table is left alone.
+func stripEmptyLeadingWashes( //nolint:cyclop // empty leading-wash strip gates
+	res *Result, idxs []int, pageTop, pageBot, lastInkBot, contentH float64,
+) {
+	if res == nil || res.root == nil || contentH <= 0 {
+		return
+	}
+
+	page := int((pageTop + layoutEpsilon) / contentH)
+
+	for _, opIdx := range idxs {
+		paintOp := &res.Ops[opIdx]
+		if paintOp.StickyID != 0 || paintOp.Kind != OpFillRect || paintOp.H <= rowChromeMaxHeight ||
+			!opInPageBand(paintOp, pageTop, pageBot) {
+			continue
+		}
+		// The fragment must start below everything already painted on the
+		// page; otherwise the wash legitimately backs the page's own ink.
+		if paintOp.Y < lastInkBot-0.5 {
+			continue
+		}
+		// Continuation fragments start at the page top with content above
+		// them only on earlier pages; those are clipped by the trailing-band
+		// pass, not stripped here.
+		if paintOp.Y <= pageTop+1 {
+			continue
+		}
+
+		owner := chromeOwnerBox(res, opIdx)
+		if owner == nil || boxInsideTable(owner) {
+			continue
+		}
+
+		contentPage, ok := boxFirstContentPage(res, owner, contentH)
+		if !ok || contentPage <= page {
+			continue
+		}
+
+		paintOp.H = 0
+	}
+}
+
+// chromeOwnerBox returns the deepest box whose own frame chrome this fill
+// paints, or nil when no box owns it.
+func chromeOwnerBox(res *Result, opIndex int) *box {
+	if res == nil || res.root == nil || opIndex < 0 || opIndex >= len(res.Ops) {
+		return nil
+	}
+
+	chain := make([]*box, 0, initialBoxPathCap)
+	if !boxChainForOp(res.root, opIndex, &chain) {
+		return nil
+	}
+
+	for k := len(chain) - 1; k >= 0; k-- {
+		if opOwnedBy(&res.Ops[opIndex], chain[k], opOwnerChrome) {
+			return chain[k]
+		}
+	}
+
+	return nil
+}
+
+// boxChainForOp fills chain with the boxes whose op range contains opIndex,
+// root first and the terminal owner last. Unlike findBoxPathForOp it keeps
+// the terminal box, the one that actually emitted the op.
+func boxChainForOp(boxNode *box, opIndex int, chain *[]*box) bool {
+	if boxNode == nil || opIndex < boxNode.opStart || opIndex > boxNode.opEnd {
+		return false
+	}
+
+	*chain = append(*chain, boxNode)
+
+	for _, child := range boxNode.children {
+		if boxChainForOp(child, opIndex, chain) {
+			return true
+		}
+	}
+
+	return true
+}
+
+// boxFirstContentPage returns the page of the box's first text/bullet/image
+// ink. ok=false when the box subtree has no content ink.
+//
+//nolint:cyclop // first content-ink page walk
+func boxFirstContentPage(res *Result, boxNode *box, contentH float64) (int, bool) {
+	if res == nil || boxNode == nil || boxNode.opStart < 0 || boxNode.opEnd < boxNode.opStart {
+		return 0, false
+	}
+
+	first, found := 0, false
+	end := boxNode.opEnd
+
+	if end >= len(res.Ops) {
+		end = len(res.Ops) - 1
+	}
+
+	for i := boxNode.opStart; i <= end; i++ {
+		paintOp := &res.Ops[i]
+		if paintOp.Fixed {
+			continue
+		}
+
+		switch paintOp.Kind { //nolint:exhaustive // only text/bullet/image ink starts content
+		case OpText, OpBullet, OpImage:
+		default:
+			continue
+		}
+
+		page, ok := checkedFlowPageOfY(paintOp.Y+layoutEpsilon, contentH)
+		if !ok {
+			continue
+		}
+
+		if !found || page < first {
+			first = page
+			found = true
+		}
+	}
+
+	return first, found
 }
 
 // pageIndexedOps buckets non-fixed ops by their canvas page with the shared

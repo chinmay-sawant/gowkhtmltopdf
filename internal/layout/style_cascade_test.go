@@ -44,7 +44,7 @@ func TestCascadeShorthandRespectsSourceOrder(t *testing.T) {
 // with its own origin and specificity; without that, both keys coexisted in
 // raw and the later-applied UA longhand won regardless of origin, so
 // `ul { list-style: none }` still painted discs.
-func TestCascadeListStyleShorthandBeatsUADisc(t *testing.T) {
+func TestCascadeListStyleShorthandBeatsUADisc(t *testing.T) { //nolint:cyclop // shorthand vs longhand cases
 	t.Parallel()
 
 	root := mustParse(t, `<html><body><ul><li>a</li><li>b</li></ul></body></html>`)
@@ -81,8 +81,18 @@ func TestCascadeListStyleShorthandBeatsUADisc(t *testing.T) {
 
 	typeCase = layoutHTML(t, `<html><body><ul><li>a</li></ul></body></html>`,
 		sheet(t, `ul { list-style-type: decimal; list-style: square }`))
-	if bullets := opsOfKind(typeCase, OpBullet); len(bullets) != 1 || bullets[0].Text != "\u25AA" {
-		t.Fatalf("later shorthand square lost to longhand: %+v", bullets)
+	squareSide := 0.0
+
+	for _, paintOp := range typeCase.Ops {
+		if paintOp.Kind == OpFillRect && near(paintOp.W, paintOp.H) && paintOp.W > 0 && paintOp.W < 8 {
+			squareSide = paintOp.W
+
+			break
+		}
+	}
+
+	if squareSide <= 0 {
+		t.Fatalf("later shorthand square lost to longhand: no square OpFillRect in %+v", typeCase.Ops)
 	}
 }
 

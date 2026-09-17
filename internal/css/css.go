@@ -104,10 +104,22 @@ type PageRule struct {
 }
 
 // FontFace is one @font-face rule (local src subset).
-// Family and Src are consumed by convert.MergeFontFaces; weight/style are ignored.
+// Family, Src, and the three selection descriptors are consumed by
+// convert.MergeFontFaces; absent descriptors keep their zero value.
 type FontFace struct {
 	Family string
 	Src    string // raw src value (may contain url(...) or local(...))
+	// Weight is the parsed font-weight descriptor (1..1000); 0 when the
+	// descriptor is absent or invalid.
+	Weight int
+	// Italic is the font-style descriptor; StyleSet records whether the
+	// descriptor was present so an explicit "normal" can override the file's
+	// own italic bit.
+	Italic   bool
+	StyleSet bool
+	// UnicodeRanges is the parsed unicode-range descriptor. nil means no
+	// restriction: an absent or invalid descriptor covers every code point.
+	UnicodeRanges []UnicodeRange
 }
 
 // Rule is one rule set: selectors plus a declaration block.
@@ -551,6 +563,17 @@ func parseFontFace(block string) FontFace {
 			}
 		case "src":
 			fontFace.Src = data.Value
+		case "font-weight":
+			if weight, ok := fontWeightDescriptor(data.Value); ok {
+				fontFace.Weight = weight
+			}
+		case "font-style":
+			if italic, ok := italicDescriptor(data.Value); ok {
+				fontFace.Italic = italic
+				fontFace.StyleSet = true
+			}
+		case "unicode-range":
+			fontFace.UnicodeRanges = ParseUnicodeRanges(data.Value)
 		}
 	}
 

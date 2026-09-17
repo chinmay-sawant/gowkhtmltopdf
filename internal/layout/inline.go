@@ -48,6 +48,8 @@ type inlineItem struct {
 	w, h     float64 // text: run width + line height; image: placed size
 	marginL  float64 // leading horizontal margin (e.g. span margin-left)
 	marginR  float64 // trailing horizontal margin
+	marginT  float64 // vertical margins of an inline-block margin box
+	marginB  float64
 	img      bool
 	thumbImg bool // img inside a collapsed wiki figure; outer frame owns L/R/T
 	chrome   bool // text belongs to an inline element with its own decoration
@@ -230,6 +232,15 @@ func (e *engine) layoutInlineFloats(
 			}
 		}
 
+		// CSS 2.1 9.4.2: line boxes that contain no text, no preserved white
+		// space, and no inline boxes with non-zero margins, padding, or
+		// borders are zero-height. A collapsible space that was pushed onto a
+		// line of its own (leading whitespace, or the space before a replaced
+		// element that wrapped) must not open a line box or advance the flow.
+		if !e.lineHasVisibleContent(items, start, end) {
+			continue
+		}
+
 		lineCount++
 		lastLine := idx >= len(items) || (clampLimit > 0 && lineCount >= clampLimit)
 
@@ -240,6 +251,9 @@ func (e *engine) layoutInlineFloats(
 		}
 
 		leftY += e.emitLine(boxNode, items, start, end, lineW, lineX, leftY, lastLine)
+		// line-height:0 spacers keep lineH at 0; still honor their vertical
+		// margins (margin-bottom:-2px pulls the next marriage line up).
+		leftY += e.lineSpacerMarginAdjust(items, start, end)
 
 		if clampLimit > 0 && lineCount >= clampLimit {
 			break
@@ -283,7 +297,7 @@ func (e *engine) releaseInlineItems(items []inlineItem) {
 // current float exclusion, splitting overlong tokens as needed. It returns
 // the next index and the updated line geometry (items may be replaced by the
 // split, hence the pointer).
-func (e *engine) packInlineLine(
+func (e *engine) packInlineLine( //nolint:cyclop // float exclusion, overflow split, and fit gates
 	items *[]inlineItem, start int, lineX, lineW, leftY float64,
 	contentX, contentW float64, floats *floatState,
 ) (int, float64, float64, float64) {
@@ -322,6 +336,23 @@ func (e *engine) packInlineLine(
 		}
 
 		adv := item.marginL + item.w + item.marginR
+		// white-space:nowrap suppresses every soft wrap opportunity inside its
+		// scope, including the boundaries between atomic inlines (the
+		// w3schools language strip of 40 inline-block links wrapped into five
+		// rows before this). A nowrap chain that cannot fit a fresh full line
+		// has nowhere better to go, so keep packing: the box overflows and an
+		// overflow:auto|hidden ancestor clips or scrolls the single row.
+		// Chains that *would* fit a fresh line fall through to the move-down
+		// path below, so a short nowrap span beside a float still wraps whole.
+		if lineAdv > 0 && lineAdv+adv > lineW+1e-6 &&
+			idx > start && isNowrapCluster((*items)[idx-1], *item) {
+			if _, chainAdv := stickyChainRange(*items, idx, start, lineW); chainAdv > lineW+inlineFitEpsilon {
+				lineAdv += adv
+				idx++
+
+				continue
+			}
+		}
 		// Always wrap to the next line when the next item does not fit.
 		// white-space:nowrap must not glue an unbreakable span onto a line
 		// that already has content and overflow into a float (wiki .IPA).
@@ -353,6 +384,66 @@ func (e *engine) packInlineLine(
 	}
 
 	return idx, lineX, lineW, leftY
+}
+
+// lineHasVisibleContent reports whether a packed line contributes anything
+// other than collapsible whitespace. Zero-width text items that carry their
+// own margin/padding/border (empty padded spans) still count: CSS 2.1 9.4.2
+// keeps those line boxes.
+//
+//nolint:cyclop // whitespace and chrome contribution gates
+func (e *engine) lineHasVisibleContent(items []inlineItem, start, end int) bool {
+	for i := start; i < end; i++ {
+		item := &items[i]
+		if item.forceBreak {
+			return true
+		}
+
+		if item.img || item.blockBox != nil {
+			return true
+		}
+
+		if item.text != "" && !isNoInkText(item.text) {
+			return true
+		}
+
+		if item.marginL != 0 || item.marginR != 0 {
+			return true
+		}
+
+		if item.chrome && e.inlineChromeLeft(item.style)+e.inlineChromeRight(item.style) > 0 {
+			return true
+		}
+
+		if item.style != nil {
+			switch item.style.WhiteSpace {
+			case cssWhiteSpacePre, cssWhiteSpacePreWrap, cssWhiteSpacePreLine:
+				// Preserved whitespace is ink even when it is all spaces.
+				if item.text != "" && !isNoInkText(item.text) {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
+}
+
+// lineSpacerMarginAdjust returns the net vertical margin of a skipped
+// line-height:0 spacer line so margin-bottom:-2px still pulls the next line.
+func (e *engine) lineSpacerMarginAdjust(items []inlineItem, start, end int) float64 {
+	adjust := 0.0
+
+	for i := start; i < end; i++ {
+		item := &items[i]
+		if item.style == nil || !item.style.LineHeightZero {
+			continue
+		}
+
+		adjust += item.marginT + item.marginB
+	}
+
+	return adjust
 }
 
 // hangingFitAdvance returns the advance that counts against the line width
@@ -577,9 +668,10 @@ func (e *engine) clearFloatBelow(
 // content width so fragments reflow full-width after a float ends).
 //
 // Policy (generic, not site-specific):
-//   - word-break:break-all / overflow-wrap:anywhere → fill remainW, any grapheme
-//   - overflow-wrap:break-word → soft then grapheme, but only when the token is
-//     wider than a full line (CSS: do not mid-break a word that fits the next line)
+//   - word-break:break-all / line-break:anywhere → fill remainW, any grapheme
+//   - overflow-wrap:break-word / overflow-wrap:anywhere → soft then grapheme,
+//     but only when the token is wider than a full line (CSS: do not mid-break
+//     a word that fits the next line)
 //   - white-space:nowrap → never split
 //   - otherwise emergency-split when the token alone exceeds fullLineW so
 //     paint cannot run past the content box (print engines commonly do this)
@@ -1191,9 +1283,18 @@ func (e *engine) lineMetrics(line []inlineItem, lineY float64) (float64, float64
 		}
 
 		ascent, descent := e.inlineFontMetrics(item.text, item.style)
-		lh := lineHeightOf(item.style) * e.scale
+		lineH := lineHeightOf(item.style) * e.scale
 
-		extra := (lh - ascent - descent) / inlineHalfDivisor
+		// line-height:0 collapses the inline box. Its font ascent/descent must
+		// not resurrect a line box (Wikipedia's marriage-line spacer div);
+		// only box chrome can still contribute height.
+		if lineH <= 0 && item.style.LineHeightZero {
+			maxAscent, maxDescent = e.accumulateZeroLineHeightChrome(item, maxAscent, maxDescent)
+
+			continue
+		}
+
+		extra := (lineH - ascent - descent) / inlineHalfDivisor
 		itemAscent := ascent + extra
 		itemDescent := descent + extra
 
@@ -1213,20 +1314,94 @@ func (e *engine) lineMetrics(line []inlineItem, lineY float64) (float64, float64
 
 	lineH := maxAscent + maxDescent
 	if lineH <= 0 {
+		// Zero-height line-height:0 spacer lines must stay collapsed. The 1pt
+		// floor is only for ordinary empty lines that still need a cursor.
+		if e.lineIsLineHeightZeroOnly(line) {
+			return 0, lineY
+		}
+
 		lineH = 1
 	}
 
 	return lineH, lineY + maxAscent
 }
 
+// accumulateZeroLineHeightChrome lets line-height:0 boxes contribute only
+// their border/padding chrome to the line metrics.
+func (e *engine) accumulateZeroLineHeightChrome(item *inlineItem, maxAscent, maxDescent float64) (float64, float64) {
+	if !item.chrome {
+		return maxAscent, maxDescent
+	}
+
+	itemAscent := e.inlineChromeTop(item.style)
+	itemDescent := e.inlineChromeBottom(item.style)
+
+	if itemAscent > maxAscent {
+		maxAscent = itemAscent
+	}
+
+	if itemDescent > maxDescent {
+		maxDescent = itemDescent
+	}
+
+	return maxAscent, maxDescent
+}
+
+// lineIsLineHeightZeroOnly reports a line whose only boxes are zero-height
+// line-height:0 spacers (Wikipedia marriage-line). Those must not pick up the
+// 1pt empty-line floor.
+func (e *engine) lineIsLineHeightZeroOnly(line []inlineItem) bool {
+	saw := false
+
+	for i := range line {
+		item := &line[i]
+		if item.forceBreak {
+			continue
+		}
+
+		if item.style != nil && item.style.LineHeightZero && item.h <= 0 &&
+			(item.blockBox != nil || (!item.img && isNoInkText(item.text))) {
+			saw = true
+
+			continue
+		}
+
+		return false
+	}
+
+	return saw
+}
+
+// isNoInkText reports text with no visible glyphs: empty, whitespace, or
+// zero-width format characters (ZWSP/ZWNJ/ZWJ/BOM) used as spacers.
+func isNoInkText(s string) bool {
+	for _, r := range s {
+		switch r {
+		case '\u200b', '\u200c', '\u200d', '\ufeff':
+			continue
+		default:
+			if !unicode.IsSpace(r) {
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
 // atomicInlineAlign is the ascent/descent a replaced or inline-block item
 // contributes to the line. A length vertical-align raises (positive) or
 // lowers (negative) the box relative to the baseline.
+//
+//nolint:cyclop // vertical-align keyword and baseline cases
 func (e *engine) atomicInlineAlign(item *inlineItem) (float64, float64) {
 	if item.style != nil {
 		switch item.style.VerticalAlign {
 		case cssVerticalAlignTop, cssVerticalAlignMiddle, cssVerticalAlignBottom:
-			return item.h, 0
+			// The atomic box is positioned by keyword, not on the baseline:
+			// the whole margin box (content plus vertical margins)
+			// contributes to the line height.
+			return item.h + item.marginT + item.marginB, 0
 		}
 	}
 
@@ -1235,8 +1410,39 @@ func (e *engine) atomicInlineAlign(item *inlineItem) (float64, float64) {
 		shift = e.scalePt(item.style.VerticalAlignShift)
 	}
 
-	ascent := item.h + shift
-	descent := -shift
+	ascent := item.h + item.marginT + shift
+	descent := item.marginB - shift
+
+	// An inline-block aligns on its internal text baseline, not its bottom
+	// edge. Using the full height as ascent added the box descent below the
+	// line whenever a plain text run shared the line, inflating a one-line
+	// breadcrumb (ul 30pt) to 40.84pt. A baseline cannot sit below the box
+	// itself: a zero-height block-in-inline (line-height:0) contributes no
+	// line box at all.
+	if item.blockBox != nil && item.blockBox.firstBaseline > 0 {
+		firstBase := item.blockBox.firstBaseline
+		if firstBase > item.h {
+			firstBase = item.h
+		}
+
+		ascent = firstBase + item.marginT + shift
+		descent = item.h - firstBase + item.marginB - shift
+	}
+
+	// line-height:0 zero-height spacers may carry a negative margin-bottom.
+	// Do not fold that negative into ascent (which would grow the line); the
+	// skipped-line path applies the margin as a leftY adjust instead.
+	if item.h <= 0 && item.style != nil && item.style.LineHeightZero {
+		if ascent < 0 {
+			ascent = 0
+		}
+
+		if descent < 0 {
+			descent = 0
+		}
+
+		return ascent, descent
+	}
 
 	if ascent < 0 {
 		descent -= ascent
