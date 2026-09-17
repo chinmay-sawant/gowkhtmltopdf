@@ -555,11 +555,21 @@ func (c *Content) TextShow(text string) {
 // TextShowLanguage is TextShow with a font-language-override tag. lang is an
 // OpenType language system tag such as "TRK"; "" keeps default shaping.
 func (c *Content) TextShowLanguage(text, lang string) {
+	c.TextShowLanguageFeatures(text, lang, "")
+}
+
+// TextShowLanguageFeatures is TextShowLanguage with a CSS font-feature-settings
+// value (also used for font-variant / font-kerning OT tags). Empty features
+// keep the default shaping path, including CJK halt/palt auto features.
+func (c *Content) TextShowLanguageFeatures(text, lang, featureSettings string) {
+	feats := ParseFontFeatureSettings(featureSettings)
+	hasFeats := len(feats) > 0
+
 	// Pure-ASCII text is untouched by shaping (no RTL/combining/CJK
 	// features) and never needs Type0, so skip the decision passes below
-	// and go straight to the simple emitter. A language override opts back
-	// in: language-specific GSUB/GPOS may rewrite even ASCII runs.
-	ascii := lang == ""
+	// and go straight to the simple emitter. A language override or explicit
+	// OpenType feature opts back in: GSUB/GPOS may rewrite even ASCII runs.
+	ascii := lang == "" && !hasFeats
 
 	if ascii {
 		for i := range len(text) {
@@ -581,7 +591,7 @@ func (c *Content) TextShowLanguage(text, lang string) {
 	// PDF emission needs the shaped text only. ShapeRun also computes per-rune
 	// advances for the raster adapter, which is unnecessary here and creates
 	// two slices for every text operator.
-	text = ShapeTextFontWithFeaturesLanguage(text, fnt, nil, lang)
+	text = ShapeTextFontWithFeaturesLanguage(text, fnt, feats, lang)
 
 	if fnt == nil || !c.textNeedsType0(text) {
 		c.textShowSimple(text)

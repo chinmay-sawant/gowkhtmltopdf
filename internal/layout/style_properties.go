@@ -241,7 +241,7 @@ func applyFlexGroup(
 	style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext, _ *ResolvedStyle, _ bool,
 ) bool {
 	switch prop {
-	case gapKeyword, "row-gap", "column-gap":
+	case gapKeyword, "row-gap", "column-gap", "grid-gap", "grid-row-gap", "grid-column-gap":
 		return applyGapProps(style, prop, value, fsize, ctx)
 	case "flex-direction", "flex-wrap", "justify-content", "align-items",
 		"align-content", "align-self", "justify-items", "justify-self",
@@ -252,57 +252,6 @@ func applyFlexGroup(
 	default:
 		return false
 	}
-}
-
-// applyGapProps owns the gap family, dispatching each property to its parser.
-func applyGapProps(style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext) bool {
-	switch prop {
-	case gapKeyword:
-		return applyGapShorthand(style, value, fsize, ctx.viewportW)
-	case "row-gap":
-		return applyRowGap(style, value, fsize, ctx.viewportW)
-	case "column-gap":
-		return applyColumnGap(style, value, fsize, ctx.viewportW)
-	default:
-		return false
-	}
-}
-
-func applyGapShorthand(style *ResolvedStyle, value string, fsize, viewportW float64) bool {
-	if value == contentNormal {
-		style.Gap = 0
-		style.RowGap = 0
-		style.ColumnGap = 0
-		style.ColumnGapNormal = true
-	} else if v, ok := lengthBox(value, fsize, viewportW, cssDisplayNone); ok && v >= 0 {
-		style.Gap = v
-		style.RowGap = v
-		style.ColumnGap = v
-		style.ColumnGapNormal = false
-	}
-
-	return true
-}
-
-func applyRowGap(style *ResolvedStyle, value string, fsize, viewportW float64) bool {
-	if v, ok := lengthBox(value, fsize, viewportW, cssDisplayNone); ok && v >= 0 {
-		style.RowGap = v
-		style.Gap = v
-	}
-
-	return true
-}
-
-func applyColumnGap(style *ResolvedStyle, value string, fsize, viewportW float64) bool {
-	if value == contentNormal {
-		style.ColumnGap = 0
-		style.ColumnGapNormal = true
-	} else if v, ok := lengthBox(value, fsize, viewportW, cssDisplayNone); ok && v >= 0 {
-		style.ColumnGap = v
-		style.ColumnGapNormal = false
-	}
-
-	return true
 }
 
 // applyFlexAlignmentProps owns the flex/grid alignment keywords.
@@ -461,111 +410,6 @@ func setFlexOrderValue(style *ResolvedStyle, value string) {
 	if v, err := strconv.Atoi(strings.TrimSpace(value)); err == nil {
 		style.FlexOrder = v
 	}
-}
-
-// applyMulticolGroup handles column-* props.
-func applyMulticolGroup(
-	style *ResolvedStyle, prop, value string, fsize float64, ctx *styleContext, _ *ResolvedStyle, _ bool,
-) bool {
-	if applyColumnCountWidthProps(style, prop, value, fsize, ctx.viewportW) {
-		return true
-	}
-
-	if applyColumnRuleProps(style, prop, value, fsize) {
-		return true
-	}
-
-	return applyColumnFillSpanProps(style, prop, value)
-}
-
-func applyColumnRuleProps(style *ResolvedStyle, prop, value string, fsize float64) bool {
-	switch prop {
-	case "column-rule":
-		applyColumnRuleShorthand(style, value, fsize)
-	case "column-rule-width":
-		if width, parsed := parseOutlineWidth(value, fsize); parsed {
-			style.ColumnRuleWidth = width
-		}
-	case "column-rule-style":
-		if ruleStyle, parsed := parseOutlineStyle(value); parsed {
-			style.ColumnRuleStyle = ruleStyle
-		}
-	case "column-rule-color":
-		if color, parsed := parseUsedColor(value, style.Color); parsed {
-			style.ColumnRuleColor = color
-			style.ColumnRuleColorSet = true
-		}
-	default:
-		return false
-	}
-
-	return true
-}
-
-func applyColumnRuleShorthand(style *ResolvedStyle, value string, fsize float64) {
-	width, ruleStyle, color, ok := parseRuleShorthand(value, fsize, style.Color)
-	if !ok {
-		return
-	}
-
-	style.ColumnRuleWidth = width
-	style.ColumnRuleStyle = ruleStyle
-	style.ColumnRuleColor = color
-	style.ColumnRuleColorSet = true
-}
-
-func applyColumnCountWidthProps(style *ResolvedStyle, prop, value string, fsize, viewportW float64) bool {
-	switch prop {
-	case "column-count":
-		return setColumnCountValue(style, value)
-	case "column-width":
-		return setColumnWidthValue(style, value, fsize, viewportW)
-	case "columns":
-		parseColumnsShorthand(style, value, fsize, viewportW)
-	default:
-		return false
-	}
-
-	return true
-}
-
-func setColumnCountValue(style *ResolvedStyle, value string) bool {
-	if value == overflowAuto {
-		style.ColumnCount = 0
-	} else if n, err := strconv.Atoi(strings.TrimSpace(value)); err == nil && n >= 1 {
-		style.ColumnCount = n
-	}
-
-	return true
-}
-
-func setColumnWidthValue(style *ResolvedStyle, value string, fsize, viewportW float64) bool {
-	if value == overflowAuto {
-		style.ColumnWidth = -1
-	} else if v, ok := lengthBox(value, fsize, viewportW, overflowAuto); ok && v >= 0 {
-		style.ColumnWidth = v
-	}
-
-	return true
-}
-
-func applyColumnFillSpanProps(style *ResolvedStyle, prop, value string) bool {
-	switch prop {
-	case "column-span":
-		switch value {
-		case cssDisplayNone, "all":
-			style.ColumnSpan = value
-		}
-	case "column-fill":
-		switch value {
-		case balanceKeyword, overflowAuto:
-			style.ColumnFill = value
-		}
-	default:
-		return false
-	}
-
-	return true
 }
 
 // applyGridGroup handles grid template/placement props.

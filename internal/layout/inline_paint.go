@@ -171,15 +171,22 @@ func (e *engine) emitInlineImage(
 	if item.imgRef != nil && item.imgRef.data != nil && imgW > 0 && imgH > 0 {
 		imgData := item.imgRef.data
 		isJPEG := item.imgRef.isJPEG
+		sty := ResolvedStyle{}
+		if item.style != nil {
+			sty = *item.style
+		}
 
-		if item.style != nil && item.style.Filter != "" {
-			filters := parseFilterList(item.style.Filter, item.style.Color, item.style.FontSize)
+		if sty.Filter != "" {
+			filters := parseFilterList(sty.Filter, sty.Color, sty.FontSize)
 			imgData = applyImageFilterToImage(imgData, filters)
 			isJPEG = false
 		}
 
+		intrinsicW, intrinsicH := replacedIntrinsicPt(e, sty, item.imgRef)
+		fitX, fitY, fitW, fitH := applyObjectFitToPaint(sty, imgX, imgY, imgW, imgH, intrinsicW, intrinsicH)
+
 		e.add((Op{ //nolint:exhaustruct // intentional zero fields
-			Kind: OpImage, X: imgX, Y: imgY, W: imgW, H: imgH, IsJPEG: isJPEG,
+			Kind: OpImage, X: fitX, Y: fitY, W: fitW, H: fitH, IsJPEG: isJPEG,
 		}).withImage(imgData, item.imgRef.w, item.imgRef.h, item.alt))
 	}
 
@@ -204,7 +211,7 @@ func (e *engine) emitInlineText(
 	gapAfter bool, und *undRun,
 ) float64 {
 	child := item.style.Color
-	size := item.style.FontSize * e.scale
+	size := usedFontSize(item.style, e.faceFor(item.style)) * e.scale
 	ascent, descent := e.inlineFontMetrics(item.text, item.style)
 
 	if ascent+descent < size*0.5 {
@@ -428,10 +435,13 @@ func (e *engine) emitInlineTextRun(
 	leftX, baseline, size, ascent, descent float64,
 ) {
 	child := item.style.Color
-	text := transformInlineText(run.text, item.style.TextTransform)
+	// Op.Text stays source text (soft hyphens stripped). CSS text-transform is
+	// carried on opExtra and applied at paint/measure time, matching pre-87.4.
+	raw := stripSoftHyphens(run.text)
+	shaped := transformInlineText(raw, item.style.TextTransform)
 	textWidth := run.w
-	if text != run.text {
-		textWidth = e.measureTextFace(text, item.style)
+	if shaped != run.text {
+		textWidth = e.measureTextFace(shaped, item.style)
 	}
 
 	textX := leftX
@@ -447,15 +457,15 @@ func (e *engine) emitInlineTextRun(
 		e.emitTextShadowRuns(item, run, textX, baseline, textWidth, size, descent)
 	}
 
-	e.add((Op{ //nolint:exhaustruct // intentional zero fields
+	e.add(decorateTextOp(Op{ //nolint:exhaustruct // intentional zero fields
 		Kind: OpText, X: textX, Y: baseline, W: textWidth, H: item.h,
-		Text: run.text, Font: run.face, Size: size,
+		Text: raw, Font: run.face, Size: size,
 		InkDescent:    descent,
 		LetterSpacing: item.style.LetterSpacing * e.scale,
 		Bold:          item.style.FontWeight >= fontWeightBoldValue,
 		R:             child[0], G: child[1], B: child[2],
 		RotateDeg: inlineRunRotation(item.style, run.text),
-	}).withTextTransform(item.style.TextTransform).withTextLanguage(fontShapingLanguage(item.style)))
+	}, item.style))
 
 	if item.href != "" {
 		e.add((Op{ //nolint:exhaustruct // intentional zero fields
@@ -474,7 +484,7 @@ func (e *engine) emitTextShadowRuns(
 	for _, shadow := range shadows {
 		opacity := shadowOpacity(shadow.blur)
 
-		shadowOp := (Op{ //nolint:exhaustruct // intentional zero fields
+		shadowOp := decorateTextOp(Op{ //nolint:exhaustruct // intentional zero fields
 			Kind: OpText, X: textX + shadow.x, Y: baseline + shadow.y, W: textWidth, H: item.h,
 			Text: run.text, Font: run.face, Size: size,
 			InkDescent:    descent,
@@ -482,7 +492,7 @@ func (e *engine) emitTextShadowRuns(
 			Bold:          item.style.FontWeight >= fontWeightBoldValue,
 			R:             shadow.color[0], G: shadow.color[1], B: shadow.color[2],
 			RotateDeg: inlineRunRotation(item.style, run.text),
-		}).withTextTransform(item.style.TextTransform).withTextLanguage(fontShapingLanguage(item.style))
+		}, item.style)
 		if opacity > 0 && opacity < 1 {
 			shadowOp.setPaintOpacity(opacity)
 		}
@@ -1563,14 +1573,15 @@ func (e *engine) measureTextFace(cssSheet string, sty *ResolvedStyle) float64 {
 		return 0
 	}
 
-	size := sty.FontSize * e.scale
-	lstyle := sty.LetterSpacing * e.scale
-	wstyle := sty.WordSpacing * e.scale
 	primary := e.faceFor(sty)
 
 	if primary == nil {
 		primary = e.font
 	}
+
+	size := usedFontSize(sty, primary) * e.scale
+	lstyle := sty.LetterSpacing * e.scale
+	wstyle := sty.WordSpacing * e.scale
 
 	total, runeCount, spaceCount := e.accumulateTextFaceWidth(cssSheet, sty, primary, size)
 
@@ -1592,11 +1603,18 @@ func (e *engine) accumulateTextFaceWidth(
 
 	runeCount := 0
 	spaceCount := 0
+	var prev rune
 
 	for _, runic := range cssSheet {
+		if runic == softHyphenRune {
+			// Soft hyphens are invisible unless a break occurs at that point.
+			continue
+		}
+
 		if runic == '\t' {
 			total += e.tabStopAdvance(sty, primary, size)
 			runeCount++
+			prev = runic
 
 			continue
 		}
@@ -1610,11 +1628,14 @@ func (e *engine) accumulateTextFaceWidth(
 		}
 
 		total += face.GlyphAdvancePoints(runic, size)
+		total += textAutospaceGap(sty, prev, runic, size)
 		runeCount++
 
 		if runic == ' ' {
 			spaceCount++
 		}
+
+		prev = runic
 	}
 
 	return total, runeCount, spaceCount
@@ -1644,6 +1665,10 @@ func (e *engine) tabStopAdvance(sty *ResolvedStyle, primary *pdf.Font, size floa
 // measureTextFace, without allocating string(r).
 func (e *engine) measureRuneFace(curRune rune, sty *ResolvedStyle) float64 {
 	if sty == nil {
+		return 0
+	}
+
+	if curRune == softHyphenRune {
 		return 0
 	}
 
@@ -1722,8 +1747,13 @@ func (e *engine) splitTextByFace(cssSheet string, sty *ResolvedStyle) []faceRun 
 	var width float64
 	runeCount := 0
 	spaceCount := 0
+	var prev rune
 
 	for idx, runic := range cssSheet {
+		if runic == softHyphenRune {
+			continue
+		}
+
 		face := primary
 		if isRuneWhitespace(runic) {
 			face = primary
@@ -1733,6 +1763,8 @@ func (e *engine) splitTextByFace(cssSheet string, sty *ResolvedStyle) []faceRun 
 				face = e.font
 			}
 		}
+
+		gap := textAutospaceGap(sty, prev, runic, size)
 
 		if current != nil && face != current {
 			runs = append(runs, faceRun{
@@ -1755,11 +1787,15 @@ func (e *engine) splitTextByFace(cssSheet string, sty *ResolvedStyle) []faceRun 
 		if face != nil {
 			width += face.AdvanceInPoints(runic, size)
 		}
+
+		width += gap
 		runeCount++
 
 		if runic == ' ' {
 			spaceCount++
 		}
+
+		prev = runic
 	}
 
 	if current != nil {
@@ -1790,19 +1826,23 @@ func (e *engine) primaryFaceRun(cssSheet string, sty *ResolvedStyle) (faceRun, b
 	}
 
 	size := sty.FontSize * e.scale
-	paintText := transformInlineText(cssSheet, sty.TextTransform)
+	paintText := stripSoftHyphens(transformInlineText(cssSheet, sty.TextTransform))
 
 	var width float64
 	runeCount := 0
 	spaceCount := 0
+	var prev rune
 
 	for _, runic := range paintText {
 		width += primary.AdvanceInPoints(runic, size)
+		width += textAutospaceGap(sty, prev, runic, size)
 		runeCount++
 
 		if runic == ' ' {
 			spaceCount++
 		}
+
+		prev = runic
 	}
 
 	return faceRun{

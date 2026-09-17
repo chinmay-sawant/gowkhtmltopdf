@@ -64,9 +64,11 @@ Status legend (verified against `applyRestProps` in
 | `border-width`, `border-style`, `border-color` | Implemented | `style.go:380-401`; `thin|medium|thick` widths `style.go:546` |
 | `border-radius` | Implemented | Shorthand including `rx / ry` slash (`setBorderRadius` `border_radius.go`). Longhands `border-top-left-radius` and siblings, including `10pt / 5pt` and `10pt 5pt`. Paint uses elliptical Bezier arcs when rx != ry (`roundedRectPathCorners` `paint.go`). Percent corners resolve per CSS against width and height axes. Tests `TestRadiusLonghand`, `TestRadiusSlash`, `TestRadiusEllipticalLonghand`, `TestRadiusPercentAxes`. |
 | `width`, `height` | Implemented | `style.go:316-323`; consumed in `layout.go:176-191` (block) and `layout.go:315-320` (images) |
+| `aspect-ratio` (`auto` \| `<ratio>`) | Implemented | Apply `style_aspect_ratio_props.go`; definite width→height (and inverse) for blocks/flex/grid/replaced via `aspect_ratio.go`, `resolveContentHeightForWidth`, `resolveUsedWidth`, `usedImageSize`. Test `TestAspectRatioOneToOne` |
 | `min-width`, `min-height`, `max-width`, `max-height` | Implemented | `style.go:324-339`; enforced `layout.go:181-186, 321-328`; `%` resolves against viewport approximation |
 | `box-sizing` (`content-box|border-box`) | Implemented | parsed `style.go`; default `content-box` (specified width is content width); `border-box` makes width include padding+border (`layout.go` `buildBlock`); test `TestBoxSizingBorderBox` |
 | `overflow` / `overflow-x` / `overflow-y` (`visible|hidden|auto|scroll|clip`) | Implemented | Sticky scrollport selection (`sticky.go`) plus paint clip of descendant fill/text/line/image to the padding box for `hidden|clip|auto|scroll` (`overflow_clip.go`). `visible` does not clip. Tests `TestOverflowClip`, `TestStickyOverflow*` |
+| `overflow-block` / `overflow-inline` | Implemented | Logical aliases mapped onto `OverflowX`/`OverflowY` by writing-mode (`style_overflow_logical.go`); `writing-mode` applies before longhands so same-rule mapping is correct. Clip via `overflow_clip.go`. Test `TestOverflowBlockInlineMapToAxes` |
 | `margin-trim` (`none|block|block-start|block-end|inline-start|inline-end`) | Implemented (lite) | Parsed, stored at `style.go:334` (`ResolvedStyle.MarginTrim`) via `style_advanced_props.go:44`; consumed in `layout_flow.go` (trims first/last child block margins at container edges). `inline` and logical sides parse but trim only block axis for horizontal-tb. Test `TestMarginTrim` (`style_advanced_props_test.go:15`). |
 | `box-decoration-break` (`slice|clone`) | Implemented (parsed, no visual effect) | Parsed, stored at `style.go:335` (`ResolvedStyle.BoxDecorationBreak`) via `style_advanced_props.go:52`; both values paint as `slice` for paginated PDF (borders/backgrounds do not clone across page breaks). `clone` is accepted then downgraded. Test `TestBoxDecorationBreak` (`style_advanced_props_test.go:35`). |
 
@@ -79,6 +81,13 @@ Status legend (verified against `applyRestProps` in
 | `display: table-caption` | Implemented | `<caption>` and `display: table-caption` render **above** the table (`buildTableCaption`) |
 | `display: table-column`, `table-column-group` | Not implemented | parsed; no column model in `buildTable` |
 | `float` (`left|right`) | Implemented (lite) | out-of-flow pack to side; stacks on same side; simple exclusion for following in-flow content; float inside `td` packs in cell BFC; in-flow `table` always clears below floats (no shrink-beside); `float` on `table-cell`/`table-row` blockifies (CSS2.1 §9.7); tests `TestFloatLeftRightClear`, `TestFloatInsideTableCell`, `TestTableClearsFloat`, fixture-22 / 29 / 38 |
+| `shape-outside` (`none` / `circle()` / `ellipse()` / `inset()`) | Implemented (lite) | Basic shapes with `float:left|right`. Per-line exclusion intervals in `shape_exclusion.go` replace the rectangular float edge when present (`float.go` exclusion / `inline.go` `lineBounds`). `polygon()` / `path()` / `url()` rejected. Apply `style_shape_props.go`. Tests `TestShapeOutsideCircleShortensLines`, `TestShapeOutsideApplyParsesBasicShapes`. |
+| `shape-margin` | Implemented (with `shape-outside`) | Expands the outside contour (circle/ellipse radius or inset edges). `%` uses the CSS Shapes reference diagonal/√2. Apply `style_shape_props.go`; consumer `buildShapeExclusion`. Test `TestShapeMarginExpandsExclusion`. |
+| `shape-inside` / `shape-padding` | Unsupported | CSS Shapes 2 interior fitting; Chrome has no BCD support. No apply arm. |
+| `shape-image-threshold` | Unsupported | No alpha-contour extraction from float images. No apply arm. |
+| `float-offset` | Implemented (lite) | Length (or `%` of float height) block-axis nudge on `placeFloat` via `nudgeFloatOffset` (`style_float_page_props.go`). Test `TestFloatOffsetNudge`. |
+| `float-reference` (`inline` / `column` / `region` / `page`) | Partial | `inline` documents the current BFC (same as plain CSS2 floats). `page` / `column` / `region` parse and store only; no pagination relocation. Apply `style_float_page_props.go`. Test `TestFloatReferenceInline`. |
+| `float-defer` | Unsupported | No page-float defer model. No apply arm. |
 | `clear` (`left|right|both`) | Implemented (lite) | advances past named float bottoms (`float.go`); test `TestFloatLeftRightClear` |
 | `position` (`static|relative|absolute|fixed|sticky`) | Implemented | static in-flow; `relative`/`absolute`/`fixed` lite via `buildAbsolute` / `buildFixed` / `applyRelativeOffset` (fixtures 26/28). `sticky` = print-scoped clamp (page content box = scrollport; `sticky.go`, fixture-31, `TestSticky*`) plus overflow-box scrollport at offset 0 |
 | `position: sticky` | Implemented | Default scrollport = page content box (`contentH`); clamps `top`/`bottom`/`left`/`right` within the containing block; natural fragment only, with no fixed-style continuation-page clones. Inside `overflow:auto|scroll|hidden|clip`, that box is the scrollport at **scroll offset 0** (PDF has no scroll; no page clones). Path: `sticky.go` / `applyStickyPrint`; fixture-31; `TestSticky*` / `TestStickyOverflow*` |
@@ -99,13 +108,35 @@ Status legend (verified against `applyRestProps` in
 | `text-combine-upright` (`none\|all\|digits <n>`) | Implemented (subset) | Vertical writing only: the whole run paints as one upright cell centered in the column when `all` is set or when every character is a digit within the `digits N` cap. No scaled cell; mixed digit/letter runs stay rotated. Apply arm `style_text_support_props.go:38`; consumers `inline_paint.go:373/379` and `inline_vertical_writing.go`. Fixture-62 row 75. |
 | `font-size` | Implemented | `style.go` `fontSize` (px/pt/em/%/rem/in/cm/mm/pc + keywords); `%`/`em` resolve against parent; test `TestFontSizeEmInherit` |
 | `font-weight` (`normal|bold|100-900`) | Implemented | ≥700 selects Liberation Sans **Bold** (or BoldItalic); fake stroke bold only if a bold face is missing; tests `TestRealBoldFaceOps`, `TestBoldFaceInInvoicePDF` |
+| `font-optical-sizing` (`auto\|none`) | Partial | Parsed; PDF embeds default instance only. Apply `style_font_variant_props.go`; face consumer `resolveFontVariants` (`layout.go`) keeps default glyf/hmtx even when `opsz` exists. Tests `TestApplyFontVariantProps`, `TestResolveFontVariantsStaticBundledFaces`, `TestResolveFontVariantsCapableFaceDoesNotFakeInstancing`. |
+| `font-palette` (`normal\|light\|dark\|<dashed-ident>`) | Partial | Parsed; PDF embeds default instance only. No COLR/CPAL paint path; `resolveFontVariants` returns the default face. Same apply/consumer/tests as optical-sizing. `palette-mix()` dropped. |
+| `font-variation-settings` (`normal\|[ <string> <number> ]#`) | Partial | Parsed; PDF embeds default instance only. Axis list is stored and validated; no fvar instancing in embed/shape. Same apply/consumer/tests as optical-sizing. |
 | `font-style` (`italic|oblique`) | Implemented | selects Liberation Sans Italic / BoldItalic (`pdf.FaceSet.Resolve`); test `TestRealBoldFaceOps` |
 | `font-language-override` (`normal\|<string>`) | Implemented (subset) | OpenType language tags map to BCP47 (TRK->tr, SRB->sr, and other documented tags); the tag rides `OpText.TextLanguage` into `shaping.Input.Language` (`internal/pdf/shape_gotext.go:216`) for PDF and PNG. Observable with DejaVu Sans `SRB` `locl` substitution. Apply arm `style_font_variant_props.go:50`; fixture-61 row 62. |
+| `font-feature-settings` | Implemented (subset) | 4-letter OT tags parsed into `OpText.FontFeatures`; PDF `TextShowLanguageFeatures` and PNG `ShapeRunWithFeaturesLanguage` pass them to go-text. Apply `style_font_feature_props.go`. Tests `TestApplyFontFeatureSettings`, `TestFontFeatureSettingsReachShaper`. |
+| `font-kerning` (`auto\|normal\|none`) | Implemented (subset) | `none` emits `kern` 0 into `OpText.FontFeatures`. Test `TestFontKerningNone`. |
+| `font-variant` / `font-variant-caps` / `-ligatures` / `-numeric` / `-position` / `-east-asian` | Implemented (subset) | Keywords map to OT tags (`smcp`, `liga`, `tnum`, `subs`, `jp90`, …) on the same feature pipeline. Tests `TestFontVariantCapsMapsToSmcp`, `TestFontVariantShorthandExpands`. |
+| `font-variant-alternates` / `font-variant-emoji` | Partial | Parsed and inherited; alternates need `@font-feature-values`, emoji needs color-font presentation (no consumer). |
+| `font-synthesis` / `font-synthesis-weight` | Implemented (subset) | `none` / `weight` gate fake bold via `Op.NoFakeBold` / `FakeBoldFor`. Test `TestFontSynthesisWeightNoneDisablesFakeBold`. |
+| `font-synthesis-style` / `-small-caps` / `-position` | Partial | Stored `auto\|none`; no fake-oblique / synthetic small-caps / synthetic sub-super consumer. |
+| `font-width` / `font-stretch` | Partial | Keywords/% stored and inherited (`font-stretch` aliases `font-width`). Bundled Liberation faces have no width masters, so lookup ignores the percent. Test `TestFontStretchAliasesToWidth`. |
+| `font-size-adjust` (`none\|<number>`) | Implemented (subset) | ex-height number form; `usedFontSize` scales measure and `OpText.Size` from OS/2 `sxHeight`. Test `TestFontSizeAdjustScalesUsedSize`. |
 | `text-align` (`left|right|center|justify`) | Implemented (justify lite) | left/right/center; `justify` distributes leftover space between word items on non-final lines (`inline.go`); test `TestTextAlignJustify` |
 | `text-decoration` (`none|underline|line-through`) | Implemented | drawn in `inline.go`; test `TestBoldUnderline` |
 | `text-decoration-inset` | Implemented (subset) | `auto` or 1-2 lengths; the first endpoint is stored in points and trims the decoration's outer endpoints (negative values extend). Percentages are rejected. Apply arm `style_text_support_props.go:42`; consumer `inline_paint.go:841`. Fixture-62 row 78. |
+| `initial-letter` | Implemented (lite) | Drop/raise on a **real leading element** (e.g. `<span>`). `:first-letter` is rejected by the CSS selector parser; no synthesized first-letter box. Sizes glyph to N lines and excludes following lines (float-like). Apply `style_initial_letter_props.go`; consumer `inline_initial_letter.go`. Test `TestInitialLetterSpansThreeLines`. |
+| `initial-letter-align` | Partial | Parsed/stored/inherited; drop-cap path uses alphabetic hanging. Other keywords accepted without distinct metrics. |
+| `initial-letter-wrap` | Partial | Parsed/stored/inherited; exclusion is always the rectangular letter box (no glyph-contour wrap). |
 | `text-decoration-skip` / `-box` / `-self` / `-spaces` | Implemented (subset) | The `none\|auto` shorthand expands onto the longhands: `skip-box:all` breaks the stroke at an item with inline padding/border, `skip-self:skip-all` suppresses the item's own decoration, `skip-spaces` trims spacer runes, `skip-ink` gaps descenders. Decorations paint per item, so ancestor decorations are not propagated. Apply arms `style_text_support_props.go:46-59`; consumers `inline_paint.go:543/550/554`. Fixture-62 rows 80/81/83/84. |
 | `text-indent` | Implemented | Inherited and applied to the first line (`inline.go`); test `TestTextIndentInheritsAndShiftsFirstLine` |
+| `text-box` / `text-box-trim` / `text-box-edge` | Implemented (subset) | Shorthand + longhands in `style_text_box_props.go`. `trim-both` (also start/end) drops half-leading on the block first/last line; `cap`/`ex`/`alphabetic` retarget edges while trimming (`inline_text_box.go`, `lineMetrics`). Test `TestTextBoxTrimBothShrinksHalfLeading`. |
+| `text-autospace` | Implemented (subset) | `ideograph-alpha` / `auto` insert 1/8em between ideograph and Latin letters in measure/paint (`inline_text_spacing.go`, `inline_paint.go`). Test `TestTextAutospaceIdeographAlpha`. |
+| `text-spacing` / `text-spacing-trim` | Implemented (lite) | Shorthand stores and mirrors trim tokens; `trim-start`/`trim-both` hang half the advance of leading fullwidth opening punctuation at line origin. Apply `style_text_spacing_props.go`. |
+| `text-group-align` | Implemented (lite) | When `text-align` is start/left, `center`/`end`/`right` remap line origin (`resolveTextGroupAlign`). Not a full multi-line group shift. Test `TestTextGroupAlignCenter`. |
+| `text-fit` | Not implemented | Apply stores `none\|auto\|scale` only; no scale-search consumer (L). Honesty: stays Unsupported. |
+| `hyphens` / `hyphenate-character` | Implemented (SHY/manual) | `none` suppresses soft hyphens; `manual` and `auto` honor authored U+00AD breaks and insert `hyphenate-character` (default `-`). No dictionary auto. Consumers `inline_hyphenation.go`, `packInlineLine`. Tests `TestSoftHyphenUsesHyphenateCharacter`, `TestHyphenateLimitChars`. |
+| `hyphenate-limit-chars` / `zone` / `lines` / `last` | Implemented (SHY) | Limits apply to soft-hyphen breaks: min word/before/after, trailing zone, consecutive hyphenated lines, and last-line suppression. `style_hyphenation_props.go` + `inline_hyphenation.go`. Test `TestHyphenateLimitChars`. |
+| `hanging-punctuation` | Implemented (subset) | `first` hangs leading opening punctuation outside the line start (`emitLine`). Other keywords stored. Test `TestHangingPunctuationFirst`. |
 | `line-height` (number, length, `normal`) | Implemented | consumed in line metrics; test `TestMarginCollapse` |
 | `letter-spacing` | Implemented | consumed in run width |
 | `word-spacing` | Implemented | Inherited; extra width per ASCII space (`style_properties.go` apply + `inline_paint.go`). Tests `TestWordSpacingInherits`, `TestWordSpacingWidensRuns` |
@@ -116,7 +147,7 @@ Status legend (verified against `applyRestProps` in
 | `overflow-wrap` / `word-wrap` / `word-break` | Implemented | Parsed `applyTextWrapProps` (`style_properties.go`). Used by `wordBreakOf` (`layout_measure.go`). `word-wrap` is the overflow-wrap alias. `anywhere` / `break-all` mid-break; `break-word` soft wrap; `keep-all` preserves non-breaking runs. Tests `overflow_wrap_test.go`, `css_partial_remaining_test.go` |
 | `list-style` / `list-style-type` / `list-style-image` / `list-style-position` | Implemented | `inside` puts the marker in the first line; `outside` (default) hangs in the gutter; `list-style-image` paints via image resolver with fallback to type. Tests `TestListStylePositionInside`, `TestListStyleImage` |
 | `quotes` | Implemented | Two-string pair inherited; `content: open-quote` / `close-quote` with nesting depth. Test `TestQuotes` |
-| `counter-reset` / `counter-increment` / `counter()` / `content` | Implemented | Decimal counters on `::before`/`::after`, nested `counters(name, ".")`, and `content` text/attr/quotes/counters. Tests `TestCounterInBefore`, `TestCounterResetIncrementLayout`, `TestQuotes`, `css_partial_remaining_test.go` |
+| `counter-reset` / `counter-set` / `counter-increment` / `counter()` / `content` | Implemented | Decimal counters on `::before`/`::after`, nested `counters(name, ".")`, and `content` text/attr/quotes/counters. Walk order reset → set → increment (`counter.go`). Tests `TestCounterInBefore`, `TestCounterResetIncrementLayout`, `TestCounterSetBeforeIncrement`, `TestQuotes` |
 
 ### 2.4 Color & background
 
@@ -183,7 +214,7 @@ Status legend (verified against `applyRestProps` in
 | Pagination | Fragment + whole-op + phase-18 polish | rect-type ops (fill/stroke/line) split at page boundaries; text/images/links move wholly (line-level) (`paint_flow_*`); `page-break-before/after: always`, `page-break-inside: avoid`, table rows never split; **`<thead>` / `table-header-group` repeat** on continuation pages (`repeatTableHeaders`, fixture-23); CSS `orphans`/`widows` parsed + Rule 3 when line boxes exist (heuristic fallback; fixtures 30/37); `--zoom` forwarded; smart-shrinking re-layouts. `Result.Locations` for outlines/links. Break aliases in §2.6. See "Pagination" note below. |
 | Floats / absolute positioning | Float lite + absolute/fixed/sticky lite | float/`clear` lite (§2.2); relative/absolute/fixed lite; sticky = print page scrollport + overflow@0 (§2.2; fixture-31) |
 | Flexbox / Grid | Partial | Stage A flex + Stage B grid (areas/dense/`minmax`) + Stage C lite (§2.7 / §2.8). Paths: `flex.go`, `grid.go`, `style.go`; fixtures 25/28/32-35; plan `plans/0.2.0/phases/subplans-tier-2/flex-grid-full.md`. **Not** Bootstrap/Tailwind / Chrome layout-test parity |
-| Multicol | Partial | Report lite: `column-count`/`column-width`/`columns`, `column-gap` (normal to 1em), `column-span:none\|all`, `column-fill:balance\|auto`; column boxes do not straddle pages (§2.9; `multicol.go`; fixture-39) |
+| Multicol | Partial | Report lite: `column-count`/`column-width`/`columns`, `column-height`, `column-wrap` (wrap/auto rows), `column-gap` (normal to 1em), `column-span:none\|all`, `column-fill:balance\|auto`; column boxes do not straddle pages (§2.9; `multicol.go`; fixture-39) |
 | Transforms (static 2D) | Implemented | `transform` + `transform-origin` paint CTM; stacking + abs/fixed CB; sibling flow unchanged. No animation timelines; no 3D; 2D image filter (opacity, blur, grayscale, invert, adjustments) on raster images + CSS `opacity()` on elements; no CSS shader/SVG filter composition. Fixture-40; `transform.go`, `filter.go` |
 | JavaScript | No | `<script>` stripped at load; no engine. `--enable-javascript` is an **unknown option** (Policy A) |
 | Image-mode text | TTF outline raster | same Liberation faces as PDF; pure-Go coverage AA (`internal/imageout/ttfraster.go`); 5×7 bitmap only if an op has no font |
@@ -226,6 +257,9 @@ Evidence: `internal/layout/grid.go`, `style.go`; fixtures 28/32/34/35; `grid_tes
 | `grid-template-rows` | [x] Implemented | Consumed when height definite; fixed mins on auto-height; fixture-32 |
 | `minmax()` track sizing | [x] Implemented | Lengths / `%` (definite) / `fr` / `auto` / `min-content` / `max-content` subset; `fr` keeps min floors (fixture-35) |
 | `gap` / `row-gap` / `column-gap` | [x] Implemented | Independent (`gridGaps`); `TestGridRowGapVsColumnGap` asserts the row gap is at least 8pt while column gap stays distinct |
+| `grid-gap` / `grid-row-gap` / `grid-column-gap` | [x] Implemented | Legacy aliases of gap/row-gap/column-gap (`style_gap_props.go`). Test `TestGridGapAliasesMatchGap` |
+| `grid-auto-columns` | [x] Implemented | Implicit columns beyond the template use `gridAutoTrackDef` (fixed / auto / 1fr lite). Test `TestGridAutoColumns` |
+| `grid-auto-rows` | [x] Implemented | Implicit and auto-height rows; fixed auto-rows lock preferred-height growth (`grid_tracks.go`). Test `TestGridAutoRows` |
 | `grid-column` / `grid-column-start` / `grid-column-end` / `span N` | [x] Implemented | Line numbers + span; 2D occupancy |
 | `grid-row` / `grid-row-start` / `grid-row-end` / `span N` | [x] Implemented | Row span + stretch into spanned tracks; `TestGridRowSpan*` |
 | Auto-flow placement (row / column) | [x] Implemented | Sparse row default; column major via `grid-auto-flow: column` |
@@ -238,13 +272,15 @@ Evidence: `internal/layout/grid.go`, `style.go`; fixtures 28/32/34/35; `grid_tes
 
 ### 2.9 CSS Multi-column (report lite)
 
-Evidence: `internal/layout/multicol.go`, `style_cascade.go` (`applyRestProps`) and `style_properties.go`; fixture-39; `multicol_test.go`. **Not** full Multicol L1 / L2 / Chrome balancing with floats.
+Evidence: `internal/layout/multicol.go`, `style_multicol_props.go`, `style_cascade.go`; fixture-39; `multicol_test.go`, `column_height_wrap_test.go`. **Not** full Multicol L1 / L2 / Chrome balancing with floats.
 
 | Property | Status | Notes / verified by |
 |----------|--------|---------------------|
 | `column-count` (`auto` \| integer ≥1) | [x] Implemented | Establishes multicol when ≠ auto; `TestMulticolParseProps` |
 | `column-width` (`auto` \| `<length>`) | [x] Implemented | Used count/width per Multicol §3.3; `TestUsedColumnCountWidth` |
-| `columns` shorthand | [x] Implemented | `parseColumnsShorthand` |
+| `column-height` (`auto` \| `<length>`) | [x] Implemented | Caps column boxes; short rows keep authored height; establishes multicol when ≠ auto. `TestColumnHeightCapsColumn` |
+| `column-wrap` (`auto` \| `wrap` \| `nowrap`) | [~] Partial | `wrap` and `auto` (when height set) open block-direction rows. `nowrap` stops after one row; inline overflow columns not shipped. `TestColumnWrapCreatesRow` |
+| `columns` shorthand | [x] Implemented | `parseColumnsShorthand` including `/ <column-height>` |
 | `column-gap` (`normal` \| `<length>`) | [x] Implemented | Multicol: `normal` → 1em; flex/grid still treat unset/normal as 0 gap |
 | `column-span` (`none` \| `all`) | [x] Implemented | Mid-flow spanner; preceding columns balance - fixture-39 / `TestMulticolColumnSpanAll` |
 | Nested multicol (2 levels) | [x] Implemented | Outer / inner geometry isolated - `TestMulticolNestedTwoLevels` |
@@ -260,7 +296,7 @@ This subsection documents CSS properties that are **parsed and stored** in `Reso
 Status for this subsection:
 - **Implemented (parsed, no visual effect)** - declaration is recognized, `style_advanced_props.go` or `style_properties.go` writes a `ResolvedStyle` field, but no box, layout, or `Op` reads it for paginated PDF. Visual output is unchanged. Downgrades are noted.
 - **Not implemented** - no `ResolvedStyle` field and no consumer; the name is recognized but the declaration is dropped. Left in triage families `E_compositing`, `E_containment`, `E_paged_media`, etc.
-- **Not implemented (demoted)** - a row that was previously in the first group; the unread storage and apply arm were removed on 2026-09-12 (PT26-LAY-04/05), so the declaration is now dropped. Its catalog row is `unsupported`. No such row remains in this table: the containment rows moved to §2.2, and the three CSS Fonts rows still demoted by PT26-LAY-05 (`font-optical-sizing`, `font-palette`, `font-variation-settings`) are parsed and dropped with no print consumer; `font-language-override` was re-implemented with a shaper consumer (§2.3).
+- **Not implemented (demoted)** - a row that was previously in the first group; the unread storage and apply arm were removed on 2026-09-12 (PT26-LAY-04/05), so the declaration is now dropped. Its catalog row is `unsupported`. No such row remains in this table: the containment rows moved to §2.2; `font-language-override` was re-implemented with a shaper consumer (§2.3); the three VF/palette rows (`font-optical-sizing`, `font-palette`, `font-variation-settings`) were re-parsed with a static default-instance consumer and are documented as Partial in §2.3 (Path A, phase 87.3).
 
 | Property | Status | Notes / file:line |
 |----------|--------|-------------------|
@@ -278,7 +314,7 @@ Status for this subsection:
 Notes:
 - `background-attachment: fixed -> scroll` downgrade is unconditional for paginated PDF (no viewport). Background position still uses `BackgroundPosX/Y` and `BackgroundSize`/`Repeat` but the attachment axis is fixed to scroll.
 - `box-decoration-break: clone -> slice` downgrade is unconditional; fragmented rects are always sliced at page boundaries (`paint_pagination_*` / `paint_flow_*` split path), backgrounds and borders do not repeat per fragment.
-- `contain` / `contain-intrinsic-*` / `content-visibility` were demoted by PT26-LAY-04 on 2026-09-12 and re-implemented the same day with consumers in `layout_flow.go` (size containment, `content-visibility:hidden`) and the overflow-clip stamp (paint containment); see §2.2 for the supported subset. The three remaining CSS Fonts rows demoted by PT26-LAY-05 (`font-optical-sizing`, `font-palette`, `font-variation-settings`) remain parsed-and-dropped no-ops in the catalog; `font-language-override` now threads its tag to the shaper.
+- `contain` / `contain-intrinsic-*` / `content-visibility` were demoted by PT26-LAY-04 on 2026-09-12 and re-implemented the same day with consumers in `layout_flow.go` (size containment, `content-visibility:hidden`) and the overflow-clip stamp (paint containment); see §2.2 for the supported subset. The three CSS Fonts VF/palette rows demoted by PT26-LAY-05 were re-applied later and are Partial in §2.3 (parsed; PDF embeds default instance only). `font-language-override` threads its tag to the shaper.
 - GCPM `bookmark-*` / `footnote-*` / `string-set` are paged-media running-string and footnote collection drafts that would feed a PDF outline or footnote area; the print engine builds its outline from heading tags and CLI TOC flags (§7), not from these properties.
 
 ### 2.11 Image adjustments (CSS Images)
@@ -288,6 +324,8 @@ Notes:
 | `image-orientation` (`from-image\|none\|<angle>\|\|flip`) | Implemented | `from-image` reads the JPEG EXIF orientation; `none` ignores it; an explicit angle replaces EXIF and rotates inside the original canvas (the `flip` mirror applies after rotation). Consumer `layout_images.go:219/237`, raster transform `image_exif.go:396`. Fixture-61 row 89. |
 | `image-resolution` (`from-image\|<resolution>`) | Implemented | `dpi`, `dpcm`, `dppx`, and the `x` alias convert to DPI; an explicit resolution always wins and `from-image` reads the bytes' declared resolution with a 96dpi fallback. 300dpi renders the image smaller than the 96dpi default. Consumer `layout_images.go:250/256`. Fixture-61 row 90. |
 | `object-view-box` (`none\|inset()\|xywh()\|rect()\|circle()\|ellipse()\|polygon()`) | Implemented (rect subset) | `inset()`, `xywh()`, and `rect()` crop the source before it scales into the image box; `circle()`, `ellipse()`, and `polygon()` parse and store but leave the image uncropped, as does an empty resolved rectangle. Consumer `layout_images.go:319` (`objectViewBoxRect`). Fixture-62 row 17. |
+| `object-fit` (`fill\|contain\|cover\|none\|scale-down`) | Implemented | Apply `style_image_adjust_props.go`; paint sizing in `object_fit.go` on block (`layout_images.go`) and inline (`inline_paint.go`) replaced paths. Test `TestObjectFitCover` |
+| `object-position` | Implemented | Keyword/length/% pair stored as X/Y; positions the fitted image in the content box (`object_fit.go`). Test `TestObjectPositionRightBottom` |
 
 ## 3. Supported units
 
@@ -540,6 +578,36 @@ The following 155 properties across six categories are intentionally left **unsu
 | 3D transforms (`A_3d_transforms`) | 4 | Not implemented | Static 2D affine transforms (`transform`, `transform-origin`) are Implemented for paint CTM; 3D transform matrices, perspective projection, perspective origins, and backface culling are permanent non-goals for print PDF (`backface-visibility`, `perspective`, `perspective-origin`, `transform-style`). |
 
 Total: 155 properties across six categories. All remain Not implemented.
+
+### 5.5 v0.2.7 Borders-4 / Round Display drafts (14 properties - Unsupported / draft-not-ready)
+
+Phase 87.7 product choice: **Defer all 14**. Spec text for these Borders-4 /
+css-round-display-1 names is largely not ready for implementation; there is no
+apply arm and no paint consumer in `internal/layout`. Do not claim Implemented
+for parse-only stubs. Catalog rows stay `engine_status: unsupported` in
+`plans/0.2.6/catalog/mapping.json`. Fixture-64 Effect cells already warn
+`Chrome: no render expected` where Chrome BCD has no render path.
+
+| Property | Spec | Status | Note |
+|----------|------|--------|------|
+| `border-block-clip` | css-borders-4 | Unsupported / draft-not-ready | No apply/paint; v0.2.7 defer |
+| `border-block-end-clip` | css-borders-4 | Unsupported / draft-not-ready | No apply/paint; v0.2.7 defer |
+| `border-block-start-clip` | css-borders-4 | Unsupported / draft-not-ready | No apply/paint; v0.2.7 defer |
+| `border-bottom-clip` | css-borders-4 | Unsupported / draft-not-ready | No apply/paint; v0.2.7 defer |
+| `border-boundary` | css-round-display-1 | Unsupported / draft-not-ready | No apply/paint; v0.2.7 defer |
+| `border-clip` | css-borders-4 | Unsupported / draft-not-ready | No apply/paint; v0.2.7 defer |
+| `border-inline-clip` | css-borders-4 | Unsupported / draft-not-ready | No apply/paint; v0.2.7 defer |
+| `border-inline-end-clip` | css-borders-4 | Unsupported / draft-not-ready | No apply/paint; v0.2.7 defer |
+| `border-inline-start-clip` | css-borders-4 | Unsupported / draft-not-ready | No apply/paint; v0.2.7 defer |
+| `border-left-clip` | css-borders-4 | Unsupported / draft-not-ready | No apply/paint; v0.2.7 defer |
+| `border-limit` | css-borders-4 | Unsupported / draft-not-ready | No apply/paint; v0.2.7 defer |
+| `border-right-clip` | css-borders-4 | Unsupported / draft-not-ready | No apply/paint; v0.2.7 defer |
+| `border-shape` | css-borders-4 | Unsupported / draft-not-ready | Chrome BCD yes since 147; still no gowk consumer; v0.2.7 defer |
+| `border-top-clip` | css-borders-4 | Unsupported / draft-not-ready | No apply/paint; v0.2.7 defer |
+
+Total: 14 properties. All remain Unsupported / draft-not-ready for v0.2.7.
+Ledger: `plans/0.2.7/phases/phase-87.7-border-drafts.md`. Proof:
+`plans/0.2.7/phases/_proof-87.7.md`.
 
 ## 6. Security policy (frozen defaults)
 

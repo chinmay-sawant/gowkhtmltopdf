@@ -1556,7 +1556,11 @@ func drawText(
 		chld.TextRenderMode(pdfTextRenderFillStroke) // fill + stroke
 	}
 
-	chld.TextShowLanguage(transformInlineText(paintOp.Text, paintOp.TextTransform), paintOp.TextLanguage())
+	chld.TextShowLanguageFeatures(
+		transformInlineText(paintOp.Text, paintOp.TextTransform),
+		paintOp.TextLanguage(),
+		paintOp.FontFeatures(),
+	)
 
 	if fakeBold {
 		chld.TextRenderMode(0)

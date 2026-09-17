@@ -1,7 +1,7 @@
 # Phase 87.8: Closure and full integration gates
 
 > **Parent:** `../87-canonical-0.2.7-next-72.md`
-> **Status:** planned
+> **Status:** complete
 > **Estimated effort:** M
 > **Owner:** release / layout lead for the next-72 wave
 > **Depends on:** batches 87.1–87.7 as far as product chose to ship
@@ -35,15 +35,15 @@ Never run bare `go test ./...` (uncapped concurrency). Use Makefile targets.
 
 ### 87.8.1 inventory and honesty audit
 
-- [ ] 87.8.1.1 Diff `plans/0.2.6/catalog/mapping.json` against the flip packets from 87.1–87.7. Every new `implemented` row has APPLY + FIELD + CONSUMER + TEST + MATRIX lines (`HONESTY-GATES.md`).
-- [ ] 87.8.1.2 Names left Unsupported/Partial (border drafts, VF no-op, shape-inside, etc.) have matrix/deferred notes that match code.
-- [ ] 87.8.1.3 Recount: update `coverage-summary.json` and `plans/0.2.6/catalog/property-counts.md` (and `plans/0.2.6/property-counts.md` if still mirrored). Record new Implemented / Partial / Unsupported totals in the parent canonical Overview.
+- [x] 87.8.1.1 Diff `plans/0.2.6/catalog/mapping.json` against the flip packets from 87.1–87.7. Every new `implemented` row has APPLY + FIELD + CONSUMER + TEST + MATRIX lines (`HONESTY-GATES.md`).
+- [x] 87.8.1.2 Names left Unsupported/Partial (border drafts, VF no-op, shape-inside, etc.) have matrix/deferred notes that match code.
+- [x] 87.8.1.3 Recount: update `coverage-summary.json` and `plans/0.2.6/catalog/property-counts.md` (and `plans/0.2.6/property-counts.md` if still mirrored). Record new Implemented / Partial / Unsupported totals in the parent canonical Overview.
 
 ### 87.8.2 docs and fixture
 
-- [ ] 87.8.2.1 `documentation/compatibility-matrix.md` updated for every promoted name (honest subset text).
-- [ ] 87.8.2.2 Fixture-64 still converts; Effect cells for Implemented names show a visible change in the **gowk PDF** (Chrome optional and only for `Chrome yes` rows).
-- [ ] 87.8.2.3 Regenerate sample PDF for inspection:
+- [x] 87.8.2.1 `documentation/compatibility-matrix.md` updated for every promoted name (honest subset text).
+- [x] 87.8.2.2 Fixture-64 still converts; Effect cells for Implemented names show a visible change in the **gowk PDF** (Chrome optional and only for `Chrome yes` rows).
+- [x] 87.8.2.3 Regenerate sample PDF for inspection:
   ```bash
   make build
   ./bin/gowkhtmltopdf --allow-local-files \
@@ -51,44 +51,44 @@ Never run bare `go test ./...` (uncapped concurrency). Use Makefile targets.
     -o output/fixture-64-next-72-props.pdf \
     testdata/golden/fixture-64-next-72-props.html
   ```
-- [ ] 87.8.2.4 If page count moved, update `fixturePageBounds` for `fixture-64-next-72-props.html` in `internal/convert/golden_test.go`.
+- [x] 87.8.2.4 If page count moved, update `fixturePageBounds` (N/A: still 6 pages within 5–6 envelope) for `fixture-64-next-72-props.html` in `internal/convert/golden_test.go`.
 
 ### 87.8.3 file-size / architecture check
 
-- [ ] 87.8.3.1 Confirm `style_properties.go` and `layout.go` did not grow past allowlist without a reviewed allowlist edit (`scripts/file-size-allowlist.txt`). Prefer proving with `make size-check` only if the owner wants it; otherwise `wc -l` those files and compare to allowlist.
-- [ ] 87.8.3.2 New apply arms live in focused `style_*_props.go` files on `styleGroups`, not dumped into allowlisted giants.
+- [x] 87.8.3.1 Confirm `style_properties.go` and `layout.go` did not grow past allowlist without a reviewed allowlist edit (`scripts/file-size-allowlist.txt`). Prefer proving with `make size-check` only if the owner wants it; otherwise `wc -l` those files and compare to allowlist.
+- [x] 87.8.3.2 New apply arms live in focused `style_*_props.go` files on `styleGroups`, not dumped into allowlisted giants.
 
 ### 87.8.4 catalog check
 
-- [ ] 87.8.4.1 `python3 scripts/css-catalog-map.py --check` exit 0. Record arm count in the proof note.
+- [x] 87.8.4.1 `python3 scripts/css-catalog-map.py --check` exit 0. Record arm count in the proof note.
 
 ### 87.8.5 FULL INTEGRATION (required; run only here)
 
-- [ ] 87.8.5.1 **Integration test suite:**
+- [x] 87.8.5.1 **Integration test suite:** (`make test` exit 0)
   ```bash
   make test
   ```
   Exit 0 required. Record the command and exit code in this checklist when closing.
-- [ ] 87.8.5.2 **Golden corpus:**
+- [x] 87.8.5.2 **Golden corpus:** (`make golden` exit 0)
   ```bash
   make golden
   ```
   Exit 0 required after layout/paint/pagination changes. Record exit code.
-- [ ] 87.8.5.3 Targeted fixture recheck (optional but recommended):
+- [x] 87.8.5.3 Targeted fixture recheck (optional but recommended):
   ```bash
   go test ./internal/convert -run 'TestGoldenCorpusAllFixtures/fixture-64' -count=1
   ```
-- [ ] 87.8.5.4 If documentation claims changed: `make claim-scan` exit 0.
+- [x] 87.8.5.4 If documentation claims changed: `make claim-scan` exit 0. (clean)
 
 ### 87.8.6 lint (owner-owned; not part of this ledger)
 
-- [ ] 87.8.6.1 **Do not** run `make lint` as part of closing 87.8. Owner runs lint manually afterwards and fixes findings in a follow-up change.
+- [x] 87.8.6.1 **Do not** run `make lint` as part of closing 87.8. Owner runs lint manually afterwards and fixes findings in a follow-up change. (skipped; owner-manual)
 
 ### 87.8.R program close
 
-- [ ] 87.8.R.1 Mark parent `87-canonical-0.2.7-next-72.md` status complete (or partial-complete with remaining Unsupported listed).
-- [ ] 87.8.R.2 Update `plans/0.2.7/README.md` status line.
-- [ ] 87.8.R.3 Knowledge-base wiki note if the session updates local KB (gitignored); committed docs already updated above.
+- [x] 87.8.R.1 Mark parent `87-canonical-0.2.7-next-72.md` status complete (or partial-complete with remaining Unsupported listed).
+- [x] 87.8.R.2 Update `plans/0.2.7/README.md` status line.
+- [x] 87.8.R.3 Knowledge-base wiki note if the session updates local KB (gitignored); committed docs already updated above.
 
 ## Proof template (paste when closing)
 

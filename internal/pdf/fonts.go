@@ -62,6 +62,7 @@ type Font struct {
 	macStyle      uint16
 	italicAngle   int16
 	capHeight     int16
+	xHeight       int16 // OS/2 sxHeight; 0 when absent
 
 	tables  map[string][]byte // name -> raw table bytes (for rebuilding subset)
 	cmap    map[uint32]uint16 // rune -> glyph id
@@ -312,6 +313,11 @@ func (f *Font) parseOS2() {
 		return
 	}
 
+	// OS/2 version 2+ stores sxHeight at 86 and sCapHeight at 88.
+	if v := int16(binary.BigEndian.Uint16(tbl[86:88])); v != 0 { //nolint:gosec // sxHeight is int16 per OS/2
+		f.xHeight = v
+	}
+
 	if v := int16(binary.BigEndian.Uint16(tbl[88:90])); v != 0 { //nolint:gosec // capHeight is int16 per OS/2 spec
 		f.capHeight = v
 	} else {
@@ -556,6 +562,26 @@ func (f *Font) CapHeight() int16 {
 	f.ensureParsed()
 
 	return f.capHeight
+}
+
+// XHeight returns the OS/2 sxHeight in font units, or 0 when the face has no
+// usable x-height metric.
+func (f *Font) XHeight() int16 {
+	f.ensureParsed()
+
+	return f.xHeight
+}
+
+// XHeightAspect returns x-height / units-per-em for font-size-adjust. Zero
+// means the face has no usable metric and size-adjust must leave size alone.
+func (f *Font) XHeightAspect() float64 {
+	f.ensureParsed()
+
+	if f.xHeight <= 0 || f.unitsPerEm <= 0 {
+		return 0
+	}
+
+	return float64(f.xHeight) / float64(f.unitsPerEm)
 }
 
 // BBox returns the font bounding box in font units.

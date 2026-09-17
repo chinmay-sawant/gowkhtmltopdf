@@ -1,7 +1,7 @@
 # Phase 87.1: Quick wins (aliases, object, overflow, counters, aspect-ratio, grid-auto)
 
 > **Parent:** `../87-canonical-0.2.7-next-72.md`
-> **Status:** planned
+> **Status:** done
 > **Estimated effort:** S–M (11 properties)
 > **Owner:** `internal/layout`
 > **Depends on:** none
@@ -40,45 +40,45 @@ Count: 3+2+2+2+1+1 = 11.
 
 ### 87.1.1 scope lock
 
-- [ ] 87.1.1.1 Confirm the 11 names above against `../next-72-properties.json`. Proof: list pasted in PR/agent note.
+- [x] 87.1.1.1 Confirm the 11 names above against `../next-72-properties.json`. Proof: list in `_proof-87.1.md`.
 
 ### 87.1.2 gap aliases
 
-- [ ] 87.1.2.1 Extract gap apply into `style_gap_props.go` (or equivalent) so `style_properties.go` does not gain net lines. Register on `styleGroups`.
-- [ ] 87.1.2.2 Map `grid-gap`→`gap`, `grid-row-gap`→`row-gap`, `grid-column-gap`→`column-gap`. Tests: `TestGridGapAliasesMatchGap`, existing gap geometry tests stay green.
+- [x] 87.1.2.1 Extract gap apply into `style_gap_props.go` (or equivalent) so `style_properties.go` does not gain net lines. Register on `styleGroups`. Proof: `style_properties.go` 2171→2120; dispatch stays in `applyFlexGroup`.
+- [x] 87.1.2.2 Map `grid-gap`→`gap`, `grid-row-gap`→`row-gap`, `grid-column-gap`→`column-gap`. Tests: `TestGridGapAliasesMatchGap`, existing gap geometry tests stay green.
 
 ### 87.1.3 grid-auto honesty
 
-- [ ] 87.1.3.1 Package tests proving `grid-auto-columns` / `grid-auto-rows` affect implicit tracks (`TestGridAutoColumns`, `TestGridAutoRows`).
-- [ ] 87.1.3.2 If indefinite row path ignores auto-rows, deepen `grid_tracks.go` only; do not grow `layout.go`.
-- [ ] 87.1.3.3 Flip packet + matrix note for both when consumers proven.
+- [x] 87.1.3.1 Package tests proving `grid-auto-columns` / `grid-auto-rows` affect implicit tracks (`TestGridAutoColumns`, `TestGridAutoRows`).
+- [x] 87.1.3.2 If indefinite row path ignores auto-rows, deepen `grid_tracks.go` only; do not grow `layout.go`. Proof: `gridAutoFixedPt` + `lockRows` in `resolveGridRows`.
+- [x] 87.1.3.3 Flip packet + matrix note for both when consumers proven. Proof: `_proof-87.1.md`.
 
 ### 87.1.4 overflow-block / overflow-inline
 
-- [ ] 87.1.4.1 Add `style_overflow_logical.go` apply arms; horizontal-tb block→Y inline→X; vertical writing-mode swaps.
-- [ ] 87.1.4.2 Test `TestOverflowBlockInlineMapToAxes` (clip / non-visible axis). Flip mapping after proof.
+- [x] 87.1.4.1 Add `style_overflow_logical.go` apply arms; horizontal-tb block→Y inline→X; vertical writing-mode swaps. Proof: `writing-mode` early in `restShorthandProps`.
+- [x] 87.1.4.2 Test `TestOverflowBlockInlineMapToAxes` (clip / non-visible axis). Flip mapping after proof.
 
 ### 87.1.5 object-fit / object-position
 
-- [ ] 87.1.5.1 Fields on `ResolvedStyle`; apply in `applyImageAdjustProps`.
-- [ ] 87.1.5.2 Consumer: cover/contain/none/scale-down + position offset in image paint. Tests: `TestObjectFitCover`, `TestObjectPositionRightBottom`.
-- [ ] 87.1.5.3 If `layout_images.go` would approach 2k lines, extract `object_fit.go`. Flip mapping last.
+- [x] 87.1.5.1 Fields on `ResolvedStyle`; apply in `applyImageAdjustProps`.
+- [x] 87.1.5.2 Consumer: cover/contain/none/scale-down + position offset in image paint. Tests: `TestObjectFitCover`, `TestObjectPositionRightBottom`.
+- [x] 87.1.5.3 If `layout_images.go` would approach 2k lines, extract `object_fit.go`. Flip mapping last. Proof: extracted `object_fit.go`.
 
 ### 87.1.6 counter-set
 
-- [ ] 87.1.6.1 Parse via existing counter-list helper; store set ops.
-- [ ] 87.1.6.2 Walk: reset → set → increment in `counter.go`. Test `TestCounterSetBeforeIncrement`. Flip mapping.
+- [x] 87.1.6.1 Parse via existing counter-list helper; store set ops.
+- [x] 87.1.6.2 Walk: reset → set → increment in `counter.go`. Test `TestCounterSetBeforeIncrement`. Flip mapping.
 
 ### 87.1.7 aspect-ratio
 
-- [ ] 87.1.7.1 Apply + field; prefer new `style_aspect_ratio_props.go` over growing box group in `style_properties.go`.
-- [ ] 87.1.7.2 Consumer for definite width→height (and inverse) on blocks/replaced; share one helper. Test `TestAspectRatioOneToOne`. Flip mapping.
+- [x] 87.1.7.1 Apply + field; prefer new `style_aspect_ratio_props.go` over growing box group in `style_properties.go`.
+- [x] 87.1.7.2 Consumer for definite width→height (and inverse) on blocks/replaced; share one helper. Test `TestAspectRatioOneToOne`. Flip mapping.
 
 ### 87.1.R batch gate (package only)
 
-- [ ] 87.1.R.1 `go test ./internal/layout -run 'TestGridGap|TestGridAuto|TestOverflowBlock|TestObjectFit|TestObjectPosition|TestCounterSet|TestAspectRatio' -count=1` exit 0.
-- [ ] 87.1.R.2 `python3 scripts/css-catalog-map.py --check` if apply arms added.
-- [ ] 87.1.R.3 Mapping + matrix updated only for properties with flip packets. **Do not** run `make test` / `make lint` here.
+- [x] 87.1.R.1 `go test ./internal/layout -run 'TestGridGap|TestGridAuto|TestOverflowBlock|TestObjectFit|TestObjectPosition|TestCounterSet|TestAspectRatio' -count=1` exit 0.
+- [x] 87.1.R.2 `python3 scripts/css-catalog-map.py --check` if apply arms added.
+- [x] 87.1.R.3 Mapping + matrix updated only for properties with flip packets. **Do not** run `make test` / `make lint` here.
 
 ## Out of scope
 

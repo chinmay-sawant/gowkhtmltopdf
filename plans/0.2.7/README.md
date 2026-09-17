@@ -1,8 +1,9 @@
 # Plans 0.2.7 - Next 72 CSS properties
 
 > **Branch:** `feature/027-next-72`
+> **Status:** complete (87.1–87.8 closed 2026-09-17)
 > **Baseline:** 354 Implemented / 0 Partial / 464 Unsupported (v0.2.6 catalog)
-> **Target after honest flips:** up to 426 Implemented of 818 (72 candidates; some stay Unsupported or Partial)
+> **After honest flips:** 393 Implemented / 14 Partial / 411 Unsupported of 818 (39 of 72 Implemented; 14 Partial; 19 Unsupported by choice)
 
 ## What this folder is
 
@@ -30,7 +31,7 @@ Execution ledger for implementing the next 72 print-relevant CSS properties list
 Do not grow allowlisted files further:
 
 - `internal/layout/layout.go` (2497)
-- `internal/layout/style_properties.go` (2171)
+- `internal/layout/style_properties.go` (2015 after gap+multicol extracts)
 - `internal/imageout/imageout.go` (2010)
 
 New apply arms go in focused `style_*_props.go` files registered on `styleGroups`.

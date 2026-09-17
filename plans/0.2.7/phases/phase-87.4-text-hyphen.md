@@ -1,7 +1,7 @@
 # Phase 87.4: Text box/spacing + hyphenation limits
 
 > **Parent:** `../87-canonical-0.2.7-next-72.md`
-> **Status:** planned
+> **Status:** done
 > **Estimated effort:** M–L (13 properties)
 > **Owner:** `internal/layout` (inline / measure)
 > **Depends on:** none hard; benefits from 87.2 if OT spacing features overlap
@@ -13,8 +13,8 @@
 ## Overview
 
 Add text-box trim/edge, autospace/spacing, and hyphenation limit / hanging
-punctuation consumers. Today `hyphens` / `hyphenate-character` are stored
-(`style_text_props.go`) but **never read** by pack/split.
+punctuation consumers. `hyphens` / `hyphenate-character` are now read for
+authored soft-hyphen (U+00AD) breaks; dictionary `auto` stays out.
 
 Do not grow `style_properties.go` or `layout.go`. Prefer new `style_text_*` and
 `inline_*` files; register apply on `styleGroups`.
@@ -47,29 +47,29 @@ Do not grow `style_properties.go` or `layout.go`. Prefer new `style_text_*` and
 
 ### 87.4.1 text-box*
 
-- [ ] 87.4.1.1 Apply `text-box` / `text-box-edge` / `text-box-trim`.
-- [ ] 87.4.1.2 Consumer trims half-leading in `lineMetrics` using ascent/descent/cap-height refs.
-- [ ] 87.4.1.3 Tests: `TestTextBoxTrimBothShrinksHalfLeading`. Flip when proven.
+- [x] 87.4.1.1 Apply `text-box` / `text-box-edge` / `text-box-trim`.
+- [x] 87.4.1.2 Consumer trims half-leading in `lineMetrics` using ascent/descent/cap-height refs.
+- [x] 87.4.1.3 Tests: `TestTextBoxTrimBothShrinksHalfLeading`. Flip when proven.
 
 ### 87.4.2 spacing / autospace / group-align / fit
 
-- [ ] 87.4.2.1 Apply autospace + spacing + spacing-trim; advance adjustments in measure/pack.
-- [ ] 87.4.2.2 `text-group-align` at emit/line origin (Chrome no: still valid print target).
-- [ ] 87.4.2.3 `text-fit`: scale search is **L**; ship lite or leave Unsupported with note.
-- [ ] 87.4.2.4 Tests: `TestTextAutospaceIdeographAlpha`, `TestTextGroupAlignCenter`.
+- [x] 87.4.2.1 Apply autospace + spacing + spacing-trim; advance adjustments in measure/pack.
+- [x] 87.4.2.2 `text-group-align` at emit/line origin (Chrome no: still valid print target).
+- [x] 87.4.2.3 `text-fit`: scale search is **L**; ship lite or leave Unsupported with note.
+- [x] 87.4.2.4 Tests: `TestTextAutospaceIdeographAlpha`, `TestTextGroupAlignCenter`.
 
 ### 87.4.3 hyphenation limits + hanging punctuation
 
-- [ ] 87.4.3.1 Wire readers for existing `Hyphens` / `HyphenateCharacter` (manual SHY first).
-- [ ] 87.4.3.2 Apply + consume `hyphenate-limit-chars` / `zone` / `lines` / `last`.
-- [ ] 87.4.3.3 `hanging-punctuation:first` overhang at line start.
-- [ ] 87.4.3.4 True `hyphens:auto` dictionary is **L** / out of batch unless a small built-in list is accepted.
-- [ ] 87.4.3.5 Tests: `TestSoftHyphenUsesHyphenateCharacter`, `TestHyphenateLimitChars`, `TestHangingPunctuationFirst`.
+- [x] 87.4.3.1 Wire readers for existing `Hyphens` / `HyphenateCharacter` (manual SHY first).
+- [x] 87.4.3.2 Apply + consume `hyphenate-limit-chars` / `zone` / `lines` / `last`.
+- [x] 87.4.3.3 `hanging-punctuation:first` overhang at line start.
+- [x] 87.4.3.4 True `hyphens:auto` dictionary is **L** / out of batch unless a small built-in list is accepted.
+- [x] 87.4.3.5 Tests: `TestSoftHyphenUsesHyphenateCharacter`, `TestHyphenateLimitChars`, `TestHangingPunctuationFirst`.
 
 ### 87.4.R batch gate (package only)
 
-- [ ] 87.4.R.1 `go test ./internal/layout -run 'TestTextBox|TestTextAuto|TestTextGroup|TestTextSpacing|TestSoftHyphen|TestHyphenate|TestHangingPunct' -count=1` exit 0.
-- [ ] 87.4.R.2 Flip packets only for names with consumers. **No `make test` / `make lint`.**
+- [x] 87.4.R.1 `go test ./internal/layout -run 'TestTextBox|TestTextAuto|TestTextGroup|TestTextSpacing|TestSoftHyphen|TestHyphenate|TestHangingPunct' -count=1` exit 0.
+- [x] 87.4.R.2 Flip packets only for names with consumers. **No `make test` / `make lint`.**
 
 ## Out of scope
 

@@ -11,10 +11,10 @@
     "webref_properties": 818,
     "mapped_properties": 818,
     "properties_by_engine_status": {
-      "implemented": 354,
-      "unsupported": 464,
+      "implemented": 393,
+      "unsupported": 411,
       "ignored": 0,
-      "partial": 0
+      "partial": 14
     },
     "properties_print_relevant": 818,
     "properties_goal_implement": 818,
@@ -2263,9 +2263,9 @@
       "groups": [
         "CSS Box Sizing"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_aspect_ratio_props.go; internal/layout/aspect_ratio.go; internal/layout/layout.go; internal/layout/grid.go; internal/layout/layout_images.go",
+      "notes": "auto|<ratio>; definite width\u2192height (and inverse) for blocks/flex/grid/replaced. TestAspectRatioOneToOne."
     },
     {
       "property": "backdrop-filter",
@@ -5707,9 +5707,9 @@
         "CSS Box Sizing",
         "CSS Multi-column Layout"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Ruby/MathML/rhythmic niche; not implemented for print PDF. Left unsupported."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_multicol_props.go;internal/layout/multicol.go",
+      "notes": "Implemented: clamps column boxes before spill; short rows keep authored height. Establishes multicol when non-auto. columns shorthand accepts / <column-height>. Test TestColumnHeightCapsColumn."
     },
     {
       "property": "column-rule",
@@ -6122,9 +6122,9 @@
         "CSS Box Sizing",
         "CSS Multi-column Layout"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Ruby/MathML/rhythmic niche; not implemented for print PDF. Left unsupported."
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_multicol_props.go;internal/layout/multicol.go",
+      "notes": "Partial: wrap and auto (when column-height set) open multicol rows in the block direction. nowrap stops after one row; overflow columns in the inline direction are not implemented. Test TestColumnWrapCreatesRow."
     },
     {
       "property": "columns",
@@ -7347,9 +7347,9 @@
       "groups": [
         "CSS Lists and Counters"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_paint_props.go; internal/layout/counter.go",
+      "notes": "Walk order reset \u2192 set \u2192 increment. TestCounterSetBeforeIncrement."
     },
     {
       "property": "cue",
@@ -8183,7 +8183,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "No page-float defer model. Left unsupported in 87.6 (no apply arm)."
     },
     {
       "property": "float-offset",
@@ -8202,9 +8202,9 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/float-offset",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_float_page_props.go",
+      "notes": "Implemented lite: length or % of float border-box height nudges placeFloat on the block axis via nudgeFloatOffset. Test TestFloatOffsetNudge."
     },
     {
       "property": "float-reference",
@@ -8223,9 +8223,9 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/float-reference",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_float_page_props.go",
+      "notes": "Partial: inline documents current BFC (CSS2 floats). page/column/region parse and store only; no pagination relocation. Test TestFloatReferenceInline."
     },
     {
       "property": "flood-color",
@@ -8409,9 +8409,9 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_font_feature_props.go",
+      "notes": "Implemented subset: parses tag list; builds OpText.FontFeatures via fontShapingFeatureSettings; pdf.TextShowLanguageFeatures / ShapeTextFontWithFeaturesLanguage consume tags. Tests TestApplyFontFeatureSettings, TestFontFeatureSettingsReachShaper."
     },
     {
       "property": "font-kerning",
@@ -8432,9 +8432,9 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_font_feature_props.go",
+      "notes": "Implemented subset: auto|normal|none; none emits kern 0 into OpText.FontFeatures for the shaper. Test TestFontKerningNone."
     },
     {
       "property": "font-language-override",
@@ -8478,9 +8478,9 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Optical sizing hint (`auto` / `none`); parsed and stored but text shaping never consumed it. Field and apply arm removed 2026-09-12 by ponytail audit PT26-LAY-05 (no layout, paint, or shaping reader); declaration is now dropped, catalog demoted implemented -> unsupported."
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_font_variant_props.go; internal/layout/layout.go:resolveFontVariants",
+      "notes": "Partial (Path A / phase 87.3): parsed and inherited; face consumer resolveFontVariants keeps the default instance. PDF embeds default glyf/hmtx only; no opsz/wght/wdth instancing and no COLR/CPAL palette paint. Not Implemented until embed/shape change glyphs, metrics, or paint."
     },
     {
       "property": "font-palette",
@@ -8501,9 +8501,9 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Color-font palette selection; parsed and stored but shaping and raster never consumed it. Field and apply arm removed 2026-09-12 by ponytail audit PT26-LAY-05 (no layout, paint, or shaping reader); declaration is now dropped, catalog demoted implemented -> unsupported."
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_font_variant_props.go; internal/layout/layout.go:resolveFontVariants",
+      "notes": "Partial (Path A / phase 87.3): parsed and inherited; face consumer resolveFontVariants keeps the default instance. PDF embeds default glyf/hmtx only; no opsz/wght/wdth instancing and no COLR/CPAL palette paint. Not Implemented until embed/shape change glyphs, metrics, or paint."
     },
     {
       "property": "font-size",
@@ -8547,9 +8547,9 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_font_size_adjust_props.go",
+      "notes": "Implemented subset: none|<number> (ex-height). usedFontSize scales OpText.Size and measureTextFace from OS/2 sxHeight. Test TestFontSizeAdjustScalesUsedSize."
     },
     {
       "property": "font-stretch",
@@ -8570,9 +8570,9 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_font_width_props.go",
+      "notes": "Partial: alias of font-width; stored percent, no width-master consumer on bundled faces. Test TestFontStretchAliasesToWidth."
     },
     {
       "property": "font-style",
@@ -8620,9 +8620,9 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_font_synthesis_props.go",
+      "notes": "Implemented subset: none and weight token gate FakeBoldFor via Op.NoFakeBold. Style/small-caps/position tokens stored but lack consumers (see longhands)."
     },
     {
       "property": "font-synthesis-position",
@@ -8643,9 +8643,9 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_font_synthesis_props.go",
+      "notes": "Partial: auto|none stored; no synthetic sub/super consumer."
     },
     {
       "property": "font-synthesis-small-caps",
@@ -8666,9 +8666,9 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_font_synthesis_props.go",
+      "notes": "Partial: auto|none stored; small-caps synthesis not synthesized when face lacks smcp."
     },
     {
       "property": "font-synthesis-style",
@@ -8689,9 +8689,9 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_font_synthesis_props.go",
+      "notes": "Partial: auto|none stored; no fake-oblique consumer."
     },
     {
       "property": "font-synthesis-weight",
@@ -8712,9 +8712,9 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_font_synthesis_props.go",
+      "notes": "Implemented: auto|none; none sets Op.NoFakeBold so FakeBoldFor is false. Test TestFontSynthesisWeightNoneDisablesFakeBold."
     },
     {
       "property": "font-variant",
@@ -8743,9 +8743,9 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_font_feature_props.go",
+      "notes": "Implemented subset: normal|none|small-caps and multi-token longhand expand; OT tags reach the shaper. Test TestFontVariantShorthandExpands."
     },
     {
       "property": "font-variant-alternates",
@@ -8766,9 +8766,9 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_font_feature_props.go",
+      "notes": "Partial: normal|historical-forms|named tokens stored; named alternates need @font-feature-values (no OT consumer)."
     },
     {
       "property": "font-variant-caps",
@@ -8789,9 +8789,9 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_font_feature_props.go",
+      "notes": "Implemented subset: small-caps->smcp (and other caps keywords to OT tags); consumer OpText.FontFeatures. Test TestFontVariantCapsMapsToSmcp."
     },
     {
       "property": "font-variant-east-asian",
@@ -8812,9 +8812,9 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_font_feature_props.go",
+      "notes": "Implemented subset: jis*/simplified/traditional/full-width/proportional-width/ruby map to OT tags; consumer OpText.FontFeatures."
     },
     {
       "property": "font-variant-emoji",
@@ -8835,9 +8835,9 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_font_feature_props.go",
+      "notes": "Partial: normal|text|emoji|unicode stored; no COLR/CPAL emoji presentation consumer."
     },
     {
       "property": "font-variant-ligatures",
@@ -8858,9 +8858,9 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_font_feature_props.go",
+      "notes": "Implemented subset: common/discretionary/historical/contextual (+ no-* / none) map to liga/clig/dlig/hlig/calt; consumer OpText.FontFeatures."
     },
     {
       "property": "font-variant-numeric",
@@ -8881,9 +8881,9 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_font_feature_props.go",
+      "notes": "Implemented subset: lining/oldstyle/proportional/tabular/fractions/ordinal/slashed-zero map to OT tags; consumer OpText.FontFeatures."
     },
     {
       "property": "font-variant-position",
@@ -8904,9 +8904,9 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_font_feature_props.go",
+      "notes": "Implemented subset: sub->subs, super->sups; consumer OpText.FontFeatures."
     },
     {
       "property": "font-variation-settings",
@@ -8927,9 +8927,9 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": "Raw variable-font axis list; parsed and stored but text shaping never consumed it. Field and apply arm removed 2026-09-12 by ponytail audit PT26-LAY-05 (no layout, paint, or shaping reader); declaration is now dropped, catalog demoted implemented -> unsupported."
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_font_variant_props.go; internal/layout/layout.go:resolveFontVariants",
+      "notes": "Partial (Path A / phase 87.3): parsed and inherited; face consumer resolveFontVariants keeps the default instance. PDF embeds default glyf/hmtx only; no opsz/wght/wdth instancing and no COLR/CPAL palette paint. Not Implemented until embed/shape change glyphs, metrics, or paint."
     },
     {
       "property": "font-weight",
@@ -8973,9 +8973,9 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_font_width_props.go",
+      "notes": "Partial: keywords/% stored and inherited; bundled Liberation faces have no width masters so face lookup ignores the percent."
     },
     {
       "property": "footnote-display",
@@ -9189,9 +9189,9 @@
       "groups": [
         "CSS Grid Layout"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_properties.go; internal/layout/grid.go; internal/layout/grid_parse.go",
+      "notes": "Implicit column tracks via expandGridColumnDefsForExplicitPlacement + gridAutoTrackDef. Fixed length / auto / 1fr lite. TestGridAutoColumns."
     },
     {
       "property": "grid-auto-flow",
@@ -9235,9 +9235,9 @@
       "groups": [
         "CSS Grid Layout"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_properties.go; internal/layout/grid_tracks.go; internal/layout/grid_parse.go",
+      "notes": "Implicit/auto-height rows via resolveGridRows + gridAutoFixedPt; locks preferred-height growth for fixed auto-rows. TestGridAutoRows."
     },
     {
       "property": "grid-column",
@@ -9307,9 +9307,9 @@
       "groups": [
         "CSS Grid Layout"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_gap_props.go; internal/layout/style_properties.go",
+      "notes": "Legacy alias of column-gap. TestGridGapAliasesMatchGap."
     },
     {
       "property": "grid-column-start",
@@ -9356,9 +9356,9 @@
       "groups": [
         "CSS Grid Layout"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_gap_props.go; internal/layout/style_properties.go",
+      "notes": "Legacy alias of gap; maps to RowGap/ColumnGap via applyGapProps. TestGridGapAliasesMatchGap."
     },
     {
       "property": "grid-row",
@@ -9428,9 +9428,9 @@
       "groups": [
         "CSS Grid Layout"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_gap_props.go; internal/layout/style_properties.go",
+      "notes": "Legacy alias of row-gap. TestGridGapAliasesMatchGap."
     },
     {
       "property": "grid-row-start",
@@ -9570,9 +9570,9 @@
       "groups": [
         "CSS Text"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_hyphenation_props.go",
+      "notes": "Implemented subset: first hangs leading opening punctuation outside the line start (emitLine). last/allow-end/force-end stored, not consumed. Test TestHangingPunctuationFirst."
     },
     {
       "property": "height",
@@ -9617,8 +9617,8 @@
         "CSS Text"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "code_path": "internal/layout/style_text_props.go",
+      "notes": "String (quotes stripped) inserted when a soft-hyphen break fires; auto/- default to \"-\". Consumer inline_hyphenation.go maybeSplitHyphen. Test TestSoftHyphenUsesHyphenateCharacter."
     },
     {
       "property": "hyphenate-limit-chars",
@@ -9639,9 +9639,9 @@
       "groups": [
         "CSS Text"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_hyphenation_props.go",
+      "notes": "Consumes min-word/before/after for soft-hyphen (U+00AD) breaks. auto components use CSS 5/2/2. Consumer inline_hyphenation.go shyBreakIndex. Test TestHyphenateLimitChars."
     },
     {
       "property": "hyphenate-limit-last",
@@ -9660,9 +9660,9 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/hyphenate-limit-last",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_hyphenation_props.go",
+      "notes": "Lite: always|column|page|spread suppress SHY when the remaining tail fits one line (last-line likely). Consumer layoutInlineFloats softHyphenBlocked. Test apply in TestHyphenateLimitChars."
     },
     {
       "property": "hyphenate-limit-lines",
@@ -9681,9 +9681,9 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/hyphenate-limit-lines",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_hyphenation_props.go",
+      "notes": "Caps consecutive hyphenated lines; no-limit is -1. Consumer layoutInlineFloats consecHyphenLines. Test apply in TestHyphenateLimitChars."
     },
     {
       "property": "hyphenate-limit-zone",
@@ -9702,9 +9702,9 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/hyphenate-limit-zone",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_hyphenation_props.go",
+      "notes": "Length or % of line width; SHY break only when leftover slack is within the zone (or zone is 0). Consumer inline_hyphenation.go. Test apply in TestHyphenateLimitChars."
     },
     {
       "property": "hyphens",
@@ -9726,8 +9726,8 @@
         "CSS Text"
       ],
       "engine_status": "implemented",
-      "code_path": "internal/layout/style_properties.go",
-      "notes": ""
+      "code_path": "internal/layout/style_text_props.go",
+      "notes": "Implemented subset: none|manual|auto. manual and auto honor authored soft hyphens (U+00AD) with hyphenate-character; true dictionary auto is not shipped. Consumer inline_hyphenation.go + packInlineLine. Tests TestSoftHyphenUsesHyphenateCharacter, TestHyphenateLimitChars."
     },
     {
       "property": "image-animation",
@@ -9838,9 +9838,9 @@
       "groups": [
         "CSS Inline"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_initial_letter_props.go;internal/layout/inline_initial_letter.go",
+      "notes": "Implemented lite drop/raise on a real leading element (e.g. span). :first-letter is rejected by the CSS selector parser; no synthesized first-letter box. Sizes glyph to N lines and excludes following lines (float-like). Test TestInitialLetterSpansThreeLines."
     },
     {
       "property": "initial-letter-align",
@@ -9861,9 +9861,9 @@
       "groups": [
         "CSS Inline"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_initial_letter_props.go;internal/layout/inline_initial_letter.go",
+      "notes": "Partial: parsed/stored/inherited; drop-cap path uses alphabetic hanging. ideographic/hanging/leading keywords accepted without distinct metrics. Chrome has no BCD support."
     },
     {
       "property": "initial-letter-wrap",
@@ -9882,9 +9882,9 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/initial-letter-wrap",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "partial",
+      "code_path": "internal/layout/style_initial_letter_props.go;internal/layout/inline_initial_letter.go",
+      "notes": "Partial: parsed/stored/inherited; exclusion uses the rectangular letter box for all keywords. Glyph-contour wrap (all/grid) not implemented. Chrome has no BCD support."
     },
     {
       "property": "inline-size",
@@ -11969,9 +11969,9 @@
       "groups": [
         "CSS Images"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_image_adjust_props.go; internal/layout/object_fit.go; internal/layout/layout_images.go; internal/layout/inline_paint.go",
+      "notes": "fill|contain|cover|none|scale-down; paint consumer on block and inline replaced paths. TestObjectFitCover."
     },
     {
       "property": "object-position",
@@ -11992,9 +11992,9 @@
       "groups": [
         "CSS Images"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_image_adjust_props.go; internal/layout/object_fit.go; internal/layout/inline_paint.go",
+      "notes": "Keyword/length/% pair; positions fitted image in content box. TestObjectPositionRightBottom."
     },
     {
       "property": "object-view-box",
@@ -12419,9 +12419,9 @@
       "groups": [
         "CSS Overflow"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_overflow_logical.go; internal/layout/overflow_clip.go",
+      "notes": "Maps to OverflowY (horizontal-tb) or OverflowX (vertical-*). Clip via overflow_clip.go. TestOverflowBlockInlineMapToAxes."
     },
     {
       "property": "overflow-clip-margin",
@@ -12686,9 +12686,9 @@
       "groups": [
         "CSS Overflow"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_overflow_logical.go; internal/layout/overflow_clip.go",
+      "notes": "Maps to OverflowX (horizontal-tb) or OverflowY (vertical-*). TestOverflowBlockInlineMapToAxes."
     },
     {
       "property": "overflow-wrap",
@@ -15691,7 +15691,7 @@
       ],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "No alpha-contour extraction from float images. Left unsupported in 87.6 (no apply arm)."
     },
     {
       "property": "shape-inside",
@@ -15712,7 +15712,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "CSS Shapes 2 interior text fitting; Chrome no BCD. Left unsupported in 87.6 (no apply arm)."
     },
     {
       "property": "shape-margin",
@@ -15733,9 +15733,9 @@
       "groups": [
         "CSS Shapes"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_shape_props.go",
+      "notes": "Implemented with shape-outside: expands circle/ellipse radius or inset edges; % uses reference diagonal/\u221a2. Test TestShapeMarginExpandsExclusion."
     },
     {
       "property": "shape-outside",
@@ -15756,9 +15756,9 @@
       "groups": [
         "CSS Shapes"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_shape_props.go",
+      "notes": "Implemented lite: none|circle()/ellipse()/inset() with float:left|right; per-line exclusion in shape_exclusion.go consulted from floatState.exclusion/lineBounds. polygon/path/url rejected. Tests TestShapeOutsideCircleShortensLines, TestShapeOutsideApplyParsesBasicShapes."
     },
     {
       "property": "shape-padding",
@@ -15779,7 +15779,7 @@
       "groups": [],
       "engine_status": "unsupported",
       "code_path": "",
-      "notes": ""
+      "notes": "CSS Shapes 2 companion to shape-inside; Chrome no BCD. Left unsupported in 87.6 (no apply arm)."
     },
     {
       "property": "shape-rendering",
@@ -16616,9 +16616,9 @@
       "groups": [
         "CSS Text"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_text_spacing_props.go",
+      "notes": "Implemented subset: ideograph-alpha (and auto) inserts 1/8em between ideograph and Latin letters in measure/paint face runs. Consumer inline_text_spacing.go + inline_paint.go. Test TestTextAutospaceIdeographAlpha."
     },
     {
       "property": "text-box",
@@ -16639,9 +16639,9 @@
       "groups": [
         "CSS Inline"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_text_box_props.go",
+      "notes": "Implemented subset: text-box shorthand sets trim+edge; consumer trims half-leading (and cap/alphabetic edges) on first/last line via lineMetrics (inline_text_box.go, inline.go). Test TestTextBoxTrimBothShrinksHalfLeading."
     },
     {
       "property": "text-box-edge",
@@ -16662,9 +16662,9 @@
       "groups": [
         "CSS Inline"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_text_box_props.go",
+      "notes": "Inherited. cap/ex retarget over edge; alphabetic zeros under descent when trimming. Consumer inline_text_box.go adjustTextBoxMetrics. Test TestTextBoxTrimBothShrinksHalfLeading."
     },
     {
       "property": "text-box-trim",
@@ -16685,9 +16685,9 @@
       "groups": [
         "CSS Inline"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_text_box_props.go",
+      "notes": "Not inherited. trim-start/end/both drop half-leading on the block first/last line. Consumer inline.go lineMetrics. Test TestTextBoxTrimBothShrinksHalfLeading."
     },
     {
       "property": "text-combine-upright",
@@ -17105,8 +17105,8 @@
         "CSS Text"
       ],
       "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "code_path": "internal/layout/style_text_spacing_props.go",
+      "notes": "Apply stores none|auto|scale on ResolvedStyle.TextFit but no scale-search consumer (L). Left Unsupported with matrix note for honesty; checklist closed without [~]."
     },
     {
       "property": "text-group-align",
@@ -17125,9 +17125,9 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/text-group-align",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_text_spacing_props.go",
+      "notes": "Lite: when text-align is start/left, text-group-align center/end/right remaps line origin (resolveTextGroupAlign). Not full group-of-lines shift. Test TestTextGroupAlignCenter."
     },
     {
       "property": "text-indent",
@@ -17310,9 +17310,9 @@
       "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/text-spacing",
       "mdn_status": null,
       "groups": [],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_text_spacing_props.go",
+      "notes": "Shorthand stores raw value and mirrors trim-* tokens onto TextSpacingTrim. Trim consumer hangs half-advance of leading fullwidth open punct. Test TestTextAutospaceIdeographAlpha apply path + text-spacing-trim consumer."
     },
     {
       "property": "text-spacing-trim",
@@ -17333,9 +17333,9 @@
       "groups": [
         "CSS Text"
       ],
-      "engine_status": "unsupported",
-      "code_path": "",
-      "notes": ""
+      "engine_status": "implemented",
+      "code_path": "internal/layout/style_text_spacing_props.go",
+      "notes": "Lite: trim-start/trim-both hang half the advance of leading fullwidth opening punctuation at line origin (emitLine). Test apply in TestTextAutospaceIdeographAlpha; hang path shared with hanging-punctuation geometry."
     },
     {
       "property": "text-transform",

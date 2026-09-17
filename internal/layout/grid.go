@@ -76,7 +76,7 @@ func (e *engine) buildGrid(node *html.Node, sty ResolvedStyle, availW, posX, pos
 		cols = []float64{contentW}
 	}
 
-	contentH := resolveContentHeight(sty, e)
+	contentH := resolveContentHeightForWidth(sty, e, contentW)
 
 	if masonryRows {
 		usedH := e.emitMasonryItems(boxNode, kids, cols, columnGap, rowGap, contentX, posY, curY)
@@ -109,8 +109,10 @@ func (e *engine) layoutStandardGrid(
 	definiteRows := contentH >= 0 && rowTemplate != "" &&
 		strings.ToLower(rowTemplate) != cssDisplayNone
 
-	rows, numRows := resolveGridRows(e, sty, kids, numRows, contentH, rowGap, definiteRows)
-	pboxes := measureGridPreferredHeights(e, placed, cols, columnGap, rowGap, contentX, curY, posY, rows, definiteRows)
+	rows, numRows, lockRows := resolveGridRows(e, sty, kids, numRows, contentH, rowGap, definiteRows)
+	pboxes := measureGridPreferredHeights(
+		e, placed, cols, columnGap, rowGap, contentX, curY, posY, rows, definiteRows || lockRows,
+	)
 
 	rowYs := emitGridBoxes(e, sty, boxNode, pboxes, rows, rowGap, posY, curY)
 
@@ -733,6 +735,14 @@ func resolveUsedWidth(sty ResolvedStyle, availW float64, engN *engine) float64 {
 			width += engN.scalePt(sty.PaddingLeft) + engN.scalePt(sty.PaddingRight) +
 				engN.scalePt(sty.BorderLeft.Width) + engN.scalePt(sty.BorderRight.Width)
 		}
+	} else if contentH := resolveContentHeight(sty, engN); contentH >= 0 {
+		if wPt, ok := aspectRatioAutoWidthPt(sty, contentH, engN); ok {
+			width = engN.scalePt(wPt)
+			if sty.BoxSizing != borderBox {
+				width += engN.scalePt(sty.PaddingLeft) + engN.scalePt(sty.PaddingRight) +
+					engN.scalePt(sty.BorderLeft.Width) + engN.scalePt(sty.BorderRight.Width)
+			}
+		}
 	}
 
 	return width
@@ -743,13 +753,22 @@ func resolveUsedWidth(sty ResolvedStyle, availW float64, engN *engine) float64 {
 // stretch; unresolved HeightPercent (indefinite CB) is treated as auto.
 // Shared by flex/grid/multicol.
 func resolveContentHeight(sty ResolvedStyle, engN *engine) float64 {
+	return resolveContentHeightForWidth(sty, engN, -1)
+}
+
+// resolveContentHeightForWidth is resolveContentHeight plus aspect-ratio when
+// height is auto and contentW (scaled) is definite.
+func resolveContentHeightForWidth(sty ResolvedStyle, engN *engine, contentW float64) float64 {
 	if sty.HeightPercent >= 0 && sty.Height < 0 {
 		// Cyclic % honesty: indefinite containing block -> auto.
 		return -1
 	}
 
 	if sty.Height < 0 {
-		return -1
+		sty = withAspectRatioHeight(sty, contentW, engN)
+		if sty.Height < 0 {
+			return -1
+		}
 	}
 
 	height := engN.scalePt(sty.Height)

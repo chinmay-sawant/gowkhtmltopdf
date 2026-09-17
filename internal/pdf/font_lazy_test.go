@@ -48,6 +48,7 @@ type fontSnapshot struct {
 	macStyle      uint16
 	italicAngle   int16
 	capHeight     int16
+	xHeight       int16
 	advance       []int32
 	lsb           []int16
 	cmap          map[uint32]uint16
@@ -73,6 +74,7 @@ func snapshotFont(fnt *Font) fontSnapshot {
 		macStyle:      fnt.macStyle,
 		italicAngle:   fnt.italicAngle,
 		capHeight:     fnt.capHeight,
+		xHeight:       fnt.xHeight,
 		advance:       fnt.advance,
 		lsb:           fnt.lsb,
 		cmap:          fnt.cmap,

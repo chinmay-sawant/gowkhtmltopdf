@@ -94,7 +94,7 @@ func (e *engine) buildFlex(node *html.Node, sty ResolvedStyle, availW, x, posY f
 
 	// The shared resolver owns bottom padding, bottom border, and the
 	// height/min-height/max-height constraints for auto-height boxes.
-	curY = e.resolveBorderBoxHeight(sty, curY)
+	curY = e.resolveBorderBoxHeight(withAspectRatioHeight(sty, contentW, e), curY)
 
 	boxNode.height = curY
 	e.prependChrome(contentStart, boxNode, sty, boxNode.x, posY, boxNode.w, boxNode.height)

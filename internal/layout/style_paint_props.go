@@ -376,6 +376,10 @@ func applyGeneratedContentProps(style *ResolvedStyle, prop, value string) bool {
 		if trimmed := strings.TrimSpace(value); trimmed != "" {
 			style.CounterReset = trimmed
 		}
+	case "counter-set":
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			style.CounterSet = trimmed
+		}
 	case "counter-increment":
 		if trimmed := strings.TrimSpace(value); trimmed != "" {
 			style.CounterIncrement = trimmed

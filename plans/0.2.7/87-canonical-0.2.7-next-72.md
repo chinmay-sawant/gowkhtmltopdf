@@ -1,7 +1,7 @@
 # 87 - Canonical next-72 CSS coverage (v0.2.7)
 
 > **Parent:** `plans/0.2.7/README.md`
-> **Status:** planned (ledger open; no batch `[x]` until code + package proof)
+> **Status:** complete (partial-complete on catalog: 393 Implemented / 14 Partial / 411 Unsupported; 19 of 72 remain Unsupported by honest choice)
 > **Estimated effort:** XL (8 batches: quick wins S–M, font M–L, VF honesty S/L, text/hyphen M–L, column/initial M–L, shape/float L–XL, border defer S, closure M)
 > **Owner:** `internal/layout` (+ `internal/pdf` for font feature shaping, `internal/css` only if selector/parse gaps)
 > **Depends on:** v0.2.6 catalog honesty (354 Implemented), fixture-64
@@ -16,6 +16,18 @@
 Implement the 72 properties in `next-72-properties.json` in dependency-ordered batches.
 Validation bar is the **gowk PDF** Effect cell on `fixture-64-next-72-props.html`, not Chrome.
 Chrome labels in the JSON are advisory (`Chrome yes` = optional browser sanity; `Chrome no` = expect no Chrome paint).
+
+### Catalog after 87.8 close (2026-09-17)
+
+| Status | Count |
+|--------|------:|
+| Implemented | 393 |
+| Partial | 14 |
+| Unsupported | 411 |
+| Total | 818 |
+
+Next-72 slice: 39 Implemented / 14 Partial / 19 Unsupported of 72. Remaining Unsupported by choice: Borders-4 drafts (14), `text-fit`, `shape-inside`, `shape-padding`, `shape-image-threshold`, `float-defer`. Partial includes VF Path A, font-width/stretch, some font-synthesis longhands, column-wrap, initial-letter-align/wrap, float-reference.
+
 
 ## Effort scale (same as 0.2.6 phase-79)
 

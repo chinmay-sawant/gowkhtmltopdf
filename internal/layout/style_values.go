@@ -18,8 +18,11 @@ const (
 func parseColumnsShorthand(sty *ResolvedStyle, value string, fsize, viewportW float64) {
 	sty.ColumnCount = 0
 	sty.ColumnWidth = -1
+	sty.ColumnHeight = -1
 
-	for _, tok := range strings.Fields(value) {
+	// Multicol-2: [ <'column-width'> || <'column-count'> ] [ / <'column-height'> ]?
+	main, heightPart, hasHeight := strings.Cut(strings.TrimSpace(value), "/")
+	for _, tok := range strings.Fields(main) {
 		tok = strings.TrimSpace(tok)
 		if tok == "" || tok == overflowAuto {
 			continue
@@ -35,12 +38,21 @@ func parseColumnsShorthand(sty *ResolvedStyle, value string, fsize, viewportW fl
 			sty.ColumnWidth = v
 		}
 	}
+
+	if hasHeight {
+		hTok := strings.TrimSpace(heightPart)
+		if hTok == "" || hTok == overflowAuto {
+			sty.ColumnHeight = -1
+		} else if v, ok := lengthBox(hTok, fsize, viewportW, overflowAuto); ok && v >= 0 {
+			sty.ColumnHeight = v
+		}
+	}
 }
 
 // isMulticol reports whether st establishes a multi-column container
-// (column-count or column-width is not auto).
+// (column-count, column-width, or column-height is not auto).
 func isMulticol(st ResolvedStyle) bool {
-	return st.ColumnCount > 0 || st.ColumnWidth >= 0
+	return st.ColumnCount > 0 || st.ColumnWidth >= 0 || st.ColumnHeight >= 0
 }
 
 // parseFontShorthand handles "font: italic bold 12px/1.4 Arial, sans-serif".

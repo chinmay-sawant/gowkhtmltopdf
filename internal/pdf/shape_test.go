@@ -273,3 +273,39 @@ func TestShapeTextFontWithFeaturesCJKStillSafe(t *testing.T) {
 		t.Fatal("empty shaped text")
 	}
 }
+
+func TestShapeTextFontWithFeaturesKernOff(t *testing.T) {
+	t.Parallel()
+
+	f := loadDejaVu(t)
+	feats := ParseFontFeatureSettings(`"kern" 0`)
+	if len(feats) != 1 || feats[0].Value != 0 {
+		t.Fatalf("kern off parse = %+v", feats)
+	}
+
+	got := ShapeTextFontWithFeatures("AV", f, feats)
+	if got == "" {
+		t.Fatal("empty shaped text with kern off")
+	}
+
+	run := ShapeRunWithFeaturesLanguage("AV", f, 12, feats, "")
+	if run.Text == "" || len(run.Runes) == 0 {
+		t.Fatalf("ShapeRunWithFeaturesLanguage = %+v", run)
+	}
+}
+
+func TestContentTextShowLanguageFeaturesParsesSettings(t *testing.T) {
+	t.Parallel()
+
+	fnt := loadDejaVu(t)
+	content := NewContent()
+	content.UseEmbeddedFont("F0", fnt)
+	content.BeginText()
+	content.SetFont("F0", 12)
+	content.TextShowLanguageFeatures("AV", "", `"kern" 0`)
+	content.EndText()
+
+	if len(content.Bytes()) == 0 {
+		t.Fatal("expected content operators for featured text")
+	}
+}

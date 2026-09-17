@@ -123,12 +123,18 @@ func styleInternEqual(a, b *ResolvedStyle) bool {
 		a.ColumnGapNormal == b.ColumnGapNormal &&
 		a.ColumnCount == b.ColumnCount &&
 		a.ColumnWidth == b.ColumnWidth &&
+		a.ColumnHeight == b.ColumnHeight &&
+		a.ColumnWrap == b.ColumnWrap &&
 		a.ColumnSpan == b.ColumnSpan &&
 		a.ColumnFill == b.ColumnFill &&
 		a.ColumnRuleWidth == b.ColumnRuleWidth &&
 		a.ColumnRuleStyle == b.ColumnRuleStyle &&
 		a.ColumnRuleColor == b.ColumnRuleColor &&
 		a.ColumnRuleColorSet == b.ColumnRuleColorSet &&
+		a.InitialLetterSize == b.InitialLetterSize &&
+		a.InitialLetterSink == b.InitialLetterSink &&
+		a.InitialLetterAlign == b.InitialLetterAlign &&
+		a.InitialLetterWrap == b.InitialLetterWrap &&
 		a.FlexGrow == b.FlexGrow &&
 		a.FlexShrink == b.FlexShrink &&
 		a.FlexBasis == b.FlexBasis &&
@@ -221,6 +227,14 @@ func styleInternEqual(a, b *ResolvedStyle) bool {
 		a.TabSize == b.TabSize &&
 		a.Hyphens == b.Hyphens &&
 		a.HyphenateCharacter == b.HyphenateCharacter &&
+		a.HyphenateLimitMinWord == b.HyphenateLimitMinWord &&
+		a.HyphenateLimitMinBefore == b.HyphenateLimitMinBefore &&
+		a.HyphenateLimitMinAfter == b.HyphenateLimitMinAfter &&
+		a.HyphenateLimitLast == b.HyphenateLimitLast &&
+		a.HyphenateLimitLines == b.HyphenateLimitLines &&
+		a.HyphenateLimitZonePt == b.HyphenateLimitZonePt &&
+		a.HyphenateLimitZonePct == b.HyphenateLimitZonePct &&
+		a.HangingPunctuation == b.HangingPunctuation &&
 		a.TextJustify == b.TextJustify &&
 		a.LineBreak == b.LineBreak &&
 		a.OverflowWrap == b.OverflowWrap &&
@@ -297,6 +311,7 @@ func styleInternEqual(a, b *ResolvedStyle) bool {
 		a.QuotesClose == b.QuotesClose &&
 		a.CounterReset == b.CounterReset &&
 		a.CounterIncrement == b.CounterIncrement &&
+		a.CounterSet == b.CounterSet &&
 		a.ListStyleImage == b.ListStyleImage &&
 		a.BoxShadowX == b.BoxShadowX &&
 		a.BoxShadowY == b.BoxShadowY &&
@@ -343,11 +358,37 @@ func styleInternEqual(a, b *ResolvedStyle) bool {
 		a.FontOpticalSizing == b.FontOpticalSizing &&
 		a.FontPalette == b.FontPalette &&
 		a.FontVariationSettings == b.FontVariationSettings &&
+		a.FontFeatureSettings == b.FontFeatureSettings &&
+		a.FontKerning == b.FontKerning &&
+		a.FontSizeAdjust == b.FontSizeAdjust &&
+		a.FontSizeAdjustSet == b.FontSizeAdjustSet &&
+		a.FontWidth == b.FontWidth &&
+		a.FontSynthesisWeight == b.FontSynthesisWeight &&
+		a.FontSynthesisStyle == b.FontSynthesisStyle &&
+		a.FontSynthesisSmallCaps == b.FontSynthesisSmallCaps &&
+		a.FontSynthesisPosition == b.FontSynthesisPosition &&
+		a.FontVariantCaps == b.FontVariantCaps &&
+		a.FontVariantLigatures == b.FontVariantLigatures &&
+		a.FontVariantNumeric == b.FontVariantNumeric &&
+		a.FontVariantPosition == b.FontVariantPosition &&
+		a.FontVariantEastAsian == b.FontVariantEastAsian &&
+		a.FontVariantAlternates == b.FontVariantAlternates &&
+		a.FontVariantEmoji == b.FontVariantEmoji &&
 		a.ImageOrientation == b.ImageOrientation &&
 		a.ImageOrientationAngle == b.ImageOrientationAngle &&
 		a.ImageResolution == b.ImageResolution &&
 		a.ImageResolutionDPI == b.ImageResolutionDPI &&
 		a.ObjectViewBox == b.ObjectViewBox &&
+		a.ObjectFit == b.ObjectFit &&
+		a.ObjectPositionX == b.ObjectPositionX &&
+		a.ObjectPositionY == b.ObjectPositionY &&
+		a.AspectRatio == b.AspectRatio &&
+		a.ShapeOutside == b.ShapeOutside &&
+		a.ShapeMargin == b.ShapeMargin &&
+		a.ShapeMarginPercent == b.ShapeMarginPercent &&
+		a.FloatOffset == b.FloatOffset &&
+		a.FloatOffsetPercent == b.FloatOffsetPercent &&
+		a.FloatReference == b.FloatReference &&
 		a.TextCombineUpright == b.TextCombineUpright &&
 		a.TextDecorationInset == b.TextDecorationInset &&
 		a.TextDecorationSkip == b.TextDecorationSkip &&
@@ -356,6 +397,14 @@ func styleInternEqual(a, b *ResolvedStyle) bool {
 		a.TextDecorationSkipSpaces == b.TextDecorationSkipSpaces &&
 		a.TextOrientation == b.TextOrientation &&
 		a.UnicodeBidi == b.UnicodeBidi &&
+		a.TextBoxTrim == b.TextBoxTrim &&
+		a.TextBoxEdgeOver == b.TextBoxEdgeOver &&
+		a.TextBoxEdgeUnder == b.TextBoxEdgeUnder &&
+		a.TextAutospace == b.TextAutospace &&
+		a.TextSpacing == b.TextSpacing &&
+		a.TextSpacingTrim == b.TextSpacingTrim &&
+		a.TextGroupAlign == b.TextGroupAlign &&
+		a.TextFit == b.TextFit &&
 		maps.Equal(a.CustomProps, b.CustomProps)
 }
 
@@ -391,6 +440,8 @@ func styleInternFingerprint(s *ResolvedStyle) uint64 {
 	h = styleInternHashBool(h, s.ColumnGapNormal)
 	h = styleInternHashInt(h, s.ColumnCount)
 	h = styleInternHashFloat64(h, s.ColumnWidth)
+	h = styleInternHashFloat64(h, s.ColumnHeight)
+	h = styleInternHashString(h, s.ColumnWrap)
 	h = styleInternHashString(h, s.ColumnSpan)
 	h = styleInternHashString(h, s.ColumnFill)
 	h = styleInternHashFloat64(h, s.ColumnRuleWidth)
@@ -399,6 +450,10 @@ func styleInternFingerprint(s *ResolvedStyle) uint64 {
 		h = styleInternHashFloat64(h, e)
 	}
 	h = styleInternHashBool(h, s.ColumnRuleColorSet)
+	h = styleInternHashFloat64(h, s.InitialLetterSize)
+	h = styleInternHashInt(h, s.InitialLetterSink)
+	h = styleInternHashString(h, s.InitialLetterAlign)
+	h = styleInternHashString(h, s.InitialLetterWrap)
 	h = styleInternHashFloat64(h, s.FlexGrow)
 	h = styleInternHashFloat64(h, s.FlexShrink)
 	h = styleInternHashFloat64(h, s.FlexBasis)
@@ -497,6 +552,14 @@ func styleInternFingerprint(s *ResolvedStyle) uint64 {
 	h = styleInternHashFloat64(h, s.TabSize)
 	h = styleInternHashString(h, s.Hyphens)
 	h = styleInternHashString(h, s.HyphenateCharacter)
+	h = styleInternHashInt(h, s.HyphenateLimitMinWord)
+	h = styleInternHashInt(h, s.HyphenateLimitMinBefore)
+	h = styleInternHashInt(h, s.HyphenateLimitMinAfter)
+	h = styleInternHashString(h, s.HyphenateLimitLast)
+	h = styleInternHashInt(h, s.HyphenateLimitLines)
+	h = styleInternHashFloat64(h, s.HyphenateLimitZonePt)
+	h = styleInternHashFloat64(h, s.HyphenateLimitZonePct)
+	h = styleInternHashString(h, s.HangingPunctuation)
 	h = styleInternHashString(h, s.TextJustify)
 	h = styleInternHashString(h, s.LineBreak)
 	h = styleInternHashString(h, s.OverflowWrap)
@@ -579,6 +642,7 @@ func styleInternFingerprint(s *ResolvedStyle) uint64 {
 	h = styleInternHashString(h, s.QuotesClose)
 	h = styleInternHashString(h, s.CounterReset)
 	h = styleInternHashString(h, s.CounterIncrement)
+	h = styleInternHashString(h, s.CounterSet)
 	h = styleInternHashString(h, s.ListStyleImage)
 	h = styleInternHashFloat64(h, s.BoxShadowX)
 	h = styleInternHashFloat64(h, s.BoxShadowY)
@@ -631,11 +695,37 @@ func styleInternFingerprint(s *ResolvedStyle) uint64 {
 	h = styleInternHashString(h, s.FontOpticalSizing)
 	h = styleInternHashString(h, s.FontPalette)
 	h = styleInternHashString(h, s.FontVariationSettings)
+	h = styleInternHashString(h, s.FontFeatureSettings)
+	h = styleInternHashString(h, s.FontKerning)
+	h = styleInternHashFloat64(h, s.FontSizeAdjust)
+	h = styleInternHashBool(h, s.FontSizeAdjustSet)
+	h = styleInternHashFloat64(h, s.FontWidth)
+	h = styleInternHashBool(h, s.FontSynthesisWeight)
+	h = styleInternHashBool(h, s.FontSynthesisStyle)
+	h = styleInternHashBool(h, s.FontSynthesisSmallCaps)
+	h = styleInternHashBool(h, s.FontSynthesisPosition)
+	h = styleInternHashString(h, s.FontVariantCaps)
+	h = styleInternHashString(h, s.FontVariantLigatures)
+	h = styleInternHashString(h, s.FontVariantNumeric)
+	h = styleInternHashString(h, s.FontVariantPosition)
+	h = styleInternHashString(h, s.FontVariantEastAsian)
+	h = styleInternHashString(h, s.FontVariantAlternates)
+	h = styleInternHashString(h, s.FontVariantEmoji)
 	h = styleInternHashString(h, s.ImageOrientation)
 	h = styleInternHashFloat64(h, s.ImageOrientationAngle)
 	h = styleInternHashString(h, s.ImageResolution)
 	h = styleInternHashFloat64(h, s.ImageResolutionDPI)
 	h = styleInternHashString(h, s.ObjectViewBox)
+	h = styleInternHashString(h, s.ObjectFit)
+	h = styleInternHashString(h, s.ObjectPositionX)
+	h = styleInternHashString(h, s.ObjectPositionY)
+	h = styleInternHashFloat64(h, s.AspectRatio)
+	h = styleInternHashString(h, s.ShapeOutside)
+	h = styleInternHashFloat64(h, s.ShapeMargin)
+	h = styleInternHashFloat64(h, s.ShapeMarginPercent)
+	h = styleInternHashFloat64(h, s.FloatOffset)
+	h = styleInternHashFloat64(h, s.FloatOffsetPercent)
+	h = styleInternHashString(h, s.FloatReference)
 	h = styleInternHashString(h, s.TextCombineUpright)
 	h = styleInternHashFloat64(h, s.TextDecorationInset)
 	h = styleInternHashString(h, s.TextDecorationSkip)
@@ -644,6 +734,14 @@ func styleInternFingerprint(s *ResolvedStyle) uint64 {
 	h = styleInternHashString(h, s.TextDecorationSkipSpaces)
 	h = styleInternHashString(h, s.TextOrientation)
 	h = styleInternHashString(h, s.UnicodeBidi)
+	h = styleInternHashString(h, s.TextBoxTrim)
+	h = styleInternHashString(h, s.TextBoxEdgeOver)
+	h = styleInternHashString(h, s.TextBoxEdgeUnder)
+	h = styleInternHashString(h, s.TextAutospace)
+	h = styleInternHashString(h, s.TextSpacing)
+	h = styleInternHashString(h, s.TextSpacingTrim)
+	h = styleInternHashString(h, s.TextGroupAlign)
+	h = styleInternHashString(h, s.TextFit)
 	h = styleInternHashStringMap(h, s.CustomProps)
 
 	return h
@@ -681,12 +779,18 @@ func styleInternFields() []string {
 		"ColumnGapNormal",
 		"ColumnCount",
 		"ColumnWidth",
+		"ColumnHeight",
+		"ColumnWrap",
 		"ColumnSpan",
 		"ColumnFill",
 		"ColumnRuleWidth",
 		"ColumnRuleStyle",
 		"ColumnRuleColor",
 		"ColumnRuleColorSet",
+		"InitialLetterSize",
+		"InitialLetterSink",
+		"InitialLetterAlign",
+		"InitialLetterWrap",
 		"FlexGrow",
 		"FlexShrink",
 		"FlexBasis",
@@ -779,6 +883,14 @@ func styleInternFields() []string {
 		"TabSize",
 		"Hyphens",
 		"HyphenateCharacter",
+		"HyphenateLimitMinWord",
+		"HyphenateLimitMinBefore",
+		"HyphenateLimitMinAfter",
+		"HyphenateLimitLast",
+		"HyphenateLimitLines",
+		"HyphenateLimitZonePt",
+		"HyphenateLimitZonePct",
+		"HangingPunctuation",
 		"TextJustify",
 		"LineBreak",
 		"OverflowWrap",
@@ -855,6 +967,7 @@ func styleInternFields() []string {
 		"QuotesClose",
 		"CounterReset",
 		"CounterIncrement",
+		"CounterSet",
 		"ListStyleImage",
 		"BoxShadowX",
 		"BoxShadowY",
@@ -901,11 +1014,37 @@ func styleInternFields() []string {
 		"FontOpticalSizing",
 		"FontPalette",
 		"FontVariationSettings",
+		"FontFeatureSettings",
+		"FontKerning",
+		"FontSizeAdjust",
+		"FontSizeAdjustSet",
+		"FontWidth",
+		"FontSynthesisWeight",
+		"FontSynthesisStyle",
+		"FontSynthesisSmallCaps",
+		"FontSynthesisPosition",
+		"FontVariantCaps",
+		"FontVariantLigatures",
+		"FontVariantNumeric",
+		"FontVariantPosition",
+		"FontVariantEastAsian",
+		"FontVariantAlternates",
+		"FontVariantEmoji",
 		"ImageOrientation",
 		"ImageOrientationAngle",
 		"ImageResolution",
 		"ImageResolutionDPI",
 		"ObjectViewBox",
+		"ObjectFit",
+		"ObjectPositionX",
+		"ObjectPositionY",
+		"AspectRatio",
+		"ShapeOutside",
+		"ShapeMargin",
+		"ShapeMarginPercent",
+		"FloatOffset",
+		"FloatOffsetPercent",
+		"FloatReference",
 		"TextCombineUpright",
 		"TextDecorationInset",
 		"TextDecorationSkip",
@@ -914,6 +1053,14 @@ func styleInternFields() []string {
 		"TextDecorationSkipSpaces",
 		"TextOrientation",
 		"UnicodeBidi",
+		"TextBoxTrim",
+		"TextBoxEdgeOver",
+		"TextBoxEdgeUnder",
+		"TextAutospace",
+		"TextSpacing",
+		"TextSpacingTrim",
+		"TextGroupAlign",
+		"TextFit",
 		"CustomProps",
 	}
 }

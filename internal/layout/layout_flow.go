@@ -1083,7 +1083,11 @@ func (e *engine) placeFloat(
 		e.shiftBoxOps(fbox, dx, 0)
 	}
 
-	floats.place(cstate.Float, fbox, margL, margR)
+	// float-offset lite: block-axis nudge before recording exclusion.
+	nudgeFloatOffset(e, fbox, cstate)
+
+	shape := buildShapeExclusion(cstate, fbox, margL, margR, e.scale)
+	floats.place(cstate.Float, fbox, margL, margR, shape)
 
 	return fbox
 }

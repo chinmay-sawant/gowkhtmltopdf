@@ -1,7 +1,7 @@
 # Phase 87.6: CSS Shapes + page-float extras
 
 > **Parent:** `../87-canonical-0.2.7-next-72.md`
-> **Status:** planned
+> **Status:** complete
 > **Estimated effort:** L–XL (8 properties)
 > **Owner:** `internal/layout` (float + inline + pagination for page floats)
 > **Depends on:** existing rectangular floats (`float.go`); 87.5 optional
@@ -48,28 +48,28 @@ Do not grow `layout.go` / `style_properties.go`.
 
 ### 87.6.1 shape-outside lite
 
-- [ ] 87.6.1.1 Apply `shape-outside` / `shape-margin`; parse basic shapes.
-- [ ] 87.6.1.2 `shape_exclusion.go` returns per-line intervals; `lineBounds` consults it when present.
-- [ ] 87.6.1.3 Tests: `TestShapeOutsideCircleShortensLines`, `TestShapeMarginExpandsExclusion`.
-- [ ] 87.6.1.4 Flip only with consumer proof; matrix names the basic-shape subset.
+- [x] 87.6.1.1 Apply `shape-outside` / `shape-margin`; parse basic shapes.
+- [x] 87.6.1.2 `shape_exclusion.go` returns per-line intervals; `lineBounds` consults it when present.
+- [x] 87.6.1.3 Tests: `TestShapeOutsideCircleShortensLines`, `TestShapeMarginExpandsExclusion`.
+- [x] 87.6.1.4 Flip only with consumer proof; matrix names the basic-shape subset.
 
 ### 87.6.2 shape-image-threshold / inside / padding
 
-- [ ] 87.6.2.1 Decide: implement alpha contour (**L**) or leave Unsupported.
-- [ ] 87.6.2.2 `shape-inside` / `shape-padding`: default stay Unsupported unless product insists.
+- [x] 87.6.2.1 Decide: implement alpha contour (**L**) or leave Unsupported.
+- [x] 87.6.2.2 `shape-inside` / `shape-padding`: default stay Unsupported unless product insists.
 
 ### 87.6.3 float-offset / reference / defer
 
-- [ ] 87.6.3.1 Apply three props in `style_float_page_props.go`.
-- [ ] 87.6.3.2 `float-offset` consumer on `placeFloat` (`layout_flow.go` place path) without growing `layout.go` (extract helper if needed).
-- [ ] 87.6.3.3 `float-reference:inline` documents current BFC; page/column Partial.
-- [ ] 87.6.3.4 `float-defer`: implement tiny lite or leave Unsupported/Partial with note.
-- [ ] 87.6.3.5 Tests matching the shipped subset.
+- [x] 87.6.3.1 Apply `float-offset` / `float-reference` in `style_float_page_props.go` (`float-defer` omitted as Unsupported).
+- [x] 87.6.3.2 `float-offset` consumer on `placeFloat` (`layout_flow.go` place path) without growing `layout.go` (extract helper if needed).
+- [x] 87.6.3.3 `float-reference:inline` documents current BFC; page/column Partial.
+- [x] 87.6.3.4 `float-defer`: implement tiny lite or leave Unsupported/Partial with note.
+- [x] 87.6.3.5 Tests matching the shipped subset.
 
 ### 87.6.R batch gate (package only)
 
-- [ ] 87.6.R.1 `go test ./internal/layout -run 'TestShapeOutside|TestShapeMargin|TestFloatOffset|TestFloatReference|TestFloatDefer' -count=1` exit 0.
-- [ ] 87.6.R.2 Mapping flips only for proven subset. **No `make test` / `make lint`.**
+- [x] 87.6.R.1 `go test ./internal/layout -run 'TestShapeOutside|TestShapeMargin|TestFloatOffset|TestFloatReference|TestFloatDefer' -count=1` exit 0.
+- [x] 87.6.R.2 Mapping flips only for proven subset. **No `make test` / `make lint`.**
 
 ## Out of scope
 

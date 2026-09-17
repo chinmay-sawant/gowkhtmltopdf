@@ -21,6 +21,9 @@ type opExtra struct {
 	StructElem    *pdf.StructElem
 	TextTransform string
 	TextLanguage  string
+	// FontFeatures is the canonical OpenType feature list string built from
+	// font-feature-settings / font-kerning / font-variant-* for the shaper.
+	FontFeatures string
 	// BlendGroup is the owning CSS element group (mix-blend-mode or
 	// isolation: isolate). GroupMark flags begin/end boundary markers that
 	// carry the group without painting.
@@ -105,6 +108,19 @@ func (op Op) TextLanguage() string {
 	return op.opExtra.TextLanguage
 }
 
+// SetFontFeatures writes the OpenType feature list string for shaping.
+func (op *Op) SetFontFeatures(value string) { op.setFontFeatures(value) }
+
+// FontFeatures returns the op's OpenType feature settings string, or "" when
+// the op carries none.
+func (op Op) FontFeatures() string {
+	if op.opExtra == nil {
+		return ""
+	}
+
+	return op.opExtra.FontFeatures
+}
+
 // SetPaintOpacity writes element opacity, allocating a unique extra if needed.
 func (op *Op) SetPaintOpacity(value float64) { op.setPaintOpacity(value) }
 
@@ -167,6 +183,20 @@ func (op *Op) setTextLanguage(value string) {
 	}
 
 	op.detachExtra().TextLanguage = value
+}
+
+func (op *Op) setFontFeatures(value string) {
+	if value == "" {
+		if op.opExtra == nil || op.opExtra == emptyExtra {
+			return
+		}
+
+		op.detachExtra().FontFeatures = ""
+
+		return
+	}
+
+	op.detachExtra().FontFeatures = value
 }
 
 func (op *Op) setPaintOpacity(value float64) {
@@ -256,6 +286,35 @@ func (op Op) withTextLanguage(value string) Op {
 	extra := op.detachedExtraCopy()
 	extra.TextLanguage = value
 	op.opExtra = extra
+
+	return op
+}
+
+func (op Op) withFontFeatures(value string) Op {
+	if value == "" {
+		return op
+	}
+
+	extra := op.detachedExtraCopy()
+	extra.FontFeatures = value
+	op.opExtra = extra
+
+	return op
+}
+
+// decorateTextOp attaches language, OpenType features, and synthesis gates
+// shared by every OpText emit site.
+func decorateTextOp(op Op, sty *ResolvedStyle) Op {
+	if sty == nil {
+		return op
+	}
+
+	op = op.withTextTransform(sty.TextTransform).
+		withTextLanguage(fontShapingLanguage(sty)).
+		withFontFeatures(fontShapingFeatureSettings(sty))
+	if textOpDisablesFakeBold(sty) {
+		op.NoFakeBold = true
+	}
 
 	return op
 }

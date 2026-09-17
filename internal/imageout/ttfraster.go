@@ -33,6 +33,7 @@ func ttfDrawString(
 	basex, basey float64,
 	text string,
 	lang string,
+	featureSettings string,
 	sizePt float64,
 	letterSpacing float64,
 	rotateDeg float64,
@@ -49,7 +50,9 @@ func ttfDrawString(
 		atlas = newGlyphAtlas()
 	}
 
-	run := pdf.ShapeRunLanguage(text, face, sizePt, lang)
+	run := pdf.ShapeRunWithFeaturesLanguage(
+		text, face, sizePt, pdf.ParseFontFeatureSettings(featureSettings), lang,
+	)
 	if run.Text == "" {
 		return
 	}

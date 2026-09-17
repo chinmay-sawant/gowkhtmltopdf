@@ -1800,7 +1800,7 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 	// bottom border / letterhead rules - fixture-07/16). The shared resolver
 	// adds them once for every formatting context and then applies
 	// height/min-height/max-height.
-	boxNode.height = e.resolveBorderBoxHeight(style, curY)
+	boxNode.height = e.resolveBorderBoxHeight(withAspectRatioHeight(style, contentW, e), curY)
 	e.paintWidgetControl(node, style, boxNode, widget, chkWidget, posY)
 
 	e.paintPositionedPseudo(node, style, boxNode, pseudoBefore)

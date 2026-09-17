@@ -93,6 +93,15 @@ func (e *engine) usedImageSize(
 	}
 
 	size = applyImageCSSRatio(size, cssW, cssH, ref)
+	if style.AspectRatio > 0 {
+		switch {
+		case cssW && !cssH:
+			size.h = size.w / style.AspectRatio
+		case cssH && !cssW:
+			size.w = size.h * style.AspectRatio
+		}
+	}
+
 	size = clampImageWidth(size, e.imageMaxWidth(style, cssW))
 	size = clampImageHeight(e, size, style)
 
@@ -445,12 +454,15 @@ func (e *engine) paintReplacedImage(
 		isJPEG = false
 	}
 
+	intrinsicW, intrinsicH := replacedIntrinsicPt(e, sty, boxNode.img)
+	fitX, fitY, fitW, fitH := applyObjectFitToPaint(sty, imgX, imgY, imgW, imgH, intrinsicW, intrinsicH)
+
 	e.add((Op{ //nolint:exhaustruct // intentional zero fields
 		Kind:   OpImage,
-		X:      imgX,
-		Y:      imgY,
-		W:      imgW,
-		H:      imgH,
+		X:      fitX,
+		Y:      fitY,
+		W:      fitW,
+		H:      fitH,
 		IsJPEG: isJPEG,
 	}).withImage(imgData, boxNode.img.w, boxNode.img.h, alt))
 
