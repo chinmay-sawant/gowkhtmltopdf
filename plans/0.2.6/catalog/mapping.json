@@ -8643,9 +8643,9 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "partial",
-      "code_path": "internal/layout/style_font_synthesis_props.go",
-      "notes": "Partial: auto|none stored; no synthetic sub/super consumer."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/font_synthesis_geom.go (synthesizePositionAdjust)",
+      "notes": "Geometric/synthesis consumer for print PDF Effect demos (v0.2.7)."
     },
     {
       "property": "font-synthesis-small-caps",
@@ -8666,9 +8666,9 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "partial",
-      "code_path": "internal/layout/style_font_synthesis_props.go",
-      "notes": "Partial: auto|none stored; small-caps synthesis not synthesized when face lacks smcp."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/font_synthesis_geom.go (synthesizeSmallCapsText)",
+      "notes": "Geometric/synthesis consumer for print PDF Effect demos (v0.2.7)."
     },
     {
       "property": "font-synthesis-style",
@@ -8689,9 +8689,9 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "partial",
-      "code_path": "internal/layout/style_font_synthesis_props.go",
-      "notes": "Partial: auto|none stored; no fake-oblique consumer."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/font_synthesis_geom.go + paint.go FakeOblique",
+      "notes": "Geometric/synthesis consumer for print PDF Effect demos (v0.2.7)."
     },
     {
       "property": "font-synthesis-weight",
@@ -8973,9 +8973,9 @@
       "groups": [
         "CSS Fonts"
       ],
-      "engine_status": "partial",
-      "code_path": "internal/layout/style_font_width_props.go",
-      "notes": "Partial: keywords/% stored and inherited; bundled Liberation faces have no width masters so face lookup ignores the percent."
+      "engine_status": "implemented",
+      "code_path": "internal/layout/font_synthesis_geom.go fontWidthScale; measureRuneFace/emit",
+      "notes": "Geometric/synthesis consumer for print PDF Effect demos (v0.2.7)."
     },
     {
       "property": "footnote-display",

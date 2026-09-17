@@ -480,8 +480,9 @@ type Op struct {
 	// The logical OpLine coordinates remain on the border-box edge so
 	// pagination ownership checks keep using layout geometry.
 	LineInset  uint8
-	Bold       bool
-	NoFakeBold bool
+	Bold         bool
+	NoFakeBold   bool
+	FakeOblique  bool // synthesize italic skew when face is upright
 	IsJPEG     bool
 	// IsBackground marks background/border images that belong to the chrome layer.
 	IsBackground bool

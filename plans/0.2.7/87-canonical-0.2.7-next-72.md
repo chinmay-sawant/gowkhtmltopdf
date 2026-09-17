@@ -1,7 +1,7 @@
 # 87 - Canonical next-72 CSS coverage (v0.2.7)
 
 > **Parent:** `plans/0.2.7/README.md`
-> **Status:** complete (partial-complete on catalog: 393 Implemented / 14 Partial / 411 Unsupported; 19 of 72 remain Unsupported by honest choice)
+> **Status:** complete (partial-complete on catalog: 397 Implemented / 10 Partial / 411 Unsupported; 19 of 72 remain Unsupported by honest choice)
 > **Estimated effort:** XL (8 batches: quick wins S–M, font M–L, VF honesty S/L, text/hyphen M–L, column/initial M–L, shape/float L–XL, border defer S, closure M)
 > **Owner:** `internal/layout` (+ `internal/pdf` for font feature shaping, `internal/css` only if selector/parse gaps)
 > **Depends on:** v0.2.6 catalog honesty (354 Implemented), fixture-64
@@ -21,12 +21,12 @@ Chrome labels in the JSON are advisory (`Chrome yes` = optional browser sanity; 
 
 | Status | Count |
 |--------|------:|
-| Implemented | 393 |
-| Partial | 14 |
+| Implemented | 397 |
+| Partial | 10 |
 | Unsupported | 411 |
 | Total | 818 |
 
-Next-72 slice: 39 Implemented / 14 Partial / 19 Unsupported of 72. Remaining Unsupported by choice: Borders-4 drafts (14), `text-fit`, `shape-inside`, `shape-padding`, `shape-image-threshold`, `float-defer`. Partial includes VF Path A, font-width/stretch, some font-synthesis longhands, column-wrap, initial-letter-align/wrap, float-reference.
+Next-72 slice: 43 Implemented / 10 Partial / 19 Unsupported of 72. Remaining Unsupported by choice: Borders-4 drafts (14), `text-fit`, `shape-inside`, `shape-padding`, `shape-image-threshold`, `float-defer`. Partial includes VF Path A, font-variant-alternates/emoji, column-wrap, initial-letter-align/wrap, float-reference.
 
 
 ## Effort scale (same as 0.2.6 phase-79)

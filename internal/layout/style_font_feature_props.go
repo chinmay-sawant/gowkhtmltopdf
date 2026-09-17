@@ -523,6 +523,11 @@ func appendVariantFeatureTags(sty *ResolvedStyle, put func(string, uint32)) {
 		put("sups", 1)
 	}
 
+	switch sty.FontVariantAlternates {
+	case "historical-forms":
+		put("hist", 1)
+	}
+
 	for _, tok := range strings.Fields(sty.FontVariantEastAsian) {
 		switch tok {
 		case "jis78":

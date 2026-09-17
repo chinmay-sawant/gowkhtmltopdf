@@ -315,6 +315,9 @@ func decorateTextOp(op Op, sty *ResolvedStyle) Op {
 	if textOpDisablesFakeBold(sty) {
 		op.NoFakeBold = true
 	}
+	if needsFakeOblique(sty, op.Font) {
+		op.FakeOblique = true
+	}
 
 	return op
 }

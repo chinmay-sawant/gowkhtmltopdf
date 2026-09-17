@@ -439,9 +439,21 @@ func (e *engine) emitInlineTextRun(
 	// carried on opExtra and applied at paint/measure time, matching pre-87.4.
 	raw := stripSoftHyphens(run.text)
 	shaped := transformInlineText(raw, item.style.TextTransform)
+	paintSize := size
+	paintBaseline := baseline
+	if scText, sc := synthesizeSmallCapsText(item.style, shaped); sc != 1 {
+		shaped = scText
+		raw = scText
+		paintSize = size * sc
+	}
+	if posScale, posShift := synthesizePositionAdjust(item.style, paintSize); posScale != 1 || posShift != 0 {
+		paintSize *= posScale
+		paintBaseline += posShift
+	}
+	widthScale := fontWidthScale(item.style)
 	textWidth := run.w
-	if shaped != run.text {
-		textWidth = e.measureTextFace(shaped, item.style)
+	if shaped != run.text || paintSize != size || widthScale != 1 {
+		textWidth = e.measureTextFace(shaped, item.style) * (paintSize / size) * widthScale
 	}
 
 	textX := leftX
@@ -454,14 +466,14 @@ func (e *engine) emitInlineTextRun(
 	}
 
 	if item.style.TextShadowSet {
-		e.emitTextShadowRuns(item, run, textX, baseline, textWidth, size, descent)
+		e.emitTextShadowRuns(item, run, textX, paintBaseline, textWidth, paintSize, descent)
 	}
 
 	e.add(decorateTextOp(Op{ //nolint:exhaustruct // intentional zero fields
-		Kind: OpText, X: textX, Y: baseline, W: textWidth, H: item.h,
-		Text: raw, Font: run.face, Size: size,
+		Kind: OpText, X: textX, Y: paintBaseline, W: textWidth, H: item.h,
+		Text: raw, Font: run.face, Size: paintSize,
 		InkDescent:    descent,
-		LetterSpacing: item.style.LetterSpacing * e.scale,
+		LetterSpacing: item.style.LetterSpacing * e.scale * widthScale,
 		Bold:          item.style.FontWeight >= fontWeightBoldValue,
 		R:             child[0], G: child[1], B: child[2],
 		RotateDeg: inlineRunRotation(item.style, run.text),
@@ -1707,7 +1719,7 @@ func (e *engine) measureRuneFace(curRune rune, sty *ResolvedStyle) float64 {
 		advance += sty.WordSpacing * e.scale
 	}
 
-	return advance
+	return advance * fontWidthScale(sty)
 }
 
 type faceRun struct {

@@ -1533,15 +1533,19 @@ func drawText(
 	chld.SetFont(fontName, paintOp.Size)
 	chld.BeginText()
 
+	skew := 0.0
+	if paintOp.FakeOblique {
+		skew = synthObliqueSkew
+	}
 	if paintOp.RotateDeg == 90 || paintOp.RotateDeg == -90 {
 		if paintOp.RotateDeg < 0 {
-			// PDF's y-up text space reverses the screen-space direction.
-			// A CSS -90deg vertical run must therefore advance toward
-			// increasing canvas Y, not above its containing box.
 			chld.TextMatrix(0, -1, 1, 0, posX, posY)
 		} else {
 			chld.TextMatrix(0, 1, -1, 0, posX, posY)
 		}
+	} else if skew != 0 {
+		// Shear in PDF text space: x' = x + skew*y (italic lean).
+		chld.TextMatrix(1, 0, skew, 1, posX, posY)
 	} else {
 		chld.TextAt(posX, posY)
 	}
