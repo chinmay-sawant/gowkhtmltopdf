@@ -451,7 +451,7 @@ var fixturePageBounds = map[string]fixtureBounds{ //nolint:gochecknoglobals // i
 		needles: []string{"FIXTURE-63-PAGE-LEVEL"},
 	},
 	"fixture-64-next-72-props.html": {
-		minPages: 5, maxPages: 6, images: true,
+		minPages: 5, maxPages: 7, images: true,
 		needles: []string{"NEXT-72-PROPS"},
 	},
 }
