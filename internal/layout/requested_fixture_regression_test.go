@@ -147,6 +147,29 @@ func TestFixture64RepeatedHeaderKeepsCollapsedGridOnContinuationPage(t *testing.
 	assertFixture64ContinuationBottomRule(t, res, contentH, *headerGrid)
 }
 
+func TestFixture64TextAutospaceAddsIdeographAlphaGap(t *testing.T) {
+	t.Parallel()
+
+	res, _ := paintGoldenFixture(t, "fixture-64-next-72-props.html")
+	var runs []Op
+	for _, op := range res.Ops {
+		if op.Kind == OpText && op.Text == "汉A汉A汉" {
+			runs = append(runs, op)
+		}
+	}
+	if len(runs) != 2 {
+		t.Fatalf("fixture-64 text-autospace runs = %d, want 2: %+v", len(runs), runs)
+	}
+	if runs[0].TextAutospaceGap() != 0 || runs[1].TextAutospaceGap() <= 0 {
+		t.Fatalf("fixture-64 text-autospace gaps = %.2f/%.2f, want 0/positive",
+			runs[0].TextAutospaceGap(), runs[1].TextAutospaceGap())
+	}
+
+	if runs[1].W <= runs[0].W+1 {
+		t.Fatalf("fixture-64 ideograph-alpha width = %.2f, no-autospace width = %.2f; want a visible gap", runs[1].W, runs[0].W)
+	}
+}
+
 func assertFixture64RepeatedHeaderGrid(t *testing.T, res *Result, contentH float64, headerGrid *Op, headerFills []Op) {
 	t.Helper()
 

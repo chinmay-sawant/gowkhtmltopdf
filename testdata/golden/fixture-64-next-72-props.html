@@ -849,8 +849,8 @@
         <td class="desc">With `text-autospace: ideograph-alpha` the effect should match ideograph-alpha.</td>
         <td class="effect">
           <div class="fx-cjk" style="display:flex;gap:8px;font-size:14px;"><span
-              style="border:1px solid #336;padding:4px;text-autospace:no-autospace;">汉A汉</span><span
-              style="border:1px solid #036;padding:4px;background:#eef6ff;text-autospace:ideograph-alpha;">汉A汉</span>
+              style="border:1px solid #336;padding:4px;text-autospace:no-autospace;">汉A汉A汉</span><span
+              style="border:1px solid #036;padding:4px;background:#eef6ff;text-autospace:ideograph-alpha;">汉A汉A汉</span>
           </div>
           <div style="font-size:7.5pt;color:#556;">right inserts ideograph-alpha gap</div>
         </td>
@@ -1239,14 +1239,14 @@
               </div>
             </div>
             <div>
-              <div style="font-size:7pt;color:#556;">page</div>
+              <div style="font-size:7pt;color:#556;">page (bounded)</div>
               <div style="display:flow-root;width:70px;height:36px;border:1px dashed #888;margin-left:18px;">
-                <div style="float:left;width:50%;height:16px;background:#6ad;float-reference:page;font-size:7px;">pg
+                <div style="width:50px;height:16px;background:#6ad;float-reference:page;font-size:7px;">pg
                 </div>
               </div>
             </div>
           </div>
-          <div style="font-size:7.5pt;color:#556;">inline: 50% of BFC. page: 50% of page, packs to page left (gowk).
+          <div style="font-size:7.5pt;color:#556;">inline: 50% of BFC. page reference is page-global; this bounded swatch keeps the table row intact.
           </div>
           <div class="chrome-badge chrome-no">Chrome: no render expected</div>
         </td>
@@ -1259,7 +1259,7 @@
         <td class="desc">With `initial-letter: 3` the first letter should span 3 lines.</td>
         <td class="effect">
           <div style="width:160px;border:1px solid #336;padding:4px;font-size:10px;line-height:14px;">
-            <p style="margin:0;"><span style="initial-letter:3;font-weight:700;margin-right:4px;">A</span>n initial
+            <p style="margin:0;"><span style="initial-letter:3;initial-letter-wrap:all;font-weight:700;margin-right:4px;">A</span>n initial
               letter should span three lines of this paragraph body with enough words to wrap beside the drop cap
               clearly for geometry.</p>
           </div>
@@ -1274,15 +1274,15 @@
           hanging metric versus alphabetic. Chrome does not support this property (no MDN BCD entry), so the Effect cell
           may look unchanged in Chrome.</td>
         <td class="effect">
-          <div style="display:flex;gap:8px;align-items:flex-start;font-size:9px;line-height:12px;"><span
-              style="border:1px solid #336;padding:4px;width:90px;">alphabetic<br>
-              <p style="margin:0;"><span
-                  style="initial-letter:3;initial-letter-align:alphabetic;font-weight:700;">A</span>lphabetic drop cap
+          <div style="display:flex;gap:8px;align-items:flex-start;font-size:9px;line-height:12px;"><div
+              style="border:1px solid #336;padding:4px;width:90px;"><div>alphabetic</div>
+              <p style="margin:12px 0 0;"><span
+                  style="initial-letter:3;initial-letter-wrap:all;initial-letter-align:alphabetic;font-weight:700;">A</span>lphabetic drop cap
                 hangs from the first-line cap height across three lines of body copy here.</p>
-            </span><span style="border:1px solid #036;padding:4px;background:#eef6ff;width:90px;">hanging<br>
-              <p style="margin:0;"><span style="initial-letter:3;initial-letter-align:hanging;font-weight:700;">A</span>
+            </div><div style="border:1px solid #036;padding:4px;background:#eef6ff;width:90px;"><div>hanging</div>
+              <p style="margin:12px 0 0;"><span style="initial-letter:3;initial-letter-wrap:all;initial-letter-align:hanging;font-weight:700;">A</span>
                 hanging drop cap uses a higher hanging baseline so the letter Y shifts versus alphabetic.</p>
-            </span></div>
+            </div></div>
           <div style="font-size:7.5pt;color:#556;margin-top:2px;">pair: alphabetic vs hanging (needs initial-letter:3)
           </div>
           <div class="chrome-badge chrome-no">Chrome: no render expected</div>

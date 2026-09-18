@@ -21,6 +21,7 @@ type opExtra struct {
 	StructElem    *pdf.StructElem
 	TextTransform string
 	TextLanguage  string
+	TextAutospace string
 	// FontFeatures is the canonical OpenType feature list string built from
 	// font-feature-settings / font-kerning / font-variant-* for the shaper.
 	FontFeatures string
@@ -119,6 +120,15 @@ func (op Op) FontFeatures() string {
 	}
 
 	return op.opExtra.FontFeatures
+}
+
+// TextAutospace returns the text-autospace value carried by a text op.
+func (op Op) TextAutospace() string {
+	if op.opExtra == nil {
+		return ""
+	}
+
+	return op.opExtra.TextAutospace
 }
 
 // SetPaintOpacity writes element opacity, allocating a unique extra if needed.
@@ -302,6 +312,18 @@ func (op Op) withFontFeatures(value string) Op {
 	return op
 }
 
+func (op Op) withTextAutospace(value string) Op {
+	if value == "" || value == "no-autospace" {
+		return op
+	}
+
+	extra := op.detachedExtraCopy()
+	extra.TextAutospace = value
+	op.opExtra = extra
+
+	return op
+}
+
 // decorateTextOp attaches language, OpenType features, and synthesis gates
 // shared by every OpText emit site.
 func decorateTextOp(op Op, sty *ResolvedStyle) Op {
@@ -311,7 +333,8 @@ func decorateTextOp(op Op, sty *ResolvedStyle) Op {
 
 	op = op.withTextTransform(sty.TextTransform).
 		withTextLanguage(fontShapingLanguage(sty)).
-		withFontFeatures(fontShapingFeatureSettings(sty))
+		withFontFeatures(fontShapingFeatureSettings(sty)).
+		withTextAutospace(sty.TextAutospace)
 	if textOpDisablesFakeBold(sty) {
 		op.NoFakeBold = true
 	}

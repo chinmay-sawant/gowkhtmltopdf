@@ -23,11 +23,28 @@ func textAutospaceGap(style *ResolvedStyle, prev, cur rune, em float64) float64 
 		return 0
 	}
 
-	if ideographAlphaPair(prev, cur) || ideographAlphaPair(cur, prev) {
+	if IsIdeographAlphaBoundary(prev, cur) {
 		return em * autospaceGapEm
 	}
 
 	return 0
+}
+
+// IsIdeographAlphaBoundary reports either direction of an ideograph/Latin
+// boundary. The image painter uses the same classifier as layout measurement.
+func IsIdeographAlphaBoundary(a, b rune) bool {
+	return ideographAlphaPair(a, b) || ideographAlphaPair(b, a)
+}
+
+// TextAutospaceGap returns the point-sized gap requested by a text op.
+// Paint backends use it to reproduce the layout advance between the same
+// ideograph and alphabetic boundaries.
+func (op Op) TextAutospaceGap() float64 {
+	if !autospaceIdeographAlpha(op.TextAutospace()) || op.Size <= 0 {
+		return 0
+	}
+
+	return op.Size * autospaceGapEm
 }
 
 func autospaceIdeographAlpha(val string) bool {

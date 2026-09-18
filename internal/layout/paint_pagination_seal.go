@@ -6,12 +6,13 @@ import (
 
 // Table-seal geometry: border-width floors, cluster sizes, and page bands.
 const (
-	sealMinBorderWidth = 0.3
-	sealFallbackWidth  = 0.5
-	sealStubMinCount   = 2
-	yBucketScale       = 2
-	trailingBandSlack  = 8.0
-	minInkHeight       = 4
+	sealMinBorderWidth    = 0.3
+	sealFallbackWidth     = 0.5
+	sealStubMinCount      = 2
+	pageBoundarySealInset = 2
+	yBucketScale          = 2
+	trailingBandSlack     = 8.0
+	minInkHeight          = 4
 
 	// bandClusterMinColumns is the smallest vertical-segment count that seals
 	// a table edge; narrower clusters are text rules, not grid borders.
@@ -168,22 +169,36 @@ func sealPageBottomClusters(
 
 		pageTop := float64(page) * contentH
 		pageBot := float64(page+1) * contentH
+		sealY := child.y
+
+		if page > 0 {
+			boundary := pageTop
+			if child.y <= boundary+bandEdgeTolerance {
+				// A collapsed border endpoint can land a fraction past the
+				// page boundary after row-height rounding. Keep that endpoint
+				// with the page it closes, not with the repeated header page.
+				page--
+				pageTop = float64(page) * contentH
+				pageBot = boundary
+				sealY = pageBot - pageBoundarySealInset*layoutCoordEpsilon
+			}
+		}
 
 		if child.y < pageTop || child.y > pageBot+eps {
 			continue
 		}
 
-		if coverage(child.y, child.minX, child.maxX, pageBot) {
+		if coverage(sealY, child.minX, child.maxX, pageBot) {
 			continue
 		}
 
 		// Same-page continuation below: do not seal (false mid-page gap,
 		// fixture-60 rows 105-106). Next-page thead at pageBot must not count.
-		if verticalClusterStartsBefore(starts, child.y, child.minX, child.maxX, pageBot) {
+		if verticalClusterStartsBefore(starts, sealY, child.minX, child.maxX, pageBot) {
 			continue
 		}
 
-		seal(child.y, child.minX, child.maxX, child.bw, child.r, child.g, child.b)
+		seal(sealY, child.minX, child.maxX, child.bw, child.r, child.g, child.b)
 	}
 }
 

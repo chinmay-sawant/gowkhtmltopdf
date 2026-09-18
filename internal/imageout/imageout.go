@@ -1484,18 +1484,20 @@ func paintText(img *image.NRGBA, paintOp *layout.Op, pxPerPt float64, atlas *gly
 		}
 	}
 
-	ttfDrawString(
+	ttfDrawStringWithAutospace(
 		img, baseX, baseY, paintOp.Text, paintOp.TextLanguage(), paintOp.FontFeatures(),
-		paintOp.Size, paintOp.LetterSpacing, float64(paintOp.RotateDeg), face, col, pxPerPt, atlas,
+		paintOp.Size, paintOp.LetterSpacing, paintOp.TextAutospaceGap(), float64(paintOp.RotateDeg),
+		face, col, pxPerPt, atlas,
 	)
 	// Latin-only fake-bold (CJK gate lives in layout.FakeBoldFor). The offset
 	// is one final CSS pixel expressed in canvas pixels, so the direct branch
 	// (pxPerPt = ptToPx) shifts by one canvas pixel rather than by rasterSS.
 	if layout.FakeBoldFor(paintOp) {
 		boldOffset := pxPerPt / ptToPx
-		ttfDrawString(
+		ttfDrawStringWithAutospace(
 			img, baseX+boldOffset, baseY, paintOp.Text, paintOp.TextLanguage(), paintOp.FontFeatures(),
-			paintOp.Size, paintOp.LetterSpacing, float64(paintOp.RotateDeg), face, col, pxPerPt, atlas,
+			paintOp.Size, paintOp.LetterSpacing, paintOp.TextAutospaceGap(), float64(paintOp.RotateDeg),
+			face, col, pxPerPt, atlas,
 		)
 	}
 }

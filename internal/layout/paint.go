@@ -1560,11 +1560,12 @@ func drawText(
 		chld.TextRenderMode(pdfTextRenderFillStroke) // fill + stroke
 	}
 
-	chld.TextShowLanguageFeatures(
-		transformInlineText(paintOp.Text, paintOp.TextTransform),
-		paintOp.TextLanguage(),
-		paintOp.FontFeatures(),
-	)
+	text := transformInlineText(paintOp.Text, paintOp.TextTransform)
+	if gap := paintOp.TextAutospaceGap(); gap > 0 {
+		chld.TextShowLanguageFeaturesWithAutospace(text, paintOp.TextLanguage(), paintOp.FontFeatures(), gap)
+	} else {
+		chld.TextShowLanguageFeatures(text, paintOp.TextLanguage(), paintOp.FontFeatures())
+	}
 
 	if fakeBold {
 		chld.TextRenderMode(0)
