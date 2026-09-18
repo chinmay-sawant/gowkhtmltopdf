@@ -825,23 +825,7 @@ func applyLogicalMarginVerticalLR(style *ResolvedStyle, prop, value string, fsiz
 	return true
 }
 
-func applyLogicalMarginHorizontal(style *ResolvedStyle, prop, value string, fsize, viewportW float64) bool {
-	switch prop {
-	case propMarginInlineStart:
-		style.MarginLeft, style.MarginLeftAuto = marginLenAuto(value, fsize, viewportW)
-	case propMarginInlineEnd:
-		style.MarginRight, style.MarginRightAuto = marginLenAuto(value, fsize, viewportW)
-	case propMarginBlockStart:
-		style.MarginTop, style.MarginTopAuto = marginLenAuto(value, fsize, viewportW)
-	case propMarginBlockEnd:
-		style.MarginBottom, style.MarginBottomAuto = marginLenAuto(value, fsize, viewportW)
-	default:
-		return false
-	}
-
-	return true
-}
-
+//nolint:gocritic // writing mode and direction are independent cascade axes
 func applyLogicalMarginPair(style *ResolvedStyle, prop, value string, fsize, viewportW float64) bool {
 	switch prop {
 	case cssPropMarginInline:
@@ -850,6 +834,9 @@ func applyLogicalMarginPair(style *ResolvedStyle, prop, value string, fsize, vie
 			if isVerticalWritingMode(style.WritingMode) {
 				style.MarginTop, style.MarginTopAuto = marginLenAuto(start, fsize, viewportW)
 				style.MarginBottom, style.MarginBottomAuto = marginLenAuto(end, fsize, viewportW)
+			} else if style.Direction == cssDirectionRTL {
+				style.MarginRight, style.MarginRightAuto = marginLenAuto(start, fsize, viewportW)
+				style.MarginLeft, style.MarginLeftAuto = marginLenAuto(end, fsize, viewportW)
 			} else {
 				style.MarginLeft, style.MarginLeftAuto = marginLenAuto(start, fsize, viewportW)
 				style.MarginRight, style.MarginRightAuto = marginLenAuto(end, fsize, viewportW)
@@ -932,23 +919,7 @@ func applyLogicalPaddingVerticalLR(style *ResolvedStyle, prop, value string, fsi
 	return true
 }
 
-func applyLogicalPaddingHorizontal(style *ResolvedStyle, prop, value string, fsize, viewportW float64) bool {
-	switch prop {
-	case propPaddingInlineStart:
-		style.PaddingLeft = marginLen(value, fsize, viewportW)
-	case propPaddingInlineEnd:
-		style.PaddingRight = marginLen(value, fsize, viewportW)
-	case propPaddingBlockStart:
-		style.PaddingTop = marginLen(value, fsize, viewportW)
-	case propPaddingBlockEnd:
-		style.PaddingBottom = marginLen(value, fsize, viewportW)
-	default:
-		return false
-	}
-
-	return true
-}
-
+//nolint:gocritic // writing mode and direction are independent cascade axes
 func applyLogicalPaddingPair(style *ResolvedStyle, prop, value string, fsize, viewportW float64) bool {
 	switch prop {
 	case cssPropPaddingInline:
@@ -957,6 +928,9 @@ func applyLogicalPaddingPair(style *ResolvedStyle, prop, value string, fsize, vi
 			if isVerticalWritingMode(style.WritingMode) {
 				style.PaddingTop = marginLen(start, fsize, viewportW)
 				style.PaddingBottom = marginLen(end, fsize, viewportW)
+			} else if style.Direction == cssDirectionRTL {
+				style.PaddingRight = marginLen(start, fsize, viewportW)
+				style.PaddingLeft = marginLen(end, fsize, viewportW)
 			} else {
 				style.PaddingLeft = marginLen(start, fsize, viewportW)
 				style.PaddingRight = marginLen(end, fsize, viewportW)

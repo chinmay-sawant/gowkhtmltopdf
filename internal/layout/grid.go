@@ -760,10 +760,26 @@ func resolveContentHeight(sty ResolvedStyle, engN *engine) float64 {
 
 // resolveContentHeightForWidth is resolveContentHeight plus aspect-ratio when
 // height is auto and contentW (scaled) is definite.
+//
+//nolint:wsl // percentage-height fallback keeps its guard and normalization together
 func resolveContentHeightForWidth(sty ResolvedStyle, engN *engine, contentW float64) float64 {
 	if sty.HeightPercent >= 0 && sty.Height < 0 {
-		// Cyclic % honesty: indefinite containing block -> auto.
-		return -1
+		cbH := engN.containingBlockHeight()
+		if cbH < 0 {
+			// Cyclic % honesty: indefinite containing block -> auto.
+			return -1
+		}
+
+		height := cbH * sty.HeightPercent / oneHundred
+		if sty.BoxSizing == borderBox {
+			height -= engN.scalePt(sty.PaddingTop) + engN.scalePt(sty.PaddingBottom) +
+				engN.scalePt(sty.BorderTop.Width) + engN.scalePt(sty.BorderBottom.Width)
+		}
+		if height < 0 {
+			height = 0
+		}
+
+		return height
 	}
 
 	if sty.Height < 0 {

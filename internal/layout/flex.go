@@ -59,6 +59,8 @@ type flexPlacedItem struct {
 // buildFlex lays out a flex container (row or column) with a report-friendly
 // subset: justify-content, align-items/self, align-content, gap/row-gap/
 // column-gap, flex-grow/shrink/basis, order, wrap, and reverse directions.
+//
+//nolint:gocritic,wsl // dispatch also installs the containing-block scope
 func (e *engine) buildFlex(node *html.Node, sty ResolvedStyle, availW, x, posY float64) *box {
 	ml := e.scalePt(sty.MarginLeft)
 	boxNode := &box{ //nolint:exhaustruct // intentional zero fields
@@ -80,6 +82,8 @@ func (e *engine) buildFlex(node *html.Node, sty ResolvedStyle, availW, x, posY f
 	kids := e.flexChildren(node, sty)
 
 	rowGap, colGap := e.styleGaps(sty)
+	previousCB, parentCB := e.setFlowCB(sty)
+	defer func() { e.flowCBHeight = previousCB }()
 
 	dir := sty.FlexDirection
 	if dir == "" {
@@ -88,13 +92,17 @@ func (e *engine) buildFlex(node *html.Node, sty ResolvedStyle, availW, x, posY f
 
 	if dir == fxCol || dir == fxColRev {
 		curY = e.flowFlexColumn(boxNode, kids, sty, contentW, contentX, posY, curY, rowGap)
+	} else if isVerticalWritingMode(sty.WritingMode) {
+		curY = e.flowFlexVerticalRow(boxNode, kids, sty, contentW, contentX, posY, curY, colGap)
 	} else {
 		curY = e.flowFlexRow(boxNode, kids, sty, contentW, contentX, posY, curY, colGap, rowGap)
 	}
 
 	// The shared resolver owns bottom padding, bottom border, and the
 	// height/min-height/max-height constraints for auto-height boxes.
-	curY = e.resolveBorderBoxHeight(withAspectRatioHeight(sty, contentW, e), curY)
+	resolvedHeightStyle := withAspectRatioHeight(sty, contentW, e)
+	curY = e.applyHeightConstraintsWithCB(&resolvedHeightStyle,
+		e.borderBoxBottom(resolvedHeightStyle, curY), parentCB)
 
 	boxNode.height = curY
 	e.prependChrome(contentStart, boxNode, sty, boxNode.x, posY, boxNode.w, boxNode.height)
@@ -214,7 +222,7 @@ func (e *engine) flowFlexRow(
 	}
 
 	wrap := style.FlexWrap == fxWrap || style.FlexWrap == fxWrapRev
-	reverse := style.FlexDirection == fxRowRev
+	reverse := flexRowPhysicalReverse(style)
 	items := e.flexRowItems(kids, contentW)
 	lines := e.flexWrapLines(items, wrap, reverse, style.FlexWrap == fxWrapRev, colGap, contentW)
 
@@ -355,8 +363,8 @@ func (e *engine) flexLineFits(items []flexMeas, contentW, gap float64) bool {
 	widths := e.flexLineWidths(items, contentW, gap)
 	total := gap * float64(len(widths)-1)
 
-	for _, width := range widths {
-		total += width
+	for idx, width := range widths {
+		total += width + flexRowNormalMargins(e, items[idx])
 	}
 
 	if total > contentW+layoutEpsilon {
@@ -530,8 +538,8 @@ func (e *engine) flexLineNaturalCross(
 	widths := e.flexLineWidths(items, contentW, gap)
 	sumW := 0.0
 
-	for _, width := range widths {
-		sumW += width
+	for idx, width := range widths {
+		sumW += width + flexRowNormalMargins(e, items[idx])
 	}
 
 	gaps := gap * float64(len(items)-1)
@@ -769,8 +777,17 @@ func (e *engine) flexSpecifiedWidthSuggestion(style ResolvedStyle, mainSize, pad
 // flexClampMainWidths applies min/max after grow/shrink, then re-resolves so
 // that percentage-driven floors and content mins that raised used sizes are
 // honored without leaving the line sum inconsistent when space remains.
-func (e *engine) flexClampMainWidths(items []flexMeas, widths []float64, contentW, mainSize float64) {
+//
+//nolint:cyclop,wsl // clamp and redistribution are one ordered flex phase
+func (e *engine) flexClampMainWidths(items []flexMeas, widths []float64, contentW, mainSize, gap float64) {
 	maxFrozen := make([]bool, len(items))
+	available := contentW - gap*float64(len(items)-1)
+	for _, item := range items {
+		available -= flexRowNormalMargins(e, item)
+	}
+	if available < 0 {
+		available = 0
+	}
 
 	for idx, it := range items {
 		cstate := e.stylePtr(it.n)
@@ -790,19 +807,19 @@ func (e *engine) flexClampMainWidths(items []flexMeas, widths []float64, content
 	}
 
 	sum := flexWidthSum(widths)
-	if sum < contentW-layoutEpsilon && contentW >= 0 && hasFrozenMax(maxFrozen) {
-		e.regrowFlexWidths(items, widths, contentW, maxFrozen)
+	if sum < available-layoutEpsilon && available >= 0 && hasFrozenMax(maxFrozen) {
+		e.regrowFlexWidths(items, widths, available, maxFrozen)
 
 		return
 	}
 
 	// If mins pushed the sum over contentW, freeze at floors and re-shrink
 	// remaining flexible items (css-sizing / flex redistribution lite).
-	if sum <= contentW+layoutEpsilon || contentW < 0 {
+	if sum <= available+layoutEpsilon || available < 0 {
 		return
 	}
 
-	e.reshrinkFlexWidths(items, widths, contentW, mainSize, sum)
+	e.reshrinkFlexWidths(items, widths, available, mainSize, sum)
 }
 
 func hasFrozenMax(maxFrozen []bool) bool {
@@ -968,8 +985,8 @@ func (e *engine) placeFlexLineMeasured(
 	}
 
 	sumW := 0.0
-	for _, w := range widths {
-		sumW += w
+	for idx, w := range widths {
+		sumW += w + flexRowNormalMargins(e, items[idx])
 	}
 
 	startX, justifyGap := justifyRowStart(flexMainJustify(style), contentX, contentW, sumW, gaps, gap, len(items))
@@ -1027,7 +1044,7 @@ func (e *engine) flexLineWidths(items []flexMeas, contentW, gap float64) []float
 	}
 
 	e.flexDistributeWidths(items, widths, contentW, gap)
-	e.flexClampMainWidths(items, widths, contentW, contentW)
+	e.flexClampMainWidths(items, widths, contentW, contentW, gap)
 
 	return widths
 }
@@ -1036,7 +1053,7 @@ func (e *engine) flexDistributeWidths(items []flexMeas, widths []float64, conten
 	var fixed, growSum, shrinkSum float64
 
 	for _, it := range items {
-		fixed += it.baseW
+		fixed += it.baseW + flexRowNormalMargins(e, it)
 		growSum += it.grow
 		shrinkSum += it.shrink * it.baseW
 	}
@@ -1239,7 +1256,7 @@ func (e *engine) buildFlexRowItem(
 	return e.buildWithStyle(node, &override, availW, posX, posY)
 }
 
-//nolint:cyclop,funlen,wsl // row placement keeps main- and cross-axis phases together
+//nolint:cyclop,funlen,gocognit,wsl // row placement keeps main- and cross-axis phases together
 func (e *engine) buildRowItems(
 	parent *box, style ResolvedStyle, items []flexMeas, widths []float64,
 	contentW, topY, curY, startX, justifyGap, targetCross float64,
@@ -1250,7 +1267,11 @@ func (e *engine) buildRowItems(
 	autoMainMargins := flexRowAutoMarginCount(items, e)
 	autoMainUnit := 0.0
 	if autoMainMargins > 0 {
-		free := contentW - flexWidthSum(widths) - justifyGap*float64(len(items)-1)
+		fixedMargins := 0.0
+		for _, item := range items {
+			fixedMargins += flexRowNormalMargins(e, item)
+		}
+		free := contentW - flexWidthSum(widths) - fixedMargins - justifyGap*float64(len(items)-1)
 		if free > 0 {
 			autoMainUnit = free / float64(autoMainMargins)
 		}
@@ -1267,6 +1288,8 @@ func (e *engine) buildRowItems(
 		cstate := e.stylePtr(item.n)
 		if cstate.MarginLeftAuto {
 			leftX += autoMainUnit
+		} else {
+			leftX += e.scalePt(cstate.MarginLeft)
 		}
 
 		itemY := topY + curY
@@ -1283,6 +1306,8 @@ func (e *engine) buildRowItems(
 			leftX += widths[idx]
 			if cstate.MarginRightAuto {
 				leftX += autoMainUnit
+			} else {
+				leftX += e.scalePt(cstate.MarginRight)
 			}
 			if idx < len(items)-1 {
 				leftX += justifyGap
@@ -1310,6 +1335,8 @@ func (e *engine) buildRowItems(
 		leftX += widths[idx]
 		if cstate.MarginRightAuto {
 			leftX += autoMainUnit
+		} else {
+			leftX += e.scalePt(cstate.MarginRight)
 		}
 		if idx < len(items)-1 {
 			leftX += justifyGap
@@ -1548,8 +1575,8 @@ func (e *engine) flowFlexColumn(
 	}
 
 	sumH := 0.0
-	for _, h := range heights {
-		sumH += h
+	for idx, h := range heights {
+		sumH += h + flexColumnMainMargins(e, items[idx])
 	}
 
 	startY, justifyGap := justifyColumnStart(flexMainJustify(style), contentH, curY, sumH+gaps, sumH, gap, len(items))
@@ -1618,11 +1645,13 @@ func (e *engine) flexColumnHeights(items []flexColMeas, contentH, gap float64) [
 
 	var fixed, growSum, shrinkSum float64
 
-	for i, it := range items {
-		heights[i] = it.baseH
-		fixed += it.baseH
-		growSum += it.grow
-		shrinkSum += it.shrink * it.baseH
+	for i, item := range items {
+		heights[i] = item.baseH
+		// Main-axis margins remain outside flex bases during negative free-space
+		// distribution; placement and auto-height still consume them.
+		fixed += item.baseH
+		growSum += item.grow
+		shrinkSum += item.shrink * item.baseH
 	}
 
 	if contentH < 0 {
@@ -1705,7 +1734,7 @@ func justifyColumnStart(justify string, contentH, curY, totalH, sumH, gap float6
 	return curY, gap
 }
 
-//nolint:cyclop,funlen,wsl // column placement keeps CSS auto-margin and alignment phases together
+//nolint:cyclop,funlen,gocognit,wsl // column placement keeps CSS auto-margin and alignment phases together
 func (e *engine) buildColumnItems(
 	parent *box, style ResolvedStyle, items []flexColMeas, heights []float64,
 	contentW, contentX, topY, curY, startY, justifyGap, contentH float64,
@@ -1735,6 +1764,9 @@ func (e *engine) buildColumnItems(
 		for _, height := range heights {
 			used += height
 		}
+		for _, item := range items {
+			used += flexColumnMainMargins(e, item)
+		}
 		used += justifyGap * float64(len(items)-1)
 		if free := contentH - used; free > 0 {
 			autoUnit = free / float64(autoMargins)
@@ -1745,6 +1777,8 @@ func (e *engine) buildColumnItems(
 		cstate := e.stylePtr(item.n)
 		if cstate.MarginTopAuto {
 			leftY += autoUnit
+		} else {
+			leftY += e.scalePt(cstate.MarginTop)
 		}
 		// Force border-box height so grow/shrink targets stick through build.
 		override := e.flexColumnItemOverride(item.n, *cstate, style, heights[idx], contentW)
@@ -1754,6 +1788,8 @@ func (e *engine) buildColumnItems(
 			leftY += heights[idx]
 			if cstate.MarginBottomAuto {
 				leftY += autoUnit
+			} else {
+				leftY += e.scalePt(cstate.MarginBottom)
 			}
 			if idx < len(items)-1 {
 				leftY += justifyGap
@@ -1777,6 +1813,8 @@ func (e *engine) buildColumnItems(
 		leftY += heights[idx]
 		if cstate.MarginBottomAuto {
 			leftY += autoUnit
+		} else {
+			leftY += e.scalePt(cstate.MarginBottom)
 		}
 		endY = leftY
 

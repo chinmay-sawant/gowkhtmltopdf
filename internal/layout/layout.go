@@ -605,6 +605,7 @@ type engine struct {
 	// absCBHeights carries the containing-block height to deferred absolute
 	// children after their in-flow parent has finished determining its size.
 	absCBHeights map[*html.Node]float64
+	flowCBHeight *float64 // nil means the in-flow containing-block height is indefinite
 	// inlineItemPool recycles temporary inline-item backing arrays. The pool is
 	// engine-local because layout is single-threaded and nested inline layout
 	// must retain each active caller's slice.
@@ -1707,7 +1708,7 @@ func useBlockForTableDisplay(node *html.Node) bool {
 
 // buildBlock lays out a block-level box.
 //
-//nolint:cyclop // block layout owns ordered CSS flow phases
+//nolint:cyclop,wsl // block layout owns ordered CSS flow phases
 func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, posY float64) *box {
 	boxNode := &box{ //nolint:exhaustruct // intentional zero fields
 		node: node, style: e.stylePtr(node), kind: boxKindBlock, x: posX, y: posY,
@@ -1734,7 +1735,9 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 		curY = applyCheckboxAutoSize(e, style, boxNode, curY)
 	}
 
+	previousCB, _ := e.setFlowCB(style)
 	curY = e.flowChildren(boxNode, children, style, contentW, contentX, posY, curY)
+	e.flowCBHeight = previousCB
 	if widget && style.Height < 0 {
 		// Native value controls use their intrinsic font-sized control height
 		// when auto-sized. Treating them as ordinary text blocks adds the
@@ -1766,7 +1769,9 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 	// bottom border / letterhead rules - fixture-07/16). The shared resolver
 	// adds them once for every formatting context and then applies
 	// height/min-height/max-height.
-	boxNode.height = e.resolveBorderBoxHeight(withAspectRatioHeight(style, contentW, e), curY)
+	resolvedHeightStyle := withAspectRatioHeight(style, contentW, e)
+	boxNode.height = e.applyHeightConstraintsWithCB(&resolvedHeightStyle,
+		e.borderBoxBottom(resolvedHeightStyle, curY), e.containingBlockHeight())
 	e.paintWidgetControl(node, style, boxNode, widget, chkWidget, posY)
 
 	e.paintPositionedPseudo(node, style, boxNode, pseudoBefore)
@@ -2127,18 +2132,12 @@ func (e *engine) borderBoxBottom(style ResolvedStyle, contentBottom float64) flo
 	return contentBottom
 }
 
-// resolveBorderBoxHeight is the used border-box height resolver: bottom
-// chrome, then height/min-height/max-height. A definite height floors the
-// content height instead of capping it, so CSS overflow keeps taller content
-// visible.
-func (e *engine) resolveBorderBoxHeight(style ResolvedStyle, contentBottom float64) float64 {
-	return e.applyHeightConstraints(style, e.borderBoxBottom(style, contentBottom))
-}
-
 // applyHeightConstraintsWithCB is the definite-CB form for min/max percent.
 func (e *engine) applyHeightConstraintsWithCB(style *ResolvedStyle, curY float64, cbH float64) float64 {
 	if h, ok := resolveUsedHeight(style, cbH, e); ok {
-		if curY < h {
+		if style.HeightPercent >= 0 {
+			curY = h
+		} else if curY < h {
 			curY = h
 		}
 	}
