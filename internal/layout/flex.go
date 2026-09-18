@@ -1084,6 +1084,16 @@ func (e *engine) forceFlexItemCrossSize(style ResolvedStyle, forceH float64) Res
 // resolved a second time against its already-assigned flex width (46% of 46%
 // in fixture-56's gauge row).
 func (e *engine) forceFlexItemMainSize(style ResolvedStyle, forceW float64) ResolvedStyle {
+	return e.forceFlexItemWidth(style, forceW, true)
+}
+
+// forceFlexItemCrossWidth preserves a column flex item's used cross size
+// through the child build without changing its main-axis flex basis.
+func (e *engine) forceFlexItemCrossWidth(style ResolvedStyle, forceW float64) ResolvedStyle {
+	return e.forceFlexItemWidth(style, forceW, false)
+}
+
+func (e *engine) forceFlexItemWidth(style ResolvedStyle, forceW float64, clearFlexBasis bool) ResolvedStyle {
 	if e.scale <= 0 {
 		return style
 	}
@@ -1101,8 +1111,10 @@ func (e *engine) forceFlexItemMainSize(style ResolvedStyle, forceW float64) Reso
 	}
 
 	style.WidthPercent = -1
-	style.FlexBasis = -1
-	style.FlexBasisPercent = -1
+	if clearFlexBasis {
+		style.FlexBasis = -1
+		style.FlexBasisPercent = -1
+	}
 
 	return style
 }
@@ -1550,7 +1562,7 @@ func (e *engine) buildColumnItems(
 			leftY += autoUnit
 		}
 		// Force border-box height so grow/shrink targets stick through build.
-		override := e.forceFlexItemCrossSize(*cstate, heights[idx])
+		override := e.flexColumnItemOverride(item.n, *cstate, style, heights[idx], contentW)
 		cblock := e.buildWithStyle(item.n, &override, contentW, contentX, topY+leftY)
 
 		if cblock == nil {
@@ -1592,6 +1604,22 @@ func (e *engine) buildColumnItems(
 	return endY
 }
 
+func (e *engine) flexColumnItemOverride(
+	node *html.Node, itemStyle, containerStyle ResolvedStyle, height, contentW float64,
+) ResolvedStyle {
+	override := e.forceFlexItemCrossSize(itemStyle, height)
+	if flexItemColumnCrossStretch(containerStyle, itemStyle) || itemStyle.Width >= 0 || itemStyle.WidthPercent >= 0 {
+		return override
+	}
+
+	crossW := e.measureFlexItemMaxContent(node, itemStyle)
+	if crossW > contentW {
+		crossW = contentW
+	}
+
+	return e.forceFlexItemCrossWidth(override, crossW)
+}
+
 func (e *engine) alignColumnItem(cblock *box, st ResolvedStyle, cs ResolvedStyle, contentX, contentW float64) {
 	align := st.AlignItems
 	if cs.AlignSelf != "" && cs.AlignSelf != fxAuto {
@@ -1612,6 +1640,27 @@ func (e *engine) alignColumnItem(cblock *box, st ResolvedStyle, cs ResolvedStyle
 			cblock.x += adx
 		}
 	}
+}
+
+// flexItemColumnCrossStretch reports whether an auto-width column item uses
+// the container's cross size. Non-stretch alignment uses the item's intrinsic
+// width instead, so alignColumnItem can place it at start, center, or end.
+func flexItemColumnCrossStretch(cstate, cstate2 ResolvedStyle) bool {
+	align := cstate.AlignItems
+	if align == "" {
+		align = fxStretch
+	}
+
+	if cstate2.AlignSelf != "" && cstate2.AlignSelf != fxAuto {
+		align = cstate2.AlignSelf
+	}
+
+	switch align {
+	case fxFlexStart, fxStart, fxFlexEnd, fxEnd, fxCenter:
+		return false
+	}
+
+	return cstate2.Width < 0 && cstate2.WidthPercent < 0
 }
 
 // applyRelativeOffset shifts a position:relative box and its ops by top/left
