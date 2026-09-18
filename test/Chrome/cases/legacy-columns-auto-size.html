@@ -1,11 +1,42 @@
 <!doctype html>
-<meta charset="utf-8">
-<title>Intrinsic column sizing</title>
-<style>
-html, body { margin: 0; padding: 0; font: 12px sans-serif; }
-.case { display: flex; flex-direction: column; width: 240px; height: 120px; border: 1px solid #222; } .item { min-height: 20px; padding: 4px; }
-</style>
-<!-- Source: third_party/blink/web_tests/css3/flexbox/columns-auto-size.html -->
-<!-- Port status: scaffold. The next phase replaces this minimal case with a verified Go fixture. -->
-<!-- Expected: Automatic column sizes include content, margins, padding, and min or max constraints. -->
-<div class="case"><div class="item" style="background:#9ec5fe">Test Header</div><div class="item" style="background:#b7e4c7">Test Subheader</div></div>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Intrinsic column sizing</title>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .case { display: flex; flex-direction: column; width: 240pt; }
+    .content-item { flex: 0 0 10pt; background: #dbeafe; outline: 1px solid #2563eb; }
+    .margin-item { flex: 0 0 auto; background: #fef3c7; outline: 1px solid #d97706; }
+    .max-case { height: 17pt; }
+    .max-item { flex: 1 1 10pt; min-height: 0; background: #dcfce7; outline: 1px solid #16a34a; }
+    .padding-case { height: 33pt; padding: 1pt 0; box-sizing: border-box; }
+    .padding-item { flex: 1 1 20pt; min-height: 0; background: #fce7f3; outline: 1px solid #db2777; }
+    .pdf-label { position: absolute; top: 360pt; left: 12pt; color: #111827; font-size: 10pt; }
+  </style>
+</head>
+<body>
+  <!-- Source: third_party/blink/web_tests/css3/flexbox/columns-auto-size.html -->
+  <!-- Port status: blocked. Content sizing passes, but margin and constrained-shrink branches expose engine gaps. -->
+  <!-- Expected: column height includes normal margins, and min/max constraints redistribute shrink. -->
+  <div class="case" id="column-content">
+    <div class="content-item" id="content-first"></div>
+    <div class="content-item" id="content-second"></div>
+    <div class="content-item" id="content-third"></div>
+  </div>
+  <div class="case" id="column-margins">
+    <div class="margin-item" id="margins-first" style="height:10pt;margin-top:10pt"></div>
+    <div class="margin-item" id="margins-second" style="height:20pt"></div>
+    <div class="margin-item" id="margins-third" style="height:20pt;margin-top:10pt"></div>
+  </div>
+  <div class="case max-case" id="column-max-constraints">
+    <div class="max-item" id="max-first"></div>
+    <div class="max-item" id="max-second"></div>
+  </div>
+  <div class="case padding-case" id="column-padding-constraints">
+    <div class="padding-item" id="padding-first"></div>
+    <div class="padding-item" id="padding-second"></div>
+  </div>
+  <div class="pdf-label">Column sizing: content, margins, and constraints</div>
+</body>
+</html>

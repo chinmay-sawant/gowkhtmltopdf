@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the Chromium Flexbox porting inventory and HTML scaffolds."""
+"""Generate the Chromium Flexbox inventory and untouched scaffolds."""
 
 from __future__ import annotations
 
@@ -540,13 +540,26 @@ html, body {{ margin: 0; padding: 0; font: 12px sans-serif; }}
 {body}
 """
 
+
+def read_existing_statuses():
+    manifest_path = OUT / "manifest.json"
+    if not manifest_path.exists():
+        return {}
+
+    existing = json.loads(manifest_path.read_text(encoding="utf-8"))
+    return {
+        case["id"]: case.get("status", "scaffold")
+        for case in existing.get("cases", [])
+    }
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "cases").mkdir(parents=True, exist_ok=True)
     fields = ("id", "title", "source", "combination", "category", "goTarget", "expected", "kind")
+    existing_statuses = read_existing_statuses()
     manifest = {
         "schema": 1,
-        "purpose": "Chromium Flexbox behavior map and Go porting scaffolds",
+        "purpose": "Chromium Flexbox behavior map and Go porting cases",
         "source_root": "chromium/",
         "caseCount": len(CASES),
         "cases": [],
@@ -555,9 +568,11 @@ def main():
         case = dict(zip(fields, row, strict=True))
         entry = dict(case)
         entry["fixture"] = f"cases/{case['id']}.html"
-        entry["status"] = "scaffold"
+        entry["status"] = existing_statuses.get(case["id"], "scaffold")
         manifest["cases"].append(entry)
-        (OUT / entry["fixture"]).write_text(make_fixture(case), encoding="utf-8")
+        fixture_path = OUT / entry["fixture"]
+        if entry["status"] == "scaffold" or not fixture_path.exists():
+            fixture_path.write_text(make_fixture(case), encoding="utf-8")
     (OUT / "manifest.json").write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",

@@ -5,7 +5,7 @@
 > **Estimated effort:** S defer (19 properties)
 > **Owner:** catalog
 > **Depends on:** none
-> **Unblocks:** honest fixture-65 Effect cells
+> **Unblocks:** honest fixture-66 Effect cells
 > **Mid-batch gate:** package tests only. No `make lint`. No `make test`.
 
 ---

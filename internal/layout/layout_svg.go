@@ -87,7 +87,18 @@ func (e *engine) usedInlineSVGSize(node *html.Node, sty ResolvedStyle, ref *imag
 		hAttr = e.scalePt(pxToPt(28))
 	}
 
-	return imageUsedSize{w: wAttr, h: hAttr}
+	// Max constraints clamp the used size exactly like usedImageSize does for
+	// <img>: a one-dimensional constraint scales the other axis by the used
+	// ratio, so max-height 100pt on a 200x200 svg yields 100x100.
+	size := imageUsedSize{w: wAttr, h: hAttr}
+	cssW := sty.Width >= 0
+	if sty.WidthPercent >= 0 && e.imageContainingWidth() > 0 {
+		cssW = true
+	}
+	size = clampImageWidth(size, e.imageMaxWidth(sty, cssW))
+	size = clampImageHeight(e, size, sty)
+
+	return size
 }
 
 func parseSVGLengthPx(raw string) float64 {

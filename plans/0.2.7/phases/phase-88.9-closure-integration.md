@@ -13,7 +13,7 @@
 ## Overview
 
 Close the next-100 program: recount catalog, sync matrix and docs, verify
-fixture-65, then run **full** integration gates.
+fixture-66, then run **full** integration gates.
 
 Mid-batch package tests already ran inside 88.1-88.8. Do **not** re-open those
 batches to run `make test`. Run them here once.
@@ -43,16 +43,16 @@ Never run bare `go test ./...` (uncapped concurrency). Use Makefile targets.
 ### 88.9.2 docs and fixture
 
 - [ ] 88.9.2.1 `documentation/compatibility-matrix.md` updated for every promoted name (honest subset text).
-- [ ] 88.9.2.2 Fixture-65 still converts; Effect cells for Implemented names show a visible change in the **gowk PDF** (Chrome optional and only for `Chrome yes` rows).
-- [ ] 88.9.2.3 If fixture-65 exists, regenerate:
+- [ ] 88.9.2.2 Fixture-66 still converts; Effect cells for Implemented names show a visible change in the **gowk PDF** (Chrome optional and only for `Chrome yes` rows).
+- [ ] 88.9.2.3 If fixture-66 exists, regenerate:
   ```bash
   make build
   ./bin/gowkhtmltopdf --allow-local-files \
     --font-path testdata/fonts/implemented-audit \
-    -o output/fixture-65-next-100-props.pdf \
-    testdata/golden/fixture-65-next-100-props.html
+    -o output/fixture-66-next-100-props.pdf \
+    testdata/golden/fixture-66-next-100-props.html
   ```
-- [ ] 88.9.2.4 If page count moved, update `fixturePageBounds` for `fixture-65-next-100-props.html` in `internal/convert/golden_test.go`.
+- [ ] 88.9.2.4 If page count moved, update `fixturePageBounds` for `fixture-66-next-100-props.html` in `internal/convert/golden_test.go`.
 
 ### 88.9.3 full gates (this batch only)
 

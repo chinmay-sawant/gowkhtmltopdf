@@ -616,6 +616,7 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 	pageOps := pageIndexedOps(res, contentH)
 
 	stickyTargets := stickySectionChromeTargets(res.root)
+	flexItems := flexItemBoxes(res.root)
 
 	for page := range pageOps {
 		pageTop := float64(page) * contentH
@@ -627,7 +628,7 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 		}
 
 		if stripOrphanRows(res, pageOps[page], pageTop, pageBot, lastInkBot) {
-			tightenLastRowChrome(res, pageOps[page], pageTop, pageBot, lastInkBot)
+			tightenLastRowChrome(res, pageOps[page], pageTop, pageBot, lastInkBot, flexItems)
 		}
 		// Pull section washes / borders up to the last row chrome / ink so grey
 		// does not pad an empty band to the page bottom (fixture-31 page 1).
@@ -775,7 +776,12 @@ func stripOrphanRowOp(paintOp *Op, lastInkBot float64) bool {
 
 // tightenLastRowChrome shortens the last row's fill so padding under the
 // final baseline does not read as another empty row (fixture-31 Row 27 cell).
-func tightenLastRowChrome(res *Result, idxs []int, pageTop, pageBot, lastInkBot float64) {
+// Flex items are exempt: their used size was resolved by the flex algorithm,
+// so their background is definite box paint, not row chrome. Tightening one
+// painted a 27.573pt fill for the 30pt Chrome Flex auto-margin item.
+func tightenLastRowChrome(
+	res *Result, idxs []int, pageTop, pageBot, lastInkBot float64, flexItems []*box,
+) {
 	const underPad = 8.0
 
 	for _, i := range idxs {
@@ -784,8 +790,58 @@ func tightenLastRowChrome(res *Result, idxs []int, pageTop, pageBot, lastInkBot 
 			continue
 		}
 
+		if opOwnedByFlexItem(paintOp, flexItems) {
+			continue
+		}
+
 		tightenLastRowOp(paintOp, lastInkBot, underPad)
 	}
+}
+
+// flexItemBoxes returns the boxes whose parent establishes a flex formatting
+// context: the flex items.
+func flexItemBoxes(root *box) []*box {
+	var items []*box
+
+	var walk func(boxNode, parent *box)
+	walk = func(boxNode, parent *box) {
+		if boxNode == nil {
+			return
+		}
+
+		if parent != nil && isFlexContainerBox(parent) {
+			items = append(items, boxNode)
+		}
+
+		for _, child := range boxNode.children {
+			walk(child, boxNode)
+		}
+	}
+	walk(root, nil)
+
+	return items
+}
+
+// isFlexContainerBox reports a box that establishes a flex formatting context.
+func isFlexContainerBox(boxNode *box) bool {
+	if boxNode == nil || boxNode.style == nil {
+		return false
+	}
+
+	return boxNode.style.Display == displayFlex || boxNode.style.Display == displayInlineFlex
+}
+
+// opOwnedByFlexItem reports an op that paints a flex item's own border-box
+// rect (a page fragment included), so the tighten pass leaves its authored
+// height alone.
+func opOwnedByFlexItem(paintOp *Op, flexItems []*box) bool {
+	for _, item := range flexItems {
+		if opOwnsBoxRect(paintOp, item, opOwnerChrome) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // tightenLastRowOp shortens the last row's fill and pulls the trailing rule

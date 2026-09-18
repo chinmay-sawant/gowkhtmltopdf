@@ -41,7 +41,7 @@ func readManifest(t *testing.T) caseManifest {
 	return manifest
 }
 
-func TestManifestHasFortyUniqueScaffolds(t *testing.T) {
+func TestManifestHasFortyUniqueCases(t *testing.T) {
 	t.Parallel()
 
 	manifest := readManifest(t)
@@ -59,9 +59,15 @@ func TestManifestHasFortyUniqueScaffolds(t *testing.T) {
 		"chrome-reference": true,
 		"golden-fixture":   true,
 	}
+	validStatuses := map[string]bool{
+		"scaffold":    true,
+		"completed":   true,
+		"blocked":     true,
+		"unsupported": true,
+	}
 
 	for _, item := range manifest.Cases {
-		assertManifestCase(t, item, ids, validTargets)
+		assertManifestCase(t, item, ids, validTargets, validStatuses)
 	}
 }
 
@@ -83,14 +89,24 @@ func TestManifestSourcesExistWhenChromiumCheckoutIsPresent(t *testing.T) {
 	}
 }
 
-func assertManifestCase(t *testing.T, item manifestCase, ids map[string]struct{}, validTargets map[string]bool) {
+func assertManifestCase(
+	t *testing.T,
+	item manifestCase,
+	ids map[string]struct{},
+	validTargets, validStatuses map[string]bool,
+) {
 	t.Helper()
 
-	assertManifestMetadata(t, item, ids, validTargets)
+	assertManifestMetadata(t, item, ids, validTargets, validStatuses)
 	assertFixture(t, item)
 }
 
-func assertManifestMetadata(t *testing.T, item manifestCase, ids map[string]struct{}, validTargets map[string]bool) {
+func assertManifestMetadata(
+	t *testing.T,
+	item manifestCase,
+	ids map[string]struct{},
+	validTargets, validStatuses map[string]bool,
+) {
 	t.Helper()
 
 	if item.ID == "" {
@@ -107,8 +123,8 @@ func assertManifestMetadata(t *testing.T, item manifestCase, ids map[string]stru
 		t.Errorf("case %q has unknown Go target %q", item.ID, item.GoTarget)
 	}
 
-	if item.Status != "scaffold" {
-		t.Errorf("case %q status = %q, want scaffold", item.ID, item.Status)
+	if !validStatuses[item.Status] {
+		t.Errorf("case %q has unknown status %q", item.ID, item.Status)
 	}
 
 	if item.Source == "" || item.Combination == "" || item.Expected == "" {
@@ -137,7 +153,7 @@ func assertFixture(t *testing.T, item manifestCase) {
 		t.Errorf("case %q fixture does not start with a doctype", item.ID)
 	}
 
-	if !strings.Contains(fixtureText, "Port status: scaffold") {
-		t.Errorf("case %q fixture lacks scaffold marker", item.ID)
+	if !strings.Contains(fixtureText, "Port status: "+item.Status) {
+		t.Errorf("case %q fixture lacks %q marker", item.ID, "Port status: "+item.Status)
 	}
 }

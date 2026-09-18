@@ -698,14 +698,14 @@ func (e *engine) roundedAccentBorderOps(
 
 // finalizeChrome merges deferred background/border ops into e.ops in one
 // linear pass and reindexes box op ranges. Paint order for multiple entries
-// at the same index matches immediate-splice nesting: later (outer) entries
-// paint first.
+// at the same index follows document order (ancestors before descendants,
+// earlier siblings before later ones).
 func (e *engine) finalizeChrome(root *box) {
 	if len(e.deferredChrome) > 0 {
 		entries := e.deferredChrome
 		e.deferredChrome = nil
 
-		out, oldToNew, ownerChrome := mergeDeferredChrome(e.ops, entries)
+		out, oldToNew, ownerChrome := mergeDeferredChrome(e.ops, entries, boxPreorder(root))
 
 		e.ops = out
 
@@ -727,15 +727,17 @@ func (e *engine) finalizeChrome(root *box) {
 type chromeSpan struct{ start, end int }
 
 // mergeDeferredChrome splices deferred background/border ops into oldOps in
-// one linear pass. Paint order for multiple entries at the same index matches
-// immediate-splice nesting: later (outer) entries paint first. The merged
-// sequence is built backwards so spare capacity in oldOps is reused in place
-// when it fits; otherwise one exact-sized list is allocated.
+// one linear pass. Paint order for multiple entries at the same index follows
+// document order (ancestors before descendants, earlier siblings before later
+// ones) so sibling op ranges stay disjoint. The merged sequence is built
+// backwards so spare capacity in oldOps is reused in place when it fits;
+// otherwise one exact-sized list is allocated.
 func mergeDeferredChrome(
-	oldOps []Op, entries []chromeEntry,
+	oldOps []Op, entries []chromeEntry, paintOrder map[*box]int,
 ) ([]Op, []int, map[*box]chromeSpan) {
-	// Sort by insert index ascending; same index → reverse registration order
-	// (parent registered after child, paints under content first).
+	// Sort by insert index ascending; within one index, document order keeps
+	// an outer box under its descendants without letting a later sibling's
+	// chrome splice ahead of an earlier sibling's.
 	type indexed struct {
 		ord int
 		ent chromeEntry
@@ -750,7 +752,15 @@ func mergeDeferredChrome(
 		if order[i].ent.at != order[j].ent.at {
 			return order[i].ent.at < order[j].ent.at
 		}
-		// Higher ord (later register) first within the same at.
+
+		ri, iRanked := paintOrder[order[i].ent.b]
+		rj, jRanked := paintOrder[order[j].ent.b]
+
+		if iRanked && jRanked && ri != rj {
+			return ri < rj
+		}
+		// Same box (or a box outside the tree): later register paints first,
+		// which keeps an outer entry under its inner entries.
 		return order[i].ord > order[j].ord
 	})
 
@@ -817,6 +827,38 @@ func mergeDeferredChrome(
 	}
 
 	return out, oldToNew, ownerChrome
+}
+
+// boxPreorder ranks every box in document (preorder) order so deferred chrome
+// entries that share an insertion index splice in document order: ancestors
+// before descendants, earlier siblings before later ones. Registration order
+// alone reverses unrelated siblings at a shared index, which let a later
+// section's chrome splice ahead of an earlier section's subtree and left the
+// earlier section's op range covering the later chrome (Chrome Flex sections
+// 11-13: the later overflow clips then deactivated the earlier fills).
+func boxPreorder(root *box) map[*box]int {
+	ranks := make(map[*box]int)
+
+	rank := 0
+
+	var walk func(b *box)
+
+	walk = func(b *box) {
+		if b == nil {
+			return
+		}
+
+		ranks[b] = rank
+		rank++
+
+		for _, child := range b.children {
+			walk(child)
+		}
+	}
+
+	walk(root)
+
+	return ranks
 }
 
 // recordOwnerChrome widens the chrome op span recorded for a box so a later

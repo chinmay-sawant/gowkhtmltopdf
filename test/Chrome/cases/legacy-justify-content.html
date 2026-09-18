@@ -1,11 +1,24 @@
 <!doctype html>
-<meta charset="utf-8">
-<title>Main-axis distribution</title>
-<style>
-html, body { margin: 0; padding: 0; font: 12px sans-serif; }
-.case { display: flex; width: 300px; height: 80px; justify-content: center; border: 1px solid #222; } .item { width: 40px; height: 30px; }
-</style>
-<!-- Source: third_party/blink/web_tests/css3/flexbox/flex-justify-content.html -->
-<!-- Port status: scaffold. The next phase replaces this minimal case with a verified Go fixture. -->
-<!-- Expected: Flex-end, center, and space distribution place fixed children at the expected main-axis offsets. -->
-<div class="case"><div class="item" style="background:#9ec5fe">A</div><div class="item" style="background:#b7e4c7">B</div></div>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Main-axis distribution</title>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .case { display: flex; width: 600pt; height: 20pt; }
+    .item { flex: 0 0 100pt; height: 20pt; }
+    .center { justify-content: center; }
+    .end { justify-content: flex-end; }
+    .between { justify-content: space-between; }
+  </style>
+</head>
+<body>
+  <!-- Source: third_party/blink/web_tests/css3/flexbox/flex-justify-content.html -->
+  <!-- Port status: completed. Reviewed static input with passing main-axis geometry. -->
+  <!-- Expected: fixed children occupy start, center, end, and evenly distributed positions. -->
+  <div class="case start" id="justify-start"><div class="item">A</div><div class="item">B</div><div class="item">C</div></div>
+  <div class="case center" id="justify-center"><div class="item">A</div><div class="item">B</div><div class="item">C</div></div>
+  <div class="case end" id="justify-end"><div class="item">A</div><div class="item">B</div><div class="item">C</div></div>
+  <div class="case between" id="justify-between"><div class="item">A</div><div class="item">B</div><div class="item">C</div></div>
+</body>
+</html>

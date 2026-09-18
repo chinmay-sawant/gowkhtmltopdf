@@ -119,3 +119,209 @@ func TestChromeFlexFractionalGrowFactorsLeaveUnusedSpace(t *testing.T) {
 
 	assertFlexChromeWidths(t, flexChromeItemWidths(t, res, 2), []float64{50, 25})
 }
+
+// TestChromeFlexPercentageBasisIndefiniteColumn covers case
+// wpt-flex-basis-011 (layout-unit), source
+// third_party/blink/web_tests/external/wpt/css/css-flexbox/flex-basis-011.html.
+// Expected: a 100% flex-basis in an indefinite nested column stays
+// content-sized instead of becoming a definite full height. Each item holds one
+// 10pt text line on a 20pt line box plus 1pt borders, so its used height is
+// 22pt and the column sums the two content heights to 44pt. The outer
+// container's auto height must not feed the percentage.
+func TestChromeFlexPercentageBasisIndefiniteColumn(t *testing.T) {
+	t.Parallel()
+
+	// The engine stretches the nested column to the outer line's cross size and
+	// resolves the 100% basis against that stretched, definite height.
+	t.Skip("blocked: stretched line cross makes the nested column definite for % basis (flex.go:1277)")
+
+	cssSheet := sheet(t, `
+body { margin: 0 }
+.flexbox { display: flex }
+.column { flex-direction: column }
+.item { flex: 1 0 100%; border: 1pt solid blue; font-size: 10pt; line-height: 20pt }
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="flexbox">
+  <div class="flexbox column">
+    <div class="item item-a"><div>AAA</div></div>
+    <div class="item item-b"><div>BBB</div></div>
+  </div>
+</div>
+</body></html>`, cssSheet)
+
+	column := findBoxByClass(t, res, "column")
+	itemA := findBoxByClass(t, res, "item-a")
+	itemB := findBoxByClass(t, res, "item-b")
+
+	const itemHeight = 22.0 // 20pt line + 1pt border top + 1pt border bottom
+
+	if !near(itemA.height, itemHeight) || !near(itemB.height, itemHeight) {
+		t.Fatalf("item heights = %.2f/%.2f, want %.2f each (content-sized, not the indefinite parent height)",
+			itemA.height, itemB.height, itemHeight)
+	}
+
+	if !near(column.height, 2*itemHeight) {
+		t.Fatalf("column height = %.2f, want %.2f", column.height, 2*itemHeight)
+	}
+
+	if !near(itemA.y, column.y) || !near(itemB.y, itemA.y+itemHeight) {
+		t.Fatalf("item y positions = %.2f/%.2f, want %.2f/%.2f",
+			itemA.y, itemB.y, column.y, column.y+itemHeight)
+	}
+}
+
+// TestChromeFlexFactorLessThanOneRowAndColumn covers case
+// wpt-flex-factor-less-than-one (layout-unit), source
+// third_party/blink/web_tests/external/wpt/css/css-flexbox/flex-factor-less-than-one.html.
+// Expected: fractional grow and shrink factors distribute space proportionally
+// in both axes. Grow factors .5 and .25 sum below one, so the space they may
+// consume is first multiplied by that sum: 40pt of free space over 30pt bases
+// gives 50/40, and a 100pt column over zero bases gives 50/25. Shrink factors
+// .5 and .25 over two 200pt bases in a 100pt container leave 50/125 because
+// the deficit is multiplied by the .75 factor sum before the scaled shrink
+// split. TestChromeFlexFractionalGrowFactorsLeaveUnusedSpace already covers
+// row grow with zero bases, so this test adds the basis-bearing row case plus
+// the column and shrink axes.
+//
+//nolint:funlen // four fractional-factor axes share one fixture family
+func TestChromeFlexFactorLessThanOneRowAndColumn(t *testing.T) {
+	t.Parallel()
+
+	t.Run("row-grow-with-basis", func(t *testing.T) {
+		t.Parallel()
+
+		cssSheet := sheet(t, `
+body { margin: 0 }
+.case { display: flex; width: 100pt; height: 20pt }
+.item { flex-basis: 30pt; min-width: 0; height: 20pt }
+.half { flex-grow: .5 }
+.quarter { flex-grow: .25 }
+`)
+		res := layoutHTML(t, `<html><body>
+<div class="case"><div class="item half"></div><div class="item quarter"></div></div>
+</body></html>`, cssSheet)
+
+		assertFlexChromeWidths(t, flexChromeItemWidths(t, res, 2), []float64{50, 40})
+	})
+
+	t.Run("column-grow", func(t *testing.T) {
+		t.Parallel()
+
+		t.Skip("blocked: flexGrowHeights ignores grow sums below one (flex.go:1649)")
+
+		cssSheet := sheet(t, `
+body { margin: 0 }
+.case { display: flex; flex-direction: column; width: 20pt; height: 100pt }
+.item { flex-basis: 0; min-height: 0 }
+.half { flex-grow: .5 }
+.quarter { flex-grow: .25 }
+`)
+		res := layoutHTML(t, `<html><body>
+<div class="case"><div class="item half"></div><div class="item quarter"></div></div>
+</body></html>`, cssSheet)
+
+		container := findBoxByClass(t, res, "case")
+		items := classBoxes(res.root, "item")
+
+		if len(items) != 2 {
+			t.Fatalf("column item boxes = %d, want 2", len(items))
+		}
+
+		if !near(items[0].height, 50) || !near(items[1].height, 25) {
+			t.Fatalf("column grow heights = %.2f/%.2f, want 50/25", items[0].height, items[1].height)
+		}
+
+		if !near(items[0].y, container.y) || !near(items[1].y, container.y+50) {
+			t.Fatalf("column grow y = %.2f/%.2f, want %.2f/%.2f",
+				items[0].y, items[1].y, container.y, container.y+50)
+		}
+	})
+
+	t.Run("row-shrink", func(t *testing.T) {
+		t.Parallel()
+
+		t.Skip("blocked: flexShrinkWidths ignores shrink factor sums below one (flex.go:1070)")
+
+		cssSheet := sheet(t, `
+body { margin: 0 }
+.case { display: flex; width: 100pt; height: 20pt }
+.item { width: 200pt; min-width: 0; height: 20pt }
+.half { flex-shrink: .5 }
+.quarter { flex-shrink: .25 }
+`)
+		res := layoutHTML(t, `<html><body>
+<div class="case"><div class="item half"></div><div class="item quarter"></div></div>
+</body></html>`, cssSheet)
+
+		assertFlexChromeWidths(t, flexChromeItemWidths(t, res, 2), []float64{50, 125})
+	})
+
+	t.Run("column-shrink", func(t *testing.T) {
+		t.Parallel()
+
+		t.Skip("blocked: flexShrinkHeights ignores shrink factor sums below one (flex.go:1657)")
+
+		cssSheet := sheet(t, `
+body { margin: 0 }
+.case { display: flex; flex-direction: column; width: 20pt; height: 100pt }
+.item { height: 200pt; min-height: 0 }
+.half { flex-shrink: .5 }
+.quarter { flex-shrink: .25 }
+`)
+		res := layoutHTML(t, `<html><body>
+<div class="case"><div class="item half"></div><div class="item quarter"></div></div>
+</body></html>`, cssSheet)
+
+		items := classBoxes(res.root, "item")
+		if len(items) != 2 {
+			t.Fatalf("column item boxes = %d, want 2", len(items))
+		}
+
+		if !near(items[0].height, 50) || !near(items[1].height, 125) {
+			t.Fatalf("column shrink heights = %.2f/%.2f, want 50/125", items[0].height, items[1].height)
+		}
+	})
+}
+
+// TestChromeFlexBaseSizeIgnoresMaxWidth covers case
+// wpt-flex-base-size-max-width (layout-unit), source
+// third_party/blink/web_tests/external/wpt/css/css-flexbox/flex-base-size-ignores-max-width.html.
+// Expected: the flex base size uses the 300pt content before max-width clamps
+// the item, then the frozen item redistributes remaining space. Both bases are
+// 300pt in a 300pt container, so the first shrink pass gives each item 150pt;
+// the capped item clamps to its 100pt max-width, and the unfrozen item
+// re-shrinks from its 300pt base by the 100pt remaining deficit to 200pt. The
+// final 100pt green box is exactly half the 200pt blue box.
+func TestChromeFlexBaseSizeIgnoresMaxWidth(t *testing.T) {
+	t.Parallel()
+
+	// The frozen max-width item frees 50pt, but the engine only regrows by grow
+	// factors; with grow 0 it skips the shrink-mode redistribution to 200pt.
+	t.Skip("blocked: regrowFlexWidths skips shrink-mode redistribution when grow is zero (flex.go:839)")
+
+	cssSheet := sheet(t, `
+body { margin: 0 }
+.flex { display: flex; width: 300pt }
+.item { min-width: 0; height: 50pt }
+.capped { max-width: 100pt }
+.content { width: 300pt; height: 50pt }
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="flex">
+  <div class="item capped"><div class="content"></div></div>
+  <div class="item uncapped"><div class="content"></div></div>
+</div>
+</body></html>`, cssSheet)
+
+	assertFlexChromeWidths(t, flexChromeItemWidths(t, res, 2), []float64{100, 200})
+
+	flex := findBoxByClass(t, res, "flex")
+	capped := findBoxByClass(t, res, "capped")
+	uncapped := findBoxByClass(t, res, "uncapped")
+
+	if !near(capped.x, flex.x) || !near(uncapped.x, flex.x+100) {
+		t.Fatalf("item x positions = %.2f/%.2f, want %.2f/%.2f",
+			capped.x, uncapped.x, flex.x, flex.x+100)
+	}
+}

@@ -1,30 +1,21 @@
 <!doctype html>
-<meta charset="utf-8">
-<title>Column cross-axis centering</title>
-<style>
-    html,
-    body {
-        margin: 0;
-        padding: 0;
-        font: 12px sans-serif;
-    }
-
-    .case {
-        display: flex;
-        flex-direction: column;
-        width: 240px;
-        align-items: center;
-        border: 1px solid #222;
-    }
-
-    .item {
-        padding: 2px 4px;
-    }
-</style>
-<!-- Source: third_party/blink/web_tests/css3/flexbox/flex-align.html::adapted-column-centering -->
-<!-- Port status: scaffold. The next phase replaces this minimal case with a verified Go fixture. -->
-<!-- Expected: Auto-width children are centered on the cross axis of a column flex container. -->
-<div class="case">
-    <div class="item" style="background:#9ec5fe">Test Header</div>
-    <div class="item" style="background:#b7e4c7">Test Subheader</div>
-</div>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Column cross-axis centering</title>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .case { display: flex; flex-direction: column; align-items: center; width: 300pt; }
+    .item { height: 20pt; }
+  </style>
+</head>
+<body>
+  <!-- Source: third_party/blink/web_tests/css3/flexbox/flex-align.html::adapted-column-centering -->
+  <!-- Port status: completed. Reviewed static input with passing center geometry. -->
+  <!-- Expected: each auto-width child has the same center as the 300pt column. -->
+  <div class="case" id="case-7">
+    <div class="item" id="align-first">First item</div>
+    <div class="item" id="align-second">Second item</div>
+  </div>
+</body>
+</html>

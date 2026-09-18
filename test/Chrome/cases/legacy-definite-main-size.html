@@ -1,11 +1,27 @@
 <!doctype html>
-<meta charset="utf-8">
-<title>Definite main size and percentage children</title>
-<style>
-html, body { margin: 0; padding: 0; font: 12px sans-serif; }
-.case { display: flex; flex-direction: column; width: 240px; height: 120px; border: 1px solid #222; } .item { min-height: 20px; padding: 4px; }
-</style>
-<!-- Source: third_party/blink/web_tests/css3/flexbox/definite-main-size.html -->
-<!-- Port status: scaffold. The next phase replaces this minimal case with a verified Go fixture. -->
-<!-- Expected: A definite flex container size resolves a percentage child against the correct axis. -->
-<div class="case"><div class="item" style="background:#9ec5fe">Test Header</div><div class="item" style="background:#b7e4c7">Test Subheader</div></div>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Definite main size and percentage children</title>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .case { display: flex; flex-direction: column; width: 300pt; height: 300pt; }
+    .flex-one { flex: 1 1 0; min-height: 0; background: #dbeafe; outline: 1px solid #2563eb; }
+    .percentage-child { width: 100%; height: 50%; background: #dcfce7; outline: 1px solid #16a34a; }
+    .fixed { flex: 0 0 auto; width: 50pt; height: 50pt; background: #fef3c7; outline: 1px solid #d97706; }
+    .pdf-label { position: absolute; top: 360pt; left: 12pt; color: #111827; font-size: 10pt; }
+  </style>
+</head>
+<body>
+  <!-- Source: third_party/blink/web_tests/css3/flexbox/definite-main-size.html -->
+  <!-- Port status: blocked. Percentage descendants do not yet receive the flex item's definite used height. -->
+  <!-- Expected: 50% of the 250pt flexible item resolves to 125pt. -->
+  <div class="case" id="definite-column">
+    <div class="flex-one" id="flexible-column-item">
+      <div class="percentage-child" id="percentage-child"></div>
+    </div>
+    <div class="fixed" id="fixed-column-item"></div>
+  </div>
+  <div class="pdf-label">Definite column size and percentage child</div>
+</body>
+</html>

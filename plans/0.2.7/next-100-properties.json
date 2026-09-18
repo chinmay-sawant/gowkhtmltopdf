@@ -11,7 +11,7 @@
   "catalog_unsupported": 411,
   "next_72_file": "plans/0.2.7/next-72-properties.json",
   "next_72_overlap": 0,
-  "golden_fixture": "testdata/golden/fixture-65-next-100-props.html",
+  "golden_fixture": "testdata/golden/fixture-66-next-100-props.html",
   "needle": "NEXT-100-PROPS",
   "font_path": "testdata/fonts/implemented-audit",
   "font_family": "Liberation Sans",

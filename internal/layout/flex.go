@@ -1805,32 +1805,82 @@ func (e *engine) flexColumnItemOverride(
 	return e.forceFlexItemCrossWidth(override, crossW)
 }
 
-func (e *engine) alignColumnItem(cblock *box, st ResolvedStyle, cs ResolvedStyle, contentX, contentW float64) {
-	align := st.AlignItems
-	if cs.AlignSelf != "" && cs.AlignSelf != fxAuto {
-		align = cs.AlignSelf
+// alignColumnItem places a column item on the cross axis. Auto cross-axis
+// margins take the line's positive free space before alignment (CSS Flexbox
+// L1 8.1), and when they do, the alignment keywords no longer move the item.
+func (e *engine) alignColumnItem(
+	cblock *box, containerStyle, itemStyle ResolvedStyle, contentX, contentW float64,
+) {
+	if flexColumnCrossAutoMargin(itemStyle) {
+		if offset, absorbed := columnCrossAutoMarginOffset(itemStyle, contentW-cblock.w); absorbed {
+			if offset != 0 {
+				e.shiftBoxOps(cblock, offset, 0)
+				cblock.x += offset
+			}
+
+			return
+		}
 	}
 
+	align := containerStyle.AlignItems
+	if itemStyle.AlignSelf != "" && itemStyle.AlignSelf != fxAuto {
+		align = itemStyle.AlignSelf
+	}
+
+	if adx := columnAlignOffset(align, cblock, contentX, contentW); adx != 0 {
+		e.shiftBoxOps(cblock, adx, 0)
+		cblock.x += adx
+	}
+}
+
+// columnCrossAutoMarginOffset resolves the cross-axis offset a column item
+// takes from the line's positive free space. absorbed is false when free space
+// is not positive, so the caller still applies align-items / align-self.
+func columnCrossAutoMarginOffset(itemStyle ResolvedStyle, free float64) (float64, bool) {
+	if free <= 0 {
+		return 0, false
+	}
+
+	switch {
+	case itemStyle.MarginLeftAuto && itemStyle.MarginRightAuto:
+		return free / two, true
+	case itemStyle.MarginLeftAuto:
+		return free, true
+	}
+
+	// A right-only auto margin takes all the free space, so the border box
+	// stays at the line start.
+	return 0, true
+}
+
+// columnAlignOffset is the cross-axis shift for the alignment keyword.
+func columnAlignOffset(align string, cblock *box, contentX, contentW float64) float64 {
 	switch align {
 	case fxCenter:
-		adx := contentX + (contentW-cblock.w)/2 - cblock.x
-		if adx != 0 {
-			e.shiftBoxOps(cblock, adx, 0)
-			cblock.x += adx
-		}
+		return contentX + (contentW-cblock.w)/2 - cblock.x
 	case fxFlexEnd, fxEnd:
-		adx := contentX + contentW - cblock.w - cblock.x
-		if adx != 0 {
-			e.shiftBoxOps(cblock, adx, 0)
-			cblock.x += adx
-		}
+		return contentX + contentW - cblock.w - cblock.x
 	}
+
+	return 0
+}
+
+// flexColumnCrossAutoMargin reports whether a column item has an auto
+// cross-axis (horizontal) margin.
+func flexColumnCrossAutoMargin(style ResolvedStyle) bool {
+	return style.MarginLeftAuto || style.MarginRightAuto
 }
 
 // flexItemColumnCrossStretch reports whether an auto-width column item uses
 // the container's cross size. Non-stretch alignment uses the item's intrinsic
 // width instead, so alignColumnItem can place it at start, center, or end.
+// Auto cross-axis margins also suppress stretch (CSS Flexbox L1 8.5): the
+// item keeps its hypothetical cross size and the margins absorb the rest.
 func flexItemColumnCrossStretch(cstate, cstate2 ResolvedStyle) bool {
+	if flexColumnCrossAutoMargin(cstate2) {
+		return false
+	}
+
 	align := cstate.AlignItems
 	if align == "" {
 		align = fxStretch

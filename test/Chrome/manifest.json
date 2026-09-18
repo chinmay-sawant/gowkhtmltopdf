@@ -10,7 +10,7 @@
       "id": "legacy-flex-algorithm",
       "kind": "row",
       "source": "third_party/blink/web_tests/css3/flexbox/flex-algorithm.html",
-      "status": "scaffold",
+      "status": "completed",
       "title": "Flex sizing with positive and negative free space"
     },
     {
@@ -22,7 +22,7 @@
       "id": "legacy-flex-algorithm-minmax",
       "kind": "minmax",
       "source": "third_party/blink/web_tests/css3/flexbox/flex-algorithm-min-max.html",
-      "status": "scaffold",
+      "status": "completed",
       "title": "Flex sizing with min and max constraints"
     },
     {
@@ -34,7 +34,7 @@
       "id": "legacy-flex-algorithm-margins",
       "kind": "margins",
       "source": "third_party/blink/web_tests/css3/flexbox/flex-algorithm-with-margins.html",
-      "status": "scaffold",
+      "status": "completed",
       "title": "Flex sizing with fixed and auto margins"
     },
     {
@@ -46,7 +46,7 @@
       "id": "legacy-columns-auto-size",
       "kind": "column",
       "source": "third_party/blink/web_tests/css3/flexbox/columns-auto-size.html",
-      "status": "scaffold",
+      "status": "blocked",
       "title": "Intrinsic column sizing"
     },
     {
@@ -58,7 +58,7 @@
       "id": "legacy-definite-main-size",
       "kind": "column",
       "source": "third_party/blink/web_tests/css3/flexbox/definite-main-size.html",
-      "status": "scaffold",
+      "status": "blocked",
       "title": "Definite main size and percentage children"
     },
     {
@@ -70,7 +70,7 @@
       "id": "legacy-justify-content",
       "kind": "justify",
       "source": "third_party/blink/web_tests/css3/flexbox/flex-justify-content.html",
-      "status": "scaffold",
+      "status": "completed",
       "title": "Main-axis distribution"
     },
     {
@@ -82,7 +82,7 @@
       "id": "legacy-flex-align",
       "kind": "column-align",
       "source": "third_party/blink/web_tests/css3/flexbox/flex-align.html::adapted-column-centering",
-      "status": "scaffold",
+      "status": "completed",
       "title": "Column cross-axis centering"
     },
     {
@@ -94,7 +94,7 @@
       "id": "legacy-flex-align-vertical-writing",
       "kind": "writing",
       "source": "third_party/blink/web_tests/css3/flexbox/flex-align-vertical-writing-mode.html",
-      "status": "scaffold",
+      "status": "blocked",
       "title": "Alignment under vertical writing modes"
     },
     {
@@ -106,7 +106,7 @@
       "id": "legacy-flex-flow-orientations",
       "kind": "writing",
       "source": "third_party/blink/web_tests/css3/flexbox/flex-flow-orientations.html",
-      "status": "scaffold",
+      "status": "blocked",
       "title": "Direction and flow orientations"
     },
     {
@@ -118,7 +118,7 @@
       "id": "legacy-flex-flow",
       "kind": "writing",
       "source": "third_party/blink/web_tests/css3/flexbox/flex-flow.html",
-      "status": "scaffold",
+      "status": "blocked",
       "title": "Flow, direction, padding, and constraints"
     },
     {
@@ -482,7 +482,7 @@
       "title": "Flex container min-content contribution"
     }
   ],
-  "purpose": "Chromium Flexbox behavior map and Go porting scaffolds",
+  "purpose": "Chromium Flexbox behavior map and Go porting cases",
   "schema": 1,
   "source_root": "chromium/"
 }

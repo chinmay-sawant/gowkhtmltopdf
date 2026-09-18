@@ -10,7 +10,7 @@ the next-72 set. Same pattern as fixtures 60/61/62/64:
 - a visible Effect cell that applies that property
 
 This commit lands the authoring contract and the JSON. The HTML itself is
-`testdata/golden/fixture-65-next-100-props.html` and should be added with the
+`testdata/golden/fixture-66-next-100-props.html` and should be added with the
 first 88.x implementation batch (plus a `fixturePageBounds` row).
 
 ## Fonts (required)
@@ -31,7 +31,7 @@ first 88.x implementation batch (plus a `fixturePageBounds` row).
 ```html
 <!DOCTYPE html>
 <!--
-  fixture-65-next-100-props
+  fixture-66-next-100-props
   Proves: visual audit of the next 100 CSS properties targeted after next-72,
   each with description + effect demo. Fonts: Liberation via --font-path
   testdata/fonts/implemented-audit.
@@ -69,7 +69,7 @@ Do not copy any name from `next-72-properties.json`.
 
 ## Output path
 
-- `testdata/golden/fixture-65-next-100-props.html`
+- `testdata/golden/fixture-66-next-100-props.html`
 
 ## Implementation ledger
 

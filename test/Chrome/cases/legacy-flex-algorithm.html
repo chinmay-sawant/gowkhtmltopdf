@@ -1,11 +1,35 @@
 <!doctype html>
-<meta charset="utf-8">
-<title>Flex sizing with positive and negative free space</title>
-<style>
-html, body { margin: 0; padding: 0; font: 12px sans-serif; }
-.case { display: flex; width: 300px; height: 100px; border: 1px solid #222; } .item { box-sizing: border-box; min-width: 0; flex: 1 1 0; height: 40px; }
-</style>
-<!-- Source: third_party/blink/web_tests/css3/flexbox/flex-algorithm.html -->
-<!-- Port status: scaffold. The next phase replaces this minimal case with a verified Go fixture. -->
-<!-- Expected: A 600px row redistributes positive and negative free space using flex basis, grow, and shrink factors. -->
-<div class="case"><div class="item" style="background:#9ec5fe">A</div><div class="item" style="background:#b7e4c7">B</div><div class="item" style="background:#ffd6a5">C</div></div>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Flex sizing with positive and negative free space</title>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .case { display: flex; width: 600px; height: 50px; }
+    .item { min-width: 0; height: 20px; background: #dbeafe; outline: 1px solid #2563eb; }
+    .pdf-label { position: absolute; top: 360pt; left: 12pt; color: #111827; font-size: 10pt; }
+    .grow { flex: 1 1 0; }
+    .grow.two { flex-grow: 2; }
+    .grow.three { flex-grow: 3; }
+    .shrink-a { flex: 1 1 300px; }
+    .shrink-b { flex: 2 3 300px; }
+    .shrink-c { flex: 0 0 200px; }
+  </style>
+</head>
+<body>
+  <!-- Source: third_party/blink/web_tests/css3/flexbox/flex-algorithm.html -->
+  <!-- Port status: completed. Static input reviewed and covered by the assigned layout test. -->
+  <!-- Expected: grow items are 75pt, 150pt, and 225pt; shrink items are 187.5pt, 112.5pt, and 150pt. -->
+  <div class="case" id="positive-grow">
+    <div class="item grow" id="basis-grow-a"></div>
+    <div class="item grow two" id="basis-grow-b"></div>
+    <div class="item grow three" id="basis-grow-c"></div>
+  </div>
+  <div class="case" id="negative-shrink">
+    <div class="item shrink-a" id="scaled-shrink-a"></div>
+    <div class="item shrink-b" id="scaled-shrink-b"></div>
+    <div class="item shrink-c" id="scaled-shrink-c"></div>
+  </div>
+  <div class="pdf-label">Flex algorithm: grow and shrink sizing</div>
+</body>
+</html>

@@ -63,6 +63,9 @@ knowledge-base
 # Local Chromium source used for browser-reference test research.
 /chromium/
 
+# Local PDFs generated from the Chrome Flex case fixtures.
+/test/Chrome/pdf/
+
 # Local decision trail for long-running investigations.
 /.audit/
 

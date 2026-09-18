@@ -5,7 +5,7 @@
 > **Estimated effort:** XL (8 batches plus closure: aliases S, SVG bake M, clip/mask L, ruby/gap M-L, honesty defer S)
 > **Owner:** `internal/layout` (+ `internal/svg` for presentation bake, `internal/pdf` for clip evenodd / mask groups)
 > **Depends on:** next-72 close (87.1-87.8), catalog 397 Implemented / 10 Partial / 411 Unsupported
-> **Unblocks:** mapping recount past the next-72 ceiling; fixture-65 Effect cells
+> **Unblocks:** mapping recount past the next-72 ceiling; fixture-66 Effect cells
 > **Honesty:** `plans/0.2.6/HONESTY-GATES.md` flip packet required per Implemented name
 > **Scan evidence:** four explore agents (aliases/cascade, SVG presentation, mask/clip/filter, ruby/overflow/gap), 2026-09-17
 
@@ -29,7 +29,7 @@ layer:
 - a Borders-4-style honesty-defer batch (mask-border, MathML, filter primitives)
 
 Validation bar is the **gowk PDF** Effect cell on
-`testdata/golden/fixture-65-next-100-props.html` (authoring contract only in this
+`testdata/golden/fixture-66-next-100-props.html` (authoring contract only in this
 commit; the HTML lands with the first 88.x implementation batch). Chrome labels
 in the JSON are advisory.
 

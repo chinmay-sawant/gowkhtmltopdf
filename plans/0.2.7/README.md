@@ -12,7 +12,7 @@ Execution ledger for two CSS waves:
 1. The next 72 print-relevant properties in `next-72-properties.json`, proven by
    `testdata/golden/fixture-64-next-72-props.html`.
 2. The next 100 after that, in `next-100-properties.json`. Zero overlap with the
-   72. Fixture contract: `next-100-fixture-authoring.md` (fixture-65).
+   72. Fixture contract: `next-100-fixture-authoring.md` (fixture-66).
 
 ## Start here
 
@@ -24,7 +24,7 @@ Execution ledger for two CSS waves:
 | [next-72-properties.json](next-72-properties.json) | 72-property inventory + Chrome BCD labels |
 | [next-100-properties.json](next-100-properties.json) | 100-property inventory + Chrome BCD labels |
 | [next-72-fixture-authoring.md](next-72-fixture-authoring.md) | Fixture-64 authoring contract |
-| [next-100-fixture-authoring.md](next-100-fixture-authoring.md) | Fixture-65 authoring contract |
+| [next-100-fixture-authoring.md](next-100-fixture-authoring.md) | Fixture-66 authoring contract |
 
 ## Gate policy (this version only)
 

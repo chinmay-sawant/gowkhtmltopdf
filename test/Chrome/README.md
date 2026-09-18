@@ -17,6 +17,20 @@ python3 scripts/generate_chrome_flex_cases.py
 go test ./test/Chrome
 ```
 
+Running the package test also renders every case into a local PDF at
+`test/Chrome/pdf/<case-id>.pdf`. These PDFs are visual inspection artifacts,
+are overwritten on each run, and are ignored by Git. To regenerate only the
+PDFs, run:
+
+```sh
+go test ./test/Chrome -run TestChromeCasePDFOutputs -count=1
+```
+
+The PDF test proves that each case converts to a structurally readable PDF and
+has at least one page. The focused layout tests remain the source of truth for
+geometry, so a case can have a PDF available for inspection while its layout
+status is still `blocked`.
+
 The inventory has 24 direct layout-unit candidates, 15 cases that need a
 Chrome reference or a larger rewrite, and one print-fragmentation candidate.
 

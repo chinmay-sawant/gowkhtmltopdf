@@ -355,13 +355,10 @@ func (m *cellMeasure) measureElement(nodeN *html.Node, childCS ResolvedStyle, no
 		return
 	}
 	if nodeN.Name == cssTagSVG {
-		innerW := parseSVGLengthPx(nodeN.Attribute("width"))
-		if childCS.Width >= 0 {
-			innerW = m.engine.scalePt(childCS.Width)
-		}
-		if innerW <= 0 {
-			innerW = m.engine.scalePt(pxToPt(64))
-		}
+		// Reuse the used-size policy so the intrinsic width floor sees the same
+		// max-width/max-height clamp and ratio transfer as the build: max-height
+		// 100pt on a 200x200 svg contributes 100, not the raw 200px attribute.
+		innerW := m.engine.usedInlineSVGSize(nodeN, childCS, nil).w
 		m.noteWord(innerW)
 		m.lineOnlyNowrap = false
 		m.lineHasInk = true
