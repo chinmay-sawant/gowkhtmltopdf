@@ -27,6 +27,23 @@ manifest cases are still scaffolds. The individual case fixtures and focused
 tests are now the canonical evidence; the former consolidated review HTML and
 PDF have been removed.
 
+## Execution ledgers
+
+The remaining cases are split into three ten-case ledgers so each batch has a
+small owner set, a clear validation gate, and a separate closure decision:
+
+- [Cases 11-20](01-cases-11-20.md): wrapping, alignment, margins, flex basis,
+  direction, and automatic minimum size.
+- [Cases 21-30](02-cases-21-30.md): wrapping and gaps, aspect ratio, writing
+  modes, definite percentages, absolute positioning, print fragmentation, and
+  column auto margins.
+- [Cases 31-40](03-cases-31-40.md): reverse wrapping, fractional factors,
+  minimum size, intrinsic sizing, border-box sizing, replaced elements, gaps,
+  overflow, and min-content.
+
+Each ledger owns only its case range. The parent plan owns the shared evidence
+rules and the final interaction-coverage gate.
+
 ## Definition of done
 
 - The 40 cases remain tied to exact Chromium source paths.
