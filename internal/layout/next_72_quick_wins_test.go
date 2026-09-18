@@ -1,4 +1,4 @@
-//nolint:cyclop // phase 87.1 property proofs
+//nolint:cyclop // next-72 quick-win property proofs
 package layout
 
 import (
@@ -179,7 +179,7 @@ func TestOverflowBlockInlineMapToAxes(t *testing.T) {
 func TestObjectFitCover(t *testing.T) {
 	t.Parallel()
 
-	data := phase871PNG(t, 40, 10)
+	data := quickWinsPNG(t, 40, 10)
 	res := imgAdjustLayout(t, "width:40pt;height:40pt;object-fit:cover", data)
 	img := imgAdjustSingleImage(t, res)
 
@@ -196,7 +196,7 @@ func TestObjectFitCover(t *testing.T) {
 func TestObjectPositionRightBottom(t *testing.T) {
 	t.Parallel()
 
-	data := phase871PNG(t, 10, 10)
+	data := quickWinsPNG(t, 10, 10)
 	res := imgAdjustLayout(t,
 		"width:40pt;height:40pt;object-fit:none;object-position:right bottom", data)
 	img := imgAdjustSingleImage(t, res)
@@ -264,7 +264,7 @@ func TestAspectRatioOneToOne(t *testing.T) {
 	}
 }
 
-func phase871PNG(t *testing.T, width, height int) []byte {
+func quickWinsPNG(t *testing.T, width, height int) []byte {
 	t.Helper()
 
 	img := image.NewRGBA(image.Rect(0, 0, width, height))
