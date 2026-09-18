@@ -34,6 +34,7 @@ const (
 	nameIDFull           = 4
 	nameIDPostScript     = 6
 	nameIDTypoFamily     = 16
+	paletteTableCount    = 3
 	paletteDemoSubfamily = "Regular"
 )
 
@@ -83,6 +84,7 @@ func (f *Font) PaletteSolidFill(name string) (float64, float64, float64, bool) {
 
 	palettes := f.ColorPalettes()
 	idx := selectPaletteIndex(palettes, name)
+
 	if idx < 0 || idx >= len(palettes) || len(palettes[idx].Colors) == 0 {
 		return 0, 0, 0, false
 	}
@@ -101,33 +103,31 @@ func selectPaletteIndex(palettes []ColorPalette, name string) int {
 	case "", "normal":
 		return -1
 	case "light":
-		for i, palette := range palettes {
-			if palette.Type&PaletteUsableWithLightBackground != 0 {
-				return i
-			}
-		}
-
-		return 0
+		return selectPaletteByType(palettes, PaletteUsableWithLightBackground, 0)
 	case "dark":
-		for i, palette := range palettes {
-			if palette.Type&PaletteUsableWithDarkBackground != 0 {
-				return i
-			}
-		}
-
-		if len(palettes) > 1 {
-			return len(palettes) - 1
-		}
-
-		return 0
+		return selectPaletteByType(palettes, PaletteUsableWithDarkBackground, len(palettes)-1)
 	}
 
-	n, err := strconv.Atoi(name)
-	if err != nil || n < 0 || n >= len(palettes) {
+	idx, err := strconv.Atoi(name)
+	if err != nil {
 		return -1
 	}
 
-	return n
+	if idx < 0 || idx >= len(palettes) {
+		return -1
+	}
+
+	return idx
+}
+
+func selectPaletteByType(palettes []ColorPalette, paletteType uint32, fallback int) int {
+	for paletteIndex, palette := range palettes {
+		if palette.Type&paletteType != 0 {
+			return paletteIndex
+		}
+	}
+
+	return fallback
 }
 
 func parseCPAL(tbl []byte) []ColorPalette {
@@ -147,59 +147,95 @@ func parseCPAL(tbl []byte) []ColorPalette {
 
 	indexOff := cpalHeaderSize
 	indexEnd := indexOff + uint16Bytes*numPalettes
+
 	if indexEnd > len(tbl) {
 		return nil
 	}
 
-	types := make([]uint32, numPalettes)
-	if version >= 1 {
-		typesOffPos := indexEnd
-		if typesOffPos+uint32Bytes > len(tbl) {
-			return nil
-		}
-
-		typesOff := int(binary.BigEndian.Uint32(tbl[typesOffPos : typesOffPos+uint32Bytes]))
-		if typesOff > 0 {
-			for i := range numPalettes {
-				pos := typesOff + i*uint32Bytes
-				if pos+uint32Bytes > len(tbl) {
-					break
-				}
-
-				types[i] = binary.BigEndian.Uint32(tbl[pos : pos+uint32Bytes])
-			}
-		}
+	types := parseCPALTypes(tbl, version, indexEnd, numPalettes)
+	if types == nil {
+		return nil
 	}
 
 	palettes := make([]ColorPalette, 0, numPalettes)
 
-	for i := range numPalettes {
-		start := int(binary.BigEndian.Uint16(tbl[indexOff+i*uint16Bytes:]))
-		end := start + numEntries
-		if start < 0 || end > numColors {
+	for paletteIndex := range numPalettes {
+		palette, paletteOK := parseCPALPalette(
+			tbl,
+			indexOff,
+			colorOff,
+			numEntries,
+			numColors,
+			paletteIndex,
+			types[paletteIndex],
+		)
+		if !paletteOK {
 			return nil
 		}
 
-		colors := make([]CPALColor, 0, numEntries)
-
-		for n := start; n < end; n++ {
-			pos := colorOff + n*uint32Bytes
-			if pos+uint32Bytes > len(tbl) {
-				return nil
-			}
-
-			colors = append(colors, CPALColor{
-				B: tbl[pos],
-				G: tbl[pos+1],
-				R: tbl[pos+2],
-				A: tbl[pos+3],
-			})
-		}
-
-		palettes = append(palettes, ColorPalette{Colors: colors, Type: types[i]})
+		palettes = append(palettes, palette)
 	}
 
 	return palettes
+}
+
+func parseCPALTypes(tbl []byte, version uint16, indexEnd, numPalettes int) []uint32 {
+	types := make([]uint32, numPalettes)
+	if version < 1 {
+		return types
+	}
+
+	typesOffPos := indexEnd
+	if typesOffPos+uint32Bytes > len(tbl) {
+		return nil
+	}
+
+	typesOff := int(binary.BigEndian.Uint32(tbl[typesOffPos : typesOffPos+uint32Bytes]))
+	if typesOff <= 0 {
+		return types
+	}
+
+	for paletteIndex := range numPalettes {
+		pos := typesOff + paletteIndex*uint32Bytes
+		if pos+uint32Bytes > len(tbl) {
+			break
+		}
+
+		types[paletteIndex] = binary.BigEndian.Uint32(tbl[pos : pos+uint32Bytes])
+	}
+
+	return types
+}
+
+func parseCPALPalette(
+	tbl []byte,
+	indexOff, colorOff, numEntries, numColors, paletteIndex int,
+	paletteType uint32,
+) (ColorPalette, bool) {
+	start := int(binary.BigEndian.Uint16(tbl[indexOff+paletteIndex*uint16Bytes:]))
+	end := start + numEntries
+
+	if start < 0 || end > numColors {
+		return ColorPalette{Colors: nil, Type: 0}, false
+	}
+
+	colors := make([]CPALColor, 0, numEntries)
+
+	for colorIndex := start; colorIndex < end; colorIndex++ {
+		pos := colorOff + colorIndex*uint32Bytes
+		if pos+uint32Bytes > len(tbl) {
+			return ColorPalette{Colors: nil, Type: 0}, false
+		}
+
+		colors = append(colors, CPALColor{
+			B: tbl[pos],
+			G: tbl[pos+1],
+			R: tbl[pos+2],
+			A: tbl[pos+3],
+		})
+	}
+
+	return ColorPalette{Colors: colors, Type: paletteType}, true
 }
 
 // WithColorPalettes rebuilds ttf with CPAL (and a minimal COLR so
@@ -217,7 +253,7 @@ func WithColorPalettes(ttf []byte, family string, palettes []ColorPalette) ([]by
 	built := make([]struct {
 		tag  string
 		data []byte
-	}, 0, len(tables)+3)
+	}, 0, len(tables)+paletteTableCount)
 
 	for tag, data := range tables {
 		if tag == "COLR" || tag == "CPAL" {
@@ -235,11 +271,11 @@ func WithColorPalettes(ttf []byte, family string, palettes []ColorPalette) ([]by
 	}
 
 	if family != "" {
-		ps := strings.ReplaceAll(family, " ", "") + "-" + paletteDemoSubfamily
+		postScriptName := strings.ReplaceAll(family, " ", "") + "-" + paletteDemoSubfamily
 		built = append(built, struct {
 			tag  string
 			data []byte
-		}{tag: "name", data: buildNameTable(family, paletteDemoSubfamily, family+" "+paletteDemoSubfamily, ps)})
+		}{tag: "name", data: buildNameTable(family, paletteDemoSubfamily, family+" "+paletteDemoSubfamily, postScriptName)})
 	}
 
 	cpal, err := buildCPAL(palettes)
@@ -289,15 +325,21 @@ func buildCPAL(palettes []ColorPalette) ([]byte, error) {
 	indices := make([]uint16, numPalettes)
 	types := make([]uint32, numPalettes)
 
-	for i, palette := range palettes {
+	for paletteIndex, palette := range palettes {
 		if len(palette.Colors) != numEntries {
-			return nil, fmt.Errorf("%w: palette %d length %d, want %d", errNoColorPalettes, i, len(palette.Colors), numEntries)
+			return nil, fmt.Errorf(
+				"%w: palette %d length %d, want %d",
+				errNoColorPalettes,
+				paletteIndex,
+				len(palette.Colors),
+				numEntries,
+			)
 		}
 
 		//nolint:gosec // palette count is tiny and well below uint16
-		indices[i] = uint16(len(records))
+		indices[paletteIndex] = uint16(len(records))
 		records = append(records, palette.Colors...)
-		types[i] = palette.Type
+		types[paletteIndex] = palette.Type
 	}
 
 	indexBytes := uint16Bytes * numPalettes
@@ -316,8 +358,8 @@ func buildCPAL(palettes []ColorPalette) ([]byte, error) {
 	//nolint:gosec // table is far below 4GiB
 	binary.BigEndian.PutUint32(buf[8:12], uint32(colorOff))
 
-	for i, idx := range indices {
-		binary.BigEndian.PutUint16(buf[cpalHeaderSize+i*uint16Bytes:], idx)
+	for paletteIndex, idx := range indices {
+		binary.BigEndian.PutUint16(buf[cpalHeaderSize+paletteIndex*uint16Bytes:], idx)
 	}
 
 	extra := cpalHeaderSize + indexBytes
@@ -326,16 +368,16 @@ func buildCPAL(palettes []ColorPalette) ([]byte, error) {
 	binary.BigEndian.PutUint32(buf[extra+uint32Bytes:], 0)
 	binary.BigEndian.PutUint32(buf[extra+2*uint32Bytes:], 0)
 
-	for i, rec := range records {
-		pos := colorOff + i*uint32Bytes
+	for recordIndex, rec := range records {
+		pos := colorOff + recordIndex*uint32Bytes
 		buf[pos] = rec.B
 		buf[pos+1] = rec.G
 		buf[pos+2] = rec.R
 		buf[pos+3] = rec.A
 	}
 
-	for i, flag := range types {
-		binary.BigEndian.PutUint32(buf[typesOff+i*uint32Bytes:], flag)
+	for paletteIndex, flag := range types {
+		binary.BigEndian.PutUint32(buf[typesOff+paletteIndex*uint32Bytes:], flag)
 	}
 
 	return buf, nil
@@ -349,7 +391,7 @@ func buildEmptyCOLR() []byte {
 	return buf
 }
 
-func buildNameTable(family, subfamily, full, ps string) []byte {
+func buildNameTable(family, subfamily, full, postScriptName string) []byte {
 	type nameRec struct {
 		id  uint16
 		txt string
@@ -359,14 +401,14 @@ func buildNameTable(family, subfamily, full, ps string) []byte {
 		{nameIDFamily, family},
 		{nameIDSubfamily, subfamily},
 		{nameIDFull, full},
-		{nameIDPostScript, ps},
+		{nameIDPostScript, postScriptName},
 		{nameIDTypoFamily, family},
 	}
 
 	encoded := make([][]byte, len(recs))
 	strBytes := 0
 
-	for i, rec := range recs {
+	for recordIndex, rec := range recs {
 		u := utf16.Encode([]rune(rec.txt))
 		raw := make([]byte, len(u)*uint16Bytes)
 
@@ -374,7 +416,7 @@ func buildNameTable(family, subfamily, full, ps string) []byte {
 			binary.BigEndian.PutUint16(raw[j*uint16Bytes:], unit)
 		}
 
-		encoded[i] = raw
+		encoded[recordIndex] = raw
 		strBytes += len(raw)
 	}
 
@@ -388,18 +430,18 @@ func buildNameTable(family, subfamily, full, ps string) []byte {
 
 	off := 0
 
-	for i, rec := range recs {
-		pos := sfntNameHeaderSize + i*sfntNameRecordSize
+	for recordIndex, rec := range recs {
+		pos := sfntNameHeaderSize + recordIndex*sfntNameRecordSize
 		binary.BigEndian.PutUint16(buf[pos:], namePlatformWin)
 		binary.BigEndian.PutUint16(buf[pos+2:], nameEncodingWinUni)
 		binary.BigEndian.PutUint16(buf[pos+4:], nameLangWinUS)
 		binary.BigEndian.PutUint16(buf[pos+6:], rec.id)
 		//nolint:gosec // name string lengths are tiny
-		binary.BigEndian.PutUint16(buf[pos+8:], uint16(len(encoded[i])))
+		binary.BigEndian.PutUint16(buf[pos+8:], uint16(len(encoded[recordIndex])))
 		//nolint:gosec // name string offsets are tiny
 		binary.BigEndian.PutUint16(buf[pos+10:], uint16(off))
-		copy(buf[header+off:], encoded[i])
-		off += len(encoded[i])
+		copy(buf[header+off:], encoded[recordIndex])
+		off += len(encoded[recordIndex])
 	}
 
 	return buf

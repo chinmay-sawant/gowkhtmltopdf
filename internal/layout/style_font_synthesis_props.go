@@ -10,29 +10,29 @@ func applyFontSynthesisProps(
 	style *ResolvedStyle, prop, value string, _ float64, _ *styleContext,
 	_ *ResolvedStyle, _ bool,
 ) bool {
+	if prop == "font-synthesis" {
+		applyFontSynthesisShorthand(style, value)
+
+		return true
+	}
+
+	var target *bool
+
 	switch prop {
-	case "font-synthesis":
-		if ok := applyFontSynthesisShorthand(style, value); !ok {
-			return true
-		}
 	case "font-synthesis-weight":
-		if allow, ok := parseFontSynthesisLonghand(value); ok {
-			style.FontSynthesisWeight = allow
-		}
+		target = &style.FontSynthesisWeight
 	case "font-synthesis-style":
-		if allow, ok := parseFontSynthesisLonghand(value); ok {
-			style.FontSynthesisStyle = allow
-		}
+		target = &style.FontSynthesisStyle
 	case "font-synthesis-small-caps":
-		if allow, ok := parseFontSynthesisLonghand(value); ok {
-			style.FontSynthesisSmallCaps = allow
-		}
+		target = &style.FontSynthesisSmallCaps
 	case "font-synthesis-position":
-		if allow, ok := parseFontSynthesisLonghand(value); ok {
-			style.FontSynthesisPosition = allow
-		}
+		target = &style.FontSynthesisPosition
 	default:
 		return false
+	}
+
+	if allow, ok := parseFontSynthesisLonghand(value); ok {
+		*target = allow
 	}
 
 	return true
@@ -77,7 +77,7 @@ func applyFontSynthesisShorthand(style *ResolvedStyle, raw string) bool {
 			weight = true
 		case "style":
 			styleAllow = true
-		case "small-caps":
+		case fontVariantCapsSmall:
 			smallCaps = true
 		case "position":
 			position = true

@@ -252,8 +252,8 @@ type ResolvedStyle struct {
 	HyphenateLimitZonePt    float64 // absolute zone; ignored when ZonePercent >= 0
 	HyphenateLimitZonePct   float64 // 0..100 when set; -1 means use ZonePt
 	HangingPunctuation      string  // "none" | "first" | "last" | "allow-end" | …
-	TextJustify        string
-	LineBreak          string
+	TextJustify             string
+	LineBreak               string
 	// OverflowWrap is CSS overflow-wrap / word-wrap: "normal" | "break-word" | "anywhere".
 	OverflowWrap string
 	// WordBreak is CSS word-break: "normal" | "break-all" | "keep-all".
@@ -389,22 +389,22 @@ type ResolvedStyle struct {
 	FontPalette           string // raw value
 	FontVariationSettings string // raw value
 	// OpenType feature / variant / synthesis / width / size-adjust (CSS Fonts).
-	FontFeatureSettings      string  // "normal" or canonical `"tag" N, ...`
-	FontKerning              string  // "auto" | "normal" | "none"
-	FontSizeAdjust           float64 // aspect number; used when FontSizeAdjustSet
-	FontSizeAdjustSet        bool
-	FontWidth                float64 // percent; 100 = normal
-	FontSynthesisWeight      bool    // true = auto (allow fake bold)
-	FontSynthesisStyle       bool    // true = auto; no consumer yet
-	FontSynthesisSmallCaps   bool    // true = auto; no consumer yet
-	FontSynthesisPosition    bool    // true = auto; no consumer yet
-	FontVariantCaps          string  // "normal" | small-caps | ...
-	FontVariantLigatures     string  // "normal" | "none" | keyword list
-	FontVariantNumeric       string  // "normal" | keyword list
-	FontVariantPosition      string  // "normal" | "sub" | "super"
-	FontVariantEastAsian     string  // "normal" | keyword list
-	FontVariantAlternates    string  // historical-forms / stylistic() / styleset() / swash(); OT tags
-	FontVariantEmoji         string  // normal|text|emoji|unicode; presentation consumer
+	FontFeatureSettings    string  // "normal" or canonical `"tag" N, ...`
+	FontKerning            string  // "auto" | "normal" | "none"
+	FontSizeAdjust         float64 // aspect number; used when FontSizeAdjustSet
+	FontSizeAdjustSet      bool
+	FontWidth              float64 // percent; 100 = normal
+	FontSynthesisWeight    bool    // true = auto (allow fake bold)
+	FontSynthesisStyle     bool    // true = auto; no consumer yet
+	FontSynthesisSmallCaps bool    // true = auto; no consumer yet
+	FontSynthesisPosition  bool    // true = auto; no consumer yet
+	FontVariantCaps        string  // "normal" | small-caps | ...
+	FontVariantLigatures   string  // "normal" | "none" | keyword list
+	FontVariantNumeric     string  // "normal" | keyword list
+	FontVariantPosition    string  // "normal" | "sub" | "super"
+	FontVariantEastAsian   string  // "normal" | keyword list
+	FontVariantAlternates  string  // historical-forms / stylistic() / styleset() / swash(); OT tags
+	FontVariantEmoji       string  // normal|text|emoji|unicode; presentation consumer
 	// Image adjustment.
 	ImageOrientation      string  // "from-image" | "none" | raw angle
 	ImageOrientationAngle float64 // degrees; 0 = unset
@@ -437,11 +437,11 @@ type ResolvedStyle struct {
 	TextBoxEdgeOver  string // "auto" | "text" | "cap" | "ex" | …
 	TextBoxEdgeUnder string // "auto" | "text" | "alphabetic" | …
 	// CSS Text 4/5 spacing + group align + fit.
-	TextAutospace    string // "no-autospace" | "ideograph-alpha" | …
-	TextSpacing      string // "normal" | "trim-start" | …
-	TextSpacingTrim  string // "space-all" | "trim-start" | "trim-both" | …
-	TextGroupAlign   string // "none" | "start" | "end" | "left" | "right" | "center"
-	TextFit          string // "none" | "auto" | "scale" (apply-only; no scale consumer yet)
+	TextAutospace   string // "no-autospace" | "ideograph-alpha" | …
+	TextSpacing     string // "normal" | "trim-start" | …
+	TextSpacingTrim string // "space-all" | "trim-start" | "trim-both" | …
+	TextGroupAlign  string // "none" | "start" | "end" | "left" | "right" | "center"
+	TextFit         string // "none" | "auto" | "scale" (apply-only; no scale consumer yet)
 	// CustomProps holds resolved CSS custom properties (--*) for this element
 	// (inherited). Shared with the parent map when the element declares none.
 	CustomProps map[string]string
@@ -457,92 +457,92 @@ type border struct {
 // initialStyle returns the CSS initial values.
 func initialStyle() ResolvedStyle { //nolint:funlen // complete CSS initial-value record
 	return ResolvedStyle{ //nolint:exhaustruct // intentional zero fields
-		Display:          "inline",
-		Position:         "static",
-		Float:            cssDisplayNone,
-		FlexGrow:         0,
-		FlexShrink:       1,
-		FlexBasis:        -1,
-		FlexBasisPercent: -1,
-		Clear:            cssDisplayNone,
-		BoxSizing:        "content-box",
-		TopAuto:          true,
-		RightAuto:        true,
-		BottomAuto:       true,
-		LeftAuto:         true,
-		FlexDirection:    "row",
-		FlexWrap:         "nowrap",
-		JustifyContent:   "flex-start",
-		AlignItems:       "stretch",
-		AlignContent:     "stretch",
-		AlignSelf:        overflowAuto,
-		JustifyItems:     "stretch",
-		JustifySelf:      overflowAuto,
-		ColumnGapNormal:  true,
-		ColumnWidth:      -1,
-		ColumnHeight:     -1,
-		ColumnWrap:       columnWrapAuto,
-		ColumnSpan:       cssDisplayNone,
-		ColumnFill:       "balance",
-		ColumnRuleWidth:  borderWidth(mediumKeyword, 0),
-		ColumnRuleStyle:  cssDisplayNone,
+		Display:            "inline",
+		Position:           "static",
+		Float:              cssDisplayNone,
+		FlexGrow:           0,
+		FlexShrink:         1,
+		FlexBasis:          -1,
+		FlexBasisPercent:   -1,
+		Clear:              cssDisplayNone,
+		BoxSizing:          "content-box",
+		TopAuto:            true,
+		RightAuto:          true,
+		BottomAuto:         true,
+		LeftAuto:           true,
+		FlexDirection:      "row",
+		FlexWrap:           "nowrap",
+		JustifyContent:     "flex-start",
+		AlignItems:         "stretch",
+		AlignContent:       "stretch",
+		AlignSelf:          overflowAuto,
+		JustifyItems:       "stretch",
+		JustifySelf:        overflowAuto,
+		ColumnGapNormal:    true,
+		ColumnWidth:        -1,
+		ColumnHeight:       -1,
+		ColumnWrap:         columnWrapAuto,
+		ColumnSpan:         cssDisplayNone,
+		ColumnFill:         "balance",
+		ColumnRuleWidth:    borderWidth(mediumKeyword, 0),
+		ColumnRuleStyle:    cssDisplayNone,
 		InitialLetterAlign: "alphabetic",
 		InitialLetterWrap:  "none",
-		Width:            -1,
-		WidthPercent:     -1,
-		Height:           -1,
-		HeightPercent:    -1,
-		MinWidth:         0,
-		MinWidthPercent:  -1,
-		MaxWidth:         -1,
-		MaxWidthPercent:  -1,
-		MinHeight:        0,
-		MinHeightPercent: -1,
-		MaxHeight:        -1,
-		MaxHeightPercent: -1,
-		Overflow:         "visible",
-		OverflowX:        "visible",
-		OverflowY:        "visible",
-		Visibility:       visibleKeyword,
-		Color:            [3]float64{0, 0, 0},
-		BGColor:          [4]float64{0, 0, 0, 0},
-		FontFamily:       nil,
+		Width:              -1,
+		WidthPercent:       -1,
+		Height:             -1,
+		HeightPercent:      -1,
+		MinWidth:           0,
+		MinWidthPercent:    -1,
+		MaxWidth:           -1,
+		MaxWidthPercent:    -1,
+		MinHeight:          0,
+		MinHeightPercent:   -1,
+		MaxHeight:          -1,
+		MaxHeightPercent:   -1,
+		Overflow:           "visible",
+		OverflowX:          "visible",
+		OverflowY:          "visible",
+		Visibility:         visibleKeyword,
+		Color:              [3]float64{0, 0, 0},
+		BGColor:            [4]float64{0, 0, 0, 0},
+		FontFamily:         nil,
 		// Empty family hashes to the FNV-1a offset, matching what
 		// resolveElementStyle records for elements without font-family.
-		famHash:             hashFontFamily(nil),
-		FontSize:            12, // 16px at 96dpi
-		FontWeight:          400,
-		TextTransform:       textTransformNone,
-		VerticalAlign:       "baseline",
-		WhiteSpace:          "normal",
-		TabSize:             defaultTabSize,
-		HyphenateCharacter:  "-",
+		famHash:               hashFontFamily(nil),
+		FontSize:              12, // 16px at 96dpi
+		FontWeight:            400,
+		TextTransform:         textTransformNone,
+		VerticalAlign:         "baseline",
+		WhiteSpace:            "normal",
+		TabSize:               defaultTabSize,
+		HyphenateCharacter:    "-",
 		HyphenateLimitLast:    cssDisplayNone,
 		HyphenateLimitLines:   -1,
 		HyphenateLimitZonePct: -1,
 		HangingPunctuation:    cssDisplayNone,
-		OverflowWrap:        "normal",
-		WordBreak:           "normal",
-		TextDecoration:      cssDisplayNone,
-		ListStyleType:       "disc",
-		BorderCollapse:      "separate",
-		BorderSpacing:       0,
-		TableLayout:         overflowAuto,
-		GridColumnSpan:      1,
-		GridRowSpan:         1,
-		WritingMode:         writingModeHorizontalTB,
-		Direction:           "ltr",
-		MixBlendMode:        blendNormal,
-		BackgroundBlendMode: blendNormal,
-		Isolation:           "auto",
-		Orphans:             2,
-		Widows:              2,
-		EmptyCells:          "",
-		Transform:           IdentityMatrix(),
-		TransformOrigin:     defaultTransformOrigin(),
-		Opacity:             1,
-		FillOpacity:         1,
-		StrokeOpacity:       1,
+		OverflowWrap:          "normal",
+		WordBreak:             "normal",
+		TextDecoration:        cssDisplayNone,
+		ListStyleType:         "disc",
+		BorderCollapse:        "separate",
+		BorderSpacing:         0,
+		TableLayout:           overflowAuto,
+		GridColumnSpan:        1,
+		GridRowSpan:           1,
+		WritingMode:           writingModeHorizontalTB,
+		Direction:             "ltr",
+		MixBlendMode:          blendNormal,
+		BackgroundBlendMode:   blendNormal,
+		Isolation:             "auto",
+		Orphans:               2,
+		Widows:                2,
+		EmptyCells:            "",
+		Transform:             IdentityMatrix(),
+		TransformOrigin:       defaultTransformOrigin(),
+		Opacity:               1,
+		FillOpacity:           1,
+		StrokeOpacity:         1,
 
 		// Re-added support properties (2026-09-12 demotions).
 		Contain:                    "none",

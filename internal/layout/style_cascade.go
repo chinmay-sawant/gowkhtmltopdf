@@ -838,7 +838,7 @@ func fontPrefixDecl(lower string) (logicalPropDecl, bool) {
 		return logicalPropDecl{prop: "font-style", val: lower}, true
 	case cssFontWeightBold, "bolder", "lighter":
 		return logicalPropDecl{prop: "font-weight", val: lower}, true
-	case contentNormal, "small-caps", "condensed", "expanded",
+	case contentNormal, fontVariantCapsSmall, "condensed", "expanded",
 		"semi-condensed", "semi-expanded", "ultra-condensed", "ultra-expanded":
 		return logicalPropDecl{}, true //nolint:exhaustruct // intentional empty keyword position
 	}

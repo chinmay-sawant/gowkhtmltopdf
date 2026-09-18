@@ -55,7 +55,7 @@ func applyTextSpacingShorthand(style *ResolvedStyle, val string) {
 func isTextAutospaceValue(val string) bool {
 	switch val {
 	case "no-autospace", contentNormal, "auto",
-		"ideograph-alpha", "ideograph-numeric", "punctuation",
+		textAutospaceIdeographAlpha, "ideograph-numeric", "punctuation",
 		"insert", "replace":
 		return true
 	default:

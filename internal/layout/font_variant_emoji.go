@@ -1,11 +1,12 @@
 package layout
 
 const (
-	vsTextPresentation  = '\uFE0E'
-	vsEmojiPresentation = '\uFE0F'
-	fontVariantEmojiKW  = "emoji"
-	fontVariantTextKW   = "text"
-	fontVariantUnicode  = "unicode"
+	vsTextPresentation     = '\uFE0E'
+	vsEmojiPresentation    = '\uFE0F'
+	fontVariantEmojiKW     = "emoji"
+	fontVariantTextKW      = "text"
+	fontVariantUnicode     = "unicode"
+	emojiVariationCapacity = 4
 	// liteEmojiFill is the solid fallback when emoji presentation is requested
 	// and the face has no color glyph. Distinct from typical CSS color:#111 so
 	// text vs emoji A/B demos change paint without a COLR emoji font.
@@ -23,23 +24,21 @@ func applyEmojiVariationSelectors(text, variant string) string {
 		return text
 	}
 
-	out := make([]rune, 0, len(text)+4)
-	runes := []rune(text)
+	out := make([]rune, 0, len(text)+emojiVariationCapacity)
 
-	for i := 0; i < len(runes); i++ {
-		r := runes[i]
-		if r == vsTextPresentation || r == vsEmojiPresentation {
+	for _, candidate := range text {
+		if candidate == vsTextPresentation || candidate == vsEmojiPresentation {
 			continue
 		}
 
-		out = append(out, r)
+		out = append(out, candidate)
 
-		if !isEmojiCandidate(r) {
+		if !isEmojiCandidate(candidate) {
 			continue
 		}
 
 		vs := vsTextPresentation
-		if wantsEmojiPresentation(r, variant) {
+		if wantsEmojiPresentation(candidate, variant) {
 			vs = vsEmojiPresentation
 		}
 
@@ -49,8 +48,8 @@ func applyEmojiVariationSelectors(text, variant string) string {
 	return string(out)
 }
 
-func wantsEmojiPresentation(r rune, variant string) bool {
-	if !isEmojiCandidate(r) {
+func wantsEmojiPresentation(candidate rune, variant string) bool {
+	if !isEmojiCandidate(candidate) {
 		return false
 	}
 
@@ -60,23 +59,24 @@ func wantsEmojiPresentation(r rune, variant string) bool {
 	case fontVariantTextKW:
 		return false
 	case fontVariantUnicode, fontVariantNormal:
-		return emojiDefaultIsEmoji(r)
+		return emojiDefaultIsEmoji(candidate)
 	default:
-		return emojiDefaultIsEmoji(r)
+		return emojiDefaultIsEmoji(candidate)
 	}
 }
 
-func isEmojiCandidate(r rune) bool {
+//nolint:cyclop // Unicode emoji ranges are independent, spec-defined cases
+func isEmojiCandidate(candidate rune) bool {
 	switch {
-	case r >= 0x1F000 && r <= 0x1FAFF:
+	case candidate >= 0x1F000 && candidate <= 0x1FAFF:
 		return true
-	case r >= 0x2600 && r <= 0x27BF:
+	case candidate >= 0x2600 && candidate <= 0x27BF:
 		return true
-	case r >= 0x2300 && r <= 0x23FF:
+	case candidate >= 0x2300 && candidate <= 0x23FF:
 		return true
-	case r >= 0x2B50 && r <= 0x2B55:
+	case candidate >= 0x2B50 && candidate <= 0x2B55:
 		return true
-	case r == 0x00A9 || r == 0x00AE || r == 0x2122:
+	case candidate == 0x00A9 || candidate == 0x00AE || candidate == 0x2122:
 		return true
 	default:
 		return false

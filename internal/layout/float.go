@@ -166,6 +166,8 @@ func (f *floatState) placeRight(fbox *box, bottom, margL float64) {
 // (contentX/contentW). Float edges are canvas-absolute. When a side has a
 // shape-outside contour, that contour's per-line interval replaces the
 // rectangular edge for that side.
+//
+//nolint:cyclop,nestif,wsl // float-side geometry intentionally handles both contours
 func (f *floatState) exclusion(contentX, contentW, y, cy float64) (float64, float64) {
 	outX, outW := contentX, contentW
 	top := y + cy

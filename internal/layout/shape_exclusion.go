@@ -1,4 +1,4 @@
-//nolint:cyclop,exhaustruct,mnd,varnamelen,wsl // CSS shape-outside float exclusion geometry
+//nolint:cyclop,exhaustruct,mnd,varnamelen // CSS shape-outside float exclusion geometry
 package layout
 
 import (
@@ -21,9 +21,12 @@ type shapeExclusion struct {
 type shapeKind uint8
 
 const (
-	shapeKindNone shapeKind = iota
-	shapeKindEllipse        // circle is an ellipse with rx==ry
+	shapeKindNone    shapeKind = iota
+	shapeKindEllipse           // circle is an ellipse with rx==ry
 	shapeKindInset
+	shapeEllipseKeyword      = "ellipse"
+	shapeClosestSideKeyword  = "closest-side"
+	shapeFarthestSideKeyword = "farthest-side"
 )
 
 // rightEdgeAt returns the rightmost x of the shape at canvas y, if the
@@ -57,6 +60,8 @@ func (s *shapeExclusion) intervalAt(y float64) (float64, float64, bool) {
 	}
 
 	switch s.kind {
+	case shapeKindNone:
+		return 0, 0, false
 	case shapeKindEllipse:
 		return ellipseInterval(s.cx, s.cy, s.rx, s.ry, y)
 	case shapeKindInset:
@@ -120,9 +125,9 @@ func buildShapeExclusion(
 	margin := resolveShapeMargin(sty, refW, refH, scale)
 
 	switch name {
-	case "circle":
+	case listStyleCircle:
 		return resolveCircleExclusion(args, refX, refY, refW, refH, margin, sty.FontSize, scale)
-	case "ellipse":
+	case shapeEllipseKeyword:
 		return resolveEllipseExclusion(args, refX, refY, refW, refH, margin, sty.FontSize, scale)
 	case "inset":
 		return resolveInsetExclusion(args, refX, refY, refW, refH, margin, sty.FontSize, scale)
@@ -152,9 +157,9 @@ func resolveCircleExclusion(
 
 	if len(radii) == 1 {
 		switch radii[0] {
-		case "closest-side":
+		case shapeClosestSideKeyword:
 			// keep default
-		case "farthest-side":
+		case shapeFarthestSideKeyword:
 			r = farthestSideRadius(cx, cy, refX, refY, refW, refH)
 		default:
 			v, ok := resolveShapeRadius(radii[0], refW, refH, fsize, scale, true)
@@ -191,7 +196,7 @@ func resolveEllipseExclusion(
 	case 0:
 		// defaults already set
 	case 2:
-		if radii[0] != "closest-side" && radii[0] != "farthest-side" {
+		if radii[0] != shapeClosestSideKeyword && radii[0] != shapeFarthestSideKeyword {
 			if v, ok := resolveShapeRadius(radii[0], refW, refH, fsize, scale, false); ok {
 				rx = v
 			} else {
@@ -199,7 +204,7 @@ func resolveEllipseExclusion(
 			}
 		}
 
-		if radii[1] != "closest-side" && radii[1] != "farthest-side" {
+		if radii[1] != shapeClosestSideKeyword && radii[1] != shapeFarthestSideKeyword {
 			if v, ok := resolveShapeRadius(radii[1], refH, refW, fsize, scale, false); ok {
 				ry = v
 			} else {

@@ -4,17 +4,26 @@ import "github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
 
 // textBoxTrimFlags reports whether the block's first/last line should drop
 // over/under half-leading (and optionally retarget edges via text-box-edge).
-func textBoxTrimFlags(block *ResolvedStyle, firstLine, lastLine bool) (trimStart, trimEnd bool) {
+const (
+	textBoxTrimStartKeyword = "trim-start"
+	textBoxTrimBothKeyword  = "trim-both"
+	textBoxEdgeCapKeyword   = "cap"
+	textBoxEdgeAlphaKeyword = "alphabetic"
+	textBoxCapRatio         = 0.7
+	textBoxExRatio          = 0.5
+)
+
+func textBoxTrimFlags(block *ResolvedStyle, firstLine, lastLine bool) (bool, bool) {
 	if block == nil {
 		return false, false
 	}
 
 	switch block.TextBoxTrim {
-	case "trim-start":
+	case textBoxTrimStartKeyword:
 		return firstLine, false
 	case "trim-end":
 		return false, lastLine
-	case "trim-both":
+	case textBoxTrimBothKeyword:
 		return firstLine, lastLine
 	default:
 		return false, false
@@ -24,10 +33,12 @@ func textBoxTrimFlags(block *ResolvedStyle, firstLine, lastLine bool) (trimStart
 // adjustTextBoxMetrics applies text-box-edge + trim to one item's ascent/
 // descent/half-leading contribution. trimStart/trimEnd drop the matching
 // half-leading; when trimming, cap/ex/alphabetic retarget the content edges.
+//
+//nolint:cyclop // text-box edge and trim rules combine independent CSS axes
 func (e *engine) adjustTextBoxMetrics(
 	style *ResolvedStyle, face *pdf.Font, size, ascent, descent, extra float64,
 	trimStart, trimEnd bool,
-) (itemAscent, itemDescent float64) {
+) (float64, float64) {
 	extraTop := extra
 	extraBottom := extra
 
@@ -52,7 +63,7 @@ func (e *engine) adjustTextBoxMetrics(
 	contentDescent := descent
 
 	switch over {
-	case "cap":
+	case textBoxEdgeCapKeyword:
 		if capH := e.fontCapHeightFace(face, size); capH > 0 && capH < contentAscent {
 			contentAscent = capH
 		}
@@ -62,8 +73,7 @@ func (e *engine) adjustTextBoxMetrics(
 		}
 	}
 
-	switch under {
-	case "alphabetic":
+	if under == textBoxEdgeAlphaKeyword {
 		contentDescent = 0
 	}
 
@@ -82,23 +92,23 @@ func (e *engine) adjustTextBoxMetrics(
 
 func (e *engine) fontCapHeightFace(face *pdf.Font, size float64) float64 {
 	if face == nil || face.UnitsPerEm() <= 0 {
-		return size * 0.7
+		return size * textBoxCapRatio
 	}
 
-	cap := face.CapHeight()
-	if cap <= 0 {
-		return size * 0.7
+	capHeight := face.CapHeight()
+	if capHeight <= 0 {
+		return size * textBoxCapRatio
 	}
 
-	return float64(cap) * size / float64(face.UnitsPerEm())
+	return float64(capHeight) * size / float64(face.UnitsPerEm())
 }
 
 // fontExHeightFace approximates x-height when the face has no OS/2 xHeight.
 func (e *engine) fontExHeightFace(face *pdf.Font, size float64) float64 {
-	cap := e.fontCapHeightFace(face, size)
-	if cap > 0 {
-		return cap * 0.7
+	capHeight := e.fontCapHeightFace(face, size)
+	if capHeight > 0 {
+		return capHeight * textBoxCapRatio
 	}
 
-	return size * 0.5
+	return size * textBoxExRatio
 }

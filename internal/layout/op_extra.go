@@ -25,6 +25,7 @@ type opExtra struct {
 	// FontFeatures is the canonical OpenType feature list string built from
 	// font-feature-settings / font-kerning / font-variant-* for the shaper.
 	FontFeatures string
+	NoFakeBold   bool
 	// BlendGroup is the owning CSS element group (mix-blend-mode or
 	// isolation: isolate). GroupMark flags begin/end boundary markers that
 	// carry the group without painting.
@@ -313,7 +314,7 @@ func (op Op) withFontFeatures(value string) Op {
 }
 
 func (op Op) withTextAutospace(value string) Op {
-	if value == "" || value == "no-autospace" {
+	if value == "" || value == textAutospaceNone {
 		return op
 	}
 
@@ -326,28 +327,31 @@ func (op Op) withTextAutospace(value string) Op {
 
 // decorateTextOp attaches language, OpenType features, and synthesis gates
 // shared by every OpText emit site.
-func decorateTextOp(op Op, sty *ResolvedStyle) Op {
+func decorateTextOp(paintOp Op, sty *ResolvedStyle) Op {
 	if sty == nil {
-		return op
+		return paintOp
 	}
 
-	op = op.withTextTransform(sty.TextTransform).
+	paintOp = paintOp.withTextTransform(sty.TextTransform).
 		withTextLanguage(fontShapingLanguage(sty)).
 		withFontFeatures(fontShapingFeatureSettings(sty)).
 		withTextAutospace(sty.TextAutospace)
+
 	if textOpDisablesFakeBold(sty) {
-		op.NoFakeBold = true
-	}
-	if needsFakeOblique(sty, op.Font) {
-		op.FakeOblique = true
-	}
-	if r, g, b, ok := fontPaletteFill(sty, op.Font); ok {
-		op.R, op.G, op.B = r, g, b
-	} else if r, g, b, ok := fontVariantEmojiFill(sty, op.Text); ok {
-		op.R, op.G, op.B = r, g, b
+		paintOp.detachExtra().NoFakeBold = true
 	}
 
-	return op
+	if needsFakeOblique(sty, paintOp.Font) {
+		paintOp.FakeOblique = true
+	}
+
+	if r, g, b, ok := fontPaletteFill(sty, paintOp.Font); ok {
+		paintOp.R, paintOp.G, paintOp.B = r, g, b
+	} else if r, g, b, ok := fontVariantEmojiFill(sty, paintOp.Text); ok {
+		paintOp.R, paintOp.G, paintOp.B = r, g, b
+	}
+
+	return paintOp
 }
 
 func cloneOpExtra(src *opExtra) *opExtra {

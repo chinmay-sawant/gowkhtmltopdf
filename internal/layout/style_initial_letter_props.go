@@ -1,6 +1,7 @@
 package layout
 
 import (
+	"math"
 	"strconv"
 	"strings"
 )
@@ -58,12 +59,25 @@ func applyInitialLetterValue(style *ResolvedStyle, value string) bool {
 		return false
 	}
 
-	size, err := strconv.ParseFloat(tokens[0], 64)
-	if err != nil || size < 1 {
+	size, sink, ok := parseInitialLetterTokens(tokens)
+	if !ok {
 		return false
 	}
 
-	sink := int(size + 0.5) // drop default: sink == size
+	style.InitialLetterSize = size
+	style.InitialLetterSink = sink
+
+	return true
+}
+
+//nolint:cyclop // Initial-letter grammar keeps drop, raise, and sink visible.
+func parseInitialLetterTokens(tokens []string) (float64, int, bool) {
+	size, err := strconv.ParseFloat(tokens[0], 64)
+	if err != nil || size < 1 {
+		return 0, 0, false
+	}
+
+	sink := int(math.Round(size))
 	raise := false
 	sawSink := false
 
@@ -76,7 +90,7 @@ func applyInitialLetterValue(style *ResolvedStyle, value string) bool {
 		default:
 			n, nErr := strconv.Atoi(tok)
 			if nErr != nil || n < 1 || sawSink {
-				return false
+				return 0, 0, false
 			}
 
 			sink = n
@@ -88,10 +102,7 @@ func applyInitialLetterValue(style *ResolvedStyle, value string) bool {
 		sink = 1
 	}
 
-	style.InitialLetterSize = size
-	style.InitialLetterSink = sink
-
-	return true
+	return size, sink, true
 }
 
 func applyInitialLetterAlignValue(style *ResolvedStyle, value string) bool {

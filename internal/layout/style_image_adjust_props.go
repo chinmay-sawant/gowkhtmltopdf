@@ -355,7 +355,7 @@ func parseObjectViewBox(raw string) (string, bool) {
 		return canonicalInsetViewBox(args)
 	case "xywh", objectViewBoxRectShape:
 		return canonicalRectViewBox(name, args)
-	case "circle", "ellipse", "polygon":
+	case listStyleCircle, "ellipse", "polygon":
 		return name + "(" + args + ")", true
 	default:
 		return "", false

@@ -847,12 +847,14 @@ func pdfPaintOpacity(paintOp *Op, includeAlpha bool) float64 {
 
 // FakeBoldFor reports whether CSS bold should be synthesized for op (Latin
 // only; CJK stroking produces streak artifacts).
-func FakeBoldFor(op *Op) bool {
-	if op == nil || op.NoFakeBold || !op.Bold || (op.Font != nil && op.Font.Bold()) {
+func FakeBoldFor(paintOp *Op) bool {
+	noFakeBold := paintOp != nil && paintOp.opExtra != nil && paintOp.opExtra.NoFakeBold
+	if paintOp == nil || noFakeBold || !paintOp.Bold ||
+		(paintOp.Font != nil && paintOp.Font.Bold()) {
 		return false
 	}
 
-	for _, r := range op.Text {
+	for _, r := range paintOp.Text {
 		if r > maxLatin1Rune {
 			return false
 		}
@@ -1516,7 +1518,7 @@ func drawLine(chld *pdf.Content, paintOp *Op, pageIdx int, contentH float64, opt
 	chld.SetLineCap(0) // restore PDF default butt for later strokes
 }
 
-func drawText(
+func drawText( //nolint:cyclop
 	chld *pdf.Content, paintOp *Op, pageIdx int, contentH float64, opts PaintOptions, pageH float64, fontName string,
 ) {
 	paintOp.bindEmptyExtra()
@@ -1537,17 +1539,21 @@ func drawText(
 	if paintOp.FakeOblique {
 		skew = synthObliqueSkew
 	}
+
 	if paintOp.RotateDeg == 90 || paintOp.RotateDeg == -90 {
 		if paintOp.RotateDeg < 0 {
 			chld.TextMatrix(0, -1, 1, 0, posX, posY)
 		} else {
 			chld.TextMatrix(0, 1, -1, 0, posX, posY)
 		}
-	} else if skew != 0 {
-		// Shear in PDF text space: x' = x + skew*y (italic lean).
-		chld.TextMatrix(1, 0, skew, 1, posX, posY)
 	} else {
-		chld.TextAt(posX, posY)
+		switch {
+		case skew != 0:
+			// Shear in PDF text space: x' = x + skew*y (italic lean).
+			chld.TextMatrix(1, 0, skew, 1, posX, posY)
+		default:
+			chld.TextAt(posX, posY)
+		}
 	}
 
 	chld.SetCharSpacing(paintOp.LetterSpacing)

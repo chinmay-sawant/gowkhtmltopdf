@@ -1038,7 +1038,7 @@ func romanMarker(node int, upper bool) string {
 // placeFloat lays out n as a float:left|right box and records it in floats.
 // Consecutive same-side floats pack horizontally when width remains;
 // otherwise they stack below the previous float bottom.
-func (e *engine) placeFloat(
+func (e *engine) placeFloat( //nolint:cyclop,funlen
 	node *html.Node, cstate ResolvedStyle, floats *floatState, contentW, contentX, posY, curY float64,
 ) *box {
 	flowY := posY + curY

@@ -6,6 +6,8 @@ import (
 	"strings"
 )
 
+const aspectRatioPartCount = 2
+
 // applyAspectRatioProps owns aspect-ratio. The ratio is width/height; 0 means
 // auto/unset. Layout consumers live in aspect_ratio.go.
 func applyAspectRatioProps(
@@ -72,24 +74,32 @@ func parseAspectRatio(raw string) (float64, bool) {
 
 func parseAspectRatioToken(tok string) (float64, bool) {
 	parts := strings.Split(tok, "/")
-	switch len(parts) {
-	case 1:
-		w, err := strconv.ParseFloat(parts[0], 64)
-		if err != nil || w <= 0 || math.IsNaN(w) || math.IsInf(w, 0) {
-			return 0, false
-		}
+	if len(parts) == 1 {
+		return parseAspectRatioNumber(parts[0])
+	}
 
-		return w, true
-	case 2:
-		w, errW := strconv.ParseFloat(strings.TrimSpace(parts[0]), 64)
-		h, errH := strconv.ParseFloat(strings.TrimSpace(parts[1]), 64)
-		if errW != nil || errH != nil || w <= 0 || h <= 0 ||
-			math.IsNaN(w) || math.IsNaN(h) || math.IsInf(w, 0) || math.IsInf(h, 0) {
-			return 0, false
-		}
-
-		return w / h, true
-	default:
+	if len(parts) != aspectRatioPartCount {
 		return 0, false
 	}
+
+	width, valid := parseAspectRatioNumber(parts[0])
+	if !valid {
+		return 0, false
+	}
+
+	height, valid := parseAspectRatioNumber(parts[1])
+	if !valid {
+		return 0, false
+	}
+
+	return width / height, true
+}
+
+func parseAspectRatioNumber(raw string) (float64, bool) {
+	number, err := strconv.ParseFloat(strings.TrimSpace(raw), 64)
+	if err != nil || number <= 0 || math.IsNaN(number) || math.IsInf(number, 0) {
+		return 0, false
+	}
+
+	return number, true
 }

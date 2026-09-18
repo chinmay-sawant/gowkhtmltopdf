@@ -1,4 +1,3 @@
-//nolint:cyclop // hyphenation limit + hanging-punctuation parsers
 package layout
 
 import (
@@ -67,7 +66,7 @@ func applyHyphenateLimitChars(style *ResolvedStyle, val string) {
 	}
 
 	parts := strings.Fields(val)
-	nums := make([]int, 0, 3)
+	nums := make([]int, 0, len(parts))
 
 	for _, part := range parts {
 		if part == "auto" {
@@ -84,25 +83,31 @@ func applyHyphenateLimitChars(style *ResolvedStyle, val string) {
 		nums = append(nums, n)
 	}
 
-	switch len(nums) {
-	case 1:
-		style.HyphenateLimitMinWord = nums[0]
-		style.HyphenateLimitMinBefore = 0
-		style.HyphenateLimitMinAfter = 0
-	case 2:
-		style.HyphenateLimitMinWord = nums[0]
-		style.HyphenateLimitMinBefore = nums[1]
-		style.HyphenateLimitMinAfter = nums[1]
-	case 3:
-		style.HyphenateLimitMinWord = nums[0]
-		style.HyphenateLimitMinBefore = nums[1]
+	if len(nums) == 0 || len(nums) > maxHyphenateLimitValues {
+		return
+	}
+
+	style.HyphenateLimitMinWord = nums[0]
+	style.HyphenateLimitMinBefore = 0
+	style.HyphenateLimitMinAfter = 0
+
+	if len(nums) == 1 {
+		return
+	}
+
+	style.HyphenateLimitMinBefore = nums[1]
+	style.HyphenateLimitMinAfter = nums[1]
+
+	if len(nums) == maxHyphenateLimitValues {
 		style.HyphenateLimitMinAfter = nums[2]
 	}
 }
 
+const maxHyphenateLimitValues = 3
+
 func isHyphenateLimitLastValue(val string) bool {
 	switch val {
-	case cssDisplayNone, "always", "column", "page", "spread":
+	case cssDisplayNone, "always", floatRefColumn, "page", "spread":
 		return true
 	default:
 		return false

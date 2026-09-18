@@ -171,7 +171,8 @@ func (e *engine) emitInlineImage(
 	if item.imgRef != nil && item.imgRef.data != nil && imgW > 0 && imgH > 0 {
 		imgData := item.imgRef.data
 		isJPEG := item.imgRef.isJPEG
-		sty := ResolvedStyle{}
+		sty := ResolvedStyle{} //nolint:exhaustruct // image paint defaults are filled conditionally
+
 		if item.style != nil {
 			sty = *item.style
 		}
@@ -428,7 +429,7 @@ func inlineBorderVisible(side border) bool {
 	return side.Width > 0 && side.Style != cssDisplayNone
 }
 
-//nolint:wsl // transform width and alignment are one geometry decision
+//nolint:cyclop,wsl // transform width and alignment are one geometry decision
 func (e *engine) emitInlineTextRun(
 	item *inlineItem,
 	run faceRun,
@@ -1615,6 +1616,7 @@ func (e *engine) accumulateTextFaceWidth(
 
 	runeCount := 0
 	spaceCount := 0
+
 	var prev rune
 
 	for _, runic := range cssSheet {
@@ -1681,6 +1683,8 @@ func (e *engine) tabStopAdvance(sty *ResolvedStyle, primary *pdf.Font, size floa
 
 // measureRuneFace measures a single rune with the same face selection as
 // measureTextFace, without allocating string(r).
+//
+//nolint:cyclop // rune measurement has separate tab, fallback, and spacing cases
 func (e *engine) measureRuneFace(curRune rune, sty *ResolvedStyle) float64 {
 	if sty == nil {
 		return 0
@@ -1720,6 +1724,7 @@ func (e *engine) measureRuneFace(curRune rune, sty *ResolvedStyle) float64 {
 	if em := emojiPresentationAdvance(sty, curRune, size); em > advance {
 		advance = em
 	}
+
 	if sty.LetterSpacing != 0 {
 		advance += sty.LetterSpacing * e.scale
 	}

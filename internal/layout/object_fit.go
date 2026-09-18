@@ -2,19 +2,25 @@ package layout
 
 import "strings"
 
-func replacedIntrinsicPt(e *engine, sty ResolvedStyle, ref *imageRef) (float64, float64) {
+const (
+	objectFitFill      = "fill"
+	objectFitScaleDown = "scale-down"
+)
+
+func replacedIntrinsicPt(eng *engine, sty ResolvedStyle, ref *imageRef) (float64, float64) {
 	if ref == nil || ref.w <= 0 || ref.h <= 0 {
 		return 0, 0
 	}
 
 	scale := imageResolutionScale(sty, ref)
-	w := pxToPt(float64(ref.w) * scale)
-	h := pxToPt(float64(ref.h) * scale)
-	if e != nil {
-		return e.scalePt(w), e.scalePt(h)
+	width := pxToPt(float64(ref.w) * scale)
+	height := pxToPt(float64(ref.h) * scale)
+
+	if eng != nil {
+		return eng.scalePt(width), eng.scalePt(height)
 	}
 
-	return w, h
+	return width, height
 }
 
 // objectFitPaintRect sizes and positions the replaced image inside its content
@@ -23,21 +29,22 @@ func replacedIntrinsicPt(e *engine, sty ResolvedStyle, ref *imageRef) (float64, 
 func objectFitPaintRect(
 	fit string, posX, posY string,
 	boxX, boxY, boxW, boxH, intrinsicW, intrinsicH float64,
-) (imgX, imgY, imgW, imgH float64, clip bool) {
+) (float64, float64, float64, float64, bool) {
 	fit = strings.ToLower(strings.TrimSpace(fit))
 	if fit == "" {
-		fit = "fill"
+		fit = objectFitFill
 	}
 
-	imgW, imgH = objectFitSize(fit, boxW, boxH, intrinsicW, intrinsicH)
-	imgX, imgY = resolveBackgroundPosition(posX, posY, boxX, boxY, boxW, boxH, imgW, imgH)
-	clip = fit == "cover" || fit == "none" || fit == "scale-down"
+	imgW, imgH := objectFitSize(fit, boxW, boxH, intrinsicW, intrinsicH)
+	imgX, imgY := resolveBackgroundPosition(posX, posY, boxX, boxY, boxW, boxH, imgW, imgH)
+	clip := fit == "cover" || fit == "none" || fit == objectFitScaleDown
 
 	return imgX, imgY, imgW, imgH, clip && (imgW > boxW+0.01 || imgH > boxH+0.01 ||
 		imgX < boxX-0.01 || imgY < boxY-0.01 ||
 		imgX+imgW > boxX+boxW+0.01 || imgY+imgH > boxY+boxH+0.01)
 }
 
+//nolint:cyclop // object-fit has separate contain, cover, none, and scale-down rules
 func objectFitSize(fit string, boxW, boxH, intrinsicW, intrinsicH float64) (float64, float64) {
 	switch fit {
 	case "contain":
@@ -50,7 +57,7 @@ func objectFitSize(fit string, boxW, boxH, intrinsicW, intrinsicH float64) (floa
 		}
 
 		return boxW, boxH
-	case "scale-down":
+	case objectFitScaleDown:
 		noneW, noneH := intrinsicW, intrinsicH
 		if noneW <= 0 || noneH <= 0 {
 			return boxW, boxH

@@ -7,6 +7,7 @@ import (
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
 )
 
+//nolint:cyclop,funlen // this regression test checks several independent column invariants
 func TestColumnHeightCapsColumn(t *testing.T) {
 	t.Parallel()
 
@@ -33,6 +34,7 @@ func TestColumnHeightCapsColumn(t *testing.T) {
 </body></html>`)
 	styles := resolveStyles(root, []*css.Stylesheet{cssSheet}, "print", 500, 800)
 	st := styleByClass(t, styles, "mc")
+
 	if st.ColumnHeight < 47 || st.ColumnHeight > 49 {
 		t.Fatalf("column-height stored=%.1f, want ~48", st.ColumnHeight)
 	}
@@ -54,27 +56,28 @@ func TestColumnHeightCapsColumn(t *testing.T) {
 </div>
 </body></html>`, cssSheet)
 
-	var ys []float64
-	for _, op := range res.Ops {
-		if op.Kind != OpText || op.Text == "" {
+	textYs := make([]float64, 0, len(res.Ops))
+
+	for _, textOp := range res.Ops {
+		if textOp.Kind != OpText || textOp.Text == "" {
 			continue
 		}
 
-		ys = append(ys, op.Y)
+		textYs = append(textYs, textOp.Y)
 	}
 
-	if len(ys) < 4 {
-		t.Fatalf("expected multicol text ops, got %d", len(ys))
+	if len(textYs) < 4 {
+		t.Fatalf("expected multicol text ops, got %d", len(textYs))
 	}
 
-	minY, maxY := ys[0], ys[0]
-	for _, y := range ys[1:] {
-		if y < minY {
-			minY = y
+	minY, maxY := textYs[0], textYs[0]
+	for _, textY := range textYs[1:] {
+		if textY < minY {
+			minY = textY
 		}
 
-		if y > maxY {
-			maxY = y
+		if textY > maxY {
+			maxY = textY
 		}
 	}
 
@@ -85,15 +88,17 @@ func TestColumnHeightCapsColumn(t *testing.T) {
 		t.Fatalf("text Y span=%.1f; want a second row past column-height 48", span)
 	}
 
-	for _, y := range ys {
-		band := math.Floor((y - minY) / 48)
+	for _, textY := range textYs {
+		band := math.Floor((textY - minY) / 48)
 		top := minY + band*48
-		if y-top > 50 {
-			t.Fatalf("text y=%.1f exceeds ~48pt band from %.1f", y, top)
+
+		if textY-top > 50 {
+			t.Fatalf("text y=%.1f exceeds ~48pt band from %.1f", textY, top)
 		}
 	}
 }
 
+//nolint:cyclop,funlen // this regression test checks wrap, labels, and row span
 func TestColumnWrapCreatesRow(t *testing.T) {
 	t.Parallel()
 
@@ -112,6 +117,7 @@ func TestColumnWrapCreatesRow(t *testing.T) {
 	root := mustParse(t, `<html><body><div class="mc">x</div></body></html>`)
 	styles := resolveStyles(root, []*css.Stylesheet{cssSheet}, "print", 500, 800)
 	st := styleByClass(t, styles, "mc")
+
 	if st.ColumnWrap != columnWrapWrap {
 		t.Fatalf("column-wrap=%q, want wrap", st.ColumnWrap)
 	}
@@ -131,9 +137,10 @@ func TestColumnWrapCreatesRow(t *testing.T) {
 </div>
 </body></html>`, cssSheet)
 
-	ys := map[string]float64{}
-	for _, op := range res.Ops {
-		if op.Kind != OpText {
+	labelY := map[string]float64{}
+
+	for _, textOp := range res.Ops {
+		if textOp.Kind != OpText {
 			continue
 		}
 
@@ -141,24 +148,24 @@ func TestColumnWrapCreatesRow(t *testing.T) {
 			"Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot",
 			"Golf", "Hotel", "India", "Juliet",
 		} {
-			if len(op.Text) >= len(key) && op.Text[:len(key)] == key {
-				ys[key] = op.Y
+			if len(textOp.Text) >= len(key) && textOp.Text[:len(key)] == key {
+				labelY[key] = textOp.Y
 			}
 		}
 	}
 
-	if len(ys) < 6 {
-		t.Fatalf("missing multicol labels: %v", ys)
+	if len(labelY) < 6 {
+		t.Fatalf("missing multicol labels: %v", labelY)
 	}
 
 	minY, maxY := math.Inf(1), math.Inf(-1)
-	for _, y := range ys {
-		if y < minY {
-			minY = y
+	for _, textY := range labelY {
+		if textY < minY {
+			minY = textY
 		}
 
-		if y > maxY {
-			maxY = y
+		if textY > maxY {
+			maxY = textY
 		}
 	}
 
@@ -184,12 +191,13 @@ func TestColumnWrapNowrapStopsAfterOneRow(t *testing.T) {
 `)
 	root := mustParse(t, `<html><body><div class="mc">x</div></body></html>`)
 	styles := resolveStyles(root, []*css.Stylesheet{cssSheet}, "print", 500, 800)
-	st := styleByClass(t, styles, "mc")
-	if st.ColumnWrap != columnWrapNowrap {
-		t.Fatalf("column-wrap=%q, want nowrap", st.ColumnWrap)
+	columnStyle := styleByClass(t, styles, "mc")
+
+	if columnStyle.ColumnWrap != columnWrapNowrap {
+		t.Fatalf("column-wrap=%q, want nowrap", columnStyle.ColumnWrap)
 	}
 
-	if columnWrapCreatesRows(*st) {
+	if columnWrapCreatesRows(*columnStyle) {
 		t.Fatal("nowrap must not open extra block-direction rows")
 	}
 
@@ -235,12 +243,13 @@ func TestColumnWrapAutoCreatesRowWhenHeightSet(t *testing.T) {
 `)
 	root := mustParse(t, `<html><body><div class="mc">x</div></body></html>`)
 	styles := resolveStyles(root, []*css.Stylesheet{cssSheet}, "print", 500, 800)
-	st := styleByClass(t, styles, "mc")
-	if st.ColumnWrap != columnWrapAuto {
-		t.Fatalf("column-wrap=%q, want auto", st.ColumnWrap)
+	columnStyle := styleByClass(t, styles, "mc")
+
+	if columnStyle.ColumnWrap != columnWrapAuto {
+		t.Fatalf("column-wrap=%q, want auto", columnStyle.ColumnWrap)
 	}
 
-	if !columnWrapCreatesRows(*st) {
+	if !columnWrapCreatesRows(*columnStyle) {
 		t.Fatal("auto with column-height must wrap to extra rows")
 	}
 
@@ -269,12 +278,13 @@ func TestColumnWrapAutoCreatesRowWhenHeightSet(t *testing.T) {
 	}
 }
 
-func columnWrapLabelYSpan(t *testing.T, res *Result) (minY, maxY float64, n int) {
+func columnWrapLabelYSpan(t *testing.T, res *Result) (float64, float64, int) {
 	t.Helper()
 
-	ys := map[string]float64{}
-	for _, op := range res.Ops {
-		if op.Kind != OpText {
+	labelY := map[string]float64{}
+
+	for _, textOp := range res.Ops {
+		if textOp.Kind != OpText {
 			continue
 		}
 
@@ -282,26 +292,26 @@ func columnWrapLabelYSpan(t *testing.T, res *Result) (minY, maxY float64, n int)
 			"Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot",
 			"Golf", "Hotel", "India", "Juliet",
 		} {
-			if len(op.Text) >= len(key) && op.Text[:len(key)] == key {
-				ys[key] = op.Y
+			if len(textOp.Text) >= len(key) && textOp.Text[:len(key)] == key {
+				labelY[key] = textOp.Y
 			}
 		}
 	}
 
-	if len(ys) == 0 {
+	if len(labelY) == 0 {
 		return 0, 0, 0
 	}
 
-	minY, maxY = math.Inf(1), math.Inf(-1)
-	for _, y := range ys {
-		if y < minY {
-			minY = y
+	minY, maxY := math.Inf(1), math.Inf(-1)
+	for _, textY := range labelY {
+		if textY < minY {
+			minY = textY
 		}
 
-		if y > maxY {
-			maxY = y
+		if textY > maxY {
+			maxY = textY
 		}
 	}
 
-	return minY, maxY, len(ys)
+	return minY, maxY, len(labelY)
 }

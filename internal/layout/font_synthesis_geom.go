@@ -7,11 +7,16 @@ import (
 )
 
 const (
-	synthSmallCapsScale  = 0.8
-	synthSubSuperScale   = 0.65
-	synthSubShiftRatio   = 0.2
-	synthSuperShiftRatio = 0.35
-	synthObliqueSkew     = 0.22
+	synthSmallCapsScale      = 0.8
+	synthSubSuperScale       = 0.65
+	synthSubShiftRatio       = 0.2
+	synthSuperShiftRatio     = 0.35
+	synthObliqueSkew         = 0.22
+	fontWidthReference       = 100
+	fontVariantCapsSmall     = "small-caps"
+	fontVariantCapsAllSmall  = "all-small-caps"
+	fontVariantCapsPetite    = "petite-caps"
+	fontVariantCapsAllPetite = "all-petite-caps"
 )
 
 func fontWidthScale(sty *ResolvedStyle) float64 {
@@ -19,7 +24,7 @@ func fontWidthScale(sty *ResolvedStyle) float64 {
 		return 1
 	}
 
-	return sty.FontWidth / 100
+	return sty.FontWidth / fontWidthReference
 }
 
 func synthesizeSmallCapsText(sty *ResolvedStyle, text string) (string, float64) {
@@ -28,22 +33,22 @@ func synthesizeSmallCapsText(sty *ResolvedStyle, text string) (string, float64) 
 	}
 
 	switch sty.FontVariantCaps {
-	case "small-caps", "all-small-caps", "petite-caps", "all-petite-caps":
+	case fontVariantCapsSmall, fontVariantCapsAllSmall, fontVariantCapsPetite, fontVariantCapsAllPetite:
 		return strings.ToUpper(text), synthSmallCapsScale
 	default:
 		return text, 1
 	}
 }
 
-func synthesizePositionAdjust(sty *ResolvedStyle, size float64) (scale, baselineShift float64) {
+func synthesizePositionAdjust(sty *ResolvedStyle, size float64) (float64, float64) {
 	if sty == nil || !sty.FontSynthesisPosition {
 		return 1, 0
 	}
 
 	switch sty.FontVariantPosition {
-	case "sub":
+	case verticalAlignSub:
 		return synthSubSuperScale, size * synthSubShiftRatio
-	case "super":
+	case verticalAlignSuper:
 		return synthSubSuperScale, -size * synthSuperShiftRatio
 	default:
 		return 1, 0

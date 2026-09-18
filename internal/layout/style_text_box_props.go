@@ -1,4 +1,3 @@
-//nolint:cyclop // text-box shorthand + longhand parsers
 package layout
 
 import "strings"
@@ -47,6 +46,7 @@ func applyTextBoxShorthand(style *ResolvedStyle, val string) {
 	}
 
 	rest := parts
+
 	if trim, ok := parseTextBoxTrim(parts[0]); ok {
 		style.TextBoxTrim = trim
 		rest = parts[1:]
@@ -64,14 +64,16 @@ func applyTextBoxShorthand(style *ResolvedStyle, val string) {
 
 func parseTextBoxTrim(val string) (string, bool) {
 	switch val {
-	case cssDisplayNone, "trim-start", "trim-end", "trim-both":
+	case cssDisplayNone, textBoxTrimStartKeyword, "trim-end", textBoxTrimBothKeyword:
 		return val, true
 	default:
 		return "", false
 	}
 }
 
-func parseTextBoxEdge(val string) (over, under string, ok bool) {
+const textBoxEdgePartCount = 2
+
+func parseTextBoxEdge(val string) (string, string, bool) {
 	parts := strings.Fields(val)
 	switch len(parts) {
 	case 1:
@@ -83,7 +85,7 @@ func parseTextBoxEdge(val string) (over, under string, ok bool) {
 		default:
 			return "", "", false
 		}
-	case 2:
+	case textBoxEdgePartCount:
 		if !isTextBoxEdgeOver(parts[0]) || !isTextBoxEdgeUnder(parts[1]) {
 			return "", "", false
 		}

@@ -25,6 +25,7 @@ func applyFontWidthProps(
 	return true
 }
 
+//nolint:cyclop,mnd // CSS keyword table intentionally mirrors the spec values.
 func parseFontWidthValue(raw string) (float64, bool) {
 	value := strings.ToLower(strings.TrimSpace(raw))
 	if value == "" {

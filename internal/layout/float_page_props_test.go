@@ -30,6 +30,7 @@ body { margin: 0; font-size: 10pt; }
 		root, err := html.Parse(`<html><body>
 <div class="box"><div class="f">F</div><span>following text wraps beside the float.</span></div>
 </body></html>`)
+
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -63,6 +64,8 @@ body { margin: 0; font-size: 10pt; }
 
 // float-reference:inline documents the current BFC: the float still packs
 // beside following inline content (no page/column relocation).
+//
+//nolint:cyclop,funlen // this regression test checks parsing and painted float geometry
 func TestFloatReferenceInline(t *testing.T) {
 	t.Parallel()
 
@@ -81,6 +84,7 @@ body { margin: 0; font-size: 10pt; }
 	root, err := html.Parse(`<html><body>
 <div class="box"><div class="f">F</div><span>following text wraps beside the float.</span></div>
 </body></html>`)
+
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,20 +106,21 @@ body { margin: 0; font-size: 10pt; }
 	}
 
 	var floatX, followX float64
+
 	var sawF, sawFollow bool
 
-	for _, op := range res.Ops {
-		if op.Kind != OpText {
+	for _, textOp := range res.Ops {
+		if textOp.Kind != OpText {
 			continue
 		}
 
-		if strings.TrimSpace(op.Text) == "F" {
-			floatX = op.X
+		if strings.TrimSpace(textOp.Text) == "F" {
+			floatX = textOp.X
 			sawF = true
 		}
 
-		if strings.Contains(op.Text, "following") {
-			followX = op.X
+		if strings.Contains(textOp.Text, "following") {
+			followX = textOp.X
 			sawFollow = true
 		}
 	}
@@ -131,10 +136,12 @@ body { margin: 0; font-size: 10pt; }
 
 // float-reference:page uses the page content box, so a nested 50% float is
 // wider (or further left) than the same float with float-reference:inline.
+//
+//nolint:cyclop,funlen // this regression test compares two reference coordinate systems
 func TestFloatReferencePageVsInline(t *testing.T) {
 	t.Parallel()
 
-	layoutRef := func(ref string) (x, w float64, stored string) {
+	layoutRef := func(ref string) (float64, float64, string) {
 		t.Helper()
 
 		cssSheet := sheet(t, `
@@ -151,6 +158,7 @@ body { margin: 0; font-size: 10pt; }
 		root, err := html.Parse(`<html><body>
 <div class="box"><div class="f">F</div><span>beside</span></div>
 </body></html>`)
+
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -165,21 +173,23 @@ body { margin: 0; font-size: 10pt; }
 		styles := resolveStylesWith(root, Options{
 			Sheets: []*css.Stylesheet{cssSheet}, Media: "print", Width: 300, Height: 200,
 		}, nil)
-		stored = styleRecordsByClass(t, root, styles, "f")[0].FloatReference
+		stored := styleRecordsByClass(t, root, styles, "f")[0].FloatReference
 
 		var textX float64
+
 		var boxW float64
+
 		var sawF bool
 
-		for _, op := range res.Ops {
-			if op.Kind == OpText && strings.TrimSpace(op.Text) == "F" {
-				textX = op.X
+		for _, textOp := range res.Ops {
+			if textOp.Kind == OpText && strings.TrimSpace(textOp.Text) == "F" {
+				textX = textOp.X
 				sawF = true
 			}
 
-			if op.Kind == OpFillRect && op.H > 20 && op.H < 28 {
-				if op.W > boxW {
-					boxW = op.W
+			if textOp.Kind == OpFillRect && textOp.H > 20 && textOp.H < 28 {
+				if textOp.W > boxW {
+					boxW = textOp.W
 				}
 			}
 		}
@@ -204,6 +214,7 @@ body { margin: 0; font-size: 10pt; }
 
 	widthDiffers := pgW > inW+20
 	xDiffers := pgX < inX-20
+
 	if !widthDiffers && !xDiffers {
 		t.Fatalf("page vs inline: page x=%.1f w=%.1f, inline x=%.1f w=%.1f; want page left of BFC or wider page CB",
 			pgX, pgW, inX, inW)
@@ -225,13 +236,13 @@ func TestFloatPagePropsApply(t *testing.T) {
 		Sheets: []*css.Stylesheet{cssSheet}, Media: "print", Width: testViewport, Height: 800,
 	}, nil)
 
-	a := styleRecordsByClass(t, root, styles, "a")[0]
-	if a.FloatOffset <= 0 || a.FloatOffsetPercent >= 0 {
-		t.Fatalf("a float-offset pt=%v pct=%v", a.FloatOffset, a.FloatOffsetPercent)
+	aStyle := styleRecordsByClass(t, root, styles, "a")[0]
+	if aStyle.FloatOffset <= 0 || aStyle.FloatOffsetPercent >= 0 {
+		t.Fatalf("a float-offset pt=%v pct=%v", aStyle.FloatOffset, aStyle.FloatOffsetPercent)
 	}
 
-	if a.FloatReference != floatRefPage {
-		t.Fatalf("a float-reference=%q", a.FloatReference)
+	if aStyle.FloatReference != floatRefPage {
+		t.Fatalf("a float-reference=%q", aStyle.FloatReference)
 	}
 
 	b := styleRecordsByClass(t, root, styles, "b")[0]

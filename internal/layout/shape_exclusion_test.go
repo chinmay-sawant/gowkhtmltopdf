@@ -10,6 +10,8 @@ import (
 
 // A left float with shape-outside:circle(50%) must shorten mid-height lines
 // more than near-top lines (contour wrap, not a full rectangle).
+//
+//nolint:cyclop,funlen // shape regression checks parsing, layout, and contour geometry
 func TestShapeOutsideCircleShortensLines(t *testing.T) {
 	t.Parallel()
 
@@ -41,11 +43,11 @@ body { margin: 0; font-size: 10pt; line-height: 12pt; }
 		t.Fatal(err)
 	}
 
-	var texts []Op
+	texts := make([]Op, 0, len(res.Ops))
 
-	for _, op := range res.Ops {
-		if op.Kind == OpText && strings.Contains(op.Text, "word") {
-			texts = append(texts, op)
+	for _, textOp := range res.Ops {
+		if textOp.Kind == OpText && strings.Contains(textOp.Text, "word") {
+			texts = append(texts, textOp)
 		}
 	}
 
@@ -55,6 +57,7 @@ body { margin: 0; font-size: 10pt; line-height: 12pt; }
 
 	// Group by Y; pick a near-top line and a mid-float line.
 	first := texts[0]
+
 	var mid *Op
 
 	for i := range texts {
@@ -84,6 +87,8 @@ body { margin: 0; font-size: 10pt; line-height: 12pt; }
 
 // shape-margin expands the exclusion so mid-line text starts further right
 // than the same circle without a margin.
+//
+//nolint:cyclop,funlen // shape-margin regression compares two full layout passes
 func TestShapeMarginExpandsExclusion(t *testing.T) {
 	t.Parallel()
 
@@ -106,6 +111,7 @@ body { margin: 0; font-size: 10pt; line-height: 12pt; }
 		root, err := html.Parse(`<html><body>
 <div class="box"><div class="f">F</div><p style="margin:0">` + words + `</p></div>
 </body></html>`)
+
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -118,23 +124,25 @@ body { margin: 0; font-size: 10pt; line-height: 12pt; }
 		}
 
 		var midX float64
+
 		var firstY float64
+
 		seen := false
 
-		for _, op := range res.Ops {
-			if op.Kind != OpText || !strings.Contains(op.Text, "word") {
+		for _, textOp := range res.Ops {
+			if textOp.Kind != OpText || !strings.Contains(textOp.Text, "word") {
 				continue
 			}
 
 			if !seen {
-				firstY = op.Y
+				firstY = textOp.Y
 				seen = true
 
 				continue
 			}
 
-			if op.Y > firstY+30 && op.Y < firstY+55 {
-				midX = op.X
+			if textOp.Y > firstY+30 && textOp.Y < firstY+55 {
+				midX = textOp.X
 
 				break
 			}
@@ -174,28 +182,28 @@ func TestShapeOutsideApplyParsesBasicShapes(t *testing.T) {
 		Sheets: []*css.Stylesheet{cssSheet}, Media: "print", Width: testViewport, Height: 800,
 	}, nil)
 
-	a := styleRecordsByClass(t, root, styles, "a")[0]
-	b := styleRecordsByClass(t, root, styles, "b")[0]
-	c := styleRecordsByClass(t, root, styles, "c")[0]
-	d := styleRecordsByClass(t, root, styles, "d")[0]
+	aStyle := styleRecordsByClass(t, root, styles, "a")[0]
+	bStyle := styleRecordsByClass(t, root, styles, "b")[0]
+	cStyle := styleRecordsByClass(t, root, styles, "c")[0]
+	dStyle := styleRecordsByClass(t, root, styles, "d")[0]
 
-	if a.ShapeOutside != "circle(50% at 50% 50%)" {
-		t.Fatalf("a shape-outside=%q", a.ShapeOutside)
+	if aStyle.ShapeOutside != "circle(50% at 50% 50%)" {
+		t.Fatalf("a shape-outside=%q", aStyle.ShapeOutside)
 	}
 
-	if a.ShapeMargin <= 0 || a.ShapeMarginPercent >= 0 {
-		t.Fatalf("a shape-margin pt=%v pct=%v", a.ShapeMargin, a.ShapeMarginPercent)
+	if aStyle.ShapeMargin <= 0 || aStyle.ShapeMarginPercent >= 0 {
+		t.Fatalf("a shape-margin pt=%v pct=%v", aStyle.ShapeMargin, aStyle.ShapeMarginPercent)
 	}
 
-	if b.ShapeOutside != "ellipse(40% 30%)" {
-		t.Fatalf("b shape-outside=%q", b.ShapeOutside)
+	if bStyle.ShapeOutside != "ellipse(40% 30%)" {
+		t.Fatalf("b shape-outside=%q", bStyle.ShapeOutside)
 	}
 
-	if c.ShapeOutside != "inset(10px 20px)" {
-		t.Fatalf("c shape-outside=%q", c.ShapeOutside)
+	if cStyle.ShapeOutside != "inset(10px 20px)" {
+		t.Fatalf("c shape-outside=%q", cStyle.ShapeOutside)
 	}
 
-	if d.ShapeOutside != shapeOutsideNone {
-		t.Fatalf("polygon must stay unsupported (initial), got %q", d.ShapeOutside)
+	if dStyle.ShapeOutside != shapeOutsideNone {
+		t.Fatalf("polygon must stay unsupported (initial), got %q", dStyle.ShapeOutside)
 	}
 }

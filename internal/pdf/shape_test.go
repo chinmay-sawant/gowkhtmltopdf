@@ -290,6 +290,7 @@ func TestParseFontFeatureSettingsSaltChangesDejaVuGlyph(t *testing.T) {
 	fnt := bundledDejaVu(t)
 	plain := ShapeTextFontWithFeatures("a", fnt, nil)
 	salt := ShapeTextFontWithFeatures("a", fnt, ParseFontFeatureSettings(`"salt" 1`))
+
 	if salt == plain {
 		t.Fatalf("DejaVu salt should substitute glyph/text, plain=%q salt=%q", plain, salt)
 	}
@@ -308,9 +309,9 @@ func TestShapeTextFontWithFeaturesCJKStillSafe(t *testing.T) {
 	t.Parallel()
 	// Face may lack halt/palt tables; requesting features must not panic
 	// or break the ShapeTextFont path for CJK punctuation.
-	f := loadDejaVu(t)
+	font := loadDejaVu(t)
 
-	got := ShapeTextFontWithFeatures("你好。", f, ParseFontFeatureSettings(`"halt" 1, "palt" 1`))
+	got := ShapeTextFontWithFeatures("你好。", font, ParseFontFeatureSettings(`"halt" 1, "palt" 1`))
 	if got == "" {
 		t.Fatal("empty shaped text")
 	}
@@ -319,18 +320,19 @@ func TestShapeTextFontWithFeaturesCJKStillSafe(t *testing.T) {
 func TestShapeTextFontWithFeaturesKernOff(t *testing.T) {
 	t.Parallel()
 
-	f := loadDejaVu(t)
+	font := loadDejaVu(t)
+
 	feats := ParseFontFeatureSettings(`"kern" 0`)
 	if len(feats) != 1 || feats[0].Value != 0 {
 		t.Fatalf("kern off parse = %+v", feats)
 	}
 
-	got := ShapeTextFontWithFeatures("AV", f, feats)
+	got := ShapeTextFontWithFeatures("AV", font, feats)
 	if got == "" {
 		t.Fatal("empty shaped text with kern off")
 	}
 
-	run := ShapeRunWithFeaturesLanguage("AV", f, 12, feats, "")
+	run := ShapeRunWithFeaturesLanguage("AV", font, 12, feats, "")
 	if run.Text == "" || len(run.Runes) == 0 {
 		t.Fatalf("ShapeRunWithFeaturesLanguage = %+v", run)
 	}

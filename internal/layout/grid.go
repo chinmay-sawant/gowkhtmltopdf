@@ -716,6 +716,8 @@ func resolveGridUsedHeight(eng *engine, sty ResolvedStyle, usedH, contentH float
 // resolveUsedWidth computes border-box width. WidthPercent against a
 // non-positive (indefinite) availW is treated as auto (fill remaining).
 // Shared by flex/grid/multicol (block keeps its own min/max/margin-auto path).
+//
+//nolint:cyclop,nestif // used-width resolution follows CSS percentage and auto rules
 func resolveUsedWidth(sty ResolvedStyle, availW float64, engN *engine) float64 {
 	ml, mr := engN.scalePt(sty.MarginLeft), engN.scalePt(sty.MarginRight)
 

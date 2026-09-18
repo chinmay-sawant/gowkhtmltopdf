@@ -1,4 +1,4 @@
-//nolint:cyclop,funlen,paralleltest // phase 87.1 property proofs
+//nolint:cyclop // phase 87.1 property proofs
 package layout
 
 import (
@@ -61,28 +61,28 @@ func TestGridAutoColumns(t *testing.T) {
 <div class="g"><div class="a">A</div><div class="b">B</div></div>
 </body></html>`, cssSheet)
 
-	var aW, bW float64
+	var areaW, blockW float64
 
-	for _, op := range res.Ops {
-		if op.Kind != OpFillRect {
+	for _, fillOp := range res.Ops {
+		if fillOp.Kind != OpFillRect {
 			continue
 		}
 
-		if op.R > 0.5 && op.G < 0.2 {
-			aW = op.W
+		if fillOp.R > 0.5 && fillOp.G < 0.2 {
+			areaW = fillOp.W
 		}
 
-		if op.G > 0.5 && op.R < 0.2 {
-			bW = op.W
+		if fillOp.G > 0.5 && fillOp.R < 0.2 {
+			blockW = fillOp.W
 		}
 	}
 
-	if aW < 55 || aW > 65 {
-		t.Fatalf("explicit col width=%.1f, want ~60", aW)
+	if areaW < 55 || areaW > 65 {
+		t.Fatalf("explicit col width=%.1f, want ~60", areaW)
 	}
 
-	if bW < 35 || bW > 45 {
-		t.Fatalf("grid-auto-columns width=%.1f, want ~40", bW)
+	if blockW < 35 || blockW > 45 {
+		t.Fatalf("grid-auto-columns width=%.1f, want ~40", blockW)
 	}
 }
 
@@ -209,6 +209,7 @@ func TestObjectPositionRightBottom(t *testing.T) {
 
 	right := img.X + img.W
 	bottom := img.Y + img.H
+
 	if right < 44 || right > 48 {
 		t.Fatalf("right edge = %.1f, want ~46 (6pt margin + 40pt box)", right)
 	}
@@ -263,12 +264,13 @@ func TestAspectRatioOneToOne(t *testing.T) {
 	}
 }
 
-func phase871PNG(t *testing.T, w, h int) []byte {
+func phase871PNG(t *testing.T, width, height int) []byte {
 	t.Helper()
 
-	img := image.NewRGBA(image.Rect(0, 0, w, h))
-	for y := range h {
-		for x := range w {
+	img := image.NewRGBA(image.Rect(0, 0, width, height))
+
+	for y := range height {
+		for x := range width {
 			img.Set(x, y, color.RGBA{R: 0xFF, A: 0xFF})
 		}
 	}

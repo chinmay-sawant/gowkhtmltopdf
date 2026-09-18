@@ -81,19 +81,24 @@ func variationCacheKey(vars []Variation) string {
 
 func instanceFont(src *Font, vars []Variation) (*Font, error) {
 	face, err := gtfont.ParseTTF(bytes.NewReader(src.data))
-	if err != nil || face == nil {
-		return nil, err
+	if err != nil {
+		return nil, fmt.Errorf("parse variable font: %w", err)
+	}
+
+	if face == nil {
+		return src, nil
 	}
 
 	gtVars := make([]gtfont.Variation, 0, len(vars))
-	for _, v := range vars {
-		if len(v.Tag) != fontAxisTagLength {
+
+	for _, variation := range vars {
+		if len(variation.Tag) != fontAxisTagLength {
 			continue
 		}
 
 		gtVars = append(gtVars, gtfont.Variation{
-			Tag:   ot.MustNewTag(v.Tag),
-			Value: v.Value,
+			Tag:   ot.MustNewTag(variation.Tag),
+			Value: variation.Value,
 		})
 	}
 
@@ -102,6 +107,7 @@ func instanceFont(src *Font, vars []Variation) (*Font, error) {
 	}
 
 	face.SetVariations(gtVars)
+
 	if variationCoordsAreDefault(face) {
 		return src, nil
 	}
@@ -171,6 +177,7 @@ func instancedLSB(face *gtfont.Face, glyph gtfont.GID, src *Font, gid int) int16
 func encodeInstancedOutline(face *gtfont.Face, glyph gtfont.GID) []byte {
 	data := face.GlyphData(glyph)
 	outline, ok := data.(gtfont.GlyphOutline)
+
 	if !ok || len(outline.Segments) == 0 {
 		return nil
 	}
@@ -183,9 +190,14 @@ type glyfPt struct {
 	on   bool
 }
 
+const (
+	outlineContourCapacity = 8
+	glyfPointCapacity      = 16
+)
+
 func outlineContours(outline gtfont.GlyphOutline) [][]glyfPt {
 	contours := make([][]glyfPt, 0, 1)
-	cur := make([]glyfPt, 0, 8)
+	cur := make([]glyfPt, 0, outlineContourCapacity)
 
 	flush := func() {
 		if len(cur) == 0 {
@@ -193,13 +205,14 @@ func outlineContours(outline gtfont.GlyphOutline) [][]glyfPt {
 		}
 
 		contours = append(contours, cur)
-		cur = make([]glyfPt, 0, 8)
+		cur = make([]glyfPt, 0, outlineContourCapacity)
 	}
 
 	for _, seg := range outline.Segments {
 		switch seg.Op {
 		case ot.SegmentOpMoveTo:
 			flush()
+
 			cur = append(cur, segmentPoint(seg.Args[0], true))
 		case ot.SegmentOpLineTo:
 			cur = append(cur, segmentPoint(seg.Args[0], true))
@@ -238,9 +251,9 @@ func encodeSimpleGlyf(contours [][]glyfPt) []byte {
 		return nil
 	}
 
-	flags, xs, ys := encodeGlyfCoords(pts)
+	flags, xCoords, yCoords := encodeGlyfCoords(pts)
 
-	size := glyfHeaderSize + uint16Bytes*len(endPts) + uint16Bytes + len(flags) + len(xs) + len(ys)
+	size := glyfHeaderSize + uint16Bytes*len(endPts) + uint16Bytes + len(flags) + len(xCoords) + len(yCoords)
 	buf := make([]byte, 0, size)
 	buf = appendInt16(buf, int16(len(endPts))) //nolint:gosec // contour count fits int16
 	buf = appendInt16(buf, xMin)
@@ -254,14 +267,14 @@ func encodeSimpleGlyf(contours [][]glyfPt) []byte {
 
 	buf = binary.BigEndian.AppendUint16(buf, 0) // instructionLength
 	buf = append(buf, flags...)
-	buf = append(buf, xs...)
-	buf = append(buf, ys...)
+	buf = append(buf, xCoords...)
+	buf = append(buf, yCoords...)
 
 	return buf
 }
 
 func collectGlyfPoints(contours [][]glyfPt) ([]glyfPt, []uint16, int16, int16, int16, int16, bool) {
-	pts := make([]glyfPt, 0, 16)
+	pts := make([]glyfPt, 0, glyfPointCapacity)
 	endPts := make([]uint16, 0, len(contours))
 
 	var xMin, yMin, xMax, yMax int16
@@ -274,15 +287,15 @@ func collectGlyfPoints(contours [][]glyfPt) ([]glyfPt, []uint16, int16, int16, i
 			continue
 		}
 
-		for _, p := range contour {
+		for _, point := range contour {
 			if first {
-				xMin, yMin, xMax, yMax = p.x, p.y, p.x, p.y
+				xMin, yMin, xMax, yMax = point.x, point.y, point.x, point.y
 				first = false
 			} else {
-				xMin, yMin, xMax, yMax = glyfBounds(xMin, yMin, xMax, yMax, p)
+				xMin, yMin, xMax, yMax = glyfBounds(xMin, yMin, xMax, yMax, point)
 			}
 
-			pts = append(pts, p)
+			pts = append(pts, point)
 		}
 
 		endPts = append(endPts, uint16(len(pts)-1)) //nolint:gosec // glyf point count fits uint16
@@ -303,52 +316,52 @@ func stripClosingDuplicate(contour []glyfPt) []glyfPt {
 	return contour
 }
 
-func glyfBounds(xMin, yMin, xMax, yMax int16, p glyfPt) (int16, int16, int16, int16) {
-	if p.x < xMin {
-		xMin = p.x
+func glyfBounds(xMin, yMin, xMax, yMax int16, point glyfPt) (int16, int16, int16, int16) {
+	if point.x < xMin {
+		xMin = point.x
 	}
 
-	if p.y < yMin {
-		yMin = p.y
+	if point.y < yMin {
+		yMin = point.y
 	}
 
-	if p.x > xMax {
-		xMax = p.x
+	if point.x > xMax {
+		xMax = point.x
 	}
 
-	if p.y > yMax {
-		yMax = p.y
+	if point.y > yMax {
+		yMax = point.y
 	}
 
 	return xMin, yMin, xMax, yMax
 }
 
-func encodeGlyfCoords(pts []glyfPt) (flags, xs, ys []byte) {
-	flags = make([]byte, 0, len(pts))
-	xs = make([]byte, 0, len(pts)*2)
-	ys = make([]byte, 0, len(pts)*2)
+func encodeGlyfCoords(pts []glyfPt) ([]byte, []byte, []byte) {
+	flags := make([]byte, 0, len(pts))
+	xCoords := make([]byte, 0, len(pts)*uint16Bytes)
+	yCoords := make([]byte, 0, len(pts)*uint16Bytes)
 
 	var prevX, prevY int16
 
-	for _, p := range pts {
-		flag, xBytes, yBytes := encodeGlyfDelta(p, prevX, prevY)
+	for _, point := range pts {
+		flag, xBytes, yBytes := encodeGlyfDelta(point, prevX, prevY)
 		flags = append(flags, flag)
-		xs = append(xs, xBytes...)
-		ys = append(ys, yBytes...)
-		prevX, prevY = p.x, p.y
+		xCoords = append(xCoords, xBytes...)
+		yCoords = append(yCoords, yBytes...)
+		prevX, prevY = point.x, point.y
 	}
 
-	return flags, xs, ys
+	return flags, xCoords, yCoords
 }
 
-func encodeGlyfDelta(p glyfPt, prevX, prevY int16) (byte, []byte, []byte) {
+func encodeGlyfDelta(point glyfPt, prevX, prevY int16) (byte, []byte, []byte) {
 	var flag byte
-	if p.on {
+	if point.on {
 		flag = glyfOnCurve
 	}
 
-	xFlag, xBytes := encodeAxisDelta(int32(p.x)-int32(prevX), glyfXShortVector, glyfXSameOrPos)
-	yFlag, yBytes := encodeAxisDelta(int32(p.y)-int32(prevY), glyfYShortVector, glyfYSameOrPos)
+	xFlag, xBytes := encodeAxisDelta(int32(point.x)-int32(prevX), glyfXShortVector, glyfXSameOrPos)
+	yFlag, yBytes := encodeAxisDelta(int32(point.y)-int32(prevY), glyfYShortVector, glyfYSameOrPos)
 
 	return flag | xFlag | yFlag, xBytes, yBytes
 }
@@ -387,20 +400,43 @@ func buildInstancedTTF(src *Font, outlines [][]byte, advances []int32, lsbs []in
 		glyf.Write(outline)
 	}
 
-	head := bytes.Clone(src.tables["head"])
-	if len(head) < 54 {
+	head := bytes.Clone(src.tables[headTableTag])
+	if len(head) < headTableMinSize {
 		return nil, errFontMissingHead
 	}
 
 	binary.BigEndian.PutUint16(head[50:52], 1) // long loca
 
 	hhea := bytes.Clone(src.tables["hhea"])
-	if len(hhea) < 36 {
+	if len(hhea) < hheaTableMinSize {
 		return nil, errFontMissingHhea
 	}
 
 	binary.BigEndian.PutUint16(hhea[34:36], uint16(len(advances))) //nolint:gosec // numGlyphs fits uint16
 
+	tables := buildInstancedTables(src, glyf, loca, head, hhea, advances, lsbs)
+
+	return buildFontFile(tables)
+}
+
+const (
+	headTableTag     = "head"
+	headTableMinSize = 54
+	hheaTableMinSize = 36
+	fixed16Scale     = 65536
+)
+
+func buildInstancedTables(
+	src *Font,
+	glyf *bytes.Buffer,
+	loca []uint32,
+	head, hhea []byte,
+	advances []int32,
+	lsbs []int16,
+) []struct {
+	tag  string
+	data []byte
+} {
 	tables := make([]struct {
 		tag  string
 		data []byte
@@ -418,7 +454,7 @@ func buildInstancedTTF(src *Font, outlines [][]byte, advances []int32, lsbs []in
 			data = encodeUint32Slice(loca)
 		case "hmtx":
 			data = encodeHmtx(advances, lsbs)
-		case "head":
+		case headTableTag:
 			data = head
 		case "hhea":
 			data = hhea
@@ -432,20 +468,22 @@ func buildInstancedTTF(src *Font, outlines [][]byte, advances []int32, lsbs []in
 		}{tag: tag, data: data})
 	}
 
-	return buildFontFile(tables)
+	return tables
 }
 
 func encodeHmtx(advances []int32, lsbs []int16) []byte {
 	out := make([]byte, len(advances)*bytesPerHMetric)
 
-	for i, adv := range advances {
-		binary.BigEndian.PutUint16(out[i*bytesPerHMetric:], uint16(adv)) //nolint:gosec // clamped earlier
+	for glyphIndex, adv := range advances {
+		binary.BigEndian.PutUint16(out[glyphIndex*bytesPerHMetric:], uint16(adv)) //nolint:gosec // clamped earlier
+
 		lsb := int16(0)
-		if i < len(lsbs) {
-			lsb = lsbs[i]
+
+		if glyphIndex < len(lsbs) {
+			lsb = lsbs[glyphIndex]
 		}
 
-		binary.BigEndian.PutUint16(out[i*bytesPerHMetric+uint16Bytes:], uint16(lsb)) //nolint:gosec // lsb is int16
+		binary.BigEndian.PutUint16(out[glyphIndex*bytesPerHMetric+uint16Bytes:], uint16(lsb)) //nolint:gosec // lsb is int16
 	}
 
 	return out
@@ -481,6 +519,7 @@ func (f *Font) VariationAxes() []VariationAxis {
 	axisOffset := int(binary.BigEndian.Uint16(raw[4:6]))
 	axisCount := int(binary.BigEndian.Uint16(raw[8:10]))
 	axisSize := int(binary.BigEndian.Uint16(raw[10:12]))
+
 	if axisSize < 16 || axisCount <= 0 {
 		return nil
 	}
@@ -507,7 +546,7 @@ func (f *Font) VariationAxes() []VariationAxis {
 func fixed1616(b []byte) float32 {
 	v := int32(binary.BigEndian.Uint32(b)) //nolint:gosec // Fixed 16.16 bit pattern
 
-	return float32(v) / 65536
+	return float32(v) / fixed16Scale
 }
 
 func (a VariationAxis) String() string {

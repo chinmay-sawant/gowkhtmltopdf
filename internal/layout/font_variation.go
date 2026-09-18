@@ -7,6 +7,8 @@ import (
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
 )
 
+const fontVariationInitialCapacity = 4
+
 // fontVariantCapability records the tables the CSS font variation family
 // needs from a resolved face.
 type fontVariantCapability struct {
@@ -66,7 +68,7 @@ func variationSettingsFor(sty *ResolvedStyle, face *pdf.Font) []pdf.Variation {
 		return nil
 	}
 
-	vars := make([]pdf.Variation, 0, 4)
+	vars := make([]pdf.Variation, 0, fontVariationInitialCapacity)
 	seen := map[string]int{}
 
 	if sty.FontOpticalSizing == fontOpticalAuto {
@@ -91,6 +93,7 @@ func variationSettingsFor(sty *ResolvedStyle, face *pdf.Font) []pdf.Variation {
 			item := pdf.Variation{Tag: tag, Value: float32(value)}
 			if idx, exists := seen[tag]; exists {
 				vars[idx] = item
+
 				continue
 			}
 
@@ -112,16 +115,17 @@ func findVariationAxis(face *pdf.Font, tag string) (pdf.VariationAxis, bool) {
 	return pdf.VariationAxis{}, false //nolint:exhaustruct // not found
 }
 
-func variationCacheBits(sty *ResolvedStyle) (optical, variations string, sizeBits uint64) {
+func variationCacheBits(sty *ResolvedStyle) (string, string, uint64) {
 	if sty == nil {
 		return "", "", 0
 	}
 
-	optical = sty.FontOpticalSizing
-	variations = sty.FontVariationSettings
+	optical := sty.FontOpticalSizing
+	variations := sty.FontVariationSettings
+
 	if optical == fontOpticalAuto {
-		sizeBits = math.Float64bits(sty.FontSize)
+		return optical, variations, math.Float64bits(sty.FontSize)
 	}
 
-	return optical, variations, sizeBits
+	return optical, variations, 0
 }

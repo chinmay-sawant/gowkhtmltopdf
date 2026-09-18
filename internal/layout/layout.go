@@ -422,7 +422,8 @@ const (
 // Op is one display-list operation. Coordinates are in canvas points; for
 // OpText and OpBullet, Y is the baseline.
 //
-// Rare payloads (URI, Image, Xform, BlendMode, structure tags, text-transform)
+// Rare payloads (URI, Image, Xform, BlendMode, structure tags, text-transform,
+// and text synthesis gates)
 // live on the embedded *opExtra so the hot record is 256 bytes. Promoted
 // field names stay so readers (paint, convert, imageout, tests) keep op.URI
 // and op.Image. Writers must detachExtra before mutating those fields.
@@ -481,7 +482,6 @@ type Op struct {
 	// pagination ownership checks keep using layout geometry.
 	LineInset   uint8
 	Bold        bool
-	NoFakeBold  bool
 	FakeOblique bool // synthesize italic skew when face is upright
 	IsJPEG      bool
 	// IsBackground marks background/border images that belong to the chrome layer.

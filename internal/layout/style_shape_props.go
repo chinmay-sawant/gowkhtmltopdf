@@ -1,4 +1,4 @@
-//nolint:cyclop,exhaustruct,mnd,varnamelen,wsl // shape-outside / shape-margin parsers
+//nolint:cyclop,mnd,varnamelen // shape-outside / shape-margin parsers
 package layout
 
 import (
@@ -91,8 +91,8 @@ func parseShapeOutside(raw string) (string, bool) {
 	return canonical, true
 }
 
-func splitShapeOutsideParts(value string) (shape, box string, ok bool) {
-	box = ""
+func splitShapeOutsideParts(value string) (string, string, bool) {
+	box := ""
 	rest := value
 
 	for _, keyword := range []string{shapeBoxMargin, shapeBoxBorder, shapeBoxPadding, shapeBoxContent} {

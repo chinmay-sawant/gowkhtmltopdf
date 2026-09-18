@@ -39,7 +39,7 @@ func parseFontVariantAlternatesList(raw string) ([]string, bool) {
 		return []string{fontVariantNormal}, true
 	}
 
-	parts := make([]string, 0, 4)
+	parts := make([]string, 0)
 	rest := src
 
 	for rest != "" {
@@ -82,18 +82,18 @@ func consumeAlternatePart(src string) (string, string, bool) {
 		return altHistoricalForms, src[end:], true
 	}
 
-	name, rest, ok := consumeIdent(src)
-	if !ok {
+	name, rest, valid := consumeIdent(src)
+	if !valid {
 		return "", src, false
 	}
 
-	args, rest, ok := consumeParenArgs(rest)
-	if !ok {
+	args, rest, valid := consumeParenArgs(rest)
+	if !valid {
 		return "", src, false
 	}
 
-	canon, ok := canonicalAlternateFunction(name, args)
-	if !ok {
+	canon, valid := canonicalAlternateFunction(name, args)
+	if !valid {
 		return "", src, false
 	}
 
@@ -121,8 +121,8 @@ func consumeParenArgs(src string) ([]string, string, bool) {
 
 	depth := 0
 
-	for i := 0; i < len(src); i++ {
-		switch src[i] {
+	for index := range len(src) {
+		switch src[index] {
 		case '(':
 			depth++
 		case ')':
@@ -131,7 +131,7 @@ func consumeParenArgs(src string) ([]string, string, bool) {
 				continue
 			}
 
-			inner := strings.TrimSpace(src[1:i])
+			inner := strings.TrimSpace(src[1:index])
 			if inner == "" {
 				return nil, src, false
 			}
@@ -141,7 +141,7 @@ func consumeParenArgs(src string) ([]string, string, bool) {
 				return nil, src, false
 			}
 
-			return args, src[i+1:], true
+			return args, src[index+1:], true
 		}
 	}
 
@@ -164,32 +164,29 @@ func splitAlternateArgs(inner string) []string {
 	return args
 }
 
+//nolint:cyclop // CSS alternate-function grammar is intentionally explicit.
 func canonicalAlternateFunction(name string, args []string) (string, bool) {
 	switch name {
 	case altStylistic, altSwash, altOrnaments, altAnnotation:
-		if len(args) != 1 || !validAlternateArg(args[0]) {
+		if !validSingleAlternateArg(args) {
 			return "", false
 		}
 
-		if n, ok := atoiBounded(args[0]); ok && n < 1 {
+		if number, ok := atoiBounded(args[0]); ok && number < 1 {
 			return "", false
 		}
 	case altStyleset, altCharVariant:
-		if len(args) == 0 {
+		if !validMultipleAlternateArgs(args) {
 			return "", false
 		}
 
-		maxN := maxStylesetIndex
+		maxNumber := maxStylesetIndex
 		if name == altCharVariant {
-			maxN = maxCharVariant
+			maxNumber = maxCharVariant
 		}
 
 		for _, arg := range args {
-			if !validAlternateArg(arg) {
-				return "", false
-			}
-
-			if n, ok := atoiBounded(arg); ok && (n < 1 || n > maxN) {
+			if number, ok := atoiBounded(arg); ok && (number < 1 || number > maxNumber) {
 				return "", false
 			}
 		}
@@ -197,14 +194,32 @@ func canonicalAlternateFunction(name string, args []string) (string, bool) {
 		return "", false
 	}
 
-	var b strings.Builder
+	var builder strings.Builder
 
-	b.WriteString(name)
-	b.WriteByte('(')
-	b.WriteString(strings.Join(args, ", "))
-	b.WriteByte(')')
+	builder.WriteString(name)
+	builder.WriteByte('(')
+	builder.WriteString(strings.Join(args, ", "))
+	builder.WriteByte(')')
 
-	return b.String(), true
+	return builder.String(), true
+}
+
+func validSingleAlternateArg(args []string) bool {
+	return len(args) == 1 && validAlternateArg(args[0])
+}
+
+func validMultipleAlternateArgs(args []string) bool {
+	if len(args) == 0 {
+		return false
+	}
+
+	for _, arg := range args {
+		if !validAlternateArg(arg) {
+			return false
+		}
+	}
+
+	return true
 }
 
 func validAlternateArg(arg string) bool {
@@ -222,7 +237,7 @@ func atoiBounded(arg string) (int, bool) {
 		return 0, false
 	}
 
-	for i := 0; i < len(arg); i++ {
+	for i := range len(arg) {
 		if arg[i] < '0' || arg[i] > '9' {
 			return 0, false
 		}
@@ -236,6 +251,7 @@ func atoiBounded(arg string) (int, bool) {
 	return n, true
 }
 
+//nolint:cyclop // OpenType tag mapping stays aligned with CSS function names.
 func appendAlternateOTTags(value string, put func(string, uint32)) {
 	if value == "" || value == fontVariantNormal {
 		return
@@ -306,18 +322,19 @@ func alternateArgValue(arg string) uint32 {
 }
 
 func numberedFeatureTag(prefix, arg string, maxN int) (string, bool) {
-	n := 1
+	number := 1
 	if v, ok := atoiBounded(arg); ok {
-		n = v
+		number = v
 	}
 
-	if n < 1 || n > maxN {
+	if number < 1 || number > maxN {
 		return "", false
 	}
 
-	if n < 10 {
-		return prefix + "0" + strconv.Itoa(n), true
+	numberText := strconv.Itoa(number)
+	if len(numberText) == 1 {
+		numberText = "0" + numberText
 	}
 
-	return prefix + strconv.Itoa(n), true
+	return prefix + numberText, true
 }

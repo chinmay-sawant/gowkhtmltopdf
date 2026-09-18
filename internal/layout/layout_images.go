@@ -51,6 +51,8 @@ func (e *engine) imageContainingWidth() float64 {
 // finally max constraints while preserving the intrinsic aspect ratio for a
 // one-dimensional constraint. The same helper is used by block, inline,
 // float, and table intrinsic measurement paths.
+//
+//nolint:cyclop // image sizing applies ordered intrinsic, attribute, CSS, and max rules
 func (e *engine) usedImageSize(
 	node *html.Node, style ResolvedStyle, ref *imageRef,
 ) imageUsedSize {
@@ -93,6 +95,7 @@ func (e *engine) usedImageSize(
 	}
 
 	size = applyImageCSSRatio(size, cssW, cssH, ref)
+
 	if style.AspectRatio > 0 {
 		switch {
 		case cssW && !cssH:

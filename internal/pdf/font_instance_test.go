@@ -10,6 +10,7 @@ func gowkVarTTF(t *testing.T) []byte {
 	t.Helper()
 
 	path := filepath.Join("..", "..", "testdata", "fonts", "implemented-audit", "GowkVar-VF.ttf")
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read GowkVar-VF: %v", err)
@@ -91,14 +92,15 @@ func outlineWidth(contours [][]GlyphPoint) float64 {
 	}
 
 	minX, maxX := contours[0][0].X, contours[0][0].X
+
 	for _, contour := range contours {
-		for _, p := range contour {
-			if p.X < minX {
-				minX = p.X
+		for _, point := range contour {
+			if point.X < minX {
+				minX = point.X
 			}
 
-			if p.X > maxX {
-				maxX = p.X
+			if point.X > maxX {
+				maxX = point.X
 			}
 		}
 	}

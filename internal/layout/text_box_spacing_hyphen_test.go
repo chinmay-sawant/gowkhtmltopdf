@@ -96,8 +96,8 @@ func TestSoftHyphenUsesHyphenateCharacter(t *testing.T) {
 
 	var sawTilde bool
 
-	for _, op := range res.Ops {
-		if op.Kind == OpText && strings.Contains(op.Text, "~") {
+	for _, textOp := range res.Ops {
+		if textOp.Kind == OpText && strings.Contains(textOp.Text, "~") {
 			sawTilde = true
 
 			break
@@ -106,9 +106,10 @@ func TestSoftHyphenUsesHyphenateCharacter(t *testing.T) {
 
 	if !sawTilde {
 		var texts []string
-		for _, op := range res.Ops {
-			if op.Kind == OpText {
-				texts = append(texts, op.Text)
+
+		for _, textOp := range res.Ops {
+			if textOp.Kind == OpText {
+				texts = append(texts, textOp.Text)
 			}
 		}
 
@@ -146,7 +147,12 @@ func TestHyphenateLimitChars(t *testing.T) {
 	applyHyphenationProps(&sty, "hanging-punctuation", "first", 12, nil, nil, false)
 
 	if sty.HyphenateLimitMinWord != 6 || sty.HyphenateLimitMinBefore != 3 || sty.HyphenateLimitMinAfter != 3 {
-		t.Fatalf("limit-chars got %d %d %d", sty.HyphenateLimitMinWord, sty.HyphenateLimitMinBefore, sty.HyphenateLimitMinAfter)
+		t.Fatalf(
+			"limit-chars got %d %d %d",
+			sty.HyphenateLimitMinWord,
+			sty.HyphenateLimitMinBefore,
+			sty.HyphenateLimitMinAfter,
+		)
 	}
 
 	if sty.HyphenateLimitZonePct != 8 || sty.HyphenateLimitLines != 2 ||

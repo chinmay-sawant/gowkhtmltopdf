@@ -1,4 +1,4 @@
-//nolint:cyclop,funlen,gocognit,gocyclo,maintidx // CSS Fonts feature/variant parsers
+//nolint:cyclop,funlen,gocyclo // CSS Fonts feature/variant parsers
 package layout
 
 import (
@@ -106,13 +106,13 @@ func parseFontFeatureSettingsValue(raw string) (string, bool) {
 
 	var out strings.Builder
 
-	for i, part := range feats {
+	for index, part := range feats {
 		tag, count, ok := parseFeatureSettingsPart(part)
 		if !ok {
 			return "", false
 		}
 
-		if i > 0 {
+		if index > 0 {
 			out.WriteString(", ")
 		}
 
@@ -137,6 +137,7 @@ func parseFeatureSettingsPart(part string) (string, uint32, bool) {
 
 	quote := part[0]
 	end := strings.IndexByte(part[1:], quote)
+
 	if end < 0 {
 		return "", 0, false
 	}
@@ -199,14 +200,15 @@ func applyFontVariantShorthand(style *ResolvedStyle, raw string) {
 	}
 
 	// CSS2 small-caps alone is still the common print form.
-	if value == "small-caps" {
-		style.FontVariantCaps = "small-caps"
+	if value == fontVariantCapsSmall {
+		style.FontVariantCaps = fontVariantCapsSmall
 
 		return
 	}
 
 	tokens := strings.Fields(value)
-	caps, lig, num, pos, east := fontVariantNormal, fontVariantNormal, fontVariantNormal, fontVariantNormal, fontVariantNormal
+	caps, lig, num, pos, east :=
+		fontVariantNormal, fontVariantNormal, fontVariantNormal, fontVariantNormal, fontVariantNormal
 	ligParts, numParts, eastParts := []string{}, []string{}, []string{}
 
 	for _, tok := range tokens {
@@ -338,7 +340,7 @@ func normalizeFontVariantEmoji(raw string) (string, bool) {
 
 func isFontVariantCapsKeyword(v string) bool {
 	switch v {
-	case "small-caps", "all-small-caps", "petite-caps", "all-petite-caps", "unicase", "titling-caps":
+	case fontVariantCapsSmall, "all-small-caps", "petite-caps", "all-petite-caps", "unicase", "titling-caps":
 		return true
 	default:
 		return false
@@ -346,7 +348,7 @@ func isFontVariantCapsKeyword(v string) bool {
 }
 
 func isFontVariantPositionKeyword(v string) bool {
-	return v == "sub" || v == "super"
+	return v == verticalAlignSub || v == verticalAlignSuper
 }
 
 func isFontVariantLigatureKeyword(v string) bool {
@@ -389,8 +391,8 @@ func fontShapingFeatureSettings(sty *ResolvedStyle) string {
 		return ""
 	}
 
-	order := make([]string, 0, 8)
-	tags := make(map[string]uint32, 8)
+	order := make([]string, 0)
+	tags := make(map[string]uint32)
 
 	put := func(tag string, val uint32) {
 		if _, seen := tags[tag]; !seen {
@@ -439,7 +441,7 @@ func fontShapingFeatureSettings(sty *ResolvedStyle) string {
 
 func appendVariantFeatureTags(sty *ResolvedStyle, put func(string, uint32)) {
 	switch sty.FontVariantCaps {
-	case "small-caps":
+	case fontVariantCapsSmall:
 		put("smcp", 1)
 	case "all-small-caps":
 		put("c2sc", 1)
@@ -506,9 +508,9 @@ func appendVariantFeatureTags(sty *ResolvedStyle, put func(string, uint32)) {
 	}
 
 	switch sty.FontVariantPosition {
-	case "sub":
+	case verticalAlignSub:
 		put("subs", 1)
-	case "super":
+	case verticalAlignSuper:
 		put("sups", 1)
 	}
 

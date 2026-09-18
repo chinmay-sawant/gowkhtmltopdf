@@ -8,6 +8,8 @@ import (
 
 // resolveGridRows sizes the row tracks, returning the final row count and
 // whether preferred-height growth should be locked (fixed template / auto-rows).
+//
+//nolint:cyclop,gocognit,funlen // row sizing has separate definite, auto, and padding branches
 func resolveGridRows(
 	eng *engine,
 	sty ResolvedStyle,
@@ -37,23 +39,27 @@ func resolveGridRows(
 		rows = make([]float64, numRows)
 
 		if mins := parseGridTrackFixedMins(sty.GridTemplateRows, eng); len(mins) > 0 {
-			for i := 0; i < numRows && i < len(mins); i++ {
-				if mins[i] > 0 {
-					rows[i] = mins[i]
+			for rowIndex := range numRows {
+				if rowIndex >= len(mins) {
+					break
+				}
+
+				if mins[rowIndex] > 0 {
+					rows[rowIndex] = mins[rowIndex]
 				}
 			}
 		}
 
 		if autoPt := gridAutoFixedPt(sty.GridAutoRows, eng); autoPt > 0 {
 			templateCount := len(parseGridTrackDefs(sty.GridTemplateRows))
-			for i := 0; i < numRows; i++ {
+			for i := range numRows {
 				if i >= templateCount && rows[i] == 0 {
 					rows[i] = autoPt
 				}
 			}
 
 			if templateCount == 0 {
-				for i := 0; i < numRows; i++ {
+				for i := range numRows {
 					if rows[i] == 0 {
 						rows[i] = autoPt
 					}
@@ -96,14 +102,14 @@ func gridAutoFixedPt(raw string, eng *engine) float64 {
 	return 0
 }
 
-func nearFloat(a, b float64) bool {
+func nearFloat(left, right float64) bool {
 	const eps = 1e-6
 
-	if a > b {
-		return a-b < eps
+	if left > right {
+		return left-right < eps
 	}
 
-	return b-a < eps
+	return right-left < eps
 }
 
 // padGridRowSizes extends a row-size slice to n entries, zero-filling.

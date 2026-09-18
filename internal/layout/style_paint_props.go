@@ -367,23 +367,13 @@ func firstCSSUrl(value string) (string, bool) {
 func applyGeneratedContentProps(style *ResolvedStyle, prop, value string) bool {
 	switch prop {
 	case "quotes":
-		style.QuotesRaw = value
-		if openQuote, closeQuote, parsed := parseQuotesPair(value); parsed {
-			style.QuotesOpen = openQuote
-			style.QuotesClose = closeQuote
-		}
+		applyQuotesValue(style, value)
 	case "counter-reset":
-		if trimmed := strings.TrimSpace(value); trimmed != "" {
-			style.CounterReset = trimmed
-		}
+		setTrimmedStyleValue(&style.CounterReset, value)
 	case "counter-set":
-		if trimmed := strings.TrimSpace(value); trimmed != "" {
-			style.CounterSet = trimmed
-		}
+		setTrimmedStyleValue(&style.CounterSet, value)
 	case "counter-increment":
-		if trimmed := strings.TrimSpace(value); trimmed != "" {
-			style.CounterIncrement = trimmed
-		}
+		setTrimmedStyleValue(&style.CounterIncrement, value)
 	case "list-style-image":
 		applyListStyleImageValue(style, value)
 	case propContent:
@@ -393,6 +383,20 @@ func applyGeneratedContentProps(style *ResolvedStyle, prop, value string) bool {
 	}
 
 	return true
+}
+
+func applyQuotesValue(style *ResolvedStyle, value string) {
+	style.QuotesRaw = value
+	if openQuote, closeQuote, parsed := parseQuotesPair(value); parsed {
+		style.QuotesOpen = openQuote
+		style.QuotesClose = closeQuote
+	}
+}
+
+func setTrimmedStyleValue(dst *string, value string) {
+	if trimmed := strings.TrimSpace(value); trimmed != "" {
+		*dst = trimmed
+	}
 }
 
 // applyListStyleImageValue stores the first url(...) from list-style-image or

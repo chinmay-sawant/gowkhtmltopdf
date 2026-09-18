@@ -21,7 +21,7 @@ const initialLetterCapRatio = 0.8
 // Returns (letter items, remaining items, ok).
 func (e *engine) prepareInitialLetter(
 	items []inlineItem, blockStyle *ResolvedStyle,
-) (letter []inlineItem, rest []inlineItem, ok bool) {
+) ([]inlineItem, []inlineItem, bool) {
 	start := firstInitialLetterIndex(items)
 	if start < 0 {
 		return nil, items, false
@@ -37,11 +37,11 @@ func (e *engine) prepareInitialLetter(
 	// block-level initial-letter declaration only drops the first word.
 	end := start + 1
 
-	letter = make([]inlineItem, 1)
+	letter := make([]inlineItem, 1)
 	copy(letter, items[start:end])
 	e.sizeInitialLetterRun(letter, blockStyle, sty)
 
-	rest = make([]inlineItem, 0, len(items)-1)
+	rest := make([]inlineItem, 0, len(items)-1)
 	rest = append(rest, items[:start]...)
 	rest = append(rest, items[end:]...)
 
@@ -49,14 +49,14 @@ func (e *engine) prepareInitialLetter(
 }
 
 func firstInitialLetterIndex(items []inlineItem) int {
-	for i := range items {
-		it := items[i]
+	for itemIndex := range items {
+		it := items[itemIndex]
 		if it.forceBreak || it.img || it.blockBox != nil || it.text == "" {
 			continue
 		}
 
 		if it.style != nil && it.style.InitialLetterSize >= 1 {
-			return i
+			return itemIndex
 		}
 	}
 
@@ -70,6 +70,7 @@ func (e *engine) sizeInitialLetterRun(letter []inlineItem, blockStyle, letterSty
 
 	parentLH := surroundingLineHeight(blockStyle, letterStyle) * e.scale
 	size := letterStyle.InitialLetterSize
+
 	if size < 1 {
 		size = 1
 	}
@@ -79,6 +80,7 @@ func (e *engine) sizeInitialLetterRun(letter []inlineItem, blockStyle, letterSty
 
 	targetH := size * parentLH
 	newFont := targetH / capRatio / e.scale
+
 	if newFont < letterStyle.FontSize {
 		newFont = letterStyle.FontSize * size
 	}
@@ -89,19 +91,20 @@ func (e *engine) sizeInitialLetterRun(letter []inlineItem, blockStyle, letterSty
 	cloned.LineHeight = targetH / e.scale
 	cloned.LineHeightUnitless = 0
 
-	for i := range letter {
-		letter[i].style = &cloned
-		if letter[i].text == "" {
+	for itemIndex := range letter {
+		letter[itemIndex].style = &cloned
+		if letter[itemIndex].text == "" {
 			continue
 		}
 
-		letter[i].w = e.measureTextFace(
-			transformInlineText(letter[i].text, cloned.TextTransform), &cloned,
+		letter[itemIndex].w = e.measureTextFace(
+			transformInlineText(letter[itemIndex].text, cloned.TextTransform), &cloned,
 		)
-		letter[i].h = targetH
+		letter[itemIndex].h = targetH
 	}
 }
 
+//nolint:mnd // CSS initial-letter fallback uses the engine's default line size
 func surroundingLineHeight(blockStyle, letterStyle *ResolvedStyle) float64 {
 	if blockStyle != nil {
 		return lineHeightOf(blockStyle)
@@ -114,6 +117,7 @@ func surroundingLineHeight(blockStyle, letterStyle *ResolvedStyle) float64 {
 	return 12 * defaultLineHeightRatio
 }
 
+//nolint:mnd // CSS initial-letter sink rounding uses the authored half-unit
 func initialLetterSinkLines(sty *ResolvedStyle) int {
 	if sty == nil {
 		return 0
@@ -133,6 +137,8 @@ func initialLetterSinkLines(sty *ResolvedStyle) int {
 // initialLetterAlignOffset is the extra block-axis shift (positive = lower)
 // so alphabetic / hanging / leading / ideographic land on distinct metrics.
 // Requires initial-letter: N (the caller already sized the letter).
+//
+//nolint:mnd // CSS initial-letter alignment ratios are specification metrics
 func initialLetterAlignOffset(align string, letterH, parentLH float64) float64 {
 	if parentLH <= 0 {
 		parentLH = 12 * defaultLineHeightRatio

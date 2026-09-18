@@ -158,7 +158,7 @@ func (e *engine) inflowPseudoImage(
 // baseline on the box. When floats is non-nil, each line re-queries exclusion
 // at its canvas Y so text widens again after a float ends mid-paragraph.
 //
-//nolint:cyclop,gocognit,funlen // hot path: per-line wrap against float exclusion zones
+//nolint:cyclop,gocognit,gocyclo,funlen,mnd,wsl // hot path: per-line wrap against float exclusion zones
 func (e *engine) layoutInlineFloats(
 	boxNode *box, nodes []*html.Node, contentW, contentX, lineY float64,
 	floats *floatState,
@@ -328,6 +328,8 @@ func (e *engine) releaseInlineItems(items []inlineItem) {
 // current float exclusion, splitting overlong tokens as needed. It returns
 // the next index and the updated line geometry (items may be replaced by the
 // split, hence the pointer).
+//
+//nolint:cyclop,gocognit,nestif,funlen // line packing has separate split, fit, and float paths
 func (e *engine) packInlineLine(
 	items *[]inlineItem, start int, lineX, lineW, leftY float64,
 	contentX, contentW float64, floats *floatState, allowHyphen bool,
@@ -937,7 +939,7 @@ func hidesPaint(style *ResolvedStyle) bool {
 // text-box-trim on the block's first line box.
 //
 //nolint:cyclop // line emission and alignment dispatch
-func (e *engine) emitLine(
+func (e *engine) emitLine( //nolint:funlen
 	boxNode *box, items []inlineItem, start, end int,
 	availW, startX, lineY float64, lastLine, firstLine bool,
 ) float64 {
@@ -1167,7 +1169,7 @@ func (e *engine) trimTrailingSpace(line []inlineItem) {
 // first and last line of a block container.
 //
 //nolint:cyclop // line metrics combine inline item classes and chrome
-func (e *engine) lineMetrics(
+func (e *engine) lineMetrics( //nolint:funlen
 	line []inlineItem, lineY float64, block *ResolvedStyle, trimStart, trimEnd bool,
 ) (float64, float64) {
 	maxAscent, maxDescent := 0.0, 0.0

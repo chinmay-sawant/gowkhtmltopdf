@@ -1,3 +1,4 @@
+//nolint:lll // regression fixtures intentionally contain long HTML text
 package layout
 
 import (
@@ -7,6 +8,7 @@ import (
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
 )
 
+//nolint:cyclop,funlen // drop-cap regression test checks source, geometry, and wrapping
 func TestInitialLetterSpansThreeLines(t *testing.T) {
 	t.Parallel()
 
@@ -27,13 +29,14 @@ p {
 <p><span class="drop">T</span>he rest of this paragraph wraps beside the drop cap across several lines so geometry can be checked.</p>
 </body></html>`)
 	styles := resolveStyles(root, []*css.Stylesheet{cssSheet}, "print", 500, 800)
-	st := styleByClass(t, styles, "drop")
-	if st.InitialLetterSize != 3 {
-		t.Fatalf("initial-letter size=%.1f, want 3", st.InitialLetterSize)
+	dropStyle := styleByClass(t, styles, "drop")
+
+	if dropStyle.InitialLetterSize != 3 {
+		t.Fatalf("initial-letter size=%.1f, want 3", dropStyle.InitialLetterSize)
 	}
 
-	if st.InitialLetterSink != 3 {
-		t.Fatalf("initial-letter sink=%d, want 3", st.InitialLetterSink)
+	if dropStyle.InitialLetterSink != 3 {
+		t.Fatalf("initial-letter sink=%d, want 3", dropStyle.InitialLetterSink)
 	}
 
 	res := layoutHTML(t, `<html><body>
@@ -41,23 +44,28 @@ p {
 </body></html>`, cssSheet)
 
 	var letterX, letterY, letterSize float64
+
 	var letterFound bool
+
 	type textHit struct {
 		x, y float64
 		text string
 	}
-	var hits []textHit
 
-	for _, op := range res.Ops {
-		if op.Kind != OpText || op.Text == "" {
+	hits := make([]textHit, 0, len(res.Ops))
+
+	for _, textOp := range res.Ops {
+		if textOp.Kind != OpText || textOp.Text == "" {
 			continue
 		}
 
-		hits = append(hits, textHit{x: op.X, y: op.Y, text: op.Text})
-		if op.Text == "T" || (len(op.Text) >= 1 && op.Text[:1] == "T" && op.Size > 20) {
-			letterX = op.X
-			letterY = op.Y
-			letterSize = op.Size
+		hits = append(hits, textHit{x: textOp.X, y: textOp.Y, text: textOp.Text})
+
+		if textOp.Text == "T" ||
+			(len(textOp.Text) >= 1 && textOp.Text[:1] == "T" && textOp.Size > 20) {
+			letterX = textOp.X
+			letterY = textOp.Y
+			letterSize = textOp.Size
 			letterFound = true
 		}
 	}
@@ -73,18 +81,20 @@ p {
 	// Body text on the lines that share the drop-cap band must start to the
 	// right of the letter box (float-like exclusion).
 	var nextLineX float64
+
 	var nextFound bool
-	for _, h := range hits {
-		if h.x <= letterX+2 {
+
+	for _, hit := range hits {
+		if hit.x <= letterX+2 {
 			continue
 		}
 
 		// Skip the letter itself.
-		if h.text == "T" || (len(h.text) > 0 && h.text[0] == 'T' && h.x == letterX) {
+		if hit.text == "T" || (len(hit.text) > 0 && hit.text[0] == 'T' && hit.x == letterX) {
 			continue
 		}
 
-		nextLineX = h.x
+		nextLineX = hit.x
 		nextFound = true
 
 		break
@@ -112,13 +122,13 @@ func TestInitialLetterParseAlignWrap(t *testing.T) {
 </body></html>`)
 	styles := resolveStyles(root, []*css.Stylesheet{cssSheet}, "print", 500, 800)
 
-	a := styleByClass(t, styles, "a")
-	if a.InitialLetterSize != 2 || a.InitialLetterSink != 1 {
-		t.Fatalf("a size=%.1f sink=%d, want 2 / 1 (raise)", a.InitialLetterSize, a.InitialLetterSink)
+	alignStyle := styleByClass(t, styles, "a")
+	if alignStyle.InitialLetterSize != 2 || alignStyle.InitialLetterSink != 1 {
+		t.Fatalf("a size=%.1f sink=%d, want 2 / 1 (raise)", alignStyle.InitialLetterSize, alignStyle.InitialLetterSink)
 	}
 
-	if a.InitialLetterAlign != "hanging" || a.InitialLetterWrap != initialLetterWrapAll {
-		t.Fatalf("a align=%q wrap=%q", a.InitialLetterAlign, a.InitialLetterWrap)
+	if alignStyle.InitialLetterAlign != "hanging" || alignStyle.InitialLetterWrap != initialLetterWrapAll {
+		t.Fatalf("a align=%q wrap=%q", alignStyle.InitialLetterAlign, alignStyle.InitialLetterWrap)
 	}
 
 	b := styleByClass(t, styles, "b")
@@ -156,17 +166,24 @@ p {
 </body></html>`, cssSheet)
 }
 
-func collectDropCapHits(t *testing.T, res *Result) (letter initialLetterHit, body []initialLetterHit) {
+//nolint:cyclop // hit collection distinguishes the letter from body runs
+func collectDropCapHits(t *testing.T, res *Result) (initialLetterHit, []initialLetterHit) {
 	t.Helper()
 
+	var letter initialLetterHit
+
+	body := make([]initialLetterHit, 0, len(res.Ops))
+
 	var found bool
-	for _, op := range res.Ops {
-		if op.Kind != OpText || op.Text == "" || strings.TrimSpace(op.Text) == "" {
+
+	for _, textOp := range res.Ops {
+		if textOp.Kind != OpText || textOp.Text == "" || strings.TrimSpace(textOp.Text) == "" {
 			continue
 		}
 
-		hit := initialLetterHit{x: op.X, y: op.Y, size: op.Size, text: op.Text}
-		isLetter := op.Text == "T" || (strings.HasPrefix(op.Text, "T") && op.Size > 20)
+		hit := initialLetterHit{x: textOp.X, y: textOp.Y, size: textOp.Size, text: textOp.Text}
+		isLetter := textOp.Text == "T" || (strings.HasPrefix(textOp.Text, "T") && textOp.Size > 20)
+
 		if isLetter && !found {
 			letter = hit
 			found = true
@@ -255,6 +272,7 @@ func TestInitialLetterWrapNoneDoesNotExclude(t *testing.T) {
 
 	firstLater := laterLineX(firstBody, firstBody[0].y)
 	allLater := laterLineX(allBody, allBody[0].y)
+
 	if firstLater < 0 || allLater < 0 {
 		t.Fatalf("need a later body line; first later=%.1f all later=%.1f firstHits=%v allHits=%v",
 			firstLater, allLater, firstBody, allBody)

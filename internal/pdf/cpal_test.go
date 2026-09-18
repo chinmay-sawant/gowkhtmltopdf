@@ -25,6 +25,14 @@ func TestPaletteDemoTTFHasCPAL(t *testing.T) {
 		t.Fatal("want COLR+CPAL")
 	}
 
+	assertPaletteDemoFamily(t, face)
+	assertPaletteDemoNormal(t, face)
+	assertPaletteDemoColors(t, face)
+}
+
+func assertPaletteDemoFamily(t *testing.T, face *Font) {
+	t.Helper()
+
 	names := face.LoadNames()
 	found := false
 
@@ -37,37 +45,47 @@ func TestPaletteDemoTTFHasCPAL(t *testing.T) {
 	if !found {
 		t.Fatalf("family names %v, want %q", names, PaletteDemoFamily)
 	}
+}
 
-	_, _, _, ok := face.PaletteSolidFill("normal")
-	if ok {
+func assertPaletteDemoNormal(t *testing.T, face *Font) {
+	t.Helper()
+
+	normalR, normalG, normalB, normalOK := face.PaletteSolidFill("normal")
+	if normalOK || normalR != 0 || normalG != 0 || normalB != 0 {
 		t.Fatal("normal must not override CSS color")
 	}
+}
 
-	lr, lg, lb, ok := face.PaletteSolidFill("light")
-	if !ok {
+func assertPaletteDemoColors(t *testing.T, face *Font) {
+	t.Helper()
+
+	lightR, lightG, lightB, lightOK := face.PaletteSolidFill("light")
+	if !lightOK {
 		t.Fatal("light palette missing")
 	}
 
-	dr, dg, db, ok := face.PaletteSolidFill("dark")
-	if !ok {
+	darkR, darkG, darkB, darkOK := face.PaletteSolidFill("dark")
+	if !darkOK {
 		t.Fatal("dark palette missing")
 	}
 
-	zr, zg, zb, ok := face.PaletteSolidFill("0")
-	if !ok {
+	zeroR, zeroG, zeroB, zeroOK := face.PaletteSolidFill("0")
+	if !zeroOK {
 		t.Fatal("palette 0 missing")
 	}
 
-	if lr == dr && lg == dg && lb == db {
+	if lightR == darkR && lightG == darkG && lightB == darkB {
 		t.Fatal("light and dark fills must differ")
 	}
 
-	if zr != lr || zg != lg || zb != lb {
-		t.Fatalf("palette 0 = (%v,%v,%v), want light (%v,%v,%v)", zr, zg, zb, lr, lg, lb)
+	if zeroR != lightR || zeroG != lightG || zeroB != lightB {
+		t.Fatalf("palette 0 = (%v,%v,%v), want light (%v,%v,%v)", zeroR, zeroG, zeroB, lightR, lightG, lightB)
 	}
 }
 
 func TestWritePaletteDemoTTF(t *testing.T) {
+	t.Parallel()
+
 	if os.Getenv("WRITE_PALETTE_DEMO") == "" {
 		t.Skip("set WRITE_PALETTE_DEMO=1 to refresh testdata")
 	}
@@ -78,7 +96,7 @@ func TestWritePaletteDemoTTF(t *testing.T) {
 	}
 
 	dest := filepath.Join("..", "..", "testdata", "fonts", "implemented-audit", "PaletteDemo-Regular.ttf")
-	if err := os.WriteFile(dest, raw, 0o644); err != nil {
+	if err := os.WriteFile(dest, raw, 0o600); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
 }

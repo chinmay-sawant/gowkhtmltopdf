@@ -1,4 +1,4 @@
-//nolint:cyclop,exhaustruct,mnd,varnamelen,wsl // page-float property parsers + place nudge
+//nolint:mnd,varnamelen // page-float property parsers + place nudge
 package layout
 
 import (
@@ -110,22 +110,22 @@ func nudgeFloatOffset(e *engine, fbox *box, sty ResolvedStyle) {
 // when the float sits in a nested BFC inside a multicol ancestor.
 func (e *engine) floatReferenceBox(
 	node *html.Node, sty ResolvedStyle, contentX, contentW, flowY float64,
-) (x, w, y float64) {
+) (float64, float64, float64) {
 	switch sty.FloatReference {
 	case floatRefPage:
-		w = 0
+		refW := 0.0
 		if e != nil {
-			w = e.opts.Width
+			refW = e.opts.Width
 		}
 
-		if w <= 0 {
-			w = contentW
+		if refW <= 0 {
+			refW = contentW
 		}
 
-		return 0, w, flowY
+		return 0, refW, flowY
 	case floatRefColumn:
-		if x, w, ok := e.columnReferenceBox(node, contentX, contentW); ok {
-			return x, w, flowY
+		if refX, refW, ok := e.columnReferenceBox(node, contentX, contentW); ok {
+			return refX, refW, flowY
 		}
 	}
 
@@ -138,7 +138,7 @@ func (e *engine) floatReferenceBox(
 // pushed a tighter box.
 func (e *engine) columnReferenceBox(
 	node *html.Node, contentX, contentW float64,
-) (x, w float64, ok bool) {
+) (float64, float64, bool) {
 	if e == nil || !hasMulticolAncestor(e, node) {
 		return 0, 0, false
 	}

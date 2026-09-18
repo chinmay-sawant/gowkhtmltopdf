@@ -5,6 +5,14 @@ import (
 	"unicode"
 )
 
+const (
+	hyphenationManual      = "manual"
+	defaultHyphenateWord   = 5
+	defaultHyphenateBefore = 2
+	defaultHyphenateAfter  = 2
+	hyphenationPercentBase = 100
+)
+
 // hyphenationAllowed reports whether soft-hyphen breaks may fire for style.
 // hyphens:none suppresses SHY breaks; manual and auto both honor authored SHY
 // (true dictionary auto is out of this batch).
@@ -16,7 +24,7 @@ func hyphenationAllowed(style *ResolvedStyle) bool {
 	switch style.Hyphens {
 	case cssDisplayNone:
 		return false
-	case "manual", "auto", "":
+	case hyphenationManual, "auto", "":
 		return true
 	default:
 		return true
@@ -33,7 +41,7 @@ func hyphenateCharacterOf(style *ResolvedStyle) string {
 
 func hyphenateLimitWord(style *ResolvedStyle) int {
 	if style == nil || style.HyphenateLimitMinWord <= 0 {
-		return 5
+		return defaultHyphenateWord
 	}
 
 	return style.HyphenateLimitMinWord
@@ -41,7 +49,7 @@ func hyphenateLimitWord(style *ResolvedStyle) int {
 
 func hyphenateLimitBefore(style *ResolvedStyle) int {
 	if style == nil || style.HyphenateLimitMinBefore <= 0 {
-		return 2
+		return defaultHyphenateBefore
 	}
 
 	return style.HyphenateLimitMinBefore
@@ -49,7 +57,7 @@ func hyphenateLimitBefore(style *ResolvedStyle) int {
 
 func hyphenateLimitAfter(style *ResolvedStyle) int {
 	if style == nil || style.HyphenateLimitMinAfter <= 0 {
-		return 2
+		return defaultHyphenateAfter
 	}
 
 	return style.HyphenateLimitMinAfter
@@ -63,7 +71,7 @@ func (e *engine) hyphenateZoneWidth(style *ResolvedStyle, lineW float64) float64
 	}
 
 	if style.HyphenateLimitZonePct >= 0 {
-		return lineW * style.HyphenateLimitZonePct / 100
+		return lineW * style.HyphenateLimitZonePct / hyphenationPercentBase
 	}
 
 	if style.HyphenateLimitZonePt > 0 {
@@ -76,6 +84,8 @@ func (e *engine) hyphenateZoneWidth(style *ResolvedStyle, lineW float64) float64
 // shyBreakIndex picks a soft-hyphen split that fits remainW, honors
 // hyphenate-limit-chars, and (when zone > 0) keeps leftover slack inside the
 // zone. Returns the rune index of the SHY (exclusive end of left piece) or -1.
+//
+//nolint:cyclop,nestif // soft-hyphen selection combines width, zone, and limit rules
 func (e *engine) shyBreakIndex(
 	text string, style *ResolvedStyle, remainW, lineW float64,
 ) int {
@@ -104,17 +114,17 @@ func (e *engine) shyBreakIndex(
 	best := -1
 	width := 0.0
 
-	for i, r := range runes {
-		if r == softHyphenRune {
-			before := countLetters(runes[:i])
-			after := countLetters(runes[i+1:])
+	for runeIndex, candidate := range runes {
+		if candidate == softHyphenRune {
+			before := countLetters(runes[:runeIndex])
+			after := countLetters(runes[runeIndex+1:])
 
 			if before >= minBefore && after >= minAfter {
 				leftW := width + hyphenW
 				if leftW <= remainW+inlineFitEpsilon {
 					slack := remainW - leftW
 					if zone <= 0 || slack <= zone+inlineFitEpsilon {
-						best = i
+						best = runeIndex
 					}
 				}
 			}
@@ -122,10 +132,11 @@ func (e *engine) shyBreakIndex(
 			continue
 		}
 
-		width += e.measureRuneFace(r, style)
+		width += e.measureRuneFace(candidate, style)
 		em := style.FontSize * e.scale
-		if i > 0 {
-			width += textAutospaceGap(style, runes[i-1], r, em)
+
+		if runeIndex > 0 {
+			width += textAutospaceGap(style, runes[runeIndex-1], candidate, em)
 		}
 	}
 
@@ -133,27 +144,27 @@ func (e *engine) shyBreakIndex(
 }
 
 func countLetters(runes []rune) int {
-	n := 0
+	letters := 0
 
-	for _, r := range runes {
-		if r != softHyphenRune && unicode.IsLetter(r) {
-			n++
+	for _, candidate := range runes {
+		if candidate != softHyphenRune && unicode.IsLetter(candidate) {
+			letters++
 		}
 	}
 
-	return n
+	return letters
 }
 
 // lineEndsWithHyphen reports that the packed line finished with a hyphenation
 // character (used for hyphenate-limit-lines consecutive tracking).
 func lineEndsWithHyphen(line []inlineItem) bool {
-	for i := len(line) - 1; i >= 0; i-- {
-		text := strings.TrimRight(line[i].text, " ")
+	for idx := len(line) - 1; idx >= 0; idx-- {
+		text := strings.TrimRight(line[idx].text, " ")
 		if text == "" {
 			continue
 		}
 
-		hyphen := hyphenateCharacterOf(line[i].style)
+		hyphen := hyphenateCharacterOf(line[idx].style)
 		if hyphen != "" && strings.HasSuffix(text, hyphen) {
 			return true
 		}
@@ -256,7 +267,7 @@ func hyphenateLimitLastBlocks(style *ResolvedStyle, lastLine bool) bool {
 	}
 
 	switch style.HyphenateLimitLast {
-	case "always", "column", "page", "spread":
+	case pageBreakAlways, floatRefColumn, floatRefPage, "spread":
 		return true
 	default:
 		return false
