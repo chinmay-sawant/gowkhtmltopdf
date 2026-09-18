@@ -60,6 +60,12 @@ scripts/bench-external-*.pdf
 testdata/golden/benchmarks/.bench-external/
 knowledge-base
 
+# Local Chromium source used for browser-reference test research.
+/chromium/
+
+# Local decision trail for long-running investigations.
+/.audit/
+
 __pycache__/
 bindings/python/**/__pycache__/
 

@@ -1,0 +1,11 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Automatic minimum width from aspect ratio</title>
+<style>
+html, body { margin: 0; padding: 0; font: 12px sans-serif; }
+.case { display: flex; flex-direction: column; width: 200px; border: 1px solid #222; } .item { width: 100px; aspect-ratio: 4 / 1; }
+</style>
+<!-- Source: third_party/blink/web_tests/external/wpt/css/css-flexbox/flex-minimum-width-flex-items-010.html -->
+<!-- Port status: scaffold. The next phase replaces this minimal case with a verified Go fixture. -->
+<!-- Expected: The automatic main-axis minimum uses the transferred aspect-ratio size. -->
+<div class="case"><div class="item" style="background:#9ec5fe">ratio</div></div>

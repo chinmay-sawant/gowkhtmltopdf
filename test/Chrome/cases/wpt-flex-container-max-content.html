@@ -1,0 +1,11 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Flex container max-content contribution</title>
+<style>
+html, body { margin: 0; padding: 0; font: 12px sans-serif; }
+.case { display: flex; width: max-content; border: 2px solid #222; } .item { margin: 5px; padding: 3px; border: 2px solid #9ec5fe; }
+</style>
+<!-- Source: third_party/blink/web_tests/external/wpt/css/css-flexbox/flex-container-max-content-001.html -->
+<!-- Port status: scaffold. The next phase replaces this minimal case with a verified Go fixture. -->
+<!-- Expected: The flex container measures outer item contributions including margins, padding, and borders. -->
+<div class="case"><div class="item">X X</div><div class="item">LONG TEXT</div></div>

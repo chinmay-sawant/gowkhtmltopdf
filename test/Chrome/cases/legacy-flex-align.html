@@ -1,0 +1,11 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Cross-axis alignment and auto margins</title>
+<style>
+html, body { margin: 0; padding: 0; font: 12px sans-serif; }
+.case { display: flex; width: 240px; height: 100px; align-items: center; border: 1px solid #222; } .item { width: 40px; height: 30px; }
+</style>
+<!-- Source: third_party/blink/web_tests/css3/flexbox/flex-align.html -->
+<!-- Port status: scaffold. The next phase replaces this minimal case with a verified Go fixture. -->
+<!-- Expected: Stretch, start, center, end, baseline, and auto cross margins produce different cross-axis geometry. -->
+<div class="case"><div class="item" style="background:#9ec5fe">A</div><div class="item" style="background:#b7e4c7;align-self:flex-end">B</div></div>
