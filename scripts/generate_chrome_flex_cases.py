@@ -71,13 +71,13 @@ CASES = [
     ],
     [
         "legacy-flex-align",
-        "Cross-axis alignment and auto margins",
-        "third_party/blink/web_tests/css3/flexbox/flex-align.html",
-        "cross-axis-alignment",
+        "Column cross-axis centering",
+        "third_party/blink/web_tests/css3/flexbox/flex-align.html::adapted-column-centering",
+        "column-cross-axis-center",
         "alignment",
         "layout-unit",
-        "Stretch, start, center, end, baseline, and auto cross margins produce different cross-axis geometry.",
-        "align"
+        "Auto-width children are centered on the cross axis of a column flex container.",
+        "column-align"
     ],
     [
         "legacy-flex-align-vertical-writing",
@@ -367,7 +367,7 @@ CASES = [
         "flex-sizing",
         "layout-unit",
         "The flex base size uses content before the max-width clamp freezes the item and redistributes space.",
-        "minmax"
+        "minmax-small"
     ],
     [
         "blink-replaced-aspect-ratio-precision",
@@ -444,6 +444,12 @@ TEMPLATES = {
         '<div class="case"><div class="item" style="background:#9ec5fe">Test Header</div>'
         '<div class="item" style="background:#b7e4c7">Test Subheader</div></div>',
     ),
+    "column-align": (
+        ".case { display: flex; flex-direction: column; width: 240px; align-items: center; border: 1px solid #222; } "
+        ".item { padding: 2px 4px; }",
+        '<div class="case"><div class="item" style="background:#9ec5fe">Test Header</div>'
+        '<div class="item" style="background:#b7e4c7">Test Subheader</div></div>',
+    ),
     "justify": (
         ".case { display: flex; width: 300px; height: 80px; justify-content: center; border: 1px solid #222; } "
         ".item { width: 40px; height: 30px; }",
@@ -510,7 +516,7 @@ TEMPLATES = {
         ".item { margin: 5px; padding: 3px; border: 2px solid #9ec5fe; }",
         '<div class="case"><div class="item">X X</div><div class="item">LONG TEXT</div></div>',
     ),
-    "minmax": (
+    "minmax-small": (
         ".case { display: flex; width: 300px; border: 1px solid #222; } "
         ".item { flex: 1 1 300px; min-width: 0; height: 50px; }",
         '<div class="case"><div class="item" style="background:#b7e4c7;max-width:100px">A</div>'

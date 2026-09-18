@@ -1,10 +1,23 @@
-# Chromium Flexbox interaction plan
+# Chromium Flexbox interaction plan for v0.2.7
 
 ## Status
 
 The Chromium source map and the Go-side inventory scaffold are complete. The
 24 layout-unit cases, 15 Chrome-reference cases, and one print case remain
 porting candidates.
+
+The first converted interaction is the column flex container with centered
+auto-width children. Its Go regression test checks the child center against the
+container center instead of only checking that the child moved away from the
+left edge. The same interaction also has a raw inline HTML PNG regression with
+a fixed 500px viewport. Its Chromium source entry is an explicit adaptation of
+the broader `flex-align.html` test, not a line-for-line port of one browser
+case.
+
+The first broader conversion wave now has direct layout tests for flex sizing,
+main-axis alignment, auto margins, wrapping, reverse flow, and multiline
+`align-content`. The sizing tests also exposed and fixed max-width
+redistribution and fractional grow-factor behavior in the shared row algorithm.
 
 ## Definition of done
 
@@ -52,6 +65,10 @@ Proof uses `python3 scripts/generate_chrome_flex_cases.py` and
 - [x] Generate one static HTML scaffold for each mapped case.
 - [x] Validate the count, unique IDs, safe fixture paths, doctype, and source
   paths when the checkout is present.
+- [x] Strengthen the column plus centered cross-axis regression in
+  `internal/layout/flex_test.go` with an exact geometry assertion.
+- [x] Retarget the existing alignment inventory slot to the column plus center
+  input and add the raw HTML PNG regression in `internal/imageout`.
 - [ ] Replace each scaffold with a reviewed case that preserves the Chromium
   behavior without browser-only JavaScript.
 
@@ -60,6 +77,14 @@ The scaffold is an inventory check. It is not an engine pass.
 ## Phase 2. Direct layout-unit cases
 
 Port the 24 `layout-unit` cases in groups that share one layout decision.
+
+- [x] Convert the sizing group with grow, scaled shrink, max-width freezing,
+  and fractional grow-factor geometry in
+  `internal/layout/flex_chrome_sizing_test.go`.
+- [x] Convert the alignment group with `justify-content` and row auto margins
+  in `internal/layout/flex_chrome_alignment_test.go`.
+- [x] Convert the flow group with row and column wrapping, reverse flow, and
+  multiline `align-content` in `internal/layout/flex_chrome_flow_test.go`.
 
 1. Flex basis, grow, shrink, min, and max constraints.
 2. Main-axis alignment, cross-axis alignment, and auto margins.

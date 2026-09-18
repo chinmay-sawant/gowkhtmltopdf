@@ -543,6 +543,11 @@ func TestFlexColumnAlignItemsCenterShrinksAutoItems(t *testing.T) {
 		if child.w >= header.w-layoutEpsilon {
 			t.Fatalf("centered flex child width=%.1f, header width=%.1f, want auto-sized child", child.w, header.w)
 		}
+
+		wantX := header.x + (header.w-child.w)/2
+		if !near(child.x, wantX) {
+			t.Fatalf("centered flex child x=%.2f, want %.2f within header x=%.2f width=%.2f", child.x, wantX, header.x, header.w)
+		}
 	}
 }
 

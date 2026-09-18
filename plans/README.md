@@ -90,6 +90,7 @@ Implementation plans and roadmaps for `gowkhtmltopdf`, partitioned by release ve
 - [next-100-properties.json](0.2.7/next-100-properties.json) - 100-property inventory + Chrome BCD, zero overlap with the 72
 - [next-72-fixture-authoring.md](0.2.7/next-72-fixture-authoring.md) - fixture-64 authoring contract
 - [next-100-fixture-authoring.md](0.2.7/next-100-fixture-authoring.md) - fixture-65 authoring contract
+- [chrome-flex-interactions/](0.2.7/chrome-flex-interactions) - Chromium-backed Flexbox interaction inventory and Go conversion plan
 - [86-canonical-0.2.6-wasm.md](0.2.6/86-canonical-0.2.6-wasm.md) - Browser WASM conversion, PDF preview, and image output phases 86-93
 - [perf-improve/wave-2-50pct/](0.2.6/perf-improve/wave-2-50pct/) - Live ledger to cut remaining Snapshot M ns/op and B/op in half (library and CLI). Wave 1 Snapshot L checklist stays closed.
 

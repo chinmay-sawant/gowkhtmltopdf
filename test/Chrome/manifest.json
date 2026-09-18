@@ -75,15 +75,15 @@
     },
     {
       "category": "alignment",
-      "combination": "cross-axis-alignment",
-      "expected": "Stretch, start, center, end, baseline, and auto cross margins produce different cross-axis geometry.",
+      "combination": "column-cross-axis-center",
+      "expected": "Auto-width children are centered on the cross axis of a column flex container.",
       "fixture": "cases/legacy-flex-align.html",
       "goTarget": "layout-unit",
       "id": "legacy-flex-align",
-      "kind": "align",
-      "source": "third_party/blink/web_tests/css3/flexbox/flex-align.html",
+      "kind": "column-align",
+      "source": "third_party/blink/web_tests/css3/flexbox/flex-align.html::adapted-column-centering",
       "status": "scaffold",
-      "title": "Cross-axis alignment and auto margins"
+      "title": "Column cross-axis centering"
     },
     {
       "category": "alignment",
@@ -428,7 +428,7 @@
       "fixture": "cases/wpt-flex-base-size-max-width.html",
       "goTarget": "layout-unit",
       "id": "wpt-flex-base-size-max-width",
-      "kind": "minmax",
+      "kind": "minmax-small",
       "source": "third_party/blink/web_tests/external/wpt/css/css-flexbox/flex-base-size-ignores-max-width.html",
       "status": "scaffold",
       "title": "Flex base size before max-width clamp"

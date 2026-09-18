@@ -1,11 +1,30 @@
 <!doctype html>
 <meta charset="utf-8">
-<title>Cross-axis alignment and auto margins</title>
+<title>Column cross-axis centering</title>
 <style>
-html, body { margin: 0; padding: 0; font: 12px sans-serif; }
-.case { display: flex; width: 240px; height: 100px; align-items: center; border: 1px solid #222; } .item { width: 40px; height: 30px; }
+    html,
+    body {
+        margin: 0;
+        padding: 0;
+        font: 12px sans-serif;
+    }
+
+    .case {
+        display: flex;
+        flex-direction: column;
+        width: 240px;
+        align-items: center;
+        border: 1px solid #222;
+    }
+
+    .item {
+        padding: 2px 4px;
+    }
 </style>
-<!-- Source: third_party/blink/web_tests/css3/flexbox/flex-align.html -->
+<!-- Source: third_party/blink/web_tests/css3/flexbox/flex-align.html::adapted-column-centering -->
 <!-- Port status: scaffold. The next phase replaces this minimal case with a verified Go fixture. -->
-<!-- Expected: Stretch, start, center, end, baseline, and auto cross margins produce different cross-axis geometry. -->
-<div class="case"><div class="item" style="background:#9ec5fe">A</div><div class="item" style="background:#b7e4c7;align-self:flex-end">B</div></div>
+<!-- Expected: Auto-width children are centered on the cross axis of a column flex container. -->
+<div class="case">
+    <div class="item" style="background:#9ec5fe">Test Header</div>
+    <div class="item" style="background:#b7e4c7">Test Subheader</div>
+</div>

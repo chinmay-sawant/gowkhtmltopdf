@@ -770,6 +770,8 @@ func (e *engine) flexSpecifiedWidthSuggestion(style ResolvedStyle, mainSize, pad
 // that percentage-driven floors and content mins that raised used sizes are
 // honored without leaving the line sum inconsistent when space remains.
 func (e *engine) flexClampMainWidths(items []flexMeas, widths []float64, contentW, mainSize float64) {
+	maxFrozen := make([]bool, len(items))
+
 	for idx, it := range items {
 		cstate := e.stylePtr(it.n)
 
@@ -782,21 +784,110 @@ func (e *engine) flexClampMainWidths(items []flexMeas, widths []float64, content
 			mx := e.scalePt(cstate.MaxWidth)
 			if widths[idx] > mx {
 				widths[idx] = mx
+				maxFrozen[idx] = true
 			}
 		}
 	}
-	// If mins pushed the sum over contentW, freeze at floors and re-shrink
-	// remaining flexible items (css-sizing / flex redistribution lite).
-	sum := 0.0
-	for _, w := range widths {
-		sum += w
+
+	sum := flexWidthSum(widths)
+	if sum < contentW-layoutEpsilon && contentW >= 0 && hasFrozenMax(maxFrozen) {
+		e.regrowFlexWidths(items, widths, contentW, maxFrozen)
+
+		return
 	}
 
+	// If mins pushed the sum over contentW, freeze at floors and re-shrink
+	// remaining flexible items (css-sizing / flex redistribution lite).
 	if sum <= contentW+layoutEpsilon || contentW < 0 {
 		return
 	}
 
 	e.reshrinkFlexWidths(items, widths, contentW, mainSize, sum)
+}
+
+func hasFrozenMax(maxFrozen []bool) bool {
+	for _, frozen := range maxFrozen {
+		if frozen {
+			return true
+		}
+	}
+
+	return false
+}
+
+func flexWidthSum(widths []float64) float64 {
+	sum := 0.0
+	for _, width := range widths {
+		sum += width
+	}
+
+	return sum
+}
+
+// regrowFlexWidths gives the remaining positive space to items that were not
+// frozen by max-width. A max clamp can turn an initial shrink pass into a
+// second positive-free-space pass, as in the flex base size max-width case.
+func (e *engine) regrowFlexWidths(items []flexMeas, widths []float64, contentW float64, maxFrozen []bool) {
+	for range items {
+		remaining := contentW - flexWidthSum(widths)
+		if remaining <= layoutEpsilon {
+			return
+		}
+
+		growSum := flexGrowSum(items, maxFrozen)
+
+		if growSum <= layoutEpsilon {
+			return
+		}
+
+		if !e.applyFlexRegrow(items, widths, remaining, growSum, maxFrozen) {
+			return
+		}
+	}
+}
+
+//nolint:wsl // grow-factor summation keeps the frozen-item filter beside the add
+func flexGrowSum(items []flexMeas, maxFrozen []bool) float64 {
+	sum := 0.0
+	for idx, item := range items {
+		if maxFrozen[idx] || item.grow <= 0 {
+			continue
+		}
+
+		sum += item.grow
+	}
+
+	return sum
+}
+
+//nolint:wsl // redistribution keeps candidate clamping beside width updates
+func (e *engine) applyFlexRegrow(
+	items []flexMeas,
+	widths []float64,
+	remaining, growSum float64,
+	maxFrozen []bool,
+) bool {
+	frozenAnother := false
+	for idx, item := range items {
+		if maxFrozen[idx] || item.grow <= 0 {
+			continue
+		}
+
+		share := remaining * item.grow / growSum
+		candidate := widths[idx] + share
+		style := e.stylePtr(item.n)
+		if style.MaxWidth >= 0 && candidate > e.scalePt(style.MaxWidth) {
+			widths[idx] = e.scalePt(style.MaxWidth)
+			maxFrozen[idx] = true
+			frozenAnother = true
+
+			continue
+		}
+
+		widths[idx] = candidate
+	}
+
+	return frozenAnother
 }
 
 // reshrinkFlexWidths iteratively cuts flexible items back toward contentW,
@@ -817,10 +908,7 @@ func (e *engine) reshrinkFlexWidths(items []flexMeas, widths []float64, contentW
 
 		e.cutFlexWidths(items, widths, mainSize, step, shrinkable)
 
-		sum = 0
-		for _, w := range widths {
-			sum += w
-		}
+		sum = flexWidthSum(widths)
 
 		if sum >= contentW-layoutEpsilon && sum <= contentW+layoutEpsilon {
 			break
@@ -885,13 +973,28 @@ func (e *engine) placeFlexLineMeasured(
 	}
 
 	startX, justifyGap := justifyRowStart(flexMainJustify(style), contentX, contentW, sumW, gaps, gap, len(items))
+	if flexRowAutoMarginCount(items, e) > 0 {
+		startX = contentX
+		justifyGap = gap
+	}
 
 	targetCross := lineCross
 	if targetCross < 0 {
 		targetCross = e.measureFlexCrossMax(items, widths, startX, topY, curY, justifyGap)
 	}
 
-	built, rowH := e.buildRowItems(parent, style, items, widths, topY, curY, startX, justifyGap, targetCross)
+	built, rowH := e.buildRowItems(
+		parent,
+		style,
+		items,
+		widths,
+		contentW,
+		topY,
+		curY,
+		startX,
+		justifyGap,
+		targetCross,
+	)
 
 	alignH := rowH
 	if lineCross > alignH {
@@ -952,9 +1055,14 @@ func (e *engine) flexDistributeWidths(items []flexMeas, widths []float64, conten
 		return
 	}
 
+	distributionSum := growSum
+	if distributionSum < 1 {
+		distributionSum = 1
+	}
+
 	for i, it := range items {
 		if it.grow > 0 {
-			widths[i] += free * (it.grow / growSum)
+			widths[i] += free * (it.grow / distributionSum)
 		}
 	}
 }
@@ -1131,13 +1239,22 @@ func (e *engine) buildFlexRowItem(
 	return e.buildWithStyle(node, &override, availW, posX, posY)
 }
 
+//nolint:cyclop,funlen,wsl // row placement keeps main- and cross-axis phases together
 func (e *engine) buildRowItems(
 	parent *box, style ResolvedStyle, items []flexMeas, widths []float64,
-	topY, curY, startX, justifyGap, targetCross float64,
+	contentW, topY, curY, startX, justifyGap, targetCross float64,
 ) ([]flexPlacedItem, float64) {
 	built := make([]flexPlacedItem, 0, len(items))
 	rowH := 0.0
 	leftX := startX
+	autoMainMargins := flexRowAutoMarginCount(items, e)
+	autoMainUnit := 0.0
+	if autoMainMargins > 0 {
+		free := contentW - flexWidthSum(widths) - justifyGap*float64(len(items)-1)
+		if free > 0 {
+			autoMainUnit = free / float64(autoMainMargins)
+		}
+	}
 
 	poll := newCtxPoll(e.ctx)
 	for idx, item := range items {
@@ -1148,14 +1265,25 @@ func (e *engine) buildRowItems(
 		}
 
 		cstate := e.stylePtr(item.n)
+		if cstate.MarginLeftAuto {
+			leftX += autoMainUnit
+		}
+
+		itemY := topY + curY
+		if cstate.MarginTopAuto {
+			itemY += flexRowCrossAutoMarginUnit(e, cstate, targetCross)
+		}
 
 		forceStretch := flexItemCrossStretch(style, *cstate) && targetCross > 0
-		cblock := e.buildFlexRowItem(item.n, cstate, forceStretch, targetCross, widths[idx], leftX, topY+curY)
+		cblock := e.buildFlexRowItem(item.n, cstate, forceStretch, targetCross, widths[idx], leftX, itemY)
 
 		if cblock == nil {
 			built = append(built, flexPlacedItem{n: item.n}) //nolint:exhaustruct // intentional zero fields
 
 			leftX += widths[idx]
+			if cstate.MarginRightAuto {
+				leftX += autoMainUnit
+			}
 			if idx < len(items)-1 {
 				leftX += justifyGap
 			}
@@ -1164,7 +1292,7 @@ func (e *engine) buildRowItems(
 		}
 
 		dx := leftX - cblock.x
-		dy := (topY + curY) - cblock.y
+		dy := itemY - cblock.y
 		e.shiftBoxOps(cblock, dx, dy)
 		cblock.x += dx
 		cblock.y += dy
@@ -1180,6 +1308,9 @@ func (e *engine) buildRowItems(
 		}
 
 		leftX += widths[idx]
+		if cstate.MarginRightAuto {
+			leftX += autoMainUnit
+		}
 		if idx < len(items)-1 {
 			leftX += justifyGap
 		}
@@ -1196,9 +1327,14 @@ func (e *engine) alignRowItems(style ResolvedStyle, built []flexPlacedItem, topY
 			continue
 		}
 
+		pageStyle := e.stylePtr(page.n)
+		if pageStyle.MarginTopAuto || pageStyle.MarginBottomAuto {
+			continue
+		}
+
 		align := style.AlignItems
-		if cs := e.stylePtr(page.n); cs.AlignSelf != "" && cs.AlignSelf != fxAuto {
-			align = cs.AlignSelf
+		if pageStyle.AlignSelf != "" && pageStyle.AlignSelf != fxAuto {
+			align = pageStyle.AlignSelf
 		}
 
 		var deltaY float64
@@ -1215,6 +1351,55 @@ func (e *engine) alignRowItems(style ResolvedStyle, built []flexPlacedItem, topY
 			page.box.y += deltaY
 		}
 	}
+}
+
+//nolint:wsl // main-axis margin counting keeps both auto sides in one pass
+func flexRowAutoMarginCount(items []flexMeas, e *engine) int {
+	count := 0
+	for _, item := range items {
+		style := e.stylePtr(item.n)
+		if style.MarginLeftAuto {
+			count++
+		}
+		if style.MarginRightAuto {
+			count++
+		}
+	}
+
+	return count
+}
+
+//nolint:wsl // cross-axis auto-margin calculation follows the CSS decision order
+func flexRowCrossAutoMarginUnit(eng *engine, style *ResolvedStyle, targetCross float64) float64 {
+	if targetCross < 0 {
+		return 0
+	}
+
+	count := 0
+	if style.MarginTopAuto {
+		count++
+	}
+	if style.MarginBottomAuto {
+		count++
+	}
+	if count == 0 {
+		return 0
+	}
+
+	height := targetCross
+	switch {
+	case style.Height >= 0:
+		height = eng.scalePt(style.Height)
+	case style.HeightPercent >= 0:
+		height = targetCross * style.HeightPercent / oneHundred
+	}
+
+	free := targetCross - height
+	if free <= 0 {
+		return 0
+	}
+
+	return free / float64(count)
 }
 
 // flexItemCrossStretch reports whether a flex item should stretch on the cross

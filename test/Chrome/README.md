@@ -25,4 +25,4 @@ constraint spaces, lifecycle state, or scroll state. The conversion plan
 turns those checks into box geometry, semantic PDF, PNG, or cross-engine
 assertions that fit this repository.
 
-See [the phase-wise conversion plan](../../plans/0.2.6/chrome-flex-interactions/00-canonical-chrome-flex-interaction-plan.md).
+See [the phase-wise conversion plan](../../plans/0.2.7/chrome-flex-interactions/00-canonical-chrome-flex-interaction-plan.md).
