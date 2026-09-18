@@ -46,7 +46,7 @@
       "id": "legacy-columns-auto-size",
       "kind": "column",
       "source": "third_party/blink/web_tests/css3/flexbox/columns-auto-size.html",
-      "status": "blocked",
+      "status": "completed",
       "title": "Intrinsic column sizing"
     },
     {
@@ -58,7 +58,7 @@
       "id": "legacy-definite-main-size",
       "kind": "column",
       "source": "third_party/blink/web_tests/css3/flexbox/definite-main-size.html",
-      "status": "blocked",
+      "status": "completed",
       "title": "Definite main size and percentage children"
     },
     {
@@ -94,7 +94,7 @@
       "id": "legacy-flex-align-vertical-writing",
       "kind": "writing",
       "source": "third_party/blink/web_tests/css3/flexbox/flex-align-vertical-writing-mode.html",
-      "status": "blocked",
+      "status": "completed",
       "title": "Alignment under vertical writing modes"
     },
     {
@@ -106,7 +106,7 @@
       "id": "legacy-flex-flow-orientations",
       "kind": "writing",
       "source": "third_party/blink/web_tests/css3/flexbox/flex-flow-orientations.html",
-      "status": "blocked",
+      "status": "completed",
       "title": "Direction and flow orientations"
     },
     {
@@ -118,7 +118,7 @@
       "id": "legacy-flex-flow",
       "kind": "writing",
       "source": "third_party/blink/web_tests/css3/flexbox/flex-flow.html",
-      "status": "blocked",
+      "status": "completed",
       "title": "Flow, direction, padding, and constraints"
     },
     {

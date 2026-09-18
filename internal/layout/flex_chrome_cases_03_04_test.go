@@ -141,11 +141,15 @@ func TestChromeColumnsAutoSize(t *testing.T) { //nolint:gocyclo,funlen // explic
 			t.Fatal("max-height column boxes missing")
 		}
 
-		if !near(container.height, 17) || !near(first.height, 9) || !near(second.height, 8) {
-			t.Fatalf("max-height geometry = container %.2f, items %.2f/%.2f, want 17/9/8", container.height, first.height, second.height)
+		// Chrome keeps the negative free-space split fractional. Its CSS-pixel
+		// values convert to approximately 8.5pt for both items.
+		if !near(container.height, 17) || !near(first.height, 8.5) || !near(second.height, 8.5) {
+			t.Fatalf("max-height geometry = container %.2f, items %.2f/%.2f, want 17/8.5/8.5", container.height, first.height, second.height)
 		}
-		if !near(first.y, 0) || !near(second.y, 9) {
-			t.Fatalf("max-height y positions = %.2f/%.2f, want 0/9", first.y, second.y)
+		firstY := first.y - container.y
+		secondY := second.y - container.y
+		if !near(firstY, 0) || !near(secondY, 8.5) {
+			t.Fatalf("max-height relative y positions = %.2f/%.2f, want 0/8.5", firstY, secondY)
 		}
 	})
 
@@ -159,11 +163,14 @@ func TestChromeColumnsAutoSize(t *testing.T) { //nolint:gocyclo,funlen // explic
 			t.Fatal("padding constraint boxes missing")
 		}
 
-		if !near(container.height, 33) || !near(first.height, 15) || !near(second.height, 15) {
-			t.Fatalf("padding geometry = container %.2f, items %.2f/%.2f, want 33/15/15", container.height, first.height, second.height)
+		// Chrome preserves the 31pt content height as two 15.5pt items.
+		if !near(container.height, 33) || !near(first.height, 15.5) || !near(second.height, 15.5) {
+			t.Fatalf("padding geometry = container %.2f, items %.2f/%.2f, want 33/15.5/15.5", container.height, first.height, second.height)
 		}
-		if !near(first.y, 1) || !near(second.y, 16) {
-			t.Fatalf("padding y positions = %.2f/%.2f, want 1/16", first.y, second.y)
+		firstY := first.y - container.y
+		secondY := second.y - container.y
+		if !near(firstY, 1) || !near(secondY, 16.5) {
+			t.Fatalf("padding relative y positions = %.2f/%.2f, want 1/16.5", firstY, secondY)
 		}
 	})
 }

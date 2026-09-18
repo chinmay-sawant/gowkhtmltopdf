@@ -20,12 +20,12 @@ main-axis alignment, auto margins, wrapping, reverse flow, and multiline
 redistribution and fractional grow-factor behavior in the shared row algorithm.
 
 The current conversion wave covers the first 10 manifest cases with five
-parallel two-case workers. Cases 1, 2, 3, 6, and 7 have passing direct layout
-tests. Cases 4, 5, 8, 9, and 10 have reviewed static inputs and strict failing
-tests that keep their engine gaps visible. The remaining 30 manifest cases are
-still scaffolds. The individual case fixtures and focused tests are now the
-canonical evidence; the former consolidated review HTML and PDF have been
-removed.
+parallel two-case workers. Cases 1 through 10 now have passing direct layout
+tests. Case 4 records Chrome's fractional constrained-shrink geometry instead
+of rounding the two item sizes to different integers. The remaining 30
+manifest cases are still scaffolds. The individual case fixtures and focused
+tests are now the canonical evidence; the former consolidated review HTML and
+PDF have been removed.
 
 ## Definition of done
 
