@@ -4,11 +4,15 @@
   <meta charset="utf-8">
   <title>Flexbox automatic minimum width from aspect ratio</title>
   <style>
+    /* Print 1:1 with the Chromium reference: no smart shrinking. The 8pt
+       page margin keeps every edge inside the page, and the 550pt panel
+       still fits the remaining width. */
+    @page { margin: 8pt; }
     html, body { margin: 0; padding: 0; }
-    .case { display: flex; width: 10pt; position: relative; }
+    .case { transform: translateY(56pt); display: flex; width: 10pt; position: relative; margin-left: 12pt; }
     .item { max-height: 100pt; outline: 4pt solid #7c3aed; outline-offset: 2pt; }
-    .red { position: absolute; width: 100pt; height: 100pt; z-index: -1; background: #dc2626; }
-    .aspect-label { position: absolute; top: 8pt; left: 112pt; white-space: nowrap; color: #7c3aed; font-size: 8pt; font-weight: bold; }
+    .red { transform: translateY(56pt); position: absolute; left: 12pt; width: 100pt; height: 100pt; z-index: -1; background: #dc2626; }
+    .aspect-label { transform: translateY(56pt); position: absolute; top: 8pt; left: 124pt; white-space: nowrap; color: #7c3aed; font-size: 8pt; font-weight: bold; }
   </style>
 </head>
 <body>
@@ -16,6 +20,9 @@
   <!-- Fixture: case-28-wpt-flex-minimum-width-aspect -->
   <!-- Port status: completed. Source image with the transferred automatic minimum. -->
   <!-- Expected: the green 200 by 200 image keeps a 100pt automatic minimum width. -->
+  <p class="case-description" style="position:absolute;top:12pt;left:12pt;margin:0;padding:6pt;border:1pt solid #64748b;background:#fff;color:#111827;font-size:9pt;line-height:12pt;width:550pt;">
+    <strong>Case 28 expected behavior:</strong> the 200 by 200 image keeps a 100pt automatic minimum width inside the 10pt flex case.
+  </p>
   <div class="red" id="red-28"></div>
   <div class="case" id="case-28"><img class="item" id="item-28" src="../../../chromium/third_party/blink/web_tests/external/wpt/css/css-flexbox/support/200x200-green.png" width="200" height="200" alt=""></div>
   <span class="aspect-label">MIN-WIDTH 100PT</span>

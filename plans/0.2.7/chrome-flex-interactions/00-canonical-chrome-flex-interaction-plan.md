@@ -338,6 +338,59 @@ instead of the initial containing block, which is why the body margin reached
 the panel. Changing that is a broader fix with its own blast radius; the
 fixtures keep the body margin at zero for now.
 
+### Cases 21-40 description panels and 1:1 page setup (2026-09-20)
+
+Cases 1-20 render a visible `case-description` panel and clear it with
+`translateY(56pt)`; cases 21-40 never got either. All twenty fixtures now carry
+a case-specific `Case N expected behavior` panel, `@page { margin: 8pt }` (an
+8pt page margin leaves room for each case's own edges while the 550pt panel
+still fits the 579.28pt content area, so no smart shrink fires in either
+engine), and the 56pt paint-only clearance. Case 29 keeps its 5in x 3in page
+and paints a compact panel inside the float, matching the golden fixture's
+label pattern. Case 34 moves the clearance transform onto the chrome-free
+`.wrap`: a transform on the bordered `.case` makes the engine splice the case
+frame chrome into the first child's op range, so the item's ink scan included
+the case's bottom border and the stretch pass grew both cases until they
+overlapped.
+
+Cases 26, 27, and 28 carry an outline that overhangs the border box by 5-6pt.
+Chromium clips document ink to the print content area, so at x=0 the
+annotation's left edge was dropped in the Chromium reference while the Go
+renderer kept it. Each fixture now insets its content 12pt (`padding-left` on
+26 and 27, `margin-left` on 28 plus matching `.red`/`.aspect-label` offsets),
+which puts the whole frame inside the content area in both engines; the focused
+geometry tests carry the new x values.
+
+Cases 26 and 27 pass on the WPT condition "green square and no red", so the
+item's red background is painted and fully covered by the green child. Their
+panels and `Expected` comments now state that explicitly ("covers the item's
+red background completely; no red should remain") instead of the older "fills
+the red item" wording, which read as if red should stay visible. A control
+render with the green fill made transparent shows the item's red in the same
+rect (about 42.7k red pixels at 150 DPI).
+
+Two engine defects surfaced while validating the panels:
+
+1. The orphan-row strip treated the outline's bottom dashes as an empty-row
+   rule and zeroed their stroke width, so case 26 painted a 1pt hairline for
+   the bottom edge while the other sides kept 3pt. `stripOrphanRowOp` and
+   `tightenLastRowOp` now skip ops marked `isOutline()`, since an outline is
+   authored stroke paint, not row chrome. Regressions:
+   `TestChromeFixtureCase26OutlineBelowTextInk` and
+   `TestOutlineSurvivesRowChromeTighten`.
+2. The strip also zeroed case 33's four 150x30 flex spacer fills once the
+   panel added page ink above them. `stripOrphanRows` now exempts flex item
+   boxes, the same rule `tightenLastRowChrome` already applied. Regression:
+   `TestChromeFixtureCase33SpacerFillsSurviveStrip`.
+
+Remaining engine-scope differences in the 21-40 pictures, all pre-existing and
+outside the two fixes above: `border: Npx solid transparent` paints black
+(case 35); native range/button faces are not painted (case 33); Liberation
+Sans wraps "LONG TEXT" a line earlier than Chromium's Tinos (case 34); straight
+borders stroke centered on the box edge, so half the 15pt border falls outside
+the border box (case 39); and the case 29 `float: left` print fixture places
+its two-inch float on the right of the content area instead of the left.
+
 ## Phase 3. Chrome-reference cases
 
 Port the 15 cases that need a browser reference or a larger rewrite.

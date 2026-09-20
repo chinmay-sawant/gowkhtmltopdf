@@ -4,8 +4,12 @@
   <meta charset="utf-8">
   <title>Flexbox column auto margins</title>
   <style>
+    /* Print 1:1 with the Chromium reference: no smart shrinking. The 8pt
+       page margin keeps every edge inside the page, and the 550pt panel
+       still fits the remaining width. */
+    @page { margin: 8pt; }
     html, body { margin: 0; padding: 0; }
-    .case { border: 1pt solid #111; width: 300pt; height: 150pt;
+    .case { position: relative; transform: translateY(56pt); border: 1pt solid #111; width: 300pt; height: 150pt;
       display: flex; flex-direction: column; }
     .item1 { margin: 0 auto; background: #9ec5fe; }
     .item1v { margin: auto 0; background: #9ec5fe; }
@@ -19,6 +23,9 @@
   <!-- Fixture: case-30-wpt-auto-margins-column -->
   <!-- Port status: completed. Source-shaped normalized column and vertical-writing branches. -->
   <!-- Expected: content-sized items are centered by auto margins and align-self. -->
+  <p class="case-description" style="position:absolute;top:12pt;left:12pt;margin:0;padding:6pt;border:1pt solid #64748b;background:#fff;color:#111827;font-size:9pt;line-height:12pt;width:550pt;">
+    <strong>Case 30 expected behavior:</strong> auto margins center the content-sized items on the cross axis in both horizontal and vertical-writing columns.
+  </p>
   <div class="case" id="case-30-horizontal">
     <div class="item1" id="item-30-margins">MARGIN</div>
     <div class="item2" id="item-30-align">ALIGN</div>

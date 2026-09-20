@@ -4,8 +4,12 @@
   <meta charset="utf-8">
   <title>Flexbox writing-mode matrix</title>
   <style>
+    /* Print 1:1 with the Chromium reference: no smart shrinking. The 8pt
+       page margin keeps every edge inside the page, and the 550pt panel
+       still fits the remaining width. */
+    @page { margin: 8pt; }
     html, body { margin: 0; padding: 0; }
-    .flexContainer { display: flex; width: 40pt; height: 30pt; border: 1pt solid #777;
+    .flexContainer { position: relative; transform: translateY(56pt); display: flex; width: 40pt; height: 30pt; border: 1pt solid #777;
       margin-bottom: 5pt; direction: rtl; writing-mode: vertical-lr; }
     .flexContainer > * { width: 20pt; height: 15pt; }
     .item1 { background: cyan; } .item2 { background: magenta; }
@@ -17,6 +21,9 @@
   <!-- Fixture: case-24-wpt-writing-mode-006 -->
   <!-- Port status: completed. Source-faithful eight-branch logical-axis matrix. -->
   <!-- Expected: row, column, reverse, and wrap-reverse preserve logical ordering. -->
+  <p class="case-description" style="position:absolute;top:12pt;left:12pt;margin:0;padding:6pt;border:1pt solid #64748b;background:#fff;color:#111827;font-size:9pt;line-height:12pt;width:550pt;">
+    <strong>Case 24 expected behavior:</strong> all eight writing-mode and flex-flow branches keep logical ordering; row wrap paints a 41.5pt by 31.5pt frame.
+  </p>
   <div class="flexContainer" id="row-wrap" style="flex-flow: row wrap"><div class="item1"></div><div class="item2"></div><div class="item3"></div><div class="item4"></div></div>
   <div class="flexContainer" id="row-wrap-reverse" style="flex-flow: row wrap-reverse"><div class="item1"></div><div class="item2"></div><div class="item3"></div><div class="item4"></div></div>
   <div class="flexContainer" id="row-reverse-wrap" style="flex-flow: row-reverse wrap"><div class="item1"></div><div class="item2"></div><div class="item3"></div><div class="item4"></div></div>

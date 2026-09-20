@@ -4,8 +4,12 @@
   <meta charset="utf-8">
   <title>Flexbox base size before max-width clamp</title>
   <style>
+    /* Print 1:1 with the Chromium reference: no smart shrinking. The 8pt
+       page margin keeps every edge inside the page, and the 550pt panel
+       still fits the remaining width. */
+    @page { margin: 8pt; }
     html, body { margin: 0; padding: 0; }
-    .case { display: flex; width: 225pt; }
+    .case { position: relative; transform: translateY(56pt); display: flex; width: 225pt; }
     .item { min-width: 0; height: 37.5pt; }
     .capped { max-width: 75pt; background: #16a34a; }
     .uncapped { background: #2563eb; }
@@ -17,6 +21,9 @@
   <!-- Fixture: case-36-wpt-flex-base-size-max-width -->
   <!-- Port status: completed. Source-faithful content-sized bases and clamp. -->
   <!-- Expected: the capped item freezes after its content base is used. -->
+  <p class="case-description" style="position:absolute;top:12pt;left:12pt;margin:0;padding:6pt;border:1pt solid #64748b;background:#fff;color:#111827;font-size:9pt;line-height:12pt;width:550pt;">
+    <strong>Case 36 expected behavior:</strong> the max-width capped item freezes after its content base, leaving 75pt and 150pt items in the 225pt row.
+  </p>
   <div class="case" id="case-36"><div class="item capped"><div class="content"></div></div><div class="item uncapped"><div class="content"></div></div></div>
 </body>
 </html>

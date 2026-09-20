@@ -4,8 +4,12 @@
   <meta charset="utf-8">
   <title>Nested flex aspect-ratio cross-size feedback</title>
   <style>
+    /* Print 1:1 with the Chromium reference: no smart shrinking. The 8pt
+       page margin keeps every edge inside the page, and the 550pt panel
+       still fits the remaining width. */
+    @page { margin: 8pt; }
     html, body { margin: 0; padding: 0; }
-    .case { width: 200pt; background: #16a34a; }
+    .case { position: relative; transform: translateY(56pt); width: 200pt; background: #16a34a; }
     .outer { display: flex; aspect-ratio: 4; }
     .inner { display: flex; aspect-ratio: 1; }
     .box { height: 100%; aspect-ratio: 2; }
@@ -16,6 +20,9 @@
   <!-- Fixture: case-23-wpt-aspect-ratio-cross-size-002 -->
   <!-- Port status: completed. Source-faithful nested aspect-ratio input. -->
   <!-- Expected: the green strip is 200pt by 50pt and does not inflate. -->
+  <p class="case-description" style="position:absolute;top:12pt;left:12pt;margin:0;padding:6pt;border:1pt solid #64748b;background:#fff;color:#111827;font-size:9pt;line-height:12pt;width:550pt;">
+    <strong>Case 23 expected behavior:</strong> the nested aspect-ratio boxes settle at 200pt by 50pt without inflating the outer height.
+  </p>
   <div class="case" id="case-23">
     <div class="outer" id="outer-23">
       <div class="inner" id="inner-23">

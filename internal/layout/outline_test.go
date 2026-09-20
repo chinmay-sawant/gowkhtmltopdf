@@ -152,6 +152,82 @@ body { margin: 0 }
 	}
 }
 
+// TestChromeFixtureCase26OutlineBelowTextInk: the case's dashed outline bottom
+// edge sits below the label ink. The orphan-row strip mistook that authored
+// stroke for an empty-row horizontal rule and zeroed its width, so the PDF
+// painted a 1pt hairline for the bottom edge while the other sides kept 3pt.
+func TestChromeFixtureCase26OutlineBelowTextInk(t *testing.T) {
+	t.Parallel()
+
+	res := layoutChromeCase(t, readChromeCase(t, "case-26-wpt-definite-sizes-002.html"))
+	item := fixtureBox(t, res, "item-26")
+
+	bottomY := item.y + item.height + outlineInflate(3, 2)
+
+	if err := Paint(pdf.NewDocument(), res, paintOpts()); err != nil {
+		t.Fatal(err)
+	}
+
+	bottom := 0
+	for i := range res.Ops {
+		op := &res.Ops[i]
+		if !op.isOutline() || op.Kind != OpLine || op.H != 0 || !near(op.Y, bottomY) {
+			continue
+		}
+
+		bottom++
+		if !near(op.Width, 3) {
+			t.Fatalf("case 26 outline bottom dash width = %.2f at x=%.2f, want 3", op.Width, op.X)
+		}
+	}
+
+	if bottom == 0 {
+		t.Fatalf("case 26 outline bottom edge not found at y=%.2f", bottomY)
+	}
+}
+
+// TestOutlineSurvivesRowChromeTighten: an outline bottom edge can sit in the
+// band the trailing-rule tighten pass rewrites (lastInkBot+8 to +40). Once the
+// strip leaves outline strokes alone, tighten must not pull the authored edge
+// up into its own box just because a real orphan row was stripped on the page.
+func TestOutlineSurvivesRowChromeTighten(t *testing.T) {
+	t.Parallel()
+
+	s := sheet(t, `
+body { margin: 0 }
+.box {
+  width: 100pt; height: 30pt; font-size: 8pt; line-height: 1;
+  outline: 3pt solid #2563eb; outline-offset: 2pt;
+}
+.trailer { width: 300pt; height: 20pt; background: #dddddd }
+`)
+	res := layoutHTML(t, `<html><body><div class="box">x</div><div class="trailer"></div></body></html>`, s)
+	boxNode := findBoxByClass(t, res, "box")
+
+	bottomY := boxNode.y + boxNode.height + outlineInflate(3, 2)
+
+	if err := Paint(pdf.NewDocument(), res, paintOpts()); err != nil {
+		t.Fatal(err)
+	}
+
+	bottom := 0
+	for i := range res.Ops {
+		op := &res.Ops[i]
+		if !op.isOutline() || op.Kind != OpLine || op.H != 0 || !near(op.Y, bottomY) {
+			continue
+		}
+
+		bottom++
+		if !near(op.Width, 3) {
+			t.Fatalf("outline bottom edge width = %.2f at x=%.2f, want 3", op.Width, op.X)
+		}
+	}
+
+	if bottom == 0 {
+		t.Fatalf("outline bottom edge not found at y=%.2f (authored chrome was moved or dropped)", bottomY)
+	}
+}
+
 // backgroundFillOf returns the box's background fill op (X/W match the border
 // box, light grey).
 func backgroundFillOf(t *testing.T, res *Result, boxNode *box) Op {

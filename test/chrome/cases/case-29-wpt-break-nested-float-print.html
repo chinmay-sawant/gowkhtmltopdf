@@ -8,7 +8,7 @@
     :root { print-color-adjust: exact; }
     html, body { margin: 0; }
     .case { display: flex; flex-wrap: nowrap; flex-direction: column; }
-    .target { float: left; background: #16a34a; width: 2in; height: 6in; }
+    .target { position: relative; float: left; background: #16a34a; width: 2in; height: 6in; }
   </style>
 </head>
 <body>
@@ -16,6 +16,8 @@
   <!-- Fixture: case-29-wpt-break-nested-float-print -->
   <!-- Port status: completed. Source-faithful deeply nested six-inch float. -->
   <!-- Expected: the green target fragments across three pages with stable width. -->
-  <div class="case" id="case-29"><div><div><div><div class="target" id="target-29"></div></div></div></div></div>
+  <!-- The 5in x 3in page cannot fit the standard panel, so the expected
+       behavior paints inside the float, like the golden fixture's label. -->
+  <div class="case" id="case-29"><div><div><div><div class="target" id="target-29"><span class="case-description" style="position:absolute;top:2pt;left:2pt;width:120pt;font-size:6pt;line-height:7.5pt;padding:3pt;border:1pt solid #64748b;background:#fff;color:#111827;"><strong>Case 29 expected behavior:</strong> the six-inch green float fragments across three pages at a stable two-inch width.</span></div></div></div></div></div>
 </body>
 </html>

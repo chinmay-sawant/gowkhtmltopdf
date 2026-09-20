@@ -4,8 +4,12 @@
   <meta charset="utf-8">
   <title>Flexbox gap geometry with wrapping</title>
   <style>
+    /* Print 1:1 with the Chromium reference: no smart shrinking. The 8pt
+       page margin keeps every edge inside the page, and the 550pt panel
+       still fits the remaining width. */
+    @page { margin: 8pt; }
     html, body { margin: 0; padding: 0; }
-    .case { border: 2pt dotted #608ba8; display: flex; column-gap: 10pt;
+    .case { position: relative; transform: translateY(56pt); border: 2pt dotted #608ba8; display: flex; column-gap: 10pt;
       row-gap: 10pt; width: 170pt; flex-wrap: wrap; }
     .item { background: rgba(96, 139, 168, .2); flex-shrink: 1; width: 50pt; height: 50pt; }
   </style>
@@ -15,6 +19,9 @@
   <!-- Fixture: case-38-blink-gap-decorations-basic -->
   <!-- Port status: completed. Source-faithful six-item wrapped gap input. -->
   <!-- Expected: six fixed items form two rows with 10pt main and cross gaps. -->
+  <p class="case-description" style="position:absolute;top:12pt;left:12pt;margin:0;padding:6pt;border:1pt solid #64748b;background:#fff;color:#111827;font-size:9pt;line-height:12pt;width:550pt;">
+    <strong>Case 38 expected behavior:</strong> the six 50pt items wrap into two rows of three with 10pt row and column gaps inside the 174pt frame.
+  </p>
   <div class="case" id="case-38">
     <div class="item">One</div><div class="item">Two</div><div class="item">Three</div>
     <div class="item">Four</div><div class="item">Five</div><div class="item">Six</div>

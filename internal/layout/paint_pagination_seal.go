@@ -631,7 +631,7 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 			continue
 		}
 
-		if stripOrphanRows(res, pageOps[page], pageTop, pageBot, lastInkBot) {
+		if stripOrphanRows(res, pageOps[page], pageTop, pageBot, lastInkBot, flexItems) {
 			tightenLastRowChrome(res, pageOps[page], pageTop, pageBot, lastInkBot, flexItems)
 		}
 		// Pull section washes / borders up to the last row chrome / ink so grey
@@ -714,13 +714,20 @@ func lastInkBottom(res *Result, idxs []int, pageTop, pageBot float64) (float64, 
 }
 
 // stripOrphanRows zeros row-sized fills / rules that sit below the last ink.
-// Returns whether anything was stripped.
-func stripOrphanRows(res *Result, idxs []int, pageTop, pageBot, lastInkBot float64) bool {
+// Returns whether anything was stripped. Flex item boxes are exempt: their
+// used size came from the flex algorithm, so their fill is definite box paint,
+// not empty-row chrome (same rule as tightenLastRowChrome; case-33's 150x30
+// spacer fills were stripped once the description panel added page ink).
+func stripOrphanRows(res *Result, idxs []int, pageTop, pageBot, lastInkBot float64, flexItems []*box) bool {
 	stripped := false
 
 	for _, i := range idxs {
 		paintOp := &res.Ops[i]
 		if paintOp.StickyID != 0 || !opInPageBand(paintOp, pageTop, pageBot) {
+			continue
+		}
+
+		if opOwnedByFlexItem(paintOp, flexItems) {
 			continue
 		}
 
@@ -737,6 +744,13 @@ func stripOrphanRows(res *Result, idxs []int, pageTop, pageBot, lastInkBot float
 //
 //nolint:cyclop // grid runs are an explicit no-strip arm
 func stripOrphanRowOp(paintOp *Op, lastInkBot float64) bool {
+	// A CSS outline is authored stroke paint, not empty-row chrome. The row
+	// heuristics below measure the box rect, so an outline edge inflated past
+	// the border box reads as a trailing rule (case-26 bottom dashes).
+	if paintOp.isOutline() {
+		return false
+	}
+
 	switch paintOp.Kind {
 	case OpGridRun:
 		// Grid runs carry verticals and shared chrome; the orphan pass does
@@ -858,6 +872,12 @@ func opOwnedByFlexItem(paintOp *Op, flexItems []*box) bool {
 // tightenLastRowOp shortens the last row's fill and pulls the trailing rule
 // up under the final baseline.
 func tightenLastRowOp(paintOp *Op, lastInkBot, underPad float64) {
+	// Outline edges keep their authored geometry for the same reason the strip
+	// leaves them alone (see stripOrphanRowOp).
+	if paintOp.isOutline() {
+		return
+	}
+
 	if isLastRowFill(paintOp, lastInkBot, underPad) {
 		paintOp.H = lastInkBot + underPad - paintOp.Y
 		if paintOp.H < 1 {

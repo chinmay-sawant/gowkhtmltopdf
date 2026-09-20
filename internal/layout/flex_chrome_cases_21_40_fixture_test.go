@@ -4,6 +4,8 @@ package layout
 import (
 	"math"
 	"testing"
+
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
 )
 
 func fixture21To40(t *testing.T, name string) *Result {
@@ -125,8 +127,8 @@ func TestChromeFixtureCase26MinHeightPercentage(t *testing.T) {
 	fill := fixtureBox(t, res, "fill-26")
 
 	assertFixtureBox(t, "case 26 container", container, chromeRect{w: 1000, h: 100})
-	assertFixtureBox(t, "case 26 item", item, chromeRect{w: 100, h: 100})
-	assertFixtureBox(t, "case 26 fill", fill, chromeRect{w: 100, h: 100})
+	assertFixtureBox(t, "case 26 item", item, chromeRect{x: 12, w: 100, h: 100})
+	assertFixtureBox(t, "case 26 fill", fill, chromeRect{x: 12, w: 100, h: 100})
 }
 
 func TestChromeFixtureCase27ColumnPercentageHeight(t *testing.T) {
@@ -136,8 +138,8 @@ func TestChromeFixtureCase27ColumnPercentageHeight(t *testing.T) {
 	fill := fixtureBox(t, res, "fill-27")
 
 	assertFixtureBox(t, "case 27 container", container, chromeRect{w: 1000, h: 100})
-	assertFixtureBox(t, "case 27 item", item, chromeRect{w: 100, h: 100})
-	assertFixtureBox(t, "case 27 fill", fill, chromeRect{w: 100, h: 100})
+	assertFixtureBox(t, "case 27 item", item, chromeRect{x: 12, w: 100, h: 100})
+	assertFixtureBox(t, "case 27 fill", fill, chromeRect{x: 12, w: 100, h: 100})
 }
 
 func TestChromeFixtureCase28AspectRatioMinimumWidth(t *testing.T) {
@@ -145,8 +147,34 @@ func TestChromeFixtureCase28AspectRatioMinimumWidth(t *testing.T) {
 	container := fixtureBox(t, res, "case-28")
 	item := fixtureBox(t, res, "item-28")
 
-	assertFixtureBox(t, "case 28 container", container, chromeRect{w: 10, h: 100})
-	assertFixtureBox(t, "case 28 item", item, chromeRect{w: 100, h: 100})
+	assertFixtureBox(t, "case 28 container", container, chromeRect{x: 12, w: 10, h: 100})
+	assertFixtureBox(t, "case 28 item", item, chromeRect{x: 12, w: 100, h: 100})
+}
+
+// TestChromeFixtureCase33SpacerFillsSurviveStrip: the description panel adds
+// page ink above the case, which armed the orphan-row strip on the 150x30 flex
+// spacer fills and zeroed four of them. Flex item fills are definite box
+// paint, so they must survive the strip exactly like the tighten pass already
+// guarantees.
+func TestChromeFixtureCase33SpacerFillsSurviveStrip(t *testing.T) {
+	t.Parallel()
+
+	res := fixture21To40(t, "case-33-wpt-flex-item-compressible.html")
+	if err := Paint(pdf.NewDocument(), res, paintOpts()); err != nil {
+		t.Fatal(err)
+	}
+
+	fills := 0
+	for i := range res.Ops {
+		op := &res.Ops[i]
+		if op.Kind == OpFillRect && near(op.W, 150) && near(op.H, 30) {
+			fills++
+		}
+	}
+
+	if fills != 5 {
+		t.Fatalf("case 33 spacer fills after paint = %d, want 5", fills)
+	}
 }
 
 //nolint:cyclop // the assertion covers horizontal and vertical-writing branches
