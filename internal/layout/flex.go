@@ -60,7 +60,7 @@ type flexPlacedItem struct {
 // subset: justify-content, align-items/self, align-content, gap/row-gap/
 // column-gap, flex-grow/shrink/basis, order, wrap, and reverse directions.
 //
-//nolint:gocritic,wsl // dispatch also installs the containing-block scope
+//nolint:cyclop,gocritic,wsl // dispatch also installs the containing-block scope
 func (e *engine) buildFlex(node *html.Node, sty ResolvedStyle, availW, x, posY float64) *box {
 	ml := e.scalePt(sty.MarginLeft)
 	boxNode := &box{ //nolint:exhaustruct // intentional zero fields
@@ -90,8 +90,10 @@ func (e *engine) buildFlex(node *html.Node, sty ResolvedStyle, availW, x, posY f
 		dir = fxRow
 	}
 
-	if dir == fxCol || dir == fxColRev {
-		curY = e.flowFlexColumn(boxNode, kids, sty, contentW, contentX, posY, curY, rowGap)
+	if isVerticalWritingMode(sty.WritingMode) && (dir == fxCol || dir == fxColRev) {
+		curY = e.flowFlexVerticalColumn(boxNode, kids, sty, contentW, contentX, posY, curY, rowGap)
+	} else if dir == fxCol || dir == fxColRev {
+		curY = e.flowFlexColumn(boxNode, kids, sty, contentW, contentX, posY, curY, rowGap, colGap)
 	} else if isVerticalWritingMode(sty.WritingMode) {
 		curY = e.flowFlexVerticalRow(boxNode, kids, sty, contentW, contentX, posY, curY, colGap)
 	} else {
@@ -101,8 +103,17 @@ func (e *engine) buildFlex(node *html.Node, sty ResolvedStyle, availW, x, posY f
 	// The shared resolver owns bottom padding, bottom border, and the
 	// height/min-height/max-height constraints for auto-height boxes.
 	resolvedHeightStyle := withAspectRatioHeight(sty, contentW, e)
-	curY = e.applyHeightConstraintsWithCB(&resolvedHeightStyle,
-		e.borderBoxBottom(resolvedHeightStyle, curY), parentCB)
+	contentBottom := e.borderBoxBottom(resolvedHeightStyle, curY)
+	if usedHeight, definite := resolveUsedHeight(&resolvedHeightStyle, parentCB, e); definite {
+		// A definite flex-container height is a used size, not a minimum. Its
+		// flex items may overflow the container when shrink is disabled.
+		vChrome := resolvedHeightStyle.verticalChrome(e)
+		curY = usedHeight
+		curY = e.clampBlockMaxHeight(&resolvedHeightStyle, curY, parentCB, vChrome)
+		curY = e.clampBlockMinHeight(&resolvedHeightStyle, curY, parentCB, vChrome)
+	} else {
+		curY = e.applyHeightConstraintsWithCB(&resolvedHeightStyle, contentBottom, parentCB)
+	}
 
 	boxNode.height = curY
 	e.prependChrome(contentStart, boxNode, sty, boxNode.x, posY, boxNode.w, boxNode.height)
@@ -213,6 +224,7 @@ func anonymousFlexItemStyle(parent ResolvedStyle) ResolvedStyle {
 	return style
 }
 
+//nolint:cyclop,funlen // row flow combines line formation, sizing, and placement
 func (e *engine) flowFlexRow(
 	parent *box, kids []*html.Node, style ResolvedStyle,
 	contentW, contentX, topY, curY, colGap, rowGap float64,
@@ -257,7 +269,20 @@ func (e *engine) flowFlexRow(
 			cross = stretchCross[lidx]
 		}
 
-		curY = e.placeFlexLineMeasured(parent, style, line, contentW, contentX, topY, curY, colGap, cross)
+		curY = e.placeFlexLineMeasured(
+			parent,
+			style,
+			line,
+			contentW,
+			contentX,
+			topY,
+			curY,
+			colGap,
+			cross,
+			lineCross >= 0 || stretchCross != nil,
+			style.FlexWrap == fxWrapRev,
+			reverse,
+		)
 
 		endChild := startChild
 		if parent != nil {
@@ -752,7 +777,7 @@ func (e *engine) flexMinMainSize(item flexMeas, mainSize float64) float64 {
 		autoMin = specSug
 	}
 	// Overflow non-visible → automatic min size is 0 (CSS Flexbox §4.5).
-	if overflowCreatesStickyScrollport(cstate.Overflow) {
+	if flexAutoMinSizeIsZero(cstate.Overflow) {
 		autoMin = 0
 	}
 
@@ -973,10 +998,11 @@ func (e *engine) cutFlexWidths(items []flexMeas, widths []float64, mainSize, ste
 	}
 }
 
-//nolint:wsl // flex placement keeps its measured state updates together
+//nolint:cyclop,funlen,wsl // flex placement keeps its measured state updates together
 func (e *engine) placeFlexLineMeasured(
 	parent *box, style ResolvedStyle, items []flexMeas,
 	contentW, contentX, topY, curY, gap, lineCross float64,
+	definiteCross, crossReverse, mainReverse bool,
 ) float64 {
 	widths := e.flexLineWidths(items, contentW, gap)
 	gaps := gap * float64(len(items)-1)
@@ -989,7 +1015,11 @@ func (e *engine) placeFlexLineMeasured(
 		sumW += w + flexRowNormalMargins(e, items[idx])
 	}
 
-	startX, justifyGap := justifyRowStart(flexMainJustify(style), contentX, contentW, sumW, gaps, gap, len(items))
+	justify := flexMainJustify(style)
+	startX, justifyGap := justifyRowStart(justify, contentX, contentW, sumW, gaps, gap, len(items))
+	if mainReverse && flexStartJustify(justify) {
+		startX = contentX + contentW - sumW
+	}
 	if flexRowAutoMarginCount(items, e) > 0 {
 		startX = contentX
 		justifyGap = gap
@@ -1011,6 +1041,7 @@ func (e *engine) placeFlexLineMeasured(
 		startX,
 		justifyGap,
 		targetCross,
+		definiteCross,
 	)
 
 	alignH := rowH
@@ -1022,7 +1053,7 @@ func (e *engine) placeFlexLineMeasured(
 		alignH = targetCross
 	}
 
-	e.alignRowItems(style, built, topY, curY, alignH)
+	e.alignRowItems(style, built, topY, curY, alignH, crossReverse)
 
 	if lineCross > rowH {
 		return curY + lineCross
@@ -1113,6 +1144,10 @@ func flexMainJustify(style ResolvedStyle) string {
 	return jc
 }
 
+func flexStartJustify(justify string) bool {
+	return justify == "" || justify == flexStartKeyword || justify == fxStart
+}
+
 // justifyRowStart resolves the main-axis start offset and gap for a row line
 // from justify-content, returning (startX, justifyGap).
 func justifyRowStart(justify string, contentX, contentW, sumW, gaps, gap float64, count int) (float64, float64) {
@@ -1189,8 +1224,15 @@ func (e *engine) forceFlexItemCrossSize(style ResolvedStyle, forceH float64) Res
 		return style
 	}
 
+	// Flex stretch assigns a used border-box size even when the item's content
+	// is taller than that size. The ordinary block resolver deliberately keeps
+	// overflowing content from shrinking an explicit height, so carry the
+	// flex assignment through as a matching max-height override. This keeps the
+	// flex-specific constraint local and lets the content paint/overflow while
+	// the item box retains its assigned cross size.
 	if style.BoxSizing == borderBox {
 		style.Height = forceH / e.scale
+		style.MaxHeight = forceH / e.scale
 	} else {
 		inner := forceH - e.scalePt(style.PaddingTop) - e.scalePt(style.PaddingBottom) -
 			e.scalePt(style.BorderTop.Width) - e.scalePt(style.BorderBottom.Width)
@@ -1199,7 +1241,11 @@ func (e *engine) forceFlexItemCrossSize(style ResolvedStyle, forceH float64) Res
 		}
 
 		style.Height = inner / e.scale
+		style.MaxHeight = inner / e.scale
 	}
+
+	style.HeightPercent = -1
+	style.MaxHeightPercent = -1
 
 	return style
 }
@@ -1259,7 +1305,7 @@ func (e *engine) buildFlexRowItem(
 //nolint:cyclop,funlen,gocognit,wsl // row placement keeps main- and cross-axis phases together
 func (e *engine) buildRowItems(
 	parent *box, style ResolvedStyle, items []flexMeas, widths []float64,
-	contentW, topY, curY, startX, justifyGap, targetCross float64,
+	contentW, topY, curY, startX, justifyGap, targetCross float64, definiteCross bool,
 ) ([]flexPlacedItem, float64) {
 	built := make([]flexPlacedItem, 0, len(items))
 	rowH := 0.0
@@ -1295,10 +1341,21 @@ func (e *engine) buildRowItems(
 		itemY := topY + curY
 		if cstate.MarginTopAuto {
 			itemY += flexRowCrossAutoMarginUnit(e, cstate, targetCross)
+		} else {
+			itemY += e.scalePt(cstate.MarginTop)
 		}
 
-		forceStretch := flexItemCrossStretch(style, *cstate) && targetCross > 0
-		cblock := e.buildFlexRowItem(item.n, cstate, forceStretch, targetCross, widths[idx], leftX, itemY)
+		intrinsicFlexContainer := cstate.Display == displayFlex || cstate.Display == displayInlineFlex
+		forceStretch := flexItemCrossStretch(style, *cstate) && targetCross > 0 &&
+			(definiteCross || !intrinsicFlexContainer)
+		stretchCross := targetCross
+		if forceStretch {
+			stretchCross -= e.scalePt(cstate.MarginTop) + e.scalePt(cstate.MarginBottom)
+			if stretchCross < 0 {
+				stretchCross = 0
+			}
+		}
+		cblock := e.buildFlexRowItem(item.n, cstate, forceStretch, stretchCross, widths[idx], leftX, itemY)
 
 		if cblock == nil {
 			built = append(built, flexPlacedItem{n: item.n}) //nolint:exhaustruct // intentional zero fields
@@ -1348,7 +1405,16 @@ func (e *engine) buildRowItems(
 
 // alignRowItems applies align-items/align-self offsets on the cross axis
 // within a line (stretch sizing happened during build).
-func (e *engine) alignRowItems(style ResolvedStyle, built []flexPlacedItem, topY, cyOffset, alignH float64) {
+//
+//nolint:cyclop,goconst // alignment keeps baseline and cross-axis branches together
+func (e *engine) alignRowItems(
+	style ResolvedStyle,
+	built []flexPlacedItem,
+	topY, cyOffset, alignH float64,
+	crossReverse bool,
+) {
+	baselineY := e.rowBaseline(style, built, topY+cyOffset)
+
 	for _, page := range built {
 		if page.box == nil {
 			continue
@@ -1368,9 +1434,23 @@ func (e *engine) alignRowItems(style ResolvedStyle, built []flexPlacedItem, topY
 
 		switch align {
 		case fxFlexEnd, fxEnd:
-			deltaY = (topY + cyOffset + alignH) - (page.box.y + page.box.height)
+			if !crossReverse {
+				deltaY = (topY + cyOffset + alignH) - (page.box.y + page.box.height)
+			}
+		case fxFlexStart, fxStart:
+			if crossReverse {
+				deltaY = (topY + cyOffset + alignH) - (page.box.y + page.box.height)
+			}
 		case fxCenter:
 			deltaY = (topY + cyOffset + (alignH-page.box.height)/2) - page.box.y
+		case "baseline":
+			if target, ok := baselineY[page.box]; ok {
+				deltaY = target - page.box.y
+			}
+		default:
+			if crossReverse {
+				deltaY = (topY + cyOffset + alignH) - (page.box.y + page.box.height)
+			}
 		}
 
 		if deltaY != 0 {
@@ -1378,6 +1458,55 @@ func (e *engine) alignRowItems(style ResolvedStyle, built []flexPlacedItem, topY
 			page.box.y += deltaY
 		}
 	}
+}
+
+//nolint:wsl // baseline collection keeps each item decision adjacent
+func (e *engine) rowBaseline(
+	style ResolvedStyle, built []flexPlacedItem, lineTop float64,
+) map[*box]float64 {
+	type baselineItem struct {
+		box    *box
+		margin float64
+		offset float64
+	}
+
+	items := make([]baselineItem, 0, len(built))
+	maxOffset := 0.0
+	for _, page := range built {
+		if page.box == nil {
+			continue
+		}
+
+		itemStyle := e.stylePtr(page.n)
+		align := style.AlignItems
+		if itemStyle.AlignSelf != "" && itemStyle.AlignSelf != fxAuto {
+			align = itemStyle.AlignSelf
+		}
+		if align != "baseline" {
+			continue
+		}
+
+		offset := page.box.height
+		if page.box.firstBaseline > page.box.y {
+			offset = page.box.firstBaseline - page.box.y
+		}
+		margin := e.scalePt(itemStyle.MarginTop)
+		items = append(items, baselineItem{box: page.box, margin: margin, offset: offset})
+		if margin+offset > maxOffset {
+			maxOffset = margin + offset
+		}
+	}
+
+	result := make(map[*box]float64, len(items))
+	for _, item := range items {
+		// The flex line's baseline includes the largest cross-axis margin, but
+		// the item margin is not subtracted again when the border box is placed.
+		// This matches empty-item baselines and keeps margin-different items on
+		// the same physical edge.
+		result[item.box] = lineTop + maxOffset - item.offset
+	}
+
+	return result
 }
 
 //nolint:wsl // main-axis margin counting keeps both auto sides in one pass
@@ -1421,7 +1550,14 @@ func flexRowCrossAutoMarginUnit(eng *engine, style *ResolvedStyle, targetCross f
 		height = targetCross * style.HeightPercent / oneHundred
 	}
 
-	free := targetCross - height
+	fixed := 0.0
+	if !style.MarginTopAuto {
+		fixed += eng.scalePt(style.MarginTop)
+	}
+	if !style.MarginBottomAuto {
+		fixed += eng.scalePt(style.MarginBottom)
+	}
+	free := targetCross - height - fixed
 	if free <= 0 {
 		return 0
 	}
@@ -1442,7 +1578,7 @@ func flexItemCrossStretch(cstate, cstate2 ResolvedStyle) bool {
 	}
 
 	switch align {
-	case fxFlexStart, fxStart, fxFlexEnd, fxEnd, fxCenter:
+	case fxFlexStart, fxStart, fxFlexEnd, fxEnd, fxCenter, "baseline":
 		return false
 	}
 	// Definite height/% means the used cross size is already specified.
@@ -1511,7 +1647,7 @@ func (e *engine) flexMinCrossMainSize(node *html.Node, baseH, mainSize float64) 
 		floor = e.scalePt(cstate.MinHeight)
 	}
 
-	if overflowCreatesStickyScrollport(cstate.Overflow) {
+	if flexAutoMinSizeIsZero(cstate.Overflow) {
 		return floor
 	}
 
@@ -1539,6 +1675,18 @@ func (e *engine) flexMinCrossMainSize(node *html.Node, baseH, mainSize float64) 
 	return floor
 }
 
+// flexAutoMinSizeIsZero separates flex sizing from sticky scrollport
+// detection. overflow: clip clips paint but does not create a scroll
+// container, so it keeps the content-based automatic minimum.
+func flexAutoMinSizeIsZero(overflow string) bool {
+	switch overflow {
+	case overflowAuto, "scroll", overflowHidden:
+		return true
+	default:
+		return false
+	}
+}
+
 func (e *engine) flexSpecifiedHeightSuggestion(style ResolvedStyle, baseH, mainSize, padV float64) float64 {
 	switch {
 	case style.HeightPercent >= 0 && mainSize >= 0:
@@ -1552,15 +1700,19 @@ func (e *engine) flexSpecifiedHeightSuggestion(style ResolvedStyle, baseH, mainS
 	return -1
 }
 
+//nolint:cyclop,wsl // column flow combines wrapping, sizing, and placement
 func (e *engine) flowFlexColumn(
 	parent *box, kids []*html.Node, style ResolvedStyle,
-	contentW, contentX, topY, curY, gap float64,
+	contentW, contentX, topY, curY, gap, crossGap float64,
 ) float64 {
 	contentH := resolveFlexColumnContentHeight(style, e)
 	items := e.flexColumnItems(kids, contentW, contentH)
 
 	if len(items) == 0 {
 		return curY
+	}
+	if style.FlexWrap == fxWrap || style.FlexWrap == fxWrapRev {
+		return e.flowFlexColumnWrapped(parent, style, items, contentW, contentX, topY, curY, gap, crossGap, contentH)
 	}
 
 	if style.FlexDirection == fxColRev {
@@ -1580,6 +1732,10 @@ func (e *engine) flowFlexColumn(
 	}
 
 	startY, justifyGap := justifyColumnStart(flexMainJustify(style), contentH, curY, sumH+gaps, sumH, gap, len(items))
+	if style.FlexDirection == fxColRev && flexStartJustify(flexMainJustify(style)) &&
+		contentH >= 0 && !flexColumnHasAutoMargins(items, e) {
+		startY = curY + contentH - sumH - gaps
+	}
 
 	endY := e.buildColumnItems(parent, style, items, heights, contentW, contentX, topY, curY, startY, justifyGap, contentH)
 
@@ -1588,352 +1744,6 @@ func (e *engine) flowFlexColumn(
 	}
 
 	return endY
-}
-
-//nolint:wsl // min-height normalization is a short, ordered fallback
-func resolveFlexColumnContentHeight(style ResolvedStyle, eng *engine) float64 {
-	contentH := resolveContentHeight(style, eng)
-	if contentH >= 0 || style.MinHeight <= 0 {
-		return contentH
-	}
-
-	contentH = eng.scalePt(style.MinHeight)
-	if style.BoxSizing == borderBox {
-		contentH -= eng.scalePt(style.PaddingTop) + eng.scalePt(style.PaddingBottom) +
-			eng.scalePt(style.BorderTop.Width) + eng.scalePt(style.BorderBottom.Width)
-	}
-	if contentH < 0 {
-		contentH = 0
-	}
-
-	return contentH
-}
-
-func (e *engine) flexColumnItems(kids []*html.Node, contentW, contentH float64) []flexColMeas {
-	items := make([]flexColMeas, 0, len(kids))
-
-	for _, kid := range kids {
-		cstate := e.stylePtr(kid)
-
-		grow := cstate.FlexGrow
-		if grow < 0 {
-			grow = 0
-		}
-
-		shrink := cstate.FlexShrink
-		if shrink < 0 {
-			shrink = 1
-		}
-
-		items = append(items, flexColMeas{
-			n: kid, baseH: e.flexItemBaseHeight(kid, *cstate, contentW, contentH),
-			grow: grow, shrink: shrink,
-		})
-	}
-
-	sort.SliceStable(items, func(i, j int) bool {
-		return e.stylePtr(items[i].n).FlexOrder < e.stylePtr(items[j].n).FlexOrder
-	})
-
-	return items
-}
-
-// flexColumnHeights resolves used main sizes: grow/shrink redistribution over
-// the definite container height, then min/max-height clamping.
-func (e *engine) flexColumnHeights(items []flexColMeas, contentH, gap float64) []float64 {
-	heights := make([]float64, len(items))
-
-	var fixed, growSum, shrinkSum float64
-
-	for i, item := range items {
-		heights[i] = item.baseH
-		// Main-axis margins remain outside flex bases during negative free-space
-		// distribution; placement and auto-height still consume them.
-		fixed += item.baseH
-		growSum += item.grow
-		shrinkSum += item.shrink * item.baseH
-	}
-
-	if contentH < 0 {
-		return heights
-	}
-
-	gaps := gap * float64(len(items)-1)
-	if gaps < 0 {
-		gaps = 0
-	}
-
-	free := contentH - fixed - gaps
-	if free > 0 && growSum > 0 {
-		e.flexGrowHeights(items, heights, free, growSum)
-	} else if free < 0 && shrinkSum > 0 {
-		e.flexShrinkHeights(items, heights, -free, shrinkSum, contentH)
-	}
-	// Re-apply min/max-height after grow/shrink (percentage re-resolve).
-	e.flexClampColumnHeights(items, heights, contentH)
-
-	return heights
-}
-
-func (e *engine) flexGrowHeights(items []flexColMeas, heights []float64, free, growSum float64) {
-	for i, it := range items {
-		if it.grow > 0 {
-			heights[i] += free * (it.grow / growSum)
-		}
-	}
-}
-
-func (e *engine) flexShrinkHeights(items []flexColMeas, heights []float64, deficit, shrinkSum, contentH float64) {
-	for idx, item := range items {
-		if item.shrink <= 0 || item.baseH <= 0 {
-			continue
-		}
-
-		share := (item.shrink * item.baseH) / shrinkSum
-		heights[idx] -= deficit * share
-		floor := e.flexMinCrossMainSize(item.n, item.baseH, contentH)
-
-		if heights[idx] < floor {
-			heights[idx] = floor
-		}
-	}
-}
-
-func (e *engine) flexClampColumnHeights(items []flexColMeas, heights []float64, contentH float64) {
-	for idx, it := range items {
-		cstate := e.stylePtr(it.n)
-
-		floor := e.flexMinCrossMainSize(it.n, it.baseH, contentH)
-		if heights[idx] < floor {
-			heights[idx] = floor
-		}
-
-		if cstate.MaxHeight >= 0 {
-			mx := e.scalePt(cstate.MaxHeight)
-			if heights[idx] > mx {
-				heights[idx] = mx
-			}
-		}
-	}
-}
-
-// justifyColumnStart resolves the main-axis start offset and gap for a column
-// from justify-content, returning (startY, justifyGap).
-func justifyColumnStart(justify string, contentH, curY, totalH, sumH, gap float64, count int) (float64, float64) {
-	if contentH >= 0 {
-		switch justify {
-		case fxFlexEnd, fxEnd:
-			return curY + contentH - totalH, gap
-		case fxCenter:
-			return curY + (contentH-totalH)/2, gap
-		case fxBetween, fxAround, fxEvenly:
-			return justifyDistributed(justify, curY, contentH, sumH, gap, count)
-		}
-	}
-
-	return curY, gap
-}
-
-//nolint:cyclop,funlen,gocognit,wsl // column placement keeps CSS auto-margin and alignment phases together
-func (e *engine) buildColumnItems(
-	parent *box, style ResolvedStyle, items []flexColMeas, heights []float64,
-	contentW, contentX, topY, curY, startY, justifyGap, contentH float64,
-) float64 {
-	leftY := startY
-	endY := curY
-	autoMargins := 0
-	poll := newCtxPoll(e.ctx)
-	for _, item := range items {
-		if poll.poll() {
-			e.err = poll.err
-
-			return endY
-		}
-
-		itemStyle := e.stylePtr(item.n)
-		if itemStyle.MarginTopAuto {
-			autoMargins++
-		}
-		if itemStyle.MarginBottomAuto {
-			autoMargins++
-		}
-	}
-	autoUnit := 0.0
-	if contentH >= 0 && autoMargins > 0 {
-		used := 0.0
-		for _, height := range heights {
-			used += height
-		}
-		for _, item := range items {
-			used += flexColumnMainMargins(e, item)
-		}
-		used += justifyGap * float64(len(items)-1)
-		if free := contentH - used; free > 0 {
-			autoUnit = free / float64(autoMargins)
-		}
-	}
-
-	for idx, item := range items {
-		cstate := e.stylePtr(item.n)
-		if cstate.MarginTopAuto {
-			leftY += autoUnit
-		} else {
-			leftY += e.scalePt(cstate.MarginTop)
-		}
-		// Force border-box height so grow/shrink targets stick through build.
-		override := e.flexColumnItemOverride(item.n, *cstate, style, heights[idx], contentW)
-		cblock := e.buildWithStyle(item.n, &override, contentW, contentX, topY+leftY)
-
-		if cblock == nil {
-			leftY += heights[idx]
-			if cstate.MarginBottomAuto {
-				leftY += autoUnit
-			} else {
-				leftY += e.scalePt(cstate.MarginBottom)
-			}
-			if idx < len(items)-1 {
-				leftY += justifyGap
-			}
-
-			continue
-		}
-
-		dx := contentX - cblock.x
-		dy := (topY + leftY) - cblock.y
-		e.shiftBoxOps(cblock, dx, dy)
-		cblock.x += dx
-		cblock.y += dy
-
-		e.alignColumnItem(cblock, style, *cstate, contentX, contentW)
-
-		if parent != nil {
-			parent.children = append(parent.children, cblock)
-		}
-
-		leftY += heights[idx]
-		if cstate.MarginBottomAuto {
-			leftY += autoUnit
-		} else {
-			leftY += e.scalePt(cstate.MarginBottom)
-		}
-		endY = leftY
-
-		if idx < len(items)-1 {
-			leftY += justifyGap
-			endY = leftY
-		}
-	}
-
-	return endY
-}
-
-func (e *engine) flexColumnItemOverride(
-	node *html.Node, itemStyle, containerStyle ResolvedStyle, height, contentW float64,
-) ResolvedStyle {
-	override := e.forceFlexItemCrossSize(itemStyle, height)
-	if flexItemColumnCrossStretch(containerStyle, itemStyle) || itemStyle.Width >= 0 || itemStyle.WidthPercent >= 0 {
-		return override
-	}
-
-	crossW := e.measureFlexItemMaxContent(node, itemStyle)
-	if crossW > contentW {
-		crossW = contentW
-	}
-
-	return e.forceFlexItemCrossWidth(override, crossW)
-}
-
-// alignColumnItem places a column item on the cross axis. Auto cross-axis
-// margins take the line's positive free space before alignment (CSS Flexbox
-// L1 8.1), and when they do, the alignment keywords no longer move the item.
-func (e *engine) alignColumnItem(
-	cblock *box, containerStyle, itemStyle ResolvedStyle, contentX, contentW float64,
-) {
-	if flexColumnCrossAutoMargin(itemStyle) {
-		if offset, absorbed := columnCrossAutoMarginOffset(itemStyle, contentW-cblock.w); absorbed {
-			if offset != 0 {
-				e.shiftBoxOps(cblock, offset, 0)
-				cblock.x += offset
-			}
-
-			return
-		}
-	}
-
-	align := containerStyle.AlignItems
-	if itemStyle.AlignSelf != "" && itemStyle.AlignSelf != fxAuto {
-		align = itemStyle.AlignSelf
-	}
-
-	if adx := columnAlignOffset(align, cblock, contentX, contentW); adx != 0 {
-		e.shiftBoxOps(cblock, adx, 0)
-		cblock.x += adx
-	}
-}
-
-// columnCrossAutoMarginOffset resolves the cross-axis offset a column item
-// takes from the line's positive free space. absorbed is false when free space
-// is not positive, so the caller still applies align-items / align-self.
-func columnCrossAutoMarginOffset(itemStyle ResolvedStyle, free float64) (float64, bool) {
-	if free <= 0 {
-		return 0, false
-	}
-
-	switch {
-	case itemStyle.MarginLeftAuto && itemStyle.MarginRightAuto:
-		return free / two, true
-	case itemStyle.MarginLeftAuto:
-		return free, true
-	}
-
-	// A right-only auto margin takes all the free space, so the border box
-	// stays at the line start.
-	return 0, true
-}
-
-// columnAlignOffset is the cross-axis shift for the alignment keyword.
-func columnAlignOffset(align string, cblock *box, contentX, contentW float64) float64 {
-	switch align {
-	case fxCenter:
-		return contentX + (contentW-cblock.w)/2 - cblock.x
-	case fxFlexEnd, fxEnd:
-		return contentX + contentW - cblock.w - cblock.x
-	}
-
-	return 0
-}
-
-// flexColumnCrossAutoMargin reports whether a column item has an auto
-// cross-axis (horizontal) margin.
-func flexColumnCrossAutoMargin(style ResolvedStyle) bool {
-	return style.MarginLeftAuto || style.MarginRightAuto
-}
-
-// flexItemColumnCrossStretch reports whether an auto-width column item uses
-// the container's cross size. Non-stretch alignment uses the item's intrinsic
-// width instead, so alignColumnItem can place it at start, center, or end.
-// Auto cross-axis margins also suppress stretch (CSS Flexbox L1 8.5): the
-// item keeps its hypothetical cross size and the margins absorb the rest.
-func flexItemColumnCrossStretch(cstate, cstate2 ResolvedStyle) bool {
-	if flexColumnCrossAutoMargin(cstate2) {
-		return false
-	}
-
-	align := cstate.AlignItems
-	if align == "" {
-		align = fxStretch
-	}
-
-	if cstate2.AlignSelf != "" && cstate2.AlignSelf != fxAuto {
-		align = cstate2.AlignSelf
-	}
-
-	switch align {
-	case fxFlexStart, fxStart, fxFlexEnd, fxEnd, fxCenter:
-		return false
-	}
-
-	return cstate2.Width < 0 && cstate2.WidthPercent < 0
 }
 
 // applyRelativeOffset shifts a position:relative box and its ops by top/left

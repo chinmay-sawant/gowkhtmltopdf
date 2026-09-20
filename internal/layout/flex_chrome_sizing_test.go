@@ -126,14 +126,13 @@ func TestChromeFlexFractionalGrowFactorsLeaveUnusedSpace(t *testing.T) {
 // Expected: a 100% flex-basis in an indefinite nested column stays
 // content-sized instead of becoming a definite full height. Each item holds one
 // 10pt text line on a 20pt line box plus 1pt borders, so its used height is
-// 22pt and the column sums the two content heights to 44pt. The outer
-// container's auto height must not feed the percentage.
+// 22pt and the column sums the two content heights to 44pt. The definite branch
+// keeps a 100pt column at 100pt while its two 102pt, non-shrinking items
+// overflow it. The outer auto height must not feed the percentage.
+//
+//nolint:cyclop,funlen // indefinite and definite branches share one source fixture
 func TestChromeFlexPercentageBasisIndefiniteColumn(t *testing.T) {
 	t.Parallel()
-
-	// The engine stretches the nested column to the outer line's cross size and
-	// resolves the 100% basis against that stretched, definite height.
-	t.Skip("blocked: stretched line cross makes the nested column definite for % basis (flex.go:1277)")
 
 	cssSheet := sheet(t, `
 body { margin: 0 }
@@ -169,6 +168,42 @@ body { margin: 0 }
 		t.Fatalf("item y positions = %.2f/%.2f, want %.2f/%.2f",
 			itemA.y, itemB.y, column.y, column.y+itemHeight)
 	}
+
+	t.Run("definite-column", func(t *testing.T) {
+		t.Parallel()
+
+		res := layoutHTML(t, `<html><body>
+<div class="flexbox column definite">
+  <div class="item item-a"><div>AAA</div></div>
+  <div class="item item-b"><div>BBB</div></div>
+</div>
+</body></html>`, sheet(t, `
+body { margin: 0 }
+.flexbox { display: flex }
+.column { flex-direction: column; height: 100pt }
+.item { flex: 1 0 100%; border: 1pt solid blue; font-size: 10pt; line-height: 20pt }
+`))
+
+		column := findBoxByClass(t, res, "definite")
+		itemA := findBoxByClass(t, res, "item-a")
+		itemB := findBoxByClass(t, res, "item-b")
+
+		const itemHeight = 102.0 // 100pt basis plus 1pt border on each side
+
+		if !near(itemA.height, itemHeight) || !near(itemB.height, itemHeight) {
+			t.Fatalf("definite item heights = %.2f/%.2f, want %.2f each",
+				itemA.height, itemB.height, itemHeight)
+		}
+
+		if !near(column.height, 100) {
+			t.Fatalf("definite column height = %.2f, want 100", column.height)
+		}
+
+		if !near(itemA.y, column.y) || !near(itemB.y, itemA.y+itemHeight) {
+			t.Fatalf("definite item y positions = %.2f/%.2f, want %.2f/%.2f",
+				itemA.y, itemB.y, column.y, column.y+itemHeight)
+		}
+	})
 }
 
 // TestChromeFlexFactorLessThanOneRowAndColumn covers case

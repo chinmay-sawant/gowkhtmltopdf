@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Definite main size and percentage children</title>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .case { display: flex; flex-direction: column; width: 300pt; height: 300pt; position: relative; transform: translateY(56pt); }
+    .flex-one { flex: 1 1 0; min-height: 0; background: #dbeafe; outline: 1px solid #2563eb; }
+    /* Keep the cross size definite so this fixture isolates percentage height. */
+    .percentage-child { width: 300pt; height: 50%; background: #dcfce7; outline: 1px solid #16a34a; }
+    .fixed { flex: 0 0 auto; width: 50pt; height: 50pt; background: #fef3c7; outline: 1px solid #d97706; }
+    .pdf-label { position: absolute; top: 378pt; left: 12pt; color: #111827; font-size: 10pt; }
+  </style>
+</head>
+<body>
+  <!-- Source: third_party/blink/web_tests/css3/flexbox/definite-main-size.html -->
+  <!-- Port status: completed fixture coverage; engine gap exposed. The expected 50% height is not resolved yet. -->
+  <!-- Expected: 50% of the 250pt flexible item resolves to 125pt. -->
+  <div class="case" id="definite-column">
+    <div class="flex-one" id="flexible-column-item">
+      <div class="percentage-child" id="percentage-child"></div>
+    </div>
+    <div class="fixed" id="fixed-column-item"></div>
+  </div>
+  <div class="pdf-label">Definite column size and percentage child</div>
+  <p class="case-description" style="position:absolute;top:12pt;left:12pt;margin:0;padding:6pt;border:1pt solid #64748b;background:#fff;color:#111827;font-size:9pt;line-height:12pt;width:560pt;">
+    <strong>Case 5 expected behavior:</strong> the definite 250pt flexible column item should resolve its 50% child height to 125pt. The fixed 300pt cross size keeps this PDF focused on that height calculation. The current engine still leaves the nested percentage height unresolved, so a zero-height green strip is an engine-gap signal, not a passing result.
+  </p>
+</body>
+</html>

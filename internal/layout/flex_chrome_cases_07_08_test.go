@@ -12,7 +12,7 @@ import (
 func layoutChromeFlexCase0708(t *testing.T, name string) *Result {
 	t.Helper()
 
-	source, err := os.ReadFile("../../test/Chrome/cases/" + name)
+	source, err := os.ReadFile("../../test/chrome/cases/" + name)
 	if err != nil {
 		t.Fatalf("read Chrome Flex case %q: %v", name, err)
 	}
@@ -49,7 +49,7 @@ func layoutChromeFlexCase0708(t *testing.T, name string) *Result {
 func TestChromeFlexCase07ColumnCrossAxisCenter(t *testing.T) {
 	t.Parallel()
 
-	res := layoutChromeFlexCase0708(t, "legacy-flex-align.html")
+	res := layoutChromeFlexCase0708(t, "case-07-legacy-flex-align.html")
 	containers := classBoxes(res.root, "case")
 	items := classBoxes(res.root, "item")
 	if len(containers) != 1 || len(items) != 2 {
@@ -72,14 +72,13 @@ func TestChromeFlexCase07ColumnCrossAxisCenter(t *testing.T) {
 
 // TestChromeFlexCase08VerticalWritingReference records the Chromium geometry
 // for flex-align-vertical-writing-mode.html. In vertical-rl writing mode, a
-// row flex direction follows the vertical inline axis, while cross-start is
-// the container's right edge. This is intentionally a reference test because
-// the Go flex algorithm currently lays out flex axes in physical row/column
-// terms rather than remapping them from writing mode.
+// row flex direction follows the vertical inline axis, while flex-end places
+// the items at the physical left edge for the source's default direction.
+// The assertion is based on the exact Chromium fixture geometry.
 func TestChromeFlexCase08VerticalWritingReference(t *testing.T) {
 	t.Parallel()
 
-	res := layoutChromeFlexCase0708(t, "legacy-flex-align-vertical-writing.html")
+	res := layoutChromeFlexCase0708(t, "case-08-legacy-flex-align-vertical-writing.html")
 	containers := classBoxes(res.root, "case")
 	items := classBoxes(res.root, "item")
 	if len(containers) != 1 || len(items) != 3 {
@@ -88,9 +87,8 @@ func TestChromeFlexCase08VerticalWritingReference(t *testing.T) {
 
 	container := containers[0]
 	for index, item := range items {
-		wantRight := container.x + container.w
-		if !near(item.x+item.w, wantRight) {
-			t.Fatalf("case 8 item %d right edge=%.2f, want Chromium right cross edge %.2f", index, item.x+item.w, wantRight)
+		if !near(item.x, container.x) {
+			t.Fatalf("case 8 item %d left edge=%.2f, want Chromium left cross edge %.2f", index, item.x, container.x)
 		}
 		if index == 0 {
 			if !near(item.y, container.y) {

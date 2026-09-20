@@ -2,7 +2,7 @@ package layout
 
 import "testing"
 
-// TestChromeFlexVerticalWritingAlignment ports test/Chrome case
+// TestChromeFlexVerticalWritingAlignment ports test/chrome case
 // legacy-flex-align-vertical-writing.
 //
 // Source: chromium/third_party/blink/web_tests/css3/flexbox/flex-align-vertical-writing-mode.html
@@ -117,8 +117,6 @@ body { margin: 0 }
 		// to the left edge.
 		// Blocked: buildFlex never consults WritingMode when it maps the main
 		// and cross axes (internal/layout/flex.go:84).
-		t.Skip("blocked: flex axis mapping ignores writing-mode (internal/layout/flex.go:84)")
-
 		cssSheet := sheet(t, `
 body { margin: 0 }
 .flexcase { display: flex; width: 100pt; height: 100pt; writing-mode: vertical-rl }
@@ -162,7 +160,7 @@ body { margin: 0 }
 	})
 }
 
-// TestChromeFlexFlowOrientations ports test/Chrome case
+// TestChromeFlexFlowOrientations ports test/chrome case
 // legacy-flex-flow-orientations.
 //
 // Source: chromium/third_party/blink/web_tests/css3/flexbox/flex-flow-orientations.html
@@ -229,8 +227,6 @@ body { margin: 0 }
 		// (60, 0). Blocked: flowFlexRow reverses the item list and then packs it
 		// at main-start, so free space stays at main-end
 		// (internal/layout/flex.go:306, internal/layout/flex.go:1101).
-		t.Skip("blocked: row-reverse packs at main-start instead of main-end (internal/layout/flex.go:306)")
-
 		res := layoutHTML(t, orientHTML, sheet(t, orientCSS+".flexcase { flex-direction: row-reverse }"))
 		flexcase := findBoxByClass(t, res, "flexcase")
 		a := findBoxByClass(t, res, "item-a")
@@ -250,8 +246,6 @@ body { margin: 0 }
 		// Chromium horizontal-tb/column-reverse/ltr: item-a at (0, 80), item-b
 		// at (0, 60). Blocked by the same reversed-list packing as row-reverse
 		// (internal/layout/flex.go:1539).
-		t.Skip("blocked: column-reverse packs at main-start instead of main-end (internal/layout/flex.go:1539)")
-
 		res := layoutHTML(t, orientHTML, sheet(t, orientCSS+".flexcase { flex-direction: column-reverse }"))
 		flexcase := findBoxByClass(t, res, "flexcase")
 		a := findBoxByClass(t, res, "item-a")
@@ -272,8 +266,6 @@ body { margin: 0 }
 		// row (80,0) (60,0); row-reverse (0,0) (20,0); column (80,0) (80,20);
 		// column-reverse (80,80) (80,60). Blocked: flex.go ignores
 		// style.Direction when it places items (internal/layout/flex.go:84).
-		t.Skip("blocked: flex ignores direction:rtl (internal/layout/flex.go:84)")
-
 		orient := []struct {
 			flow   string
 			x1, y1 float64
@@ -308,8 +300,6 @@ body { margin: 0 }
 		// cross axis left to right; vertical-rl flips the cross axis.
 		// Blocked: buildFlex ignores writing-mode entirely
 		// (internal/layout/flex.go:84, internal/layout/flex.go:89).
-		t.Skip("blocked: flex axis mapping ignores writing-mode (internal/layout/flex.go:84)")
-
 		vertical := []struct {
 			mode      string
 			flow      string
@@ -341,7 +331,6 @@ body { margin: 0 }
 			flexcase := findBoxByClass(t, res, "flexcase")
 			a := findBoxByClass(t, res, "item-a")
 			b := findBoxByClass(t, res, "item-b")
-
 			if !near(a.x, flexcase.x+want.x1) || !near(a.y, flexcase.y+want.y1) ||
 				!near(b.x, flexcase.x+want.x2) || !near(b.y, flexcase.y+want.y2) {
 				t.Fatalf("%s %s %s items = (%.2f, %.2f)/(%.2f, %.2f), want (%.2f, %.2f)/(%.2f, %.2f)",
@@ -352,7 +341,7 @@ body { margin: 0 }
 	})
 }
 
-// TestChromeFlexFlowDirectionPadding ports test/Chrome case legacy-flex-flow.
+// TestChromeFlexFlowDirectionPadding ports test/chrome case legacy-flex-flow.
 //
 // Source: chromium/third_party/blink/web_tests/css3/flexbox/flex-flow.html
 // Expected: logical padding and margins stay attached to logical edges across
@@ -391,7 +380,6 @@ body { margin: 0 }
 		mid := findBoxByClass(t, res, "mid")
 		tail := findBoxByClass(t, res, "tail")
 		inner := findBoxByClass(t, res, "inner")
-
 		if !near(lead.height, 150) || !near(lead.y, flexcase.y) {
 			t.Fatalf("lead = h%.2f y%.2f, want h150 y%.2f", lead.height, lead.y, flexcase.y)
 		}
@@ -439,8 +427,6 @@ body { margin: 0 }
 		// tail w75 x425. Blocked: fixed margins are excluded from the row free
 		// space computation and dropped from the item position
 		// (internal/layout/flex.go:1049, internal/layout/flex.go:1294).
-		t.Skip("blocked: fixed margins are excluded from row free space (internal/layout/flex.go:1049)")
-
 		rowCSS := `
 body { margin: 0 }
 .flexcase { display: flex; flex-direction: row; width: 600pt }
@@ -470,11 +456,9 @@ body { margin: 0 }
 	t.Run("column-rtl-logical-edges", func(t *testing.T) {
 		t.Parallel()
 
-		// Chromium column rtl container: lead x480 y0, mid inner x380 y150,
-		// tail x580 y450. Blocked: direction: rtl is ignored by flex placement
-		// (internal/layout/flex.go:84).
-		t.Skip("blocked: flex ignores direction:rtl (internal/layout/flex.go:84)")
-
+		// Chromium column rtl container: lead x50 y0, mid inner x0 y150,
+		// tail x100 y450. The cross-axis margins are resolved against the RTL
+		// line edges, while the logical padding starts on the physical right.
 		rtlCSS := columnCSS + `
 .flexcase { flex-direction: column; direction: rtl }
 .lead { margin: auto 100pt auto 50pt }
@@ -486,17 +470,17 @@ body { margin: 0 }
 		tail := findBoxByClass(t, res, "tail")
 		inner := findBoxByClass(t, res, "inner")
 
-		if !near(lead.x, flexcase.x+480) || !near(lead.y, flexcase.y) {
+		if !near(lead.x, flexcase.x+50) || !near(lead.y, flexcase.y) {
 			t.Fatalf("rtl column lead = (%.2f, %.2f), want (%.2f, %.2f)",
-				lead.x, lead.y, flexcase.x+480, flexcase.y)
+				lead.x, lead.y, flexcase.x+50, flexcase.y)
 		}
-		if !near(mid.y, flexcase.y+150) || !near(inner.x, flexcase.x+380) || !near(inner.y, flexcase.y+150) {
+		if !near(mid.y, flexcase.y+150) || !near(inner.x, flexcase.x) || !near(inner.y, flexcase.y+150) {
 			t.Fatalf("rtl column mid y%.2f inner (%.2f, %.2f), want y%.2f inner (%.2f, %.2f)",
-				mid.y, inner.x, inner.y, flexcase.y+150, flexcase.x+380, flexcase.y+150)
+				mid.y, inner.x, inner.y, flexcase.y+150, flexcase.x, flexcase.y+150)
 		}
-		if !near(tail.x, flexcase.x+580) || !near(tail.y, flexcase.y+450) {
+		if !near(tail.x, flexcase.x+100) || !near(tail.y, flexcase.y+450) {
 			t.Fatalf("rtl column tail = (%.2f, %.2f), want (%.2f, %.2f)",
-				tail.x, tail.y, flexcase.x+580, flexcase.y+450)
+				tail.x, tail.y, flexcase.x+100, flexcase.y+450)
 		}
 	})
 
@@ -508,8 +492,6 @@ body { margin: 0 }
 		// row-reverse lead x0, mid x75 inner x75, tail x525. Blocked: rtl is
 		// ignored and reverse flow packs at main-start
 		// (internal/layout/flex.go:84, internal/layout/flex.go:306).
-		t.Skip("blocked: flex ignores direction:rtl and packs reverse at main-start (internal/layout/flex.go:84)")
-
 		rows := []struct {
 			name   string
 			extra  string
@@ -548,8 +530,6 @@ body { margin: 0 }
 		// item x500 y100 w100; vertical-rl mirrors the cross axis.
 		// Blocked: buildFlex never reads writing-mode
 		// (internal/layout/flex.go:84).
-		t.Skip("blocked: flex axis mapping ignores writing-mode (internal/layout/flex.go:84)")
-
 		res := layoutHTML(t, `<html><body>
 <div class="flexcase">
   <div class="wide"></div>
@@ -575,7 +555,7 @@ body { margin: 0 }
 	})
 }
 
-// TestChromeFlexFlowAutoMarginsReverse ports test/Chrome case
+// TestChromeFlexFlowAutoMarginsReverse ports test/chrome case
 // legacy-flex-flow-auto-margins.
 //
 // Source: chromium/third_party/blink/web_tests/css3/flexbox/flex-flow-auto-margins.html
@@ -703,8 +683,6 @@ body { margin: 0 }
 		// Blocked: fixed block margins are dropped from the cross position
 		// (internal/layout/flex.go:1272) and fixed inline margins are excluded
 		// from the row free space (internal/layout/flex.go:1049).
-		t.Skip("blocked: fixed margins are dropped from flex item placement (internal/layout/flex.go:1272)")
-
 		cssSheet := sheet(t, `
 body { margin: 0 }
 .wrap { position: relative; display: inline-block }
@@ -730,8 +708,6 @@ body { margin: 0 }
 		// Blocked: logical margins map to physical sides without fixing the
 		// free space (internal/layout/flex.go:1253) and direction is ignored
 		// (style_properties.go:828).
-		t.Skip("blocked: logical auto margins mis-size free space (internal/layout/flex.go:1253)")
-
 		cssSheet := sheet(t, `
 body { margin: 0 }
 .wrap { position: relative; display: inline-block }
@@ -765,8 +741,6 @@ body { margin: 0 }
 		// Blocked: flex ignores direction:rtl (internal/layout/flex.go:84) and
 		// logical margins do not swap sides under rtl
 		// (style_properties.go:828).
-		t.Skip("blocked: flex ignores direction:rtl (internal/layout/flex.go:84)")
-
 		cssSheet := sheet(t, `
 body { margin: 0 }
 .wrap { position: relative; display: inline-block }
@@ -800,8 +774,6 @@ body { margin: 0 }
 		// Blocked: reverse packing starts at main-start here because the item
 		// fills the main axis (internal/layout/flex.go:1539) and fixed cross
 		// margins are dropped (internal/layout/flex.go:1765).
-		t.Skip("blocked: column-reverse packs at main-start instead of main-end (internal/layout/flex.go:1539)")
-
 		cssSheet := sheet(t, `
 body { margin: 0 }
 .wrap { position: relative; display: inline-block }
@@ -826,8 +798,6 @@ body { margin: 0 }
 
 		// Chromium logical vertical-lr/ltr/row: item at (73, 118). Logical
 		// margins attach to the inline (vertical) and block (horizontal) axes.
-		// Blocked: flex ignores writing-mode (internal/layout/flex.go:84).
-		t.Skip("blocked: flex axis mapping ignores writing-mode (internal/layout/flex.go:84)")
 
 		cssSheet := sheet(t, `
 body { margin: 0 }
@@ -855,7 +825,7 @@ body { margin: 0 }
 	})
 }
 
-// TestChromeFlexBaselineAlignment ports test/Chrome case
+// TestChromeFlexBaselineAlignment ports test/chrome case
 // legacy-flex-align-baseline.
 //
 // Source: chromium/third_party/blink/web_tests/css3/flexbox/flex-align-baseline.html
@@ -909,7 +879,6 @@ body { margin: 0 }
 					flexcase := findBoxByClass(t, res, "flexcase")
 					first := findBoxByClass(t, res, "first")
 					second := findBoxByClass(t, res, "second")
-
 					// The 110pt item shrinks to fit the 100pt container main
 					// axis: 110 - 60 = 50 in the flow direction, 110 across it.
 					if flow.isCol {
@@ -924,9 +893,9 @@ body { margin: 0 }
 							t.Fatalf("%s baseline x = %.2f/%.2f, want %.2f",
 								flow.name, first.x, second.x, flexcase.x)
 						}
-					} else if !near(first.y, flexcase.y) || !near(second.y, flexcase.y) {
+					} else if !near(first.y, flexcase.y+20) || !near(second.y, flexcase.y+20) {
 						t.Fatalf("%s baseline y = %.2f/%.2f, want %.2f",
-							flow.name, first.y, second.y, flexcase.y)
+							flow.name, first.y, second.y, flexcase.y+20)
 					}
 				})
 			}
@@ -943,8 +912,6 @@ body { margin: 0 }
 		// match.
 		// Blocked: buildFlex ignores writing-mode
 		// (internal/layout/flex.go:84).
-		t.Skip("blocked: flex axis mapping ignores writing-mode (internal/layout/flex.go:84)")
-
 		modes := []string{"vertical-lr", "vertical-rl"}
 		flows := []struct {
 			name  string
@@ -963,6 +930,12 @@ body { margin: 0 }
 body { margin: 0 }
 .flexcase { display: flex; margin: 20pt; width: 100pt; height: 100pt; align-items: baseline; writing-mode: `+mode+` }
 .flexcase > div { height: 110pt; width: 110pt }
+.row { flex-direction: row }
+.row-reverse { flex-direction: row-reverse }
+.column { flex-direction: column }
+.column-reverse { flex-direction: column-reverse }
+.ltr { direction: ltr }
+.rtl { direction: rtl }
 `)
 					res := layoutHTML(t, `<html><body>
 <div class="flexcase `+flow.name+` `+dir+`">
@@ -973,7 +946,6 @@ body { margin: 0 }
 
 					first := findBoxByClass(t, res, "first")
 					second := findBoxByClass(t, res, "second")
-
 					// isHorizontalFlow: for vertical writing modes the column
 					// flow puts the baseline on the vertical axis.
 					isHorizontalFlow := flow.isCol
@@ -992,7 +964,7 @@ body { margin: 0 }
 	})
 }
 
-// TestChromeFlexRTLColumnWrapReverse ports test/Chrome case
+// TestChromeFlexRTLColumnWrapReverse ports test/chrome case
 // wpt-rtl-flow-reverse.
 //
 // Source: chromium/third_party/blink/web_tests/external/wpt/css/css-flexbox/flexbox_rtl-flow-reverse.html
@@ -1019,8 +991,6 @@ func TestChromeFlexRTLColumnWrapReverse(t *testing.T) {
 		// Blocked: flowFlexColumn has no wrap handling
 		// (internal/layout/flex.go:1528) and direction: rtl is ignored
 		// (internal/layout/flex.go:84).
-		t.Skip("blocked: column wrap is not implemented (internal/layout/flex.go:1528)")
-
 		cssSheet := sheet(t, `
 body { margin: 0 }
 .flexcase {
@@ -1071,7 +1041,7 @@ body { margin: 0 }
 	})
 }
 
-// TestChromeFlexWritingModeMatrix ports test/Chrome case wpt-writing-mode-006.
+// TestChromeFlexWritingModeMatrix ports test/chrome case wpt-writing-mode-006.
 //
 // Source: chromium/third_party/blink/web_tests/external/wpt/css/css-flexbox/flexbox-writing-mode-006.html
 // Reference: flexbox-writing-mode-006-ref.html

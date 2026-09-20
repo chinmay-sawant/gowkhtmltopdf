@@ -3,7 +3,7 @@ package layout
 import "testing"
 
 // TestChromeFlexCrossSizeBorderBox covers case wpt-flex-cross-size-border-box
-// (test/Chrome/manifest.json goTarget layout-unit).
+// (test/chrome/manifest.json goTarget layout-unit).
 //
 // Source: third_party/blink/web_tests/external/wpt/css/css-flexbox/flex-cross-size-border-box-001.html
 // Expected: a border-box container and a content-box container that both leave
@@ -64,7 +64,7 @@ body { margin: 0 }
 }
 
 // TestChromeFlexAutoMinSizeOverflowClip covers case
-// wpt-min-size-auto-overflow-clip (test/Chrome/manifest.json goTarget
+// wpt-min-size-auto-overflow-clip (test/chrome/manifest.json goTarget
 // chrome-reference).
 //
 // Source: third_party/blink/web_tests/external/wpt/css/css-flexbox/min-size-auto-overflow-clip.html
@@ -73,16 +73,8 @@ body { margin: 0 }
 // on its block child, so the item keeps 150pt and overflows the 100pt content
 // box instead of shrinking below it. Chromium's reftest ref
 // (min-size-auto-overflow-clip-ref.html) renders the same 150pt green block.
-//
-// Blocked: the engine caps an auto flex item's base width at the container
-// content width (internal/layout/flex.go:615) and zeroes the automatic minimum
-// size for overflow: clip (internal/layout/flex.go:747 via
-// internal/layout/style_values.go:696). The strict assertions below stay so the
-// case flips green when those two paths are fixed.
 func TestChromeFlexAutoMinSizeOverflowClip(t *testing.T) {
 	t.Parallel()
-
-	t.Skip("blocked: capped auto base width and zeroed overflow:clip minimum")
 
 	cssSheet := sheet(t, `
 body { margin: 0 }
@@ -123,7 +115,7 @@ body { margin: 0 }
 }
 
 // TestChromeFlexScrollbarsRowReverseVRL covers case
-// blink-scrollbars-row-reverse-vrl (test/Chrome/manifest.json goTarget
+// blink-scrollbars-row-reverse-vrl (test/chrome/manifest.json goTarget
 // chrome-reference).
 //
 // Source: third_party/blink/renderer/core/layout/layout_flexible_box_test.cc

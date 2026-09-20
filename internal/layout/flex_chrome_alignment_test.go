@@ -278,8 +278,6 @@ html, body { margin: 0; padding: 0; }
 		// Chromium's expectations from the same source file: an empty baseline
 		// item is measured at its bottom border edge, so the line baseline is
 		// the largest margin-top + height in the baseline group.
-		t.Skip("blocked: alignRowItems has no baseline branch (internal/layout/flex.go:1342)")
-
 		cssSheet := sheet(t, `
 html, body { margin: 0; padding: 0; }
 .row { display: flex; flex-flow: row wrap; align-content: flex-start; width: 120pt; }
@@ -393,8 +391,6 @@ html, body { margin: 0; padding: 0; }
 		// Chromium computes the stretched cross size as the line cross size
 		// minus the item's cross-axis margins, so a 96pt margin inside the
 		// 96pt tall container leaves a 0pt border box at container.y + 96.
-		t.Skip("blocked: stretch ignores cross-axis margins (internal/layout/flex.go:1170)")
-
 		pushed := findBoxByClass(t, res, "pushed")
 		if !near(pushed.height, 0) || !near(pushed.w, itemW) {
 			t.Errorf("margin-pushed item size = %.2fx%.2f, want %.2fx0",

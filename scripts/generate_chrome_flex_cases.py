@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "test" / "Chrome"
+OUT = ROOT / "test" / "chrome"
 CASES = [
     [
         "legacy-flex-algorithm",
@@ -524,9 +524,10 @@ TEMPLATES = {
     ),
 }
 
-def make_fixture(case):
+def make_fixture(case, number):
     style, body = TEMPLATES[case["kind"]]
     source = case["source"]
+    fixture_id = f"case-{number:02d}-{case['id']}"
     return f"""<!doctype html>
 <meta charset="utf-8">
 <title>{case["title"]}</title>
@@ -535,6 +536,7 @@ html, body {{ margin: 0; padding: 0; font: 12px sans-serif; }}
 {style}
 </style>
 <!-- Source: {source} -->
+<!-- Fixture: {fixture_id} -->
 <!-- Port status: scaffold. The next phase replaces this minimal case with a verified Go fixture. -->
 <!-- Expected: {case["expected"]} -->
 {body}
@@ -564,15 +566,16 @@ def main():
         "caseCount": len(CASES),
         "cases": [],
     }
-    for row in CASES:
+    for number, row in enumerate(CASES, 1):
         case = dict(zip(fields, row, strict=True))
         entry = dict(case)
-        entry["fixture"] = f"cases/{case['id']}.html"
+        fixture_id = f"case-{number:02d}-{case['id']}"
+        entry["fixture"] = f"cases/{fixture_id}.html"
         entry["status"] = existing_statuses.get(case["id"], "scaffold")
         manifest["cases"].append(entry)
         fixture_path = OUT / entry["fixture"]
         if entry["status"] == "scaffold" or not fixture_path.exists():
-            fixture_path.write_text(make_fixture(case), encoding="utf-8")
+            fixture_path.write_text(make_fixture(case, number), encoding="utf-8")
     (OUT / "manifest.json").write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",

@@ -254,8 +254,12 @@ func TestFixture55ActionCopySharesStatusRowTop(t *testing.T) {
 		t.Fatalf("plan geometry items=%d copies=%d statuses=%d", len(items), len(copies), len(statuses))
 	}
 
-	if math.Abs(copies[0].y-statuses[5].y) > 0.01 {
-		t.Fatalf("Old station copy/status tops diverge: copy=%.2f status=%.2f", copies[0].y, statuses[5].y)
+	const statusMarginTop = 1.5 // 2 CSS px at the renderer's 0.75 scale
+	if math.Abs(copies[0].y+statusMarginTop-statuses[5].y) > 0.01 {
+		t.Fatalf(
+			"Old station copy/status tops diverge after the authored margin: copy=%.2f status=%.2f",
+			copies[0].y, statuses[5].y,
+		)
 	}
 }
 

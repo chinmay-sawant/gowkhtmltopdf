@@ -1,0 +1,43 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Align-content across wrapped columns</title>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .fixture-label { font-size: 1pt; line-height: 1pt; }
+    .flexbox {
+      position: relative;
+      transform: translateY(56pt);
+      display: flex;
+      width: 600pt;
+      height: 20pt;
+      flex-flow: column wrap;
+      align-content: center;
+      direction: ltr;
+      writing-mode: horizontal-tb;
+      background: #ddd;
+    }
+    .flexbox > * {
+      flex: 1 20pt;
+      min-width: 100pt;
+    }
+    .child-1 { background: #00f; }
+    .child-2 { flex-basis: 5pt; background: #0a0; }
+  </style>
+</head>
+<body>
+  <!-- Source: chromium/third_party/blink/web_tests/css3/flexbox/multiline-align-content-horizontal-column.html -->
+  <!-- Manifest source: third_party/blink/web_tests/css3/flexbox/multiline-align-content-horizontal-column.html -->
+  <!-- Port status: completed. Column wrapping and centered align-content placement pass the focused layout assertions. -->
+  <!-- Expected in Chromium: item widths 100pt at x 200pt and 300pt for align-content:center. -->
+  <p class="case-description" style="position:absolute;top:12pt;left:12pt;margin:0;padding:6pt;border:1pt solid #64748b;background:#fff;color:#111827;font-size:9pt;line-height:12pt;width:560pt;">
+    <strong>Case 12 expected behavior:</strong> Chromium wraps the column into two 100pt columns centered at x=200pt and x=300pt. The Go engine matches those line offsets.
+  </p>
+  <div class="fixture-label">legacy-multiline-align-content-column</div>
+  <div class="flexbox" id="case-12">
+    <div class="child-1"></div>
+    <div class="child-2"></div>
+  </div>
+</body>
+</html>

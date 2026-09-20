@@ -118,6 +118,7 @@ func (e *engine) measureCellMinMax(node *html.Node, style ResolvedStyle) (float6
 		engine: e,
 		em:     style.FontSize,
 		style:  style,
+		root:   node,
 	}
 	cellMeas.walk(node, style, style.WhiteSpace == cssWhiteSpaceNowrap || style.WhiteSpace == cssWhiteSpacePre)
 	cellMeas.flushLine()
@@ -147,6 +148,7 @@ func (e *engine) measureCellMinMax(node *html.Node, style ResolvedStyle) (float6
 type cellMeasure struct {
 	engine         *engine
 	style          ResolvedStyle
+	root           *html.Node
 	em             float64
 	lineW          float64
 	maxW           float64
@@ -382,6 +384,14 @@ func (m *cellMeasure) measureElement(nodeN *html.Node, childCS ResolvedStyle, no
 	}
 	// Block-level in-cell boxes start a new line (simplified).
 	blockish := isCellBlockish(childCS.Display)
+	if blockish && nodeN != m.root && childCS.Width >= 0 {
+		m.flushLine()
+		m.noteWord(specifiedBlockOuterWidth(m.engine, childCS))
+		m.lineW = specifiedBlockOuterWidth(m.engine, childCS)
+		m.flushLine()
+
+		return
+	}
 	m.walkBlockChildren(nodeN, childCS, nowrap, blockish)
 }
 
@@ -440,6 +450,15 @@ func specifiedInlineBlockOuterWidth(eng *engine, style ResolvedStyle) float64 {
 	if style.BoxSizing != borderBox {
 		width += eng.scalePt(style.PaddingLeft) + eng.scalePt(style.PaddingRight) +
 			eng.scalePt(style.BorderLeft.Width) + eng.scalePt(style.BorderRight.Width)
+	}
+
+	return width + eng.scalePt(style.MarginLeft) + eng.scalePt(style.MarginRight)
+}
+
+func specifiedBlockOuterWidth(eng *engine, style ResolvedStyle) float64 {
+	width := eng.scalePt(style.Width)
+	if style.BoxSizing != borderBox {
+		width += style.horizontalChrome(eng)
 	}
 
 	return width + eng.scalePt(style.MarginLeft) + eng.scalePt(style.MarginRight)

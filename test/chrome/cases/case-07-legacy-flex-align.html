@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Column cross-axis centering</title>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .case { display: flex; flex-direction: column; align-items: center; width: 300pt; position: relative; transform: translateY(56pt); }
+    .item { height: 20pt; }
+  </style>
+</head>
+<body>
+  <!-- Source: third_party/blink/web_tests/css3/flexbox/flex-align.html::adapted-column-centering -->
+  <!-- Port status: completed. Reviewed static input with passing center geometry. -->
+  <!-- Expected: each auto-width child has the same center as the 300pt column. -->
+  <div class="case" id="case-7">
+    <div class="item" id="align-first">First item</div>
+    <div class="item" id="align-second">Second item</div>
+  </div>
+  <p class="case-description" style="position:absolute;top:12pt;left:12pt;margin:0;padding:6pt;border:1pt solid #64748b;background:#fff;color:#111827;font-size:9pt;line-height:12pt;width:560pt;">
+    <strong>Case 7 expected behavior:</strong> each auto-width child has the same horizontal center as the 300pt column container.
+  </p>
+</body>
+</html>

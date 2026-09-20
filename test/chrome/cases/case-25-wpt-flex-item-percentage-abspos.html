@@ -1,0 +1,12 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Percentage absolute child inside a flex item</title>
+<style>
+html, body { margin: 0; padding: 0; font: 12px sans-serif; }
+.case { position: relative; display: flex; width: 100px; height: 100px; border: 1px solid #222; } .item { position: relative; width: 100px; height: 100px; } .fill { position:absolute;width:100%;height:100%;background:#b7e4c7; }
+</style>
+<!-- Source: third_party/blink/web_tests/external/wpt/css/css-flexbox/flex-item-and-percentage-abspos.html -->
+<!-- Fixture: case-25-wpt-flex-item-percentage-abspos -->
+<!-- Port status: scaffold. The next phase replaces this minimal case with a verified Go fixture. -->
+<!-- Expected: A percentage-sized absolute child fills its flex item without corrupting the item size. -->
+<div class="case"><div class="item"><div class="fill"></div></div></div>

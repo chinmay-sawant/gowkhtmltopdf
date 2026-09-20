@@ -3,7 +3,7 @@ package layout
 import "testing"
 
 // TestChromeFlexRowWrap converts the line-assignment part of the
-// test/Chrome wrapping cases into direct box geometry.
+// test/chrome wrapping cases into direct box geometry.
 //
 //nolint:wsl,varnamelen // fixture assertions use short item labels
 func TestChromeFlexRowWrap(t *testing.T) {
@@ -157,7 +157,7 @@ body { margin: 0 }
 }
 
 // TestChromeFlexMultilineWrapReverse covers case legacy-multiline
-// (test/Chrome/manifest.json goTarget layout-unit).
+// (test/chrome/manifest.json goTarget layout-unit).
 //
 // Source: third_party/blink/web_tests/css3/flexbox/multiline.html
 // Expected: wrap-reverse stacks wrapped lines from the cross-end, so the first
@@ -264,7 +264,7 @@ body { margin: 0 }
 }
 
 // TestChromeFlexAlignContentWrappedColumns covers case
-// legacy-multiline-align-content-column (test/Chrome/manifest.json goTarget
+// legacy-multiline-align-content-column (test/chrome/manifest.json goTarget
 // layout-unit).
 //
 // Source: third_party/blink/web_tests/css3/flexbox/multiline-align-content-horizontal-column.html
@@ -281,11 +281,9 @@ body { margin: 0 }
 // line width (internal/layout/flex.go:1528 flowFlexColumn has no wrap path;
 // internal/layout/flex.go:1616 flexColumnHeights packs a single line).
 //
-//nolint:funlen,varnamelen // fixture assertions use short item labels
+//nolint:varnamelen // fixture assertions use short item labels
 func TestChromeFlexAlignContentWrappedColumns(t *testing.T) {
 	t.Parallel()
-
-	t.Skip("blocked: column flex has no wrap path, so wrapped column lines never form")
 
 	for _, tc := range []struct {
 		wrap  string
@@ -347,7 +345,7 @@ body { margin: 0 }
 }
 
 // TestChromeFlexColumnReverseMultiline covers case
-// wpt-column-reverse-multiline (test/Chrome/manifest.json goTarget
+// wpt-column-reverse-multiline (test/chrome/manifest.json goTarget
 // layout-unit).
 //
 // Source: third_party/blink/web_tests/external/wpt/css/css-flexbox/flex-column-reverse-multiline-item-position.html

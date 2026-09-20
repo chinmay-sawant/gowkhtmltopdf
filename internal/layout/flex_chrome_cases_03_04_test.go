@@ -18,7 +18,7 @@ func chromeFlexFixture(t *testing.T, name string) *Result {
 func TestChromeFlexAlgorithmMargins(t *testing.T) {
 	t.Parallel()
 
-	res := chromeFlexFixture(t, "legacy-flex-algorithm-margins.html")
+	res := chromeFlexFixture(t, "case-03-legacy-flex-algorithm-margins.html")
 
 	t.Run("positive-free-space", func(t *testing.T) {
 		t.Parallel()
@@ -82,7 +82,7 @@ func TestChromeFlexAlgorithmMargins(t *testing.T) {
 func TestChromeColumnsAutoSize(t *testing.T) { //nolint:gocyclo,funlen // explicit subcases keep each sizing branch visible
 	t.Parallel()
 
-	res := chromeFlexFixture(t, "legacy-columns-auto-size.html")
+	res := chromeFlexFixture(t, "case-04-legacy-columns-auto-size.html")
 
 	t.Run("content", func(t *testing.T) {
 		t.Parallel()

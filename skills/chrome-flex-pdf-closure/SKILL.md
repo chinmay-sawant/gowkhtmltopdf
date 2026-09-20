@@ -15,8 +15,8 @@ Read these files before editing:
 
 - `knowledge-base/wiki/index.md`
 - `plans/0.2.7/chrome-flex-interactions/00-canonical-chrome-flex-interaction-plan.md`
-- `test/Chrome/README.md`
-- `test/Chrome/manifest.json`
+- `test/chrome/README.md`
+- `test/chrome/manifest.json`
 - the Chromium source file named by the case
 - the existing test helper in the package you will change
 
@@ -43,7 +43,7 @@ because a representative case in the same property family passes.
 ### 1. Static case input
 
 Replace the generated scaffold with a reviewed static HTML file under
-`test/Chrome/cases/`.
+`test/chrome/cases/`.
 
 The file must have:
 
@@ -55,14 +55,14 @@ The file must have:
 - no browser-only JavaScript or generated assertion matrix.
 
 Keep the case's `id`, `fixture`, source path, category, and `goTarget` aligned
-with `test/Chrome/manifest.json`. The manifest status remains `scaffold` until
+with `test/chrome/manifest.json`. The manifest status remains `scaffold` until
 the required evidence exists.
 
 Run the Chrome inventory validator after changing the input:
 
 ```sh
 python3 scripts/generate_chrome_flex_cases.py
-go test ./test/Chrome
+go test ./test/chrome
 ```
 
 If the generator rewrites the file, update the generator's case template or
@@ -160,7 +160,7 @@ Use the case allocation already defined by the plan:
 - `golden-fixture`: page bounds and semantic PDF checks.
 
 Do not create a pairwise matrix of every CSS property. The inventory is the
-40 named cases in `test/Chrome/manifest.json`. Close each case individually.
+40 named cases in `test/chrome/manifest.json`. Close each case individually.
 Add a named case when two declarations share a layout decision or exercise a
 distinct branch. The coverage record must make missing families visible,
 including direction plus alignment, automatic sizing plus alignment, wrapping

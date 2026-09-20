@@ -1,0 +1,30 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Automatic minimum size with overflow clip</title>
+  <style>
+    .flex { position: relative; transform: translateY(56pt); }
+    .flex {
+      display: flex;
+      width: 100px;
+      border: 1px solid;
+    }
+  </style>
+</head>
+<body>
+  <!-- Source: third_party/blink/web_tests/external/wpt/css/css-flexbox/min-size-auto-overflow-clip.html -->
+  <!-- Reference: min-size-auto-overflow-clip-ref.html -->
+  <!-- Port status: completed. The source-faithful overflow-clip case passes the automatic minimum-size assertion. -->
+  <!-- The paired overflow: visible comparison is covered by the focused geometry test. -->
+  <!-- Expected: overflow: visible and overflow: clip use the same automatic minimum size, so the green child stays 150px wide. -->
+  <p class="case-description" style="position:absolute;top:12pt;left:12pt;margin:0;padding:6pt;border:1pt solid #64748b;background:#fff;color:#111827;font-size:9pt;line-height:12pt;width:560pt;">
+    <strong>Case 20 expected behavior:</strong> this fixture renders the overflow: clip branch. It should preserve the same 150px automatic minimum width as overflow: visible, so the green child remains 150px wide and visibly extends beyond the 100px container.
+  </p>
+  <div class="flex" data-case="auto-min-size-overflow-clip">
+    <div class="item" style="overflow:clip">
+      <div class="inner" style="background:green;width:150px;height:50px"></div>
+    </div>
+  </div>
+</body>
+</html>

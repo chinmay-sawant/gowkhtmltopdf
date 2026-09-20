@@ -878,11 +878,15 @@ func expandLogicalBoxDeclaration(prop, value string) ([]logicalPropDecl, bool) {
 
 //nolint:cyclop,funlen // logical margin/padding mapping table
 func expandLogicalMarginPadding(prop, value string) ([]logicalPropDecl, bool) {
-	if prop == cssPropMarginInline || prop == "margin-inline-start" || prop == "margin-inline-end" ||
-		prop == cssPropPaddingInline || prop == "padding-inline-start" || prop == "padding-inline-end" {
-		// Inline logical sides depend on the inherited direction. Keep these
-		// declarations for the resolved-style pass, where direction and writing
-		// mode are available, instead of freezing them as left/right here.
+	if prop == cssPropMarginInline || prop == cssPropMarginBlock ||
+		prop == "margin-inline-start" || prop == "margin-inline-end" ||
+		prop == "margin-block-start" || prop == "margin-block-end" ||
+		prop == cssPropPaddingInline || prop == cssPropPaddingBlock ||
+		prop == "padding-inline-start" || prop == "padding-inline-end" ||
+		prop == "padding-block-start" || prop == "padding-block-end" {
+		// Logical sides depend on the inherited direction and writing mode.
+		// Keep them for the resolved-style pass instead of freezing them to
+		// physical sides before that context is available.
 		return nil, false
 	}
 

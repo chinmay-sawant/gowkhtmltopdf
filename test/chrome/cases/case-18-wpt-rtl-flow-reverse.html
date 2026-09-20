@@ -1,0 +1,41 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>RTL column wrap reverse</title>
+  <style>
+    body > .flexcase { position: relative; transform: translateY(56pt); }
+    div.flexcase {
+      background: blue;
+      margin: 1em 0;
+      border: 1px solid black;
+      width: 20em;
+      height: 8em;
+      direction: rtl;
+      display: flex;
+      flex-flow: column wrap-reverse;
+    }
+    div.flexcase span {
+      background: white;
+      margin: 1em;
+      width: 8em;
+      display: inline-block;
+    }
+  </style>
+</head>
+<body>
+  <!-- Source: third_party/blink/web_tests/external/wpt/css/css-flexbox/flexbox_rtl-flow-reverse.html -->
+  <!-- Reference: flexbox_rtl-flow-reverse-ref.html -->
+  <!-- Port status: completed. The source-faithful column wrap-reverse case passes the RTL ordering assertions. -->
+  <!-- Expected: RTL changes logical column order, while one/two and three/four keep their within-column order. -->
+  <p class="case-description" style="position:absolute;top:12pt;left:12pt;margin:0;padding:6pt;border:1pt solid #64748b;background:#fff;color:#111827;font-size:9pt;line-height:12pt;width:560pt;">
+    <strong>Case 18 expected behavior:</strong> RTL column wrap-reverse reverses logical column order but preserves item order within each column.
+  </p>
+  <div class="flexcase" data-case="rtl-column-wrap-reverse">
+    <span class="span-one">one</span>
+    <span class="span-two">two</span>
+    <span class="span-three">three</span>
+    <span class="span-four">four</span>
+  </div>
+</body>
+</html>

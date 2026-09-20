@@ -19,13 +19,15 @@ main-axis alignment, auto margins, wrapping, reverse flow, and multiline
 `align-content`. The sizing tests also exposed and fixed max-width
 redistribution and fractional grow-factor behavior in the shared row algorithm.
 
-The current conversion wave covers the first 10 manifest cases with five
+The first conversion wave covers the first 10 manifest cases with five
 parallel two-case workers. Cases 1 through 10 now have passing direct layout
 tests. Case 4 records Chrome's fractional constrained-shrink geometry instead
-of rounding the two item sizes to different integers. The remaining 30
-manifest cases are still scaffolds. The individual case fixtures and focused
-tests are now the canonical evidence; the former consolidated review HTML and
-PDF have been removed.
+of rounding the two item sizes to different integers. The second wave has now
+converted cases 11 through 20 into source-faithful fixtures with named focused
+tests, Chromium rectangle probes where needed, and completed manifest status.
+Cases 21 through 40 remain scaffolds. The individual case fixtures and
+focused tests are now the canonical evidence; the former consolidated review
+HTML and PDF have been removed.
 
 ## Execution ledgers
 
@@ -79,11 +81,11 @@ need an explicit reference comparison.
   paths needed for this study.
 - [x] Select exactly 40 high-value cases.
 - [x] Record the source path, interaction family, expected result, and Go
-  target in `test/Chrome/manifest.json`.
+  target in `test/chrome/manifest.json`.
 - [x] Keep the checkout and the local decision trail out of the repository.
 
 Proof uses `python3 scripts/generate_chrome_flex_cases.py` and
-`go test ./test/Chrome`.
+`go test ./test/chrome`.
 
 ## Phase 1. Porting scaffold
 
@@ -94,10 +96,9 @@ Proof uses `python3 scripts/generate_chrome_flex_cases.py` and
   `internal/layout/flex_test.go` with an exact geometry assertion.
 - [x] Retarget the existing alignment inventory slot to the column plus center
   input and add the raw HTML PNG regression in `internal/imageout`.
-- [ ] Replace each scaffold with a reviewed case that preserves the Chromium
-  behavior without browser-only JavaScript.
-  The current first-10 wave replaces cases 1 through 10 with reviewed bodies;
-  cases 11 through 40 remain scaffolds.
+- [x] Replace the first 20 scaffolds with reviewed cases that preserve the
+  Chromium behavior without browser-only JavaScript. Cases 21 through 40
+  remain the next two scaffold waves.
 
 The scaffold is an inventory check. It is not an engine pass.
 
@@ -127,7 +128,7 @@ test pass.
 
 The following exploratory results remain useful as background for future
 waves, but they are not the current manifest status. The active first-10
-ledger is recorded in the status section above and in `test/Chrome/manifest.json`.
+ledger is recorded in the status section above and in `test/chrome/manifest.json`.
 
 Ten workers, one property area each, disjoint test files under
 `internal/layout/flex_chrome_*.go`.
@@ -221,10 +222,11 @@ test:
    and realigns a box's own frame rules after pagination
    (`paint_pagination_fixpoint.go`, `paint_pagination_chrome.go`).
 
-The remaining blocked families stay blocked in the case ledger. The focused
-layout tests and the Chrome inventory validator are the active gates for the
-first 10 cases. The golden corpus no longer includes a consolidated Chrome
-Flex review fixture.
+The historical exploratory skips above are retained as background notes. The
+active case ledger records cases 11 through 20 as completed, with focused
+layout tests and Chromium rectangle probes as the gates. Cases 21 through 40
+remain in their scaffold ledgers. The golden corpus no longer includes a
+consolidated Chrome Flex review fixture.
 
 ## Phase 3. Chrome-reference cases
 
@@ -261,7 +263,7 @@ branch.
 
 ```sh
 python3 scripts/generate_chrome_flex_cases.py
-go test ./test/Chrome
+go test ./test/chrome
 go test ./internal/layout -run '^TestFlex'
 make golden
 ```

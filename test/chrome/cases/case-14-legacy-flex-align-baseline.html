@@ -1,0 +1,78 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Baseline alignment across axes</title>
+  <style>
+    html, body { margin: 0; padding: 0; font: 12px sans-serif; }
+    .flexbox {
+      display: flex;
+      margin: 24px;
+      width: 100px;
+      height: 100px;
+      background: #aaa;
+      position: relative;
+      outline: 2px solid red;
+      align-items: baseline;
+    }
+    .title { margin-bottom: 10px; }
+    .title, .flexbox { position: relative; transform: translateY(56pt); }
+    .flexbox > div { height: 110px; width: 110px; }
+    .flexbox :nth-child(1) { background: blue; }
+    .flexbox :nth-child(2) { background: green; }
+    .ltr { direction: ltr; }
+    .rtl { direction: rtl; }
+    .horizontal-tb { writing-mode: horizontal-tb; }
+    .vertical-rl { writing-mode: vertical-rl; }
+    .vertical-lr { writing-mode: vertical-lr; }
+    .row { flex-flow: row; }
+    .row-reverse { flex-flow: row-reverse; }
+    .column { flex-flow: column; }
+    .column-reverse { flex-flow: column-reverse; }
+  </style>
+</head>
+<body>
+  <!-- Source: third_party/blink/web_tests/css3/flexbox/flex-align-baseline.html -->
+  <!-- Port status: completed fixture coverage; baseline and vertical-writing engine gaps remain documented by focused tests. -->
+  <!-- Expected: the two flex items share the cross-axis baseline edge in every named flow. -->
+  <p class="case-description" style="position:absolute;top:12pt;left:12pt;margin:0;padding:6pt;border:1pt solid #64748b;background:#fff;color:#111827;font-size:9pt;line-height:12pt;width:560pt;">
+    <strong>Case 14 expected behavior:</strong> baseline-aligned items should share the cross-axis baseline edge across horizontal and vertical-writing flows. The six colored branches are reference geometry; the current engine does not yet provide a strict baseline guide for every branch.
+  </p>
+
+  <div class="title">horizontal-tb ltr row</div>
+  <div class="flexbox horizontal-tb ltr row" data-case="horizontal-ltr-row">
+    <div><div style="display:inline-block"></div></div>
+    <div style="margin-top:20px"><div style="display:inline-block"></div></div>
+  </div>
+
+  <div class="title">horizontal-tb rtl column</div>
+  <div class="flexbox horizontal-tb rtl column" data-case="horizontal-rtl-column">
+    <div><div style="display:inline-block"></div></div>
+    <div style="margin-top:20px"><div style="display:inline-block"></div></div>
+  </div>
+
+  <div class="title">vertical-lr ltr row</div>
+  <div class="flexbox vertical-lr ltr row" data-case="vertical-lr-ltr-row">
+    <div><div style="display:inline-block"></div></div>
+    <div style="margin-top:20px"><div style="display:inline-block"></div></div>
+  </div>
+
+  <div class="title">vertical-lr rtl column</div>
+  <div class="flexbox vertical-lr rtl column" data-case="vertical-lr-rtl-column">
+    <div><div style="display:inline-block"></div></div>
+    <div style="margin-top:20px"><div style="display:inline-block"></div></div>
+  </div>
+
+  <div class="title">vertical-rl ltr row-reverse</div>
+  <div class="flexbox vertical-rl ltr row-reverse" data-case="vertical-rl-ltr-row-reverse">
+    <div><div style="display:inline-block"></div></div>
+    <div style="margin-top:20px"><div style="display:inline-block"></div></div>
+  </div>
+
+  <div class="title">vertical-rl rtl column-reverse</div>
+  <div class="flexbox vertical-rl rtl column-reverse" data-case="vertical-rl-rtl-column-reverse">
+    <div><div style="display:inline-block"></div></div>
+    <div style="margin-top:20px"><div style="display:inline-block"></div></div>
+  </div>
+</body>
+</html>

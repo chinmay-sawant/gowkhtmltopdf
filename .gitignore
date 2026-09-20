@@ -64,7 +64,7 @@ knowledge-base
 /chromium/
 
 # Local PDFs generated from the Chrome Flex case fixtures.
-/test/Chrome/pdf/
+/test/chrome/pdf/
 
 # Local decision trail for long-running investigations.
 /.audit/

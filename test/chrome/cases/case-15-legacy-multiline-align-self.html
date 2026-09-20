@@ -1,0 +1,63 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Per-item alignment on multiple lines</title>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .fixture-label { font-size: 1pt; line-height: 1pt; }
+    .flexbox {
+      position: relative;
+      transform: translateY(56pt);
+      display: flex;
+      width: 70pt;
+      flex-flow: row wrap;
+      align-content: flex-start;
+      direction: ltr;
+      writing-mode: horizontal-tb;
+      background: #ddd;
+    }
+    .flexbox > * { flex: 1 0 10pt; }
+    .child-1 { height: 10pt; align-self: flex-start; background: #0f0; }
+    .child-2 { height: 10pt; align-self: center; background: #0d0; }
+    .child-3 { height: 10pt; align-self: flex-end; background: #0b0; }
+    .child-4 { height: 10pt; align-self: baseline; background: #090; }
+    .child-5 { height: 10pt; align-self: baseline; margin-block-start: 5pt; background: #070; }
+    .child-6 { height: auto; align-self: stretch; background: #050; }
+    .child-7 { height: 30pt; align-self: flex-start; background: #030; }
+    .child-8 { height: 10pt; align-self: flex-start; background: #00f; }
+    .child-9 { height: 10pt; align-self: center; background: #00d; }
+    .child-10 { height: 10pt; align-self: flex-end; background: #00b; }
+    .child-11 { height: 10pt; align-self: baseline; background: #009; }
+    .child-12 { height: 10pt; align-self: baseline; margin-block-start: 5pt; background: #007; }
+    .child-13 { height: auto; align-self: stretch; background: #005; }
+    .child-14 { height: 30pt; align-self: flex-start; background: #003; }
+  </style>
+</head>
+<body>
+  <!-- Source: chromium/third_party/blink/web_tests/css3/flexbox/multiline-align-self.html -->
+  <!-- Manifest source: third_party/blink/web_tests/css3/flexbox/multiline-align-self.html -->
+  <!-- Port status: completed fixture coverage; one dark-blue wrapped child remains a PDF geometry gap. -->
+  <!-- Expected: each line has its own 30pt cross size, and every align-self value is asserted. -->
+  <p class="case-description" style="position:absolute;top:12pt;left:12pt;margin:0;padding:6pt;border:1pt solid #64748b;background:#fff;color:#111827;font-size:9pt;line-height:12pt;width:560pt;">
+    <strong>Case 15 expected behavior:</strong> each wrapped line gets its own cross size, then align-self applies start, center, end, baseline, or stretch to that line. The current PDF shows the two colored line groups, but the dark-blue end-aligned child is a zero-height line instead of the expected 10pt tile.
+  </p>
+  <div class="fixture-label">legacy-multiline-align-self</div>
+  <div class="flexbox" id="case-15">
+    <div class="child-1"></div>
+    <div class="child-2"></div>
+    <div class="child-3"></div>
+    <div class="child-4"></div>
+    <div class="child-5"></div>
+    <div class="child-6"></div>
+    <div class="child-7"></div>
+    <div class="child-8"></div>
+    <div class="child-9"></div>
+    <div class="child-10"></div>
+    <div class="child-11"></div>
+    <div class="child-12"></div>
+    <div class="child-13"></div>
+    <div class="child-14"></div>
+  </div>
+</body>
+</html>

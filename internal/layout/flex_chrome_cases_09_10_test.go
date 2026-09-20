@@ -22,7 +22,7 @@ type chromeRect struct {
 func TestChromeReferenceLegacyFlexFlowOrientations(t *testing.T) {
 	t.Parallel()
 
-	src := readChromeCase(t, "legacy-flex-flow-orientations.html")
+	src := readChromeCase(t, "case-09-legacy-flex-flow-orientations.html")
 	res := layoutChromeCase(t, src)
 	refs := map[string]chromeRect{
 		"item-a": {x: 80, y: 0, w: 20, h: 20},
@@ -45,7 +45,7 @@ func TestChromeReferenceLegacyFlexFlowOrientations(t *testing.T) {
 func TestChromeReferenceLegacyFlexFlow(t *testing.T) {
 	t.Parallel()
 
-	src := readChromeCase(t, "legacy-flex-flow.html")
+	src := readChromeCase(t, "case-10-legacy-flex-flow.html")
 	res := layoutChromeCase(t, src)
 	refs := map[string]chromeRect{
 		"item-a": {x: 0, y: 0, w: 75, h: 20},
@@ -64,7 +64,7 @@ func TestChromeReferenceLegacyFlexFlow(t *testing.T) {
 func readChromeCase(t *testing.T, name string) string {
 	t.Helper()
 
-	path := filepath.Join("..", "..", "test", "Chrome", "cases", name)
+	path := filepath.Join("..", "..", "test", "chrome", "cases", name)
 	src, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read Chrome case %q: %v", name, err)

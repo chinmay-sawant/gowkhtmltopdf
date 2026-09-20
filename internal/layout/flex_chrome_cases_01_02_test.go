@@ -12,7 +12,7 @@ import (
 func loadChromeFlexCase0102(t *testing.T, name string) (*html.Node, []*css.Stylesheet) {
 	t.Helper()
 
-	source, err := os.ReadFile("../../test/Chrome/cases/" + name)
+	source, err := os.ReadFile("../../test/chrome/cases/" + name)
 	if err != nil {
 		t.Fatalf("read Chrome Flex case %q: %v", name, err)
 	}
@@ -90,7 +90,7 @@ func layoutChromeFlexCase0102(t *testing.T, name string) *Result {
 func TestChromeFlexCase01LegacyAlgorithm(t *testing.T) {
 	t.Parallel()
 
-	res := layoutChromeFlexCase0102(t, "legacy-flex-algorithm.html")
+	res := layoutChromeFlexCase0102(t, "case-01-legacy-flex-algorithm.html")
 
 	for _, testCase := range []struct {
 		id   string
@@ -115,7 +115,7 @@ func TestChromeFlexCase01LegacyAlgorithm(t *testing.T) {
 func TestChromeFlexCase02LegacyAlgorithmMinmax(t *testing.T) {
 	t.Parallel()
 
-	res := layoutChromeFlexCase0102(t, "legacy-flex-algorithm-minmax.html")
+	res := layoutChromeFlexCase0102(t, "case-02-legacy-flex-algorithm-minmax.html")
 
 	for _, testCase := range []struct {
 		id   string
