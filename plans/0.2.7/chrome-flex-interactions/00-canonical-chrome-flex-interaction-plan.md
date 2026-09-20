@@ -34,6 +34,8 @@ HTML and PDF have been removed.
 The remaining cases are split into three ten-case ledgers so each batch has a
 small owner set, a clear validation gate, and a separate closure decision:
 
+- [Phase-wise checklist for cases 21-40](04-cases-21-40-phase-wise-checklist.md):
+  cross-phase execution ledger and evidence rules for the next twenty cases.
 - [Cases 11-20](01-cases-11-20.md): wrapping, alignment, margins, flex basis,
   direction, and automatic minimum size.
 - [Cases 21-30](02-cases-21-30.md): wrapping and gaps, aspect ratio, writing
