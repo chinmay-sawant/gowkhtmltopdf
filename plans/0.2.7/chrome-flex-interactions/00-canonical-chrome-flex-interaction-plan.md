@@ -228,6 +228,23 @@ layout tests and Chromium rectangle probes as the gates. Cases 21 through 40
 remain in their scaffold ledgers. The golden corpus no longer includes a
 consolidated Chrome Flex review fixture.
 
+### Case 5 deferred-chrome leak (2026-09-20)
+
+Case `legacy-definite-main-size` resolved its percentage child correctly at the
+box level but painted it twice. `flexMinCrossMainSize` (`flex.go`) measured the
+item's children through `layoutCell` with emission enabled, so `prependChrome`
+recorded the child's background and outline in `e.deferredChrome`. The
+following `e.ops = e.ops[:start]` truncation dropped the emitted ops but not
+the deferred entry, and `finalizeChrome` (`layout_chrome.go`) spliced the stale
+chrome back at its old index with the measurement geometry (50% of the flex
+container, 150pt, at the untransformed container origin). The measurement now
+sets `e.noEmit` around `layoutCell`, the same contract as `measureCellHeight`
+(`layout_tables.go`) and `measureMulticolChildHeight` (`multicol.go`).
+Regression: `TestChromeCaseLegacyDefiniteMainSizePaintsChildOnce` in
+`internal/layout/flex_chrome_cases_05_06_test.go` counts the display-list green
+fills (want one, 300x125). The fixture comments that claimed an unresolved
+percentage were corrected.
+
 ## Phase 3. Chrome-reference cases
 
 Port the 15 cases that need a browser reference or a larger rewrite.

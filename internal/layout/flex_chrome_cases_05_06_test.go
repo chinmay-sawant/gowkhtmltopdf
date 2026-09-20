@@ -67,6 +67,54 @@ html, body { margin: 0; padding: 0; }
 	}
 }
 
+// TestChromeCaseLegacyDefiniteMainSizePaintsChildOnce is the display-list
+// regression for the same case. flexMinCrossMainSize measures the item's
+// children through layoutCell while the container height is the active
+// percentage basis; that measurement must not emit. A deferred-chrome entry
+// recorded there survives the ops truncation and finalizeChrome later splices
+// it back at a stale index, so the percentage child painted a second time at
+// the container origin (300x150) in addition to its correct 300x125 fill.
+func TestChromeCaseLegacyDefiniteMainSizePaintsChildOnce(t *testing.T) {
+	t.Parallel()
+
+	cssSheet := sheet(t, `
+html, body { margin: 0; padding: 0; }
+.case { display: flex; flex-direction: column; width: 300pt; height: 300pt;
+  position: relative; transform: translateY(56pt); }
+.flex-one { flex: 1 1 0; min-height: 0; background: #dbeafe; outline: 1px solid #2563eb; }
+.percentage-child { width: 300pt; height: 50%; background: #dcfce7; outline: 1px solid #16a34a; }
+.fixed { flex: 0 0 auto; width: 50pt; height: 50pt; background: #fef3c7; outline: 1px solid #d97706; }
+`)
+	res := layoutHTML(t, `<html><body>
+<div class="case" id="definite-column">
+  <div class="flex-one" id="flexible-column-item">
+    <div class="percentage-child" id="percentage-child"></div>
+  </div>
+  <div class="fixed" id="fixed-column-item"></div>
+</div>
+</body></html>`, cssSheet)
+
+	var greens []Op
+
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpFillRect {
+			continue
+		}
+
+		if near(paintOp.R, 0xdc/255.0) && near(paintOp.G, 0xfc/255.0) && near(paintOp.B, 0xe7/255.0) {
+			greens = append(greens, paintOp)
+		}
+	}
+
+	if len(greens) != 1 {
+		t.Fatalf("percentage-child fills = %d, want 1 (stray chrome leaked): %+v", len(greens), greens)
+	}
+
+	if !near(greens[0].W, 300) || !near(greens[0].H, 125) {
+		t.Fatalf("percentage-child fill = %.2fx%.2f, want 300x125", greens[0].W, greens[0].H)
+	}
+}
+
 // TestChromeCaseLegacyJustifyContent adapts
 // third_party/blink/web_tests/css3/flexbox/flex-justify-content.html. Three
 // fixed children expose the free-space placement for each main-axis mode.

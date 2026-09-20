@@ -1653,9 +1653,18 @@ func (e *engine) flexMinCrossMainSize(node *html.Node, baseH, mainSize float64) 
 
 	padV := e.scalePt(cstate.PaddingTop) + e.scalePt(cstate.PaddingBottom) +
 		e.scalePt(cstate.BorderTop.Width) + e.scalePt(cstate.BorderBottom.Width)
+	// layoutCell flows the item's children while the container height is the
+	// active percentage basis. Measure without emitting, or prependChrome
+	// defers the child's background/border into e.deferredChrome and the ops
+	// truncation below cannot drop it: finalizeChrome splices the stale entry
+	// back at its old index (case-05 painted its percentage child a second
+	// time at the container origin). Same contract as measureCellHeight.
+	was := e.noEmit
+	e.noEmit = true
 	start := len(e.ops)
 	contentSug := e.layoutCell(node, *cstate, indefiniteContentCap)
 	e.ops = e.ops[:start]
+	e.noEmit = was
 
 	if contentSug < padV {
 		contentSug = padV + e.scalePt(cstate.FontSize)*textLineHeightFactor
