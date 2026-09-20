@@ -24,7 +24,7 @@ font-metric-only height comparisons.
 | 26 | Direct layout | `completed` | `TestChromeFixtureCase26MinHeightPercentage` validates the definite min-height basis and percentage child. |
 | 27 | Direct layout | `completed` | `TestChromeFixtureCase27ColumnPercentageHeight` validates the definite column percentage height. |
 | 28 | Chromium reference | `completed` | `TestChromeFixtureCase28AspectRatioMinimumWidth` validates the transferred replaced-element minimum. |
-| 29 | PDF golden | `completed` | `TestGoldenCorpusAllFixtures/fixture-29-wpt-break-nested-float-print.html` validates three pages and ordered semantic text. |
+| 29 | PDF golden | `completed` | `TestGoldenCorpusAllFixtures/fixture-29-wpt-break-nested-float-print.html` validates three pages and ordered semantic text; `TestChromeFixtureCase29NestedFloatLeft` pins the float to the left content edge. |
 | 30 | Direct layout | `completed` | `TestChromeFixtureCase30ColumnAutoMargins` validates horizontal and vertical-writing auto-margin geometry. |
 | 31 | Direct layout | `completed` | `TestChromeFixtureCase31ColumnReverseWrap` validates each named item after reverse-line placement. |
 | 32 | Direct layout | `completed` | `TestChromeFixtureCase32FractionalFactors` validates fractional grow and shrink behavior across row, column, and vertical branches. |
@@ -76,3 +76,12 @@ font-metric-only height comparisons.
 
 - [x] Confirmed all twenty cases have a source-backed fixture, named assertion, and completed manifest result.
 - [x] Confirmed all twenty case rows are closed with `[x]`.
+
+## Case 29 follow-up: float alignment (2026-09-21)
+
+- [x] Reproduced the gap against the Puppeteer print reference: Chromium paints the green float at x=36..180pt, the Go PDF painted it at x=180..324pt on all three pages.
+- [x] Traced the ghost float to the `flexItemBaseHeight` noEmit measure build and fixed it with the measure float-state quarantine in `internal/layout`.
+- [x] Added `TestChromeFixtureCase29NestedFloatLeft`; the focused test passes with `-count=1`.
+- [x] Re-ran the case 29 PDF comparison: all three pages match Chromium's green rect, and pages 2 and 3 are pixel-identical at 110 DPI.
+- [x] Ran `make test`, `make golden`, `make claim-scan`, and `make size-check`; exit code 0.
+- [x] Ran golangci-lint on the tree; exit code 0 (the temporary `zz_probe_case30_test.go` from the parallel case 30 session was excluded, and that file is not part of this change).

@@ -151,6 +151,17 @@ func TestChromeFixtureCase28AspectRatioMinimumWidth(t *testing.T) {
 	assertFixtureBox(t, "case 28 item", item, chromeRect{x: 12, w: 100, h: 100})
 }
 
+// TestChromeFixtureCase29NestedFloatLeft pins the float's cross-axis position.
+// The column flex base-size measure used to register the six-inch float in the
+// live BFC, so the real build packed it beside the ghost registration and the
+// float landed flush right at x=width-144pt instead of the left content edge.
+func TestChromeFixtureCase29NestedFloatLeft(t *testing.T) {
+	res := fixture21To40(t, "case-29-wpt-break-nested-float-print.html")
+	target := fixtureBox(t, res, "target-29")
+
+	assertFixtureBox(t, "case 29 target", target, chromeRect{x: 0, y: 0, w: 144, h: 432})
+}
+
 // TestChromeFixtureCase33SpacerFillsSurviveStrip: the description panel adds
 // page ink above the case, which armed the orphan-row strip on the 150x30 flex
 // spacer fills and zeroed four of them. Flex item fills are definite box

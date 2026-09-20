@@ -602,6 +602,16 @@ type engine struct {
 	bfcStack []*floatState
 	// bfcPool recycles floatState values for pushBFCFloats.
 	bfcPool []*floatState
+	// measureFloatDepth is non-zero while a noEmit measure pass is running.
+	// Measurement must not leave floats in the enclosing BFC, or a later real
+	// build packs a new float beside a ghost one (case 29: float:left in a
+	// column flex item landed at the right content edge).
+	measureFloatDepth int
+	// measureFloats is the scratch state float registration is redirected to
+	// during the outermost measure scope; savedBFCFloats restores the live
+	// state when that scope ends.
+	measureFloats  floatState
+	savedBFCFloats *floatState
 	// absCBHeights carries the containing-block height to deferred absolute
 	// children after their in-flow parent has finished determining its size.
 	absCBHeights map[*html.Node]float64
@@ -1483,32 +1493,6 @@ func estimateOpCapacity(root *html.Node) int {
 	return capacity
 }
 
-// boxKind is the internal layout role of a box. uint8 avoids a per-box
-// string header (16 bytes) and keeps the hot box struct small.
-type boxKind uint8
-
-const (
-	boxKindBlock    boxKind = iota // "block"
-	boxKindTable                   // "table"
-	boxKindCell                    // "cell"
-	boxKindReplaced                // "replaced"
-)
-
-func (k boxKind) String() string {
-	switch k {
-	case boxKindBlock:
-		return displayBlock
-	case boxKindTable:
-		return displayTable
-	case boxKindCell:
-		return tableCellKind
-	case boxKindReplaced:
-		return "replaced"
-	default:
-		return "unknown"
-	}
-}
-
 // box is one laid-out box.
 type box struct {
 	node *html.Node
@@ -1585,6 +1569,13 @@ func (e *engine) build(node *html.Node, availW, posX, posY float64) *box {
 		return nil
 	}
 
+	// Measure builds must not record floats in the live BFC (see
+	// beginMeasureFloats). Pair with endMeasureFloats before returning.
+	measure := e.noEmit
+	if measure {
+		e.beginMeasureFloats()
+	}
+
 	scope := e.pushZ(sty, e.stylePtr(node))
 	// Ancestor transforms only (own transform does not change this box's CB).
 	underXformCB := e.transformCBDepth > 0
@@ -1598,6 +1589,10 @@ func (e *engine) build(node *html.Node, availW, posX, posY float64) *box {
 	}
 
 	e.popZ(scope, boxNode)
+
+	if measure {
+		e.endMeasureFloats()
+	}
 
 	return boxNode
 }

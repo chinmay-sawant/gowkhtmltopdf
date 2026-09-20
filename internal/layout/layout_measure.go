@@ -828,6 +828,11 @@ func (e *engine) measureLargestImageWidth(node *html.Node) float64 {
 
 // layoutCell measures the height of a cell's content (no ops emitted).
 func (e *engine) layoutCell(n *html.Node, sty ResolvedStyle, width float64) float64 {
+	measure := e.noEmit
+	if measure {
+		e.beginMeasureFloats()
+	}
+
 	_, contentW := e.contentBox(0, width, &sty)
 	curY := e.scalePt(sty.PaddingTop) + e.scalePt(sty.BorderTop.Width)
 	enclose := e.pushBFCFloats(sty, 0, contentW)
@@ -838,6 +843,10 @@ func (e *engine) layoutCell(n *html.Node, sty ResolvedStyle, width float64) floa
 	}
 
 	e.popBFCFloats(enclose)
+
+	if measure {
+		e.endMeasureFloats()
+	}
 
 	return e.borderBoxBottom(sty, curY)
 }

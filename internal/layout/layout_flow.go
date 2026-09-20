@@ -831,6 +831,47 @@ func (e *engine) popBFCFloats(enclose bool) {
 	e.bfcStack = e.bfcStack[:stackLen-1]
 }
 
+// beginMeasureFloats redirects float registration during a noEmit measure
+// build into a scratch copy of the live BFC state. Without this, a measured
+// float stays registered in the live BFC and the later real build packs a new
+// float beside it, at the wrong side of the content box (case 29: float:left
+// inside a column flex item rendered flush right).
+//
+// Nested measure scopes share the outermost scratch so floats registered
+// during a measurement remain visible to the rest of that measurement.
+func (e *engine) beginMeasureFloats() {
+	if !e.noEmit {
+		return
+	}
+
+	e.measureFloatDepth++
+
+	if e.measureFloatDepth > 1 || e.bfcFloats == nil {
+		return
+	}
+
+	e.savedBFCFloats = e.bfcFloats
+	e.measureFloats = *e.bfcFloats
+	e.bfcFloats = &e.measureFloats
+}
+
+// endMeasureFloats restores the live BFC float state when the outermost
+// measure scope finishes, discarding the scratch registrations.
+func (e *engine) endMeasureFloats() {
+	if e.measureFloatDepth == 0 {
+		return
+	}
+
+	e.measureFloatDepth--
+
+	if e.measureFloatDepth > 0 {
+		return
+	}
+
+	e.bfcFloats = e.savedBFCFloats
+	e.savedBFCFloats = nil
+}
+
 // emitListMarker paints the list marker for an <li>.
 // list-style-image, when it resolves, replaces the type glyph. Missing images
 // fall back to list-style-type. list-style-position:inside places the marker

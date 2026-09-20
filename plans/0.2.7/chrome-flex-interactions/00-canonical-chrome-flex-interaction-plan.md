@@ -386,10 +386,36 @@ Two engine defects surfaced while validating the panels:
 Remaining engine-scope differences in the 21-40 pictures, all pre-existing and
 outside the two fixes above: `border: Npx solid transparent` paints black
 (case 35); native range/button faces are not painted (case 33); Liberation
-Sans wraps "LONG TEXT" a line earlier than Chromium's Tinos (case 34); straight
-borders stroke centered on the box edge, so half the 15pt border falls outside
-the border box (case 39); and the case 29 `float: left` print fixture places
-its two-inch float on the right of the content area instead of the left.
+Sans wraps "LONG TEXT" a line earlier than Chromium's Tinos (case 34); and
+straight borders stroke centered on the box edge, so half the 15pt border
+falls outside the border box (case 39).
+
+### Case 29 float alignment fix (2026-09-21)
+
+The case 29 picture no longer differs from Chromium. Its two-inch
+`float: left` used to land at the right edge of the content area
+(x=180..324pt on the 360pt page instead of x=36..180pt).
+
+Root cause: `flexItemBaseHeight` (`internal/layout/flex.go`) measures a column
+flex item with `e.noEmit = true`, but the measured build still registered the
+float in the enclosing BFC's `floatState`. The real build then saw
+`hasLeft = true`, so `packFloatPosition` (`internal/layout/layout_flow.go`)
+packed the float beside the ghost registration and the exclusion pushed it to
+`content width - 144pt`.
+
+Fix: `beginMeasureFloats` / `endMeasureFloats`
+(`internal/layout/layout_flow.go`) redirect float registration during a
+`noEmit` measure build into a scratch copy of the live BFC state and drop
+those registrations when the outermost measure scope ends. Nested measure
+scopes share the scratch, so floats stay visible within one measurement.
+`build` (`internal/layout/layout.go`) and `layoutCell`
+(`internal/layout/layout_measure.go`) pair the calls.
+
+Evidence: the Puppeteer reference (`scripts/puppeteer/print.sh`) and the Go PDF
+both paint the green float at x=36..180pt on all three pages; at 110 DPI pages
+2 and 3 are pixel-identical and page 1 differs only in text font metrics.
+Regression: `TestChromeFixtureCase29NestedFloatLeft`
+(`internal/layout/flex_chrome_cases_21_40_fixture_test.go`).
 
 ## Phase 3. Chrome-reference cases
 
