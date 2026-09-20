@@ -16,10 +16,10 @@
 <body>
   <!-- Source: third_party/blink/web_tests/external/wpt/css/css-flexbox/flex-basis-011.html -->
   <!-- Reference: flex-basis-011-ref.html -->
-  <!-- Port status: completed. The source-faithful nested column passes the indefinite percentage-basis assertion. -->
-  <!-- Expected: percentage flex-basis in the indefinite nested column falls back to content sizing. -->
+  <!-- Port status: completed. The percentage basis resolves against the column's stretched used height, matching the source reference. -->
+  <!-- Expected: percentage flex-basis in the nested column resolves against the column's stretched used height. -->
   <p class="case-description" style="position:absolute;top:12pt;left:12pt;margin:0;padding:6pt;border:1pt solid #64748b;background:#fff;color:#111827;font-size:9pt;line-height:12pt;width:560pt;">
-    <strong>Case 17 expected behavior:</strong> percentage flex-basis in the indefinite nested column falls back to content sizing instead of becoming a definite 100% size.
+    <strong>Case 17 expected behavior:</strong> percentage flex-basis in the nested column resolves against the column's stretched used height, so each item fills it.
   </p>
   <div class="flexbox" data-case="indefinite-outer">
     <div class="flexbox column">

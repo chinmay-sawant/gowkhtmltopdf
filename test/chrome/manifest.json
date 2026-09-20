@@ -196,7 +196,7 @@
     {
       "category": "flex-sizing",
       "combination": "flex-basis",
-      "expected": "A percentage flex basis in an indefinite nested column remains content-sized instead of becoming a definite full height.",
+      "expected": "A percentage flex basis in an indefinite nested column resolves against the column's stretched used height.",
       "fixture": "cases/case-17-wpt-flex-basis-011.html",
       "goTarget": "layout-unit",
       "id": "wpt-flex-basis-011",

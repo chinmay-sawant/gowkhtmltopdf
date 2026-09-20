@@ -224,7 +224,7 @@ func anonymousFlexItemStyle(parent ResolvedStyle) ResolvedStyle {
 	return style
 }
 
-//nolint:cyclop,funlen // row flow combines line formation, sizing, and placement
+//nolint:funlen // row flow combines line formation, sizing, and placement
 func (e *engine) flowFlexRow(
 	parent *box, kids []*html.Node, style ResolvedStyle,
 	contentW, contentX, topY, curY, colGap, rowGap float64,
@@ -279,7 +279,6 @@ func (e *engine) flowFlexRow(
 			curY,
 			colGap,
 			cross,
-			lineCross >= 0 || stretchCross != nil,
 			style.FlexWrap == fxWrapRev,
 			reverse,
 		)
@@ -1002,7 +1001,7 @@ func (e *engine) cutFlexWidths(items []flexMeas, widths []float64, mainSize, ste
 func (e *engine) placeFlexLineMeasured(
 	parent *box, style ResolvedStyle, items []flexMeas,
 	contentW, contentX, topY, curY, gap, lineCross float64,
-	definiteCross, crossReverse, mainReverse bool,
+	crossReverse, mainReverse bool,
 ) float64 {
 	widths := e.flexLineWidths(items, contentW, gap)
 	gaps := gap * float64(len(items)-1)
@@ -1041,7 +1040,6 @@ func (e *engine) placeFlexLineMeasured(
 		startX,
 		justifyGap,
 		targetCross,
-		definiteCross,
 	)
 
 	alignH := rowH
@@ -1305,7 +1303,7 @@ func (e *engine) buildFlexRowItem(
 //nolint:cyclop,funlen,gocognit,wsl // row placement keeps main- and cross-axis phases together
 func (e *engine) buildRowItems(
 	parent *box, style ResolvedStyle, items []flexMeas, widths []float64,
-	contentW, topY, curY, startX, justifyGap, targetCross float64, definiteCross bool,
+	contentW, topY, curY, startX, justifyGap, targetCross float64,
 ) ([]flexPlacedItem, float64) {
 	built := make([]flexPlacedItem, 0, len(items))
 	rowH := 0.0
@@ -1345,9 +1343,12 @@ func (e *engine) buildRowItems(
 			itemY += e.scalePt(cstate.MarginTop)
 		}
 
-		intrinsicFlexContainer := cstate.Display == displayFlex || cstate.Display == displayInlineFlex
-		forceStretch := flexItemCrossStretch(style, *cstate) && targetCross > 0 &&
-			(definiteCross || !intrinsicFlexContainer)
+		// A stretched item's used cross size is the line's cross size and
+		// becomes definite for its contents (CSS Flexbox 9.4 step 5), so a
+		// nested flex container re-resolves its children's percentages against
+		// it. Intrinsic containers are not exempt: the measured hypothetical
+		// cross size is already the line's cross size for a single-line row.
+		forceStretch := flexItemCrossStretch(style, *cstate) && targetCross > 0
 		stretchCross := targetCross
 		if forceStretch {
 			stretchCross -= e.scalePt(cstate.MarginTop) + e.scalePt(cstate.MarginBottom)

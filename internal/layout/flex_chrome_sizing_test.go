@@ -123,12 +123,13 @@ func TestChromeFlexFractionalGrowFactorsLeaveUnusedSpace(t *testing.T) {
 // TestChromeFlexPercentageBasisIndefiniteColumn covers case
 // wpt-flex-basis-011 (layout-unit), source
 // third_party/blink/web_tests/external/wpt/css/css-flexbox/flex-basis-011.html.
-// Expected: a 100% flex-basis in an indefinite nested column stays
-// content-sized instead of becoming a definite full height. Each item holds one
-// 10pt text line on a 20pt line box plus 1pt borders, so its used height is
-// 22pt and the column sums the two content heights to 44pt. The definite branch
-// keeps a 100pt column at 100pt while its two 102pt, non-shrinking items
-// overflow it. The outer auto height must not feed the percentage.
+// Expected: a 100% flex-basis in a nested column resolves against the
+// column's stretched used height. CSS Flexbox 9.4 step 5 makes a stretched
+// flex item's used cross size definite for its contents, so the column's
+// content-sized height (two 22pt items = 44pt) becomes the percentage basis:
+// each item's content resolves to 44pt, 46pt with its borders, and the two
+// non-shrinking items overflow the column. The definite branch keeps a 100pt
+// column at 100pt while its two 102pt, non-shrinking items overflow it.
 //
 //nolint:cyclop,funlen // indefinite and definite branches share one source fixture
 func TestChromeFlexPercentageBasisIndefiniteColumn(t *testing.T) {
@@ -153,20 +154,23 @@ body { margin: 0 }
 	itemA := findBoxByClass(t, res, "item-a")
 	itemB := findBoxByClass(t, res, "item-b")
 
-	const itemHeight = 22.0 // 20pt line + 1pt border top + 1pt border bottom
+	const (
+		columnHeight = 44.0 // two content-sized 22pt items
+		itemHeight   = 46.0 // 100% of the 44pt stretched column plus 1pt borders
+	)
 
 	if !near(itemA.height, itemHeight) || !near(itemB.height, itemHeight) {
-		t.Fatalf("item heights = %.2f/%.2f, want %.2f each (content-sized, not the indefinite parent height)",
+		t.Fatalf("item heights = %.2f/%.2f, want %.2f each (100%% of the stretched column)",
 			itemA.height, itemB.height, itemHeight)
 	}
 
-	if !near(column.height, 2*itemHeight) {
-		t.Fatalf("column height = %.2f, want %.2f", column.height, 2*itemHeight)
+	if !near(column.height, columnHeight) {
+		t.Fatalf("column height = %.2f, want %.2f", column.height, columnHeight)
 	}
 
 	if !near(itemA.y, column.y) || !near(itemB.y, itemA.y+itemHeight) {
 		t.Fatalf("item y positions = %.2f/%.2f, want %.2f/%.2f",
-			itemA.y, itemB.y, column.y, column.y+itemHeight)
+			itemA.y, itemB.y, column.y, itemA.y+itemHeight)
 	}
 
 	t.Run("definite-column", func(t *testing.T) {

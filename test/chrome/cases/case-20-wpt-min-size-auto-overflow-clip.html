@@ -4,6 +4,10 @@
   <meta charset="utf-8">
   <title>Automatic minimum size with overflow clip</title>
   <style>
+    /* Print 1:1 with the Chromium reference: no page margins, so the 560pt
+       panel does not trigger smart shrinking and every size matches. */
+    @page { margin: 0; }
+    html, body { margin: 0; padding: 0; }
     .flex { position: relative; transform: translateY(56pt); }
     .flex {
       display: flex;

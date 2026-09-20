@@ -296,6 +296,44 @@ The same review reconfirmed the suite-wide transform gap: absolute
 case top by about 1pt under the opaque panel. Both are pre-existing and out of
 scope here.
 
+### Case 17 stretched cross size is definite for contents (2026-09-20)
+
+Case `wpt-flex-basis-011` rendered its two `flex: 1 0 100%` items
+content-sized instead of filling the nested column. CSS Flexbox 9.4 step 5
+makes a stretched flex item's used cross size (the line's cross size) definite
+for its contents, so the column's content-sized height becomes the percentage
+basis and each item resolves to it, overflowing by its borders. The engine
+excluded intrinsic flex containers from the forced stretch whenever the row's
+cross size was indefinite; `buildRowItems` now stretches them like any other
+item and the unused `definiteCross` plumbing was removed. The WPT reftest
+contract is preserved: Go renders the source and the `height: 100%` reference
+identically. Regression: `TestChromeFlexPercentageBasisIndefiniteColumn` now
+asserts a 44pt column with 46pt items (the definite branch stays 100pt/102pt),
+and the fixture, manifest, and case-17 ledger rows were updated.
+
+### Case 20 body margin reset and 1:1 page setup (2026-09-20)
+
+Case `wpt-min-size-auto-overflow-clip` renders the automatic minimum size
+correctly (the green child stays 150px wide and overflows the 100px
+container), but the page did not line up with the Chromium reference: the
+description panel sat at (18,18) instead of (12,12) and the smart-shrink zoom
+was 0.910 instead of 1. Cause: the fixture was one of five (16-20) that never
+added the `html, body { margin: 0; padding: 0 }` reset, so the body's 8px UA
+margin shifted the absolutely positioned panel's containing block by 6pt, and
+the panel's 560pt width pushed the measured content (586pt) past the A4
+content area (538.6pt), triggering the smart shrink. The fixture now carries
+the body reset plus `@page { margin: 0 }`: the page area becomes 595.28pt, the
+shrink does not fire, and every size matches the Chromium reference 1:1 (panel
+12,12; container at y=56; green 112.5x37.5pt). Cases 16-19 still lack both
+lines and show the same 6pt panel offset and 0.910 zoom; the same `@page`
+rule would make them 1:1 as well.
+
+The engine still resolves an absolutely positioned element's containing block
+against a static ancestor's content box (`flowAbsCB` in `layout_flow.go`)
+instead of the initial containing block, which is why the body margin reached
+the panel. Changing that is a broader fix with its own blast radius; the
+fixtures keep the body margin at zero for now.
+
 ## Phase 3. Chrome-reference cases
 
 Port the 15 cases that need a browser reference or a larger rewrite.
