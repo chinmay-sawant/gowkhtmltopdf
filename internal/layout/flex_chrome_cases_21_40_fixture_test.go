@@ -227,10 +227,19 @@ func TestChromeFixtureCase30ColumnAutoMargins(t *testing.T) {
 	if verticalAlign.x <= verticalMargins.x {
 		t.Fatalf("case 30 vertical items did not advance along the column axis: margin x %.2f, align x %.2f", verticalMargins.x, verticalAlign.x)
 	}
-	marginCenterY := verticalMargins.y + verticalMargins.height/2
-	alignCenterY := verticalAlign.y + verticalAlign.height/2
-	if math.Abs(marginCenterY-alignCenterY) > vertical.height*0.05 {
-		t.Fatalf("case 30 vertical cross-axis centers differ: margin %.2f, align %.2f", marginCenterY, alignCenterY)
+	// Chromium centers each item on the container's vertical cross axis: the
+	// two auto margins split the free space for the margin item, and
+	// align-self: center centers the align item. Their centers must therefore
+	// coincide with the container center, not merely with each other.
+	verticalCenterY := vertical.y + vertical.height/2
+	for label, item := range map[string]*box{
+		"case 30 vertical margin item": verticalMargins,
+		"case 30 vertical align item":  verticalAlign,
+	} {
+		if center := item.y + item.height/2; math.Abs(center-verticalCenterY) > 1 {
+			t.Fatalf("%s is not centered on the vertical cross-axis: center %.2f, want %.2f",
+				label, center, verticalCenterY)
+		}
 	}
 }
 

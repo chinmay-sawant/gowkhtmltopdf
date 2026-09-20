@@ -477,7 +477,7 @@ func (e *engine) emitInlineTextRun(
 		LetterSpacing: item.style.LetterSpacing * e.scale * widthScale,
 		Bold:          item.style.FontWeight >= fontWeightBoldValue,
 		R:             child[0], G: child[1], B: child[2],
-		RotateDeg: inlineRunRotation(item.style, run.text),
+		RotateDeg: e.noteRotatedRun(item, run, textWidth),
 	}, item.style))
 
 	if item.href != "" {

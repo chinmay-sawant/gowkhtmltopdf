@@ -565,12 +565,17 @@ type engine struct {
 	ops             []Op
 	gridScratch     []GridSeg // reusable row-grid collector storage
 	noEmit          bool      // measurement mode: compute geometry without emitting ops
-	height          float64
-	scale           float64 // zoom factor applied to style lengths (>= 1)
-	zIndex          int
-	zIndexSet       bool
-	positioned      bool
-	blendMode       string
+	// maxRotatedRunW is the widest rotated (sideways) text advance seen in the
+	// current build subtree. verticalWritingHeight consumes it instead of
+	// scanning e.ops so measured geometry matches emitted geometry when
+	// noEmit drops the rotated text ops.
+	maxRotatedRunW float64
+	height         float64
+	scale          float64 // zoom factor applied to style lengths (>= 1)
+	zIndex         int
+	zIndexSet      bool
+	positioned     bool
+	blendMode      string
 	// blendGroup is the CSS element group that owns newly emitted ops
 	// (mix-blend-mode or isolation: isolate). nil means page-level paint.
 	// blendGroupOwner is the style that created the innermost group, so the
@@ -1580,12 +1585,21 @@ func (e *engine) build(node *html.Node, availW, posX, posY float64) *box {
 	// Ancestor transforms only (own transform does not change this box's CB).
 	underXformCB := e.transformCBDepth > 0
 	start := len(e.ops)
+	// verticalWritingHeight reads the widest rotated run in this box's
+	// subtree. Reset the accumulator for the subtree and merge it back into
+	// the parent scope after the build so sibling content cannot leak in.
+	previousRotatedRunW := e.maxRotatedRunW
+	e.maxRotatedRunW = 0
 
 	boxNode := e.buildDisplayBox(node, sty, availW, posX, posY, underXformCB)
 
 	if boxNode != nil {
 		boxNode.opStart, boxNode.opEnd = start, len(e.ops)-1
 		e.finishBuiltBox(boxNode, sty, underXformCB)
+	}
+
+	if e.maxRotatedRunW < previousRotatedRunW {
+		e.maxRotatedRunW = previousRotatedRunW
 	}
 
 	e.popZ(scope, boxNode)
@@ -1752,7 +1766,7 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 	e.popBFCFloats(enclose)
 
 	if isVerticalWritingMode(style.WritingMode) && style.Height < 0 && style.HeightPercent < 0 {
-		curY = e.verticalWritingHeight(contentStart, curY, style)
+		curY = e.verticalWritingHeight(curY, style)
 	}
 
 	// list marker (outside the principal box content — in the marker area)
@@ -1908,34 +1922,6 @@ func (e *engine) paintPositionedPseudo( //nolint:cyclop
 		Bold: style.FontWeight >= fontWeightBoldValue,
 	})
 	e.popZ(scope, nil)
-}
-
-func (e *engine) verticalWritingHeight(contentStart int, current float64, style ResolvedStyle) float64 {
-	// Lite vertical-rl/vertical-lr: glyphs are rotated -90deg (see
-	// inline_paint writingModeRotate) while block flow stays horizontal.
-	// This keeps the print pipeline intact and only reserves enough block
-	// height for the longest rotated run. Full vertical block progression
-	// (line stacking along the inline axis) is out of scope for print.
-	textWidth := 0.0
-	for _, op := range e.ops[contentStart:] {
-		if op.Kind == OpText && op.RotateDeg != 0 && op.W > textWidth {
-			textWidth = op.W
-		}
-	}
-
-	if textWidth == 0 {
-		return current
-	}
-
-	verticalChrome := e.scalePt(style.PaddingTop) + e.scalePt(style.PaddingBottom) +
-		e.scalePt(style.BorderTop.Width) + e.scalePt(style.BorderBottom.Width)
-
-	needed := textWidth + verticalChrome
-	if needed > current {
-		return needed
-	}
-
-	return current
 }
 
 func (e *engine) paintValueWidget(node *html.Node, style ResolvedStyle, leftX, topY, width, height float64) {
