@@ -152,3 +152,34 @@ func TestChromeCase15LegacyMultilineAlignSelf(t *testing.T) {
 		}
 	})
 }
+
+// TestChromeCase15DescriptionPanelClearance guards the fixture's panel
+// clearance. The absolutely positioned description panel must stay two lines:
+// a third line reaches the translated flexbox, so the case renders with no gap
+// above it (the engine's default font is wider than Chromium's serif).
+func TestChromeCase15DescriptionPanelClearance(t *testing.T) {
+	t.Parallel()
+
+	res := layoutChromeFlexCase0708(t, "case-15-legacy-multiline-align-self.html")
+	container := findBoxByID(res.root, "case-15")
+	if container == nil {
+		t.Fatal("Chrome Flex case box \"case-15\" is missing")
+	}
+
+	panels := classBoxes(res.root, "case-description")
+	if len(panels) != 1 {
+		t.Fatalf("description panels = %d, want 1", len(panels))
+	}
+
+	panelBottom := panels[0].y + panels[0].height
+
+	// The flexbox carries transform: translateY(56pt); apply its own matrix to
+	// the box origin to get the painted top.
+	_, translateY := container.style.Transform.Apply(0, 0)
+	flexTop := container.y + translateY
+
+	if panelBottom > flexTop-4 {
+		t.Fatalf("panel bottom %.2f vs painted flexbox top %.2f: gap %.2f, want at least 4pt",
+			panelBottom, flexTop, flexTop-panelBottom)
+	}
+}

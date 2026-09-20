@@ -274,6 +274,28 @@ inline-block's own vertical margins are dropped from the line box, the
 "removes" horizontal rules by zeroing Width, which the painter clamps to a
 1pt hairline.
 
+### Case 15 panel clearance and stale gap claim (2026-09-20)
+
+Case `legacy-multiline-align-self` had no engine defect: all fourteen
+align-self children painted with matching geometry, and the fixture's claim
+that the dark-blue end-aligned child was a zero-height line was stale. The
+reported problem was the missing gap above the case: the absolutely positioned
+description panel wraps to three lines under the engine's default font
+(Liberation Sans is wider than Chromium's serif), so the panel reached the
+flexbox that the fixture clears with `translateY(56pt)`. The stale sentence
+was replaced with a shorter truthful one ("All fourteen children paint with
+their expected geometry."), which keeps the panel at two lines in both engines
+and restores a 12.05pt gap (Chromium 7.25pt). Regression:
+`TestChromeCase15DescriptionPanelClearance` asserts the panel bottom stays at
+least 4pt above the flexbox's painted top and fails on the pre-fix fixture
+with -4.88pt.
+
+The same review reconfirmed the suite-wide transform gap: absolute
+`translate` lengths are applied unscaled under smart-shrink zoom (case 15 is
++4.93pt normalized), and the case sweep found case-05's panel overlapping its
+case top by about 1pt under the opaque panel. Both are pre-existing and out of
+scope here.
+
 ## Phase 3. Chrome-reference cases
 
 Port the 15 cases that need a browser reference or a larger rewrite.

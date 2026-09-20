@@ -37,10 +37,10 @@
 <body>
   <!-- Source: chromium/third_party/blink/web_tests/css3/flexbox/multiline-align-self.html -->
   <!-- Manifest source: third_party/blink/web_tests/css3/flexbox/multiline-align-self.html -->
-  <!-- Port status: completed fixture coverage; one dark-blue wrapped child remains a PDF geometry gap. -->
+  <!-- Port status: completed fixture coverage; all fourteen children paint their expected geometry. -->
   <!-- Expected: each line has its own 30pt cross size, and every align-self value is asserted. -->
   <p class="case-description" style="position:absolute;top:12pt;left:12pt;margin:0;padding:6pt;border:1pt solid #64748b;background:#fff;color:#111827;font-size:9pt;line-height:12pt;width:560pt;">
-    <strong>Case 15 expected behavior:</strong> each wrapped line gets its own cross size, then align-self applies start, center, end, baseline, or stretch to that line. The current PDF shows the two colored line groups, but the dark-blue end-aligned child is a zero-height line instead of the expected 10pt tile.
+    <strong>Case 15 expected behavior:</strong> each wrapped line gets its own cross size, then align-self applies start, center, end, baseline, or stretch to that line. All fourteen children paint with their expected geometry.
   </p>
   <div class="fixture-label">legacy-multiline-align-self</div>
   <div class="flexbox" id="case-15">
