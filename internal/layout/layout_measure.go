@@ -384,7 +384,7 @@ func (m *cellMeasure) measureElement(nodeN *html.Node, childCS ResolvedStyle, no
 	}
 	// Block-level in-cell boxes start a new line (simplified).
 	blockish := isCellBlockish(childCS.Display)
-	if blockish && nodeN != m.root && childCS.Width >= 0 {
+	if countedBySpecifiedBlockMeasure(nodeN, childCS) && nodeN != m.root {
 		m.flushLine()
 		m.noteWord(specifiedBlockOuterWidth(m.engine, childCS))
 		m.lineW = specifiedBlockOuterWidth(m.engine, childCS)
@@ -455,6 +455,8 @@ func specifiedInlineBlockOuterWidth(eng *engine, style ResolvedStyle) float64 {
 	return width + eng.scalePt(style.MarginLeft) + eng.scalePt(style.MarginRight)
 }
 
+// specifiedBlockOuterWidth is the margin-box width of a blockish child with a
+// specified width, the contribution measureElement records for that arm.
 func specifiedBlockOuterWidth(eng *engine, style ResolvedStyle) float64 {
 	width := eng.scalePt(style.Width)
 	if style.BoxSizing != borderBox {
@@ -462,6 +464,27 @@ func specifiedBlockOuterWidth(eng *engine, style ResolvedStyle) float64 {
 	}
 
 	return width + eng.scalePt(style.MarginLeft) + eng.scalePt(style.MarginRight)
+}
+
+// countedBySpecifiedBlockMeasure reports whether measureCellMinMax counts the
+// node's margin box through its specified-width blockish arm. Replaced and
+// contained nodes are measured by earlier arms that omit outer margins, so
+// callers must still add their horizontal chrome. Shared by measureElement and
+// nestedBlockHChrome so the two dispatch sites cannot drift apart.
+func countedBySpecifiedBlockMeasure(node *html.Node, style ResolvedStyle) bool {
+	if node == nil || node.Type != html.ElementNode {
+		return false
+	}
+
+	if containsSize(style) || style.ContentVisibility == contentVisibilityHidden {
+		return false
+	}
+
+	if node.Name == "br" || node.Name == cssTagImg || node.Name == cssTagSVG || isInputCheckbox(node) {
+		return false
+	}
+
+	return isCellBlockish(style.Display) && style.Width >= 0
 }
 
 // isCellBlockish reports displays that break the current measured line.

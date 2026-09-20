@@ -24,6 +24,10 @@ const (
 	bandEdgeTolerance = 0.5
 	// bandOverlapSlack is the horizontal overlap slack for cluster spans.
 	bandOverlapSlack = 2.0
+	// stripRowAspect is the width/height ratio below which a fill is not
+	// row-shaped: the orphan-row strip leaves it alone. Row chrome in the
+	// corpus starts at 7.5x; the case-13 flex marker is 1.0x.
+	stripRowAspect = 4.0
 )
 
 // capTablePageBreaks draws a horizontal top edge on pages where a table
@@ -750,6 +754,13 @@ func stripOrphanRowOp(paintOp *Op, lastInkBot float64) bool {
 		// empty trailing row backgrounds (not the cell that holds the
 		// last text, whose center is at/above the baseline band).
 		if paintOp.H <= 0.5 || paintOp.H > 40 {
+			return false
+		}
+
+		// Rows are wide by construction. A square or tall fill below the last
+		// ink is authored box paint, not row chrome: case-13's vertical-rl
+		// marker (13.79x13.79) sits below the last title and was zeroed here.
+		if paintOp.W <= stripRowAspect*paintOp.H {
 			return false
 		}
 

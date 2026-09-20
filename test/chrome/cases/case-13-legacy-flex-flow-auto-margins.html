@@ -50,10 +50,10 @@
 </head>
 <body>
   <!-- Source: third_party/blink/web_tests/css3/flexbox/flex-flow-auto-margins.html -->
-  <!-- Port status: completed fixture coverage; the vertical-rl reverse-flow branch remains an engine gap in the PDF. -->
+  <!-- Port status: completed fixture coverage; every branch renders in the PDF, including the vertical-rl marker. -->
   <!-- Expected: auto margins split free space after fixed margins, and logical sides follow direction and writing mode. -->
   <p class="case-description" style="position:absolute;top:12pt;left:12pt;margin:0;padding:6pt;border:1pt solid #64748b;background:#fff;color:#111827;font-size:9pt;line-height:12pt;width:560pt;">
-    <strong>Case 13 expected behavior:</strong> physical and logical auto margins should consume free space consistently across direction, writing mode, and reverse flow. The first four branches render visible blue markers; the final vertical-rl, RTL, column-reverse branch should also render a 20px marker, but the current engine collapses that child to a thin line.
+    <strong>Case 13 expected behavior:</strong> physical and logical auto margins should consume free space consistently across direction, writing mode, and reverse flow. The first four branches render visible blue markers, and the final vertical-rl, RTL, column-reverse branch renders its 20px marker too.
   </p>
 
   <div class="title">horizontal-tb ltr row physical</div>

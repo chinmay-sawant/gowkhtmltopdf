@@ -561,11 +561,10 @@ body { margin: 0 }
 // Source: chromium/third_party/blink/web_tests/css3/flexbox/flex-flow-auto-margins.html
 // Expected: logical auto margins consume free space through direction, writing
 // mode, and column-reverse. The engine resolves explicit auto margins on the
-// four physical sides but ignores style.Direction and writing-mode, and it
-// excludes fixed margins from the free space that auto margins split, so the
-// source's 13/17/2pt margin boxes are asserted strictly and skipped. The
-// supported subtests use the same physical auto-margin branches with the fixed
-// offsets zeroed.
+// four physical sides and maps logical margins through direction and writing
+// mode, so the source's 13/17/2pt margin boxes are asserted strictly.
+// TestChromeFlexCase13AutoMarginsFixture pins the same fixture's wrapper
+// geometry and the painted markers.
 //
 //nolint:cyclop,funlen,maintidx // Chromium fixture geometry keeps short labels
 func TestChromeFlexFlowAutoMarginsReverse(t *testing.T) {
@@ -680,9 +679,6 @@ body { margin: 0 }
 		// Chromium physical horizontal-tb/ltr/row: item at (80, 23) relative to
 		// the inline-block wrapper, from margin: 13pt auto 17pt auto inside a
 		// 100x100 flex box offset by (40, 10).
-		// Blocked: fixed block margins are dropped from the cross position
-		// (internal/layout/flex.go:1272) and fixed inline margins are excluded
-		// from the row free space (internal/layout/flex.go:1049).
 		cssSheet := sheet(t, `
 body { margin: 0 }
 .wrap { position: relative; display: inline-block }
@@ -705,9 +701,6 @@ body { margin: 0 }
 		// Chromium logical horizontal-tb/ltr/row: item at (118, 73). The
 		// inline-end 2pt and block-end 17pt fixed margins shrink the free space
 		// that the two auto margins consume.
-		// Blocked: logical margins map to physical sides without fixing the
-		// free space (internal/layout/flex.go:1253) and direction is ignored
-		// (style_properties.go:828).
 		cssSheet := sheet(t, `
 body { margin: 0 }
 .wrap { position: relative; display: inline-block }
@@ -738,9 +731,6 @@ body { margin: 0 }
 
 		// Chromium logical horizontal-tb/rtl/row: item at (22, 73). The
 		// inline-start auto margin resolves on the right under rtl.
-		// Blocked: flex ignores direction:rtl (internal/layout/flex.go:84) and
-		// logical margins do not swap sides under rtl
-		// (style_properties.go:828).
 		cssSheet := sheet(t, `
 body { margin: 0 }
 .wrap { position: relative; display: inline-block }
@@ -771,9 +761,6 @@ body { margin: 0 }
 
 		// Chromium physical horizontal-tb/ltr/column-reverse: item at
 		// (80, 73) from the same 13pt auto 17pt auto margins.
-		// Blocked: reverse packing starts at main-start here because the item
-		// fills the main axis (internal/layout/flex.go:1539) and fixed cross
-		// margins are dropped (internal/layout/flex.go:1765).
 		cssSheet := sheet(t, `
 body { margin: 0 }
 .wrap { position: relative; display: inline-block }

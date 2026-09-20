@@ -288,11 +288,13 @@ func (e *engine) flowChildren(
 	e.flushDeferredFlowChildren(parent, deferred, cbHeight, absCBW, absCBX, absOriginY)
 
 	// A final child margin is inside a parent that has bottom padding or a
-	// bottom border. Without this, the margin disappears from the parent's
-	// used height, making padded cards and diagram boxes shorter than HTML.
+	// bottom border, or that establishes a BFC: an inline-block, flow-root,
+	// overflow-hidden box, float, or cell does not let the margin collapse
+	// out. Without this, the margin disappears from the parent's used height,
+	// making padded cards and diagram boxes shorter than HTML.
 	// A size-contained box is sized as empty, so that trailing margin does
 	// not apply either.
-	if !sizeContained && (sty.PaddingBottom > 0 || sty.BorderBottom.Width > 0) {
+	if !sizeContained && (sty.PaddingBottom > 0 || sty.BorderBottom.Width > 0 || establishesBFC(sty)) {
 		curY += prevBottom
 	}
 

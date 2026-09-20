@@ -245,6 +245,35 @@ Regression: `TestChromeCaseLegacyDefiniteMainSizePaintsChildOnce` in
 fills (want one, 300x125). The fixture comments that claimed an unresolved
 percentage were corrected.
 
+### Case 13 inline-block sizing and marker seal (2026-09-20)
+
+Case `legacy-flex-flow-auto-margins` already matched Chromium for every flex
+child position, but three engine defects changed the picture:
+
+1. `inlineBlockAvail` counted a specified-width blockish child's horizontal
+   margins twice: `measureCellMinMax` includes them through
+   `specifiedBlockOuterWidth`, and `nestedBlockHChrome` added them again.
+   `nestedBlockHChrome` now skips children consumed by that measure arm, using
+   the shared `countedBySpecifiedBlockMeasure` predicate that `measureElement`
+   also uses.
+2. `flowChildren` added the trailing child's bottom margin only when the
+   parent had bottom padding or border. BFC roots (`establishesBFC`: inline-
+   block, flow-root, overflow other than visible, floats, cells) do not let
+   that margin collapse out, so the condition now includes them.
+3. The orphan-row strip zeroed the vertical-rl reverse-flow marker's fill
+   because its center sat below the last title ink. `stripOrphanRowOp` now
+   requires a row-shaped fill (`stripRowAspect`, width at least 4x height)
+   before stripping, so small square markers survive.
+
+Regression: `TestChromeFlexCase13AutoMarginsFixture` asserts the five wrapper
+sizes (120x105, 120x105, 120x105, 105x120, 105x120), 15x15 markers, and five
+blue marker fills after paint. Stale "Blocked" notes in
+`flex_chrome_writing_test.go` were removed. Remaining pre-existing gaps: an
+inline-block's own vertical margins are dropped from the line box, the
+`translateY(56pt)` is not scaled by smart shrink, and the strip pass still
+"removes" horizontal rules by zeroing Width, which the painter clamps to a
+1pt hairline.
+
 ## Phase 3. Chrome-reference cases
 
 Port the 15 cases that need a browser reference or a larger rewrite.
