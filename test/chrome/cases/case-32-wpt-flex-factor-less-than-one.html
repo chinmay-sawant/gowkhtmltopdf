@@ -1,12 +1,31 @@
 <!doctype html>
-<meta charset="utf-8">
-<title>Fractional flex grow and shrink factors</title>
-<style>
-html, body { margin: 0; padding: 0; font: 12px sans-serif; }
-.case { display: flex; width: 100px; height: 100px; border: 1px solid #222; } .item { flex-basis: 0; height: 30px; }
-</style>
-<!-- Source: third_party/blink/web_tests/external/wpt/css/css-flexbox/flex-factor-less-than-one.html -->
-<!-- Fixture: case-32-wpt-flex-factor-less-than-one -->
-<!-- Port status: scaffold. The next phase replaces this minimal case with a verified Go fixture. -->
-<!-- Expected: Fractional grow and shrink factors distribute space proportionally in both row and column axes. -->
-<div class="case"><div class="item" style="flex-grow:.5;background:#9ec5fe">A</div><div class="item" style="flex-grow:.25;background:#b7e4c7">B</div></div>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Flexbox factors less than one</title>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .container { height: 75pt; width: 75pt; border: 1pt solid #111; display: flex; }
+    .column { flex-direction: column; }
+    .vertical { writing-mode: vertical-rl; }
+    .grow-half { background: #16a34a; flex-grow: .5; }
+    .grow-quarter { background: #dc2626; flex-grow: .25; }
+    .shrink-half { background: #16a34a; flex-shrink: .5; width: 150pt; height: 150pt; }
+    .shrink-quarter { background: #dc2626; flex-shrink: .25; width: 150pt; height: 150pt; }
+    .basis { flex-basis: 22.5pt; }
+    .basis-big { flex-basis: 75pt; }
+  </style>
+</head>
+<body>
+  <!-- Source: third_party/blink/web_tests/external/wpt/css/css-flexbox/flex-factor-less-than-one.html -->
+  <!-- Fixture: case-32-wpt-flex-factor-less-than-one -->
+  <!-- Port status: completed. Source-faithful grow, shrink, column, and vertical branches. -->
+  <!-- Expected: fractional factors preserve proportional free-space behavior. -->
+  <div class="container" id="row-grow"><div class="grow-half"></div><div class="grow-quarter"></div></div>
+  <div class="container column" id="column-grow"><div class="grow-half"></div><div class="grow-quarter"></div></div>
+  <div class="container" id="row-grow-basis"><div class="grow-half basis"></div><div class="grow-quarter basis"></div></div>
+  <div class="container" id="row-shrink"><div class="shrink-half"></div><div class="shrink-quarter"></div></div>
+  <div class="container column" id="column-shrink"><div class="shrink-half"></div><div class="shrink-quarter"></div></div>
+  <div class="container vertical" id="vertical-grow"><div class="grow-half"></div><div class="grow-quarter"></div></div>
+</body>
+</html>

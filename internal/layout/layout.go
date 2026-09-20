@@ -1714,7 +1714,7 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 		node: node, style: e.stylePtr(node), kind: boxKindBlock, x: posX, y: posY,
 	}
 	boxStyle := &style
-	w, margL := resolveBlockWidth(e, boxStyle, availW)
+	w, margL := resolveBlockWidth(e, node, boxStyle, availW)
 	boxNode.w = w
 
 	boxNode.x = posX + margL
@@ -1756,7 +1756,7 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 
 	e.popBFCFloats(enclose)
 
-	if isVerticalWritingMode(style.WritingMode) {
+	if isVerticalWritingMode(style.WritingMode) && style.Height < 0 && style.HeightPercent < 0 {
 		curY = e.verticalWritingHeight(contentStart, curY, style)
 	}
 
@@ -2154,7 +2154,7 @@ func (e *engine) applyHeightConstraintsWithCB(style *ResolvedStyle, curY float64
 
 // resolveBlockWidth computes a block's used border-box width and the scaled
 // left margin. Horizontal auto margins center (or push) a definite-width box.
-func resolveBlockWidth(eng *engine, style *ResolvedStyle, availW float64) (float64, float64) {
+func resolveBlockWidth(eng *engine, node *html.Node, style *ResolvedStyle, availW float64) (float64, float64) {
 	margR := eng.scalePt(style.MarginRight)
 	margL := eng.scalePt(style.MarginLeft)
 	// Default: fill remaining width after horizontal margins.
@@ -2163,11 +2163,11 @@ func resolveBlockWidth(eng *engine, style *ResolvedStyle, availW float64) (float
 		width = 0
 	}
 
-	definiteW := resolveDefiniteWidth(eng, style, availW, &width)
+	definiteW, intrinsicW := resolveDefiniteWidth(eng, node, style, availW, &width)
 	// content-box (default): specified width is the content width, so the
 	// border box grows by horizontal padding + border. border-box: specified
 	// width already is the border-box size.
-	if definiteW && style.BoxSizing != borderBox {
+	if definiteW && !intrinsicW && style.BoxSizing != borderBox {
 		width += style.horizontalChrome(eng)
 	}
 
@@ -2198,26 +2198,6 @@ func resolveAutoMargins(style *ResolvedStyle, definiteW bool, width, availW, mar
 	}
 
 	return margL
-}
-
-// resolveDefiniteWidth applies the width/width% to *w. Returns false when the
-// width resolves to auto (cyclic % honesty: indefinite containing block).
-func resolveDefiniteWidth(eng *engine, style *ResolvedStyle, availW float64, width *float64) bool {
-	definiteW := style.Width >= 0 || style.WidthPercent >= 0
-
-	switch {
-	case style.WidthPercent >= 0:
-		// Cyclic % honesty: indefinite containing block → treat as auto.
-		if availW > 0 && availW < 1e12 {
-			*width = availW * style.WidthPercent / oneHundred
-		} else {
-			definiteW = false
-		}
-	case style.Width >= 0:
-		*width = eng.scalePt(style.Width)
-	}
-
-	return definiteW
 }
 
 // clampBlockMinMax applies the min/max-width constraints to w.

@@ -71,7 +71,7 @@ func applyDisplayFlowProps(style *ResolvedStyle, prop, value string) bool {
 		setWritingModeKeyword(style, value)
 	case "direction":
 		val := strings.ToLower(strings.TrimSpace(value))
-		if val == "ltr" || val == "rtl" {
+		if val == cssDirectionLTR || val == cssDirectionRTL {
 			style.Direction = val
 		}
 	case "overflow", "overflow-x", "overflow-y":
@@ -574,8 +574,24 @@ func applyBoxMainSizeProps(style *ResolvedStyle, prop, value string, fsize float
 	}
 }
 
+//nolint:nestif // width parsing preserves intrinsic and deferred flex values in order
 func setWidthValue(style *ResolvedStyle, value string, fsize float64, ctx *styleContext) bool {
-	if value == overflowAuto {
+	value = strings.TrimSpace(value)
+	if value == "max-content" {
+		style.Width = widthMaxContent
+		style.WidthPercent = -1
+	} else if value == "min-content" {
+		style.Width = widthMinContent
+		style.WidthPercent = -1
+	} else if calcPercent, calcAbsolute, ok := calcFlexWidth(value, fsize); ok {
+		if calcPercent >= 0 {
+			style.WidthPercent = calcPercent
+			style.Width = -1
+		} else {
+			style.Width = calcAbsolute
+			style.WidthPercent = -1
+		}
+	} else if value == overflowAuto {
 		style.Width = -1
 		style.WidthPercent = -1
 	} else if v, ok := vminVmaxPt(value, ctx.viewportW, ctx.viewportH); ok {
@@ -592,6 +608,39 @@ func setWidthValue(style *ResolvedStyle, value string, fsize float64, ctx *style
 	}
 
 	return true
+}
+
+//nolint:cyclop,nlreturn,wsl // the supported deferred calc grammar is intentionally small
+func calcFlexWidth(value string, fsize float64) (float64, float64, bool) {
+	if len(value) < len("calc()") || !strings.EqualFold(value[:5], "calc(") || value[len(value)-1] != ')' {
+		return -1, 0, false
+	}
+
+	parts := strings.Fields(value[5 : len(value)-1])
+	if len(parts) == 1 {
+		if percent, unit, ok := css.ParseLength(parts[0]); ok && unit == "%" {
+			return percent, 0, true
+		}
+		return -1, 0, false
+	}
+	if len(parts) != calcParts || (parts[1] != "+" && parts[1] != "-") {
+		return -1, 0, false
+	}
+
+	for _, part := range []string{parts[0], parts[2]} {
+		if _, unit, ok := css.ParseLength(part); ok && unit == "%" {
+			other := parts[2]
+			if part == parts[2] {
+				other = parts[0]
+			}
+			absolute, parsed := lengthBox(other, fsize, 0, overflowAuto)
+			if parsed {
+				return -1, absolute, true
+			}
+		}
+	}
+
+	return -1, 0, false
 }
 
 func setHeightValue(style *ResolvedStyle, value string, fsize float64, ctx *styleContext) bool {

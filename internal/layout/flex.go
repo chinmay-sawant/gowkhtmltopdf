@@ -67,6 +67,9 @@ func (e *engine) buildFlex(node *html.Node, sty ResolvedStyle, availW, x, posY f
 		node: node, style: e.stylePtr(node), kind: boxKindBlock, x: x + ml, y: posY,
 	}
 	boxNode.w = resolveUsedWidth(sty, availW, e)
+	if isIntrinsicWidth(sty.Width) {
+		boxNode.w = e.flexIntrinsicWidth(node, sty, sty.Width == widthMinContent)
+	}
 
 	if sty.IsWebkitBox && sty.Width < 0 && sty.WidthPercent < 0 {
 		if intr := e.measureFlexItemMaxContent(node, sty); intr > 0 && intr < boxNode.w {
@@ -75,6 +78,7 @@ func (e *engine) buildFlex(node *html.Node, sty ResolvedStyle, availW, x, posY f
 	}
 
 	contentX, contentW := e.contentBox(boxNode.x, boxNode.w, &sty)
+	sty = withAspectRatioHeight(sty, contentW, e)
 
 	contentStart := len(e.ops)
 	curY := e.scalePt(sty.PaddingTop) + e.scalePt(sty.BorderTop.Width)
@@ -235,12 +239,13 @@ func (e *engine) flowFlexRow(
 
 	wrap := style.FlexWrap == fxWrap || style.FlexWrap == fxWrapRev
 	reverse := flexRowPhysicalReverse(style)
-	items := e.flexRowItems(kids, contentW)
+	contentH := resolveContentHeight(style, e)
+	items := e.flexRowItems(kids, contentW, contentH)
 	lines := e.flexWrapLines(items, wrap, reverse, style.FlexWrap == fxWrapRev, colGap, contentW)
 
 	lineCross := -1.0
 	if !wrap {
-		lineCross = resolveContentHeight(style, e)
+		lineCross = contentH
 	}
 
 	stretchCross := e.alignContentStretchLineCross(
@@ -295,10 +300,10 @@ func (e *engine) flowFlexRow(
 		}
 	}
 
-	return e.applyAlignContentRow(parent, style.AlignContent, placed, rowGap, resolveContentHeight(style, e), curY)
+	return e.applyAlignContentRow(parent, style.AlignContent, placed, rowGap, contentH, curY)
 }
 
-func (e *engine) flexRowItems(kids []*html.Node, contentW float64) []flexMeas {
+func (e *engine) flexRowItems(kids []*html.Node, contentW float64, crossSize ...float64) []flexMeas {
 	items := make([]flexMeas, 0, len(kids))
 
 	for _, kid := range kids {
@@ -314,8 +319,15 @@ func (e *engine) flexRowItems(kids []*html.Node, contentW float64) []flexMeas {
 			shrink = 1
 		}
 
+		baseW := e.flexItemBaseWidth(kid, *cstate, contentW)
+		if len(crossSize) > 0 {
+			if aspectW := e.flexAspectContentWidth(kid, *cstate, crossSize[0]); aspectW > baseW {
+				baseW = aspectW
+			}
+		}
+
 		item := flexMeas{
-			n: kid, baseW: e.flexItemBaseWidth(kid, *cstate, contentW),
+			n: kid, baseW: baseW,
 			hypotheticalW: 0, grow: grow, shrink: shrink, order: cstate.FlexOrder,
 		}
 		item.hypotheticalW = e.flexHypotheticalMainSize(item, contentW)
@@ -325,6 +337,52 @@ func (e *engine) flexRowItems(kids []*html.Node, contentW float64) []flexMeas {
 	sort.SliceStable(items, func(i, j int) bool { return items[i].order < items[j].order })
 
 	return items
+}
+
+//nolint:cyclop,goconst,wsl // recursive aspect-ratio contribution walks the small flex tree
+func (e *engine) flexAspectContentWidth(node *html.Node, style ResolvedStyle, crossSize float64) float64 {
+	if node != nil {
+		switch node.Name {
+		case cssTagImg, cssTagSVG, "video", "canvas":
+			return 0
+		}
+	}
+
+	width := 0.0
+	if style.AspectRatio > 0 {
+		height := -1.0
+		if style.Height >= 0 {
+			height = e.scalePt(style.Height)
+		} else if style.HeightPercent >= 0 && crossSize >= 0 {
+			height = crossSize * style.HeightPercent / oneHundred
+		}
+		if height > 0 {
+			width = height * style.AspectRatio
+		}
+	}
+
+	for _, child := range node.Children {
+		if child.Type != html.ElementNode {
+			continue
+		}
+		childStyle := e.stylePtr(child)
+		if childStyle.Display == cssDisplayNone {
+			continue
+		}
+		if childWidth := e.flexAspectContentWidth(child, *childStyle, crossSize); childWidth > width {
+			width = childWidth
+		}
+	}
+	if width <= 0 {
+		return 0
+	}
+
+	if style.BoxSizing != borderBox {
+		width += e.scalePt(style.PaddingLeft) + e.scalePt(style.PaddingRight) +
+			e.scalePt(style.BorderLeft.Width) + e.scalePt(style.BorderRight.Width)
+	}
+
+	return width
 }
 
 // flexWrapLines packs measured items into flex lines, honoring wrap mode and
@@ -641,7 +699,7 @@ func (e *engine) flexItemBaseWidth(node *html.Node, style ResolvedStyle, mainSiz
 	intr := e.measureFlexItemMaxContent(node, style) +
 		e.scalePt(style.MarginLeft) + e.scalePt(style.MarginRight)
 	if intr <= 0 {
-		intr = pad + e.scalePt(style.FontSize)*two
+		intr = pad
 	}
 
 	if intr > capW {
@@ -659,6 +717,10 @@ func (e *engine) flexItemBaseWidth(node *html.Node, style ResolvedStyle, mainSiz
 //
 //nolint:cyclop,wsl // intrinsic flex measurement keeps the CSS cases together
 func (e *engine) measureFlexItemMaxContent(node *html.Node, style ResolvedStyle) float64 {
+	if style.Display == displayFlex || style.Display == displayInlineFlex {
+		return e.flexIntrinsicWidth(node, style, false)
+	}
+
 	_, maxW := e.measureCellMinMax(node, style)
 	chrome := e.scalePt(style.PaddingLeft) + e.scalePt(style.PaddingRight) +
 		e.scalePt(style.BorderLeft.Width) + e.scalePt(style.BorderRight.Width)
@@ -687,6 +749,7 @@ func (e *engine) measureFlexItemMaxContent(node *html.Node, style ResolvedStyle)
 		}
 
 		childW := e.measureFlexItemMaxContent(child, *childStyle)
+		childW += e.scalePt(childStyle.MarginLeft) + e.scalePt(childStyle.MarginRight)
 		if rowFlex {
 			rowContentW += childW
 			rowChildCount++
@@ -707,6 +770,66 @@ func (e *engine) measureFlexItemMaxContent(node *html.Node, style ResolvedStyle)
 	}
 
 	return contentW + chrome
+}
+
+// flexIntrinsicWidth returns the border-box width contribution of a flex
+// container. Row containers sum their item contributions; column containers
+// use the largest contribution because their items share the cross axis.
+//
+//nolint:cyclop,wsl // intrinsic flex contributions keep the row and column rules together
+func (e *engine) flexIntrinsicWidth(node *html.Node, style ResolvedStyle, _ bool) float64 {
+	rowFlex := style.FlexDirection != fxCol && style.FlexDirection != fxColRev
+	chrome := e.scalePt(style.PaddingLeft) + e.scalePt(style.PaddingRight) +
+		e.scalePt(style.BorderLeft.Width) + e.scalePt(style.BorderRight.Width)
+	contentW := 0.0
+	if !rowFlex {
+		_, maxW := e.measureCellMinMax(node, style)
+		contentW = maxW - chrome
+		if contentW < 0 {
+			contentW = 0
+		}
+	}
+
+	childW := 0.0
+	childCount := 0
+	for _, child := range node.Children {
+		if child.Type != html.ElementNode {
+			continue
+		}
+
+		childStyle := e.stylePtr(child)
+		if childStyle.Display == cssDisplayNone {
+			continue
+		}
+
+		var contribution float64
+		if childStyle.Width >= 0 && childStyle.WidthPercent < 0 {
+			pad := e.scalePt(childStyle.PaddingLeft) + e.scalePt(childStyle.PaddingRight) +
+				e.scalePt(childStyle.BorderLeft.Width) + e.scalePt(childStyle.BorderRight.Width)
+			contribution = e.flexBoxSized(*childStyle, e.scalePt(childStyle.Width), pad)
+		} else {
+			contribution = e.measureFlexItemMaxContent(child, *childStyle)
+		}
+		contribution += e.scalePt(childStyle.MarginLeft) + e.scalePt(childStyle.MarginRight)
+		if rowFlex {
+			childW += contribution
+			childCount++
+		} else if contribution > childW {
+			childW = contribution
+		}
+	}
+
+	if rowFlex {
+		_, columnGap := e.styleGaps(style)
+		if childCount > 1 {
+			childW += columnGap * float64(childCount-1)
+		}
+	}
+	if childW > contentW {
+		contentW = childW
+	}
+
+	return contentW
 }
 
 // flexSpecifiedBaseWidth resolves a definite flex base size (flex-basis then
@@ -842,8 +965,23 @@ func (e *engine) flexClampMainWidths(items []flexMeas, widths []float64, content
 	if sum <= available+layoutEpsilon || available < 0 {
 		return
 	}
+	if flexShrinkFactorSum(items) < 1 {
+		return
+	}
 
 	e.reshrinkFlexWidths(items, widths, available, mainSize, sum)
+}
+
+//nolint:wsl // the sum is a small companion to the shrink redistribution
+func flexShrinkFactorSum(items []flexMeas) float64 {
+	sum := 0.0
+	for _, item := range items {
+		if item.shrink > 0 {
+			sum += item.shrink
+		}
+	}
+
+	return sum
 }
 
 func hasFrozenMax(maxFrozen []bool) bool {
@@ -891,11 +1029,15 @@ func (e *engine) regrowFlexWidths(items []flexMeas, widths []float64, contentW f
 func flexGrowSum(items []flexMeas, maxFrozen []bool) float64 {
 	sum := 0.0
 	for idx, item := range items {
-		if maxFrozen[idx] || item.grow <= 0 {
+		if maxFrozen[idx] {
 			continue
 		}
 
-		sum += item.grow
+		factor := item.grow
+		if factor <= 0 {
+			factor = 1
+		}
+		sum += factor
 	}
 
 	return sum
@@ -910,11 +1052,15 @@ func (e *engine) applyFlexRegrow(
 ) bool {
 	frozenAnother := false
 	for idx, item := range items {
-		if maxFrozen[idx] || item.grow <= 0 {
+		if maxFrozen[idx] {
 			continue
 		}
 
-		share := remaining * item.grow / growSum
+		factor := item.grow
+		if factor <= 0 {
+			factor = 1
+		}
+		share := remaining * factor / growSum
 		candidate := widths[idx] + share
 		style := e.stylePtr(item.n)
 		if style.MaxWidth >= 0 && candidate > e.scalePt(style.MaxWidth) {
@@ -1113,7 +1259,18 @@ func (e *engine) flexDistributeWidths(items []flexMeas, widths []float64, conten
 	}
 }
 
+//nolint:wsl // factor normalization belongs beside the shrink distribution
 func (e *engine) flexShrinkWidths(items []flexMeas, widths []float64, deficit, shrinkSum, contentW float64) {
+	factorSum := 0.0
+	for _, item := range items {
+		if item.shrink > 0 {
+			factorSum += item.shrink
+		}
+	}
+	if factorSum < 1 {
+		deficit *= factorSum
+	}
+
 	for idx, item := range items {
 		if item.shrink <= 0 || item.baseW <= 0 {
 			continue
@@ -1189,6 +1346,8 @@ func justifyDistributed(justify string, contentX, contentW, sumW, gap float64, c
 
 // measureFlexCrossMax measures the tallest item to get the cross size for a
 // line when the container cross size is indefinite (noEmit measure pass).
+//
+//nolint:wsl // measurement keeps item build and cross-margin accounting together
 func (e *engine) measureFlexCrossMax(
 	items []flexMeas, widths []float64, startX, topY, curY, justifyGap float64,
 ) float64 {
@@ -1199,8 +1358,12 @@ func (e *engine) measureFlexCrossMax(
 
 	for idx, it := range items {
 		cb := e.build(it.n, widths[idx], maxX, topY+curY)
-		if cb != nil && cb.height > maxH {
-			maxH = cb.height
+		if cb != nil {
+			itemStyle := e.stylePtr(it.n)
+			itemH := cb.height + e.scalePt(itemStyle.MarginTop) + e.scalePt(itemStyle.MarginBottom)
+			if itemH > maxH {
+				maxH = itemH
+			}
 		}
 
 		maxX += widths[idx]
@@ -1348,7 +1511,7 @@ func (e *engine) buildRowItems(
 		// nested flex container re-resolves its children's percentages against
 		// it. Intrinsic containers are not exempt: the measured hypothetical
 		// cross size is already the line's cross size for a single-line row.
-		forceStretch := flexItemCrossStretch(style, *cstate) && targetCross > 0
+		forceStretch := flexItemCrossStretchNode(item.n, style, *cstate) && targetCross > 0
 		stretchCross := targetCross
 		if forceStretch {
 			stretchCross -= e.scalePt(cstate.MarginTop) + e.scalePt(cstate.MarginBottom)
@@ -1380,8 +1543,9 @@ func (e *engine) buildRowItems(
 		cblock.x += dx
 		cblock.y += dy
 
-		if cblock.height > rowH {
-			rowH = cblock.height
+		itemH := cblock.height + e.scalePt(cstate.MarginTop) + e.scalePt(cstate.MarginBottom)
+		if itemH > rowH {
+			rowH = itemH
 		}
 
 		built = append(built, flexPlacedItem{box: cblock, h: cblock.height, n: item.n})
@@ -1590,6 +1754,21 @@ func flexItemCrossStretch(cstate, cstate2 ResolvedStyle) bool {
 	return true
 }
 
+func flexItemCrossStretchNode(node *html.Node, cstate, cstate2 ResolvedStyle) bool {
+	if node != nil {
+		switch node.Name {
+		case cssTagImg:
+			if node.Attribute("width") == "1" && node.Attribute("height") == "1" {
+				return false
+			}
+		case "video", "canvas":
+			return false
+		}
+	}
+
+	return flexItemCrossStretch(cstate, cstate2)
+}
+
 // flexItemBaseHeight resolves the flex base size on the column main axis.
 // mainSize is the flex container content-box height from resolveContentHeight.
 // (−1 when height is auto / indefinite). Percentage flex-basis against an
@@ -1615,7 +1794,7 @@ func (e *engine) flexItemBaseHeight(node *html.Node, style ResolvedStyle, conten
 	}
 
 	if height <= 0 {
-		height = padV + e.scalePt(style.FontSize)*textLineHeightFactor
+		height = padV
 	}
 
 	return height

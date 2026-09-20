@@ -1,12 +1,27 @@
 <!doctype html>
-<meta charset="utf-8">
-<title>Replaced flex item automatic minimum</title>
-<style>
-html, body { margin: 0; padding: 0; font: 12px sans-serif; }
-.case { display: flex; flex-direction: column; width: 50px; border: 1px solid #222; } .item { width: 29px; height: 22px; background:#b7e4c7; }
-</style>
-<!-- Source: third_party/blink/web_tests/external/wpt/css/css-flexbox/flex-item-compressible-001.html -->
-<!-- Fixture: case-33-wpt-flex-item-compressible -->
-<!-- Port status: scaffold. The next phase replaces this minimal case with a verified Go fixture. -->
-<!-- Expected: An input flex item uses its specified-size suggestion correctly when the row must shrink it. -->
-<div class="case"><div class="item">SVG ratio</div></div>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Flexbox replaced item automatic minimum</title>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .case { display: flex; width: 225pt; height: 30pt; border: 1pt solid #111; margin-bottom: 5pt; }
+    .spacer { flex: 0 0 150pt; background: #d1d5db; }
+    input { appearance: none; border: 0; padding: 0; margin: 0; height: 30pt; background: #9ec5fe; }
+    .test1 { width: 100%; }
+    .test2 { width: calc(100%); }
+    .test3 { width: calc(105pt + 100%); }
+  </style>
+</head>
+<body>
+  <!-- Source: third_party/blink/web_tests/external/wpt/css/css-flexbox/flex-item-compressible-001.html -->
+  <!-- Fixture: case-33-wpt-flex-item-compressible -->
+  <!-- Port status: completed. Source-faithful replaced input variants. -->
+  <!-- Expected: specified-size suggestions are used while the row shrinks the input. -->
+  <div class="case" id="case-33-text"><div class="spacer"></div><input class="test1" type="text"></div>
+  <div class="case" id="case-33-range"><div class="spacer"></div><input class="test1" type="range"></div>
+  <div class="case" id="case-33-button"><div class="spacer"></div><input class="test1" type="button" value="XXXXXXX"></div>
+  <div class="case" id="case-33-calc"><div class="spacer"></div><input class="test2" type="text"></div>
+  <div class="case" id="case-33-wide"><div class="spacer"></div><input class="test3" type="text"></div>
+</body>
+</html>

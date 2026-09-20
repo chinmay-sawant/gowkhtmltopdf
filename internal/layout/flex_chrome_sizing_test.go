@@ -247,8 +247,6 @@ body { margin: 0 }
 	t.Run("column-grow", func(t *testing.T) {
 		t.Parallel()
 
-		t.Skip("blocked: flexGrowHeights ignores grow sums below one (flex.go:1649)")
-
 		cssSheet := sheet(t, `
 body { margin: 0 }
 .case { display: flex; flex-direction: column; width: 20pt; height: 100pt }
@@ -280,8 +278,6 @@ body { margin: 0 }
 	t.Run("row-shrink", func(t *testing.T) {
 		t.Parallel()
 
-		t.Skip("blocked: flexShrinkWidths ignores shrink factor sums below one (flex.go:1070)")
-
 		cssSheet := sheet(t, `
 body { margin: 0 }
 .case { display: flex; width: 100pt; height: 20pt }
@@ -298,8 +294,6 @@ body { margin: 0 }
 
 	t.Run("column-shrink", func(t *testing.T) {
 		t.Parallel()
-
-		t.Skip("blocked: flexShrinkHeights ignores shrink factor sums below one (flex.go:1657)")
 
 		cssSheet := sheet(t, `
 body { margin: 0 }
@@ -334,10 +328,6 @@ body { margin: 0 }
 // final 100pt green box is exactly half the 200pt blue box.
 func TestChromeFlexBaseSizeIgnoresMaxWidth(t *testing.T) {
 	t.Parallel()
-
-	// The frozen max-width item frees 50pt, but the engine only regrows by grow
-	// factors; with grow 0 it skips the shrink-mode redistribution to 200pt.
-	t.Skip("blocked: regrowFlexWidths skips shrink-mode redistribution when grow is zero (flex.go:839)")
 
 	cssSheet := sheet(t, `
 body { margin: 0 }

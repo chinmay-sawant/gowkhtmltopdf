@@ -250,7 +250,7 @@
       "id": "wpt-flow-row-wrap",
       "kind": "wrap",
       "source": "third_party/blink/web_tests/external/wpt/css/css-flexbox/flexbox_flow-row-wrap.html",
-      "status": "scaffold",
+      "status": "completed",
       "title": "Row wrapping with margins"
     },
     {
@@ -262,7 +262,7 @@
       "id": "wpt-gap-002-ltr",
       "kind": "gap",
       "source": "third_party/blink/web_tests/external/wpt/css/css-flexbox/gap-002-ltr.html",
-      "status": "scaffold",
+      "status": "completed",
       "title": "Column gap with flexible children"
     },
     {
@@ -274,7 +274,7 @@
       "id": "wpt-aspect-ratio-cross-size-002",
       "kind": "aspect",
       "source": "third_party/blink/web_tests/external/wpt/css/css-flexbox/flex-aspect-ratio-cross-size-002.html",
-      "status": "scaffold",
+      "status": "completed",
       "title": "Nested aspect ratio and cross-size feedback"
     },
     {
@@ -286,7 +286,7 @@
       "id": "wpt-writing-mode-006",
       "kind": "writing",
       "source": "third_party/blink/web_tests/external/wpt/css/css-flexbox/flexbox-writing-mode-006.html",
-      "status": "scaffold",
+      "status": "completed",
       "title": "Writing mode matrix"
     },
     {
@@ -298,7 +298,7 @@
       "id": "wpt-flex-item-percentage-abspos",
       "kind": "abspos",
       "source": "third_party/blink/web_tests/external/wpt/css/css-flexbox/flex-item-and-percentage-abspos.html",
-      "status": "scaffold",
+      "status": "completed",
       "title": "Percentage absolute child inside a flex item"
     },
     {
@@ -310,7 +310,7 @@
       "id": "wpt-definite-sizes-002",
       "kind": "column",
       "source": "third_party/blink/web_tests/external/wpt/css/css-flexbox/flexbox-definite-sizes-002.html",
-      "status": "scaffold",
+      "status": "completed",
       "title": "Definite size from min-height"
     },
     {
@@ -322,7 +322,7 @@
       "id": "wpt-percentage-heights-005",
       "kind": "column",
       "source": "third_party/blink/web_tests/external/wpt/css/css-flexbox/percentage-heights-005.html",
-      "status": "scaffold",
+      "status": "completed",
       "title": "Percentage height in a column flex item"
     },
     {
@@ -334,7 +334,7 @@
       "id": "wpt-flex-minimum-width-aspect",
       "kind": "aspect",
       "source": "third_party/blink/web_tests/external/wpt/css/css-flexbox/flex-minimum-width-flex-items-010.html",
-      "status": "scaffold",
+      "status": "completed",
       "title": "Automatic minimum width from aspect ratio"
     },
     {
@@ -346,7 +346,7 @@
       "id": "wpt-break-nested-float-print",
       "kind": "print",
       "source": "third_party/blink/web_tests/external/wpt/css/css-flexbox/break-nested-float-in-flex-item-001-print.html",
-      "status": "scaffold",
+      "status": "completed",
       "title": "Flex content fragmentation in print"
     },
     {
@@ -358,7 +358,7 @@
       "id": "wpt-auto-margins-column",
       "kind": "margins",
       "source": "third_party/blink/web_tests/external/wpt/css/css-flexbox/auto-margins-003.html",
-      "status": "scaffold",
+      "status": "completed",
       "title": "Auto margins and align-self in a column"
     },
     {
@@ -370,7 +370,7 @@
       "id": "wpt-column-reverse-multiline",
       "kind": "wrap",
       "source": "third_party/blink/web_tests/external/wpt/css/css-flexbox/flex-column-reverse-multiline-item-position.html",
-      "status": "scaffold",
+      "status": "completed",
       "title": "Column-reverse multiline item positions"
     },
     {
@@ -382,7 +382,7 @@
       "id": "wpt-flex-factor-less-than-one",
       "kind": "grow",
       "source": "third_party/blink/web_tests/external/wpt/css/css-flexbox/flex-factor-less-than-one.html",
-      "status": "scaffold",
+      "status": "completed",
       "title": "Fractional flex grow and shrink factors"
     },
     {
@@ -394,7 +394,7 @@
       "id": "wpt-flex-item-compressible",
       "kind": "replaced",
       "source": "third_party/blink/web_tests/external/wpt/css/css-flexbox/flex-item-compressible-001.html",
-      "status": "scaffold",
+      "status": "completed",
       "title": "Replaced flex item automatic minimum"
     },
     {
@@ -406,7 +406,7 @@
       "id": "wpt-flex-container-max-content",
       "kind": "intrinsic",
       "source": "third_party/blink/web_tests/external/wpt/css/css-flexbox/flex-container-max-content-001.html",
-      "status": "scaffold",
+      "status": "completed",
       "title": "Flex container max-content contribution"
     },
     {
@@ -418,7 +418,7 @@
       "id": "wpt-flex-cross-size-border-box",
       "kind": "align",
       "source": "third_party/blink/web_tests/external/wpt/css/css-flexbox/flex-cross-size-border-box-001.html",
-      "status": "scaffold",
+      "status": "completed",
       "title": "Border-box cross-size for stretched items"
     },
     {
@@ -430,7 +430,7 @@
       "id": "wpt-flex-base-size-max-width",
       "kind": "minmax-small",
       "source": "third_party/blink/web_tests/external/wpt/css/css-flexbox/flex-base-size-ignores-max-width.html",
-      "status": "scaffold",
+      "status": "completed",
       "title": "Flex base size before max-width clamp"
     },
     {
@@ -442,7 +442,7 @@
       "id": "blink-replaced-aspect-ratio-precision",
       "kind": "replaced",
       "source": "third_party/blink/renderer/core/layout/flex/flex_layout_algorithm_test.cc",
-      "status": "scaffold",
+      "status": "completed",
       "title": "Intrinsic replaced-element ratio precision"
     },
     {
@@ -454,7 +454,7 @@
       "id": "blink-gap-decorations-basic",
       "kind": "gap",
       "source": "third_party/blink/renderer/core/layout/flex/flex_layout_algorithm_test.cc",
-      "status": "scaffold",
+      "status": "completed",
       "title": "Gap geometry with wrapping"
     },
     {
@@ -466,7 +466,7 @@
       "id": "blink-scrollbars-row-reverse-vrl",
       "kind": "writing",
       "source": "third_party/blink/renderer/core/layout/layout_flexible_box_test.cc",
-      "status": "scaffold",
+      "status": "completed",
       "title": "Reverse flow with vertical writing and overflow"
     },
     {
@@ -478,7 +478,7 @@
       "id": "wpt-flex-container-min-content",
       "kind": "intrinsic",
       "source": "third_party/blink/web_tests/external/wpt/css/css-flexbox/flex-container-min-content-001.html",
-      "status": "scaffold",
+      "status": "completed",
       "title": "Flex container min-content contribution"
     }
   ],

@@ -357,16 +357,9 @@ body { margin: 0 }
 // reference (flex-column-reverse-multiline-item-position-ref.html) pins the
 // same 200x80 container with .short at (0,40) and .tall at (50,0).
 //
-// Blocked: column flex ignores flex-wrap and never forms a second line
-// (internal/layout/flex.go:1528); the auto height then falls through
-// resolveFlexColumnContentHeight (internal/layout/flex.go:1567) and stacks
-// both items into one 120pt column clamped to max-height 100pt.
-//
 //nolint:varnamelen // fixture assertions use short item labels
 func TestChromeFlexColumnReverseMultiline(t *testing.T) {
 	t.Parallel()
-
-	t.Skip("blocked: column flex has no wrap path; one clamped line replaces two wrapped lines")
 
 	cssSheet := sheet(t, `
 body { margin: 0 }

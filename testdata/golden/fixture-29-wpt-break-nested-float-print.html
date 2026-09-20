@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<!--
+  fixture-29-wpt-break-nested-float-print
+  Proves: nested float fragmentation through a three-page flex column.
+  Expected: the semantic label remains ordered while the six-inch float fragments.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Flexbox nested float fragmentation</title>
+  <style>
+    @page { size: 5in 3in; margin: 0.5in; }
+    :root { print-color-adjust: exact; }
+    html, body { margin: 0; }
+    .case { display: flex; flex-wrap: nowrap; flex-direction: column; }
+    .target { position: relative; float: left; background: #16a34a; width: 2in; height: 6in; }
+    .label { position: absolute; top: 2pt; left: 2pt; font-size: 8pt; }
+  </style>
+</head>
+<body>
+  <div class="case"><div><div><div><div class="target"><span class="label">Case 29 nested float fragmentation</span></div></div></div></div></div>
+</body>
+</html>

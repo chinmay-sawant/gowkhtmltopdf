@@ -1,12 +1,22 @@
 <!doctype html>
-<meta charset="utf-8">
-<title>Reverse flow with vertical writing and overflow</title>
-<style>
-html, body { margin: 0; padding: 0; font: 12px sans-serif; }
-.case { display: flex; width: 180px; height: 100px; writing-mode: vertical-rl; flex-flow: row wrap; border: 1px solid #222; } .item { width: 30px; height: 30px; }
-</style>
-<!-- Source: third_party/blink/renderer/core/layout/layout_flexible_box_test.cc -->
-<!-- Fixture: case-39-blink-scrollbars-row-reverse-vrl -->
-<!-- Port status: scaffold. The next phase replaces this minimal case with a verified Go fixture. -->
-<!-- Expected: Row-reverse with vertical-rl maps content and overflow into negative physical coordinates. -->
-<div class="case"><div class="item" style="background:#9ec5fe">A</div><div class="item" style="background:#b7e4c7">B</div><div class="item" style="background:#ffd6a5">C</div></div>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Flexbox row-reverse vertical writing overflow</title>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    ::-webkit-scrollbar { width: 11pt; height: 12pt; background: yellow; }
+    .case { display: flex; width: 300pt; height: 225pt; overflow: auto;
+      padding: 7.5pt 15pt 22.5pt 30pt; border: 15pt solid #111;
+      direction: ltr; writing-mode: vertical-rl; flex-direction: row-reverse; }
+    .item { width: 1500pt; height: 750pt; background: #9ec5fe; }
+  </style>
+</head>
+<body>
+  <!-- Source: third_party/blink/renderer/core/layout/layout_flexible_box_test.cc -->
+  <!-- Fixture: case-39-blink-scrollbars-row-reverse-vrl -->
+  <!-- Port status: completed. Source-faithful overflowing row-reverse vertical-rl input. -->
+  <!-- Expected: the child reaches negative physical coordinates after logical-axis mapping. -->
+  <div class="case" id="case-39"><div class="item" id="item-39"></div></div>
+</body>
+</html>

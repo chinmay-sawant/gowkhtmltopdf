@@ -1,12 +1,23 @@
 <!doctype html>
-<meta charset="utf-8">
-<title>Automatic minimum width from aspect ratio</title>
-<style>
-html, body { margin: 0; padding: 0; font: 12px sans-serif; }
-.case { display: flex; flex-direction: column; width: 200px; border: 1px solid #222; } .item { width: 100px; aspect-ratio: 4 / 1; }
-</style>
-<!-- Source: third_party/blink/web_tests/external/wpt/css/css-flexbox/flex-minimum-width-flex-items-010.html -->
-<!-- Fixture: case-28-wpt-flex-minimum-width-aspect -->
-<!-- Port status: scaffold. The next phase replaces this minimal case with a verified Go fixture. -->
-<!-- Expected: The automatic main-axis minimum uses the transferred aspect-ratio size. -->
-<div class="case"><div class="item" style="background:#9ec5fe">ratio</div></div>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Flexbox automatic minimum width from aspect ratio</title>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .case { display: flex; width: 10pt; position: relative; }
+    .item { max-height: 100pt; outline: 4pt solid #7c3aed; outline-offset: 2pt; }
+    .red { position: absolute; width: 100pt; height: 100pt; z-index: -1; background: #dc2626; }
+    .aspect-label { position: absolute; top: 8pt; left: 112pt; white-space: nowrap; color: #7c3aed; font-size: 8pt; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <!-- Source: third_party/blink/web_tests/external/wpt/css/css-flexbox/flex-minimum-width-flex-items-010.html -->
+  <!-- Fixture: case-28-wpt-flex-minimum-width-aspect -->
+  <!-- Port status: completed. Source image with the transferred automatic minimum. -->
+  <!-- Expected: the green 200 by 200 image keeps a 100pt automatic minimum width. -->
+  <div class="red" id="red-28"></div>
+  <div class="case" id="case-28"><img class="item" id="item-28" src="../../../chromium/third_party/blink/web_tests/external/wpt/css/css-flexbox/support/200x200-green.png" width="200" height="200" alt=""></div>
+  <span class="aspect-label">MIN-WIDTH 100PT</span>
+</body>
+</html>

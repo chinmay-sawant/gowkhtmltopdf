@@ -1,12 +1,21 @@
 <!doctype html>
-<meta charset="utf-8">
-<title>Percentage height in a column flex item</title>
-<style>
-html, body { margin: 0; padding: 0; font: 12px sans-serif; }
-.case { display: flex; flex-direction: column; width: 240px; height: 120px; border: 1px solid #222; } .item { min-height: 20px; padding: 4px; }
-</style>
-<!-- Source: third_party/blink/web_tests/external/wpt/css/css-flexbox/percentage-heights-005.html -->
-<!-- Fixture: case-27-wpt-percentage-heights-005 -->
-<!-- Port status: scaffold. The next phase replaces this minimal case with a verified Go fixture. -->
-<!-- Expected: A height percentage fills the definite column flex item without leaving the parent visible. -->
-<div class="case"><div class="item" style="background:#9ec5fe">Test Header</div><div class="item" style="background:#b7e4c7">Test Subheader</div></div>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Flexbox percentage height in a column item</title>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .case { display: flex; flex-direction: column; }
+    .item { width: 100pt; height: 100pt; background: #dc2626; outline: 3pt dotted #2563eb; outline-offset: 2pt; }
+    .fill { width: 100%; height: 100%; background: #16a34a; position: relative; }
+    .fill-label { position: absolute; top: 8pt; left: 8pt; white-space: nowrap; color: white; font-size: 8pt; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <!-- Source: third_party/blink/web_tests/external/wpt/css/css-flexbox/percentage-heights-005.html -->
+  <!-- Fixture: case-27-wpt-percentage-heights-005 -->
+  <!-- Port status: completed. Source-faithful definite column child. -->
+  <!-- Expected: the green child fills the 100pt red item without parent overflow. -->
+  <div class="case" id="case-27"><div class="item" id="item-27"><div class="fill" id="fill-27"><span class="fill-label">HEIGHT 100%</span></div></div></div>
+</body>
+</html>

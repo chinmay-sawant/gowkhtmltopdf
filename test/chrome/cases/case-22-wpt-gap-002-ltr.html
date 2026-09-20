@@ -1,12 +1,24 @@
 <!doctype html>
-<meta charset="utf-8">
-<title>Column gap with flexible children</title>
-<style>
-html, body { margin: 0; padding: 0; font: 12px sans-serif; }
-.case { display: flex; flex-direction: column; width: 160px; height: 180px; gap: 20px; border: 1px solid #222; } .item { flex: 1 1 auto; }
-</style>
-<!-- Source: third_party/blink/web_tests/external/wpt/css/css-flexbox/gap-002-ltr.html -->
-<!-- Fixture: case-22-wpt-gap-002-ltr -->
-<!-- Port status: scaffold. The next phase replaces this minimal case with a verified Go fixture. -->
-<!-- Expected: Column gap is counted between items and not added before the first or after the last item. -->
-<div class="case"><div class="item" style="background:#9ec5fe">A</div><div class="item" style="background:#b7e4c7">B</div><div class="item" style="background:#ffd6a5">C</div></div>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Flexbox vertical gap</title>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .case { background: #16a34a; display: flex; flex-direction: column;
+      width: 150pt; height: 150pt; gap: 15pt; }
+    .item { background: #9ca3af; flex: 1 1 auto; }
+  </style>
+</head>
+<body>
+  <!-- Source: third_party/blink/web_tests/external/wpt/css/css-flexbox/gap-002-ltr.html -->
+  <!-- Fixture: case-22-wpt-gap-002-ltr -->
+  <!-- Port status: completed. Source-faithful flexible column-gap input. -->
+  <!-- Expected: the gap appears between items, not before the first or after the last. -->
+  <section class="case" id="case-22">
+    <div class="item" id="item-one"></div>
+    <div class="item" id="item-two"></div>
+    <div class="item" id="item-three"></div>
+  </section>
+</body>
+</html>

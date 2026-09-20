@@ -21,7 +21,7 @@ type flexColumnLine struct {
 //
 // Wrapped columns keep line formation and physical placement together.
 //
-//nolint:cyclop,funlen,nlreturn,wsl
+//nolint:cyclop,funlen,gocognit,nlreturn,wsl
 func (e *engine) flowFlexColumnWrapped(
 	parent *box,
 	style ResolvedStyle,
@@ -34,6 +34,22 @@ func (e *engine) flowFlexColumnWrapped(
 		return e.flowFlexColumn(
 			parent, itemsToNodes(items), nowrap, contentW, contentX, topY, curY, gap, crossGap,
 		)
+	}
+	if style.Height < 0 && style.HeightPercent < 0 {
+		probe := e.flexColumnLines(items, contentH, gap)
+		naturalH := 0.0
+		for _, line := range probe {
+			lineH := gap * float64(len(line.items)-1)
+			for _, item := range line.items {
+				lineH += item.baseH + flexColumnMainMargins(e, item)
+			}
+			if lineH > naturalH {
+				naturalH = lineH
+			}
+		}
+		if naturalH > 0 {
+			contentH = naturalH
+		}
 	}
 
 	lines := e.flexColumnLines(items, contentH, gap)
@@ -48,6 +64,7 @@ func (e *engine) flowFlexColumnWrapped(
 	if style.FlexWrap == fxWrapRev {
 		reverseCross = !reverseCross
 	}
+	maxEndY := curY
 
 	for idx, line := range lines {
 		lineWidth := widths[idx]
@@ -78,7 +95,7 @@ func (e *engine) flowFlexColumnWrapped(
 			slices.Reverse(heights)
 		}
 
-		e.buildColumnItems(
+		lineEndY := e.buildColumnItems(
 			parent,
 			style,
 			line.items,
@@ -91,6 +108,13 @@ func (e *engine) flowFlexColumnWrapped(
 			justifyGap,
 			contentH,
 		)
+		if lineEndY > maxEndY {
+			maxEndY = lineEndY
+		}
+	}
+
+	if style.Height < 0 && style.HeightPercent < 0 {
+		return maxEndY
 	}
 
 	return curY + contentH
@@ -226,6 +250,13 @@ func flexColumnLineOffsets(align string, widths []float64, contentW, gap float64
 //nolint:wsl // min-height normalization is a short, ordered fallback
 func resolveFlexColumnContentHeight(style ResolvedStyle, eng *engine) float64 {
 	contentH := resolveContentHeight(style, eng)
+	if contentH < 0 && style.MaxHeight >= 0 {
+		contentH = eng.scalePt(style.MaxHeight)
+		if style.BoxSizing == borderBox {
+			contentH -= eng.scalePt(style.PaddingTop) + eng.scalePt(style.PaddingBottom) +
+				eng.scalePt(style.BorderTop.Width) + eng.scalePt(style.BorderBottom.Width)
+		}
+	}
 	if contentH >= 0 || style.MinHeight <= 0 {
 		return contentH
 	}
@@ -298,6 +329,10 @@ func (e *engine) flexColumnHeights(items []flexColMeas, contentH, gap float64) [
 
 	free := contentH - fixed - gaps
 	if free > 0 && growSum > 0 {
+		if growSum < 1 {
+			growSum = 1
+		}
+
 		e.flexGrowHeights(items, heights, free, growSum)
 	} else if free < 0 && shrinkSum > 0 {
 		e.flexShrinkHeights(items, heights, -free, shrinkSum, contentH)
@@ -316,7 +351,18 @@ func (e *engine) flexGrowHeights(items []flexColMeas, heights []float64, free, g
 	}
 }
 
+//nolint:wsl // shrink normalization belongs beside the shrink distribution
 func (e *engine) flexShrinkHeights(items []flexColMeas, heights []float64, deficit, shrinkSum, contentH float64) {
+	factorSum := 0.0
+	for _, item := range items {
+		if item.shrink > 0 {
+			factorSum += item.shrink
+		}
+	}
+	if factorSum < 1 {
+		deficit *= factorSum
+	}
+
 	for idx, item := range items {
 		if item.shrink <= 0 || item.baseH <= 0 {
 			continue

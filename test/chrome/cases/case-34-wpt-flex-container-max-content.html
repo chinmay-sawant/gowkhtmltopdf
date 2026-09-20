@@ -1,12 +1,25 @@
 <!doctype html>
-<meta charset="utf-8">
-<title>Flex container max-content contribution</title>
-<style>
-html, body { margin: 0; padding: 0; font: 12px sans-serif; }
-.case { display: flex; width: max-content; border: 2px solid #222; } .item { margin: 5px; padding: 3px; border: 2px solid #9ec5fe; }
-</style>
-<!-- Source: third_party/blink/web_tests/external/wpt/css/css-flexbox/flex-container-max-content-001.html -->
-<!-- Fixture: case-34-wpt-flex-container-max-content -->
-<!-- Port status: scaffold. The next phase replaces this minimal case with a verified Go fixture. -->
-<!-- Expected: The flex container measures outer item contributions including margins, padding, and borders. -->
-<div class="case"><div class="item">X X</div><div class="item">LONG TEXT</div></div>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Flex container max-content contribution</title>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .wrap { width: max-content; height: max-content; margin-bottom: 8pt; }
+    .case { display: flex; border: 2pt solid #222; }
+    .row { flex-flow: row; }
+    .column { flex-flow: column; }
+    .item { margin: 5pt; padding: 3pt; border: 2pt solid #9ec5fe; }
+    .ink { display: inline-block; width: 30pt; height: 10pt; }
+    .wide { width: 40pt; }
+  </style>
+</head>
+<body>
+  <!-- Source: third_party/blink/web_tests/external/wpt/css/css-flexbox/flex-container-max-content-001.html -->
+  <!-- Fixture: case-34-wpt-flex-container-max-content -->
+  <!-- Port status: completed. Reduced source-faithful intrinsic contribution matrix. -->
+  <!-- Expected: max-content includes item margins, padding, and borders. -->
+  <div class="wrap"><div class="case row" id="case-34-row"><div class="item"><span class="ink">X X</span></div><div class="item"><span class="ink wide">X X</span></div></div></div>
+  <div class="wrap"><div class="case column" id="case-34-column"><div class="item">X X</div><div class="item">LONG TEXT</div></div></div>
+</body>
+</html>

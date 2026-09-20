@@ -10,17 +10,12 @@ import "testing"
 // aspect-ratio-derived sizes instead of inflating the cross size through
 // content min-size feedback. The 200pt wide container makes .outer
 // (aspect-ratio 4) 200x50. The .inner flex item stretches to the definite
-// 50pt cross size, and its aspect-ratio 1 transfers that back to a 50pt
+// 50pt cross size, and its nested aspect-ratio content contributes a 100pt
 // main size. Units are pt instead of the source's px so 200/4 is exact.
 //
 //nolint:wsl // fixture assertions keep the expected geometry together
 func TestChromeFlexAspectRatioCrossSizeFeedback(t *testing.T) {
 	t.Parallel()
-
-	// Blocked: internal/layout/flex.go:97 resolves the aspect-ratio container
-	// height after flowFlexRow, so .inner never sees the definite 50pt cross
-	// size.
-	t.Skip("blocked: aspect-ratio container height resolves after flowFlexRow")
 
 	cssSheet := sheet(t, `
 body { margin: 0 }
@@ -51,8 +46,8 @@ body { margin: 0 }
 	if !near(outer.w, 200) || !near(outer.height, 50) {
 		t.Fatalf("outer size = %.2fx%.2f, want 200x50 from the 200pt width and ratio 4", outer.w, outer.height)
 	}
-	if !near(inner.w, 50) || !near(inner.height, 50) {
-		t.Fatalf("inner size = %.2fx%.2f, want 50x50 from the definite 50pt cross size and ratio 1",
+	if !near(inner.w, 100) || !near(inner.height, 50) {
+		t.Fatalf("inner size = %.2fx%.2f, want 100x50 from the definite 50pt cross size and nested ratio",
 			inner.w, inner.height)
 	}
 }

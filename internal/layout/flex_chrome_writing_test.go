@@ -1086,11 +1086,6 @@ body { margin: 0 }
 		// wrap item1 (20,15) item2 (0,15) item3 (20,0) item4 (0,0); and
 		// column-reverse wrap-reverse item1 (20,0) item2 (0,0) item3 (20,15)
 		// item4 (0,15).
-		// Blocked: buildFlex ignores writing-mode and direction
-		// (internal/layout/flex.go:84), and flowFlexColumn has no wrap
-		// handling (internal/layout/flex.go:1528).
-		t.Skip("blocked: flex ignores writing-mode and direction (internal/layout/flex.go:84)")
-
 		grid := []struct {
 			flow   string
 			x1, y1 float64

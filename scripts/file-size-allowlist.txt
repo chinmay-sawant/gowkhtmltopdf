@@ -7,5 +7,5 @@
 # Enforced by scripts/check-file-size.sh via `make size-check`, which `make lint`
 # calls, so CI fails when this list drifts from the tree.
 internal/layout/inline_paint.go	2021
-internal/layout/layout.go	2462
+internal/layout/layout.go	2442
 internal/imageout/imageout.go	2012

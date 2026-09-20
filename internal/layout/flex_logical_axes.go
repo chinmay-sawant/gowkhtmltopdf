@@ -20,6 +20,20 @@ func (e *engine) flowFlexVerticalRow(
 	if len(items) == 0 {
 		return curY
 	}
+	if style.FlexWrap == fxWrap || style.FlexWrap == fxWrapRev {
+		mapped := style
+		if flexRowPhysicalReverse(style) {
+			mapped.FlexDirection = fxColRev
+		} else {
+			mapped.FlexDirection = fxCol
+		}
+		mapped.Direction = cssDirectionLTR
+		if style.WritingMode == writingModeVerticalRL {
+			mapped.Direction = cssDirectionRTL
+		}
+
+		return e.flowFlexColumnWrapped(parent, mapped, items, contentW, contentX, topY, curY, gap, 0, contentH)
+	}
 
 	if flexRowPhysicalReverse(style) {
 		slices.Reverse(items)
@@ -58,15 +72,38 @@ func (e *engine) flowFlexVerticalRow(
 // onto physical X. Its cross axis is the logical inline axis, which is
 // physical Y in vertical writing modes.
 //
-//nolint:cyclop,wsl // the physical-axis mapping mirrors the row path
+//nolint:cyclop,funlen,nestif,wsl // the physical-axis mapping mirrors the row path
 func (e *engine) flowFlexVerticalColumn(
 	parent *box, kids []*html.Node, style ResolvedStyle,
 	contentW, contentX, topY, curY, gap float64,
 ) float64 {
 	contentH := resolveContentHeight(style, e)
-	items := e.flexRowItems(kids, contentW)
+	items := e.flexRowItems(kids, contentW, contentH)
 	if len(items) == 0 {
 		return curY
+	}
+	if style.FlexWrap == fxWrap || style.FlexWrap == fxWrapRev {
+		mapped := style
+		if style.FlexDirection == fxColRev {
+			mapped.FlexDirection = fxRowRev
+		} else {
+			mapped.FlexDirection = fxRow
+		}
+		mapped.Direction = cssDirectionLTR
+		if style.Direction == cssDirectionRTL {
+			if style.FlexWrap == fxWrap {
+				mapped.FlexWrap = fxWrapRev
+			} else {
+				mapped.FlexWrap = fxWrap
+			}
+		}
+
+		nodes := make([]*html.Node, len(items))
+		for idx, item := range items {
+			nodes[idx] = item.n
+		}
+
+		return e.flowFlexRow(parent, nodes, mapped, contentW, contentX, topY, curY, gap, 0)
 	}
 
 	mainReverse := style.FlexDirection == fxColRev
@@ -175,8 +212,8 @@ func (e *engine) buildVerticalColumnItems(
 			leftX += e.scalePt(itemStyle.MarginLeft)
 		}
 
-		forceStretch := definiteCross && flexItemCrossStretch(style, *itemStyle) &&
-			!flexColumnCrossAutoMargin(*itemStyle)
+		forceStretch := definiteCross && flexItemCrossStretchNode(item.n, style, *itemStyle) &&
+			!flexVerticalColumnCrossAutoMargin(*itemStyle)
 		crossSize := lineCross
 		if forceStretch {
 			crossSize -= e.scalePt(itemStyle.MarginTop) + e.scalePt(itemStyle.MarginBottom)
@@ -220,6 +257,12 @@ func (e *engine) buildVerticalColumnItems(
 			leftX += justifyGap
 		}
 	}
+}
+
+// flexVerticalColumnCrossAutoMargin reports auto margins on the physical
+// vertical cross axis of a column in vertical writing mode.
+func flexVerticalColumnCrossAutoMargin(style ResolvedStyle) bool {
+	return style.MarginTopAuto || style.MarginBottomAuto
 }
 
 //nolint:wsl // measurement toggles emission around one recursive build

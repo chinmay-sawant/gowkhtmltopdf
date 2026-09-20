@@ -1,12 +1,21 @@
 <!doctype html>
-<meta charset="utf-8">
-<title>Border-box cross-size for stretched items</title>
-<style>
-html, body { margin: 0; padding: 0; font: 12px sans-serif; }
-.case { display: flex; width: 240px; height: 100px; align-items: center; border: 1px solid #222; } .item { width: 40px; height: 30px; }
-</style>
-<!-- Source: third_party/blink/web_tests/external/wpt/css/css-flexbox/flex-cross-size-border-box-001.html -->
-<!-- Fixture: case-35-wpt-flex-cross-size-border-box -->
-<!-- Port status: scaffold. The next phase replaces this minimal case with a verified Go fixture. -->
-<!-- Expected: Border-box and content-box containers provide equivalent content cross sizes to stretched children. -->
-<div class="case"><div class="item" style="background:#9ec5fe">A</div><div class="item" style="background:#b7e4c7;align-self:flex-end">B</div></div>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Flexbox border-box cross size</title>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .case { display: flex; width: 300pt; height: 150pt; box-sizing: border-box; border: 8pt solid transparent; }
+    .item { display: block; width: 1px; flex: 0 0 auto; }
+    .contentbox { box-sizing: content-box; height: 134pt; }
+  </style>
+</head>
+<body>
+  <!-- Source: third_party/blink/web_tests/external/wpt/css/css-flexbox/flex-cross-size-border-box-001.html -->
+  <!-- Fixture: case-35-wpt-flex-cross-size-border-box -->
+  <!-- Port status: completed. Source-faithful border-box and content-box variants. -->
+  <!-- Expected: intrinsic 1px replaced children keep the same 0.75pt cross size in both frames. -->
+  <div class="case" id="case-35-border"><img class="item" width="1" height="1" alt=""></div>
+  <div class="case contentbox" id="case-35-content"><img class="item" width="1" height="1" alt=""></div>
+</body>
+</html>

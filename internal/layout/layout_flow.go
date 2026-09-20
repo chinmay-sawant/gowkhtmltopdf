@@ -745,7 +745,7 @@ func (e *engine) applyJustifySelfFitContent(
 // justifySelfUsesFitContent reports CSS Align "auto width becomes fit-content"
 // for block-level justify-self keywords other than stretch/auto/normal.
 func justifySelfUsesFitContent(style ResolvedStyle) bool {
-	if style.Width >= 0 || style.WidthPercent >= 0 {
+	if isIntrinsicWidth(style.Width) || style.Width >= 0 || style.WidthPercent >= 0 {
 		return false
 	}
 

@@ -65,6 +65,7 @@ const (
 	cssPropBorderBlockEndWidth    = "border-block-end-width"
 	cssPropBorderInlineStartWidth = "border-inline-start-width"
 	cssPropBorderInlineEndWidth   = "border-inline-end-width"
+	cssDirectionLTR               = "ltr"
 	cssDirectionRTL               = "rtl"
 )
 
@@ -447,6 +448,15 @@ type ResolvedStyle struct {
 	CustomProps map[string]string
 }
 
+const (
+	widthMaxContent = -2.0
+	widthMinContent = -3.0
+)
+
+func isIntrinsicWidth(width float64) bool {
+	return width == widthMaxContent || width == widthMinContent
+}
+
 type border struct {
 	Width      float64 // layout width in CSS points, retained for pagination geometry
 	PaintWidth float64 // device paint width; zero means use Width
@@ -531,7 +541,7 @@ func initialStyle() ResolvedStyle { //nolint:funlen // complete CSS initial-valu
 		GridColumnSpan:        1,
 		GridRowSpan:           1,
 		WritingMode:           writingModeHorizontalTB,
-		Direction:             "ltr",
+		Direction:             cssDirectionLTR,
 		MixBlendMode:          blendNormal,
 		BackgroundBlendMode:   blendNormal,
 		Isolation:             "auto",

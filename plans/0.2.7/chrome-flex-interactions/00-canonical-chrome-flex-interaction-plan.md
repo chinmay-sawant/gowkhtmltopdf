@@ -2,9 +2,9 @@
 
 ## Status
 
-The Chromium source map and the Go-side inventory scaffold are complete. The
-24 layout-unit cases, 15 Chrome-reference cases, and one print case remain
-porting candidates.
+The Chromium source map and the Go-side inventory are complete. Cases 21-40
+now have source-shaped fixtures, focused evidence, and final manifest results:
+twenty completed cases.
 
 The first converted interaction is the column flex container with centered
 auto-width children. Its Go regression test checks the child center against the
@@ -25,9 +25,10 @@ tests. Case 4 records Chrome's fractional constrained-shrink geometry instead
 of rounding the two item sizes to different integers. The second wave has now
 converted cases 11 through 20 into source-faithful fixtures with named focused
 tests, Chromium rectangle probes where needed, and completed manifest status.
-Cases 21 through 40 remain scaffolds. The individual case fixtures and
-focused tests are now the canonical evidence; the former consolidated review
-HTML and PDF have been removed.
+The individual case fixtures and focused tests are now the canonical evidence;
+the former consolidated review HTML and PDF have been removed. The 21-40
+closure is recorded in the shared phase-wise checklist and its two child
+ledgers.
 
 ## Execution ledgers
 
@@ -99,8 +100,8 @@ Proof uses `python3 scripts/generate_chrome_flex_cases.py` and
 - [x] Retarget the existing alignment inventory slot to the column plus center
   input and add the raw HTML PNG regression in `internal/imageout`.
 - [x] Replace the first 20 scaffolds with reviewed cases that preserve the
-  Chromium behavior without browser-only JavaScript. Cases 21 through 40
-  remain the next two scaffold waves.
+  Chromium behavior without browser-only JavaScript. Cases 21 through 40 are
+  now covered by the completed 21-40 execution ledgers.
 
 The scaffold is an inventory check. It is not an engine pass.
 
@@ -227,8 +228,9 @@ test:
 The historical exploratory skips above are retained as background notes. The
 active case ledger records cases 11 through 20 as completed, with focused
 layout tests and Chromium rectangle probes as the gates. Cases 21 through 40
-remain in their scaffold ledgers. The golden corpus no longer includes a
-consolidated Chrome Flex review fixture.
+have final `completed` or `blocked` statuses backed by focused tests and
+reference captures. The golden corpus no longer includes a consolidated
+Chrome Flex review fixture.
 
 ### Case 5 deferred-chrome leak (2026-09-20)
 

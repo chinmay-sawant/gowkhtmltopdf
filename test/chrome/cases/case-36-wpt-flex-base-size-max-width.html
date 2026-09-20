@@ -1,12 +1,22 @@
 <!doctype html>
-<meta charset="utf-8">
-<title>Flex base size before max-width clamp</title>
-<style>
-html, body { margin: 0; padding: 0; font: 12px sans-serif; }
-.case { display: flex; width: 300px; border: 1px solid #222; } .item { flex: 1 1 300px; min-width: 0; height: 50px; }
-</style>
-<!-- Source: third_party/blink/web_tests/external/wpt/css/css-flexbox/flex-base-size-ignores-max-width.html -->
-<!-- Fixture: case-36-wpt-flex-base-size-max-width -->
-<!-- Port status: scaffold. The next phase replaces this minimal case with a verified Go fixture. -->
-<!-- Expected: The flex base size uses content before the max-width clamp freezes the item and redistributes space. -->
-<div class="case"><div class="item" style="background:#b7e4c7;max-width:100px">A</div><div class="item" style="background:#9ec5fe">B</div></div>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Flexbox base size before max-width clamp</title>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .case { display: flex; width: 225pt; }
+    .item { min-width: 0; height: 37.5pt; }
+    .capped { max-width: 75pt; background: #16a34a; }
+    .uncapped { background: #2563eb; }
+    .content { width: 225pt; height: 37.5pt; }
+  </style>
+</head>
+<body>
+  <!-- Source: third_party/blink/web_tests/external/wpt/css/css-flexbox/flex-base-size-ignores-max-width.html -->
+  <!-- Fixture: case-36-wpt-flex-base-size-max-width -->
+  <!-- Port status: completed. Source-faithful content-sized bases and clamp. -->
+  <!-- Expected: the capped item freezes after its content base is used. -->
+  <div class="case" id="case-36"><div class="item capped"><div class="content"></div></div><div class="item uncapped"><div class="content"></div></div></div>
+</body>
+</html>

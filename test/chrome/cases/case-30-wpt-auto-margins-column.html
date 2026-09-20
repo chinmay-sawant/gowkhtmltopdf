@@ -1,12 +1,33 @@
 <!doctype html>
-<meta charset="utf-8">
-<title>Auto margins and align-self in a column</title>
-<style>
-html, body { margin: 0; padding: 0; font: 12px sans-serif; }
-.case { display: flex; width: 300px; height: 80px; border: 1px solid #222; } .item { width: 40px; height: 30px; }
-</style>
-<!-- Source: third_party/blink/web_tests/external/wpt/css/css-flexbox/auto-margins-003.html -->
-<!-- Fixture: case-30-wpt-auto-margins-column -->
-<!-- Port status: scaffold. The next phase replaces this minimal case with a verified Go fixture. -->
-<!-- Expected: Column auto margins and align-self center both center their items across the cross-axis. -->
-<div class="case"><div class="item" style="background:#9ec5fe;margin:auto">A</div><div class="item" style="background:#b7e4c7">B</div></div>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Flexbox column auto margins</title>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .case { border: 1pt solid #111; width: 300pt; height: 150pt;
+      display: flex; flex-direction: column; }
+    .item1 { margin: 0 auto; background: #9ec5fe; }
+    .item1v { margin: auto 0; background: #9ec5fe; }
+    .item2 { background: #16a34a; }
+    .item1, .item1v, .item2 { font-size: 9pt; line-height: 1; padding: 3pt 5pt; }
+    .item2 { align-self: center; }
+  </style>
+</head>
+<body>
+  <!-- Source: third_party/blink/web_tests/external/wpt/css/css-flexbox/auto-margins-003.html -->
+  <!-- Fixture: case-30-wpt-auto-margins-column -->
+  <!-- Port status: completed. Source-shaped normalized column and vertical-writing branches. -->
+  <!-- Expected: content-sized items are centered by auto margins and align-self. -->
+  <div class="case" id="case-30-horizontal">
+    <div class="item1" id="item-30-margins">MARGIN</div>
+    <div class="item2" id="item-30-align">ALIGN</div>
+  </div>
+  <div style="writing-mode: vertical-lr">
+    <div class="case" id="case-30-vertical">
+      <div class="item1v" id="item-30-vertical-margins">MARGIN</div>
+      <div class="item2" id="item-30-vertical-align">ALIGN</div>
+    </div>
+  </div>
+</body>
+</html>
