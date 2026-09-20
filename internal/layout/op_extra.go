@@ -26,6 +26,9 @@ type opExtra struct {
 	// font-feature-settings / font-kerning / font-variant-* for the shaper.
 	FontFeatures string
 	NoFakeBold   bool
+	// IsOutline marks CSS outline operations, which paint above descendant
+	// content even though ordinary backgrounds and borders paint below it.
+	IsOutline bool
 	// BlendGroup is the owning CSS element group (mix-blend-mode or
 	// isolation: isolate). GroupMark flags begin/end boundary markers that
 	// carry the group without painting.
@@ -59,6 +62,14 @@ func (op *Op) bindEmptyExtra() {
 	if op.opExtra == nil {
 		op.opExtra = emptyExtra
 	}
+}
+
+func (op *Op) setOutline() {
+	op.detachExtra().IsOutline = true
+}
+
+func (op *Op) isOutline() bool {
+	return op != nil && op.opExtra != nil && op.opExtra.IsOutline
 }
 
 // BindEmptyExtra points a nil extra at the shared zero extra so readers in

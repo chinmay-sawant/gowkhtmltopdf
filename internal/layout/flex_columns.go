@@ -280,9 +280,9 @@ func (e *engine) flexColumnHeights(items []flexColMeas, contentH, gap float64) [
 
 	for i, item := range items {
 		heights[i] = item.baseH
-		// Main-axis margins remain outside flex bases during negative free-space
-		// distribution; placement and auto-height still consume them.
-		fixed += item.baseH
+		// Main-axis margins consume flex container space but do not participate
+		// in the shrink factor. Placement adds the same margins after sizing.
+		fixed += item.baseH + flexColumnMainMargins(e, item)
 		growSum += item.grow
 		shrinkSum += item.shrink * item.baseH
 	}
@@ -507,7 +507,7 @@ func (e *engine) alignColumnItem(
 		align = itemStyle.AlignSelf
 	}
 
-	reverseCross := containerStyle.Direction == "rtl"
+	reverseCross := containerStyle.Direction == cssDirectionRTL
 	if containerStyle.FlexWrap == fxWrapRev {
 		reverseCross = !reverseCross
 	}
@@ -547,6 +547,15 @@ func columnAlignOffset(
 	left := e.scalePt(itemStyle.MarginLeft)
 	right := e.scalePt(itemStyle.MarginRight)
 	switch align {
+	case "baseline":
+		// A column's cross axis is the inline axis. For empty items, the
+		// baseline is their start-side border edge, so direction controls
+		// whether that edge is the physical left or right side.
+		if reverse {
+			return contentX + contentW - right - cblock.w - cblock.x
+		}
+
+		return contentX + left - cblock.x
 	case fxCenter:
 		return contentX + (contentW-cblock.w)/2 - cblock.x
 	case fxFlexEnd, fxEnd:

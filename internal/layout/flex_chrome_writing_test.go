@@ -830,11 +830,8 @@ body { margin: 0 }
 //
 // Source: chromium/third_party/blink/web_tests/css3/flexbox/flex-align-baseline.html
 // Expected: items with different margins share the expected baseline across
-// flows and writing modes. The source sanity check asserts that the first and
-// last item land on the same cross-axis edge in every combination. The engine
-// has no baseline branch (it aligns items at cross-start and drops the fixed
-// cross margin), so the equality still holds for horizontal-tb; vertical
-// writing modes are asserted strictly and skipped.
+// flows and writing modes. The source sanity check asserts the physical edge
+// for each direction, including the RTL start edge in a column.
 //
 //nolint:cyclop,funlen,wsl,gocognit // Chromium fixture geometry keeps short labels
 func TestChromeFlexBaselineAlignment(t *testing.T) {
@@ -879,19 +876,24 @@ body { margin: 0 }
 					flexcase := findBoxByClass(t, res, "flexcase")
 					first := findBoxByClass(t, res, "first")
 					second := findBoxByClass(t, res, "second")
-					// The 110pt item shrinks to fit the 100pt container main
-					// axis: 110 - 60 = 50 in the flow direction, 110 across it.
+					// The 110pt items plus the second item's 20pt main-axis
+					// margin shrink into the 100pt container: 40 in the flow
+					// direction, 110 across it.
 					if flow.isCol {
-						if !near(first.w, 110) || !near(first.height, 50) {
-							t.Fatalf("%s item size = %.1fx%.1f, want 110x50", flow.name, first.w, first.height)
+						if !near(first.w, 110) || !near(first.height, 40) {
+							t.Fatalf("%s item size = %.1fx%.1f, want 110x40", flow.name, first.w, first.height)
 						}
 					} else if !near(first.w, 50) || !near(first.height, 110) {
 						t.Fatalf("%s item size = %.1fx%.1f, want 50x110", flow.name, first.w, first.height)
 					}
 					if flow.isCol {
-						if !near(first.x, flexcase.x) || !near(second.x, flexcase.x) {
+						wantX := flexcase.x
+						if dir == "rtl" {
+							wantX -= 10
+						}
+						if !near(first.x, wantX) || !near(second.x, wantX) {
 							t.Fatalf("%s baseline x = %.2f/%.2f, want %.2f",
-								flow.name, first.x, second.x, flexcase.x)
+								flow.name, first.x, second.x, wantX)
 						}
 					} else if !near(first.y, flexcase.y+20) || !near(second.y, flexcase.y+20) {
 						t.Fatalf("%s baseline y = %.2f/%.2f, want %.2f",
