@@ -122,5 +122,5 @@ No new images. The cards use the PNGs and WebP thumbs already in `frontend/src/a
 | --- | ---: | ---: | ---: |
 | `.html` | 1 | 1 | 1 |
 | `.js` | 7 | 94 | 22 |
-| `.md` | 1 | 1 | 1 |
-| **Total** | **9** | **96** | **24** |
+| `.md` | 2 | 127 | 1 |
+| **Total** | **10** | **222** | **24** |
