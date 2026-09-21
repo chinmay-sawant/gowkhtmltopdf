@@ -119,7 +119,10 @@ Fixture 64 page images were regenerated from the new PDF. Fixtures 57 and 58 no 
 
 | Extension | Files | Insertions | Deletions |
 | --- | ---: | ---: | ---: |
-| `.html` | 1 | 1 | 1 |
-| `.js` | 7 | 94 | 22 |
-| `.md` | 2 | 127 | 1 |
-| **Total** | **10** | **222** | **24** |
+| `.html` | 2 | 8 | 8 |
+| `.js` | 8 | 72 | 16 |
+| `.md` | 2 | 129 | 1 |
+| `.pdf` | 1 | Binary | Binary |
+| `.png` | 41 | Binary | Binary |
+| `.webp` | 42 | Binary | Binary |
+| **Total** | **96** | **209** | **25** |
