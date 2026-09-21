@@ -27,7 +27,7 @@
    "type": "code",
    "heading": "Build",
    "language": "sh",
-   "code": "# recommended: static binaries, version stamped from VERSION\nmake build\n# writes bin/gowkhtmltopdf and bin/gowkhtmltoimage\n\n# equivalent, explicit:\nCGO_ENABLED=0 go build -ldflags \"-X github.com/chinmay-sawant/gowkhtmltopdf/internal/cli.Version=$(cat VERSION)\" \\\n  -o bin/gowkhtmltopdf ./cmd/gowkhtmltopdf\nCGO_ENABLED=0 go build -ldflags \"-X github.com/chinmay-sawant/gowkhtmltopdf/internal/cli.Version=$(cat VERSION)\" \\\n  -o bin/gowkhtmltoimage ./cmd/gowkhtmltoimage\n\n./bin/gowkhtmltopdf --version   # Name: gowkhtmltopdf / Version: 0.2.6\n# VERSION is the project release. LibraryVersion (0.12.7-dev) is the\n# wkhtmltopdf settings-surface id, not the release number."
+   "code": "# stamps VERSION into bin/gowkhtmltopdf and bin/gowkhtmltoimage\n# export CGO_ENABLED=0 first for the static release link; make build\n# does not set that variable itself\nmake build\n\n# equivalent, explicit:\nCGO_ENABLED=0 go build -ldflags \"-X github.com/chinmay-sawant/gowkhtmltopdf/internal/cli.Version=$(cat VERSION)\" \\\n  -o bin/gowkhtmltopdf ./cmd/gowkhtmltopdf\nCGO_ENABLED=0 go build -ldflags \"-X github.com/chinmay-sawant/gowkhtmltopdf/internal/cli.Version=$(cat VERSION)\" \\\n  -o bin/gowkhtmltoimage ./cmd/gowkhtmltoimage\n\n./bin/gowkhtmltopdf --version   # Name: gowkhtmltopdf / Version: 0.2.6\n# VERSION is the project release. LibraryVersion (0.12.7-dev) is the\n# wkhtmltopdf settings-surface id, not the release number."
   },
   {
    "type": "callout",
@@ -156,6 +156,14 @@
     [
      "fmt / clean",
      "gofmt -w .; clean removes testdata/golden/out and dist"
+    ],
+    [
+     "run",
+     "Builds the PDF CLI and converts RUN_HTML (default testdata/golden/fixture-01-simple-invoice.html) with a wall-time cap of RUN_MAX_MS (default 400)"
+    ],
+    [
+     "chrome-cases-pdf",
+     "Writes one PDF per test/chrome/cases/case-*.html into test/chrome/cases/pdf/ for visual inspection. The layout tests under test/chrome own the assertions"
     ]
    ]
   }

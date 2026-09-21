@@ -18,7 +18,7 @@
     "The status legend is three-valued: Implemented, Partial (parsed and used for a subset; the rest degrades silently), and Not implemented (parsed and dropped, or never parsed).",
     "Coverage counts are catalog-based, not prose: the W3C webref list holds 818 property names. After the v0.2.7 next-72 wave the mapping is 407 Implemented, 0 Partial, and 411 Unsupported (`plans/0.2.6/catalog/mapping.json`). 53 of the 72 next-72 names flipped Implemented; 19 stay Unsupported by choice.",
     "Coverage added in 0.2.6: logical margins/padding/inset/sizing and logical border radii; multi-layer backgrounds (`background-size`, `-position`, `-repeat`, `-clip`, `-origin`); `border-image`; multi-layer `box-shadow` with inset and spread; `text-shadow` and decoration longhands (`text-decoration-thickness`, `-color`, `text-underline-offset`); static 2D `transform` plus individual `translate`/`rotate`/`scale`; and 28 `-webkit-*` aliases remapped to implemented bases (matrix 5.3).",
-    "Coverage added in the unreleased next-72 wave: `aspect-ratio`, `object-fit` / `object-position`, `overflow-block` / `overflow-inline`, `counter-set`, `grid-gap` aliases, OpenType `font-feature-settings` / `font-kerning` / `font-variant*` / `font-synthesis*` / VF lite (`font-optical-sizing`, `font-palette`, `font-variation-settings`), `text-autospace` / `text-box*` / `hyphenate-limit-*` / `hanging-punctuation`, `initial-letter*`, `column-height` / `column-wrap`, and `shape-outside` lite. `text-fit` and the Borders-4 clip family stay Unsupported (matrix §2.3, §5.5).",
+    "The Next-72 table on this page names all 72 properties from that unreleased wave. 53 are Implemented. 19 stay Unsupported: `text-fit`, `shape-inside`, `shape-padding`, `shape-image-threshold`, `float-defer`, `border-clip`, `border-top-clip`, `border-right-clip`, `border-bottom-clip`, `border-left-clip`, `border-block-clip`, `border-block-start-clip`, `border-block-end-clip`, `border-inline-clip`, `border-inline-start-clip`, `border-inline-end-clip`, `border-limit`, `border-shape`, and `border-boundary`. The per-property contract remains `documentation/compatibility-matrix.md` section 2.3 and section 5.5.",
     "Prefer the matrix over marketing prose: if a row says Implemented, there should be a code path and preferably a test or golden fixture to prove it.",
     "CLI URL fetch over `http`/`https` is a supported input path, but it is not the same as browser-grade print: live URL output stays exploratory until Phase 21 acceptance against vendored fixtures."
    ]
@@ -87,6 +87,378 @@
     [
      "header, footer, main, section, article, aside, nav",
      "Semantic aliases treated as `div`"
+    ]
+   ]
+  },
+  {
+   "type": "table",
+   "id": "next-72",
+   "heading": "Next-72 properties",
+   "headers": [
+    "Property",
+    "Status",
+    "What the engine does"
+   ],
+   "rows": [
+    [
+     "font-feature-settings",
+     "Implemented (subset)",
+     "4-letter OpenType tags reach the shaper on PDF and PNG."
+    ],
+    [
+     "font-kerning",
+     "Implemented (subset)",
+     "`none` emits kern 0. `auto` and `normal` leave kerning on."
+    ],
+    [
+     "font-optical-sizing",
+     "Implemented (lite)",
+     "On an `fvar` face, `auto` sets `opsz` from the used size. Static Liberation and DejaVu stay a no-op."
+    ],
+    [
+     "font-palette",
+     "Implemented (lite)",
+     "A COLR+CPAL face uses the first palette color as a solid fill. No layered COLR and no `palette-mix()`."
+    ],
+    [
+     "font-size-adjust",
+     "Implemented (subset)",
+     "The number form scales the used size from the OS/2 `sxHeight`."
+    ],
+    [
+     "font-stretch",
+     "Implemented (lite)",
+     "Alias of `font-width`. Keywords and percents scale advances. No width-master face pick."
+    ],
+    [
+     "font-synthesis",
+     "Implemented (subset)",
+     "Shorthand. `none` and `weight` gate fake bold."
+    ],
+    [
+     "font-synthesis-position",
+     "Implemented (lite)",
+     "When synthesis is auto, `sub` and `super` scale the size and shift the baseline."
+    ],
+    [
+     "font-synthesis-small-caps",
+     "Implemented (lite)",
+     "When synthesis is auto and the face has no small-caps, the run is uppercased and scaled."
+    ],
+    [
+     "font-synthesis-style",
+     "Implemented (lite)",
+     "Fake oblique on an upright-only italic face."
+    ],
+    [
+     "font-synthesis-weight",
+     "Implemented (subset)",
+     "`none` disables fake bold."
+    ],
+    [
+     "font-variant",
+     "Implemented (subset)",
+     "Shorthand. It expands onto the variant longhands."
+    ],
+    [
+     "font-variant-alternates",
+     "Implemented (lite)",
+     "`historical-forms`, `stylistic()`, `swash()`, and `styleset(N)` map to `hist`, `salt`, `swsh`, and `ssNN`."
+    ],
+    [
+     "font-variant-caps",
+     "Implemented (subset)",
+     "Keywords such as `small-caps` map to the `smcp` tag."
+    ],
+    [
+     "font-variant-east-asian",
+     "Implemented (subset)",
+     "East-Asian keywords such as `jis90` map to tags such as `jp90`."
+    ],
+    [
+     "font-variant-emoji",
+     "Implemented (lite)",
+     "`text` versus `emoji` presentation, with a minimum advance for the emoji form."
+    ],
+    [
+     "font-variant-ligatures",
+     "Implemented (subset)",
+     "Ligature keywords map to tags such as `liga`."
+    ],
+    [
+     "font-variant-numeric",
+     "Implemented (subset)",
+     "Numeric keywords map to tags such as `tnum`."
+    ],
+    [
+     "font-variant-position",
+     "Implemented (subset)",
+     "`sub` and `super` map to the corresponding OpenType tags."
+    ],
+    [
+     "font-variation-settings",
+     "Implemented (lite)",
+     "Quoted 4-letter tags instance an `fvar` face. Static faces stay a no-op."
+    ],
+    [
+     "font-width",
+     "Implemented (lite)",
+     "Keywords and percents scale glyph advances. No width-master face pick."
+    ],
+    [
+     "border-block-clip",
+     "Not implemented",
+     "Borders-4 draft. No apply arm and no paint."
+    ],
+    [
+     "border-block-end-clip",
+     "Not implemented",
+     "Borders-4 draft. No apply arm and no paint."
+    ],
+    [
+     "border-block-start-clip",
+     "Not implemented",
+     "Borders-4 draft. No apply arm and no paint."
+    ],
+    [
+     "border-bottom-clip",
+     "Not implemented",
+     "Borders-4 draft. No apply arm and no paint."
+    ],
+    [
+     "border-boundary",
+     "Not implemented",
+     "css-round-display-1 draft. No apply arm and no paint."
+    ],
+    [
+     "border-clip",
+     "Not implemented",
+     "Borders-4 draft. No apply arm and no paint."
+    ],
+    [
+     "border-inline-clip",
+     "Not implemented",
+     "Borders-4 draft. No apply arm and no paint."
+    ],
+    [
+     "border-inline-end-clip",
+     "Not implemented",
+     "Borders-4 draft. No apply arm and no paint."
+    ],
+    [
+     "border-inline-start-clip",
+     "Not implemented",
+     "Borders-4 draft. No apply arm and no paint."
+    ],
+    [
+     "border-left-clip",
+     "Not implemented",
+     "Borders-4 draft. No apply arm and no paint."
+    ],
+    [
+     "border-limit",
+     "Not implemented",
+     "Borders-4 draft. No apply arm and no paint."
+    ],
+    [
+     "border-right-clip",
+     "Not implemented",
+     "Borders-4 draft. No apply arm and no paint."
+    ],
+    [
+     "border-shape",
+     "Not implemented",
+     "Borders-4 draft. No apply arm and no paint."
+    ],
+    [
+     "border-top-clip",
+     "Not implemented",
+     "Borders-4 draft. No apply arm and no paint."
+    ],
+    [
+     "text-autospace",
+     "Implemented (subset)",
+     "`ideograph-alpha` and `auto` insert 1/8em between an ideograph and a Latin letter."
+    ],
+    [
+     "text-box",
+     "Implemented (subset)",
+     "Shorthand for `text-box-trim` and `text-box-edge`."
+    ],
+    [
+     "text-box-edge",
+     "Implemented (subset)",
+     "`cap`, `ex`, and `alphabetic` retarget the trim edges."
+    ],
+    [
+     "text-box-trim",
+     "Implemented (subset)",
+     "`trim-both` drops half-leading on the first and last line of the block."
+    ],
+    [
+     "text-fit",
+     "Not implemented",
+     "The value is stored. There is no scale-search consumer."
+    ],
+    [
+     "text-group-align",
+     "Implemented (lite)",
+     "When `text-align` is start or left, `center`, `end`, and `right` remap the line origin."
+    ],
+    [
+     "text-spacing",
+     "Implemented (lite)",
+     "Shorthand. It stores the value and mirrors trim tokens onto `text-spacing-trim`."
+    ],
+    [
+     "text-spacing-trim",
+     "Implemented (lite)",
+     "`trim-start` and `trim-both` hang half the advance of a leading fullwidth opening punctuation mark."
+    ],
+    [
+     "grid-auto-columns",
+     "Implemented",
+     "Implicit columns use a fixed length, `auto`, or `1fr`."
+    ],
+    [
+     "grid-auto-rows",
+     "Implemented",
+     "Implicit rows. A fixed auto-row locks the preferred height."
+    ],
+    [
+     "grid-column-gap",
+     "Implemented",
+     "Legacy alias of `column-gap`."
+    ],
+    [
+     "grid-gap",
+     "Implemented",
+     "Legacy alias of `gap`."
+    ],
+    [
+     "grid-row-gap",
+     "Implemented",
+     "Legacy alias of `row-gap`."
+    ],
+    [
+     "hanging-punctuation",
+     "Implemented (subset)",
+     "`first` hangs a leading opening punctuation mark. Other keywords are stored."
+    ],
+    [
+     "hyphenate-limit-chars",
+     "Implemented (SHY)",
+     "Minimum word length, characters before, and characters after a soft hyphen."
+    ],
+    [
+     "hyphenate-limit-last",
+     "Implemented (SHY)",
+     "Suppresses a soft hyphen on the last line."
+    ],
+    [
+     "hyphenate-limit-lines",
+     "Implemented (SHY)",
+     "Caps how many lines in a row may end with a soft hyphen."
+    ],
+    [
+     "hyphenate-limit-zone",
+     "Implemented (SHY)",
+     "A soft hyphen is allowed only inside the trailing zone."
+    ],
+    [
+     "shape-image-threshold",
+     "Not implemented",
+     "No alpha-contour extraction from a float image."
+    ],
+    [
+     "shape-inside",
+     "Not implemented",
+     "No interior text fit. CSS Shapes 2."
+    ],
+    [
+     "shape-margin",
+     "Implemented (lite)",
+     "Expands a `shape-outside` contour. Requires `shape-outside`."
+    ],
+    [
+     "shape-outside",
+     "Implemented (lite)",
+     "`circle()`, `ellipse()`, and `inset()` with `float: left` or `right`. `polygon()`, `path()`, and `url()` are rejected."
+    ],
+    [
+     "shape-padding",
+     "Not implemented",
+     "No interior padding inset. CSS Shapes 2."
+    ],
+    [
+     "float-defer",
+     "Not implemented",
+     "No page-float defer model."
+    ],
+    [
+     "float-offset",
+     "Implemented (lite)",
+     "A length, or a percent of the float height, nudges the float on the block axis."
+    ],
+    [
+     "float-reference",
+     "Implemented (lite)",
+     "`inline` uses the current block formatting context. `page` uses the page content box. `column` uses the parent context inside multicol. `region` is stored and behaves as `inline`."
+    ],
+    [
+     "initial-letter",
+     "Implemented (lite)",
+     "Drop cap on a real leading element such as a span. `:first-letter` is not synthesized."
+    ],
+    [
+     "initial-letter-align",
+     "Implemented (lite)",
+     "`alphabetic`, `hanging`, `leading`, and `ideographic` use different Y offsets. Requires `initial-letter`."
+    ],
+    [
+     "initial-letter-wrap",
+     "Implemented (lite)",
+     "Rectangular wrap: `none`, `first`, or `all`. No glyph-contour wrap."
+    ],
+    [
+     "column-height",
+     "Implemented",
+     "Caps each column box. A value other than `auto` establishes a multicol container."
+    ],
+    [
+     "column-wrap",
+     "Implemented (lite)",
+     "`wrap` and `auto` open another row when a column height is set. `nowrap` keeps one row."
+    ],
+    [
+     "object-fit",
+     "Implemented",
+     "`fill`, `contain`, `cover`, `none`, and `scale-down` size a replaced image."
+    ],
+    [
+     "object-position",
+     "Implemented",
+     "A keyword or length pair places the fitted image in the content box."
+    ],
+    [
+     "overflow-block",
+     "Implemented",
+     "Maps onto `overflow-x` or `overflow-y` from the writing mode."
+    ],
+    [
+     "overflow-inline",
+     "Implemented",
+     "Maps onto `overflow-x` or `overflow-y` from the writing mode."
+    ],
+    [
+     "aspect-ratio",
+     "Implemented",
+     "A definite width produces the height, and a definite height produces the width, on blocks, flex, grid, and replaced boxes."
+    ],
+    [
+     "counter-set",
+     "Implemented",
+     "Applied after `counter-reset` and before `counter-increment`."
     ]
    ]
   },
@@ -289,13 +661,13 @@
     ],
     [
      "Text",
-     "font-feature-settings, font-kerning, font-variant, font-synthesis, font-width, font-size-adjust",
+     "font-feature-settings, font-kerning, font-optical-sizing, font-palette, font-variation-settings, font-size-adjust, font-stretch, font-width, font-synthesis, font-synthesis-weight, font-synthesis-style, font-synthesis-small-caps, font-synthesis-position, font-variant, font-variant-alternates, font-variant-caps, font-variant-ligatures, font-variant-numeric, font-variant-position, font-variant-east-asian, font-variant-emoji",
      "Implemented (subset / lite)",
      "OT tags reach the shaper; `font-kerning: none` emits kern 0; variant/synthesis longhands have geometric or OT consumers; VF `font-optical-sizing` / `font-palette` / `font-variation-settings` instance `fvar`/CPAL faces (static Liberation/DejaVu no-op)"
     ],
     [
      "Text",
-     "initial-letter, text-autospace, text-box, hyphenate-limit-chars, hanging-punctuation",
+     "initial-letter, initial-letter-align, initial-letter-wrap, text-autospace, text-box, text-box-trim, text-box-edge, text-group-align, text-spacing, text-spacing-trim, hyphenate-limit-chars, hyphenate-limit-last, hyphenate-limit-lines, hyphenate-limit-zone, hanging-punctuation",
      "Implemented (lite)",
      "Drop caps on a real leading element; 1/8em ideograph-Latin spacing; half-leading trim; SHY hyphen limits; `hanging-punctuation: first`. `text-fit` stays Unsupported"
     ],
@@ -307,9 +679,15 @@
     ],
     [
      "Flow",
-     "counter-set, grid-gap, grid-row-gap, grid-column-gap",
+     "counter-set, grid-auto-columns, grid-auto-rows, grid-gap, grid-row-gap, grid-column-gap",
      "Implemented",
      "`counter-set` walks reset then set then increment; `grid-gap*` alias `gap`"
+    ],
+    [
+     "Flow",
+     "column-height, column-wrap",
+     "Implemented (lite)",
+     "`column-height` caps each column box. `column-wrap: wrap` and `auto` open another row when a height is set; `nowrap` keeps one row."
     ],
     [
      "Transform",
@@ -343,9 +721,9 @@
     ],
     [
      "Text",
-     "text-fit, shape-inside, shape-padding, shape-image-threshold, float-defer, border-clip family",
+     "text-fit, shape-inside, shape-padding, shape-image-threshold, float-defer, border-clip, border-top-clip, border-right-clip, border-bottom-clip, border-left-clip, border-block-clip, border-block-start-clip, border-block-end-clip, border-inline-clip, border-inline-start-clip, border-inline-end-clip, border-limit, border-shape, border-boundary",
      "Not implemented",
-     "Next-72 leftovers by choice: `text-fit` has a store-only apply arm; the other 18 have no apply/paint (matrix §2.3, §5.5)"
+     "These 19 next-72 names stay Unsupported. `text-fit` is stored and has no scale-search consumer. The other 18 have no apply arm and no paint (matrix section 2.3 and section 5.5)."
     ]
    ]
   },

@@ -43,7 +43,7 @@ export default function LandingPage() {
             <em>No Chromium and No Blink.</em>
           </h1>
           <p className="landing-lede">
-            More than 350 CSS properties supported: tables and flex, borders and backgrounds,
+            More than 400 CSS properties supported: tables and flex, borders and backgrounds,
             shadows and transforms, and more.
           </p>
           <div className="landing-actions">

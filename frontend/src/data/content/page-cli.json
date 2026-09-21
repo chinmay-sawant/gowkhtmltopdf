@@ -39,7 +39,10 @@
         ["--font-path PATH, --use-system-fonts", "Add a font directory (repeatable) or use fonts installed on the host"],
         ["--format png | jpg | jpeg, --quality N", "gowkhtmltoimage output format and JPEG quality (1-100); --width and --height set the raster size"],
         ["--transparent, --smart-width, --crop-x/-y/-w/-h", "gowkhtmltoimage canvas controls: transparency, smart width, and crop rectangle"],
-        ["--help, --version, --license", "Print documentation or version metadata"]
+        ["--help, --version, --license", "Print documentation or version metadata"],
+        ["--header-left/center/right, --footer-left/center/right", "Document header and footer text. Placeholders include [page], [topage], [date], [title], and [doctitle]. Also --header-line, --footer-line, font name, font size, spacing, and --header-html / --footer-html"],
+        ["--toc, --outline, --outline-depth N", "Generated table of contents and PDF outline (outline defaults on, depth 4)"],
+        ["--simplify-dom, --simplify-dom-profile, --print-link-underline", "Opt-in URL helpers. simplify-dom hides landmark chrome (mediawiki profile adds MediaWiki selectors). print-link-underline forces a[href] underlines. Both default off"]
       ]
     }
   ]

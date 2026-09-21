@@ -85,7 +85,7 @@
     },
     {
      "heading": "CJK needs a capable face",
-     "body": "CJK (Han, kana, Hangul) works when a capable TTF is on the font path; Hangul specifically needs `fonts-noto-cjk` or any Hangul-capable TTF on `--font-path`. `writing-mode: vertical-rl|lr` is parsed but lays out as a horizontal block. In mixed Latin + CJK runs, Latin glyphs missing from the CJK face are drawn with embedded Liberation while CJK continues on the Type0 sibling of the original face."
+     "body": "CJK (Han, kana, Hangul) works when a capable TTF is on the font path; Hangul specifically needs `fonts-noto-cjk` or any Hangul-capable TTF on `--font-path`. `writing-mode: vertical-rl` and `vertical-lr` rotate glyphs by -90 degrees while the block still flows horizontally (`internal/layout/inline_vertical_writing.go`). Full vertical line stacking is not implemented. In mixed Latin + CJK runs, Latin glyphs missing from the CJK face are drawn with embedded Liberation while CJK continues on the Type0 sibling of the original face."
     },
     {
      "heading": "Indic and other complex scripts: partial",
@@ -98,7 +98,7 @@
       "WOFF1 is supported: decompress, then `pdf.ParseTTF`, TrueType outlines only.",
       "`.woff2`, `.eot`, and `data:` sources are skipped with a warning (`internal/convert/prepare/styles.go:468-476`); remote `http(s)` sources are fetched, not skipped.",
       "`font-weight` and `font-style` on `@font-face` are parsed but ignored at register time (the alias is the family name only).",
-      "`halt` / `palt` are requested via typesetting `FontFeatures` for CJK / East-Asian punctuation runs, and via `ParseFontFeatureSettings` / `ShapeTextFontWithFeatures` when CSS `font-feature-settings` is supplied. The CSS names `font-feature-settings`, `font-kerning`, and `font-variant-caps` stay Unsupported: the 2026-09-12 catalog audit holds them dropped with no layout consumer (`documentation/compatibility-matrix.md`)."
+      "`halt` / `palt` are requested via typesetting `FontFeatures` for CJK / East-Asian punctuation runs, and via `ParseFontFeatureSettings` / `ShapeTextFontWithFeatures` when CSS `font-feature-settings` is supplied. `font-feature-settings`, `font-kerning`, and `font-variant-caps` are Implemented (subset): the tags and keywords reach the shaper (`internal/layout/style_font_feature_props.go`, `documentation/compatibility-matrix.md`)."
      ]
     }
    ]

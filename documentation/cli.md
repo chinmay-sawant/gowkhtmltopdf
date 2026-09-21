@@ -1,11 +1,8 @@
 # Command-line interface
 
-This page documents the 0.2.4 CLI target from Phase 36.
-
-> **Implementation status:** the target parser, help text, and root Document
-> API are complete and validated. The -o/--output, --html, --url, --cover,
-> --toc, and --allow-local-files examples below are the supported 0.2.4
-> contract. There is no legacy compatibility mode.
+`gowkhtmltopdf` and `gowkhtmltoimage` share one document model with the Go
+library. `VERSION` is 0.2.6. The flags below are what the binaries accept.
+There is no legacy `page` / `cover` / `toc` object grammar.
 
 The CLI and library describe the same model:
 
@@ -14,8 +11,8 @@ gowkhtmltopdf argv → Document → Document.WritePDF
 gowkhtmltoimage argv → ImageDocument → ImageDocument.WriteImage
 ~~~
 
-The engine remains a pure-Go, no-cgo PDF engine based on HTML templates —
-without any wrappers. It does not execute JavaScript and is not a browser.
+The engine is a pure-Go, no-cgo PDF engine for HTML templates. It does not
+execute JavaScript, and it is not a browser.
 
 ## Binaries
 
@@ -80,13 +77,13 @@ gowkhtmltopdf --allow-local-files \
 gowkhtmltopdf --quiet --allow-local-files -o - report.html > report.pdf
 ~~~
 
-There is no implicit page, cover, or toc positional token in the target
-grammar. There is also no stdin HTML shorthand: use --html or --url.
+There is no `page`, `cover`, or `toc` positional token. There is also no
+stdin HTML shorthand: use `--html` or `--url`.
 
-## Target PDF flags
+## PDF flags
 
-The 0.2.4 CLI exposes named flags that map to Document fields. It does not
-expose a generic --set key=value escape hatch.
+Named flags map to `Document` fields. There is no `--set key=value` escape
+hatch.
 
 | Flag | Document field / behavior |
 |---|---|
@@ -97,8 +94,8 @@ expose a generic --set key=value escape hatch.
 | --title TEXT | Title and PDF /Title |
 | --copies N | Copies; must be at least 1 |
 | --collate, --no-collate | Collate |
-| --outline, --no-outline | Outline |
-| --outline-depth N | OutlineDepth |
+| --outline, --no-outline | Outline; default on (`internal/settings/settings.go` `Outline: true`) |
+| --outline-depth N | OutlineDepth; default 4 |
 | --pdf-version 1.4, 1.7, or 2.0 | PDFVersion; version alone is not a conformance claim |
 | --pdf-profile PROFILE | PDFProfile, for example a3a-ua1 or a4-ua2 |
 | --background, --no-background | Background |
@@ -111,12 +108,51 @@ expose a generic --set key=value escape hatch.
 | --restrict-network | Restricted network policy |
 | --allow-host HOST | Network host allowlist entry |
 | --quiet | Suppress informational output; errors remain visible |
+| --header-left, --header-center, --header-right | Document header text |
+| --footer-left, --footer-center, --footer-right | Document footer text |
+| --header-line, --footer-line | Rule under the header or over the footer |
+| --header-html, --footer-html | HTML URL for the header or footer |
+| --header-font-name, --header-font-size, --header-spacing | Header face, size, and spacing (footer twins use the `footer-` prefix) |
+| --toc | Insert a generated table of contents |
+| --simplify-dom, --no-simplify-dom | Opt-in landmark chrome strip; default off |
+| --simplify-dom-profile NAME | `mediawiki` adds MediaWiki selectors; empty keeps landmarks only |
+| --print-link-underline | Opt-in underline on `a[href]` after the cascade; default off |
+| --zoom FLOAT | Layout scale |
+| --timeout DURATION | HTTP response timeout |
+| --media-type, --print-media-type, --no-print-media-type | Media used for the cascade; PDF default stays `print` |
 
-Header and footer text flags map to the document-level Header and Footer,
-with page-specific variants reserved for a later flag-group decision. The
-supported placeholders remain [page], [topage], [frompage], [date],
-[time], [title], [doctitle], [webpage], [section], and
-[subsection]. [subject] expands to an empty value.
+Header and footer flags apply to the whole document (`hfFlag` in
+`internal/cli/flags.go`). Placeholders: `[page]`, `[topage]`, `[frompage]`,
+`[date]`, `[time]`, `[title]`, `[doctitle]`, `[webpage]`, `[section]`,
+`[subsection]`. `[subject]` expands empty. Custom substitutions:
+`--replace key value`.
+
+## URL mode, chrome strip, simplify-dom
+
+`--url` fetches one `http` or `https` document. Connect timeout is 30 s,
+response timeout is 60 s (`--timeout` overrides the response timeout),
+redirects stop at 10, and the body cap is 100 MiB. TLS verification stays
+on. There is no `--insecure`.
+
+Live public pages stay exploratory until Phase 21 acceptance against
+vendored fixtures. See [fidelity.md](fidelity.md#arbitrary-websites-phase-21).
+
+`--simplify-dom` is off by default. Turn it on to hide landmark chrome
+through `prepare.SimplifyChromeCSS` (`internal/convert/prepare/simplify.go`).
+`--simplify-dom-profile=mediawiki` adds MediaWiki selectors on top of those
+landmarks. The flag does not run JavaScript.
+
+`--print-link-underline` is off by default. Turn it on to underline
+`a[href]` after the cascade. With the flag off, `text-decoration: none`
+on a link stays off.
+
+A raw Wikipedia smoke (no chrome strip) is:
+
+```sh
+./bin/gowkhtmltopdf --use-system-fonts --zoom 0.666667 \
+  --url 'https://en.wikipedia.org/wiki/Ana_de_Armas' \
+  -o output/wiki-ana-de-armas.pdf
+```
 
 ## Image grammar
 
@@ -199,18 +235,14 @@ authorization, host policy, and resource limits. See
 
 ## Exit codes
 
-The target keeps the useful HTTP distinctions from the existing CLI:
+`cli.ExitCode` (`internal/cli/cli.go`) maps the result:
 
 | Exit code | Meaning |
 |---:|---|
-| 0 | Help/version/license or successful conversion |
-| 1 | Usage, validation, rendering, I/O, or unexpected failure |
+| 0 | Help, version, license, or a successful conversion |
+| 1 | Usage, validation, rendering, I/O, or any other error |
 | 2 | Main document returned HTTP 404 |
 | 3 | Main document returned HTTP 401 |
-
-Phase 36 owns the final parser and exit-code tests. Until that phase closes,
-the binary help and phase implementation are authoritative for the current
-working tree.
 
 ## Migrating from the old CLI
 
@@ -230,7 +262,7 @@ gowkhtmltopdf --allow-local-files \
 
 Other common changes:
 
-| 0.2.3 style | 0.2.4 target |
+| 0.2.3 style | Current CLI |
 |---|---|
 | Output as the final positional argument | Required -o OUTPUT / --output OUTPUT |
 | page input.html | Positional input.html |
