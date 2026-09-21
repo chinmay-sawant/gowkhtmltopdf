@@ -119,3 +119,66 @@ func TestBorderColorFourValues(t *testing.T) {
 			s.BorderTop.Color, s.BorderRight.Color, s.BorderBottom.Color, s.BorderLeft.Color)
 	}
 }
+
+// TestTransparentBorderPaintsNothing pins the transparent-border contract:
+// layout keeps the declared width, paint emits nothing. Chromium paints
+// nothing for `border: 8pt solid transparent` (see
+// test/chrome/cases/case-35-wpt-flex-cross-size-border-box.html).
+func TestTransparentBorderPaintsNothing(t *testing.T) {
+	t.Parallel()
+
+	const borderWidthPt = 8
+
+	ctx := &styleContext{
+		ctx:       context.Background(),
+		err:       nil,
+		work:      0,
+		sheets:    nil,
+		viewportW: 800,
+	}
+
+	resolve := func(props map[string]string) ResolvedStyle {
+		s := initialStyle()
+		applyRestProps(&s, props, ctx, nil)
+
+		return s
+	}
+
+	eng := &engine{scale: 1}
+
+	// All four sides transparent: the block border box and the replaced
+	// element emitter stay silent while layout keeps the 8pt width.
+	allTransparent := resolve(map[string]string{"border": "8pt solid transparent"})
+	if ops := eng.borderOps(allTransparent, 0, 0, 300, 150); len(ops) != 0 {
+		t.Fatalf("transparent border ops = %d, want 0", len(ops))
+	}
+	eng.emitBorders(allTransparent, 0, 0, 300, 150)
+	if len(eng.ops) != 0 {
+		t.Fatalf("transparent replaced-element border ops = %d, want 0", len(eng.ops))
+	}
+	if !near(allTransparent.BorderTop.Width, borderWidthPt) {
+		t.Fatalf("transparent border width = %.2fpt, want %dpt", allTransparent.BorderTop.Width, borderWidthPt)
+	}
+
+	// Longhand color declarations take the same alpha path.
+	longhands := map[string]map[string]string{
+		"border-color": {
+			"border-width": "8pt", "border-style": "solid", "border-color": "transparent",
+		},
+		"border-top-color": {
+			"border-width": "8pt", "border-style": "solid", "border-top-color": "transparent",
+		},
+	}
+	for name, props := range longhands {
+		sty := resolve(props)
+		if ops := eng.borderOpsSides(sty, 0, 0, 300, 150, true, false, false, false); len(ops) != 0 {
+			t.Fatalf("%s: transparent top border ops = %d, want 0", name, len(ops))
+		}
+	}
+
+	// The opaque control still paints so the gates cannot pass vacuously.
+	opaque := resolve(map[string]string{"border": "8pt solid black"})
+	if ops := eng.borderOps(opaque, 0, 0, 300, 150); len(ops) == 0 {
+		t.Fatal("opaque border ops = 0, want > 0")
+	}
+}

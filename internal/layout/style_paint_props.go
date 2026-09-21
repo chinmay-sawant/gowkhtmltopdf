@@ -15,19 +15,27 @@ func isCurrentColor(value string) bool {
 	return strings.EqualFold(strings.TrimSpace(value), currentColorKeyword)
 }
 
+// parseUsedColorAlpha maps a CSS color token onto 0..1 RGB plus its source
+// alpha. currentColor resolves opaque: inherited used colors carry no alpha.
+func parseUsedColorAlpha(value string, current [3]float64) ([3]float64, float64, bool) {
+	if isCurrentColor(value) {
+		return current, 1, true
+	}
+
+	r, g, b, a, ok := css.ParseColor(value)
+	if !ok {
+		return [3]float64{}, 0, false
+	}
+
+	return [3]float64{float64(r) / 255, float64(g) / 255, float64(b) / 255}, a, true
+}
+
 // parseUsedColor maps a CSS color token onto 0..1 RGB. currentColor uses the
 // element's used color (already inherited or applied).
 func parseUsedColor(value string, current [3]float64) ([3]float64, bool) {
-	if isCurrentColor(value) {
-		return current, true
-	}
+	color, _, ok := parseUsedColorAlpha(value, current)
 
-	r, g, b, _, ok := css.ParseColor(value)
-	if !ok {
-		return [3]float64{}, false
-	}
-
-	return [3]float64{float64(r) / 255, float64(g) / 255, float64(b) / 255}, true
+	return color, ok
 }
 
 func applyOutlineProps(style *ResolvedStyle, prop, value string, fsize float64) bool {

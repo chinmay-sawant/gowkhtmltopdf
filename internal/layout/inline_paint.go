@@ -426,7 +426,7 @@ func combinesUpright(mode, text string) bool {
 }
 
 func inlineBorderVisible(side border) bool {
-	return side.Width > 0 && side.Style != cssDisplayNone
+	return side.Width > 0 && side.Style != cssDisplayNone && !side.Transparent
 }
 
 //nolint:cyclop,wsl // transform width and alignment are one geometry decision

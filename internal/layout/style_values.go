@@ -389,8 +389,9 @@ func parseBorder(value string, fsize float64, current [3]float64) (border, bool)
 		default:
 			if isCurrentColor(face) {
 				boxNode.Color = current
-			} else if r, g, bb, _, ok := css.ParseColor(face); ok {
+			} else if r, g, bb, a, ok := css.ParseColor(face); ok {
 				boxNode.Color = [3]float64{float64(r) / 255, float64(g) / 255, float64(bb) / 255}
+				boxNode.Transparent = a <= 0
 			} else if v, unit, ok := css.ParseLength(face); ok {
 				boxNode.Width = v
 				if pt, converted := lengthToPt(v, unit, fsize); converted {

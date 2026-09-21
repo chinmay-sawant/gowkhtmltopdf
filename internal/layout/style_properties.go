@@ -999,7 +999,7 @@ func applyBorderGroup(
 
 func applyBorderAllSides(style *ResolvedStyle, value string, fsize float64) bool {
 	if strings.EqualFold(strings.TrimSpace(value), cssDisplayNone) || strings.TrimSpace(value) == "0" {
-		zero := border{Width: 0, PaintWidth: 0, Style: "", Color: [3]float64{0, 0, 0}}
+		zero := border{Width: 0, PaintWidth: 0, Style: "", Color: [3]float64{0, 0, 0}, Transparent: false}
 		style.BorderTop, style.BorderRight, style.BorderBottom, style.BorderLeft = zero, zero, zero, zero
 
 		return true
@@ -1031,7 +1031,7 @@ func applyBorderOneSide(style *ResolvedStyle, prop, value string, fsize float64)
 
 func setBorderSide(style *ResolvedStyle, side *border, value string, fsize float64) {
 	if strings.EqualFold(strings.TrimSpace(value), cssDisplayNone) || strings.TrimSpace(value) == "0" {
-		*side = border{Width: 0, PaintWidth: 0, Style: "", Color: [3]float64{0, 0, 0}}
+		*side = border{Width: 0, PaintWidth: 0, Style: "", Color: [3]float64{0, 0, 0}, Transparent: false}
 
 		return
 	}
@@ -1138,14 +1138,16 @@ func setFourBorderColor(style *ResolvedStyle, value string) {
 	}
 
 	colors := make([][3]float64, count)
+	transparent := make([]bool, count)
 
 	for idx := range count {
-		c, ok := parseUsedColor(val[idx], style.Color)
+		c, alpha, ok := parseUsedColorAlpha(val[idx], style.Color)
 		if !ok {
 			return
 		}
 
 		colors[idx] = c
+		transparent[idx] = alpha <= 0
 	}
 
 	col := expandTRBL(colors)
@@ -1153,6 +1155,12 @@ func setFourBorderColor(style *ResolvedStyle, value string) {
 	style.BorderRight.Color = col[1]
 	style.BorderBottom.Color = col[2]
 	style.BorderLeft.Color = col[3]
+
+	tr := expandTRBL(transparent)
+	style.BorderTop.Transparent = tr[0]
+	style.BorderRight.Transparent = tr[1]
+	style.BorderBottom.Transparent = tr[2]
+	style.BorderLeft.Transparent = tr[3]
 }
 
 //nolint:cyclop // border shorthand/property dispatch
@@ -1195,8 +1203,9 @@ func setBorderStyleSide(side *border, value string) {
 }
 
 func setBorderColor(side *border, value string, current [3]float64) {
-	if c, ok := parseUsedColor(value, current); ok {
+	if c, alpha, ok := parseUsedColorAlpha(value, current); ok {
 		side.Color = c
+		side.Transparent = alpha <= 0
 	}
 }
 

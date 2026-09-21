@@ -174,22 +174,23 @@ func (e *engine) borderOpsSides(
 	sty ResolvedStyle, posX, posY, wid, height float64, top, right, bottom, left bool,
 ) []Op {
 	wTop := 0.0
-	if top && sty.BorderTop.Style != cssDisplayNone && borderPaint(sty.BorderTop) > 0 {
+	if top && sty.BorderTop.Style != cssDisplayNone && !sty.BorderTop.Transparent && borderPaint(sty.BorderTop) > 0 {
 		wTop = e.scalePt(borderPaint(sty.BorderTop))
 	}
 
 	wRight := 0.0
-	if right && sty.BorderRight.Style != cssDisplayNone && borderPaint(sty.BorderRight) > 0 {
+	if right && sty.BorderRight.Style != cssDisplayNone && !sty.BorderRight.Transparent && borderPaint(sty.BorderRight) > 0 {
 		wRight = e.scalePt(borderPaint(sty.BorderRight))
 	}
 
 	wBottom := 0.0
-	if bottom && sty.BorderBottom.Style != cssDisplayNone && borderPaint(sty.BorderBottom) > 0 {
+	if bottom && sty.BorderBottom.Style != cssDisplayNone && !sty.BorderBottom.Transparent &&
+		borderPaint(sty.BorderBottom) > 0 {
 		wBottom = e.scalePt(borderPaint(sty.BorderBottom))
 	}
 
 	wLeft := 0.0
-	if left && sty.BorderLeft.Style != cssDisplayNone && borderPaint(sty.BorderLeft) > 0 {
+	if left && sty.BorderLeft.Style != cssDisplayNone && !sty.BorderLeft.Transparent && borderPaint(sty.BorderLeft) > 0 {
 		wLeft = e.scalePt(borderPaint(sty.BorderLeft))
 	}
 
@@ -601,12 +602,15 @@ func (e *engine) roundedBorderOps(
 	// BorderTop here would spread that accent across the rounded stroke on all
 	// four sides before the per-side overlays are painted.
 	base := sty.BorderBottom
-	ops := []Op{{ //nolint:exhaustruct // intentional zero fields
-		Kind: OpStrokeRect, X: posX, Y: posY, W: width, H: height,
-		R: base.Color[0], G: base.Color[1], B: base.Color[2], Width: e.scalePt(borderPaint(base)),
-		Radius: uniformRadius(radii), RadiusTopLeft: radii[0], RadiusTopRight: radii[1],
-		RadiusBottomRight: radii[2], RadiusBottomLeft: radii[3],
-	}}
+	var ops []Op
+	if !base.Transparent {
+		ops = append(ops, Op{ //nolint:exhaustruct // intentional zero fields
+			Kind: OpStrokeRect, X: posX, Y: posY, W: width, H: height,
+			R: base.Color[0], G: base.Color[1], B: base.Color[2], Width: e.scalePt(borderPaint(base)),
+			Radius: uniformRadius(radii), RadiusTopLeft: radii[0], RadiusTopRight: radii[1],
+			RadiusBottomRight: radii[2], RadiusBottomLeft: radii[3],
+		})
+	}
 
 	type mixedSide struct {
 		border border
@@ -621,7 +625,7 @@ func (e *engine) roundedBorderOps(
 	}
 
 	for _, side := range sides {
-		if side.border == base || side.border.Style != solidKeyword {
+		if side.border == base || side.border.Style != solidKeyword || side.border.Transparent {
 			continue
 		}
 
@@ -655,7 +659,7 @@ func (e *engine) roundedAccentBorderOps(
 	var ops []Op
 
 	appendSolidMask := func(side border, mask uint8, sideRadii [4]float64) {
-		if borderPaint(side) <= 0 || side.Style != solidKeyword {
+		if side.Transparent || borderPaint(side) <= 0 || side.Style != solidKeyword {
 			return
 		}
 
@@ -670,7 +674,7 @@ func (e *engine) roundedAccentBorderOps(
 	}
 
 	appendDashedSide := func(sideX, sideY, sideW, sideH float64, side border) {
-		if borderPaint(side) <= 0 || side.Style == solidKeyword {
+		if side.Transparent || borderPaint(side) <= 0 || side.Style == solidKeyword {
 			return
 		}
 

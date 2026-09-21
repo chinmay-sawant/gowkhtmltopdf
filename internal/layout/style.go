@@ -462,6 +462,9 @@ type border struct {
 	PaintWidth float64 // device paint width; zero means use Width
 	Style      string  // cssDisplayNone | "solid" | "dashed" | "dotted"
 	Color      [3]float64
+	// Transparent marks a fully transparent color: layout keeps its width,
+	// paint emits nothing. Zero value false keeps every other border opaque.
+	Transparent bool
 }
 
 // initialStyle returns the CSS initial values.

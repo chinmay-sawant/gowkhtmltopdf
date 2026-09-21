@@ -85,3 +85,16 @@ font-metric-only height comparisons.
 - [x] Re-ran the case 29 PDF comparison: all three pages match Chromium's green rect, and pages 2 and 3 are pixel-identical at 110 DPI.
 - [x] Ran `make test`, `make golden`, `make claim-scan`, and `make size-check`; exit code 0.
 - [x] Ran golangci-lint on the tree; exit code 0 (the temporary `zz_probe_case30_test.go` from the parallel case 30 session was excluded, and that file is not part of this change).
+
+## Case 35 follow-up: transparent border paint (2026-09-21)
+
+- [x] Reproduced the case 35 picture difference against the Puppeteer print reference: Chromium painted only the description panel, while the Go PDF added two solid black 8pt frames around the `border: 8pt solid transparent` `.case` boxes (8 extra stroke rows, pixel delta 3.34%).
+- [x] Traced the root cause to the border color parse paths: `border.Color` is `[3]float64` and `parseBorder`, `setFourBorderColor`, and `setBorderColor` dropped the source alpha, so `transparent` painted opaque black.
+- [x] Added `Transparent bool` to the `border` struct, set it from the parsed alpha in `parseBorder` and via the new `parseUsedColorAlpha` in `setFourBorderColor` / `setBorderColor`, and gated the border paint emitters `borderOpsSides`, `roundedBorderOps`, `roundedAccentBorderOps`, `emitBorders`, `emitThumbImageBottomSeparator`, and `inlineBorderVisible`. Layout width is unchanged.
+- [x] Added `TestTransparentBorderPaintsNothing` (`internal/layout/style_backgrounds_borders_test.go`); it failed with 4 black ops before the fix, and it pins that the transparent border keeps its 8pt width while an opaque control still paints.
+- [x] Restored the missing WPT `1x1-green.png` src on both case 35 `<img>` children, matching the original WPT source and the case 28 asset convention.
+- [x] Re-ran the Puppeteer comparison after the fix: the black frames are gone, Go drawing rows dropped 13 to 5, both engines paint the two 0.75pt images, and the pixel delta fell from 3.34% to 0.82% (under the 1.00% threshold). Remaining deltas are the pre-existing page-size, font, and 0.25pt round-off differences.
+- [x] Regenerated `test/chrome/pdf/case-35-wpt-flex-cross-size-border-box.pdf`.
+- [x] Ran `make test`, `make golden`, and `make lint`; exit code 0 on the final tree.
+
+Known same-class gaps left open (pre-existing, not regressed by this change): `hr` borders (`buildHR`), collapsed-table borders, and `column-rule-color` store `[3]float64` colors without the transparency flag and still paint a transparent color.
