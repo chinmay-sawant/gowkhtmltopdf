@@ -1500,11 +1500,23 @@ func opRadiiPositive(radii [4]float64) bool {
 }
 
 func drawLine(chld *pdf.Content, paintOp *Op, pageIdx int, contentH float64, opts PaintOptions, pageH float64) {
-	x, y, w, h, width := paintOp.PaintLineGeometry()
-	xEnd, yEnd := canvasToPDF(x, y, pageIdx, contentH, opts, pageH)
-	xTwo, yTwo := canvasToPDF(x+w, y+h, pageIdx, contentH, opts, pageH)
+	lineX, lineY, lineW, lineH, width := paintOp.PaintLineGeometry()
+	xEnd, yEnd := canvasToPDF(lineX, lineY, pageIdx, contentH, opts, pageH)
+	xTwo, yTwo := canvasToPDF(lineX+lineW, lineY+lineH, pageIdx, contentH, opts, pageH)
 
 	strokeR, strokeG, strokeB := sRGBRangeLimit(paintOp.R, paintOp.G, paintOp.B, opts.colorAdjust.rangeLimit)
+
+	if lineW == 0 && lineH == 0 {
+		// An inset dotted fragment collapses to its dot centre. A
+		// single-point stroked path is renderer-dependent (MuPDF paints
+		// nothing), so fill the square the square cap would have covered.
+		chld.SetFillColor(strokeR, strokeG, strokeB)
+		chld.Rect(xEnd-width/2, yEnd-width/2, width, width)
+		chld.Fill()
+
+		return
+	}
+
 	chld.SetStrokeColor(strokeR, strokeG, strokeB)
 	chld.SetLineWidth(width)
 	// Square caps project half the stroke past each endpoint so axis-aligned

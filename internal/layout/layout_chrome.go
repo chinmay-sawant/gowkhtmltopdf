@@ -195,12 +195,11 @@ func (e *engine) borderOpsSides(
 	}
 
 	mixed := wTop != wRight || wTop != wBottom || wTop != wLeft
-	topInset, rightInset := uint8(0), uint8(0)
-	bottomInset, leftInset := uint8(0), uint8(0)
-	if mixed {
-		topInset, rightInset = LineInsetTop, LineInsetRight
-		bottomInset, leftInset = LineInsetBottom, LineInsetLeft
-	}
+
+	topInset := borderSideLineInset(mixed, sty.BorderTop.Style, LineInsetTop)
+	rightInset := borderSideLineInset(mixed, sty.BorderRight.Style, LineInsetRight)
+	bottomInset := borderSideLineInset(mixed, sty.BorderBottom.Style, LineInsetBottom)
+	leftInset := borderSideLineInset(mixed, sty.BorderLeft.Style, LineInsetLeft)
 
 	// Size the slice once for the active sides. Edge lengths passed to the
 	// dashed splitter are at most wid/height, so bounding with those keeps the
@@ -294,6 +293,19 @@ func (e *engine) borderOpsSides(
 	}
 
 	return ops
+}
+
+// borderSideLineInset returns the inward paint inset for one border side.
+// Mixed-width frames inset every side so the wider strip owns the corner.
+// Dashed and dotted sides always inset: their fragments sit centered in the
+// strip instead of straddling the border-box edge, so the authored stroke
+// width lands inside the box (Chrome's dotted geometry).
+func borderSideLineInset(mixed bool, style string, flag uint8) uint8 {
+	if mixed || isDashedOrDottedStyle(style) {
+		return flag
+	}
+
+	return 0
 }
 
 func hasVerticalBorder(sty ResolvedStyle) bool {

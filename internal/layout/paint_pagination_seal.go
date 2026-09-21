@@ -787,6 +787,15 @@ func stripOrphanRowOp(paintOp *Op, lastInkBot float64) bool {
 		if paintOp.H >= 1 {
 			return false
 		}
+
+		// Dashed/dotted border fragments are authored edge paint, not an
+		// empty-row separator: their short W matches the dash metric for
+		// their stroke width (case-38's dotted bottom edge, stripped once
+		// its fragments sat below the last text ink).
+		if looksLikeDashSegmentLength(paintOp.W, paintOp.Width) {
+			return false
+		}
+
 		// Horizontal rule below the last ink (empty row separator).
 		if paintOp.Y > lastInkBot+0.5 {
 			paintOp.Width = 0

@@ -361,6 +361,90 @@ func TestChromeFixtureCase38WrappedGapGeometry(t *testing.T) {
 	}
 }
 
+// TestChromeFixtureCase38DottedBorderPaintsAuthoredWidth pins the dotted
+// border after Paint. The orphan-row seal zeroed the bottom fragments (they
+// painted as 1pt hairlines) and the remaining fragments straddled the
+// border-box edge, so only half of the authored 2pt stroke landed inside.
+func TestChromeFixtureCase38DottedBorderPaintsAuthoredWidth(t *testing.T) {
+	res := fixture21To40(t, "case-38-blink-gap-decorations-basic.html")
+	container := fixtureBox(t, res, "case-38")
+
+	if err := Paint(pdf.NewDocument(), res, PaintOptions{PageWidth: 595.28, PageHeight: 841.89}); err != nil {
+		t.Fatal(err)
+	}
+
+	sides := dottedBorderFragments(t, res, container)
+
+	for _, side := range []string{"top", "right", "bottom", "left"} {
+		if sides[side] == 0 {
+			t.Errorf("case 38 %s dotted border paints no 2pt fragments", side)
+		}
+	}
+}
+
+// dottedBorderFragments counts the container's 2pt dotted fragments per side
+// and reports every fragment whose painted square escapes the border box.
+func dottedBorderFragments(t *testing.T, res *Result, container *box) map[string]int {
+	t.Helper()
+
+	sides := map[string]int{}
+
+	for _, paintOp := range res.Ops {
+		if paintOp.Kind != OpLine || !near(paintOp.Width, 2) {
+			continue
+		}
+
+		side := dottedSideOf(paintOp, container)
+		if side == "" {
+			continue
+		}
+
+		sides[side]++
+
+		if !dottedFragmentInsideBox(paintOp, container) {
+			t.Errorf("case 38 %s dotted fragment paints outside the border box: op=(%.2f,%.2f,%.2f,%.2f) width=%.2f",
+				side, paintOp.X, paintOp.Y, paintOp.W, paintOp.H, paintOp.Width)
+		}
+	}
+
+	return sides
+}
+
+// dottedFragmentInsideBox reports whether a dotted fragment's painted square
+// (the stroke plus its square-cap overhang) lies inside the border box.
+func dottedFragmentInsideBox(paintOp Op, container *box) bool {
+	lineX, lineY, lineW, lineH, width := paintOp.PaintLineGeometry()
+	half := width / 2
+
+	return lineX-half >= container.x-0.01 && lineX+lineW+half <= container.x+container.w+0.01 &&
+		lineY-half >= container.y-0.01 && lineY+lineH+half <= container.y+container.height+0.01
+}
+
+// dottedSideOf names the container edge a dotted border fragment sits on.
+func dottedSideOf(paintOp Op, container *box) string {
+	if paintOp.H == 0 && paintOp.W > 0 {
+		switch {
+		case near(paintOp.Y, container.y):
+			return "top"
+		case near(paintOp.Y, container.y+container.height):
+			return "bottom"
+		}
+
+		return ""
+	}
+
+	if paintOp.W == 0 && paintOp.H > 0 {
+		switch {
+		case near(paintOp.X, container.x):
+			return "left"
+		case near(paintOp.X, container.x+container.w):
+			return "right"
+		}
+	}
+
+	return ""
+}
+
 func TestChromeFixtureCase39VerticalOverflow(t *testing.T) {
 	res := fixture21To40(t, "case-39-blink-scrollbars-row-reverse-vrl.html")
 	container := fixtureBox(t, res, "case-39")
