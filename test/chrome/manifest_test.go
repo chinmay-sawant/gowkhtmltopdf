@@ -24,18 +24,18 @@ type manifestCase struct {
 	Combination string `json:"combination"`
 }
 
-func readManifest(t *testing.T) caseManifest {
-	t.Helper()
+func readManifest(tb testing.TB) caseManifest {
+	tb.Helper()
 
 	raw, err := os.ReadFile("manifest.json")
 	if err != nil {
-		t.Fatalf("read manifest: %v", err)
+		tb.Fatalf("read manifest: %v", err)
 	}
 
 	var manifest caseManifest
 
 	if err := json.Unmarshal(raw, &manifest); err != nil {
-		t.Fatalf("decode manifest: %v", err)
+		tb.Fatalf("decode manifest: %v", err)
 	}
 
 	return manifest
