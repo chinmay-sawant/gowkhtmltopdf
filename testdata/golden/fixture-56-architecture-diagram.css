@@ -1563,7 +1563,8 @@ figure.d07-flow {
   width: 100%;
   width: clamp(11rem, 45%, 34rem); /* modern clamp; ignored - fallback width wins */
   margin: 0 0 var(--space);
-  aspect-ratio: 16 / 7; /* modern; ignored (future-proofing only) */
+  /* aspect-ratio omitted on purpose: it is honored now, and 16/7 around
+     this single-row figure reserved ~173pt of blank space before the card. */
 }
 
 .d07-flowrow {
