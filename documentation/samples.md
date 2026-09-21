@@ -7,7 +7,7 @@ Related:
 
 - Fixture inventory and pass criteria: [`testdata/golden/README.md`](../testdata/golden/README.md)
 - Product claims and degrade rules: [fidelity.md](fidelity.md)
-- URL recipes (raw smoke vs chrome-strip): [cli.md — URL mode](cli.md#url-mode--chrome-strip---simplify-dom)
+- URL recipes (raw smoke vs chrome-strip): [cli.md, URL mode](cli.md#url-mode-chrome-strip-simplify-dom)
 - Contributor setup, visual QA, PR expectations: [`CONTRIBUTING.md`](../CONTRIBUTING.md)
 
 ---
@@ -184,7 +184,7 @@ go test ./internal/convert -run 'TestWeb(Wiki|Marketing)FixtureAcceptance' -coun
 
 Live Wikipedia remains optional smoke (`make samples`), not a CI gate. See
 [fidelity.md — Arbitrary websites](fidelity.md#arbitrary-websites-phase-21)
-and [cli.md — URL mode](cli.md#url-mode--chrome-strip---simplify-dom).
+and [cli.md, URL mode](cli.md#url-mode-chrome-strip-simplify-dom).
 
 ---
 
@@ -262,11 +262,12 @@ Manual equivalent:
 
 ```sh
 ./bin/gowkhtmltopdf --use-system-fonts --zoom 0.666667 \
-  'https://en.wikipedia.org/wiki/Ana_de_Armas' output/wiki-ana-de-armas.pdf
+  --url 'https://en.wikipedia.org/wiki/Ana_de_Armas' \
+  -o output/wiki-ana-de-armas.pdf
 ```
 
 Full URL-mode recipes (raw vs decent-print):
-[cli.md — URL mode](cli.md#url-mode--chrome-strip---simplify-dom). Open the
+[cli.md, URL mode](cli.md#url-mode-chrome-strip-simplify-dom). Open the
 PDF and judge layout honestly against the Phase 21 “decent print” bar. Do
 **not** gate CI on this; commit `output/wiki-*.pdf` only when intentionally
 updating the smoke artifact.

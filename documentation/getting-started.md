@@ -42,9 +42,10 @@ ordinary CI on pull requests does not upload platform archives.
 ## Build
 
 ```sh
-# recommended: static binaries, version stamped from VERSION
+# stamps VERSION into bin/gowkhtmltopdf and bin/gowkhtmltoimage
+# export CGO_ENABLED=0 first for the static release link; make build
+# does not set that variable itself
 make build
-# writes bin/gowkhtmltopdf and bin/gowkhtmltoimage
 
 # equivalent, explicit:
 CGO_ENABLED=0 go build -ldflags "-X github.com/chinmay-sawant/gowkhtmltopdf/internal/cli.Version=$(cat VERSION)" \
@@ -53,8 +54,10 @@ CGO_ENABLED=0 go build -ldflags "-X github.com/chinmay-sawant/gowkhtmltopdf/inte
   -o bin/gowkhtmltoimage ./cmd/gowkhtmltoimage
 ```
 
-Always build with `CGO_ENABLED=0`. The resulting binaries are statically
-linked and have no native runtime library requirements.
+Release archives are built with `CGO_ENABLED=0`, which produces a static
+binary with no native runtime library. `make build` stamps `VERSION` and
+leaves `CGO_ENABLED` alone, so export it before `make build` when you want
+that same link.
 
 Check the stamp:
 
@@ -77,16 +80,15 @@ limits, and resource boundary.
 
 ## First local PDF
 
-Local files are **blocked by default**. The 0.2.4 target uses
-`--allow-local-files`, named output, and no `page` keyword:
+Local files are **blocked by default**. Pass `--allow-local-files` and name
+the output with `-o`. There is no `page` keyword:
 
 ```sh
 ./bin/gowkhtmltopdf --allow-local-files -o /tmp/invoice.pdf \
   testdata/golden/fixture-01-simple-invoice.html
 ```
 
-The target parser is present in the working tree, but the migration boundary
-and current validation status are documented in [cli.md](cli.md) and
+Flag names are in [cli.md](cli.md). The break from the 0.2.3 grammar is in
 [MIGRATION-0.2.4.md](MIGRATION-0.2.4.md).
 
 ## PDF version and profile
@@ -148,7 +150,7 @@ values into the converter without host allowlists and network isolation.
 That is classic **SSRF** (your server fetches internal hosts). The preferred
 pattern is to generate HTML yourself, then convert that. The same class of
 issue exists for upstream wkhtmltopdf. See
-[cli.md — Remote URL security](cli.md#remote-url-security),
+[cli.md, URL mode](cli.md#url-mode-chrome-strip-simplify-dom),
 [integration-security.md](integration-security.md), and
 [THREAT-MODEL.md](THREAT-MODEL.md).
 
@@ -181,9 +183,11 @@ Placeholders: `[page]`, `[topage]`, `[frompage]`, `[date]`, `[time]`,
 Outlines are **on by default** (depth 4). PDF `/Title` comes from `--title`,
 not from the HTML `<title>` (`<title>` feeds `[doctitle]` only).
 
-## Library (0.2.4 target)
+## Library
 
-Module path is `github.com/chinmay-sawant/gowkhtmltopdf`.
+Module path is `github.com/chinmay-sawant/gowkhtmltopdf`. The public types
+are `Document` and `ImageDocument` (shipped in 0.2.4, current at `VERSION`
+0.2.6).
 
 > **Python user?** The same engine runs in-process from Python through an
 > opt-in shared library (`pip install gowkhtmltopdf`). Install steps,
@@ -200,15 +204,10 @@ doc := gowkhtmltopdf.Document{
 pdfBytes, err := doc.PDF(ctx)
 ```
 
-The root package now exposes the v0.2.4 Document exports, so the examples
-remain under `examples/` until the hard break closes. See the full target
-contract and
-old-to-new table in [library-api.md](library-api.md) and
-[MIGRATION-0.2.4.md](MIGRATION-0.2.4.md).
-
 Worked programs: [`examples/pdf`](../examples/pdf/) and
 [`examples/image`](../examples/image/). Full surface:
-[library-api.md](library-api.md).
+[library-api.md](library-api.md). The 0.2.3 symbol list is in
+[MIGRATION-0.2.4.md](MIGRATION-0.2.4.md).
 
 ## Run tests
 
@@ -237,13 +236,18 @@ explicitly: `make test TEST_P=4 TEST_PARALLEL=4`.
 | `make test-quick` | `make test` plus `-short` |
 | `make test-serial` | `-p 1 -parallel 1` for very low RAM |
 | `make test-race` | `-race` on convert/layout/pdf/imageout/load, same caps |
-| `make lint` | `golangci-lint run` via [`.golangci.yml`](../.golangci.yml), then `npm run lint` in `frontend/` (ESLint plus `src/data` content/config checks) |
+| `make lint` | `golangci-lint` (pinned v1.64.8) via [`.golangci.yml`](../.golangci.yml), then `size-check`, then `npm run lint` in `frontend/` |
 | `make build` | `bin/gowkhtmltopdf`, `bin/gowkhtmltoimage` (stamps `VERSION`) |
 | `make golden` | Golden corpus tests (capped parallelism) |
 | `make golden-update GOLDEN_FIXTURE=fixture-NN-name.html GOLDEN_APPROVE=1` | One reviewed PDF under ignored `testdata/golden/out/` |
 | `make samples` | Refresh [`output/`](../output/) |
 | `make fmt` | `gofmt -w .` |
-| `make bench` | In-process Go benchmark matrix |
-| `make bench-cli-compare` | Process-level CLI comparison vs installed wkhtmltopdf |
+| `make bench` | External CLI comparisons via `scripts/bench-external.sh` (wkhtmltopdf, then WeasyPrint and Puppeteer on that gowk baseline) |
+| `make bench-engine` | Internal engine matrix (`bench-inprocess` is the old name) |
+| `make bench-lib` | Public `Document` / `ImageDocument` timings |
+| `make bench-cli-compare` | Process-level comparison against installed wkhtmltopdf (`make build` first) |
+| `make run` | Build the PDF CLI and convert `RUN_HTML` (default fixture-01) under `RUN_MAX_MS` (default 400) |
+| `make chrome-cases-pdf` | One PDF per `test/chrome/cases/case-*.html` under `test/chrome/cases/pdf/` |
+| `make wasm` / `make wasm-test` | Browser artifact in `frontend/public/wasm/`; `wasm-test` runs the adapter contract and the live-demo harness |
 | `make claim-scan` | Fail on forbidden over-claim phrases in user-facing docs |
-| `make clean` | Remove `testdata/golden/out` |
+| `make clean` | Remove `testdata/golden/out` and `dist` |

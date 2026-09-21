@@ -97,7 +97,7 @@ files are skipped as bodies; fixture-36 attaches them as HTML header/footer.
 | File | Description |
 |------|-------------|
 | `showcase-toc-hf-outline.pdf` | TOC + text headers/footers + outline on fixture-16 |
-| `wiki-ana-de-armas.pdf` | Live Wikipedia **raw** smoke from `make samples` (no `--simplify-dom`; `--use-system-fonts --zoom 0.666667`; needs network; **soft-fail** if offline). Not a chrome-stripped "pretty" print - see [`documentation/cli.md`](../documentation/cli.md#url-mode--chrome-strip---simplify-dom). |
+| `wiki-ana-de-armas.pdf` | Live Wikipedia **raw** smoke from `make samples` (no `--simplify-dom`; `--use-system-fonts --zoom 0.666667`; needs network; **soft-fail** if offline). Not a chrome-stripped "pretty" print - see [`documentation/cli.md`](../documentation/cli.md#url-mode-chrome-strip-simplify-dom). |
 
 ## Library-API architecture diagram
 

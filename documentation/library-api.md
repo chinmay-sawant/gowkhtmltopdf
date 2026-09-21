@@ -2,20 +2,18 @@
 
 Module path: `github.com/chinmay-sawant/gowkhtmltopdf`.
 
-> **0.2.4 migration status:** this page documents the complete `Document` /
-> `ImageDocument` API. The hard break is implemented in the root package;
-> `api.go` no longer exports the v0.2.3 symbols. See
-> [MIGRATION-0.2.4.md](MIGRATION-0.2.4.md).
+The public API is `Document` / `ImageDocument`, shipped in 0.2.4 and current
+at `VERSION` 0.2.6. `api.go` does not export the v0.2.3 symbols. The
+old-to-new table is [MIGRATION-0.2.4.md](MIGRATION-0.2.4.md).
 
-The 0.2.4 library models a document as data first and conversion as one
-explicit operation:
+A document is data. Conversion is one call:
 
 ~~~text
 Content source(s) → Page tree → Document / ImageDocument → WritePDF / WriteImage
 ~~~
 
-There is no public `Set("dotted.key", value)` escape hatch in the v0.2.4 API.
-Engine settings remain an internal implementation detail.
+There is no public `Set("dotted.key", value)`. Engine settings stay inside
+the module.
 
 For a browser-hosted inline HTML conversion that returns PDF, PNG, or JPEG
 bytes, use the separate [Browser WASM adapter](wasm.md). It reuses these root
@@ -23,7 +21,7 @@ document APIs but does not accept native file or URL sources.
 
 ## PDF quick start
 
-The v0.2.4 API uses `Content` to make the source kind explicit. A document may
+`Content` makes the source kind explicit. A document may
 contain a cover, an optional TOC, and one or more body pages. The render order
 is always Cover → TOC → Pages.
 
@@ -353,7 +351,6 @@ There is no `compat` package in 0.2.4. Use the
 
 ## Internal settings appendix
 
-The engine and the migration-period CLI may still use dotted names such as
-`size.pagesize`, `margin.top`, and `load.blocklocalfileaccess` internally.
-Those names are not the 0.2.4 library contract and should not appear in new
-application code.
+The engine still uses dotted names such as `size.pagesize`, `margin.top`,
+and `load.blocklocalfileaccess` internally. Those names are not the library
+contract. Keep them out of application code.

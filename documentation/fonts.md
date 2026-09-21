@@ -109,17 +109,23 @@ Identity-H. **There is no CGO HarfBuzz.**
   (fallback keeps combining marks after the base; no in-tree matra
   reordering).
 - **CJK (Han / kana / Hangul)** works when a capable TTF is on the font
-  path. `writing-mode: vertical-rl|vertical-lr` paints vertical runs
-  (rotated line boxes, `inline_vertical_writing.go`). Per-grapheme-cluster
-  vertical metrics and a dedicated vertical CJK face are still out.
+  path. `writing-mode: vertical-rl` and `vertical-lr` rotate glyphs by -90
+  degrees while the block still flows horizontally
+  (`internal/layout/inline_vertical_writing.go`). Full vertical line
+  stacking is not implemented. Per-grapheme-cluster vertical metrics and a
+  dedicated vertical CJK face are still out.
 - **IPA / uncommon Unicode:** when the CSS `font-family` face and Liberation
   lack a glyph, layout falls back to DejaVu (bundled) and then to any
   covering face on the opt-in registry. Use `--use-system-fonts` or
-  `--font-path` for extra coverage — see [cli.md](cli.md#url-mode--chrome-strip---simplify-dom).
+  `--font-path` for extra coverage. See
+  [cli.md](cli.md#url-mode-chrome-strip-simplify-dom).
 - **OpenType `halt` / `palt`:** requested via typesetting `FontFeatures` for
   CJK / East-Asian punctuation runs in `ShapeTextFont`, and via
   `ParseFontFeatureSettings` / `ShapeTextFontWithFeatures` when CSS
-  `font-feature-settings` is supplied.
+  `font-feature-settings` is supplied. `font-feature-settings`,
+  `font-kerning`, and `font-variant-caps` are Implemented (subset): the
+  tags and keywords reach the shaper
+  (`internal/layout/style_font_feature_props.go`).
 
 ## Image mode
 
