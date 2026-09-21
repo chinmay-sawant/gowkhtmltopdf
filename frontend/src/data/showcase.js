@@ -38,8 +38,8 @@ export const SHOWCASE = [
     name: 'fixture-64-next-72-props',
     file: 'fixture-64-next-72-props.pdf',
     pages: 8,
-    title: 'Next 72 CSS audit',
-    desc: 'Property gallery for the v0.2.7 next-72 set. Each row has a short description and a live Effect cell.',
+    title: 'font-feature-settings to counter-set',
+    desc: '72 properties from font-feature-settings through counter-set. Each row has a short description and a live Effect cell.',
     category: 'CSS & layout fixtures',
   },
   {
@@ -80,22 +80,6 @@ export const SHOWCASE = [
     pages: 9,
     title: 'Apex Digital landing',
     desc: 'Marketing landing with a hero, feature, pricing, and gallery grids, CSS variables, and local images.',
-    category: 'CSS & layout fixtures',
-  },
-  {
-    name: 'fixture-58-unsupported-worklist-audit',
-    file: 'fixture-58-unsupported-worklist-audit.pdf',
-    pages: 9,
-    title: 'Unsupported CSS worklist',
-    desc: 'Gallery that keeps the unsupported CSS worklist from crashing: animations, scroll snap, pointer UI, speech, and 3D.',
-    category: 'CSS & layout fixtures',
-  },
-  {
-    name: 'fixture-57-vanguard-telemetry-audit',
-    file: 'fixture-57-vanguard-telemetry-audit.pdf',
-    pages: 9,
-    title: 'Vanguard telemetry audit',
-    desc: 'Print gallery of the implemented CSS set, with the Vanguard audit narrative on the same pages.',
     category: 'CSS & layout fixtures',
   },
   {

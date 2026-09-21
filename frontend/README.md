@@ -16,7 +16,7 @@ What the site ships:
   reading time, scrollspy table of contents, previous/next links, and an
   "Edit this page on GitHub" link. `/about` uses the same block format and
   renders through `ContentPage.jsx`.
-- **Showcase** (`/showcase`): 70 committed samples (67 golden outputs plus 3
+- **Showcase** (`/showcase`): 68 committed samples (65 golden outputs plus 3
   specials) shown as page images, with category filters, a per-card page
   stepper, and a zoomable modal viewer.
 - **Benchmarks** (`/benchmarks`): gowkhtmltopdf versus wkhtmltopdf 0.12.6.1,

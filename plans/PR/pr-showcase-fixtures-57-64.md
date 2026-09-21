@@ -1,6 +1,6 @@
 ## Summary
 
-The showcase page reads its sample list from `frontend/src/data/showcase.js`. That list stopped at fixture 56, so fixtures 57-64 never appeared even though `make screenshots` had already written their page images. This adds those fixtures, plus the nested-float sample `fixture-29-wpt`, and rebuilds the published site bundle.
+The showcase page reads its sample list from `frontend/src/data/showcase.js`. That list stopped at fixture 56. This adds fixtures 59-64 and the nested-float sample `fixture-29-wpt`. Fixtures 57 and 58 stay as PDFs under `output/` and are not shown on the site. Fixture 64's heading names the property range, `font-feature-settings` through `counter-set`.
 
 ---
 
@@ -17,10 +17,11 @@ The golden corpus now runs through `fixture-64-next-72-props.html`. The gallery 
 
 ### Showcase catalog
 
-- Added fixtures 57, 58, 59, 60, 61, 62, 63, and 64 to `frontend/src/data/showcase.js`, in that descending order, under CSS & layout fixtures.
+- Added fixtures 59, 60, 61, 62, 63, and 64 to `frontend/src/data/showcase.js`, under CSS & layout fixtures. Fixtures 57 and 58 are omitted. Their PDFs remain in `output/`.
+- Fixture 64's page title and catalog card say `font-feature-settings to counter-set`. The HTML, `output/fixture-64-next-72-props.pdf`, and the page screenshots were regenerated with `bin/gowkhtmltopdf --font-path testdata/fonts/implemented-audit`. The golden needle stays `NEXT-72-PROPS`.
 - Added `fixture-29-wpt-break-nested-float-print`. Its three page images were already generated and it was the only other page-1 screenshot missing from the catalog.
-- Page counts match the PNG files in `frontend/src/assets/showcase/`: 9, 9, 9, 8, 8, 8, 7, and 8 for fixtures 57-64, and 3 for fixture 29-wpt.
-- `frontend/README.md` now says 70 samples (67 golden outputs plus 3 specials). It previously said 61.
+- Page counts match the PNG files in `frontend/src/assets/showcase/`: 9, 8, 8, 8, 7, and 8 for fixtures 59-64, and 3 for fixture 29-wpt.
+- `frontend/README.md` now says 68 samples (65 golden outputs plus 3 specials). It previously said 61.
 
 ### Published site
 
@@ -32,9 +33,9 @@ The golden corpus now runs through `fixture-64-next-72-props.html`. The gallery 
 
 | Area | Impact |
 |------|--------|
-| **Performance** | No engine change. The showcase JS bundle grows by the nine new catalog rows. |
+| **Performance** | No engine change. The showcase list gains fixtures 59-64 and fixture 29-wpt, and leaves out 57 and 58. |
 | **Memory** | None. |
-| **Behavior / correctness** | The showcase, its category filters, and the command palette now include fixtures 57-64 and fixture 29-wpt. |
+| **Behavior / correctness** | The showcase, its category filters, and the command palette include fixtures 59-64 and fixture 29-wpt. Fixture 64 is titled by its property range. |
 | **API / CLI** | None. |
 | **Dependencies** | None. |
 | **Binary size / build time** | None for the Go binaries. The site rebuild rewrote six hashed JS filenames. |
@@ -51,7 +52,8 @@ The golden corpus now runs through `fixture-64-next-72-props.html`. The gallery 
 
 ## Test plan
 
-- [x] Catalog check: every showcase row has a PNG and a WebP for each listed page, and every page-1 PNG is in the catalog (70 items, 0 gaps)
+- [x] Catalog check: every showcase row has a PNG and a WebP for each listed page, and every page-1 PNG is in the catalog (68 items, 0 gaps)
+- [x] `go test ./internal/convert -run 'TestGoldenCorpusAllFixtures/fixture-64' -count=1`
 - [x] `node frontend/scripts/lint-data.mjs`
 - [x] `npx eslint src/data/showcase.js` from `frontend/`
 - [x] `npm run build && npm test` in `frontend/`
@@ -67,18 +69,15 @@ cd frontend && npx eslint src/data/showcase.js && npm run build && npm test
 
 Chrome headless against `vite preview` at `#/showcase`:
 
-- 70 cards, meta text `70 of 70 samples`
-- Fixture 64 thumbnail loaded (400x566) and the modal listed pages 1-8
-- CSS & layout filter showed 39 cards, including Next 72 CSS audit
-- Invoices & receipts filter showed 10 cards, including Simple invoice, and did not include Next 72
-- Ctrl+K search for `Next 72` hit the new card
-- A 390px-wide viewport still listed 70 cards
+- 68 cards
+- No card for fixture 57 or fixture 58
+- Fixture 64 card title is `font-feature-settings to counter-set` and its thumbnail loaded (400 px wide)
 
 ---
 
 ## Screenshots / sample output
 
-No new images. The cards use the PNGs and WebP thumbs already in `frontend/src/assets/showcase/`.
+Fixture 64 page images were regenerated from the new PDF. Fixtures 57 and 58 no longer have site images. Their PDFs in `output/` are unchanged.
 
 ---
 
