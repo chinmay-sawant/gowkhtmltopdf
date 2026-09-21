@@ -384,11 +384,10 @@ Two engine defects surfaced while validating the panels:
    `TestChromeFixtureCase33SpacerFillsSurviveStrip`.
 
 Remaining engine-scope differences in the 21-40 pictures, all pre-existing and
-outside the two fixes above: `border: Npx solid transparent` paints black
-(case 35); native range/button faces are not painted (case 33); Liberation
-Sans wraps "LONG TEXT" a line earlier than Chromium's Tinos (case 34); and
-straight borders stroke centered on the box edge, so half the 15pt border
-falls outside the border box (case 39).
+outside the fixes above: `border: Npx solid transparent` paints black
+(case 35); native range/button faces are not painted (case 33); and straight
+borders stroke centered on the box edge, so half the 15pt border falls outside
+the border box (case 39).
 
 ### Case 29 float alignment fix (2026-09-21)
 
@@ -416,6 +415,37 @@ both paint the green float at x=36..180pt on all three pages; at 110 DPI pages
 2 and 3 are pixel-identical and page 1 differs only in text font metrics.
 Regression: `TestChromeFixtureCase29NestedFloatLeft`
 (`internal/layout/flex_chrome_cases_21_40_fixture_test.go`).
+
+### Case 34 max-content chrome fix (2026-09-21)
+
+The case 34 picture no longer wraps `LONG TEXT`. `flexIntrinsicWidth`
+(`internal/layout/flex.go`) is documented and consumed as returning a flex
+container's border-box width contribution, but it returned `contentW` without
+the container's own horizontal padding and border, even though `chrome` was
+already computed in the function. In the row case the second item's 5pt margin
+overflowed into the case's own border; in the column case `align-items:
+stretch` left the `LONG TEXT` item 64.01pt of content for the engine's 68.01pt
+line, so the text wrapped.
+
+Root cause: the three consumers treat the return as a border box
+(`buildFlex`, `internal/layout/flex.go:71`; `measureFlexItemMaxContent`,
+`internal/layout/flex.go:721`; `layoutWidth`, `internal/layout/layout_width.go:11`),
+and `measureFlexItemMaxContent` already returns `contentW + chrome`
+(`internal/layout/flex.go:772`). The container's own chrome was dropped only in
+`flexIntrinsicWidth`.
+
+Fix: `flexIntrinsicWidth` returns `contentW + chrome`. The row case box is now
+114pt (item border boxes 40 + 50, margins 20, chrome 4) and the column case box
+92.01pt (68.01 line + 10 item chrome + 10 margins + 4 chrome).
+
+Evidence: `skills/chrome-debug-v2/scripts/compare_pdfs.py` shows one
+`LONG TEXT` row at (20.0, 157.25, 88.0, 170.75) where two rows `LONG` and
+`TEXT` painted before; the column case path span is x 8..100. Regression pins:
+`TestChromeFixtureCase34MaxContentContribution` (`internal/layout/flex_chrome_cases_21_40_fixture_test.go`)
+and `TestChromeFlexContainerMaxContentContribution`
+(`internal/layout/flex_chrome_intrinsic_test.go`), which keeps a chrome-free
+container at 90pt. `make test`, `make golden`, and `make lint` exit 0. Remaining
+case 34 differences are font metrics and the border convention.
 
 ## Phase 3. Chrome-reference cases
 

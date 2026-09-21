@@ -829,7 +829,7 @@ func (e *engine) flexIntrinsicWidth(node *html.Node, style ResolvedStyle, _ bool
 		contentW = childW
 	}
 
-	return contentW
+	return contentW + chrome
 }
 
 // flexSpecifiedBaseWidth resolves a definite flex base size (flex-basis then

@@ -299,8 +299,8 @@ func TestChromeFixtureCase34MaxContentContribution(t *testing.T) {
 	res := fixture21To40(t, "case-34-wpt-flex-container-max-content.html")
 	row := fixtureBox(t, res, "case-34-row")
 	column := fixtureBox(t, res, "case-34-column")
-	if !near(row.w, 110) || !near(column.w, 88.01) {
-		t.Fatalf("case 34 intrinsic widths = %.2f/%.2fpt, want 110/88.01pt", row.w, column.w)
+	if !near(row.w, 114) || !near(column.w, 92.01) {
+		t.Fatalf("case 34 intrinsic widths = %.2f/%.2fpt, want 114/92.01pt", row.w, column.w)
 	}
 }
 

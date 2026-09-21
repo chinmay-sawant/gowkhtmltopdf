@@ -258,7 +258,8 @@ func TestChromeFlexContainerMaxContentContribution(t *testing.T) {
 
 		// 30pt and 40pt content boxes: 30+3+3+2+2 = 40pt and 40+3+3+2+2 =
 		// 50pt, so the container max-content width is 90pt and both items
-		// keep their outer sizes side by side.
+		// keep their outer sizes side by side. The container itself has no
+		// padding or border, so its border box equals the 90pt content sum.
 		cssSheet := sheet(t, `
 body { margin: 0 }
 .case { display: flex; width: max-content; justify-self: center }
