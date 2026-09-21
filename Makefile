@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-quick test-serial test-race lint lint-frontend size-check build wasm wasm-test fmt golden golden-update samples samples-python screenshots weasyprint clean claim-scan bench bench-engine bench-lib bench-inprocess bench-cli-compare c-shared bindings-clean check-versions python-binding-test python-benchmarks python-api
+.PHONY: test test-unit test-quick test-serial test-race lint lint-frontend size-check build wasm wasm-test fmt golden golden-update samples samples-python screenshots weasyprint clean claim-scan bench bench-engine bench-lib bench-inprocess bench-cli-compare c-shared bindings-clean check-versions python-binding-test python-benchmarks python-api chrome-cases-pdf
 # Pure-Go runtime: the standard library plus the allowlisted direct modules
 # below. No cgo, browser, or native converter process is required.
 # Direct third-party requires must stay ⊆ {
@@ -224,6 +224,22 @@ samples:
 		-o output/wiki-ana-de-armas.pdf \
 		|| echo "warning: wiki-ana-de-armas.pdf live smoke skipped (network/fetch failed)"
 	ls -la output/ | awk '{print $$5, $$9}' | tail -30
+
+# Render every Chrome flex interaction case under test/chrome/cases/ into
+# test/chrome/cases/pdf/ for visual inspection. Artifacts only; the focused
+# layout tests under test/chrome own the assertions. Depends on `make build`
+# and is meant to run after `make golden` (or `make samples`), so the visual
+# pass starts from a green, freshly built tree.
+chrome-cases-pdf: build
+	mkdir -p test/chrome/cases/pdf
+	rm -f test/chrome/cases/pdf/*.pdf
+	@for f in test/chrome/cases/case-*.html; do \
+		name=$$(basename "$$f" .html); \
+		title=$$(printf '%s\n' "$$name" | sed -n 's/^case-[0-9][0-9]*-//p'); \
+		./bin/gowkhtmltopdf --allow-local-files --title "$$title" \
+			-o "test/chrome/cases/pdf/$$name.pdf" "$$f" || exit 1; \
+	done
+	@echo "chrome cases: $$(ls test/chrome/cases/pdf/*.pdf | wc -l) PDFs written to test/chrome/cases/pdf/"
 
 # Regenerate the committed frontend showcase screenshots and WebP thumbnails
 # from the PDFs currently present in output/. Use `make samples` first when the
