@@ -425,3 +425,68 @@ func TestFixture43CardsAndTheadDoNotOverlap(t *testing.T) {
 		break
 	}
 }
+
+// Fixture-64 page 7: a sliver repair on page 6 dragged the whole following
+// flow down by 63.65pt, and row 63 stayed that far under the repeated header
+// because nothing pulls a row back up across a page boundary.
+func TestFixture64ContinuationRowsStartAtHeaderBottom(t *testing.T) {
+	t.Parallel()
+
+	res, contentH := paintGoldenFixture(t, "fixture-64-next-72-props.html")
+
+	table := fixture64BigTable(res)
+	if table == nil {
+		t.Fatal("fixture-64 table not found")
+	}
+
+	hdrFirst, hdrLast, _, hdrH := rowSpan(table.rows[:table.headerRows], res)
+	if hdrFirst < 0 || hdrLast < hdrFirst || hdrH <= 0 {
+		t.Fatalf("fixture-64 header band missing: first=%d last=%d h=%.2f", hdrFirst, hdrLast, hdrH)
+	}
+
+	firstTop := fixture64FirstBodyRowPerPage(table, res, contentH)
+	if len(firstTop) < 5 {
+		t.Fatalf("fixture-64 continuation pages = %d, want >= 5", len(firstTop))
+	}
+
+	for page, top := range firstTop {
+		want := float64(page)*contentH + hdrH
+		if top < want-0.75 || top > want+0.75 {
+			t.Errorf("page %d: first body row top = %.2f, want repeated-header bottom %.2f", page+1, top, want)
+		}
+	}
+}
+
+func fixture64BigTable(res *Result) *box {
+	for _, b := range flowBoxList(res) {
+		if b.kind == boxKindTable && len(b.rows) > 60 && b.headerRows > 0 {
+			return b
+		}
+	}
+
+	return nil
+}
+
+// fixture64FirstBodyRowPerPage returns the topmost body row Y per page index,
+// skipping page 0 (the table's first page starts below the masthead).
+func fixture64FirstBodyRowPerPage(table *box, res *Result, contentH float64) map[int]float64 {
+	firstTop := map[int]float64{}
+
+	for _, row := range table.rows[table.headerRows:] {
+		top := rowYBounds(row, res)
+		if top < 0 {
+			continue
+		}
+
+		page := int(top / contentH)
+		if page == 0 {
+			continue
+		}
+
+		if current, ok := firstTop[page]; !ok || top < current {
+			firstTop[page] = top
+		}
+	}
+
+	return firstTop
+}
