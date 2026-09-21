@@ -119,7 +119,7 @@ proves. Page envelopes are pinned in `internal/convert/golden_test.go`
 | 60 | Implemented CSS props audit slice A (~1/3): property/description/effect gallery; Liberation via `--font-path testdata/fonts/implemented-audit`; needle `IMPLEMENTED-PROPS-A`. | 8 |
 | 61 | Implemented CSS props audit slice B (~1/3): same pattern; needle `IMPLEMENTED-PROPS-B`. | 8 |
 | 62 | Implemented CSS props audit slice C (~1/3): same pattern; needle `IMPLEMENTED-PROPS-C`. | 8 |
-| 64 | Next 72 CSS props target audit for v0.2.7 (`plans/0.2.7/next-72-properties.json`); property/description/effect gallery; needle `NEXT-72-PROPS`. | 5 |
+| 64 | Next 72 CSS props target audit for v0.2.7 (`plans/0.2.7/next-72-properties.json`); property/description/effect gallery; needle `NEXT-72-PROPS`. | 5–8 |
 | font-examples | Font showcase: 1,125 free Google Fonts (fonts.google.com Feeling/Calligraphy filters + top-trending modern/display/script/handwriting) - randomized sampler: every font appears exactly once, each line in a random text style (regular, bold, italic, bold-italic, underline, strikethrough, underline+strikethrough, bold+underline, bold-italic+underline+strikethrough, letter-spaced, uppercase), rows span 100% width in a single column; inline `<style>`; fonts intentionally NOT bundled - render with `--font-path <dir>` or `Global().Set("fontpath", dir)`; falls back to Liberation Sans without font flags | 25 (with fonts, single column, number+name inline, overflow-wrap) |
 
 ## Pass criteria

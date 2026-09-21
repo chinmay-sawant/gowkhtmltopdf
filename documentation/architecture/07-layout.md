@@ -515,8 +515,10 @@ Cross-referenced with `documentation/compatibility-matrix.md` (normative),
 - **Orphans/widows**: Rule 3 applies only when line boxes are countable; the
   geometric short-block heuristic remains for nested/uncountable cases
   (fixtures 30/37).
-- **No vertical writing modes beyond parsing** (`writing-mode` parsed into
-  `ResolvedStyle.WritingMode`, layout assumes horizontal-tb).
+- **Vertical writing is lite:** `writing-mode: vertical-rl|vertical-lr`
+  rotates line boxes (`inline_vertical_writing.go`, matrix §2.3). It is
+  not a full vertical typesetting engine (no vertical font metrics, no
+  per-grapheme upright CJK).
 - **HTML HF band**: single-page, clipped; taller content is clipped rather
   than paginated (documented in `hf.go`).
 - **Zoom interacts with absolute positioning/viewport percentages** in

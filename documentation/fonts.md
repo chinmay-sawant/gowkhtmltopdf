@@ -109,8 +109,9 @@ Identity-H. **There is no CGO HarfBuzz.**
   (fallback keeps combining marks after the base; no in-tree matra
   reordering).
 - **CJK (Han / kana / Hangul)** works when a capable TTF is on the font
-  path. `writing-mode: vertical-rl|lr` is **parsed** but lays out
-  **horizontal**. There is no rotated CJK / vertical typesetting path.
+  path. `writing-mode: vertical-rl|vertical-lr` paints vertical runs
+  (rotated line boxes, `inline_vertical_writing.go`). Per-grapheme-cluster
+  vertical metrics and a dedicated vertical CJK face are still out.
 - **IPA / uncommon Unicode:** when the CSS `font-family` face and Liberation
   lack a glyph, layout falls back to DejaVu (bundled) and then to any
   covering face on the opt-in registry. Use `--use-system-fonts` or

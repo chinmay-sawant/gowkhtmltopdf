@@ -67,12 +67,14 @@ Measured on `BenchmarkChromeCasePDFs` (40 cases × 10 warm renders) at `e1ef59a`
 
 ### Plans, skills, samples
 
-- `plans/0.2.7/` ledgers for next-72, next-100, and Chrome flex. `documentation/compatibility-matrix.md` gained next-72 rows and §5.5 Borders-4 deferrals.
+- `plans/0.2.7/` ledgers for next-72, next-100, and Chrome flex. `documentation/compatibility-matrix.md` catalog line is 407 / 0 / 411, next-72 rows use full property names in backticks, and §5.5 lists the 14 Borders-4 deferrals.
+- `documentation/deferred.md` records the 19 next-72 leftovers. `documentation/fonts.md` and `documentation/architecture/07-layout.md` describe vertical-rl/lr lite instead of parse-only. `documentation/samples.md` lists fixtures 57-64 and 29-wpt.
+- Frontend compatibility and about pages now quote 407 Implemented / 0 Partial / 411 Unsupported. The old "font-feature-settings Unsupported" row is gone; next-72 Implemented groups and the 19 leftovers are in the property table. `npm --prefix frontend run build` refreshed `docs/`.
 - Skills: `skills/chrome-debug-v2` (budgeted one-fixture Chrome-vs-Go PDF loop), `skills/perf-patterns` (measured Go hot-path catalog), `skills/chrome-flex-pdf-closure`, `skills/chrome-debug` kept as the long-form reference.
 - `make samples` regenerated `output/` including `output/fixture-64-next-72-props.pdf` and `output/fixture-29-wpt-break-nested-float-print.pdf` (`1c449b1`, `9fe9b51`, `1b6672d`).
 - `make run` times fixture-01 through the CLI and fails at 400ms.
 
-No `frontend/` or `docs/` files in the diff. No `go.mod` change. No Document / CLI / C ABI / Python stamp change.
+No `go.mod` change. No Document / CLI / C ABI / Python stamp change.
 
 ---
 
@@ -114,7 +116,7 @@ Re-run on HEAD `1b6672d` (2026-09-21). Every listed gate exited 0.
 - [x] `make build` (exit 0, 2s; `bin/gowkhtmltopdf` and `bin/gowkhtmltoimage` stamped 0.2.6)
 - [x] `make samples` (committed `output/` on `1c449b1`, `9fe9b51`, `1b6672d`; not re-run here so `output/` stays as committed)
 - [x] `python3 scripts/css-catalog-map.py --check` (exit 0; `check ok (253 apply arms mapped)`)
-- [x] `make claim-scan` (exit 0; `claim-scan: clean`)
+- [x] `make claim-scan` (exit 0; `claim-scan: clean` after the documentation/frontend honesty pass)
 - [x] `go test ./test/chrome -count=1` (exit 0, 0.095s)
 - [x] `go test ./internal/layout -count=1` (exit 0, 3.722s)
 - [x] `go test ./internal/convert -run 'TestGoldenCorpusAllFixtures/fixture-64-next-72-props.html' -count=1` (exit 0, 0.506s)
@@ -257,20 +259,23 @@ GitHub PR: https://github.com/chinmay-sawant/gowkhtmltopdf/pull/76
 
 ## Diff stat by extension
 
-Generated with `bash scripts/pr-diff-stat.sh master` on `feature/027-next-72-with-chrome-test`.
+Generated from the staged tree vs `master` (same grouping as `bash scripts/pr-diff-stat.sh master`) on `feature/027-next-72-with-chrome-test`.
 
 | Extension | Files | Insertions | Deletions |
 | --- | ---: | ---: | ---: |
 | `.css` | 1 | 2 | 1 |
 | `.go` | 151 | 21777 | 1466 |
-| `.html` | 42 | 2957 | 0 |
-| `.json` | 5 | 4512 | 197 |
-| `.md` | 39 | 4768 | 56 |
+| `.html` | 43 | 2958 | 1 |
+| `.js` | 6 | 19 | 19 |
+| `.json` | 7 | 4550 | 205 |
+| `.md` | 43 | 5066 | 63 |
 | `.pdf` | 76 | Binary | Binary |
-| `.png` | 2 | Binary | Binary |
+| `.png` | 131 | Binary | Binary |
 | `.py` | 3 | 1092 | 0 |
+| `.sh` | 1 | 34 | 0 |
 | `.ttf` | 3 | Binary | Binary |
 | `.txt` | 2 | 17 | 3 |
+| `.webp` | 129 | Binary | Binary |
 | `.yaml` | 2 | 6 | 0 |
-| No extension | 2 | 30 | 1 |
-| **Total** | **328** | **35161** | **1724** |
+| No extension | 2 | 40 | 1 |
+| **Total** | **600** | **35561** | **1759** |
