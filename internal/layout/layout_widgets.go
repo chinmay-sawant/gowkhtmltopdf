@@ -221,3 +221,118 @@ func (e *engine) paintCheckboxWidget(
 		e.paintUncheckedCheckbox(geo)
 	}
 }
+
+// isInputRange reports whether node is an input range control.
+func isInputRange(node *html.Node) bool {
+	if node == nil || node.Name != htmlInput {
+		return false
+	}
+
+	return strings.ToLower(node.Attribute("type")) == "range"
+}
+
+// isInputButton reports whether node is an input button control.
+func isInputButton(node *html.Node) bool {
+	if node == nil || node.Name != htmlInput {
+		return false
+	}
+
+	return strings.ToLower(node.Attribute("type")) == "button"
+}
+
+// rangeThumbDiameterPx is the Chrome range thumb diameter in CSS px.
+const rangeThumbDiameterPx = 15
+
+// formControlFontSizePt is the Chrome UA form-control font size in points
+// (13.333px). The style pipeline records no "author set font-size" flag, so the
+// button label always uses the UA control size rather than the inherited body
+// size.
+const formControlFontSizePt = 10
+
+// rangeThumbColor returns the range thumb fill: an authored accent-color when
+// present, otherwise Chrome's default range accent #0075FF. The input fallback
+// in widgetValueColor (0.46) is the rounded value checkboxes use; the range
+// thumb keeps Chrome's exact 117/255.
+func rangeThumbColor(style ResolvedStyle) [3]float64 {
+	if style.AccentColorSet {
+		return style.AccentColor
+	}
+
+	return [3]float64{0, 117.0 / 255.0, 1}
+}
+
+// paintRangeWidget paints the range thumb: a fully rounded circle centered in
+// the control's border box. Chrome keeps the thumb visible for the fixture's
+// appearance:none range input.
+func (e *engine) paintRangeWidget(style ResolvedStyle, leftX, topY, width, height float64) {
+	diameter := e.scalePt(pxToPt(rangeThumbDiameterPx))
+	if diameter <= 0 || width <= 0 || height <= 0 {
+		return
+	}
+
+	color := rangeThumbColor(style)
+
+	e.add(Op{ //nolint:exhaustruct // intentional zero fields
+		Kind:   OpFillRect,
+		X:      leftX + (width-diameter)/two,
+		Y:      topY + (height-diameter)/two,
+		W:      diameter,
+		H:      diameter,
+		R:      color[0],
+		G:      color[1],
+		B:      color[2],
+		Alpha:  1,
+		Radius: diameter / two,
+	})
+}
+
+// paintButtonWidget paints the input[type=button] value attribute centered in
+// the control's border box at the UA form-control font size.
+func (e *engine) paintButtonWidget(node *html.Node, style ResolvedStyle, leftX, topY, width, height float64) {
+	text := node.Attribute("value")
+	if text == "" {
+		return
+	}
+
+	face := e.faceFor(&style)
+	if face == nil {
+		return
+	}
+
+	size := e.scalePt(formControlFontSizePt)
+	if size <= 0 {
+		return
+	}
+
+	textStyle := style
+	textStyle.FontSize = formControlFontSizePt
+
+	textW := e.measureTextFace(text, &textStyle)
+	ascent := e.fontAscentFace(face, size)
+	descent := e.fontDescentFace(face, size)
+
+	e.add(Op{ //nolint:exhaustruct // intentional zero fields
+		Kind: OpText, X: leftX + (width-textW)/two,
+		Y: topY + (height+ascent-descent)/two, W: textW, H: ascent + descent,
+		Text: text, Font: face, Size: size, InkDescent: descent,
+		R: style.Color[0], G: style.Color[1], B: style.Color[2],
+		Bold: style.FontWeight >= fontWeightBoldValue,
+	})
+}
+
+// paintWidgetControl paints the native control face for value, range, button
+// and checkbox widgets after the box height is final.
+func (e *engine) paintWidgetControl(
+	node *html.Node, style ResolvedStyle, boxNode *box, widget, chkWidget bool, posY float64,
+) {
+	switch {
+	case widget:
+		e.paintValueWidget(node, style, boxNode.x, posY, boxNode.w, boxNode.height)
+	case chkWidget:
+		e.paintCheckboxWidget(node, style, boxNode.x, posY, boxNode.w, boxNode.height)
+	case isInputRange(node):
+		e.paintRangeWidget(style, boxNode.x, posY, boxNode.w, boxNode.height)
+	case isInputButton(node):
+		e.paintButtonWidget(node, style, boxNode.x, posY, boxNode.w, boxNode.height)
+	}
+}

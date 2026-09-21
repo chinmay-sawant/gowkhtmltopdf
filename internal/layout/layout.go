@@ -1791,18 +1791,6 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 	return boxNode
 }
 
-// paintWidgetControl paints the native control face for value and checkbox
-// widgets after the box height is final.
-func (e *engine) paintWidgetControl(
-	node *html.Node, style ResolvedStyle, boxNode *box, widget, chkWidget bool, posY float64,
-) {
-	if widget {
-		e.paintValueWidget(node, style, boxNode.x, posY, boxNode.w, boxNode.height)
-	} else if chkWidget {
-		e.paintCheckboxWidget(node, style, boxNode.x, posY, boxNode.w, boxNode.height)
-	}
-}
-
 // nativeWidgetAutoContentBottom returns the content-flow endpoint for an
 // auto-sized native value control whose border-box height is one scaled font
 // size. Padding and the top border are already part of the flow coordinate;
