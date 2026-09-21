@@ -77,6 +77,7 @@ const (
 	// Content stream / operators.
 	pdfFloatPrec     = 3
 	pdfNumBase       = 10
+	float64Bits      = 64
 	rgbComponents    = 3
 	pointComponents  = 2
 	rectComponents   = 4

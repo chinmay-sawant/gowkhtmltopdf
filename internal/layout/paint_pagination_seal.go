@@ -6,12 +6,13 @@ import (
 
 // Table-seal geometry: border-width floors, cluster sizes, and page bands.
 const (
-	sealMinBorderWidth = 0.3
-	sealFallbackWidth  = 0.5
-	sealStubMinCount   = 2
-	yBucketScale       = 2
-	trailingBandSlack  = 8.0
-	minInkHeight       = 4
+	sealMinBorderWidth    = 0.3
+	sealFallbackWidth     = 0.5
+	sealStubMinCount      = 2
+	pageBoundarySealInset = 2
+	yBucketScale          = 2
+	trailingBandSlack     = 8.0
+	minInkHeight          = 4
 
 	// bandClusterMinColumns is the smallest vertical-segment count that seals
 	// a table edge; narrower clusters are text rules, not grid borders.
@@ -23,6 +24,10 @@ const (
 	bandEdgeTolerance = 0.5
 	// bandOverlapSlack is the horizontal overlap slack for cluster spans.
 	bandOverlapSlack = 2.0
+	// stripRowAspect is the width/height ratio below which a fill is not
+	// row-shaped: the orphan-row strip leaves it alone. Row chrome in the
+	// corpus starts at 7.5x; the case-13 flex marker is 1.0x.
+	stripRowAspect = 4.0
 )
 
 // capTablePageBreaks draws a horizontal top edge on pages where a table
@@ -168,22 +173,36 @@ func sealPageBottomClusters(
 
 		pageTop := float64(page) * contentH
 		pageBot := float64(page+1) * contentH
+		sealY := child.y
+
+		if page > 0 {
+			boundary := pageTop
+			if child.y <= boundary+bandEdgeTolerance {
+				// A collapsed border endpoint can land a fraction past the
+				// page boundary after row-height rounding. Keep that endpoint
+				// with the page it closes, not with the repeated header page.
+				page--
+				pageTop = float64(page) * contentH
+				pageBot = boundary
+				sealY = pageBot - pageBoundarySealInset*layoutCoordEpsilon
+			}
+		}
 
 		if child.y < pageTop || child.y > pageBot+eps {
 			continue
 		}
 
-		if coverage(child.y, child.minX, child.maxX, pageBot) {
+		if coverage(sealY, child.minX, child.maxX, pageBot) {
 			continue
 		}
 
 		// Same-page continuation below: do not seal (false mid-page gap,
 		// fixture-60 rows 105-106). Next-page thead at pageBot must not count.
-		if verticalClusterStartsBefore(starts, child.y, child.minX, child.maxX, pageBot) {
+		if verticalClusterStartsBefore(starts, sealY, child.minX, child.maxX, pageBot) {
 			continue
 		}
 
-		seal(child.y, child.minX, child.maxX, child.bw, child.r, child.g, child.b)
+		seal(sealY, child.minX, child.maxX, child.bw, child.r, child.g, child.b)
 	}
 }
 
@@ -601,6 +620,7 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 	pageOps := pageIndexedOps(res, contentH)
 
 	stickyTargets := stickySectionChromeTargets(res.root)
+	flexItems := flexItemBoxes(res.root)
 
 	for page := range pageOps {
 		pageTop := float64(page) * contentH
@@ -611,8 +631,8 @@ func stripOrphanRowChrome(res *Result, contentH float64) {
 			continue
 		}
 
-		if stripOrphanRows(res, pageOps[page], pageTop, pageBot, lastInkBot) {
-			tightenLastRowChrome(res, pageOps[page], pageTop, pageBot, lastInkBot)
+		if stripOrphanRows(res, pageOps[page], pageTop, pageBot, lastInkBot, flexItems) {
+			tightenLastRowChrome(res, pageOps[page], pageTop, pageBot, lastInkBot, flexItems)
 		}
 		// Pull section washes / borders up to the last row chrome / ink so grey
 		// does not pad an empty band to the page bottom (fixture-31 page 1).
@@ -694,13 +714,20 @@ func lastInkBottom(res *Result, idxs []int, pageTop, pageBot float64) (float64, 
 }
 
 // stripOrphanRows zeros row-sized fills / rules that sit below the last ink.
-// Returns whether anything was stripped.
-func stripOrphanRows(res *Result, idxs []int, pageTop, pageBot, lastInkBot float64) bool {
+// Returns whether anything was stripped. Flex item boxes are exempt: their
+// used size came from the flex algorithm, so their fill is definite box paint,
+// not empty-row chrome (same rule as tightenLastRowChrome; case-33's 150x30
+// spacer fills were stripped once the description panel added page ink).
+func stripOrphanRows(res *Result, idxs []int, pageTop, pageBot, lastInkBot float64, flexItems []*box) bool {
 	stripped := false
 
 	for _, i := range idxs {
 		paintOp := &res.Ops[i]
 		if paintOp.StickyID != 0 || !opInPageBand(paintOp, pageTop, pageBot) {
+			continue
+		}
+
+		if opOwnedByFlexItem(paintOp, flexItems) {
 			continue
 		}
 
@@ -717,6 +744,13 @@ func stripOrphanRows(res *Result, idxs []int, pageTop, pageBot, lastInkBot float
 //
 //nolint:cyclop // grid runs are an explicit no-strip arm
 func stripOrphanRowOp(paintOp *Op, lastInkBot float64) bool {
+	// A CSS outline is authored stroke paint, not empty-row chrome. The row
+	// heuristics below measure the box rect, so an outline edge inflated past
+	// the border box reads as a trailing rule (case-26 bottom dashes).
+	if paintOp.isOutline() {
+		return false
+	}
+
 	switch paintOp.Kind {
 	case OpGridRun:
 		// Grid runs carry verticals and shared chrome; the orphan pass does
@@ -737,6 +771,13 @@ func stripOrphanRowOp(paintOp *Op, lastInkBot float64) bool {
 			return false
 		}
 
+		// Rows are wide by construction. A square or tall fill below the last
+		// ink is authored box paint, not row chrome: case-13's vertical-rl
+		// marker (13.79x13.79) sits below the last title and was zeroed here.
+		if paintOp.W <= stripRowAspect*paintOp.H {
+			return false
+		}
+
 		if paintOp.Y+paintOp.H/2 > lastInkBot+0.5 {
 			paintOp.H = 0
 
@@ -746,6 +787,15 @@ func stripOrphanRowOp(paintOp *Op, lastInkBot float64) bool {
 		if paintOp.H >= 1 {
 			return false
 		}
+
+		// Dashed/dotted border fragments are authored edge paint, not an
+		// empty-row separator: their short W matches the dash metric for
+		// their stroke width (case-38's dotted bottom edge, stripped once
+		// its fragments sat below the last text ink).
+		if looksLikeDashSegmentLength(paintOp.W, paintOp.Width) {
+			return false
+		}
+
 		// Horizontal rule below the last ink (empty row separator).
 		if paintOp.Y > lastInkBot+0.5 {
 			paintOp.Width = 0
@@ -760,7 +810,12 @@ func stripOrphanRowOp(paintOp *Op, lastInkBot float64) bool {
 
 // tightenLastRowChrome shortens the last row's fill so padding under the
 // final baseline does not read as another empty row (fixture-31 Row 27 cell).
-func tightenLastRowChrome(res *Result, idxs []int, pageTop, pageBot, lastInkBot float64) {
+// Flex items are exempt: their used size was resolved by the flex algorithm,
+// so their background is definite box paint, not row chrome. Tightening one
+// painted a 27.573pt fill for the 30pt Chrome Flex auto-margin item.
+func tightenLastRowChrome(
+	res *Result, idxs []int, pageTop, pageBot, lastInkBot float64, flexItems []*box,
+) {
 	const underPad = 8.0
 
 	for _, i := range idxs {
@@ -769,13 +824,69 @@ func tightenLastRowChrome(res *Result, idxs []int, pageTop, pageBot, lastInkBot 
 			continue
 		}
 
+		if opOwnedByFlexItem(paintOp, flexItems) {
+			continue
+		}
+
 		tightenLastRowOp(paintOp, lastInkBot, underPad)
 	}
+}
+
+// flexItemBoxes returns the boxes whose parent establishes a flex formatting
+// context: the flex items.
+func flexItemBoxes(root *box) []*box {
+	var items []*box
+
+	var walk func(boxNode, parent *box)
+	walk = func(boxNode, parent *box) {
+		if boxNode == nil {
+			return
+		}
+
+		if parent != nil && isFlexContainerBox(parent) {
+			items = append(items, boxNode)
+		}
+
+		for _, child := range boxNode.children {
+			walk(child, boxNode)
+		}
+	}
+	walk(root, nil)
+
+	return items
+}
+
+// isFlexContainerBox reports a box that establishes a flex formatting context.
+func isFlexContainerBox(boxNode *box) bool {
+	if boxNode == nil || boxNode.style == nil {
+		return false
+	}
+
+	return boxNode.style.Display == displayFlex || boxNode.style.Display == displayInlineFlex
+}
+
+// opOwnedByFlexItem reports an op that paints a flex item's own border-box
+// rect (a page fragment included), so the tighten pass leaves its authored
+// height alone.
+func opOwnedByFlexItem(paintOp *Op, flexItems []*box) bool {
+	for _, item := range flexItems {
+		if opOwnsBoxRect(paintOp, item, opOwnerChrome) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // tightenLastRowOp shortens the last row's fill and pulls the trailing rule
 // up under the final baseline.
 func tightenLastRowOp(paintOp *Op, lastInkBot, underPad float64) {
+	// Outline edges keep their authored geometry for the same reason the strip
+	// leaves them alone (see stripOrphanRowOp).
+	if paintOp.isOutline() {
+		return
+	}
+
 	if isLastRowFill(paintOp, lastInkBot, underPad) {
 		paintOp.H = lastInkBot + underPad - paintOp.Y
 		if paintOp.H < 1 {

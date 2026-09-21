@@ -158,7 +158,7 @@ func (e *engine) inflowPseudoImage(
 // baseline on the box. When floats is non-nil, each line re-queries exclusion
 // at its canvas Y so text widens again after a float ends mid-paragraph.
 //
-//nolint:cyclop,gocognit,funlen // hot path: per-line wrap against float exclusion zones
+//nolint:cyclop,gocognit,gocyclo,funlen,mnd,wsl // hot path: per-line wrap against float exclusion zones
 func (e *engine) layoutInlineFloats(
 	boxNode *box, nodes []*html.Node, contentW, contentX, lineY float64,
 	floats *floatState,
@@ -189,7 +189,30 @@ func (e *engine) layoutInlineFloats(
 		}
 	}
 
+	// Drop-cap: size leading initial-letter run, paint it, exclude beside it.
+	var localFloats floatState
+	if letter, rest, hasIL := e.prepareInitialLetter(items, blockStyle); hasIL {
+		if floats == nil {
+			localFloats = newFloatState(contentX, contentW)
+			floats = &localFloats
+		}
+
+		parentLH := surroundingLineHeight(blockStyle, letter[0].style) * e.scale
+		e.placeInitialLetter(boxNode, letter, contentX, leftY, parentLH, floats)
+		items = rest
+		if len(items) == 0 {
+			sink := initialLetterSinkLines(letter[0].style)
+			if sink < 1 {
+				sink = 1
+			}
+
+			return parentLH * float64(sink)
+		}
+	}
+
 	idx := 0
+	consecHyphenLines := 0
+
 	for idx < len(items) {
 		lineX, lineW := e.lineBounds(floats, contentX, contentW, leftY)
 
@@ -209,8 +232,25 @@ func (e *engine) layoutInlineFloats(
 		leftY, lineX, lineW = e.preferClearForTail(items, idx, lineX, lineW, contentX, contentW, leftY, floats)
 		// Pack one line under current exclusion width.
 		start := idx
+		tailW, _ := tailRemaining(items, start)
+		lastLikely := tailW <= lineW+1e-6
 
-		idx, lineX, lineW, leftY = e.packInlineLine(&items, start, lineX, lineW, leftY, contentX, contentW, floats)
+		blockHyphen := true
+
+		if blockStyle != nil {
+			if hyphenateLimitLastBlocks(blockStyle, lastLikely) {
+				blockHyphen = false
+			}
+
+			if blockStyle.HyphenateLimitLines >= 0 &&
+				consecHyphenLines >= blockStyle.HyphenateLimitLines {
+				blockHyphen = false
+			}
+		}
+
+		idx, lineX, lineW, leftY = e.packInlineLine(
+			&items, start, lineX, lineW, leftY, contentX, contentW, floats, blockHyphen,
+		)
 
 		end := idx
 
@@ -230,6 +270,7 @@ func (e *engine) layoutInlineFloats(
 
 		lineCount++
 		lastLine := idx >= len(items) || (clampLimit > 0 && lineCount >= clampLimit)
+		firstLine := lineCount == 1
 
 		if clampLimit > 0 && lineCount >= clampLimit && idx < len(items) {
 			if end > start && items[end-1].text != "" {
@@ -237,7 +278,13 @@ func (e *engine) layoutInlineFloats(
 			}
 		}
 
-		leftY += e.emitLine(boxNode, items, start, end, lineW, lineX, leftY, lastLine)
+		if lineEndsWithHyphen(items[start:end]) {
+			consecHyphenLines++
+		} else {
+			consecHyphenLines = 0
+		}
+
+		leftY += e.emitLine(boxNode, items, start, end, lineW, lineX, leftY, lastLine, firstLine)
 
 		if clampLimit > 0 && lineCount >= clampLimit {
 			break
@@ -281,9 +328,11 @@ func (e *engine) releaseInlineItems(items []inlineItem) {
 // current float exclusion, splitting overlong tokens as needed. It returns
 // the next index and the updated line geometry (items may be replaced by the
 // split, hence the pointer).
+//
+//nolint:cyclop,gocognit,nestif,funlen // line packing has separate split, fit, and float paths
 func (e *engine) packInlineLine(
 	items *[]inlineItem, start int, lineX, lineW, leftY float64,
-	contentX, contentW float64, floats *floatState,
+	contentX, contentW float64, floats *floatState, allowHyphen bool,
 ) (int, float64, float64, float64) {
 	idx := start
 	lineAdv := 0.0
@@ -293,29 +342,27 @@ func (e *engine) packInlineLine(
 		if item.forceBreak {
 			break
 		}
-		// Split long unbreakable runs (URLs, paths, base64) that would
-		// overflow the line. Honors overflow-wrap / word-break; also
-		// emergency-breaks when a token is wider than the line so text
-		// does not paint past the page edge (print PDF).
-		// restMax for subsequent chunks uses contentW (full BFC width) so
-		// pre-split fragments can reflow wider after a float ends.
-		if parts := e.maybeSplitOverflow(*item, lineW, lineAdv, contentW); len(parts) > 1 {
-			// Open space in-place for the split fragments. The former nested
-			// append always allocated for the tail because chunkParts returns a
-			// full-capacity slice, even when items already had enough room.
-			oldLen := len(*items)
-			extra := len(parts) - 1
+		// Prefer an authored soft-hyphen break before emergency mid-word
+		// overflow splits when the token does not fit the remaining width.
+		remain := lineW - lineAdv
+		if remain < 0 {
+			remain = 0
+		}
 
-			if oldLen+extra > cap(*items) {
-				grown := make([]inlineItem, oldLen+extra)
-				copy(grown, *items)
-				*items = grown
-			} else {
-				*items = (*items)[:oldLen+extra]
+		if allowHyphen {
+			if parts := e.maybeSplitHyphen(*item, remain, lineW); len(parts) > 1 {
+				e.spliceInlineParts(items, idx, parts)
+				item = &(*items)[idx]
+			} else if parts := e.maybeSplitOverflow(*item, lineW, lineAdv, contentW); len(parts) > 1 {
+				// Split long unbreakable runs (URLs, paths, base64) that would
+				// overflow the line. Honors overflow-wrap / word-break; also
+				// emergency-breaks when a token is wider than the line so text
+				// does not paint past the page edge (print PDF).
+				e.spliceInlineParts(items, idx, parts)
+				item = &(*items)[idx]
 			}
-
-			copy((*items)[idx+len(parts):], (*items)[idx+1:oldLen])
-			copy((*items)[idx:idx+len(parts)], parts)
+		} else if parts := e.maybeSplitOverflow(*item, lineW, lineAdv, contentW); len(parts) > 1 {
+			e.spliceInlineParts(items, idx, parts)
 			item = &(*items)[idx]
 		}
 
@@ -326,6 +373,22 @@ func (e *engine) packInlineLine(
 		// Exception: never break before attaching punctuation / mid-cite
 		// (")[37]" → ")\n[" or "[\n37]" or "saying.[\n7]").
 		if lineAdv > 0 && lineAdv+adv > lineW+1e-6 {
+			// Last chance: SHY-split the current item into the remaining room.
+			if allowHyphen {
+				if parts := e.maybeSplitHyphen(*item, remain, lineW); len(parts) > 1 {
+					e.spliceInlineParts(items, idx, parts)
+					item = &(*items)[idx]
+					adv = item.marginL + item.w + item.marginR
+
+					if lineAdv+adv <= lineW+1e-6 {
+						lineAdv += adv
+						idx++
+
+						continue
+					}
+				}
+			}
+
 			idx, _ = e.glueStickyTail(*items, idx, start, adv)
 
 			break
@@ -348,7 +411,27 @@ func (e *engine) packInlineLine(
 	return idx, lineX, lineW, leftY
 }
 
+// spliceInlineParts replaces items[idx] with parts in place (grows the slice
+// when needed). Shared by soft-hyphen and overflow mid-token splits.
+func (e *engine) spliceInlineParts(items *[]inlineItem, idx int, parts []inlineItem) {
+	oldLen := len(*items)
+	extra := len(parts) - 1
+
+	if oldLen+extra > cap(*items) {
+		grown := make([]inlineItem, oldLen+extra)
+		copy(grown, *items)
+		*items = grown
+	} else {
+		*items = (*items)[:oldLen+extra]
+	}
+
+	copy((*items)[idx+len(parts):], (*items)[idx+1:oldLen])
+	copy((*items)[idx:idx+len(parts)], parts)
+}
+
 // lineBounds returns the line origin and width under float exclusion at y.
+// When a float carries a shape-outside contour (shape_exclusion.go), exclusion
+// uses that contour's per-line interval instead of the rectangular margin box.
 func (e *engine) lineBounds(floats *floatState, contentX, contentW, lineY float64) (float64, float64) {
 	if floats == nil {
 		return contentX, contentW
@@ -852,12 +935,13 @@ func hidesPaint(style *ResolvedStyle) bool {
 
 // emitLine renders items[start:end) as one line and returns its height.
 // lastLine is true for the final line of the inline formatting context (used
-// so text-align:justify leaves the last line start-aligned).
+// so text-align:justify leaves the last line start-aligned). firstLine gates
+// text-box-trim on the block's first line box.
 //
 //nolint:cyclop // line emission and alignment dispatch
-func (e *engine) emitLine(
+func (e *engine) emitLine( //nolint:funlen
 	boxNode *box, items []inlineItem, start, end int,
-	availW, startX, lineY float64, lastLine bool,
+	availW, startX, lineY float64, lastLine, firstLine bool,
 ) float64 {
 	line := items[start:end]
 	if len(line) == 0 {
@@ -867,28 +951,35 @@ func (e *engine) emitLine(
 	// trim trailing whitespace of the last run
 	e.trimTrailingSpace(line)
 
+	var blockStyle *ResolvedStyle
+	if boxNode != nil {
+		blockStyle = boxNode.style
+	}
+
 	textAlign := floatLeft
 
-	if boxNode != nil && boxNode.style != nil {
-		if boxNode.style.Direction == cssDirectionRTL {
+	if blockStyle != nil {
+		if blockStyle.Direction == cssDirectionRTL {
 			textAlign = "right"
 		}
 
-		if boxNode.style.TextAlign != "" {
-			textAlign = boxNode.style.TextAlign
+		if blockStyle.TextAlign != "" {
+			textAlign = blockStyle.TextAlign
 		}
 	}
 
-	if lastLine && boxNode != nil && boxNode.style != nil &&
-		boxNode.style.TextAlignLast != "" && boxNode.style.TextAlignLast != "auto" {
-		textAlign = boxNode.style.TextAlignLast
+	if lastLine && blockStyle != nil &&
+		blockStyle.TextAlignLast != "" && blockStyle.TextAlignLast != "auto" {
+		textAlign = blockStyle.TextAlignLast
 	}
+
+	textAlign = resolveTextGroupAlign(blockStyle, textAlign)
 
 	// A vertical-rl block advances columns right-to-left, so a single column
 	// anchors at the content box's right edge. text-align along the vertical
 	// axis is not implemented; justify keeps the shared path.
-	if boxNode != nil && boxNode.style != nil &&
-		boxNode.style.WritingMode == writingModeVerticalRL && textAlign != cssTextAlignJustify {
+	if blockStyle != nil &&
+		blockStyle.WritingMode == writingModeVerticalRL && textAlign != cssTextAlignJustify {
 		textAlign = floatRight
 	}
 
@@ -896,19 +987,33 @@ func (e *engine) emitLine(
 	// advances match layout (avoids word-by-word Tj gaps). Skip when
 	// justifying — gaps are distributed between word items. Legacy
 	// -webkit-box keeps items separate so pack backgrounds stay distinct.
-	if textAlign != cssTextAlignJustify && (boxNode == nil || boxNode.style == nil || !boxNode.style.IsWebkitBox) {
+	if textAlign != cssTextAlignJustify && (blockStyle == nil || !blockStyle.IsWebkitBox) {
 		line = e.coalesceTextItems(line)
 	}
 
-	// line metrics
-	lineH, baseline := e.lineMetrics(line, lineY)
+	trimStart, trimEnd := textBoxTrimFlags(blockStyle, firstLine, lastLine)
+	lineH, baseline := e.lineMetrics(line, lineY, blockStyle, trimStart, trimEnd)
 
 	totalW := 0.0
 	for i := range line {
 		totalW += line[i].marginL + line[i].w + line[i].marginR
 	}
 
-	leftX, justifyGap := e.lineOriginAndGap(textAlign, startX, availW, totalW, line, lastLine)
+	hang := 0.0
+	trimLead := 0.0
+
+	if len(line) > 0 && line[0].style != nil && line[0].text != "" {
+		hang = e.hangingPunctuationFirstWidth(line[0].style, line[0].text)
+		trimLead = e.textSpacingTrimLeading(line[0].style, line[0].text)
+	}
+
+	alignW := totalW - hang - trimLead
+	if alignW < 0 {
+		alignW = 0
+	}
+
+	leftX, justifyGap := e.lineOriginAndGap(textAlign, startX, availW, alignW, line, lastLine)
+	leftX -= hang + trimLead
 
 	e.emitLineItems(boxNode, line, leftX, baseline, lineH, lineY, justifyGap)
 
@@ -1060,10 +1165,15 @@ func (e *engine) trimTrailingSpace(line []inlineItem) {
 }
 
 // lineMetrics returns the height of a line and the Y of its baseline.
+// block + trimStart/trimEnd apply CSS text-box-trim / text-box-edge on the
+// first and last line of a block container.
 //
 //nolint:cyclop // line metrics combine inline item classes and chrome
-func (e *engine) lineMetrics(line []inlineItem, lineY float64) (float64, float64) {
+func (e *engine) lineMetrics( //nolint:funlen
+	line []inlineItem, lineY float64, block *ResolvedStyle, trimStart, trimEnd bool,
+) (float64, float64) {
 	maxAscent, maxDescent := 0.0, 0.0
+	edgeStyle := block
 
 	for i := range line {
 		item := &line[i]
@@ -1088,8 +1198,23 @@ func (e *engine) lineMetrics(line []inlineItem, lineY float64) (float64, float64
 		lh := lineHeightOf(item.style) * e.scale
 
 		extra := (lh - ascent - descent) / inlineHalfDivisor
-		itemAscent := ascent + extra
-		itemDescent := descent + extra
+		if extra < 0 {
+			extra = 0
+		}
+
+		face := e.faceFor(item.style)
+		metricStyle := item.style
+
+		if edgeStyle != nil && metricStyle.TextBoxEdgeOver == "auto" &&
+			metricStyle.TextBoxEdgeUnder == "auto" {
+			// Inherit edge from the block when the inline kept initials.
+			metricStyle = edgeStyle
+		}
+
+		itemAscent, itemDescent := e.adjustTextBoxMetrics(
+			metricStyle, face, item.style.FontSize*e.scale,
+			ascent, descent, extra, trimStart, trimEnd,
+		)
 
 		if item.chrome {
 			itemAscent += e.inlineChromeTop(item.style)

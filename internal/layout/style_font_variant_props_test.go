@@ -37,6 +37,7 @@ func TestApplyFontVariantProps(t *testing.T) {
 		{"palette normal case-insensitive", "font-palette", "Normal", "normal", paletteField},
 		{"palette light", "font-palette", "light", "light", paletteField},
 		{"palette dark case-insensitive", "font-palette", "DARK", "dark", paletteField},
+		{"palette index zero", "font-palette", "0", "0", paletteField},
 		{"palette ident keeps case", "font-palette", "--Brand-2", "--Brand-2", paletteField},
 		{"palette ident leading dash", "font-palette", "---custom", "---custom", paletteField},
 		{"palette non-dashed dropped", "font-palette", "brand", "normal", paletteField},

@@ -150,6 +150,13 @@ func paintGoldenFixture(t *testing.T, name string) (*Result, float64) {
 
 	pageW, pageH := 595.28, 841.89
 	mat := 28.35
+
+	if name == "fixture-64-next-72-props.html" {
+		// Fixture 64 declares a 12mm @page margin; the other regression
+		// fixtures use the helper's historical 1cm paint margin.
+		mat = 12 * 72 / 25.4
+	}
+
 	contentH := pageH - 2*mat
 
 	res, err := Layout(root, Options{

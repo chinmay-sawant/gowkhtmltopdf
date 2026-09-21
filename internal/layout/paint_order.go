@@ -2,6 +2,12 @@ package layout
 
 import "sort"
 
+const (
+	paintLayerChrome = iota
+	paintLayerContent
+	paintLayerOutline
+)
+
 // PaintOrder returns operation indices in the canonical display-list paint
 // order. PDF and raster adapters consume this same policy; backend drawing
 // remains responsible for interpreting each operation.
@@ -63,18 +69,23 @@ func paintOrderBefore(ops []Op, left, right int) bool {
 	return left < right
 }
 
-// paintLayer orders ops within a z-index band: chrome under content.
-func paintLayer(op *Op) int {
-	if op.IsBackground {
-		return 0
+// paintLayer orders ops within a z-index band: ordinary chrome under content,
+// outlines above descendant content.
+func paintLayer(paintOp *Op) int {
+	if paintOp.IsBackground {
+		return paintLayerChrome
 	}
 
-	switch op.Kind {
+	if paintOp.isOutline() {
+		return paintLayerOutline
+	}
+
+	switch paintOp.Kind {
 	case OpFillRect, OpStrokeRect, OpLine, OpGridRun:
-		return 0
+		return paintLayerChrome
 	case OpText, OpImage, OpLinkURI, OpBullet, OpUnknown, opKindNoop:
-		return 1
+		return paintLayerContent
 	}
 
-	return 1
+	return paintLayerContent
 }

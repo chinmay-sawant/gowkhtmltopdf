@@ -10,8 +10,10 @@ import (
 
 const (
 	cssPropCounterReset     = "counter-reset"
+	cssPropCounterSet       = "counter-set"
 	cssPropCounterIncrement = "counter-increment"
 	cssPropQuotes           = "quotes"
+	counterSetDefault       = 0
 	cssContentOpenQuote     = "open-quote"
 	cssContentCloseQuote    = "close-quote"
 	cssContentNoOpenQuote   = "no-open-quote"
@@ -54,6 +56,21 @@ func (m *counterMap) applyReset(spec string) []string {
 	}
 
 	return names
+}
+
+func (m *counterMap) applySet(spec string) {
+	for _, item := range parseCounterList(spec, counterSetDefault) {
+		stack := m.byName[item.name]
+		if len(stack) == 0 {
+			// CSS Lists 3: set on an unseen counter creates it (no new scope).
+			m.byName[item.name] = []int{item.value}
+
+			continue
+		}
+
+		stack[len(stack)-1] = item.value
+		m.byName[item.name] = stack
+	}
 }
 
 func (m *counterMap) applyIncrement(spec string) {
@@ -357,6 +374,16 @@ func (e *engine) counterResetSpec(ctx *styleContext, node *html.Node) string {
 	return cascadedProp(ctx, node, cssPropCounterReset)
 }
 
+func (e *engine) counterSetSpec(ctx *styleContext, node *html.Node) string {
+	if e != nil {
+		if sty := e.stylePtr(node); sty != nil {
+			return sty.CounterSet
+		}
+	}
+
+	return cascadedProp(ctx, node, cssPropCounterSet)
+}
+
 func (e *engine) counterIncrementSpec(ctx *styleContext, node *html.Node) string {
 	if e != nil {
 		if sty := e.stylePtr(node); sty != nil {
@@ -450,6 +477,7 @@ func (e *engine) walkContentEnv(
 	}
 
 	pushes := env.counters.applyReset(e.counterResetSpec(ctx, node))
+	env.counters.applySet(e.counterSetSpec(ctx, node))
 	env.counters.applyIncrement(e.counterIncrementSpec(ctx, node))
 
 	if node == target && pseudo == pseudoBefore {

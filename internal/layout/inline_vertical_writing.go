@@ -65,6 +65,44 @@ func (e *engine) emitTextRuns(
 	return e.emitInlineFaceRuns(item, leftX, textBaseline, size, ascent, descent)
 }
 
+// noteRotatedRun records the widest rotated run advance seen in the current
+// build subtree and returns the run's rotation for the text op stamp. The
+// record keeps verticalWritingHeight correct when noEmit drops the text ops.
+func (e *engine) noteRotatedRun(item *inlineItem, run faceRun, width float64) float32 {
+	rotation := inlineRunRotation(item.style, run.text)
+	if rotation != 0 && width > e.maxRotatedRunW {
+		e.maxRotatedRunW = width
+	}
+
+	return rotation
+}
+
+// verticalWritingHeight returns the auto content-flow bottom for a block in a
+// vertical writing mode. Lite vertical-rl/vertical-lr keeps block flow
+// horizontal (glyphs are rotated -90deg, see inline_paint), so the block
+// reserves enough height for its longest rotated run. maxRotatedRunW carries
+// that advance from noteRotatedRun, which keeps measured geometry equal to
+// emitted geometry when noEmit drops the ops. Full vertical block progression
+// (line stacking along the inline axis) is out of scope for print.
+func (e *engine) verticalWritingHeight(current float64, style ResolvedStyle) float64 {
+	textWidth := e.maxRotatedRunW
+	if textWidth == 0 {
+		return current
+	}
+
+	// current is a content-flow bottom that already includes the top chrome;
+	// the caller adds bottom padding and border through borderBoxBottom, so
+	// needed must not include them a second time.
+	topChrome := e.scalePt(style.PaddingTop) + e.scalePt(style.BorderTop.Width)
+
+	needed := textWidth + topChrome
+	if needed > current {
+		return needed
+	}
+
+	return current
+}
+
 // emitGlyphRuns paints one glyph through the item's primary face or its
 // per-face fallback runs.
 func (e *engine) emitGlyphRuns(

@@ -295,14 +295,17 @@ var inheritableProps = []inheritCopy{ //nolint:gochecknoglobals // static inheri
 	{[]string{"forced-color-adjust"}, func(dst, src *ResolvedStyle) { dst.ForcedColorAdjust = src.ForcedColorAdjust }},
 	{[]string{"color-scheme"}, func(dst, src *ResolvedStyle) { dst.ColorScheme = src.ColorScheme }},
 	{[]string{"dynamic-range-limit"}, func(dst, src *ResolvedStyle) { dst.DynamicRangeLimit = src.DynamicRangeLimit }},
-	{[]string{"font-language-override"}, func(dst, src *ResolvedStyle) {
-		dst.FontLanguageOverride = src.FontLanguageOverride
-	}},
-	{[]string{"font-optical-sizing"}, func(dst, src *ResolvedStyle) { dst.FontOpticalSizing = src.FontOpticalSizing }},
-	{[]string{"font-palette"}, func(dst, src *ResolvedStyle) { dst.FontPalette = src.FontPalette }},
-	{[]string{"font-variation-settings"}, func(dst, src *ResolvedStyle) {
-		dst.FontVariationSettings = src.FontVariationSettings
-	}},
+	// One inherit entry for the CSS Fonts shaping cluster so the uint64
+	// declared mask stays within 64 slots while new feature fields inherit.
+	{[]string{
+		"font-language-override", "font-optical-sizing", "font-palette", "font-variation-settings",
+		"font-feature-settings", "font-kerning", "font-size-adjust", "font-stretch", "font-width",
+		"font-synthesis", "font-synthesis-weight", "font-synthesis-style",
+		"font-synthesis-small-caps", "font-synthesis-position",
+		"font-variant", "font-variant-caps", "font-variant-ligatures", "font-variant-numeric",
+		"font-variant-position", "font-variant-east-asian", "font-variant-alternates",
+		"font-variant-emoji",
+	}, copyInheritedFontShapingProps},
 	{[]string{"image-orientation"}, func(dst, src *ResolvedStyle) {
 		dst.ImageOrientation = src.ImageOrientation
 		dst.ImageOrientationAngle = src.ImageOrientationAngle
@@ -316,6 +319,33 @@ var inheritableProps = []inheritCopy{ //nolint:gochecknoglobals // static inheri
 		dst.TextDecorationSkip = src.TextDecorationSkip
 		dst.TextDecorationSkipBox = src.TextDecorationSkipBox
 		dst.TextDecorationSkipSpaces = src.TextDecorationSkipSpaces
+	}},
+	// Phase 87.4: one slot left in the uint64 inherit mask, so the new
+	// inherited text-box-edge / spacing / hyphenate-limit / hanging fields
+	// share a single entry (same coalesce pattern as text-decoration-skip).
+	{[]string{
+		"text-autospace", "text-box-edge", "text-spacing", "text-spacing-trim",
+		"hanging-punctuation",
+		"hyphenate-limit-chars", "hyphenate-limit-last", "hyphenate-limit-lines", "hyphenate-limit-zone",
+	}, func(dst, src *ResolvedStyle) {
+		dst.TextAutospace = src.TextAutospace
+		dst.TextBoxEdgeOver = src.TextBoxEdgeOver
+		dst.TextBoxEdgeUnder = src.TextBoxEdgeUnder
+		dst.TextSpacing = src.TextSpacing
+		dst.TextSpacingTrim = src.TextSpacingTrim
+		dst.HangingPunctuation = src.HangingPunctuation
+		dst.HyphenateLimitMinWord = src.HyphenateLimitMinWord
+		dst.HyphenateLimitMinBefore = src.HyphenateLimitMinBefore
+		dst.HyphenateLimitMinAfter = src.HyphenateLimitMinAfter
+		dst.HyphenateLimitLast = src.HyphenateLimitLast
+		dst.HyphenateLimitLines = src.HyphenateLimitLines
+		dst.HyphenateLimitZonePt = src.HyphenateLimitZonePt
+		dst.HyphenateLimitZonePct = src.HyphenateLimitZonePct
+	}},
+	// initial-letter is not inherited; align/wrap are (CSS Inline 3).
+	{[]string{"initial-letter-align", "initial-letter-wrap"}, func(dst, src *ResolvedStyle) {
+		dst.InitialLetterAlign = src.InitialLetterAlign
+		dst.InitialLetterWrap = src.InitialLetterWrap
 	}},
 	{[]string{"text-orientation"}, func(dst, src *ResolvedStyle) { dst.TextOrientation = src.TextOrientation }},
 }
@@ -808,7 +838,7 @@ func fontPrefixDecl(lower string) (logicalPropDecl, bool) {
 		return logicalPropDecl{prop: "font-style", val: lower}, true
 	case cssFontWeightBold, "bolder", "lighter":
 		return logicalPropDecl{prop: "font-weight", val: lower}, true
-	case contentNormal, "small-caps", "condensed", "expanded",
+	case contentNormal, fontVariantCapsSmall, "condensed", "expanded",
 		"semi-condensed", "semi-expanded", "ultra-condensed", "ultra-expanded":
 		return logicalPropDecl{}, true //nolint:exhaustruct // intentional empty keyword position
 	}
@@ -846,8 +876,20 @@ func expandLogicalBoxDeclaration(prop, value string) ([]logicalPropDecl, bool) {
 	return expandLogicalBorder(prop, value)
 }
 
-//nolint:cyclop // logical margin/padding mapping table
+//nolint:cyclop,funlen // logical margin/padding mapping table
 func expandLogicalMarginPadding(prop, value string) ([]logicalPropDecl, bool) {
+	if prop == cssPropMarginInline || prop == cssPropMarginBlock ||
+		prop == "margin-inline-start" || prop == "margin-inline-end" ||
+		prop == "margin-block-start" || prop == "margin-block-end" ||
+		prop == cssPropPaddingInline || prop == cssPropPaddingBlock ||
+		prop == "padding-inline-start" || prop == "padding-inline-end" ||
+		prop == "padding-block-start" || prop == "padding-block-end" {
+		// Logical sides depend on the inherited direction and writing mode.
+		// Keep them for the resolved-style pass instead of freezing them to
+		// physical sides before that context is available.
+		return nil, false
+	}
+
 	switch prop {
 	case cssPropMarginBlock:
 		start, end, ok := logicalPair(value)
@@ -1119,7 +1161,6 @@ func applyFontProps(style *ResolvedStyle, raw map[string]string, parentSize floa
 	applyFontFamilyValue(style, raw)
 	applyFontWeightValue(style, raw)
 	applyFontStyleValue(style, raw)
-	applyFontPropsWave4(style, raw)
 
 	if val, found := raw["font"]; found {
 		parseFontShorthand(style, val, remBase)
@@ -1197,7 +1238,7 @@ func resolveFontWeight(current int, val string) int {
 // longhand (e.g. margin-bottom) always overrides its shorthand (margin).
 // Package-level to avoid per-node slice/array rebuilds.
 var restShorthandProps = [...]string{ //nolint:gochecknoglobals // static apply order
-	"display", marginProperty, paddingProperty, borderProperty, borderTopProperty,
+	"display", "writing-mode", "direction", marginProperty, paddingProperty, borderProperty, borderTopProperty,
 	borderRightProperty, borderBottomProperty, borderLeftProperty,
 	borderWidthKeyword, borderStyleKeyword,
 	borderColorKeyword, gapKeyword, flexKeyword, containerKeyword,
@@ -1319,8 +1360,20 @@ var styleGroups = [...]styleGroupFn{ //nolint:gochecknoglobals // static dispatc
 	applyContainmentProps,
 	applyColorAdjustProps,
 	applyFontVariantProps,
+	applyFontFeatureProps,
+	applyFontSynthesisProps,
+	applyFontWidthProps,
+	applyFontSizeAdjustProps,
 	applyImageAdjustProps,
 	applyTextSupportProps,
+	applyOverflowLogicalProps,
+	applyAspectRatioProps,
+	applyTextBoxProps,
+	applyTextAutospaceProps,
+	applyHyphenationProps,
+	applyInitialLetterProps,
+	applyShapeProps,
+	applyFloatPageProps,
 }
 
 //nolint:cyclop,goconst,funlen // vendor prefix lookup map

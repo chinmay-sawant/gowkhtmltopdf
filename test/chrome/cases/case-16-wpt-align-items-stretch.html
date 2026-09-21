@@ -1,0 +1,42 @@
+<!doctype html>
+<title>flexbox | align-items: stretch</title>
+<link rel="author" href="http://opera.com" title="Opera Software">
+<link rel="help" href="http://www.w3.org/TR/css-flexbox-1/#align-items-property">
+<link rel="match" href="flexbox_align-items-stretch-2-ref.html">
+<style>
+div {
+	background: black;
+	margin: 1em 0;
+	width: 30em;
+	height: 6em;
+
+	display: flex;
+	align-items: stretch;
+}
+.stretch-case {
+	position: relative;
+	transform: translateY(56pt);
+}
+span {
+	width: 8em;
+	display: inline-block;
+
+	flex: none;
+	color: white;
+	outline: 1px solid #60a5fa;
+}
+span:nth-child(1) {
+	margin-top: 6em;
+}
+</style>
+<!-- Source: third_party/blink/web_tests/external/wpt/css/css-flexbox/flexbox_align-items-stretch-2.html -->
+<!-- Port status: completed fixture coverage; the outlined boxes expose the stretch geometry. -->
+<!-- Expected: the first span's cross-axis margin consumes the line height; the other spans stretch to the line height. -->
+<p class="case-description" style="position:absolute;top:12pt;left:12pt;margin:0;padding:6pt;border:1pt solid #64748b;background:#fff;color:#111827;font-size:9pt;line-height:12pt;width:560pt;">
+    <strong>Case 16 expected behavior:</strong> align-items: stretch gives unsized spans the full cross size while preserving the first span's 6em cross-axis margin. The blue outlines show the stretched span boxes; the first span's text is outside the black bar because its margin consumes the line's cross size.
+</p>
+<div class="stretch-case">
+	<span>PASS</span>
+	<span></span>
+	<span>x</span>
+</div>

@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Flex sizing with min and max constraints</title>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .case { display: flex; width: 600px; height: 40px; position: relative; transform: translateY(56pt); }
+    .item { flex: 1 1 200px; min-width: 0; height: 20px; background: #dcfce7; outline: 1px solid #16a34a; }
+    .pdf-label { position: absolute; top: 360pt; left: 12pt; color: #111827; font-size: 10pt; }
+  </style>
+</head>
+<body>
+  <!-- Source: third_party/blink/web_tests/css3/flexbox/flex-algorithm-min-max.html -->
+  <!-- Port status: completed. Static input reviewed and covered by the assigned layout test. -->
+  <!-- Expected: the 100px max-width item freezes at 75pt and its siblings grow to 187.5pt. -->
+  <div class="case" id="minmax-case">
+    <div class="item" id="minmax-frozen" style="max-width:100px"></div>
+    <div class="item" id="minmax-redistributed-a"></div>
+    <div class="item" id="minmax-redistributed-b"></div>
+  </div>
+  <div class="pdf-label">Flex algorithm: min and max constraints</div>
+  <p class="case-description" style="position:absolute;top:12pt;left:12pt;margin:0;padding:6pt;border:1pt solid #64748b;background:#fff;color:#111827;font-size:9pt;line-height:12pt;width:560pt;">
+    <strong>Case 2 expected behavior:</strong> the max-width-constrained item freezes at 75pt, and the released space is redistributed so its siblings grow to 187.5pt each.
+  </p>
+</body>
+</html>

@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Percentage flex basis in an indefinite column</title>
+  <style>
+    body > .flexbox { position: relative; transform: translateY(56pt); }
+    .flexbox { display: flex; }
+    .column { flex-direction: column; }
+    .flex-item {
+      flex: 1 0 100%;
+      border: 1px solid blue;
+    }
+  </style>
+</head>
+<body>
+  <!-- Source: third_party/blink/web_tests/external/wpt/css/css-flexbox/flex-basis-011.html -->
+  <!-- Reference: flex-basis-011-ref.html -->
+  <!-- Port status: completed. The percentage basis resolves against the column's stretched used height, matching the source reference. -->
+  <!-- Expected: percentage flex-basis in the nested column resolves against the column's stretched used height. -->
+  <p class="case-description" style="position:absolute;top:12pt;left:12pt;margin:0;padding:6pt;border:1pt solid #64748b;background:#fff;color:#111827;font-size:9pt;line-height:12pt;width:560pt;">
+    <strong>Case 17 expected behavior:</strong> percentage flex-basis in the nested column resolves against the column's stretched used height, so each item fills it.
+  </p>
+  <div class="flexbox" data-case="indefinite-outer">
+    <div class="flexbox column">
+      <div class="flex-item item-a"><div>AAA</div></div>
+      <div class="flex-item item-b"><div>BBB</div></div>
+    </div>
+  </div>
+</body>
+</html>

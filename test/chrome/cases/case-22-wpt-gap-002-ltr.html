@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Flexbox vertical gap</title>
+  <style>
+    /* Print 1:1 with the Chromium reference: no smart shrinking. The 8pt
+       page margin keeps every edge inside the page, and the 550pt panel
+       still fits the remaining width. */
+    @page { margin: 8pt; }
+    html, body { margin: 0; padding: 0; }
+    .case { position: relative; transform: translateY(56pt); background: #16a34a; display: flex; flex-direction: column;
+      width: 150pt; height: 150pt; gap: 15pt; }
+    .item { background: #9ca3af; flex: 1 1 auto; }
+  </style>
+</head>
+<body>
+  <!-- Source: third_party/blink/web_tests/external/wpt/css/css-flexbox/gap-002-ltr.html -->
+  <!-- Fixture: case-22-wpt-gap-002-ltr -->
+  <!-- Port status: completed. Source-faithful flexible column-gap input. -->
+  <!-- Expected: the gap appears between items, not before the first or after the last. -->
+  <p class="case-description" style="position:absolute;top:12pt;left:12pt;margin:0;padding:6pt;border:1pt solid #64748b;background:#fff;color:#111827;font-size:9pt;line-height:12pt;width:550pt;">
+    <strong>Case 22 expected behavior:</strong> the 15pt gap appears only between the three flexible items, never before the first or after the last.
+  </p>
+  <section class="case" id="case-22">
+    <div class="item" id="item-one"></div>
+    <div class="item" id="item-two"></div>
+    <div class="item" id="item-three"></div>
+  </section>
+</body>
+</html>

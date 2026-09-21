@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Flexbox row-reverse vertical writing overflow</title>
+  <style>
+    /* Print 1:1 with the Chromium reference: no smart shrinking. The 8pt
+       page margin keeps every edge inside the page, and the 550pt panel
+       still fits the remaining width. */
+    @page { margin: 8pt; }
+    html, body { margin: 0; padding: 0; }
+    ::-webkit-scrollbar { width: 11pt; height: 12pt; background: yellow; }
+    .case { position: relative; transform: translateY(56pt); display: flex; width: 300pt; height: 225pt; overflow: auto;
+      padding: 7.5pt 15pt 22.5pt 30pt; border: 15pt solid #111;
+      direction: ltr; writing-mode: vertical-rl; flex-direction: row-reverse; }
+    .item { width: 1500pt; height: 750pt; background: #9ec5fe; }
+  </style>
+</head>
+<body>
+  <!-- Source: third_party/blink/renderer/core/layout/layout_flexible_box_test.cc -->
+  <!-- Fixture: case-39-blink-scrollbars-row-reverse-vrl -->
+  <!-- Port status: completed. Source-faithful overflowing row-reverse vertical-rl input. -->
+  <!-- Expected: the child reaches negative physical coordinates after logical-axis mapping. -->
+  <p class="case-description" style="position:absolute;top:12pt;left:12pt;margin:0;padding:6pt;border:1pt solid #64748b;background:#fff;color:#111827;font-size:9pt;line-height:12pt;width:550pt;">
+    <strong>Case 39 expected behavior:</strong> the row-reverse vertical-rl item overflows to negative physical coordinates under the 15pt border.
+  </p>
+  <div class="case" id="case-39"><div class="item" id="item-39"></div></div>
+</body>
+</html>

@@ -23,7 +23,6 @@ import (
 	"strings"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
-	"github.com/chinmay-sawant/gowkhtmltopdf/internal/errs"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
 )
@@ -422,7 +421,8 @@ const (
 // Op is one display-list operation. Coordinates are in canvas points; for
 // OpText and OpBullet, Y is the baseline.
 //
-// Rare payloads (URI, Image, Xform, BlendMode, structure tags, text-transform)
+// Rare payloads (URI, Image, Xform, BlendMode, structure tags, text-transform,
+// and text synthesis gates)
 // live on the embedded *opExtra so the hot record is 256 bytes. Promoted
 // field names stay so readers (paint, convert, imageout, tests) keep op.URI
 // and op.Image. Writers must detachExtra before mutating those fields.
@@ -479,10 +479,10 @@ type Op struct {
 	// LineInset selects inward paint geometry for mixed-width straight borders.
 	// The logical OpLine coordinates remain on the border-box edge so
 	// pagination ownership checks keep using layout geometry.
-	LineInset  uint8
-	Bold       bool
-	NoFakeBold bool
-	IsJPEG     bool
+	LineInset   uint8
+	Bold        bool
+	FakeOblique bool // synthesize italic skew when face is upright
+	IsJPEG      bool
 	// IsBackground marks background/border images that belong to the chrome layer.
 	IsBackground bool
 	// Fixed marks ops from position:fixed boxes; Paint stamps them on every
@@ -564,12 +564,17 @@ type engine struct {
 	ops             []Op
 	gridScratch     []GridSeg // reusable row-grid collector storage
 	noEmit          bool      // measurement mode: compute geometry without emitting ops
-	height          float64
-	scale           float64 // zoom factor applied to style lengths (>= 1)
-	zIndex          int
-	zIndexSet       bool
-	positioned      bool
-	blendMode       string
+	// maxRotatedRunW is the widest rotated (sideways) text advance seen in the
+	// current build subtree. verticalWritingHeight consumes it instead of
+	// scanning e.ops so measured geometry matches emitted geometry when
+	// noEmit drops the rotated text ops.
+	maxRotatedRunW float64
+	height         float64
+	scale          float64 // zoom factor applied to style lengths (>= 1)
+	zIndex         int
+	zIndexSet      bool
+	positioned     bool
+	blendMode      string
 	// blendGroup is the CSS element group that owns newly emitted ops
 	// (mix-blend-mode or isolation: isolate). nil means page-level paint.
 	// blendGroupOwner is the style that created the innermost group, so the
@@ -601,9 +606,20 @@ type engine struct {
 	bfcStack []*floatState
 	// bfcPool recycles floatState values for pushBFCFloats.
 	bfcPool []*floatState
+	// measureFloatDepth is non-zero while a noEmit measure pass is running.
+	// Measurement must not leave floats in the enclosing BFC, or a later real
+	// build packs a new float beside a ghost one (case 29: float:left in a
+	// column flex item landed at the right content edge).
+	measureFloatDepth int
+	// measureFloats is the scratch state float registration is redirected to
+	// during the outermost measure scope; savedBFCFloats restores the live
+	// state when that scope ends.
+	measureFloats  floatState
+	savedBFCFloats *floatState
 	// absCBHeights carries the containing-block height to deferred absolute
 	// children after their in-flow parent has finished determining its size.
 	absCBHeights map[*html.Node]float64
+	flowCBHeight *float64 // nil means the in-flow containing-block height is indefinite
 	// inlineItemPool recycles temporary inline-item backing arrays. The pool is
 	// engine-local because layout is single-threaded and nested inline layout
 	// must retain each active caller's slice.
@@ -638,20 +654,27 @@ type styleOverride struct {
 	style *ResolvedStyle
 }
 
-// faceStyleKey is the faceFor cache key for one CSS face identity.
+// faceStyleKey is the faceFor cache key for one CSS face identity, including
+// variation axes so instanced faces are not reused across settings.
 type faceStyleKey struct {
-	famHash uint64
-	weight  int
-	italic  bool
+	famHash     uint64
+	weight      int
+	italic      bool
+	optical     string
+	variations  string
+	opticalSize uint64
 }
 
 // faceRuneKey is the faceForRune fallback cache key for one (style face
 // identity, rune). famHash is FNV-1a over FontFamily tokens (no Join alloc).
 type faceRuneKey struct {
-	famHash uint64
-	weight  int
-	italic  bool
-	r       rune
+	famHash     uint64
+	weight      int
+	italic      bool
+	r           rune
+	optical     string
+	variations  string
+	opticalSize uint64
 }
 
 // chromeEntry records one box's background/border ops for insertion before
@@ -671,10 +694,14 @@ func (e *engine) faceFor(sty *ResolvedStyle) *pdf.Font {
 		return e.font
 	}
 
+	optical, variations, sizeBits := variationCacheBits(sty)
 	key := faceStyleKey{
-		famHash: sty.famHash,
-		weight:  sty.FontWeight,
-		italic:  sty.FontItalic,
+		famHash:     sty.famHash,
+		weight:      sty.FontWeight,
+		italic:      sty.FontItalic,
+		optical:     optical,
+		variations:  variations,
+		opticalSize: sizeBits,
 	}
 
 	if e.faceByStyle != nil {
@@ -725,61 +752,6 @@ func (e *engine) lookupBaseFaceFor(sty *ResolvedStyle) *pdf.Font {
 	return e.font
 }
 
-// fontVariantCapability records the tables the CSS font variation family
-// needs from a resolved face.
-type fontVariantCapability struct {
-	variationAxes bool // fvar present: variable font
-	colorPalette  bool // COLR and CPAL present: color-palette font
-}
-
-// resolveFontVariants is the face-resolution consumer for font-optical-sizing,
-// font-variation-settings, and font-palette. It reads the three fields and the
-// resolved face's OpenType tables, then returns the face the writer will use.
-//
-// Static faces (every bundled Liberation and DejaVu face) have no fvar and no
-// COLR/CPAL; CSS makes all three properties no-ops there, so returning the
-// default face is spec-correct.
-//
-// A registry face loaded with --font-path can expose fvar and/or COLR+CPAL.
-// This writer cannot apply either: pdf.Font embeds default-instance glyf
-// outlines and has no CPAL/COLR painting path, and go-text v0.3.4 variable
-// instancing (font.Face.SetVariations) only affects the shaping/raster face,
-// not the embedded outlines. Such a face still resolves to its default
-// instance. That is a known gap, recorded rather than faked by shaping with
-// variation coordinates the PDF would not embed.
-func resolveFontVariants(sty *ResolvedStyle, face *pdf.Font) *pdf.Font {
-	if sty == nil || face == nil {
-		return face
-	}
-
-	wantsAxes := sty.FontVariationSettings != fontVariantNormal || sty.FontOpticalSizing == fontOpticalAuto
-	wantsPalette := sty.FontPalette != fontVariantNormal
-
-	if !wantsAxes && !wantsPalette {
-		return face
-	}
-
-	capability := faceFontVariantCapability(face)
-	if (wantsAxes && !capability.variationAxes) || (wantsPalette && !capability.colorPalette) {
-		return face
-	}
-
-	return face
-}
-
-// faceFontVariantCapability probes the resolved face for variation and palette
-// tables. Both are false for the static bundled faces.
-func faceFontVariantCapability(face *pdf.Font) fontVariantCapability {
-	if face == nil {
-		return fontVariantCapability{} //nolint:exhaustruct // zero value means neither capability
-	}
-
-	return fontVariantCapability{
-		variationAxes: face.HasVariationAxes(),
-		colorPalette:  face.HasColorPalette(),
-	}
-}
-
 // faceForRune picks the first CSS font-family face (then defaults) that has a
 // glyph for r — browser-like fallback so Hangul/Latin/CJK can come from
 // different faces in one run.
@@ -811,11 +783,15 @@ func (e *engine) faceForRuneFallback(sty *ResolvedStyle, runeValue rune, primary
 		return primary
 	}
 
+	optical, variations, sizeBits := variationCacheBits(sty)
 	key := faceRuneKey{
-		famHash: sty.famHash,
-		weight:  sty.FontWeight,
-		italic:  sty.FontItalic,
-		r:       runeValue,
+		famHash:     sty.famHash,
+		weight:      sty.FontWeight,
+		italic:      sty.FontItalic,
+		r:           runeValue,
+		optical:     optical,
+		variations:  variations,
+		opticalSize: sizeBits,
 	}
 
 	if e.faceByRune != nil {
@@ -844,6 +820,11 @@ func (e *engine) lookupFaceForRune(sty *ResolvedStyle, runeValue rune) *pdf.Font
 		return e.font
 	}
 
+	return resolveFontVariants(sty, e.lookupBaseFaceForRune(sty, runeValue))
+}
+
+// lookupBaseFaceForRune resolves a per-rune fallback face without instancing.
+func (e *engine) lookupBaseFaceForRune(sty *ResolvedStyle, runeValue rune) *pdf.Font {
 	if f := e.registryFamilyWithGlyph(sty, runeValue); f != nil {
 		return f
 	}
@@ -1170,59 +1151,11 @@ func WithWorkspace(ctx context.Context, root *html.Node, opts Options, workspace
 	return layoutContext(ctx, root, opts, workspace)
 }
 
-//nolint:cyclop // layout preflight and staged style/container passes are explicit lifecycle gates.
 func layoutContext(
 	ctx context.Context,
 	root *html.Node, opts Options, workspace *Workspace,
 ) (*Result, error) {
-	if root == nil {
-		return nil, errors.New("layout: nil root") //nolint:err113 // static sentinel-free message matches legacy behavior
-	}
-
-	if err := opts.validate(); err != nil {
-		return nil, err
-	}
-
-	if ctx == nil {
-		return nil, errs.ErrNilContext
-	}
-
-	if err := ctx.Err(); err != nil {
-		return nil, fmt.Errorf("layout: context: %w", err)
-	}
-
-	faces, err := pdf.LoadDefaultFaces()
-	if err != nil {
-		return nil, fmt.Errorf("layout: load default faces: %w", err)
-	}
-
-	if opts.Faces != nil {
-		faces = opts.Faces
-	}
-
-	if err := ctx.Err(); err != nil {
-		return nil, fmt.Errorf("layout: context: %w", err)
-	}
-
-	font := opts.Font
-	if font == nil {
-		font = faces.Regular
-	}
-
-	styles, containers, err := resolveStylesForLayoutContext(ctx, root, opts)
-	if err != nil {
-		return nil, fmt.Errorf("layout: style resolution: %w", err)
-	}
-
-	var ops []Op
-
-	if workspace == nil || cap(workspace.ops) == 0 {
-		ops = make([]Op, 0, estimateOpCapacity(root))
-	} else {
-		ops = workspace.ops[:0]
-	}
-
-	return finalizeResult(newEngine(ctx, opts, faces, font, styles, containers, ops), root, opts)
+	return layoutContextWithStyles(ctx, root, opts, workspace, nil)
 }
 
 // newEngine constructs the layout engine state (extracted from LayoutContext
@@ -1516,32 +1449,6 @@ func estimateOpCapacity(root *html.Node) int {
 	return capacity
 }
 
-// boxKind is the internal layout role of a box. uint8 avoids a per-box
-// string header (16 bytes) and keeps the hot box struct small.
-type boxKind uint8
-
-const (
-	boxKindBlock    boxKind = iota // "block"
-	boxKindTable                   // "table"
-	boxKindCell                    // "cell"
-	boxKindReplaced                // "replaced"
-)
-
-func (k boxKind) String() string {
-	switch k {
-	case boxKindBlock:
-		return displayBlock
-	case boxKindTable:
-		return displayTable
-	case boxKindCell:
-		return tableCellKind
-	case boxKindReplaced:
-		return "replaced"
-	default:
-		return "unknown"
-	}
-}
-
 // box is one laid-out box.
 type box struct {
 	node *html.Node
@@ -1618,10 +1525,22 @@ func (e *engine) build(node *html.Node, availW, posX, posY float64) *box {
 		return nil
 	}
 
+	// Measure builds must not record floats in the live BFC (see
+	// beginMeasureFloats). Pair with endMeasureFloats before returning.
+	measure := e.noEmit
+	if measure {
+		e.beginMeasureFloats()
+	}
+
 	scope := e.pushZ(sty, e.stylePtr(node))
 	// Ancestor transforms only (own transform does not change this box's CB).
 	underXformCB := e.transformCBDepth > 0
 	start := len(e.ops)
+	// verticalWritingHeight reads the widest rotated run in this box's
+	// subtree. Reset the accumulator for the subtree and merge it back into
+	// the parent scope after the build so sibling content cannot leak in.
+	previousRotatedRunW := e.maxRotatedRunW
+	e.maxRotatedRunW = 0
 
 	boxNode := e.buildDisplayBox(node, sty, availW, posX, posY, underXformCB)
 
@@ -1630,7 +1549,15 @@ func (e *engine) build(node *html.Node, availW, posX, posY float64) *box {
 		e.finishBuiltBox(boxNode, sty, underXformCB)
 	}
 
+	if e.maxRotatedRunW < previousRotatedRunW {
+		e.maxRotatedRunW = previousRotatedRunW
+	}
+
 	e.popZ(scope, boxNode)
+
+	if measure {
+		e.endMeasureFloats()
+	}
 
 	return boxNode
 }
@@ -1741,13 +1668,13 @@ func useBlockForTableDisplay(node *html.Node) bool {
 
 // buildBlock lays out a block-level box.
 //
-//nolint:cyclop // block layout owns ordered CSS flow phases
+//nolint:cyclop,wsl // block layout owns ordered CSS flow phases
 func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, posY float64) *box {
 	boxNode := &box{ //nolint:exhaustruct // intentional zero fields
 		node: node, style: e.stylePtr(node), kind: boxKindBlock, x: posX, y: posY,
 	}
 	boxStyle := &style
-	w, margL := resolveBlockWidth(e, boxStyle, availW)
+	w, margL := resolveBlockWidth(e, node, boxStyle, availW)
 	boxNode.w = w
 
 	boxNode.x = posX + margL
@@ -1768,7 +1695,9 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 		curY = applyCheckboxAutoSize(e, style, boxNode, curY)
 	}
 
+	previousCB, _ := e.setFlowCB(style)
 	curY = e.flowChildren(boxNode, children, style, contentW, contentX, posY, curY)
+	e.flowCBHeight = previousCB
 	if widget && style.Height < 0 {
 		// Native value controls use their intrinsic font-sized control height
 		// when auto-sized. Treating them as ordinary text blocks adds the
@@ -1787,8 +1716,8 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 
 	e.popBFCFloats(enclose)
 
-	if isVerticalWritingMode(style.WritingMode) {
-		curY = e.verticalWritingHeight(contentStart, curY, style)
+	if isVerticalWritingMode(style.WritingMode) && style.Height < 0 && style.HeightPercent < 0 {
+		curY = e.verticalWritingHeight(curY, style)
 	}
 
 	// list marker (outside the principal box content — in the marker area)
@@ -1800,7 +1729,9 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 	// bottom border / letterhead rules - fixture-07/16). The shared resolver
 	// adds them once for every formatting context and then applies
 	// height/min-height/max-height.
-	boxNode.height = e.resolveBorderBoxHeight(style, curY)
+	resolvedHeightStyle := withAspectRatioHeight(style, contentW, e)
+	boxNode.height = e.applyHeightConstraintsWithCB(&resolvedHeightStyle,
+		e.borderBoxBottom(resolvedHeightStyle, curY), e.containingBlockHeight())
 	e.paintWidgetControl(node, style, boxNode, widget, chkWidget, posY)
 
 	e.paintPositionedPseudo(node, style, boxNode, pseudoBefore)
@@ -1809,18 +1740,6 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 	e.prependChrome(contentStart, boxNode, style, boxNode.x, posY, boxNode.w, boxNode.height)
 
 	return boxNode
-}
-
-// paintWidgetControl paints the native control face for value and checkbox
-// widgets after the box height is final.
-func (e *engine) paintWidgetControl(
-	node *html.Node, style ResolvedStyle, boxNode *box, widget, chkWidget bool, posY float64,
-) {
-	if widget {
-		e.paintValueWidget(node, style, boxNode.x, posY, boxNode.w, boxNode.height)
-	} else if chkWidget {
-		e.paintCheckboxWidget(node, style, boxNode.x, posY, boxNode.w, boxNode.height)
-	}
 }
 
 // nativeWidgetAutoContentBottom returns the content-flow endpoint for an
@@ -1942,34 +1861,6 @@ func (e *engine) paintPositionedPseudo( //nolint:cyclop
 		Bold: style.FontWeight >= fontWeightBoldValue,
 	})
 	e.popZ(scope, nil)
-}
-
-func (e *engine) verticalWritingHeight(contentStart int, current float64, style ResolvedStyle) float64 {
-	// Lite vertical-rl/vertical-lr: glyphs are rotated -90deg (see
-	// inline_paint writingModeRotate) while block flow stays horizontal.
-	// This keeps the print pipeline intact and only reserves enough block
-	// height for the longest rotated run. Full vertical block progression
-	// (line stacking along the inline axis) is out of scope for print.
-	textWidth := 0.0
-	for _, op := range e.ops[contentStart:] {
-		if op.Kind == OpText && op.RotateDeg != 0 && op.W > textWidth {
-			textWidth = op.W
-		}
-	}
-
-	if textWidth == 0 {
-		return current
-	}
-
-	verticalChrome := e.scalePt(style.PaddingTop) + e.scalePt(style.PaddingBottom) +
-		e.scalePt(style.BorderTop.Width) + e.scalePt(style.BorderBottom.Width)
-
-	needed := textWidth + verticalChrome
-	if needed > current {
-		return needed
-	}
-
-	return current
 }
 
 func (e *engine) paintValueWidget(node *html.Node, style ResolvedStyle, leftX, topY, width, height float64) {
@@ -2161,18 +2052,12 @@ func (e *engine) borderBoxBottom(style ResolvedStyle, contentBottom float64) flo
 	return contentBottom
 }
 
-// resolveBorderBoxHeight is the used border-box height resolver: bottom
-// chrome, then height/min-height/max-height. A definite height floors the
-// content height instead of capping it, so CSS overflow keeps taller content
-// visible.
-func (e *engine) resolveBorderBoxHeight(style ResolvedStyle, contentBottom float64) float64 {
-	return e.applyHeightConstraints(style, e.borderBoxBottom(style, contentBottom))
-}
-
 // applyHeightConstraintsWithCB is the definite-CB form for min/max percent.
 func (e *engine) applyHeightConstraintsWithCB(style *ResolvedStyle, curY float64, cbH float64) float64 {
 	if h, ok := resolveUsedHeight(style, cbH, e); ok {
-		if curY < h {
+		if style.HeightPercent >= 0 {
+			curY = h
+		} else if curY < h {
 			curY = h
 		}
 	}
@@ -2189,7 +2074,7 @@ func (e *engine) applyHeightConstraintsWithCB(style *ResolvedStyle, curY float64
 
 // resolveBlockWidth computes a block's used border-box width and the scaled
 // left margin. Horizontal auto margins center (or push) a definite-width box.
-func resolveBlockWidth(eng *engine, style *ResolvedStyle, availW float64) (float64, float64) {
+func resolveBlockWidth(eng *engine, node *html.Node, style *ResolvedStyle, availW float64) (float64, float64) {
 	margR := eng.scalePt(style.MarginRight)
 	margL := eng.scalePt(style.MarginLeft)
 	// Default: fill remaining width after horizontal margins.
@@ -2198,11 +2083,11 @@ func resolveBlockWidth(eng *engine, style *ResolvedStyle, availW float64) (float
 		width = 0
 	}
 
-	definiteW := resolveDefiniteWidth(eng, style, availW, &width)
+	definiteW, intrinsicW := resolveDefiniteWidth(eng, node, style, availW, &width)
 	// content-box (default): specified width is the content width, so the
 	// border box grows by horizontal padding + border. border-box: specified
 	// width already is the border-box size.
-	if definiteW && style.BoxSizing != borderBox {
+	if definiteW && !intrinsicW && style.BoxSizing != borderBox {
 		width += style.horizontalChrome(eng)
 	}
 
@@ -2233,26 +2118,6 @@ func resolveAutoMargins(style *ResolvedStyle, definiteW bool, width, availW, mar
 	}
 
 	return margL
-}
-
-// resolveDefiniteWidth applies the width/width% to *w. Returns false when the
-// width resolves to auto (cyclic % honesty: indefinite containing block).
-func resolveDefiniteWidth(eng *engine, style *ResolvedStyle, availW float64, width *float64) bool {
-	definiteW := style.Width >= 0 || style.WidthPercent >= 0
-
-	switch {
-	case style.WidthPercent >= 0:
-		// Cyclic % honesty: indefinite containing block → treat as auto.
-		if availW > 0 && availW < 1e12 {
-			*width = availW * style.WidthPercent / oneHundred
-		} else {
-			definiteW = false
-		}
-	case style.Width >= 0:
-		*width = eng.scalePt(style.Width)
-	}
-
-	return definiteW
 }
 
 // clampBlockMinMax applies the min/max-width constraints to w.

@@ -1,0 +1,28 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Flexbox border-box cross size</title>
+  <style>
+    /* Print 1:1 with the Chromium reference: no smart shrinking. The 8pt
+       page margin keeps every edge inside the page, and the 550pt panel
+       still fits the remaining width. */
+    @page { margin: 8pt; }
+    html, body { margin: 0; padding: 0; }
+    .case { position: relative; transform: translateY(56pt); display: flex; width: 300pt; height: 150pt; box-sizing: border-box; border: 8pt solid transparent; }
+    .item { display: block; width: 1px; flex: 0 0 auto; }
+    .contentbox { box-sizing: content-box; height: 134pt; }
+  </style>
+</head>
+<body>
+  <!-- Source: third_party/blink/web_tests/external/wpt/css/css-flexbox/flex-cross-size-border-box-001.html -->
+  <!-- Fixture: case-35-wpt-flex-cross-size-border-box -->
+  <!-- Port status: completed. Source-faithful border-box and content-box variants. -->
+  <!-- Expected: intrinsic 1px replaced children keep the same 0.75pt cross size in both frames. -->
+  <p class="case-description" style="position:absolute;top:12pt;left:12pt;margin:0;padding:6pt;border:1pt solid #64748b;background:#fff;color:#111827;font-size:9pt;line-height:12pt;width:550pt;">
+    <strong>Case 35 expected behavior:</strong> the 1px replaced children keep the same 0.75pt cross size in the border-box and content-box frames.
+  </p>
+  <div class="case" id="case-35-border"><img class="item" src="../../../chromium/third_party/blink/web_tests/external/wpt/css/css-flexbox/support/1x1-green.png" width="1" height="1" alt=""></div>
+  <div class="case contentbox" id="case-35-content"><img class="item" src="../../../chromium/third_party/blink/web_tests/external/wpt/css/css-flexbox/support/1x1-green.png" width="1" height="1" alt=""></div>
+</body>
+</html>

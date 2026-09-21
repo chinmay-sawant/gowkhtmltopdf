@@ -52,7 +52,15 @@ func ShapeRun(s string, fnt *Font, size float64) ShapedRun {
 // ShapeRunLanguage is ShapeRun with a font-language-override tag so raster
 // output selects the same language-system glyphs as PDF emission.
 func ShapeRunLanguage(s string, fnt *Font, size float64, lang string) ShapedRun {
-	text := ShapeTextFontWithFeaturesLanguage(s, fnt, nil, lang)
+	return ShapeRunWithFeaturesLanguage(s, fnt, size, nil, lang)
+}
+
+// ShapeRunWithFeaturesLanguage is ShapeRunLanguage with explicit OpenType
+// features (CSS font-feature-settings / font-variant / font-kerning).
+func ShapeRunWithFeaturesLanguage(
+	s string, fnt *Font, size float64, features []shaping.FontFeature, lang string,
+) ShapedRun {
+	text := ShapeTextFontWithFeaturesLanguage(s, fnt, features, lang)
 	runes := []rune(text)
 	advances := make([]float64, len(runes))
 

@@ -794,6 +794,13 @@ func (e *engine) nestedBlockHChrome(node *html.Node) float64 {
 			continue
 		}
 
+		// A specified-width blockish child was already counted with its
+		// margins by measureCellMinMax (specifiedBlockOuterWidth); adding the
+		// chrome here doubled the wrapper width (case-13 inline-block).
+		if countedBySpecifiedBlockMeasure(child, *childStyle) {
+			continue
+		}
+
 		sum += e.scalePt(childStyle.MarginLeft) + e.scalePt(childStyle.MarginRight) +
 			e.scalePt(childStyle.PaddingLeft) + e.scalePt(childStyle.PaddingRight) +
 			e.scalePt(childStyle.BorderLeft.Width) + e.scalePt(childStyle.BorderRight.Width)

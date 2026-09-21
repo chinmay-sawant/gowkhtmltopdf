@@ -328,6 +328,9 @@ var fixturePageBounds = map[string]fixtureBounds{ //nolint:gochecknoglobals // i
 	"fixture-29-float-beside-table.html": {
 		minPages: 1, maxPages: 1,
 	},
+	"fixture-29-wpt-break-nested-float-print.html": {
+		minPages: 3, maxPages: 3, needles: []string{"Case 29 nested float fragmentation"},
+	},
 	"fixture-30-orphans-heuristic.html": {
 		minPages: 2, maxPages: 0,
 	},
@@ -449,6 +452,10 @@ var fixturePageBounds = map[string]fixtureBounds{ //nolint:gochecknoglobals // i
 	"fixture-63-page-level-demos.html": {
 		minPages: 6, maxPages: 8,
 		needles: []string{"FIXTURE-63-PAGE-LEVEL"},
+	},
+	"fixture-64-next-72-props.html": {
+		minPages: 5, maxPages: 8, images: true,
+		needles: []string{"NEXT-72-PROPS"},
 	},
 }
 

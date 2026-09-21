@@ -118,6 +118,7 @@ func (e *engine) measureCellMinMax(node *html.Node, style ResolvedStyle) (float6
 		engine: e,
 		em:     style.FontSize,
 		style:  style,
+		root:   node,
 	}
 	cellMeas.walk(node, style, style.WhiteSpace == cssWhiteSpaceNowrap || style.WhiteSpace == cssWhiteSpacePre)
 	cellMeas.flushLine()
@@ -147,6 +148,7 @@ func (e *engine) measureCellMinMax(node *html.Node, style ResolvedStyle) (float6
 type cellMeasure struct {
 	engine         *engine
 	style          ResolvedStyle
+	root           *html.Node
 	em             float64
 	lineW          float64
 	maxW           float64
@@ -355,13 +357,10 @@ func (m *cellMeasure) measureElement(nodeN *html.Node, childCS ResolvedStyle, no
 		return
 	}
 	if nodeN.Name == cssTagSVG {
-		innerW := parseSVGLengthPx(nodeN.Attribute("width"))
-		if childCS.Width >= 0 {
-			innerW = m.engine.scalePt(childCS.Width)
-		}
-		if innerW <= 0 {
-			innerW = m.engine.scalePt(pxToPt(64))
-		}
+		// Reuse the used-size policy so the intrinsic width floor sees the same
+		// max-width/max-height clamp and ratio transfer as the build: max-height
+		// 100pt on a 200x200 svg contributes 100, not the raw 200px attribute.
+		innerW := m.engine.usedInlineSVGSize(nodeN, childCS, nil).w
 		m.noteWord(innerW)
 		m.lineOnlyNowrap = false
 		m.lineHasInk = true
@@ -385,6 +384,14 @@ func (m *cellMeasure) measureElement(nodeN *html.Node, childCS ResolvedStyle, no
 	}
 	// Block-level in-cell boxes start a new line (simplified).
 	blockish := isCellBlockish(childCS.Display)
+	if countedBySpecifiedBlockMeasure(nodeN, childCS) && nodeN != m.root {
+		m.flushLine()
+		m.noteWord(specifiedBlockOuterWidth(m.engine, childCS))
+		m.lineW = specifiedBlockOuterWidth(m.engine, childCS)
+		m.flushLine()
+
+		return
+	}
 	m.walkBlockChildren(nodeN, childCS, nowrap, blockish)
 }
 
@@ -446,6 +453,38 @@ func specifiedInlineBlockOuterWidth(eng *engine, style ResolvedStyle) float64 {
 	}
 
 	return width + eng.scalePt(style.MarginLeft) + eng.scalePt(style.MarginRight)
+}
+
+// specifiedBlockOuterWidth is the margin-box width of a blockish child with a
+// specified width, the contribution measureElement records for that arm.
+func specifiedBlockOuterWidth(eng *engine, style ResolvedStyle) float64 {
+	width := eng.scalePt(style.Width)
+	if style.BoxSizing != borderBox {
+		width += style.horizontalChrome(eng)
+	}
+
+	return width + eng.scalePt(style.MarginLeft) + eng.scalePt(style.MarginRight)
+}
+
+// countedBySpecifiedBlockMeasure reports whether measureCellMinMax counts the
+// node's margin box through its specified-width blockish arm. Replaced and
+// contained nodes are measured by earlier arms that omit outer margins, so
+// callers must still add their horizontal chrome. Shared by measureElement and
+// nestedBlockHChrome so the two dispatch sites cannot drift apart.
+func countedBySpecifiedBlockMeasure(node *html.Node, style ResolvedStyle) bool {
+	if node == nil || node.Type != html.ElementNode {
+		return false
+	}
+
+	if containsSize(style) || style.ContentVisibility == contentVisibilityHidden {
+		return false
+	}
+
+	if node.Name == "br" || node.Name == cssTagImg || node.Name == cssTagSVG || isInputCheckbox(node) {
+		return false
+	}
+
+	return isCellBlockish(style.Display) && style.Width >= 0
 }
 
 // isCellBlockish reports displays that break the current measured line.
@@ -789,6 +828,11 @@ func (e *engine) measureLargestImageWidth(node *html.Node) float64 {
 
 // layoutCell measures the height of a cell's content (no ops emitted).
 func (e *engine) layoutCell(n *html.Node, sty ResolvedStyle, width float64) float64 {
+	measure := e.noEmit
+	if measure {
+		e.beginMeasureFloats()
+	}
+
 	_, contentW := e.contentBox(0, width, &sty)
 	curY := e.scalePt(sty.PaddingTop) + e.scalePt(sty.BorderTop.Width)
 	enclose := e.pushBFCFloats(sty, 0, contentW)
@@ -799,6 +843,10 @@ func (e *engine) layoutCell(n *html.Node, sty ResolvedStyle, width float64) floa
 	}
 
 	e.popBFCFloats(enclose)
+
+	if measure {
+		e.endMeasureFloats()
+	}
 
 	return e.borderBoxBottom(sty, curY)
 }

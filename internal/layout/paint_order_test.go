@@ -30,6 +30,21 @@ func TestPaintOrderSharedPolicyKeepsStableMetadataOrder(t *testing.T) {
 	}
 }
 
+func TestPaintOrderOutlinesAboveDescendantChrome(t *testing.T) {
+	t.Parallel()
+
+	ops := []Op{
+		{Kind: OpFillRect},
+		{Kind: OpLine},
+		{Kind: OpFillRect},
+	}
+	ops[1].setOutline()
+
+	if got, want := PaintOrder(ops), []int{0, 2, 1}; !sameIndices(got, want) {
+		t.Fatalf("paint order = %v, want outline after descendant fill %v", got, want)
+	}
+}
+
 func sameIndices(got, want []int) bool {
 	if len(got) != len(want) {
 		return false

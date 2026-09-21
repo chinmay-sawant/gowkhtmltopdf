@@ -1,0 +1,43 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Flex sizing with fixed and auto margins</title>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .case { display: flex; width: 600pt; height: 80pt; position: relative; transform: translateY(56pt); }
+    .item { height: 30pt; background: #fef3c7; outline: 1px solid #d97706; }
+    .positive { width: 100pt; }
+    .positive-auto { margin: 0 auto; }
+    .negative-first { flex: 1 1 200pt; }
+    .negative-auto { flex: 2 1 400pt; }
+    .negative-last { flex: 1 1 200pt; }
+    .padded-free-space { width: 800pt; padding: 0 100pt; box-sizing: border-box; }
+    .padded { flex: 1 1 300pt; }
+    .pdf-label { position: absolute; top: 360pt; left: 12pt; color: #111827; font-size: 10pt; }
+  </style>
+</head>
+<body>
+  <!-- Source: third_party/blink/web_tests/css3/flexbox/flex-algorithm-with-margins.html -->
+  <!-- Port status: completed. Reviewed static input with passing expected geometry. -->
+  <!-- Expected: auto margins consume positive free space; negative space uses scaled shrink; padding moves the content box. -->
+  <div class="case" id="positive-auto-margins">
+    <div class="item positive" id="positive-first"></div>
+    <div class="item positive positive-auto" id="positive-auto"></div>
+    <div class="item positive" id="positive-last"></div>
+  </div>
+  <div class="case" id="negative-auto-margins">
+    <div class="item negative-first" id="negative-first"></div>
+    <div class="item negative-auto" id="negative-auto"></div>
+    <div class="item negative-last" id="negative-last"></div>
+  </div>
+  <div class="case padded-free-space" id="padded-free-space">
+    <div class="item padded" id="padded-first"></div>
+    <div class="item padded" id="padded-last"></div>
+  </div>
+  <div class="pdf-label">Flex algorithm: auto margins and free space</div>
+  <p class="case-description" style="position:absolute;top:12pt;left:12pt;margin:0;padding:6pt;border:1pt solid #64748b;background:#fff;color:#111827;font-size:9pt;line-height:12pt;width:560pt;">
+    <strong>Case 3 expected behavior:</strong> auto margins consume positive free space, negative space uses scaled shrink factors, and padding reduces the available content-box space.
+  </p>
+</body>
+</html>

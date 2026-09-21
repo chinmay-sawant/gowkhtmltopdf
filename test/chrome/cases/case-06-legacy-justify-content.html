@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Main-axis distribution</title>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .case { display: flex; width: 600pt; height: 20pt; position: relative; transform: translateY(56pt); }
+    .item { flex: 0 0 100pt; height: 20pt; }
+    .center { justify-content: center; }
+    .end { justify-content: flex-end; }
+    .between { justify-content: space-between; }
+  </style>
+</head>
+<body>
+  <!-- Source: third_party/blink/web_tests/css3/flexbox/flex-justify-content.html -->
+  <!-- Port status: completed. Reviewed static input with passing main-axis geometry. -->
+  <!-- Expected: fixed children occupy start, center, end, and evenly distributed positions. -->
+  <div class="case start" id="justify-start"><div class="item">A</div><div class="item">B</div><div class="item">C</div></div>
+  <div class="case center" id="justify-center"><div class="item">A</div><div class="item">B</div><div class="item">C</div></div>
+  <div class="case end" id="justify-end"><div class="item">A</div><div class="item">B</div><div class="item">C</div></div>
+  <div class="case between" id="justify-between"><div class="item">A</div><div class="item">B</div><div class="item">C</div></div>
+  <p class="case-description" style="position:absolute;top:12pt;left:12pt;margin:0;padding:6pt;border:1pt solid #64748b;background:#fff;color:#111827;font-size:9pt;line-height:12pt;width:560pt;">
+    <strong>Case 6 expected behavior:</strong> fixed children occupy main-axis start, center, end, and evenly distributed positions for the corresponding justify-content values.
+  </p>
+</body>
+</html>

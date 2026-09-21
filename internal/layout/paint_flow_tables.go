@@ -2,6 +2,7 @@ package layout
 
 import (
 	"math"
+	"slices"
 	"sort"
 )
 
@@ -61,7 +62,16 @@ func normalizeTableRowGaps(res *Result, contentH float64) {
 
 			previousPage := int(previousTop / contentH)
 			currentPage := int(currentTop / contentH)
-			if previousPage != currentPage || int(currentBottom/contentH) != currentPage {
+
+			if previousPage != currentPage {
+				if int(previousBottom/contentH) == previousPage {
+					closeContinuationHeaderGap(res, table, rowIndex, currentPage, currentTop, contentH)
+				}
+
+				continue
+			}
+
+			if int(currentBottom/contentH) != currentPage {
 				continue
 			}
 
@@ -116,6 +126,77 @@ func shiftTableRowsUp(res *Result, rows [][]*box, page int, contentH, gap float6
 		shiftOpsOnly(res, first, last, -gap)
 		shiftTableRowBoxes(row, -gap)
 	}
+}
+
+// closeContinuationHeaderGap pulls the first body rows of a continuation page
+// back up to the repeated header bottom when a sliver repair on an earlier
+// page dragged the following flow down (fixture-64 page 7: row 63 sat 63.65pt
+// under the header). Nothing else pulls a row back up across a page boundary,
+// so without this the band stays visible for the rest of the table.
+//
+// The pull is skipped when anything but pinned header furniture sits above the
+// row: real content keeps the row where it is.
+func closeContinuationHeaderGap(
+	res *Result, table *box, rowIndex, page int, currentTop, contentH float64,
+) {
+	if res == nil || table == nil || page <= 0 || contentH <= 0 || table.headerRows <= 0 {
+		return
+	}
+
+	hdrH := repeatedHeaderHeight(res, table)
+	if hdrH <= 0 {
+		return
+	}
+
+	minTop := float64(page)*contentH + hdrH
+
+	gap := currentTop - minTop
+	if gap <= layoutEpsilon {
+		return
+	}
+
+	if !onlyPinnedInkAbove(res, page, currentTop, contentH) {
+		return
+	}
+
+	shiftTableRowsUp(res, table.rows[rowIndex:], page, contentH, gap)
+}
+
+// repeatedHeaderHeight returns the painted height of a table's header band,
+// or 0 when the band has no geometry.
+func repeatedHeaderHeight(res *Result, table *box) float64 {
+	first, last, _, hdrH := rowSpan(table.rows[:table.headerRows], res)
+	if first < 0 || last < first || hdrH < 1 {
+		return 0
+	}
+
+	return hdrH
+}
+
+// onlyPinnedInkAbove reports whether the page band above limitY holds only
+// pinned repeated-header clones. Fixed stamps paint outside flow and are
+// ignored.
+func onlyPinnedInkAbove(res *Result, page int, limitY, contentH float64) bool {
+	if res == nil || contentH <= 0 {
+		return false
+	}
+
+	for idx := range res.Ops {
+		paintOp := &res.Ops[idx]
+		if paintOp.Fixed || paintOp.Y >= limitY-layoutEpsilon {
+			continue
+		}
+
+		if int(paintOp.Y/contentH) != page {
+			continue
+		}
+
+		if !paintOp.Pinned {
+			return false
+		}
+	}
+
+	return true
 }
 
 // rowPaintBand returns the op range and painted Y band for a table row.
@@ -697,12 +778,16 @@ func cloneHeaderOps(res *Result, hdrFirst, hdrLast int, hdrTop, pageTop float64)
 	res.Ops = append(res.Ops, make([]Op, hdrLast-hdrFirst+1)...)
 
 	for hdrIndex := hdrFirst; hdrIndex <= hdrLast; hdrIndex++ {
-		op := res.Ops[hdrIndex]
-		op.Y = pageTop + (op.Y - hdrTop)
-		op.Pinned = true
+		headerOp := res.Ops[hdrIndex]
+		if headerOp.Grid != nil {
+			headerOp.Grid = &GridRun{Segs: slices.Clone(headerOp.Grid.Segs)}
+		}
+
+		shiftOpY(&headerOp, pageTop-hdrTop)
+		headerOp.Pinned = true
 		// Clones are in-flow page furniture, not position:fixed stamps.
-		op.Fixed = false
-		res.Ops[start+hdrIndex-hdrFirst] = op
+		headerOp.Fixed = false
+		res.Ops[start+hdrIndex-hdrFirst] = headerOp
 	}
 
 	// Header clones extend the display list after the page index was built.

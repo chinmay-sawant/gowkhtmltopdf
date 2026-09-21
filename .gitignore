@@ -60,6 +60,16 @@ scripts/bench-external-*.pdf
 testdata/golden/benchmarks/.bench-external/
 knowledge-base
 
+# Local Chromium source used for browser-reference test research.
+/chromium/
+
+# Local PDFs generated from the Chrome Flex case fixtures.
+/test/chrome/pdf/
+/test/chrome/cases/pdf/
+
+# Local decision trail for long-running investigations.
+/.audit/
+
 __pycache__/
 bindings/python/**/__pycache__/
 
@@ -75,3 +85,6 @@ plans/0.2.6/perf-review/results/*
 /plans/0.2.6/perf-improve/results/*
 plans/0.2.6/perf-time/profiles/raw/*
 /plans/0.2.6/perf-time/results/*
+
+# Agent batch proof notes (local only; not committed)
+plans/**/phases/_proof-*.md

@@ -54,7 +54,7 @@ make golden-update GOLDEN_FIXTURE=fixture-01-simple-invoice.html GOLDEN_APPROVE=
 
 ## Golden HTML corpus (`testdata/golden/`)
 
-**Body fixtures:** `fixture-01` … `fixture-56`. Companion files matching
+**Body fixtures:** `fixture-01` … `fixture-64`. Companion files matching
 `*-header.html` / `*-footer.html` are **not** converted as bodies.
 
 When `fixture-NN-header.html` and/or `fixture-NN-footer.html` sit beside a
@@ -91,6 +91,7 @@ only — it does not rewrite the corpus fixture above or write a PDF under
 | Business documents | 43–48 | Dossier, receipt, PO, contract, certificate, shipping |
 | Illustrated print | 49–54 | Poster, letter, storybooks, boarding pass, observatory poster, Ember Harbor |
 | Long-form | 55–56 | Operations brief, 21-page architecture diagram |
+| Catalog audits | 57–64 | Implemented/unsupported property galleries; fixture-64 is the v0.2.7 next-72 audit |
 
 ### Fixture inventory
 
@@ -128,6 +129,7 @@ fixture header comments and [`testdata/golden/README.md`](../testdata/golden/REA
 | 27 | CJK/Unicode sample (pair with `--font-path` for real glyphs) | 1 |
 | 28 | flex-wrap, CSS grid lite, position:fixed stamp | 2 |
 | 29 | Float beside table: float:right infobox + wrapping prose + clear | 1 |
+| 29-wpt | Nested float print fragmentation (Chrome case 29 twin; needle `Case 29 nested float fragmentation`) | 3 |
 | 30 | Orphans/keep-with-next heuristic sample (geometric fallback) | ≥2 |
 | 31 | Print-scoped `position: sticky` (page content box = scrollport) | ≥2 |
 | 32 | Flex Stage A + Grid Stage B lite: reverse, space-evenly, gaps, column flex, template-rows, row span | 1 |
@@ -155,6 +157,10 @@ fixture header comments and [`testdata/golden/README.md`](../testdata/golden/REA
 | 54 | Ember Harbor storybook: cover + three chapter pages, shared print theme, local illustrations | 4 |
 | 55 | Self-contained operations brief: inline CSS, status cards, route table, action plan, and page breaks | 3 |
 | 56 | Architecture diagram: hero, pipeline strip, TOC, 10 domain sections (modern semantic tags and CSS with graceful-degrade fallbacks), linked `fixture-56-architecture-diagram.css` | 21 |
+| 57 | Implemented CSS vanguard gallery (needle `VANGUARD-CSS-356-IMPLEMENTED`) | 9 |
+| 58 | Unsupported worklist audit (needle `UNSUPPORTED-WORKLIST-AUDIT`) | 9 |
+| 60–62 | Implemented property audit slices A/B/C | 8 each |
+| 64 | Next-72 CSS audit (`NEXT-72-PROPS`); 53 Implemented / 19 Unsupported by choice | 5–8 |
 
 Supporting assets in the same directory: `logo.png`, `certificate-background.jpg`,
 `style-05.css`, `theme-print-stories.css`, `fixture-56-architecture-diagram.css`,

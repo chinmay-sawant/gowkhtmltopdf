@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Flexbox definite size from min-height</title>
+  <style>
+    /* Print 1:1 with the Chromium reference: no smart shrinking. The 8pt
+       page margin keeps every edge inside the page, and the 550pt panel
+       still fits the remaining width. The 12pt content inset keeps the 5pt
+       outline overhang off the content-area edge, which Chromium clips. */
+    @page { margin: 8pt; }
+    html, body { margin: 0; padding: 0; }
+    .case { position: relative; transform: translateY(56pt); display: flex; padding-left: 12pt; }
+    .item { display: flex; width: 100pt; background: #dc2626; align-items: center; min-height: 100pt; outline: 3pt dashed #2563eb; outline-offset: 2pt; }
+    .fill { min-height: 100%; width: 100%; background: #16a34a; position: relative; }
+    .fill-label { position: absolute; top: 8pt; left: 8pt; color: white; font-size: 8pt; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <!-- Source: third_party/blink/web_tests/external/wpt/css/css-flexbox/flexbox-definite-sizes-002.html -->
+  <!-- Fixture: case-26-wpt-definite-sizes-002 -->
+  <!-- Port status: completed. Source-faithful min-height percentage child. -->
+  <!-- Expected: the green min-height 100% child covers the item's red background completely, so no red shows. -->
+  <p class="case-description" style="position:absolute;top:12pt;left:12pt;margin:0;padding:6pt;border:1pt solid #64748b;background:#fff;color:#111827;font-size:9pt;line-height:12pt;width:550pt;">
+    <strong>Case 26 expected behavior:</strong> the item's 100pt min-height makes its height definite, so the min-height 100% child covers the item's red background completely; no red should remain.
+  </p>
+  <div class="case" id="case-26"><div class="item" id="item-26"><span class="fill" id="fill-26"><span class="fill-label">MIN-H 100%</span></span></div></div>
+</body>
+</html>

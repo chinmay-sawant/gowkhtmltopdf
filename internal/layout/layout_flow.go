@@ -288,11 +288,13 @@ func (e *engine) flowChildren(
 	e.flushDeferredFlowChildren(parent, deferred, cbHeight, absCBW, absCBX, absOriginY)
 
 	// A final child margin is inside a parent that has bottom padding or a
-	// bottom border. Without this, the margin disappears from the parent's
-	// used height, making padded cards and diagram boxes shorter than HTML.
+	// bottom border, or that establishes a BFC: an inline-block, flow-root,
+	// overflow-hidden box, float, or cell does not let the margin collapse
+	// out. Without this, the margin disappears from the parent's used height,
+	// making padded cards and diagram boxes shorter than HTML.
 	// A size-contained box is sized as empty, so that trailing margin does
 	// not apply either.
-	if !sizeContained && (sty.PaddingBottom > 0 || sty.BorderBottom.Width > 0) {
+	if !sizeContained && (sty.PaddingBottom > 0 || sty.BorderBottom.Width > 0 || establishesBFC(sty)) {
 		curY += prevBottom
 	}
 
@@ -743,7 +745,7 @@ func (e *engine) applyJustifySelfFitContent(
 // justifySelfUsesFitContent reports CSS Align "auto width becomes fit-content"
 // for block-level justify-self keywords other than stretch/auto/normal.
 func justifySelfUsesFitContent(style ResolvedStyle) bool {
-	if style.Width >= 0 || style.WidthPercent >= 0 {
+	if isIntrinsicWidth(style.Width) || style.Width >= 0 || style.WidthPercent >= 0 {
 		return false
 	}
 
@@ -827,6 +829,47 @@ func (e *engine) popBFCFloats(enclose bool) {
 
 	e.bfcFloats = e.bfcStack[stackLen-1]
 	e.bfcStack = e.bfcStack[:stackLen-1]
+}
+
+// beginMeasureFloats redirects float registration during a noEmit measure
+// build into a scratch copy of the live BFC state. Without this, a measured
+// float stays registered in the live BFC and the later real build packs a new
+// float beside it, at the wrong side of the content box (case 29: float:left
+// inside a column flex item rendered flush right).
+//
+// Nested measure scopes share the outermost scratch so floats registered
+// during a measurement remain visible to the rest of that measurement.
+func (e *engine) beginMeasureFloats() {
+	if !e.noEmit {
+		return
+	}
+
+	e.measureFloatDepth++
+
+	if e.measureFloatDepth > 1 || e.bfcFloats == nil {
+		return
+	}
+
+	e.savedBFCFloats = e.bfcFloats
+	e.measureFloats = *e.bfcFloats
+	e.bfcFloats = &e.measureFloats
+}
+
+// endMeasureFloats restores the live BFC float state when the outermost
+// measure scope finishes, discarding the scratch registrations.
+func (e *engine) endMeasureFloats() {
+	if e.measureFloatDepth == 0 {
+		return
+	}
+
+	e.measureFloatDepth--
+
+	if e.measureFloatDepth > 0 {
+		return
+	}
+
+	e.bfcFloats = e.savedBFCFloats
+	e.savedBFCFloats = nil
 }
 
 // emitListMarker paints the list marker for an <li>.
@@ -1038,25 +1081,31 @@ func romanMarker(node int, upper bool) string {
 // placeFloat lays out n as a float:left|right box and records it in floats.
 // Consecutive same-side floats pack horizontally when width remains;
 // otherwise they stack below the previous float bottom.
-func (e *engine) placeFloat(
+func (e *engine) placeFloat( //nolint:cyclop,funlen
 	node *html.Node, cstate ResolvedStyle, floats *floatState, contentW, contentX, posY, curY float64,
 ) *box {
-	avail := contentW
+	flowY := posY + curY
+	refX, refW, refY := e.floatReferenceBox(node, cstate, contentX, contentW, flowY)
+	pinRef := pinFloatToReference(cstate, refX, refW, contentX, contentW)
+
+	avail := refW
 	if cstate.Width < 0 && cstate.WidthPercent < 0 {
 		avail = e.floatIntrinsicAvail(node, cstate, avail)
 	}
 
-	flowY := posY + curY
+	fixX, fromY := refX, refY
 
-	fixX, fromY := contentX, flowY
-
-	switch cstate.Float {
-	case floatLeft, floatRight:
-		fixX, fromY, avail = packFloatPosition(floats, contentX, contentW, flowY, avail, cstate.Float == floatLeft)
+	if !pinRef {
+		switch cstate.Float {
+		case floatLeft, floatRight:
+			fixX, fromY, avail = packFloatPosition(
+				floats, contentX, contentW, flowY, avail, cstate.Float == floatLeft,
+			)
+		}
 	}
 
 	oldMax := e.imgMaxW
-	e.setFloatImgMaxW(cstate, contentW, avail)
+	e.setFloatImgMaxW(cstate, refW, avail)
 
 	fbox := e.build(node, avail, fixX, fromY)
 	e.imgMaxW = oldMax
@@ -1065,7 +1114,12 @@ func (e *engine) placeFloat(
 		return nil
 	}
 
-	if cstate.Float == floatLeft && floats.hasLeft && fbox.x+fbox.w > contentX+contentW {
+	packX, packW := contentX, contentW
+	if pinRef {
+		packX, packW = refX, refW
+	}
+
+	if !pinRef && cstate.Float == floatLeft && floats.hasLeft && fbox.x+fbox.w > contentX+contentW {
 		// Overflowed the pack attempt — stack below.
 		fromY = maxY(floats.leftBottom, flowY)
 		dx, dy := contentX-fbox.x, fromY-fbox.y
@@ -1076,14 +1130,24 @@ func (e *engine) placeFloat(
 	margL := e.scalePt(cstate.MarginLeft)
 	margR := e.scalePt(cstate.MarginRight)
 
+	if pinRef && cstate.Float == floatLeft && fbox.x != packX {
+		dx := packX - fbox.x
+		fbox.x = packX
+		e.shiftBoxOps(fbox, dx, 0)
+	}
+
 	if cstate.Float == floatRight {
-		wantX := contentX + contentW - fbox.w - margR
+		wantX := packX + packW - fbox.w - margR
 		dx := wantX - fbox.x
 		fbox.x = wantX
 		e.shiftBoxOps(fbox, dx, 0)
 	}
 
-	floats.place(cstate.Float, fbox, margL, margR)
+	// float-offset lite: block-axis nudge before recording exclusion.
+	nudgeFloatOffset(e, fbox, cstate)
+
+	shape := buildShapeExclusion(cstate, fbox, margL, margR, e.scale)
+	floats.place(cstate.Float, fbox, margL, margR, shape)
 
 	return fbox
 }

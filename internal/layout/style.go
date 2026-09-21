@@ -65,6 +65,7 @@ const (
 	cssPropBorderBlockEndWidth    = "border-block-end-width"
 	cssPropBorderInlineStartWidth = "border-inline-start-width"
 	cssPropBorderInlineEndWidth   = "border-inline-end-width"
+	cssDirectionLTR               = "ltr"
 	cssDirectionRTL               = "rtl"
 )
 
@@ -132,12 +133,21 @@ type ResolvedStyle struct {
 	ColumnGapNormal    bool    // true when column-gap is normal/initial (multicol → 1em; flex/grid → 0)
 	ColumnCount        int     // 0 = auto; ≥1 = used count hint
 	ColumnWidth        float64 // -1 = auto; else length in pt
+	ColumnHeight       float64 // -1 = auto; else length in pt (Multicol 2)
+	ColumnWrap         string  // "auto" | "nowrap" | "wrap"
 	ColumnSpan         string  // cssDisplayNone | "all" (multicol spanner)
 	ColumnFill         string  // "balance" | overflowAuto
 	ColumnRuleWidth    float64 // pt; CSS initial medium
 	ColumnRuleStyle    string  // none | solid | dashed | dotted
 	ColumnRuleColor    [3]float64
 	ColumnRuleColorSet bool // false → paint uses currentColor (Color)
+	// Initial-letter drop/raised caps (CSS Inline 3). Size 0 = normal.
+	// Authoring: apply on a real leading element (e.g. <span>); :first-letter
+	// is rejected by the CSS selector parser.
+	InitialLetterSize  float64 // size in lines; 0 = normal
+	InitialLetterSink  int     // sink lines; 0 with size>0 means size (drop)
+	InitialLetterAlign string  // alphabetic | ideographic | hanging | leading
+	InitialLetterWrap  string  // none | first | all | grid | <length>
 	FlexGrow           float64
 	FlexShrink         float64 // default 1; 0 disables shrink
 	FlexBasis          float64 // -1 = auto
@@ -233,8 +243,18 @@ type ResolvedStyle struct {
 	TabSize            float64
 	Hyphens            string
 	HyphenateCharacter string
-	TextJustify        string
-	LineBreak          string
+	// HyphenateLimitMinWord/Before/After are hyphenate-limit-chars components.
+	// Zero means CSS auto (5 / 2 / 2) at the SHY consumer.
+	HyphenateLimitMinWord   int
+	HyphenateLimitMinBefore int
+	HyphenateLimitMinAfter  int
+	HyphenateLimitLast      string  // "none" | "always" | "column" | "page" | "spread"
+	HyphenateLimitLines     int     // -1 = no-limit (initial)
+	HyphenateLimitZonePt    float64 // absolute zone; ignored when ZonePercent >= 0
+	HyphenateLimitZonePct   float64 // 0..100 when set; -1 means use ZonePt
+	HangingPunctuation      string  // "none" | "first" | "last" | "allow-end" | …
+	TextJustify             string
+	LineBreak               string
 	// OverflowWrap is CSS overflow-wrap / word-wrap: "normal" | "break-word" | "anywhere".
 	OverflowWrap string
 	// WordBreak is CSS word-break: "normal" | "break-all" | "keep-all".
@@ -319,6 +339,7 @@ type ResolvedStyle struct {
 	QuotesClose              string
 	CounterReset             string
 	CounterIncrement         string
+	CounterSet               string
 	ListStyleImage           string
 	BoxShadowX               float64
 	BoxShadowY               float64
@@ -368,12 +389,41 @@ type ResolvedStyle struct {
 	FontOpticalSizing     string // "auto" | "none"
 	FontPalette           string // raw value
 	FontVariationSettings string // raw value
+	// OpenType feature / variant / synthesis / width / size-adjust (CSS Fonts).
+	FontFeatureSettings    string  // "normal" or canonical `"tag" N, ...`
+	FontKerning            string  // "auto" | "normal" | "none"
+	FontSizeAdjust         float64 // aspect number; used when FontSizeAdjustSet
+	FontSizeAdjustSet      bool
+	FontWidth              float64 // percent; 100 = normal
+	FontSynthesisWeight    bool    // true = auto (allow fake bold)
+	FontSynthesisStyle     bool    // true = auto; no consumer yet
+	FontSynthesisSmallCaps bool    // true = auto; no consumer yet
+	FontSynthesisPosition  bool    // true = auto; no consumer yet
+	FontVariantCaps        string  // "normal" | small-caps | ...
+	FontVariantLigatures   string  // "normal" | "none" | keyword list
+	FontVariantNumeric     string  // "normal" | keyword list
+	FontVariantPosition    string  // "normal" | "sub" | "super"
+	FontVariantEastAsian   string  // "normal" | keyword list
+	FontVariantAlternates  string  // historical-forms / stylistic() / styleset() / swash(); OT tags
+	FontVariantEmoji       string  // normal|text|emoji|unicode; presentation consumer
 	// Image adjustment.
 	ImageOrientation      string  // "from-image" | "none" | raw angle
 	ImageOrientationAngle float64 // degrees; 0 = unset
 	ImageResolution       string  // "from-image" | raw resolution token
 	ImageResolutionDPI    float64 // 0 = unset/from-image
 	ObjectViewBox         string  // raw value
+	ObjectFit             string  // fill | contain | cover | none | scale-down
+	ObjectPositionX       string  // background-position-x grammar subset
+	ObjectPositionY       string
+	// AspectRatio is width/height; 0 means auto/unset.
+	AspectRatio float64
+	// CSS Shapes (outside wrap) + page-float extras (87.6).
+	ShapeOutside       string  // "none" | circle()/ellipse()/inset() canonical
+	ShapeMargin        float64 // pt when ShapeMarginPercent < 0
+	ShapeMarginPercent float64 // >=0 means % of reference diagonal/√2; -1 = length
+	FloatOffset        float64 // pt nudge on placeFloat when FloatOffsetPercent < 0
+	FloatOffsetPercent float64 // >=0 means % of float border-box height; -1 = length
+	FloatReference     string  // "inline" | "column" | "region" | "page"
 	// Advanced text support.
 	TextCombineUpright       string  // "none" | "all" | "digits N"
 	TextDecorationInset      float64 // pt
@@ -383,9 +433,28 @@ type ResolvedStyle struct {
 	TextDecorationSkipSpaces string
 	TextOrientation          string // "mixed" | "upright" | "sideways"
 	UnicodeBidi              string // "normal" | "embed" | "isolate" | "bidi-override" | "isolate-override" | "plaintext"
+	// CSS Inline 3 text-box family (trim is not inherited; edge is).
+	TextBoxTrim      string // "none" | "trim-start" | "trim-end" | "trim-both"
+	TextBoxEdgeOver  string // "auto" | "text" | "cap" | "ex" | …
+	TextBoxEdgeUnder string // "auto" | "text" | "alphabetic" | …
+	// CSS Text 4/5 spacing + group align + fit.
+	TextAutospace   string // "no-autospace" | "ideograph-alpha" | …
+	TextSpacing     string // "normal" | "trim-start" | …
+	TextSpacingTrim string // "space-all" | "trim-start" | "trim-both" | …
+	TextGroupAlign  string // "none" | "start" | "end" | "left" | "right" | "center"
+	TextFit         string // "none" | "auto" | "scale" (apply-only; no scale consumer yet)
 	// CustomProps holds resolved CSS custom properties (--*) for this element
 	// (inherited). Shared with the parent map when the element declares none.
 	CustomProps map[string]string
+}
+
+const (
+	widthMaxContent = -2.0
+	widthMinContent = -3.0
+)
+
+func isIntrinsicWidth(width float64) bool {
+	return width == widthMaxContent || width == widthMinContent
 }
 
 type border struct {
@@ -393,89 +462,100 @@ type border struct {
 	PaintWidth float64 // device paint width; zero means use Width
 	Style      string  // cssDisplayNone | "solid" | "dashed" | "dotted"
 	Color      [3]float64
+	// Transparent marks a fully transparent color: layout keeps its width,
+	// paint emits nothing. Zero value false keeps every other border opaque.
+	Transparent bool
 }
 
 // initialStyle returns the CSS initial values.
 func initialStyle() ResolvedStyle { //nolint:funlen // complete CSS initial-value record
 	return ResolvedStyle{ //nolint:exhaustruct // intentional zero fields
-		Display:          "inline",
-		Position:         "static",
-		Float:            cssDisplayNone,
-		FlexGrow:         0,
-		FlexShrink:       1,
-		FlexBasis:        -1,
-		FlexBasisPercent: -1,
-		Clear:            cssDisplayNone,
-		BoxSizing:        "content-box",
-		TopAuto:          true,
-		RightAuto:        true,
-		BottomAuto:       true,
-		LeftAuto:         true,
-		FlexDirection:    "row",
-		FlexWrap:         "nowrap",
-		JustifyContent:   "flex-start",
-		AlignItems:       "stretch",
-		AlignContent:     "stretch",
-		AlignSelf:        overflowAuto,
-		JustifyItems:     "stretch",
-		JustifySelf:      overflowAuto,
-		ColumnGapNormal:  true,
-		ColumnWidth:      -1,
-		ColumnSpan:       cssDisplayNone,
-		ColumnFill:       "balance",
-		ColumnRuleWidth:  borderWidth(mediumKeyword, 0),
-		ColumnRuleStyle:  cssDisplayNone,
-		Width:            -1,
-		WidthPercent:     -1,
-		Height:           -1,
-		HeightPercent:    -1,
-		MinWidth:         0,
-		MinWidthPercent:  -1,
-		MaxWidth:         -1,
-		MaxWidthPercent:  -1,
-		MinHeight:        0,
-		MinHeightPercent: -1,
-		MaxHeight:        -1,
-		MaxHeightPercent: -1,
-		Overflow:         "visible",
-		OverflowX:        "visible",
-		OverflowY:        "visible",
-		Visibility:       visibleKeyword,
-		Color:            [3]float64{0, 0, 0},
-		BGColor:          [4]float64{0, 0, 0, 0},
-		FontFamily:       nil,
+		Display:            "inline",
+		Position:           "static",
+		Float:              cssDisplayNone,
+		FlexGrow:           0,
+		FlexShrink:         1,
+		FlexBasis:          -1,
+		FlexBasisPercent:   -1,
+		Clear:              cssDisplayNone,
+		BoxSizing:          "content-box",
+		TopAuto:            true,
+		RightAuto:          true,
+		BottomAuto:         true,
+		LeftAuto:           true,
+		FlexDirection:      "row",
+		FlexWrap:           "nowrap",
+		JustifyContent:     "flex-start",
+		AlignItems:         "stretch",
+		AlignContent:       "stretch",
+		AlignSelf:          overflowAuto,
+		JustifyItems:       "stretch",
+		JustifySelf:        overflowAuto,
+		ColumnGapNormal:    true,
+		ColumnWidth:        -1,
+		ColumnHeight:       -1,
+		ColumnWrap:         columnWrapAuto,
+		ColumnSpan:         cssDisplayNone,
+		ColumnFill:         "balance",
+		ColumnRuleWidth:    borderWidth(mediumKeyword, 0),
+		ColumnRuleStyle:    cssDisplayNone,
+		InitialLetterAlign: "alphabetic",
+		InitialLetterWrap:  "none",
+		Width:              -1,
+		WidthPercent:       -1,
+		Height:             -1,
+		HeightPercent:      -1,
+		MinWidth:           0,
+		MinWidthPercent:    -1,
+		MaxWidth:           -1,
+		MaxWidthPercent:    -1,
+		MinHeight:          0,
+		MinHeightPercent:   -1,
+		MaxHeight:          -1,
+		MaxHeightPercent:   -1,
+		Overflow:           "visible",
+		OverflowX:          "visible",
+		OverflowY:          "visible",
+		Visibility:         visibleKeyword,
+		Color:              [3]float64{0, 0, 0},
+		BGColor:            [4]float64{0, 0, 0, 0},
+		FontFamily:         nil,
 		// Empty family hashes to the FNV-1a offset, matching what
 		// resolveElementStyle records for elements without font-family.
-		famHash:             hashFontFamily(nil),
-		FontSize:            12, // 16px at 96dpi
-		FontWeight:          400,
-		TextTransform:       textTransformNone,
-		VerticalAlign:       "baseline",
-		WhiteSpace:          "normal",
-		TabSize:             defaultTabSize,
-		HyphenateCharacter:  "-",
-		OverflowWrap:        "normal",
-		WordBreak:           "normal",
-		TextDecoration:      cssDisplayNone,
-		ListStyleType:       "disc",
-		BorderCollapse:      "separate",
-		BorderSpacing:       0,
-		TableLayout:         overflowAuto,
-		GridColumnSpan:      1,
-		GridRowSpan:         1,
-		WritingMode:         writingModeHorizontalTB,
-		Direction:           "ltr",
-		MixBlendMode:        blendNormal,
-		BackgroundBlendMode: blendNormal,
-		Isolation:           "auto",
-		Orphans:             2,
-		Widows:              2,
-		EmptyCells:          "",
-		Transform:           IdentityMatrix(),
-		TransformOrigin:     defaultTransformOrigin(),
-		Opacity:             1,
-		FillOpacity:         1,
-		StrokeOpacity:       1,
+		famHash:               hashFontFamily(nil),
+		FontSize:              12, // 16px at 96dpi
+		FontWeight:            400,
+		TextTransform:         textTransformNone,
+		VerticalAlign:         "baseline",
+		WhiteSpace:            "normal",
+		TabSize:               defaultTabSize,
+		HyphenateCharacter:    "-",
+		HyphenateLimitLast:    cssDisplayNone,
+		HyphenateLimitLines:   -1,
+		HyphenateLimitZonePct: -1,
+		HangingPunctuation:    cssDisplayNone,
+		OverflowWrap:          "normal",
+		WordBreak:             "normal",
+		TextDecoration:        cssDisplayNone,
+		ListStyleType:         "disc",
+		BorderCollapse:        "separate",
+		BorderSpacing:         0,
+		TableLayout:           overflowAuto,
+		GridColumnSpan:        1,
+		GridRowSpan:           1,
+		WritingMode:           writingModeHorizontalTB,
+		Direction:             cssDirectionLTR,
+		MixBlendMode:          blendNormal,
+		BackgroundBlendMode:   blendNormal,
+		Isolation:             "auto",
+		Orphans:               2,
+		Widows:                2,
+		EmptyCells:            "",
+		Transform:             IdentityMatrix(),
+		TransformOrigin:       defaultTransformOrigin(),
+		Opacity:               1,
+		FillOpacity:           1,
+		StrokeOpacity:         1,
 
 		// Re-added support properties (2026-09-12 demotions).
 		Contain:                    "none",
@@ -492,9 +572,30 @@ func initialStyle() ResolvedStyle { //nolint:funlen // complete CSS initial-valu
 		FontOpticalSizing:          "auto",
 		FontPalette:                "normal",
 		FontVariationSettings:      "normal",
+		FontFeatureSettings:        "normal",
+		FontKerning:                "auto",
+		FontWidth:                  100,
+		FontSynthesisWeight:        true,
+		FontSynthesisStyle:         true,
+		FontSynthesisSmallCaps:     true,
+		FontSynthesisPosition:      true,
+		FontVariantCaps:            "normal",
+		FontVariantLigatures:       "normal",
+		FontVariantNumeric:         "normal",
+		FontVariantPosition:        "normal",
+		FontVariantEastAsian:       "normal",
+		FontVariantAlternates:      "normal",
+		FontVariantEmoji:           "normal",
 		ImageOrientation:           imageAdjustFromImage,
 		ImageResolution:            imageAdjustFromImage,
 		ObjectViewBox:              "none",
+		ObjectFit:                  "fill",
+		ObjectPositionX:            "50%",
+		ObjectPositionY:            "50%",
+		ShapeOutside:               shapeOutsideNone,
+		ShapeMarginPercent:         -1,
+		FloatOffsetPercent:         -1,
+		FloatReference:             floatRefInline,
 		TextCombineUpright:         "none",
 		TextDecorationSkip:         "auto",
 		TextDecorationSkipBox:      "none",
@@ -502,6 +603,14 @@ func initialStyle() ResolvedStyle { //nolint:funlen // complete CSS initial-valu
 		TextDecorationSkipSpaces:   "start end",
 		TextOrientation:            "mixed",
 		UnicodeBidi:                "normal",
+		TextBoxTrim:                cssDisplayNone,
+		TextBoxEdgeOver:            "auto",
+		TextBoxEdgeUnder:           "auto",
+		TextAutospace:              "no-autospace",
+		TextSpacing:                contentNormal,
+		TextSpacingTrim:            "space-all",
+		TextGroupAlign:             cssDisplayNone,
+		TextFit:                    cssDisplayNone,
 	}
 }
 

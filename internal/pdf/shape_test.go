@@ -262,14 +262,94 @@ func TestParseFontFeatureSettings(t *testing.T) {
 	}
 }
 
+func TestParseFontFeatureSettingsHist(t *testing.T) {
+	t.Parallel()
+
+	feats := ParseFontFeatureSettings(`"hist" 1`)
+	if len(feats) != 1 || feats[0].Tag.String() != "hist" || feats[0].Value != 1 {
+		t.Fatalf("hist = %+v, want hist=1", feats)
+	}
+
+	swsh := ParseFontFeatureSettings(`"swsh" 1, "salt" 1`)
+	if len(swsh) != 2 {
+		t.Fatalf("swsh/salt count = %d", len(swsh))
+	}
+
+	if swsh[0].Tag.String() != "swsh" || swsh[0].Value != 1 {
+		t.Errorf("swsh = %+v", swsh[0])
+	}
+
+	if swsh[1].Tag.String() != "salt" || swsh[1].Value != 1 {
+		t.Errorf("salt = %+v", swsh[1])
+	}
+}
+
+func TestParseFontFeatureSettingsSaltChangesDejaVuGlyph(t *testing.T) {
+	t.Parallel()
+
+	fnt := bundledDejaVu(t)
+	plain := ShapeTextFontWithFeatures("a", fnt, nil)
+	salt := ShapeTextFontWithFeatures("a", fnt, ParseFontFeatureSettings(`"salt" 1`))
+
+	if salt == plain {
+		t.Fatalf("DejaVu salt should substitute glyph/text, plain=%q salt=%q", plain, salt)
+	}
+
+	if salt != "ɑ" {
+		t.Fatalf("DejaVu salt a = %q, want ɑ", salt)
+	}
+
+	hist := ShapeTextFontWithFeatures("a", fnt, ParseFontFeatureSettings(`"hist" 1`))
+	if hist != plain {
+		t.Fatalf("DejaVu has no hist; hist a = %q, want %q", hist, plain)
+	}
+}
+
 func TestShapeTextFontWithFeaturesCJKStillSafe(t *testing.T) {
 	t.Parallel()
 	// Face may lack halt/palt tables; requesting features must not panic
 	// or break the ShapeTextFont path for CJK punctuation.
-	f := loadDejaVu(t)
+	font := loadDejaVu(t)
 
-	got := ShapeTextFontWithFeatures("你好。", f, ParseFontFeatureSettings(`"halt" 1, "palt" 1`))
+	got := ShapeTextFontWithFeatures("你好。", font, ParseFontFeatureSettings(`"halt" 1, "palt" 1`))
 	if got == "" {
 		t.Fatal("empty shaped text")
+	}
+}
+
+func TestShapeTextFontWithFeaturesKernOff(t *testing.T) {
+	t.Parallel()
+
+	font := loadDejaVu(t)
+
+	feats := ParseFontFeatureSettings(`"kern" 0`)
+	if len(feats) != 1 || feats[0].Value != 0 {
+		t.Fatalf("kern off parse = %+v", feats)
+	}
+
+	got := ShapeTextFontWithFeatures("AV", font, feats)
+	if got == "" {
+		t.Fatal("empty shaped text with kern off")
+	}
+
+	run := ShapeRunWithFeaturesLanguage("AV", font, 12, feats, "")
+	if run.Text == "" || len(run.Runes) == 0 {
+		t.Fatalf("ShapeRunWithFeaturesLanguage = %+v", run)
+	}
+}
+
+func TestContentTextShowLanguageFeaturesParsesSettings(t *testing.T) {
+	t.Parallel()
+
+	fnt := loadDejaVu(t)
+	content := NewContent()
+	content.UseEmbeddedFont("F0", fnt)
+	content.BeginText()
+	content.SetFont("F0", 12)
+	content.TextShowLanguageFeatures("AV", "", `"kern" 0`)
+	content.EndText()
+
+	if len(content.Bytes()) == 0 {
+		t.Fatal("expected content operators for featured text")
 	}
 }

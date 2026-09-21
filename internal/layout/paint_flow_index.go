@@ -49,6 +49,135 @@ func shiftFlowBounded(res *Result, from, toIdx int, fromY, beforeY, deltaY float
 	}
 
 	shiftFlowBoxes(res, from, toIdx, fromY, beforeY, startPage, deltaY)
+
+	// A flow shift on one flex item must carry its whole flex line: split
+	// between the target range and the bucket walk, sibling fills sitting at
+	// exactly fromY are left behind. The orphans/widows fixpoint then shifts
+	// each item separately and staircases the Chrome Flex wrapped row.
+	// Runs after shiftFlowBoxes so sibling boxes are not shifted twice.
+	shiftFlexLineSiblings(res, from, toIdx, fromY, deltaY)
+}
+
+// flexLineItemPathCap bounds the box path scratch for a flex line lookup.
+const flexLineItemPathCap = 8
+
+// shiftFlexLineSiblings moves the flex line of the target box with the target
+// op range. It only fires when [from,toIdx] is exactly a leaf flex item's op
+// range on a line, so containers, inputs, replaced elements, table rows and
+// ordinary blocks keep the old single-range behavior. Callers pass the box top
+// as fromY, so siblings on the line share that band. Sibling ops the bucket
+// walk already moved sit above fromY and are skipped; ops at or above fromY
+// are the fills and rails that must follow.
+func shiftFlexLineSiblings(res *Result, from, toIdx int, fromY, deltaY float64) {
+	if res == nil || res.root == nil || deltaY == 0 {
+		return
+	}
+
+	path := make([]*box, 0, flexLineItemPathCap)
+	if !snapOpBoxPath(res.root, from, &path) {
+		return
+	}
+
+	target, container := flexLineTarget(res, path, from, toIdx)
+	if target == nil {
+		return
+	}
+
+	for _, sibling := range container.children {
+		if sibling == target || !withinTol(sibling.y, fromY) {
+			continue
+		}
+
+		shiftFlexSiblingOps(res, sibling, from, toIdx, fromY, deltaY)
+	}
+}
+
+// flexLineTarget finds the box whose op range is exactly [from,toIdx] and is a
+// genuine single leaf flex item on a line: its parent establishes the flex
+// line, it has no child boxes, it is not a replaced element, and no other
+// box's ops sit inside its range. A container, an input, or a box whose range
+// was merged over descendants would otherwise hand the shift the wrong ops and
+// drag unrelated content when the flow shift carries the line.
+func flexLineTarget(res *Result, path []*box, from, toIdx int) (*box, *box) {
+	for pathIndex := len(path) - 1; pathIndex > 0; pathIndex-- {
+		boxNode := path[pathIndex]
+		if boxNode.opStart != from || boxNode.opEnd != toIdx {
+			continue
+		}
+
+		if !isFlexLineContainer(path[pathIndex-1]) || !isLeafFlexLineItem(res, boxNode) {
+			continue
+		}
+
+		return boxNode, path[pathIndex-1]
+	}
+
+	return nil, nil
+}
+
+// isLeafFlexLineItem reports whether boxNode is a single leaf flex item whose
+// op range owns no other box's ops. Replaced elements (images, SVG) are
+// excluded; so is an input, which box kind cannot flag because the widget
+// builds as a block.
+func isLeafFlexLineItem(res *Result, boxNode *box) bool {
+	if boxNode == nil || len(boxNode.children) > 0 || boxNode.kind == boxKindReplaced {
+		return false
+	}
+
+	if boxNode.node != nil && boxNode.node.Name == htmlInput {
+		return false
+	}
+
+	return !rangeHoldsOtherBox(res, boxNode)
+}
+
+// rangeHoldsOtherBox reports whether any other laid-out box's op range sits
+// inside boxNode's range. A container whose chrome was merged over children
+// fails this test, so a flow shift cannot treat it as a single line item.
+func rangeHoldsOtherBox(res *Result, boxNode *box) bool {
+	if res == nil || res.root == nil {
+		return false
+	}
+
+	for _, other := range flowBoxList(res) {
+		if other == boxNode || other == nil || other.opEnd < other.opStart {
+			continue
+		}
+
+		if other.opStart >= boxNode.opStart && other.opEnd <= boxNode.opEnd {
+			return true
+		}
+	}
+
+	return false
+}
+
+// shiftFlexSiblingOps moves one sibling line box and the ops of its range
+// that the flow shift left at or above fromY.
+func shiftFlexSiblingOps(res *Result, sibling *box, from, toIdx int, fromY, deltaY float64) {
+	if sibling.opStart < 0 || sibling.opEnd < sibling.opStart {
+		return
+	}
+
+	end := sibling.opEnd
+	if end >= len(res.Ops) {
+		end = len(res.Ops) - 1
+	}
+
+	for idx := sibling.opStart; idx <= end; idx++ {
+		if idx >= from && idx <= toIdx {
+			continue
+		}
+
+		paintOp := &res.Ops[idx]
+		if paintOp.Fixed || paintOp.Y > fromY+layoutCoordEpsilon {
+			continue
+		}
+
+		shiftIndexedOp(res, idx, deltaY)
+	}
+
+	shiftLineBoxY(res, sibling, deltaY)
 }
 
 // flowIndexStorage is one retained page-index backing set: the per-page op

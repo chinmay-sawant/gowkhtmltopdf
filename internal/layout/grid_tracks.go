@@ -6,7 +6,10 @@ import (
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
 
-// resolveGridRows sizes the row tracks, returning the final row count.
+// resolveGridRows sizes the row tracks, returning the final row count and
+// whether preferred-height growth should be locked (fixed template / auto-rows).
+//
+//nolint:cyclop,gocognit,funlen // row sizing has separate definite, auto, and padding branches
 func resolveGridRows(
 	eng *engine,
 	sty ResolvedStyle,
@@ -14,8 +17,10 @@ func resolveGridRows(
 	numRows int,
 	contentH, rowGap float64,
 	definiteRows bool,
-) ([]float64, int) {
+) ([]float64, int, bool) {
 	var rows []float64
+
+	lockRows := false
 
 	if definiteRows {
 		rowDefs := parseGridTrackDefs(sty.GridTemplateRows)
@@ -26,6 +31,7 @@ func resolveGridRows(
 
 		rowIntrinsics := measureTrackIntrinsics(eng, kids, len(rowDefs), false)
 		rows = resolveGridTrackSizes(rowDefs, contentH, rowGap, eng, rowIntrinsics)
+		lockRows = true
 	}
 
 	switch {
@@ -33,19 +39,77 @@ func resolveGridRows(
 		rows = make([]float64, numRows)
 
 		if mins := parseGridTrackFixedMins(sty.GridTemplateRows, eng); len(mins) > 0 {
-			for i := 0; i < numRows && i < len(mins); i++ {
-				if mins[i] > 0 {
-					rows[i] = mins[i]
+			for rowIndex := range numRows {
+				if rowIndex >= len(mins) {
+					break
+				}
+
+				if mins[rowIndex] > 0 {
+					rows[rowIndex] = mins[rowIndex]
 				}
 			}
 		}
+
+		if autoPt := gridAutoFixedPt(sty.GridAutoRows, eng); autoPt > 0 {
+			templateCount := len(parseGridTrackDefs(sty.GridTemplateRows))
+			for i := range numRows {
+				if i >= templateCount && rows[i] == 0 {
+					rows[i] = autoPt
+				}
+			}
+
+			if templateCount == 0 {
+				for i := range numRows {
+					if rows[i] == 0 {
+						rows[i] = autoPt
+					}
+				}
+			}
+
+			lockRows = true
+		}
 	case len(rows) < numRows:
 		rows = padGridRowSizes(rows, numRows)
+		if autoPt := gridAutoFixedPt(sty.GridAutoRows, eng); autoPt > 0 {
+			for i := range rows {
+				if rows[i] == 0 {
+					rows[i] = autoPt
+				}
+			}
+
+			lockRows = true
+		}
 	case len(rows) > numRows:
 		numRows = len(rows)
 	}
 
-	return rows, numRows
+	return rows, numRows, lockRows
+}
+
+// gridAutoFixedPt returns a fixed grid-auto-rows/columns length in scaled pt,
+// or 0 when the value is auto/fr/intrinsic.
+func gridAutoFixedPt(raw string, eng *engine) float64 {
+	def := gridAutoTrackDef(raw)
+	if def.min.kind == trackFixed && def.max.kind == trackFixed &&
+		nearFloat(def.min.val, def.max.val) {
+		if eng == nil {
+			return def.min.val
+		}
+
+		return eng.scalePt(def.min.val)
+	}
+
+	return 0
+}
+
+func nearFloat(left, right float64) bool {
+	const eps = 1e-6
+
+	if left > right {
+		return left-right < eps
+	}
+
+	return right-left < eps
 }
 
 // padGridRowSizes extends a row-size slice to n entries, zero-filling.

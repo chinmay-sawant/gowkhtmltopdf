@@ -6,6 +6,7 @@ import (
 	"math"
 	"sync"
 
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/layout"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
 )
 
@@ -26,16 +27,34 @@ const (
 //
 // Text is run through pdf.ShapeTextFont first so Arabic/RTL/OT forms match
 // PDF emission (Phase 2.4 image shaping parity).
-//
-//nolint:cyclop,mnd // glyph drawing with rotation and spacing
 func ttfDrawString(
 	img *image.NRGBA,
 	basex, basey float64,
 	text string,
 	lang string,
+	featureSettings string,
 	sizePt float64,
 	letterSpacing float64,
 	rotateDeg float64,
+	face *pdf.Font,
+	col color.NRGBA,
+	pxPerPt float64,
+	atlas *glyphAtlas,
+) {
+	ttfDrawStringWithAutospace(
+		img, basex, basey, text, lang, featureSettings, sizePt, letterSpacing, 0,
+		rotateDeg, face, col, pxPerPt, atlas,
+	)
+}
+
+//nolint:cyclop,mnd // the existing glyph loop also handles rotation and spacing
+func ttfDrawStringWithAutospace(
+	img *image.NRGBA,
+	basex, basey float64,
+	text string,
+	lang string,
+	featureSettings string,
+	sizePt, letterSpacing, autospaceGap, rotateDeg float64,
 	face *pdf.Font,
 	col color.NRGBA,
 	pxPerPt float64,
@@ -49,7 +68,9 @@ func ttfDrawString(
 		atlas = newGlyphAtlas()
 	}
 
-	run := pdf.ShapeRunLanguage(text, face, sizePt, lang)
+	run := pdf.ShapeRunWithFeaturesLanguage(
+		text, face, sizePt, pdf.ParseFontFeatureSettings(featureSettings), lang,
+	)
 	if run.Text == "" {
 		return
 	}
@@ -65,10 +86,15 @@ func ttfDrawString(
 	cursorX := basex
 	cursorY := basey
 
-	for i, r := range run.Runes {
-		adv := run.Advances[i]*pxPerPt + letterSpacing*pxPerPt
+	var prev rune
 
-		drawGlyphAA(img, cursorX, cursorY, r, face, scale, col, atlas)
+	for i, glyphRune := range run.Runes {
+		adv := run.Advances[i]*pxPerPt + letterSpacing*pxPerPt
+		if autospaceGap > 0 && layout.IsIdeographAlphaBoundary(prev, glyphRune) {
+			adv += autospaceGap * pxPerPt
+		}
+
+		drawGlyphAA(img, cursorX, cursorY, glyphRune, face, scale, col, atlas)
 
 		switch rotateDeg {
 		case -90:
@@ -78,6 +104,8 @@ func ttfDrawString(
 		default:
 			cursorX += adv
 		}
+
+		prev = glyphRune
 	}
 }
 

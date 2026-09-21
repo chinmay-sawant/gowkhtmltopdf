@@ -317,11 +317,8 @@ func pickFace(faces []*Font, weight int, italic bool) *Font {
 
 // HasVariationAxes reports whether the face carries an fvar table, that is,
 // whether it is a variable font. The bundled Liberation and DejaVu faces are
-// static, so this is false for every default face.
-//
-// The font-variation consumer in internal/layout uses the probe to tell a
-// spec-correct no-op (static face, CSS variations have no effect) from a known
-// gap (variable face the writer cannot instance).
+// static, so this is false for every default face. Instanced faces produced
+// by Instance drop fvar, so this is false for them too.
 func (f *Font) HasVariationAxes() bool {
 	if f == nil {
 		return false
@@ -335,9 +332,9 @@ func (f *Font) HasVariationAxes() bool {
 }
 
 // HasColorPalette reports whether the face carries both COLR and CPAL, the
-// tables font-palette needs to select a color palette. The PDF writer embeds
-// glyf outlines only and has no CPAL/COLR painting path, so a true result
-// identifies a known gap rather than supported palette painting.
+// tables font-palette needs to select a color palette. Layout uses CPAL for a
+// documented lite solid fill (first color of the selected palette). Layered
+// COLR glyph paint is still out of scope.
 func (f *Font) HasColorPalette() bool {
 	if f == nil {
 		return false

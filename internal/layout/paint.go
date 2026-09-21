@@ -847,12 +847,14 @@ func pdfPaintOpacity(paintOp *Op, includeAlpha bool) float64 {
 
 // FakeBoldFor reports whether CSS bold should be synthesized for op (Latin
 // only; CJK stroking produces streak artifacts).
-func FakeBoldFor(op *Op) bool {
-	if op == nil || op.NoFakeBold || !op.Bold || (op.Font != nil && op.Font.Bold()) {
+func FakeBoldFor(paintOp *Op) bool {
+	noFakeBold := paintOp != nil && paintOp.opExtra != nil && paintOp.opExtra.NoFakeBold
+	if paintOp == nil || noFakeBold || !paintOp.Bold ||
+		(paintOp.Font != nil && paintOp.Font.Bold()) {
 		return false
 	}
 
-	for _, r := range op.Text {
+	for _, r := range paintOp.Text {
 		if r > maxLatin1Rune {
 			return false
 		}
@@ -1498,11 +1500,23 @@ func opRadiiPositive(radii [4]float64) bool {
 }
 
 func drawLine(chld *pdf.Content, paintOp *Op, pageIdx int, contentH float64, opts PaintOptions, pageH float64) {
-	x, y, w, h, width := paintOp.PaintLineGeometry()
-	xEnd, yEnd := canvasToPDF(x, y, pageIdx, contentH, opts, pageH)
-	xTwo, yTwo := canvasToPDF(x+w, y+h, pageIdx, contentH, opts, pageH)
+	lineX, lineY, lineW, lineH, width := paintOp.PaintLineGeometry()
+	xEnd, yEnd := canvasToPDF(lineX, lineY, pageIdx, contentH, opts, pageH)
+	xTwo, yTwo := canvasToPDF(lineX+lineW, lineY+lineH, pageIdx, contentH, opts, pageH)
 
 	strokeR, strokeG, strokeB := sRGBRangeLimit(paintOp.R, paintOp.G, paintOp.B, opts.colorAdjust.rangeLimit)
+
+	if lineW == 0 && lineH == 0 {
+		// An inset dotted fragment collapses to its dot centre. A
+		// single-point stroked path is renderer-dependent (MuPDF paints
+		// nothing), so fill the square the square cap would have covered.
+		chld.SetFillColor(strokeR, strokeG, strokeB)
+		chld.Rect(xEnd-width/2, yEnd-width/2, width, width)
+		chld.Fill()
+
+		return
+	}
+
 	chld.SetStrokeColor(strokeR, strokeG, strokeB)
 	chld.SetLineWidth(width)
 	// Square caps project half the stroke past each endpoint so axis-aligned
@@ -1516,7 +1530,7 @@ func drawLine(chld *pdf.Content, paintOp *Op, pageIdx int, contentH float64, opt
 	chld.SetLineCap(0) // restore PDF default butt for later strokes
 }
 
-func drawText(
+func drawText( //nolint:cyclop
 	chld *pdf.Content, paintOp *Op, pageIdx int, contentH float64, opts PaintOptions, pageH float64, fontName string,
 ) {
 	paintOp.bindEmptyExtra()
@@ -1533,17 +1547,25 @@ func drawText(
 	chld.SetFont(fontName, paintOp.Size)
 	chld.BeginText()
 
+	skew := 0.0
+	if paintOp.FakeOblique {
+		skew = synthObliqueSkew
+	}
+
 	if paintOp.RotateDeg == 90 || paintOp.RotateDeg == -90 {
 		if paintOp.RotateDeg < 0 {
-			// PDF's y-up text space reverses the screen-space direction.
-			// A CSS -90deg vertical run must therefore advance toward
-			// increasing canvas Y, not above its containing box.
 			chld.TextMatrix(0, -1, 1, 0, posX, posY)
 		} else {
 			chld.TextMatrix(0, 1, -1, 0, posX, posY)
 		}
 	} else {
-		chld.TextAt(posX, posY)
+		switch {
+		case skew != 0:
+			// Shear in PDF text space: x' = x + skew*y (italic lean).
+			chld.TextMatrix(1, 0, skew, 1, posX, posY)
+		default:
+			chld.TextAt(posX, posY)
+		}
 	}
 
 	chld.SetCharSpacing(paintOp.LetterSpacing)
@@ -1556,7 +1578,12 @@ func drawText(
 		chld.TextRenderMode(pdfTextRenderFillStroke) // fill + stroke
 	}
 
-	chld.TextShowLanguage(transformInlineText(paintOp.Text, paintOp.TextTransform), paintOp.TextLanguage())
+	text := transformInlineText(paintOp.Text, paintOp.TextTransform)
+	if gap := paintOp.TextAutospaceGap(); gap > 0 {
+		chld.TextShowLanguageFeaturesWithAutospace(text, paintOp.TextLanguage(), paintOp.FontFeatures(), gap)
+	} else {
+		chld.TextShowLanguageFeatures(text, paintOp.TextLanguage(), paintOp.FontFeatures())
+	}
 
 	if fakeBold {
 		chld.TextRenderMode(0)

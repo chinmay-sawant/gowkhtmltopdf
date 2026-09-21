@@ -1,0 +1,26 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Intrinsic replaced-element ratio precision</title>
+  <style>
+    /* Print 1:1 with the Chromium reference: no smart shrinking. The 8pt
+       page margin keeps every edge inside the page, and the 550pt panel
+       still fits the remaining width. */
+    @page { margin: 8pt; }
+    html, body { margin: 0; padding: 0; }
+    .case { position: relative; transform: translateY(56pt); display: flex; flex-direction: column; width: 37.5pt; }
+    .item { width: auto; height: auto; margin: auto; }
+  </style>
+</head>
+<body>
+  <!-- Source: third_party/blink/renderer/core/layout/flex/flex_layout_algorithm_test.cc -->
+  <!-- Fixture: case-37-blink-replaced-aspect-ratio-precision -->
+  <!-- Port status: completed. Source-faithful intrinsic 29 by 22 SVG. -->
+  <!-- Expected: the auto-sized SVG keeps its intrinsic 29 by 22 size. -->
+  <p class="case-description" style="position:absolute;top:12pt;left:12pt;margin:0;padding:6pt;border:1pt solid #64748b;background:#fff;color:#111827;font-size:9pt;line-height:12pt;width:550pt;">
+    <strong>Case 37 expected behavior:</strong> the auto-sized 29 by 22 SVG keeps its intrinsic ratio and stays centered in the narrow column.
+  </p>
+  <div class="case" id="case-37"><svg class="item" id="svg-37" width="29" height="22"><rect width="29" height="22"></rect></svg></div>
+</body>
+</html>

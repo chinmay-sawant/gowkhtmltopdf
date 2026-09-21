@@ -1,48 +1,50 @@
 {
-  "generated": "2026-09-12",
+  "generated": "2026-09-17",
   "sources": {
     "webref": "@webref/css (css.json via unpkg, captured 2026-08-27)",
     "all_properties": "https://www.w3.org/Style/CSS/all-properties.en.json",
     "mdn_units": "mdn/data css/units.json",
     "mdn_properties": "mdn/data css/properties.json (overlay for mdn_url/groups)",
-    "engine": "honesty pass plus standard compositing support; mix-blend-mode and isolation completed 2026-09-12 with element-level transparency groups in PDF and grouped raster composites in PNG; 2026-09-12 ponytail audit PT26-LAY-04/05 demoted 27 parsed-and-stored no-op properties to unsupported; the same day 24 were re-implemented with real layout/paint consumers (3 CSS Fonts rows stay demoted)"
+    "engine": "honesty pass plus standard compositing support; mix-blend-mode and isolation completed 2026-09-12 with element-level transparency groups in PDF and grouped raster composites in PNG; 2026-09-12 ponytail audit PT26-LAY-04/05 demoted 27 parsed-and-stored no-op properties to unsupported; the same day 24 were re-implemented with real layout/paint consumers (3 CSS Fonts rows stay demoted); v0.2.7 next-72 (87.1-87.7) honesty flips: Implemented 393 / Partial 14 / Unsupported 411"
   },
   "counts": {
     "webref_properties": 818,
     "mapped_properties": 818,
     "properties_by_engine_status": {
-      "implemented": 354,
-      "unsupported": 464,
-      "ignored": 0,
-      "partial": 0
+      "implemented": 407,
+      "partial": 0,
+      "unsupported": 411,
+      "ignored": 0
     },
     "properties_print_relevant": 818,
     "properties_goal_implement": 818,
     "atrules": 55,
     "atrules_by_engine_status": {
-      "ignored": 10,
+      "implemented": 0,
+      "partial": 11,
       "unsupported": 34,
-      "partial": 11
+      "ignored": 10
     },
     "selectors": 158,
     "selectors_by_engine_status": {
+      "implemented": 14,
       "partial": 10,
       "unsupported": 113,
-      "ignored": 21,
-      "implemented": 14
+      "ignored": 21
     },
     "functions": 162,
     "functions_by_engine_status": {
-      "ignored": 24,
-      "unsupported": 109,
+      "implemented": 5,
       "partial": 24,
-      "implemented": 5
+      "unsupported": 109,
+      "ignored": 24
     },
     "units": 30,
     "units_by_engine_status": {
-      "unsupported": 15,
+      "implemented": 7,
       "partial": 8,
-      "implemented": 7
+      "unsupported": 15,
+      "ignored": 0
     }
   },
   "policy": {

@@ -23,6 +23,10 @@ import (
 	gowkhtmltopdf "github.com/chinmay-sawant/gowkhtmltopdf"
 )
 
+const pdfArgumentCount = 2
+
+var errPDFArguments = errors.New("need exactly one input and one output file")
+
 func usage() {
 	fmt.Fprintln(os.Stderr, `usage: pdf [options] <input.html> <output.pdf>
 
@@ -42,52 +46,57 @@ func main() {
 }
 
 func run(argv []string) error {
-	fs := flag.NewFlagSet("pdf", flag.ContinueOnError)
-	fs.Usage = usage
-	pageSize := fs.String("page-size", "A4", "e.g. A4, Letter")
-	orientation := fs.String("orientation", "portrait", "portrait or landscape")
-	marginTop := fs.String("margin-top", "", "top margin in mm")
-	allowLocalFiles := fs.Bool("allow-local-files", false, "allow local files (needed for file inputs)")
-	if err := fs.Parse(argv); err != nil {
+	flags := flag.NewFlagSet("pdf", flag.ContinueOnError)
+	flags.Usage = usage
+	pageSize := flags.String("page-size", "A4", "e.g. A4, Letter")
+	orientation := flags.String("orientation", "portrait", "portrait or landscape")
+	marginTop := flags.String("margin-top", "", "top margin in mm")
+	allowLocalFiles := flags.Bool("allow-local-files", false, "allow local files (needed for file inputs)")
+
+	if err := flags.Parse(argv); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
 		}
-		return err
+
+		return fmt.Errorf("parse flags: %w", err)
 	}
-	if fs.NArg() != 2 {
+
+	if flags.NArg() != pdfArgumentCount {
 		usage()
-		return fmt.Errorf("need exactly one input and one output file")
+
+		return errPDFArguments
 	}
 
 	var topMargin float64
+
 	if *marginTop != "" {
 		parsed, err := strconv.ParseFloat(*marginTop, 64)
 		if err != nil {
 			return fmt.Errorf("margin-top: %w", err)
 		}
+
 		topMargin = parsed
 	}
 
-	doc := gowkhtmltopdf.Document{
-		Pages: []gowkhtmltopdf.Page{{
-			Source: gowkhtmltopdf.Content{File: fs.Arg(0)},
-		}},
-		PageSize:        *pageSize,
-		Orientation:     *orientation,
-		Margin:          gowkhtmltopdf.Margin{Top: topMargin},
-		AllowLocalFiles: *allowLocalFiles,
-	}
+	var doc gowkhtmltopdf.Document
+	doc.Pages = make([]gowkhtmltopdf.Page, 1)
+	doc.Pages[0].Source.File = flags.Arg(0)
+	doc.PageSize = *pageSize
+	doc.Orientation = *orientation
+	doc.Margin.Top = topMargin
+	doc.AllowLocalFiles = *allowLocalFiles
 
-	output, err := os.Create(fs.Arg(1))
+	output, err := os.Create(flags.Arg(1))
 	if err != nil {
-		return err
+		return fmt.Errorf("create output: %w", err)
 	}
 	defer output.Close()
 
 	if err := doc.WritePDF(context.Background(), output); err != nil {
-		return err
+		return fmt.Errorf("write PDF: %w", err)
 	}
 
-	fmt.Printf("pdf: wrote %s\n", fs.Arg(1))
+	fmt.Fprintf(os.Stdout, "pdf: wrote %s\n", flags.Arg(1))
+
 	return nil
 }

@@ -161,7 +161,7 @@ func (e *engine) roundedOutlineOp(
 	radBR := inflateRadius(e.scalePt(sty.BorderRadiusBottomRight), inflate)
 	radBL := inflateRadius(e.scalePt(sty.BorderRadiusBottomLeft), inflate)
 
-	return Op{ //nolint:exhaustruct // outline rounded stroke op
+	outlineOp := Op{ //nolint:exhaustruct // outline rounded stroke op
 		Kind:              OpStrokeRect,
 		X:                 outX,
 		Y:                 outY,
@@ -175,7 +175,10 @@ func (e *engine) roundedOutlineOp(
 		RadiusTopRight:    radTR,
 		RadiusBottomRight: radBR,
 		RadiusBottomLeft:  radBL,
-	}, true
+	}
+	outlineOp.setOutline()
+
+	return outlineOp, true
 }
 
 func (e *engine) outlineOps(sty *ResolvedStyle, posX, posY, width, height float64) []Op {
@@ -194,8 +197,13 @@ func (e *engine) outlineOps(sty *ResolvedStyle, posX, posY, width, height float6
 		}
 	}
 
-	return appendOutlineOps(
+	ops := appendOutlineOps(
 		make([]Op, 0, outlineSideHint),
 		posX, posY, width, height, outlineWidth, outlineOff, effStyle, red, green, blue,
 	)
+	for idx := range ops {
+		ops[idx].setOutline()
+	}
+
+	return ops
 }

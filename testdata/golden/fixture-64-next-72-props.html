@@ -1,0 +1,1462 @@
+<!DOCTYPE html>
+<!--
+  fixture-64-next-72-props
+  Proves: visual audit of the next 72 CSS properties targeted for v0.2.7
+  (implement / partial / unsupported honesty), each with a plain-language description and a live
+  Effect cell. Pattern matches fixture-60/61/62 implemented-props audits.
+  Meta line: kind · group · Chrome yes/no (MDN BCD). Chrome-unsupported rows
+  note that no render is expected in Chrome.
+  Fonts: Liberation Sans via --font-path testdata/fonts/implemented-audit (SIL OFL 1.1).
+  Images: logo.png + assets/asteria-lake.png + inline data URI.
+  Expected: multi-page; envelope in fixturePageBounds.
+  Property source: plans/0.2.7/next-72-properties.json
+-->
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <title>Next 72 CSS audit (72 properties)</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 12mm;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: "Liberation Sans", "Liberation Serif", "Liberation Mono", sans-serif;
+      font-size: 9.5pt;
+      line-height: 1.35;
+      color: #1a1f24;
+      margin: 0;
+      padding: 0;
+    }
+
+    header.masthead {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 3px solid #1f4b99;
+      padding-bottom: 8px;
+      margin-bottom: 12px;
+    }
+
+    header.masthead img.logo {
+      height: 36px;
+    }
+
+    header.masthead img.hero {
+      height: 48px;
+      border-radius: 4px;
+    }
+
+    header.masthead .titles h1 {
+      font-size: 16pt;
+      margin: 0 0 2px 0;
+      color: #1f4b99;
+    }
+
+    header.masthead .titles p {
+      margin: 0;
+      font-size: 8.5pt;
+      color: #445;
+    }
+
+    .needle {
+      display: inline-block;
+      background: #1f4b99;
+      color: #fff;
+      font-weight: normal;
+      padding: 2px 8px;
+      border-radius: 3px;
+      letter-spacing: 0.04em;
+      margin: 8px 0 12px;
+    }
+
+    table.audit {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    table.audit th,
+    table.audit td {
+      border: 1px solid #b8c0cc;
+      vertical-align: top;
+      padding: 6px 7px;
+    }
+
+    table.audit th {
+      background: #e8eef8;
+      font-size: 8.5pt;
+      text-align: left;
+    }
+
+    table.audit tr:nth-child(even) td {
+      background: #f7f9fc;
+    }
+
+    td.idx,
+    th.idx {
+      width: 36px;
+      text-align: right;
+      color: #667;
+      font-size: 8pt;
+      padding: 6px 4px;
+    }
+
+    td.prop {
+      width: 24%;
+    }
+
+    td.prop code {
+      font-family: "Liberation Mono", monospace;
+      font-size: 8.5pt;
+      color: #103a7a;
+      font-weight: normal;
+    }
+
+    td.prop .meta {
+      font-size: 7.5pt;
+      color: #667;
+      margin-top: 2px;
+    }
+
+    td.desc {
+      width: 38%;
+      font-size: 8.5pt;
+    }
+
+    td.effect {
+      width: 32%;
+    }
+
+    .chrome-badge {
+      margin-top: 4px;
+      font-size: 7.5pt;
+      padding: 1px 5px;
+      border-radius: 3px;
+      display: inline-block;
+    }
+
+    .chrome-no {
+      background: #fee2e2;
+      color: #991b1b;
+      border: 1px solid #fecaca;
+    }
+
+    .chrome-partial {
+      background: #ffedd5;
+      color: #9a3412;
+      border: 1px solid #fed7aa;
+    }
+
+    footer.note {
+      margin-top: 14px;
+      font-size: 8pt;
+      color: #556;
+      border-top: 1px solid #ccd;
+      padding-top: 6px;
+    }
+
+    .fx-ctr-root {
+      counter-reset: item;
+      font-size: 8.5pt;
+    }
+
+    .fx-ctr-inc {
+      counter-increment: item;
+    }
+
+    .fx-ctr-inc::before {
+      content: counter(item) ". ";
+    }
+
+    .fx-cjk {
+      font-family: "Cactus Classical Serif", "Liberation Sans", sans-serif;
+    }
+  </style>
+</head>
+
+<body>
+  <header class="masthead">
+    <img class="logo" src="logo.png" alt="logo">
+    <img class="hero" src="assets/asteria-lake.png" alt="sample">
+    <img class="logo"
+      src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAIAAAACUFjqAAAAEklEQVR42mP4z8CABzGMSmNDALfKY53W1e90AAAAAElFTkSuQmCC"
+      alt="pixel">
+    <div class="titles">
+      <h1>Next 72 CSS audit</h1>
+      <p>72 target properties · font-family "Liberation Sans" · local images · Chrome support from MDN BCD</p>
+    </div>
+  </header>
+
+  <div class="needle">NEXT-72-PROPS</div>
+  <p style="font-size:8.5pt;margin:0 0 10px 0;">
+    Each row names a v0.2.7 target property from the next-72 worklist. Implemented rows use
+    side-by-side or precondition-rich Effect demos so the gowk PDF shows a visible change.
+    The property meta line is <code>kind · group · Chrome yes/no</code> (MDN browser-compat-data).
+    If Chrome says no, the Effect cell will often look unchanged in Chrome; that is expected.
+    Generate with <code>--font-path testdata/fonts/implemented-audit</code>.
+  </p>
+
+  <table class="audit">
+    <thead>
+      <tr>
+        <th class="idx">#</th>
+        <th>Property</th>
+        <th>What it should do</th>
+        <th>Effect (live)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="idx">1</td>
+        <td class="prop"><code>font-feature-settings</code>
+          <div class="meta">longhand · CSS Fonts · Chrome yes (since 48)</div>
+        </td>
+        <td class="desc">With `font-feature-settings: 'smcp' 1` OpenType small-caps features should engage when
+          available.</td>
+        <td class="effect">
+          <div style="display:flex;gap:8px;align-items:flex-end;font-size:14px;"><span
+              style="border:1px solid #336;padding:4px;">off<br><span
+                style="font-feature-settings:'smcp' 0;">Ag</span></span><span
+              style="border:1px solid #036;padding:4px;background:#eef6ff;">smcp on<br><span
+                style="font-feature-settings:'smcp' 1;">Ag</span></span></div>
+          <div style="font-size:7.5pt;color:#556;margin-top:2px;">pair: features off vs on (Liberation may share glyphs)
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">2</td>
+        <td class="prop"><code>font-kerning</code>
+          <div class="meta">longhand · CSS Fonts · Chrome yes (since 33)</div>
+        </td>
+        <td class="desc">With `font-kerning: none` letter-pair kerning should stay off.</td>
+        <td class="effect">
+          <div style="display:flex;gap:8px;font-size:16px;"><span
+              style="border:1px solid #336;padding:4px;font-kerning:normal;">AV To<br><span
+                style="font-size:7pt;">kern</span></span><span
+              style="border:1px solid #036;padding:4px;background:#eef6ff;font-kerning:none;">AV To<br><span
+                style="font-size:7pt;">none</span></span></div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">3</td>
+        <td class="prop"><code>font-optical-sizing</code>
+          <div class="meta">longhand · CSS Fonts · Chrome yes (since 79)</div>
+        </td>
+        <td class="desc">With `font-optical-sizing: auto` at a large size, a variable face opsz axis should match used
+          font-size. `none` keeps the default optical size.</td>
+        <td class="effect">
+          <div style="display:flex;gap:8px;align-items:flex-end;font-family:'Gowk Var',sans-serif;font-size:36pt;"><span
+              style="border:1px solid #336;padding:4px;font-optical-sizing:none;">A<br><span
+                style="font-size:7pt;">none</span></span><span
+              style="border:1px solid #036;padding:4px;background:#eef6ff;font-optical-sizing:auto;">A<br><span
+                style="font-size:7pt;">auto</span></span></div>
+          <div style="font-size:7.5pt;color:#556;margin-top:2px;">pair: Gowk Var opsz off vs auto at 36pt</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">4</td>
+        <td class="prop"><code>font-palette</code>
+          <div class="meta">longhand · CSS Fonts · Chrome yes (since 101)</div>
+        </td>
+        <td class="desc">With `font-palette: dark` on the Palette Demo COLR/CPAL face, the solid CPAL fill should differ
+          from `normal` (CSS color).</td>
+        <td class="effect">
+          <div class="fx-palette" style="display:flex;gap:8px;align-items:flex-end;font-size:18px;color:#111;"><span
+              style="border:1px solid #336;padding:4px;font-palette:normal;">Ag<br><span
+                style="font-size:7pt;">normal</span></span><span
+              style="border:1px solid #036;padding:4px;background:#eef6ff;font-palette:dark;">Ag<br><span
+                style="font-size:7pt;">dark</span></span></div>
+          <div style="font-size:7.5pt;color:#556;margin-top:2px;">pair: CPAL lite fill via Palette Demo face</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">5</td>
+        <td class="prop"><code>font-size-adjust</code>
+          <div class="meta">longhand · CSS Fonts · Chrome yes (since 127)</div>
+        </td>
+        <td class="desc">With `font-size-adjust: 0.5` the effect should match 0.5.</td>
+        <td class="effect">
+          <div style="display:flex;gap:8px;align-items:baseline;font-size:18px;"><span
+              style="border:1px solid #336;padding:4px;">Aa<br><span style="font-size:7pt;">plain</span></span><span
+              style="border:1px solid #036;padding:4px;background:#eef6ff;font-size-adjust:0.2;">Aa<br><span
+                style="font-size:7pt;">adj 0.2</span></span></div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">6</td>
+        <td class="prop"><code>font-stretch</code>
+          <div class="meta">legacy-alias · CSS Fonts · Chrome yes (since 60)</div>
+        </td>
+        <td class="desc">A/B `font-stretch: normal` vs `condensed`. Condensed should look narrower after the font-width
+          advance-scale consumer (legacy alias).</td>
+        <td class="effect">
+          <div style="display:flex;gap:8px;align-items:baseline;font-size:16px;"><span
+              style="border:1px solid #336;padding:4px;font-stretch:normal;">Ag fi 0123<br><span
+                style="font-size:7pt;">normal</span></span><span
+              style="border:1px solid #036;padding:4px;background:#eef6ff;font-stretch:condensed;">Ag fi 0123<br><span
+                style="font-size:7pt;">condensed</span></span></div>
+          <div style="font-size:7.5pt;color:#556;margin-top:2px;">condensed advances should look narrower</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">7</td>
+        <td class="prop"><code>font-synthesis</code>
+          <div class="meta">shorthand · CSS Fonts · Chrome yes (since 97)</div>
+        </td>
+        <td class="desc">With `font-synthesis: none` the effect should match none.</td>
+        <td class="effect">
+          <div style="display:flex;gap:8px;font-size:14px;"><span
+              style="border:1px solid #336;padding:4px;font-weight:700;font-synthesis:weight;">Bold synth<br><span
+                style="font-size:7pt;">allowed</span></span><span
+              style="border:1px solid #036;padding:4px;background:#eef6ff;font-weight:700;font-synthesis:none;">Bold
+              synth<br><span style="font-size:7pt;">none</span></span></div>
+          <div style="font-size:7.5pt;color:#556;">uses weight 700; none gates fake-bold when no bold face</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">8</td>
+        <td class="prop"><code>font-synthesis-position</code>
+          <div class="meta">longhand · CSS Fonts · Chrome no (not supported)</div>
+        </td>
+        <td class="desc">Pair `font-variant-position: sub` with `font-synthesis-position: auto` vs `none` on digit 2.
+          Auto synthesizes a smaller/lower 2 when no real sub glyphs exist; none keeps the digit full-size. Chrome does
+          not support this property, so the Effect cell may look unchanged in Chrome.</td>
+        <td class="effect">
+          <div style="display:flex;gap:8px;align-items:baseline;font-size:16px;"><span
+              style="border:1px solid #336;padding:4px;">H<span
+                style="font-variant-position:sub;font-synthesis-position:auto;">2</span>O<br><span
+                style="font-size:7pt;">sub + auto</span></span><span
+              style="border:1px solid #036;padding:4px;background:#eef6ff;">H<span
+                style="font-variant-position:sub;font-synthesis-position:none;">2</span>O<br><span
+                style="font-size:7pt;">sub + none</span></span></div>
+          <div style="font-size:7.5pt;color:#556;margin-top:2px;">auto should look smaller/lower; none stays baseline
+            size</div>
+          <div class="chrome-badge chrome-no">Chrome: no render expected</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">9</td>
+        <td class="prop"><code>font-synthesis-small-caps</code>
+          <div class="meta">longhand · CSS Fonts · Chrome yes (since 97)</div>
+        </td>
+        <td class="desc">Pair `font-variant-caps: small-caps` with `font-synthesis-small-caps: auto` vs `none` on Ag.
+          Auto geometrically scales uppercase when the face lacks smcp; none leaves Ag unchanged.</td>
+        <td class="effect">
+          <div style="display:flex;gap:8px;align-items:baseline;font-size:16px;"><span
+              style="border:1px solid #336;padding:4px;font-variant-caps:small-caps;font-synthesis-small-caps:auto;">Ag<br><span
+                style="font-size:7pt;">smcp + auto</span></span><span
+              style="border:1px solid #036;padding:4px;background:#eef6ff;font-variant-caps:small-caps;font-synthesis-small-caps:none;">Ag<br><span
+                style="font-size:7pt;">smcp + none</span></span></div>
+          <div style="font-size:7.5pt;color:#556;margin-top:2px;">auto may look like AG scaled; none keeps mixed case
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">10</td>
+        <td class="prop"><code>font-synthesis-style</code>
+          <div class="meta">longhand · CSS Fonts · Chrome yes (since 97)</div>
+        </td>
+        <td class="desc">On upright-only face `Cactus Classical Serif`, pair `font-style: italic` with
+          `font-synthesis-style: auto` vs `none`. Auto applies FakeOblique; none stays upright.</td>
+        <td class="effect">
+          <div class="fx-cjk" style="display:flex;gap:8px;align-items:baseline;font-size:14px;"><span
+              style="border:1px solid #336;padding:4px;font-style:italic;font-synthesis-style:auto;">Italic Ag<br><span
+                style="font-size:7pt;font-style:normal;">auto (oblique)</span></span><span
+              style="border:1px solid #036;padding:4px;background:#eef6ff;font-style:italic;font-synthesis-style:none;">Italic
+              Ag<br><span style="font-size:7pt;font-style:normal;">none (upright)</span></span></div>
+          <div style="font-size:7.5pt;color:#556;margin-top:2px;">Cactus Classical Serif has no italic master</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">11</td>
+        <td class="prop"><code>font-synthesis-weight</code>
+          <div class="meta">longhand · CSS Fonts · Chrome yes (since 97)</div>
+        </td>
+        <td class="desc">With `font-synthesis-weight: none` the effect should match none.</td>
+        <td class="effect">
+          <div style="display:flex;gap:8px;font-size:14px;"><span
+              style="border:1px solid #336;padding:4px;font-weight:700;">700 auto</span><span
+              style="border:1px solid #036;padding:4px;background:#eef6ff;font-weight:700;font-synthesis-weight:none;">700
+              none</span></div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">12</td>
+        <td class="prop"><code>font-variant</code>
+          <div class="meta">shorthand · CSS Fonts · Chrome yes (since 1)</div>
+        </td>
+        <td class="desc">With `font-variant: small-caps` the sample text should render in small caps.</td>
+        <td class="effect">
+          <div style="display:flex;gap:8px;font-size:14px;"><span style="border:1px solid #336;padding:4px;">Normal
+              Ag</span><span
+              style="border:1px solid #036;padding:4px;background:#eef6ff;font-variant:small-caps;">Small-caps Ag</span>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">13</td>
+        <td class="prop"><code>font-variant-alternates</code>
+          <div class="meta">longhand · CSS Fonts · Chrome yes (since 111)</div>
+        </td>
+        <td class="desc">A/B `font-variant-alternates: historical-forms` (hist) and `stylistic(1)` (salt) vs `normal`.
+          Tags reach the shaper. Liberation often no-ops; DejaVu salt substitutes a to ɑ in tests.</td>
+        <td class="effect">
+          <div style="display:flex;gap:8px;align-items:baseline;font-size:16px;"><span
+              style="border:1px solid #336;padding:4px;font-variant-alternates:historical-forms;">Ag fi<br><span
+                style="font-size:7pt;">historical-forms</span></span><span
+              style="border:1px solid #246;padding:4px;font-variant-alternates:stylistic(1);">Ag a<br><span
+                style="font-size:7pt;">stylistic(1)</span></span><span
+              style="border:1px solid #036;padding:4px;background:#eef6ff;font-variant-alternates:normal;">Ag
+              fi<br><span style="font-size:7pt;">normal</span></span></div>
+          <div style="font-size:7.5pt;color:#556;margin-top:2px;">hist/salt tags applied; Liberation GSUB often empty
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">14</td>
+        <td class="prop"><code>font-variant-caps</code>
+          <div class="meta">longhand · CSS Fonts · Chrome yes (since 52)</div>
+        </td>
+        <td class="desc">With `font-variant-caps: small-caps` the effect should match small-caps.</td>
+        <td class="effect">
+          <div style="display:flex;gap:8px;font-size:14px;"><span style="border:1px solid #336;padding:4px;">Caps
+              Off</span><span
+              style="border:1px solid #036;padding:4px;background:#eef6ff;font-variant-caps:small-caps;">Caps On</span>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">15</td>
+        <td class="prop"><code>font-variant-east-asian</code>
+          <div class="meta">longhand · CSS Fonts · Chrome yes (since 63)</div>
+        </td>
+        <td class="desc">With `font-variant-east-asian: jis78` the effect should match jis78.</td>
+        <td class="effect">
+          <div class="fx-cjk" style="border:1px solid #336;padding:4px;font-size:14px;font-variant-east-asian:jis78;">漢字
+            jis78</div>
+          <div style="font-size:7.5pt;color:#556;">CJK face via Cactus Classical Serif subset</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">16</td>
+        <td class="prop"><code>font-variant-emoji</code>
+          <div class="meta">longhand · CSS Fonts · Chrome yes (since 131)</div>
+        </td>
+        <td class="desc">With `font-variant-emoji: text` vs `emoji`, ☺ should differ: text keeps CSS color; emoji uses
+          U+FE0F presentation fill and at least 1em advance.</td>
+        <td class="effect">
+          <div style="display:flex;gap:8px;align-items:baseline;font-size:18px;color:#111;"><span
+              style="border:1px solid #336;padding:4px;font-variant-emoji:text;">☺<br><span
+                style="font-size:7pt;">text</span></span><span
+              style="border:1px solid #036;padding:4px;background:#eef6ff;font-variant-emoji:emoji;">☺<br><span
+                style="font-size:7pt;">emoji</span></span></div>
+          <div style="font-size:7.5pt;color:#556;margin-top:2px;">pair: text vs emoji presentation (U+FE0E / U+FE0F
+            semantics)</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">17</td>
+        <td class="prop"><code>font-variant-ligatures</code>
+          <div class="meta">longhand · CSS Fonts · Chrome yes (since 34)</div>
+        </td>
+        <td class="desc">With `font-variant-ligatures: no-common-ligatures` the effect should match no-common-ligatures.
+        </td>
+        <td class="effect">
+          <div style="display:flex;gap:8px;font-size:18px;"><span
+              style="border:1px solid #336;padding:4px;font-variant-ligatures:common-ligatures;">office
+              fillet</span><span
+              style="border:1px solid #036;padding:4px;background:#eef6ff;font-variant-ligatures:no-common-ligatures;">office
+              fillet</span></div>
+          <div style="font-size:7.5pt;color:#556;">left allows liga; right disables</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">18</td>
+        <td class="prop"><code>font-variant-numeric</code>
+          <div class="meta">longhand · CSS Fonts · Chrome yes (since 52)</div>
+        </td>
+        <td class="desc">With `font-variant-numeric: tabular-nums` the effect should match tabular-nums.</td>
+        <td class="effect">
+          <div style="display:flex;gap:8px;font-size:16px;"><span
+              style="border:1px solid #336;padding:4px;font-variant-numeric:proportional-nums;">1111<br>0000</span><span
+              style="border:1px solid #036;padding:4px;background:#eef6ff;font-variant-numeric:tabular-nums;">1111<br>0000</span>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">19</td>
+        <td class="prop"><code>font-variant-position</code>
+          <div class="meta">longhand · CSS Fonts · Chrome yes (since 117)</div>
+        </td>
+        <td class="desc">With `font-variant-position: sub` the effect should match sub.</td>
+        <td class="effect">
+          <div style="font-size:14px;border:1px solid #336;padding:6px;">H<span
+              style="font-variant-position:sub;">2</span>O and x<span style="font-variant-position:sub;">i</span></div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">20</td>
+        <td class="prop"><code>font-variation-settings</code>
+          <div class="meta">longhand · CSS Fonts · Chrome yes (since 62)</div>
+        </td>
+        <td class="desc">With `font-variation-settings: 'wght' 900` a variable face should paint a heavier, wider A than
+          `normal`.</td>
+        <td class="effect">
+          <div style="display:flex;gap:8px;align-items:flex-end;font-family:'Gowk Var',sans-serif;font-size:28px;"><span
+              style="border:1px solid #336;padding:4px;font-variation-settings:normal;font-optical-sizing:none;">A<br><span
+                style="font-size:7pt;">normal</span></span><span
+              style="border:1px solid #036;padding:4px;background:#eef6ff;font-variation-settings:'wght' 900;font-optical-sizing:none;">A<br><span
+                style="font-size:7pt;">wght 900</span></span></div>
+          <div style="font-size:7.5pt;color:#556;margin-top:2px;">pair: Gowk Var default vs wght 900</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">21</td>
+        <td class="prop"><code>font-width</code>
+          <div class="meta">longhand · CSS Fonts · Chrome no (not supported)</div>
+        </td>
+        <td class="desc">A/B `font-width: normal` vs `condensed`. Condensed should look narrower after the advance-scale
+          consumer. Chrome does not support this property, so the Effect cell may look unchanged in Chrome.</td>
+        <td class="effect">
+          <div style="display:flex;gap:8px;align-items:baseline;font-size:16px;"><span
+              style="border:1px solid #336;padding:4px;font-width:normal;">Ag fi 0123<br><span
+                style="font-size:7pt;">normal</span></span><span
+              style="border:1px solid #036;padding:4px;background:#eef6ff;font-width:condensed;">Ag fi 0123<br><span
+                style="font-size:7pt;">condensed</span></span></div>
+          <div style="font-size:7.5pt;color:#556;margin-top:2px;">condensed advances should look narrower</div>
+          <div class="chrome-badge chrome-no">Chrome: no render expected</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">22</td>
+        <td class="prop"><code>border-block-clip</code>
+          <div class="meta">shorthand · (ungrouped) · Chrome no (no MDN BCD entry)</div>
+        </td>
+        <td class="desc">Unsupported / draft-not-ready (phase 87.7 defer). No gowk apply/paint for `border-block-clip`.
+          Demo value `1` is not a live clip; Effect is an honesty panel only. Chrome does not support this property (no
+          MDN BCD entry).</td>
+        <td class="effect">
+          <div style="display:flex;gap:8px;align-items:flex-start;">
+            <div
+              style="border:2px dashed #c44;background:#e8e8e8;padding:6px 8px;font-size:7.5pt;color:#444;line-height:1.25;max-width:130px;">
+              gowk Unsupported (87.7 defer)</div>
+            <div style="text-align:center;">
+              <div style="border:4px solid #246;background:#fff;width:40px;height:24px;" title="plain border baseline">
+              </div>
+              <div style="font-size:7pt;color:#556;margin-top:2px;">baseline border only</div>
+            </div>
+          </div>
+          <div class="chrome-badge chrome-no">Chrome: no render expected</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">23</td>
+        <td class="prop"><code>border-block-end-clip</code>
+          <div class="meta">longhand · (ungrouped) · Chrome no (no MDN BCD entry)</div>
+        </td>
+        <td class="desc">Unsupported / draft-not-ready (phase 87.7 defer). No gowk apply/paint for
+          `border-block-end-clip`. Demo value `1` is not a live clip; Effect is an honesty panel only. Chrome does not
+          support this property (no MDN BCD entry).</td>
+        <td class="effect">
+          <div style="display:flex;gap:8px;align-items:flex-start;">
+            <div
+              style="border:2px dashed #c44;background:#e8e8e8;padding:6px 8px;font-size:7.5pt;color:#444;line-height:1.25;max-width:130px;">
+              gowk Unsupported (87.7 defer)</div>
+            <div style="text-align:center;">
+              <div style="border:4px solid #246;background:#fff;width:40px;height:24px;" title="plain border baseline">
+              </div>
+              <div style="font-size:7pt;color:#556;margin-top:2px;">baseline border only</div>
+            </div>
+          </div>
+          <div class="chrome-badge chrome-no">Chrome: no render expected</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">24</td>
+        <td class="prop"><code>border-block-start-clip</code>
+          <div class="meta">longhand · (ungrouped) · Chrome no (no MDN BCD entry)</div>
+        </td>
+        <td class="desc">Unsupported / draft-not-ready (phase 87.7 defer). No gowk apply/paint for
+          `border-block-start-clip`. Demo value `1` is not a live clip; Effect is an honesty panel only. Chrome does not
+          support this property (no MDN BCD entry).</td>
+        <td class="effect">
+          <div style="display:flex;gap:8px;align-items:flex-start;">
+            <div
+              style="border:2px dashed #c44;background:#e8e8e8;padding:6px 8px;font-size:7.5pt;color:#444;line-height:1.25;max-width:130px;">
+              gowk Unsupported (87.7 defer)</div>
+            <div style="text-align:center;">
+              <div style="border:4px solid #246;background:#fff;width:40px;height:24px;" title="plain border baseline">
+              </div>
+              <div style="font-size:7pt;color:#556;margin-top:2px;">baseline border only</div>
+            </div>
+          </div>
+          <div class="chrome-badge chrome-no">Chrome: no render expected</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">25</td>
+        <td class="prop"><code>border-bottom-clip</code>
+          <div class="meta">longhand · (ungrouped) · Chrome no (no MDN BCD entry)</div>
+        </td>
+        <td class="desc">Unsupported / draft-not-ready (phase 87.7 defer). No gowk apply/paint for `border-bottom-clip`.
+          Demo value `1` is not a live clip; Effect is an honesty panel only. Chrome does not support this property (no
+          MDN BCD entry).</td>
+        <td class="effect">
+          <div style="display:flex;gap:8px;align-items:flex-start;">
+            <div
+              style="border:2px dashed #c44;background:#e8e8e8;padding:6px 8px;font-size:7.5pt;color:#444;line-height:1.25;max-width:130px;">
+              gowk Unsupported (87.7 defer)</div>
+            <div style="text-align:center;">
+              <div style="border:4px solid #246;background:#fff;width:40px;height:24px;" title="plain border baseline">
+              </div>
+              <div style="font-size:7pt;color:#556;margin-top:2px;">baseline border only</div>
+            </div>
+          </div>
+          <div class="chrome-badge chrome-no">Chrome: no render expected</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">26</td>
+        <td class="prop"><code>border-boundary</code>
+          <div class="meta">longhand · (ungrouped) · Chrome no (no MDN BCD entry)</div>
+        </td>
+        <td class="desc">Unsupported / draft-not-ready (phase 87.7 defer). No gowk apply/paint for `border-boundary`.
+          Effect is an honesty panel only (no live boundary effect). Chrome does not support this property (no MDN BCD
+          entry).</td>
+        <td class="effect">
+          <div style="display:flex;gap:8px;align-items:flex-start;">
+            <div
+              style="border:2px dashed #c44;background:#e8e8e8;padding:6px 8px;font-size:7.5pt;color:#444;line-height:1.25;max-width:130px;">
+              gowk Unsupported (87.7 defer)</div>
+            <div style="text-align:center;">
+              <div style="border:4px solid #246;background:#fff;width:40px;height:24px;" title="plain border baseline">
+              </div>
+              <div style="font-size:7pt;color:#556;margin-top:2px;">baseline border only</div>
+            </div>
+          </div>
+          <div class="chrome-badge chrome-no">Chrome: no render expected</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">27</td>
+        <td class="prop"><code>border-clip</code>
+          <div class="meta">shorthand · (ungrouped) · Chrome no (no MDN BCD entry)</div>
+        </td>
+        <td class="desc">Unsupported / draft-not-ready (phase 87.7 defer). No gowk apply/paint for `border-clip`. Demo
+          value `1` is not a live clip; Effect is an honesty panel only. Chrome does not support this property (no MDN
+          BCD entry).</td>
+        <td class="effect">
+          <div style="display:flex;gap:8px;align-items:flex-start;">
+            <div
+              style="border:2px dashed #c44;background:#e8e8e8;padding:6px 8px;font-size:7.5pt;color:#444;line-height:1.25;max-width:130px;">
+              gowk Unsupported (87.7 defer)</div>
+            <div style="text-align:center;">
+              <div style="border:4px solid #246;background:#fff;width:40px;height:24px;" title="plain border baseline">
+              </div>
+              <div style="font-size:7pt;color:#556;margin-top:2px;">baseline border only</div>
+            </div>
+          </div>
+          <div class="chrome-badge chrome-no">Chrome: no render expected</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">28</td>
+        <td class="prop"><code>border-inline-clip</code>
+          <div class="meta">shorthand · (ungrouped) · Chrome no (no MDN BCD entry)</div>
+        </td>
+        <td class="desc">Unsupported / draft-not-ready (phase 87.7 defer). No gowk apply/paint for `border-inline-clip`.
+          Demo value `1` is not a live clip; Effect is an honesty panel only. Chrome does not support this property (no
+          MDN BCD entry).</td>
+        <td class="effect">
+          <div style="display:flex;gap:8px;align-items:flex-start;">
+            <div
+              style="border:2px dashed #c44;background:#e8e8e8;padding:6px 8px;font-size:7.5pt;color:#444;line-height:1.25;max-width:130px;">
+              gowk Unsupported (87.7 defer)</div>
+            <div style="text-align:center;">
+              <div style="border:4px solid #246;background:#fff;width:40px;height:24px;" title="plain border baseline">
+              </div>
+              <div style="font-size:7pt;color:#556;margin-top:2px;">baseline border only</div>
+            </div>
+          </div>
+          <div class="chrome-badge chrome-no">Chrome: no render expected</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">29</td>
+        <td class="prop"><code>border-inline-end-clip</code>
+          <div class="meta">longhand · (ungrouped) · Chrome no (no MDN BCD entry)</div>
+        </td>
+        <td class="desc">Unsupported / draft-not-ready (phase 87.7 defer). No gowk apply/paint for
+          `border-inline-end-clip`. Demo value `1` is not a live clip; Effect is an honesty panel only. Chrome does not
+          support this property (no MDN BCD entry).</td>
+        <td class="effect">
+          <div style="display:flex;gap:8px;align-items:flex-start;">
+            <div
+              style="border:2px dashed #c44;background:#e8e8e8;padding:6px 8px;font-size:7.5pt;color:#444;line-height:1.25;max-width:130px;">
+              gowk Unsupported (87.7 defer)</div>
+            <div style="text-align:center;">
+              <div style="border:4px solid #246;background:#fff;width:40px;height:24px;" title="plain border baseline">
+              </div>
+              <div style="font-size:7pt;color:#556;margin-top:2px;">baseline border only</div>
+            </div>
+          </div>
+          <div class="chrome-badge chrome-no">Chrome: no render expected</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">30</td>
+        <td class="prop"><code>border-inline-start-clip</code>
+          <div class="meta">longhand · (ungrouped) · Chrome no (no MDN BCD entry)</div>
+        </td>
+        <td class="desc">Unsupported / draft-not-ready (phase 87.7 defer). No gowk apply/paint for
+          `border-inline-start-clip`. Demo value `1` is not a live clip; Effect is an honesty panel only. Chrome does
+          not support this property (no MDN BCD entry).</td>
+        <td class="effect">
+          <div style="display:flex;gap:8px;align-items:flex-start;">
+            <div
+              style="border:2px dashed #c44;background:#e8e8e8;padding:6px 8px;font-size:7.5pt;color:#444;line-height:1.25;max-width:130px;">
+              gowk Unsupported (87.7 defer)</div>
+            <div style="text-align:center;">
+              <div style="border:4px solid #246;background:#fff;width:40px;height:24px;" title="plain border baseline">
+              </div>
+              <div style="font-size:7pt;color:#556;margin-top:2px;">baseline border only</div>
+            </div>
+          </div>
+          <div class="chrome-badge chrome-no">Chrome: no render expected</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">31</td>
+        <td class="prop"><code>border-left-clip</code>
+          <div class="meta">longhand · (ungrouped) · Chrome no (no MDN BCD entry)</div>
+        </td>
+        <td class="desc">Unsupported / draft-not-ready (phase 87.7 defer). No gowk apply/paint for `border-left-clip`.
+          Demo value `1` is not a live clip; Effect is an honesty panel only. Chrome does not support this property (no
+          MDN BCD entry).</td>
+        <td class="effect">
+          <div style="display:flex;gap:8px;align-items:flex-start;">
+            <div
+              style="border:2px dashed #c44;background:#e8e8e8;padding:6px 8px;font-size:7.5pt;color:#444;line-height:1.25;max-width:130px;">
+              gowk Unsupported (87.7 defer)</div>
+            <div style="text-align:center;">
+              <div style="border:4px solid #246;background:#fff;width:40px;height:24px;" title="plain border baseline">
+              </div>
+              <div style="font-size:7pt;color:#556;margin-top:2px;">baseline border only</div>
+            </div>
+          </div>
+          <div class="chrome-badge chrome-no">Chrome: no render expected</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">32</td>
+        <td class="prop"><code>border-limit</code>
+          <div class="meta">longhand · (ungrouped) · Chrome no (no MDN BCD entry)</div>
+        </td>
+        <td class="desc">Unsupported / draft-not-ready (phase 87.7 defer). No gowk apply/paint for `border-limit`. Demo
+          value `3` is not a live limit; Effect is an honesty panel only. Chrome does not support this property (no MDN
+          BCD entry).</td>
+        <td class="effect">
+          <div style="display:flex;gap:8px;align-items:flex-start;">
+            <div
+              style="border:2px dashed #c44;background:#e8e8e8;padding:6px 8px;font-size:7.5pt;color:#444;line-height:1.25;max-width:130px;">
+              gowk Unsupported (87.7 defer)</div>
+            <div style="text-align:center;">
+              <div style="border:4px solid #246;background:#fff;width:40px;height:24px;" title="plain border baseline">
+              </div>
+              <div style="font-size:7pt;color:#556;margin-top:2px;">baseline border only</div>
+            </div>
+          </div>
+          <div class="chrome-badge chrome-no">Chrome: no render expected</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">33</td>
+        <td class="prop"><code>border-right-clip</code>
+          <div class="meta">longhand · (ungrouped) · Chrome no (no MDN BCD entry)</div>
+        </td>
+        <td class="desc">Unsupported / draft-not-ready (phase 87.7 defer). No gowk apply/paint for `border-right-clip`.
+          Demo value `1` is not a live clip; Effect is an honesty panel only. Chrome does not support this property (no
+          MDN BCD entry).</td>
+        <td class="effect">
+          <div style="display:flex;gap:8px;align-items:flex-start;">
+            <div
+              style="border:2px dashed #c44;background:#e8e8e8;padding:6px 8px;font-size:7.5pt;color:#444;line-height:1.25;max-width:130px;">
+              gowk Unsupported (87.7 defer)</div>
+            <div style="text-align:center;">
+              <div style="border:4px solid #246;background:#fff;width:40px;height:24px;" title="plain border baseline">
+              </div>
+              <div style="font-size:7pt;color:#556;margin-top:2px;">baseline border only</div>
+            </div>
+          </div>
+          <div class="chrome-badge chrome-no">Chrome: no render expected</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">34</td>
+        <td class="prop"><code>border-shape</code>
+          <div class="meta">longhand · CSS Backgrounds and Borders · Chrome yes (since 147)</div>
+        </td>
+        <td class="desc">Unsupported / draft-not-ready (phase 87.7 defer). No gowk apply/paint for `border-shape`. Demo
+          value `bevel` is invalid (needs &lt;basic-shape&gt;, e.g. inset()/circle()); Effect is an honesty panel only.
+        </td>
+        <td class="effect">
+          <div style="display:flex;gap:8px;align-items:flex-start;">
+            <div
+              style="border:2px dashed #c44;background:#e8e8e8;padding:6px 8px;font-size:7.5pt;color:#444;line-height:1.25;max-width:130px;">
+              gowk Unsupported (87.7 defer)</div>
+            <div style="text-align:center;">
+              <div style="border:4px solid #246;background:#fff;width:40px;height:24px;" title="plain border baseline">
+              </div>
+              <div style="font-size:7pt;color:#556;margin-top:2px;">baseline border only</div>
+            </div>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">35</td>
+        <td class="prop"><code>border-top-clip</code>
+          <div class="meta">longhand · (ungrouped) · Chrome no (no MDN BCD entry)</div>
+        </td>
+        <td class="desc">Unsupported / draft-not-ready (phase 87.7 defer). No gowk apply/paint for `border-top-clip`.
+          Demo value `1` is not a live clip; Effect is an honesty panel only. Chrome does not support this property (no
+          MDN BCD entry).</td>
+        <td class="effect">
+          <div style="display:flex;gap:8px;align-items:flex-start;">
+            <div
+              style="border:2px dashed #c44;background:#e8e8e8;padding:6px 8px;font-size:7.5pt;color:#444;line-height:1.25;max-width:130px;">
+              gowk Unsupported (87.7 defer)</div>
+            <div style="text-align:center;">
+              <div style="border:4px solid #246;background:#fff;width:40px;height:24px;" title="plain border baseline">
+              </div>
+              <div style="font-size:7pt;color:#556;margin-top:2px;">baseline border only</div>
+            </div>
+          </div>
+          <div class="chrome-badge chrome-no">Chrome: no render expected</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">36</td>
+        <td class="prop"><code>text-autospace</code>
+          <div class="meta">longhand · CSS Text · Chrome yes (since 140)</div>
+        </td>
+        <td class="desc">With `text-autospace: ideograph-alpha` the effect should match ideograph-alpha.</td>
+        <td class="effect">
+          <div class="fx-cjk" style="display:flex;gap:8px;font-size:14px;"><span
+              style="border:1px solid #336;padding:4px;text-autospace:no-autospace;">汉A汉A汉</span><span
+              style="border:1px solid #036;padding:4px;background:#eef6ff;text-autospace:ideograph-alpha;">汉A汉A汉</span>
+          </div>
+          <div style="font-size:7.5pt;color:#556;">right inserts ideograph-alpha gap</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">37</td>
+        <td class="prop"><code>text-box</code>
+          <div class="meta">longhand · CSS Inline · Chrome yes (since 133)</div>
+        </td>
+        <td class="desc">With `text-box: trim-both cap alphabetic` the effect should match trim-both cap alphabetic.
+        </td>
+        <td class="effect">
+          <div style="display:flex;gap:8px;align-items:flex-start;">
+            <div style="border:1px solid #336;padding:0;font-size:16px;line-height:2;width:70px;">Aa<br>Bb</div>
+            <div
+              style="border:1px solid #036;padding:0;background:#eef6ff;font-size:16px;line-height:2;width:70px;text-box:trim-both cap alphabetic;">
+              Aa<br>Bb</div>
+          </div>
+          <div style="font-size:7.5pt;color:#556;">right trims half-leading</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">38</td>
+        <td class="prop"><code>text-box-edge</code>
+          <div class="meta">longhand · CSS Inline · Chrome yes (since 133)</div>
+        </td>
+        <td class="desc">With `text-box-edge: cap alphabetic` the effect should match cap alphabetic.</td>
+        <td class="effect">
+          <div style="display:flex;gap:8px;align-items:flex-start;">
+            <div style="border:1px solid #336;font-size:16px;line-height:2;width:70px;text-box-trim:trim-both;">edge
+              default</div>
+            <div
+              style="border:1px solid #036;background:#eef6ff;font-size:16px;line-height:2;width:70px;text-box-trim:trim-both;text-box-edge:cap alphabetic;">
+              edge cap/alph</div>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">39</td>
+        <td class="prop"><code>text-box-trim</code>
+          <div class="meta">longhand · CSS Inline · Chrome yes (since 133)</div>
+        </td>
+        <td class="desc">With `text-box-trim: trim-both` half-leading above and below the text box should be removed.
+        </td>
+        <td class="effect">
+          <div style="display:flex;gap:8px;align-items:flex-start;">
+            <div style="border:1px solid #336;font-size:16px;line-height:2.2;width:64px;padding:0;">no trim<br>Yy</div>
+            <div
+              style="border:1px solid #036;background:#eef6ff;font-size:16px;line-height:2.2;width:64px;padding:0;text-box-trim:trim-both;">
+              trim-both<br>Yy</div>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">40</td>
+        <td class="prop"><code>text-fit</code>
+          <div class="meta">longhand · CSS Text · Chrome yes (since 150)</div>
+        </td>
+        <td class="desc">With `text-fit: scale` the effect should match scale.</td>
+        <td class="effect">
+          <div style="width:120px;border:1px solid #336;padding:4px;font-size:9px;text-fit:scale;">The quick 汉字 Latin
+            wrap sample.</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">41</td>
+        <td class="prop"><code>text-group-align</code>
+          <div class="meta">longhand · (ungrouped) · Chrome no (no MDN BCD entry)</div>
+        </td>
+        <td class="desc">With `text-group-align: center` the effect should match center. Chrome does not support this
+          property (no MDN BCD entry), so the Effect cell may look unchanged in Chrome.</td>
+        <td class="effect">
+          <div style="width:200px;border:1px dashed #888;font-size:14px;text-group-align:center;">Hi</div>
+          <div style="font-size:7.5pt;color:#556;">short line centered in wide box</div>
+          <div class="chrome-badge chrome-no">Chrome: no render expected</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">42</td>
+        <td class="prop"><code>text-spacing</code>
+          <div class="meta">shorthand · (ungrouped) · Chrome no (no MDN BCD entry)</div>
+        </td>
+        <td class="desc">With `text-spacing: trim-start` the effect should match trim-start. Chrome does not support
+          this property (no MDN BCD entry), so the Effect cell may look unchanged in Chrome.</td>
+        <td class="effect">
+          <div class="fx-cjk" style="display:flex;gap:10px;font-size:18px;line-height:1.2;">
+            <div style="width:56px;border-left:2px solid #c00;padding-left:0;text-spacing:normal;">「AB</div>
+            <div
+              style="width:56px;border-left:2px solid #c00;padding-left:0;background:#eef6ff;text-spacing:trim-start;">
+              「AB</div>
+          </div>
+          <div style="font-size:7.5pt;color:#556;">right hangs 「 past the red rule</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">43</td>
+        <td class="prop"><code>text-spacing-trim</code>
+          <div class="meta">longhand · CSS Text · Chrome yes (since 123)</div>
+        </td>
+        <td class="desc">With `text-spacing-trim: space-all` the effect should match space-all.</td>
+        <td class="effect">
+          <div class="fx-cjk" style="display:flex;gap:10px;font-size:18px;line-height:1.2;">
+            <div style="width:64px;border-left:2px solid #c00;text-spacing-trim:space-all;">「AB</div>
+            <div style="width:64px;border-left:2px solid #c00;background:#eef6ff;text-spacing-trim:trim-start;">「AB
+            </div>
+          </div>
+          <div style="font-size:7.5pt;color:#556;">trim-start hangs leading 「</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">44</td>
+        <td class="prop"><code>grid-auto-columns</code>
+          <div class="meta">longhand · CSS Grid Layout · Chrome yes (since 57)</div>
+        </td>
+        <td class="desc">With `grid-auto-columns: 40px` each implicit column should be 40px wide.</td>
+        <td class="effect">
+          <div
+            style="display:grid;grid-template-columns:24px;grid-auto-columns:48px;grid-auto-flow:column;gap:4px;width:140px;border:1px solid #336;padding:4px;">
+            <div style="background:#9cf;height:20px;font-size:7pt;text-align:center;">1</div>
+            <div style="background:#6ad;height:20px;font-size:7pt;text-align:center;">auto</div>
+            <div style="background:#6ad;height:20px;font-size:7pt;text-align:center;">auto</div>
+          </div>
+          <div style="font-size:7.5pt;color:#556;">col1=24px explicit; col2/3=48px auto-columns</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">45</td>
+        <td class="prop"><code>grid-auto-rows</code>
+          <div class="meta">longhand · CSS Grid Layout · Chrome yes (since 57)</div>
+        </td>
+        <td class="desc">With `grid-auto-rows: 24px` each implicit row should be 24px tall.</td>
+        <td class="effect">
+          <div
+            style="display:grid;grid-template-columns:40px 40px;grid-auto-rows:28px;gap:4px;width:100px;border:1px solid #336;padding:4px;">
+            <div style="background:#9cf;font-size:7pt;">r1</div>
+            <div style="background:#9cf;font-size:7pt;">r1</div>
+            <div style="background:#6ad;font-size:7pt;">auto</div>
+            <div style="background:#6ad;font-size:7pt;">auto</div>
+          </div>
+          <div style="font-size:7.5pt;color:#556;">implicit row height locked to 28px</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">46</td>
+        <td class="prop"><code>grid-column-gap</code>
+          <div class="meta">legacy-alias · CSS Grid Layout · Chrome yes (since 1)</div>
+        </td>
+        <td class="desc">With `grid-column-gap: 12px` columns should be separated by 12px.</td>
+        <td class="effect">
+          <div
+            style="display:grid;grid-template-columns:36px 36px;grid-column-gap:16px;width:110px;border:1px solid #336;padding:4px;">
+            <div style="background:#246;color:#fff;height:24px;font-size:8pt;text-align:center;">A</div>
+            <div style="background:#246;color:#fff;height:24px;font-size:8pt;text-align:center;">B</div>
+          </div>
+          <div style="font-size:7.5pt;color:#556;">16px column gap between A and B</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">47</td>
+        <td class="prop"><code>grid-gap</code>
+          <div class="meta">legacy-alias · CSS Grid Layout · Chrome yes (since 57)</div>
+        </td>
+        <td class="desc">With `grid-gap: 8px 12px` row and column gaps should be 8px and 12px.</td>
+        <td class="effect">
+          <div
+            style="display:grid;grid-template-columns:36px 36px;grid-gap:10px 16px;width:120px;border:1px solid #336;padding:4px;">
+            <div style="background:#246;color:#fff;height:20px;font-size:8pt;text-align:center;">A</div>
+            <div style="background:#246;color:#fff;height:20px;font-size:8pt;text-align:center;">B</div>
+            <div style="background:#468;color:#fff;height:20px;font-size:8pt;text-align:center;">C</div>
+            <div style="background:#468;color:#fff;height:20px;font-size:8pt;text-align:center;">D</div>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">48</td>
+        <td class="prop"><code>grid-row-gap</code>
+          <div class="meta">legacy-alias · CSS Grid Layout · Chrome yes (since 47)</div>
+        </td>
+        <td class="desc">With `grid-row-gap: 8px` rows should be separated by 8px.</td>
+        <td class="effect">
+          <div
+            style="display:grid;grid-template-columns:40px 40px;grid-row-gap:14px;width:100px;border:1px solid #336;padding:4px;">
+            <div style="background:#246;color:#fff;height:18px;font-size:8pt;text-align:center;">A</div>
+            <div style="background:#246;color:#fff;height:18px;font-size:8pt;text-align:center;">B</div>
+            <div style="background:#468;color:#fff;height:18px;font-size:8pt;text-align:center;">C</div>
+            <div style="background:#468;color:#fff;height:18px;font-size:8pt;text-align:center;">D</div>
+          </div>
+          <div style="font-size:7.5pt;color:#556;">14px row gap</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">49</td>
+        <td class="prop"><code>hanging-punctuation</code>
+          <div class="meta">longhand · CSS Text · Chrome no (not supported)</div>
+        </td>
+        <td class="desc">With `hanging-punctuation: first` opening punctuation may hang outside the start edge. Chrome
+          does not support this property (not supported), so the Effect cell may look unchanged in Chrome.</td>
+        <td class="effect">
+          <div style="width:130px;border-left:2px solid #c00;padding-left:0;font-size:12px;hanging-punctuation:first;">
+            "Hang the opening quote outside the measure.</div>
+          <div class="chrome-badge chrome-no">Chrome: no render expected</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">50</td>
+        <td class="prop"><code>hyphenate-limit-chars</code>
+          <div class="meta">longhand · CSS Text · Chrome yes (since 109)</div>
+        </td>
+        <td class="desc">With `hyphenate-limit-chars: 6 3 3` hyphenation should need 6/3/3 character counts.</td>
+        <td class="effect">
+          <div
+            style="width:110px;border:1px solid #336;padding:4px;font-size:11px;hyphens:manual;hyphenate-character:'~';hyphenate-limit-chars:6 3 3;">
+            super&shy;califragilistic&shy;expialidocious</div>
+          <div style="font-size:7.5pt;color:#556;">SHY only when 3+ chars each side</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">51</td>
+        <td class="prop"><code>hyphenate-limit-last</code>
+          <div class="meta">longhand · (ungrouped) · Chrome no (no MDN BCD entry)</div>
+        </td>
+        <td class="desc">With `hyphenate-limit-last: always` the effect should match always. Chrome does not support
+          this property (no MDN BCD entry), so the Effect cell may look unchanged in Chrome.</td>
+        <td class="effect">
+          <div
+            style="width:110px;border:1px solid #336;padding:4px;font-size:11px;hyphens:manual;hyphenate-limit-last:always;">
+            super&shy;califragilistic&shy;expialidocious end</div>
+          <div class="chrome-badge chrome-no">Chrome: no render expected</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">52</td>
+        <td class="prop"><code>hyphenate-limit-lines</code>
+          <div class="meta">longhand · (ungrouped) · Chrome no (no MDN BCD entry)</div>
+        </td>
+        <td class="desc">With `hyphenate-limit-lines: 2` the effect should match 2. Chrome does not support this
+          property (no MDN BCD entry), so the Effect cell may look unchanged in Chrome.</td>
+        <td class="effect">
+          <div
+            style="width:110px;border:1px solid #336;padding:4px;font-size:11px;hyphens:manual;hyphenate-limit-lines:2;">
+            super&shy;califragilistic&shy;expialidocious&shy;extra&shy;break&shy;points</div>
+          <div style="font-size:7.5pt;color:#556;">at most 2 hyphenated lines</div>
+          <div class="chrome-badge chrome-no">Chrome: no render expected</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">53</td>
+        <td class="prop"><code>hyphenate-limit-zone</code>
+          <div class="meta">longhand · (ungrouped) · Chrome no (no MDN BCD entry)</div>
+        </td>
+        <td class="desc">With `hyphenate-limit-zone: 8%` the effect should match 8%. Chrome does not support this
+          property (no MDN BCD entry), so the Effect cell may look unchanged in Chrome.</td>
+        <td class="effect">
+          <div
+            style="width:110px;border:1px solid #336;padding:4px;font-size:11px;hyphens:manual;hyphenate-limit-zone:40%;">
+            super&shy;califragilistic&shy;expialidocious</div>
+          <div class="chrome-badge chrome-no">Chrome: no render expected</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">54</td>
+        <td class="prop"><code>shape-image-threshold</code>
+          <div class="meta">longhand · CSS Shapes · Chrome yes (since 37)</div>
+        </td>
+        <td class="desc">With `shape-image-threshold: 0.5` the effect should match 0.5.</td>
+        <td class="effect">
+          <div style="overflow:hidden;border:1px solid #336;height:48px;font-size:8px;line-height:1.2;"><img
+              src="logo.png" alt="s" style="float:left;width:36px;height:36px;shape-image-threshold:0.5;">Wrap text
+            beside the shaped float contour.</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">55</td>
+        <td class="prop"><code>shape-inside</code>
+          <div class="meta">longhand · (ungrouped) · Chrome no (no MDN BCD entry)</div>
+        </td>
+        <td class="desc">With `shape-inside: circle(40%)` the effect should match circle(40%). Chrome does not support
+          this property (no MDN BCD entry), so the Effect cell may look unchanged in Chrome.</td>
+        <td class="effect">
+          <div
+            style="width:100px;height:48px;border:1px solid #336;font-size:8px;shape-inside:circle(40%);padding:4px;">
+            Inside shape sample text.</div>
+          <div class="chrome-badge chrome-no">Chrome: no render expected</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">56</td>
+        <td class="prop"><code>shape-margin</code>
+          <div class="meta">longhand · CSS Shapes · Chrome yes (since 37)</div>
+        </td>
+        <td class="desc">With `shape-margin: 8px` the effect should match 8px.</td>
+        <td class="effect">
+          <div style="display:flex;gap:8px;">
+            <div style="overflow:hidden;border:1px solid #336;height:64px;font-size:7.5px;line-height:1.2;width:85px;">
+              <div
+                style="float:left;width:40px;height:40px;background:#6ad;shape-outside:circle(50%);border-radius:50%;">
+              </div>wrap wrap wrap wrap wrap wrap wrap wrap wrap wrap
+            </div>
+            <div
+              style="overflow:hidden;border:1px solid #036;height:64px;font-size:7.5px;line-height:1.2;width:85px;background:#f5f9ff;">
+              <div
+                style="float:left;width:40px;height:40px;background:#6ad;shape-outside:circle(50%);shape-margin:10px;border-radius:50%;">
+              </div>wrap wrap wrap wrap wrap wrap wrap wrap wrap wrap
+            </div>
+          </div>
+          <div style="font-size:7.5pt;color:#556;">left margin 0; right shape-margin 10px</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">57</td>
+        <td class="prop"><code>shape-outside</code>
+          <div class="meta">longhand · CSS Shapes · Chrome yes (since 37)</div>
+        </td>
+        <td class="desc">With `shape-outside: circle(50%)` sibling text should wrap around a circular float.</td>
+        <td class="effect">
+          <div style="overflow:hidden;border:1px solid #336;height:70px;font-size:8px;line-height:1.25;width:180px;">
+            <div style="float:left;width:56px;height:56px;background:#6ad;shape-outside:circle(50%);border-radius:50%;">
+            </div>Wrap wrap wrap wrap wrap wrap wrap wrap wrap wrap wrap wrap wrap wrap wrap wrap wrap wrap wrap wrap.
+          </div>
+          <div style="font-size:7.5pt;color:#556;">circle(50%) float exclusion</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">58</td>
+        <td class="prop"><code>shape-padding</code>
+          <div class="meta">longhand · (ungrouped) · Chrome no (no MDN BCD entry)</div>
+        </td>
+        <td class="desc">With `shape-padding: 6px` the effect should match 6px. Chrome does not support this property
+          (no MDN BCD entry), so the Effect cell may look unchanged in Chrome.</td>
+        <td class="effect">
+          <div style="width:100px;height:48px;border:1px solid #336;font-size:8px;shape-padding:6px;padding:4px;">Inside
+            shape sample text.</div>
+          <div class="chrome-badge chrome-no">Chrome: no render expected</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">59</td>
+        <td class="prop"><code>float-defer</code>
+          <div class="meta">longhand · (ungrouped) · Chrome no (no MDN BCD entry)</div>
+        </td>
+        <td class="desc">With `float-defer: 1` the effect should match 1. Chrome does not support this property (no MDN
+          BCD entry), so the Effect cell may look unchanged in Chrome.</td>
+        <td class="effect">
+          <div style="overflow:auto;border:1px dashed #888;">
+            <div style="float:left;width:36px;height:28px;background:#9cf;float-defer:1;margin-right:6px;">F</div>
+            <span>following text wraps beside the float.</span>
+          </div>
+          <div class="chrome-badge chrome-no">Chrome: no render expected</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">60</td>
+        <td class="prop"><code>float-offset</code>
+          <div class="meta">longhand · (ungrouped) · Chrome no (no MDN BCD entry)</div>
+        </td>
+        <td class="desc">With `float-offset: 12px` the effect should match 12px. Chrome does not support this property
+          (no MDN BCD entry), so the Effect cell may look unchanged in Chrome.</td>
+        <td class="effect">
+          <div style="display:flex;gap:10px;">
+            <div style="width:70px;height:50px;border:1px dashed #888;position:relative;">
+              <div style="float:left;width:28px;height:20px;background:#9cf;">0</div>
+            </div>
+            <div style="width:70px;height:50px;border:1px dashed #888;">
+              <div style="float:left;width:28px;height:20px;background:#6ad;float-offset:16px;">16</div>
+            </div>
+          </div>
+          <div style="font-size:7.5pt;color:#556;">right float nudged 16px down</div>
+          <div class="chrome-badge chrome-no">Chrome: no render expected</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">61</td>
+        <td class="prop"><code>float-reference</code>
+          <div class="meta">longhand · (ungrouped) · Chrome no (no MDN BCD entry)</div>
+        </td>
+        <td class="desc">With `float-reference: page` the float containing block is the page content box; `inline` stays
+          the current BFC. Chrome does not support this property (no MDN BCD entry), so the Effect cell may look
+          unchanged in Chrome.</td>
+        <td class="effect">
+          <div style="display:flex;gap:8px;align-items:flex-start;">
+            <div>
+              <div style="font-size:7pt;color:#556;">inline</div>
+              <div style="display:flow-root;width:70px;height:36px;border:1px dashed #888;margin-left:18px;">
+                <div style="float:left;width:50%;height:16px;background:#9cf;float-reference:inline;font-size:7px;">in
+                </div>
+              </div>
+            </div>
+            <div>
+              <div style="font-size:7pt;color:#556;">page (bounded)</div>
+              <div style="display:flow-root;width:70px;height:36px;border:1px dashed #888;margin-left:18px;">
+                <div style="width:50px;height:16px;background:#6ad;float-reference:page;font-size:7px;">pg
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style="font-size:7.5pt;color:#556;">inline: 50% of BFC. page reference is page-global; this bounded swatch keeps the table row intact.
+          </div>
+          <div class="chrome-badge chrome-no">Chrome: no render expected</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">62</td>
+        <td class="prop"><code>initial-letter</code>
+          <div class="meta">longhand · CSS Inline · Chrome yes (since 110)</div>
+        </td>
+        <td class="desc">With `initial-letter: 3` the first letter should span 3 lines.</td>
+        <td class="effect">
+          <div style="width:160px;border:1px solid #336;padding:4px;font-size:10px;line-height:14px;">
+            <p style="margin:0;"><span style="initial-letter:3;initial-letter-wrap:all;font-weight:700;margin-right:4px;">A</span>n initial
+              letter should span three lines of this paragraph body with enough words to wrap beside the drop cap
+              clearly for geometry.</p>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">63</td>
+        <td class="prop"><code>initial-letter-align</code>
+          <div class="meta">longhand · CSS Inline · Chrome no (no MDN BCD entry)</div>
+        </td>
+        <td class="desc">With `initial-letter: 3; initial-letter-align: hanging` the drop cap should sit on a distinct
+          hanging metric versus alphabetic. Chrome does not support this property (no MDN BCD entry), so the Effect cell
+          may look unchanged in Chrome.</td>
+        <td class="effect">
+          <div style="display:flex;gap:8px;align-items:flex-start;font-size:9px;line-height:12px;"><div
+              style="border:1px solid #336;padding:4px;width:90px;"><div>alphabetic</div>
+              <p style="margin:12px 0 0;"><span
+                  style="initial-letter:3;initial-letter-wrap:all;initial-letter-align:alphabetic;font-weight:700;">A</span>lphabetic drop cap
+                hangs from the first-line cap height across three lines of body copy here.</p>
+            </div><div style="border:1px solid #036;padding:4px;background:#eef6ff;width:90px;"><div>hanging</div>
+              <p style="margin:12px 0 0;"><span style="initial-letter:3;initial-letter-wrap:all;initial-letter-align:hanging;font-weight:700;">A</span>
+                hanging drop cap uses a higher hanging baseline so the letter Y shifts versus alphabetic.</p>
+            </div></div>
+          <div style="font-size:7.5pt;color:#556;margin-top:2px;">pair: alphabetic vs hanging (needs initial-letter:3)
+          </div>
+          <div class="chrome-badge chrome-no">Chrome: no render expected</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">64</td>
+        <td class="prop"><code>initial-letter-wrap</code>
+          <div class="meta">longhand · (ungrouped) · Chrome no (no MDN BCD entry)</div>
+        </td>
+        <td class="desc">With `initial-letter: 3; initial-letter-wrap: all` overlapping lines should shorten beside the
+          letter; `none` does not side-wrap. Chrome does not support this property (no MDN BCD entry), so the Effect
+          cell may look unchanged in Chrome.</td>
+        <td class="effect">
+          <div style="display:flex;gap:8px;align-items:flex-start;font-size:9px;line-height:12px;"><span
+              style="border:1px solid #336;padding:4px;width:90px;">none<br>
+              <p style="margin:0;"><span style="initial-letter:3;initial-letter-wrap:none;font-weight:700;">A</span>
+                none keeps later lines full width with no side wrap beside the letter.</p>
+            </span><span style="border:1px solid #036;padding:4px;background:#eef6ff;width:90px;">all<br>
+              <p style="margin:0;"><span style="initial-letter:3;initial-letter-wrap:all;font-weight:700;">A</span> all
+                shortens every overlapping line beside the rectangular letter box.</p>
+            </span></div>
+          <div style="font-size:7.5pt;color:#556;margin-top:2px;">pair: wrap none vs all (needs initial-letter:3)</div>
+          <div class="chrome-badge chrome-no">Chrome: no render expected</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">65</td>
+        <td class="prop"><code>column-height</code>
+          <div class="meta">longhand · CSS Box Sizing · Chrome yes (since 145)</div>
+        </td>
+        <td class="desc">With `column-height: 80px` the effect should match 80px.</td>
+        <td class="effect">
+          <div
+            style="columns:2;column-gap:8px;column-height:48px;width:170px;border:1px solid #336;padding:4px;font-size:8px;">
+            One. Two. Three. Four. Five. Six. Seven. Eight. Nine. Ten. Eleven. Twelve. Thirteen. Fourteen. Fifteen.
+            Sixteen.</div>
+          <div style="font-size:7.5pt;color:#556;">80px-ish cap forces extra columns/rows</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">66</td>
+        <td class="prop"><code>column-wrap</code>
+          <div class="meta">longhand · CSS Box Sizing · Chrome yes (since 145)</div>
+        </td>
+        <td class="desc">With `column-wrap: wrap` vs `nowrap` and a set `column-height`, overflow should open a second
+          row only for wrap.</td>
+        <td class="effect">
+          <div style="display:flex;gap:8px;align-items:flex-start;">
+            <div>
+              <div style="font-size:7pt;color:#556;">wrap</div>
+              <div
+                style="column-count:2;column-gap:6px;column-height:28px;column-wrap:wrap;column-fill:auto;width:110px;border:1px solid #036;padding:3px;font-size:7px;background:#eef6ff;">
+                <p style="margin:0;">A1 aa</p>
+                <p style="margin:0;">A2 bb</p>
+                <p style="margin:0;">A3 cc</p>
+                <p style="margin:0;">A4 dd</p>
+                <p style="margin:0;">A5 ee</p>
+                <p style="margin:0;">A6 ff</p>
+                <p style="margin:0;">A7 gg</p>
+                <p style="margin:0;">A8 hh</p>
+              </div>
+            </div>
+            <div>
+              <div style="font-size:7pt;color:#556;">nowrap</div>
+              <div
+                style="column-count:2;column-gap:6px;column-height:28px;column-wrap:nowrap;column-fill:auto;width:110px;border:1px solid #336;padding:3px;font-size:7px;">
+                <p style="margin:0;">B1 aa</p>
+                <p style="margin:0;">B2 bb</p>
+                <p style="margin:0;">B3 cc</p>
+                <p style="margin:0;">B4 dd</p>
+                <p style="margin:0;">B5 ee</p>
+                <p style="margin:0;">B6 ff</p>
+                <p style="margin:0;">B7 gg</p>
+                <p style="margin:0;">B8 hh</p>
+              </div>
+            </div>
+          </div>
+          <div style="font-size:7.5pt;color:#556;margin-top:2px;">wrap opens a second row; nowrap stays one row</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">67</td>
+        <td class="prop"><code>object-fit</code>
+          <div class="meta">longhand · CSS Images · Chrome yes (since 32)</div>
+        </td>
+        <td class="desc">With `object-fit: cover` the replaced image should cover the box and crop overflow.</td>
+        <td class="effect">
+          <div style="width:72px;height:40px;border:2px solid #036;overflow:hidden;background:#eee;"><img alt="obj"
+              src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACgAAAAKCAYAAADGmhxQAAAAH0lEQVR42mOQizrxfzBjhlEHjjpw1IGjDhx14OB2IABwm4Ke/AxMiQAAAABJRU5ErkJggg=="
+              style="width:100%;height:100%;object-fit:cover;"></div>
+          <div style="font-size:7.5pt;color:#556;">wide image covered into short box</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">68</td>
+        <td class="prop"><code>object-position</code>
+          <div class="meta">longhand · CSS Images · Chrome yes (since 32)</div>
+        </td>
+        <td class="desc">With `object-position: right bottom` the replaced image should align to the right bottom of the
+          box.</td>
+        <td class="effect">
+          <div style="width:72px;height:40px;border:2px solid #036;overflow:hidden;background:#ddd;"><img alt="obj"
+              src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFElEQVR42mO4Y6PxnxjMMKqQvgoB2GngnS88QKgAAAAASUVORK5CYII="
+              style="width:100%;height:100%;object-fit:none;object-position:right bottom;"></div>
+          <div style="font-size:7.5pt;color:#556;">10x10 pinned to right bottom</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">69</td>
+        <td class="prop"><code>overflow-block</code>
+          <div class="meta">longhand · CSS Overflow · Chrome yes (since 135)</div>
+        </td>
+        <td class="desc">With `overflow-block: hidden` block-axis overflow should clip.</td>
+        <td class="effect">
+          <div
+            style="width:110px;height:14px;max-height:14px;overflow-block:hidden;font-size:10px;line-height:12px;background:#eef6ff;border:2px solid #036;">
+            LINE1 only<br>LINE2 hide<br>LINE3 hide<br>LINE4 hide</div>
+          <div style="font-size:7.5pt;color:#556;">14px tall: only LINE1 should paint</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">70</td>
+        <td class="prop"><code>overflow-inline</code>
+          <div class="meta">longhand · CSS Overflow · Chrome yes (since 135)</div>
+        </td>
+        <td class="desc">With `overflow-inline: hidden` inline-axis overflow should clip.</td>
+        <td class="effect">
+          <div
+            style="width:64px;height:18px;max-width:64px;overflow-inline:hidden;white-space:nowrap;font-size:11px;background:#eef6ff;border:2px solid #036;">
+            XXXXXXXXXXXXXXXXTOOLONG</div>
+          <div style="font-size:7.5pt;color:#556;">inline axis clips the XXX run</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">71</td>
+        <td class="prop"><code>aspect-ratio</code>
+          <div class="meta">longhand · CSS Box Sizing · Chrome yes (since 88)</div>
+        </td>
+        <td class="desc">With `aspect-ratio: 1 / 1` the box should keep a square width/height ratio.</td>
+        <td class="effect">
+          <div style="display:flex;gap:8px;align-items:flex-end;">
+            <div
+              style="width:36px;aspect-ratio:1 / 1;background:#9cf;border:2px solid #246;font-size:7pt;display:flex;align-items:center;justify-content:center;">
+              1:1</div>
+            <div style="width:36px;height:20px;background:#ccc;border:1px solid #666;font-size:7pt;">no-ar</div>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">72</td>
+        <td class="prop"><code>counter-set</code>
+          <div class="meta">longhand · CSS Lists and Counters · Chrome yes (since 85)</div>
+        </td>
+        <td class="desc">With `counter-set: item 5` the named counter should be set to 5 before later increments. Labels
+          should read 6. / 7. after increment.</td>
+        <td class="effect">
+          <div class="fx-ctr-root"
+            style="counter-set:item 5;font-size:9pt;border:1px solid #336;padding:4px;width:120px;">
+            <div class="fx-ctr-inc">alpha</div>
+            <div class="fx-ctr-inc">beta</div>
+          </div>
+          <div style="font-size:7.5pt;color:#556;">expect 6. alpha / 7. beta</div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <footer class="note">
+    Source: plans/0.2.7/next-72-properties.json · Pattern: fixture-60/61/62 ·
+    Chrome column: MDN BCD (44 yes /
+    28 no) ·
+    Needle: NEXT-72-PROPS · font-family "Liberation Sans"
+  </footer>
+</body>
+
+</html>

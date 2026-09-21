@@ -174,32 +174,32 @@ func (e *engine) borderOpsSides(
 	sty ResolvedStyle, posX, posY, wid, height float64, top, right, bottom, left bool,
 ) []Op {
 	wTop := 0.0
-	if top && sty.BorderTop.Style != cssDisplayNone && borderPaint(sty.BorderTop) > 0 {
+	if top && sty.BorderTop.Style != cssDisplayNone && !sty.BorderTop.Transparent && borderPaint(sty.BorderTop) > 0 {
 		wTop = e.scalePt(borderPaint(sty.BorderTop))
 	}
 
 	wRight := 0.0
-	if right && sty.BorderRight.Style != cssDisplayNone && borderPaint(sty.BorderRight) > 0 {
+	if right && sty.BorderRight.Style != cssDisplayNone && !sty.BorderRight.Transparent && borderPaint(sty.BorderRight) > 0 {
 		wRight = e.scalePt(borderPaint(sty.BorderRight))
 	}
 
 	wBottom := 0.0
-	if bottom && sty.BorderBottom.Style != cssDisplayNone && borderPaint(sty.BorderBottom) > 0 {
+	if bottom && sty.BorderBottom.Style != cssDisplayNone && !sty.BorderBottom.Transparent &&
+		borderPaint(sty.BorderBottom) > 0 {
 		wBottom = e.scalePt(borderPaint(sty.BorderBottom))
 	}
 
 	wLeft := 0.0
-	if left && sty.BorderLeft.Style != cssDisplayNone && borderPaint(sty.BorderLeft) > 0 {
+	if left && sty.BorderLeft.Style != cssDisplayNone && !sty.BorderLeft.Transparent && borderPaint(sty.BorderLeft) > 0 {
 		wLeft = e.scalePt(borderPaint(sty.BorderLeft))
 	}
 
 	mixed := wTop != wRight || wTop != wBottom || wTop != wLeft
-	topInset, rightInset := uint8(0), uint8(0)
-	bottomInset, leftInset := uint8(0), uint8(0)
-	if mixed {
-		topInset, rightInset = LineInsetTop, LineInsetRight
-		bottomInset, leftInset = LineInsetBottom, LineInsetLeft
-	}
+
+	topInset := borderSideLineInset(mixed, sty.BorderTop.Style, LineInsetTop)
+	rightInset := borderSideLineInset(mixed, sty.BorderRight.Style, LineInsetRight)
+	bottomInset := borderSideLineInset(mixed, sty.BorderBottom.Style, LineInsetBottom)
+	leftInset := borderSideLineInset(mixed, sty.BorderLeft.Style, LineInsetLeft)
 
 	// Size the slice once for the active sides. Edge lengths passed to the
 	// dashed splitter are at most wid/height, so bounding with those keeps the
@@ -293,6 +293,19 @@ func (e *engine) borderOpsSides(
 	}
 
 	return ops
+}
+
+// borderSideLineInset returns the inward paint inset for one border side.
+// Mixed-width frames inset every side so the wider strip owns the corner.
+// Dashed and dotted sides always inset: their fragments sit centered in the
+// strip instead of straddling the border-box edge, so the authored stroke
+// width lands inside the box (Chrome's dotted geometry).
+func borderSideLineInset(mixed bool, style string, flag uint8) uint8 {
+	if mixed || isDashedOrDottedStyle(style) {
+		return flag
+	}
+
+	return 0
 }
 
 func hasVerticalBorder(sty ResolvedStyle) bool {
@@ -601,12 +614,15 @@ func (e *engine) roundedBorderOps(
 	// BorderTop here would spread that accent across the rounded stroke on all
 	// four sides before the per-side overlays are painted.
 	base := sty.BorderBottom
-	ops := []Op{{ //nolint:exhaustruct // intentional zero fields
-		Kind: OpStrokeRect, X: posX, Y: posY, W: width, H: height,
-		R: base.Color[0], G: base.Color[1], B: base.Color[2], Width: e.scalePt(borderPaint(base)),
-		Radius: uniformRadius(radii), RadiusTopLeft: radii[0], RadiusTopRight: radii[1],
-		RadiusBottomRight: radii[2], RadiusBottomLeft: radii[3],
-	}}
+	var ops []Op
+	if !base.Transparent {
+		ops = append(ops, Op{ //nolint:exhaustruct // intentional zero fields
+			Kind: OpStrokeRect, X: posX, Y: posY, W: width, H: height,
+			R: base.Color[0], G: base.Color[1], B: base.Color[2], Width: e.scalePt(borderPaint(base)),
+			Radius: uniformRadius(radii), RadiusTopLeft: radii[0], RadiusTopRight: radii[1],
+			RadiusBottomRight: radii[2], RadiusBottomLeft: radii[3],
+		})
+	}
 
 	type mixedSide struct {
 		border border
@@ -621,7 +637,7 @@ func (e *engine) roundedBorderOps(
 	}
 
 	for _, side := range sides {
-		if side.border == base || side.border.Style != solidKeyword {
+		if side.border == base || side.border.Style != solidKeyword || side.border.Transparent {
 			continue
 		}
 
@@ -655,7 +671,7 @@ func (e *engine) roundedAccentBorderOps(
 	var ops []Op
 
 	appendSolidMask := func(side border, mask uint8, sideRadii [4]float64) {
-		if borderPaint(side) <= 0 || side.Style != solidKeyword {
+		if side.Transparent || borderPaint(side) <= 0 || side.Style != solidKeyword {
 			return
 		}
 
@@ -670,7 +686,7 @@ func (e *engine) roundedAccentBorderOps(
 	}
 
 	appendDashedSide := func(sideX, sideY, sideW, sideH float64, side border) {
-		if borderPaint(side) <= 0 || side.Style == solidKeyword {
+		if side.Transparent || borderPaint(side) <= 0 || side.Style == solidKeyword {
 			return
 		}
 
@@ -698,14 +714,14 @@ func (e *engine) roundedAccentBorderOps(
 
 // finalizeChrome merges deferred background/border ops into e.ops in one
 // linear pass and reindexes box op ranges. Paint order for multiple entries
-// at the same index matches immediate-splice nesting: later (outer) entries
-// paint first.
+// at the same index follows document order (ancestors before descendants,
+// earlier siblings before later ones).
 func (e *engine) finalizeChrome(root *box) {
 	if len(e.deferredChrome) > 0 {
 		entries := e.deferredChrome
 		e.deferredChrome = nil
 
-		out, oldToNew, ownerChrome := mergeDeferredChrome(e.ops, entries)
+		out, oldToNew, ownerChrome := mergeDeferredChrome(e.ops, entries, boxPreorder(root))
 
 		e.ops = out
 
@@ -727,15 +743,17 @@ func (e *engine) finalizeChrome(root *box) {
 type chromeSpan struct{ start, end int }
 
 // mergeDeferredChrome splices deferred background/border ops into oldOps in
-// one linear pass. Paint order for multiple entries at the same index matches
-// immediate-splice nesting: later (outer) entries paint first. The merged
-// sequence is built backwards so spare capacity in oldOps is reused in place
-// when it fits; otherwise one exact-sized list is allocated.
+// one linear pass. Paint order for multiple entries at the same index follows
+// document order (ancestors before descendants, earlier siblings before later
+// ones) so sibling op ranges stay disjoint. The merged sequence is built
+// backwards so spare capacity in oldOps is reused in place when it fits;
+// otherwise one exact-sized list is allocated.
 func mergeDeferredChrome(
-	oldOps []Op, entries []chromeEntry,
+	oldOps []Op, entries []chromeEntry, paintOrder map[*box]int,
 ) ([]Op, []int, map[*box]chromeSpan) {
-	// Sort by insert index ascending; same index → reverse registration order
-	// (parent registered after child, paints under content first).
+	// Sort by insert index ascending; within one index, document order keeps
+	// an outer box under its descendants without letting a later sibling's
+	// chrome splice ahead of an earlier sibling's.
 	type indexed struct {
 		ord int
 		ent chromeEntry
@@ -750,7 +768,15 @@ func mergeDeferredChrome(
 		if order[i].ent.at != order[j].ent.at {
 			return order[i].ent.at < order[j].ent.at
 		}
-		// Higher ord (later register) first within the same at.
+
+		ri, iRanked := paintOrder[order[i].ent.b]
+		rj, jRanked := paintOrder[order[j].ent.b]
+
+		if iRanked && jRanked && ri != rj {
+			return ri < rj
+		}
+		// Same box (or a box outside the tree): later register paints first,
+		// which keeps an outer entry under its inner entries.
 		return order[i].ord > order[j].ord
 	})
 
@@ -817,6 +843,38 @@ func mergeDeferredChrome(
 	}
 
 	return out, oldToNew, ownerChrome
+}
+
+// boxPreorder ranks every box in document (preorder) order so deferred chrome
+// entries that share an insertion index splice in document order: ancestors
+// before descendants, earlier siblings before later ones. Registration order
+// alone reverses unrelated siblings at a shared index, which let a later
+// section's chrome splice ahead of an earlier section's subtree and left the
+// earlier section's op range covering the later chrome (Chrome Flex sections
+// 11-13: the later overflow clips then deactivated the earlier fills).
+func boxPreorder(root *box) map[*box]int {
+	ranks := make(map[*box]int)
+
+	rank := 0
+
+	var walk func(b *box)
+
+	walk = func(b *box) {
+		if b == nil {
+			return
+		}
+
+		ranks[b] = rank
+		rank++
+
+		for _, child := range b.children {
+			walk(child)
+		}
+	}
+
+	walk(root)
+
+	return ranks
 }
 
 // recordOwnerChrome widens the chrome op span recorded for a box so a later

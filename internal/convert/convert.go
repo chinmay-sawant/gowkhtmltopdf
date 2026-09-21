@@ -598,12 +598,23 @@ func (run *runContext) renderObject(ctx context.Context, obj *settings.PdfObject
 	}
 
 	layoutOpts := state.bodyLayoutOpts(objectRender)
-	if blocks, ok := layout.IndependentBlocksForOptions(ctx, root, layoutOpts); ok && len(blocks) > 1 {
-		if err := renderIndependentBlocks(ctx, run.doc, state, root, blocks, objectRender); err != nil {
-			return nil, fmt.Errorf("object %d (%s): independent blocks: %w", idx+1, obj.Page, err)
-		}
 
-		return state, nil
+	// One cascade serves the independent-block probe, both smart-shrink body
+	// passes, and (when the probe fires) independent-block assembly. A failed
+	// resolve is swallowed here; layoutBody resolves again and reports it.
+	sharedStyles, stylesErr := layout.ResolveStyles(ctx, root, layoutOpts)
+	if stylesErr != nil {
+		sharedStyles = nil
+	}
+
+	if sharedStyles != nil {
+		if blocks, ok := layout.IndependentBlocks(root, sharedStyles, layoutOpts.Height); ok && len(blocks) > 1 {
+			if err := renderIndependentBlocks(ctx, run.doc, state, blocks, sharedStyles, objectRender); err != nil {
+				return nil, fmt.Errorf("object %d (%s): independent blocks: %w", idx+1, obj.Page, err)
+			}
+
+			return state, nil
+		}
 	}
 
 	lres, objectRender, err := layoutBody(
@@ -612,7 +623,7 @@ func (run *runContext) renderObject(ctx context.Context, obj *settings.PdfObject
 		objectRender,
 		run.log,
 		func(options layout.Options) (*layout.Result, error) {
-			return layout.LayoutContext(ctx, root, options)
+			return layout.ContextWithStyles(ctx, root, options, sharedStyles)
 		},
 	)
 	if err != nil {

@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-quick test-serial test-race lint lint-frontend size-check build wasm wasm-test fmt golden golden-update samples samples-python screenshots weasyprint clean claim-scan bench bench-engine bench-lib bench-inprocess bench-cli-compare c-shared bindings-clean check-versions python-binding-test python-benchmarks python-api
+.PHONY: test test-unit test-quick test-serial test-race lint lint-frontend size-check build wasm wasm-test fmt golden golden-update samples samples-python screenshots weasyprint clean claim-scan bench bench-engine bench-lib bench-inprocess bench-cli-compare c-shared bindings-clean check-versions python-binding-test python-benchmarks python-api chrome-cases-pdf run
 # Pure-Go runtime: the standard library plus the allowlisted direct modules
 # below. No cgo, browser, or native converter process is required.
 # Direct third-party requires must stay ⊆ {
@@ -224,6 +224,32 @@ samples:
 		-o output/wiki-ana-de-armas.pdf \
 		|| echo "warning: wiki-ana-de-armas.pdf live smoke skipped (network/fetch failed)"
 	ls -la output/ | awk '{print $$5, $$9}' | tail -30
+
+# Render every Chrome flex interaction case under test/chrome/cases/ into
+# test/chrome/cases/pdf/ for visual inspection. Artifacts only; the focused
+# layout tests under test/chrome own the assertions. Depends on `make build`
+# and is meant to run after `make golden` (or `make samples`), so the visual
+# pass starts from a green, freshly built tree.
+chrome-cases-pdf: build
+	mkdir -p test/chrome/cases/pdf
+	rm -f test/chrome/cases/pdf/*.pdf
+	@for f in test/chrome/cases/case-*.html; do \
+		name=$$(basename "$$f" .html); \
+		title=$$(printf '%s\n' "$$name" | sed -n 's/^case-[0-9][0-9]*-//p'); \
+		./bin/gowkhtmltopdf --allow-local-files --title "$$title" \
+			-o "test/chrome/cases/pdf/$$name.pdf" "$$f" || exit 1; \
+	done
+	@echo "chrome cases: $$(ls test/chrome/cases/pdf/*.pdf | wc -l) PDFs written to test/chrome/cases/pdf/"
+
+# Wall-time smoke from skills/PR/PR_TEMPLATE.md: convert fixture-01 through
+# the built CLI and fail at or above 400ms. Soft ±50ms of a stored
+# reference is host noise on this WSL2 box (see skills/perf-patterns) and
+# is not a fail gate. The 400ms hard cap is the leftover goslop PR-template
+# number; fixture-01 is a 1-page invoice and sits far under it.
+RUN_HTML ?= testdata/golden/fixture-01-simple-invoice.html
+RUN_MAX_MS ?= 400
+run: build
+	bash scripts/run-walltime.sh "$(RUN_HTML)" "$(RUN_MAX_MS)" ./bin/gowkhtmltopdf
 
 # Regenerate the committed frontend showcase screenshots and WebP thumbnails
 # from the PDFs currently present in output/. Use `make samples` first when the

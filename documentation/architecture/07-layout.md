@@ -69,7 +69,7 @@ Production files (`internal/layout`, 80 files, 45,232 production lines;
 |------|------:|----------------|
 | `layout.go` | 2497 | Package entry points (`Layout`, `LayoutContext`, `WithWorkspace`), `Options`/`Result`/`Op`/`Workspace`/`ElementLocation` types, `engine` state, `build` dispatch (block/img/hr/table/flex/grid/multicol/out-of-flow), block width/height resolution, font-face selection & rune fallback |
 | `layout_section.go` | 134 | Independent-block public path: `ResolveStyles` (shared cascade + interning), `NodeWithWorkspace` (sequential layout borrowing display-list storage), `assembleNodeResult` |
-| `independent_blocks.go` | 148 | `IndependentBlocks`/`IndependentBlocksForOptions` gate for the certified one-at-a-time body-child run; fails closed on floats, abspos, flex/grid items, or page-break gaps |
+| `independent_blocks.go` | 132 | `IndependentBlocks` gate for the certified one-at-a-time body-child run; fails closed on floats, abspos, flex/grid items, or page-break gaps. The wrapper `IndependentBlocksForOptions` was deleted on 2026-09-21; convert now shares one cascade with layout (`plans/performance/2026-09-21/`) |
 | `style.go` | 889 | `ResolvedStyle` struct, `initialStyle()`, inheritance walk (`resolveStylesCtx`), `styleStore` interning (`append` canonicalizes `*ResolvedStyle` sharing), `styleContext`, `sizeContainer`; generated intern fingerprint/equality in `style_intern_gen.go` |
 | `style_cascade.go` | 1475 | `cascadeRaw` (UA + author + inline with specificity/order/!important), `matchedRules`, custom properties (`--*`) merge + `resolveRawVars`, `inheritableProps`/`inheritProps`, cascade-win comparison, `styleGroups` dispatch + `applyStyleProp` routing |
 | `style_properties.go` | 2171 | Property-group `apply*` setters: display/position/flex/multicol/grid/box/border/color/text/table-break/transform, plus `applyIgnoredGroup`; the dispatch order lives in `style_cascade.go` |
@@ -515,8 +515,10 @@ Cross-referenced with `documentation/compatibility-matrix.md` (normative),
 - **Orphans/widows**: Rule 3 applies only when line boxes are countable; the
   geometric short-block heuristic remains for nested/uncountable cases
   (fixtures 30/37).
-- **No vertical writing modes beyond parsing** (`writing-mode` parsed into
-  `ResolvedStyle.WritingMode`, layout assumes horizontal-tb).
+- **Vertical writing is lite:** `writing-mode: vertical-rl|vertical-lr`
+  rotates line boxes (`inline_vertical_writing.go`, matrix §2.3). It is
+  not a full vertical typesetting engine (no vertical font metrics, no
+  per-grapheme upright CJK).
 - **HTML HF band**: single-page, clipped; taller content is clipped rather
   than paginated (documented in `hf.go`).
 - **Zoom interacts with absolute positioning/viewport percentages** in

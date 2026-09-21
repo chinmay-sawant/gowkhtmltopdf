@@ -18,7 +18,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
+	"sync/atomic"
 	"time"
 	"unicode/utf16"
 )
@@ -599,6 +599,47 @@ func writePDFString(out *countingWriter, text string) error {
 	return nil
 }
 
+// xrefOffsetWidth is the fixed digit width of one xref entry offset.
+const xrefOffsetWidth = 10
+
+// idScratchCapacity sizes the trailer /ID hash scratch buffer.
+const idScratchCapacity = 64
+
+// idFloatPrec matches the default %f precision used for the /ID hash.
+const idFloatPrec = 6
+
+// appendPadZero appends value as a decimal number zero-padded to width digits.
+// The xref table requires a fixed-width offset field.
+func appendPadZero(dst []byte, value int64, width int) []byte {
+	if value < 0 {
+		return strconv.AppendInt(dst, value, pdfNumBase)
+	}
+
+	if value == 0 {
+		for pad := width - 1; pad > 0; pad-- {
+			dst = append(dst, '0')
+		}
+
+		return append(dst, '0')
+	}
+
+	var buf [20]byte
+
+	index := len(buf)
+
+	for value > 0 {
+		index--
+		buf[index] = byte('0' + value%pdfNumBase)
+		value /= pdfNumBase
+	}
+
+	for pad := width - (len(buf) - index); pad > 0; pad-- {
+		dst = append(dst, '0')
+	}
+
+	return append(dst, buf[index:]...)
+}
+
 func writePDFHeader(out *countingWriter, policy WriterPolicy) error {
 	if err := writePDFFormat(out, "%%PDF-%s\n", policy.HeaderVersion()); err != nil {
 		return err
@@ -656,14 +697,28 @@ func computeTrailerID(doc *Document) string {
 		_, _ = hasher.Write([]byte(doc.info[k]))
 	}
 
-	_, _ = fmt.Fprintf(hasher, "pages:%d", len(doc.pages))
+	idBuf := make([]byte, 0, idScratchCapacity)
+
+	idBuf = append(idBuf, "pages:"...)
+	idBuf = strconv.AppendInt(idBuf, int64(len(doc.pages)), pdfNumBase)
+	_, _ = hasher.Write(idBuf)
 
 	for _, p := range doc.pages {
-		_, _ = fmt.Fprintf(hasher, "page:%f,%f", p.width, p.height)
+		idBuf = append(idBuf[:0], "page:"...)
+		idBuf = strconv.AppendFloat(idBuf, p.width, 'f', idFloatPrec, float64Bits)
+		idBuf = append(idBuf, ',')
+		idBuf = strconv.AppendFloat(idBuf, p.height, 'f', idFloatPrec, float64Bits)
+		_, _ = hasher.Write(idBuf)
 	}
 
 	for _, obj := range doc.objects {
-		_, _ = fmt.Fprintf(hasher, "obj:%d:%s:%d", obj.id, obj.dict, len(obj.stream))
+		idBuf = append(idBuf[:0], "obj:"...)
+		idBuf = strconv.AppendInt(idBuf, int64(obj.id), pdfNumBase)
+		idBuf = append(idBuf, ':')
+		idBuf = append(idBuf, obj.dict...)
+		idBuf = append(idBuf, ':')
+		idBuf = strconv.AppendInt(idBuf, int64(len(obj.stream)), pdfNumBase)
+		_, _ = hasher.Write(idBuf)
 	}
 
 	sum := hasher.Sum(nil)
@@ -683,9 +738,14 @@ func writePDFTrailer(out *countingWriter, doc *Document, offsets []int64) error 
 		return err
 	}
 
+	var lineBuf [24]byte
+
 	for idx := 1; idx <= len(doc.objects); idx++ {
-		if err := writePDFFormat(out, "%010d 00000 n \n", offsets[idx]); err != nil {
-			return err
+		line := appendPadZero(lineBuf[:0], offsets[idx], xrefOffsetWidth)
+		line = append(line, " 00000 n \n"...)
+
+		if _, err := out.Write(line); err != nil {
+			return fmt.Errorf("write PDF xref: %w", err)
 		}
 	}
 
@@ -1329,7 +1389,7 @@ func firstPageStructElem(page *Page) *StructElem {
 	return nil
 }
 
-func writeAnnotDest(buf *strings.Builder, doc *Document, arg *annotation) {
+func writeAnnotDest(buf *[]byte, doc *Document, arg *annotation) {
 	idx := doc.pageIndexOf(arg.destPage)
 	if idx < 0 {
 		return
@@ -1339,13 +1399,20 @@ func writeAnnotDest(buf *strings.Builder, doc *Document, arg *annotation) {
 	// PDF/UA-2: dual named dest — /D page (Arlington/PDF/A) + /SD struct (UA-2 8.8).
 	if doc.policy.IsPDFUA2() {
 		name := doc.registerDualDest(pageRef, arg.destX, arg.destY, structureDestElem(arg, doc))
-		fmt.Fprintf(buf, " /Dest %s", pdfString(name))
+
+		*buf = append(*buf, " /Dest "...)
+		*buf = appendPDFString(*buf, name)
 
 		return
 	}
 
-	fmt.Fprintf(buf, " /Dest [%s /XYZ %s %s null]",
-		pageRef, num(arg.destX), num(arg.destY))
+	*buf = append(*buf, " /Dest ["...)
+	*buf = append(*buf, pageRef.String()...)
+	*buf = append(*buf, " /XYZ "...)
+	*buf = appendPDFNum(*buf, arg.destX)
+	*buf = append(*buf, ' ')
+	*buf = appendPDFNum(*buf, arg.destY)
+	*buf = append(*buf, " null]"...)
 }
 
 func (d *Document) buildAnnots(page *Page) {
@@ -1355,29 +1422,40 @@ func (d *Document) buildAnnots(page *Page) {
 			arg.annotRef = d.newObject()
 		}
 
-		r := arg.rect
+		rect := arg.rect
 
-		var buf strings.Builder
+		var buf []byte
 
-		fmt.Fprintf(&buf, "<< /Type /Annot /Subtype /Link /Rect [%s %s %s %s] /Border [0 0 0] /F 4",
-			num(r[0]), num(r[1]), num(r[2]), num(r[3]))
+		buf = append(buf, "<< /Type /Annot /Subtype /Link /Rect ["...)
+		buf = appendPDFNum(buf, rect[0])
+		buf = append(buf, ' ')
+		buf = appendPDFNum(buf, rect[1])
+		buf = append(buf, ' ')
+		buf = appendPDFNum(buf, rect[2])
+		buf = append(buf, ' ')
+		buf = appendPDFNum(buf, rect[3])
+		buf = append(buf, "] /Border [0 0 0] /F 4"...)
 
 		if d.policy.IsPDFUA1() || d.policy.IsPDFUA2() {
-			fmt.Fprintf(&buf, " /Contents %s", d.encodeTextString(annotDescription(d, arg)))
+			buf = append(buf, " /Contents "...)
+			buf = append(buf, d.encodeTextString(annotDescription(d, arg))...)
 
 			if arg.hasStructParent {
-				fmt.Fprintf(&buf, " /StructParent %d", arg.structParent)
+				buf = append(buf, " /StructParent "...)
+				buf = strconv.AppendInt(buf, int64(arg.structParent), pdfNumBase)
 			}
 		}
 
 		if arg.hasDest {
 			writeAnnotDest(&buf, d, arg)
 		} else {
-			fmt.Fprintf(&buf, " /A << /S /URI /URI %s >>", pdfString(arg.uri))
+			buf = append(buf, " /A << /S /URI /URI "...)
+			buf = appendPDFString(buf, arg.uri)
+			buf = append(buf, " >>"...)
 		}
 
-		buf.WriteString(" >>")
-		d.setDict(arg.annotRef, buf.String())
+		buf = append(buf, " >>"...)
+		d.setDict(arg.annotRef, string(buf))
 	}
 }
 
@@ -1689,19 +1767,27 @@ func (s *flateState) compress(raw []byte) []byte {
 	return append([]byte(nil), s.buf.Bytes()...)
 }
 
-//nolint:gochecknoglobals // compressor reuse across page streams; not a mutable global
-var flatePool sync.Pool
+// flateSerial retains one flateState for the serial flate path across GC
+// cycles. A sync.Pool was measured to lose the state within two GC cycles
+// (overlay probe: first call 817,592 B, nine warm calls 2,016 B, after two
+// GCs 817,592 B again), so the 2026-09-21 Chrome corpus capture paid a fresh
+// deflate state per conversion (245 MB cum, 34% of all allocations). Parallel
+// page streams keep their own retained states in flate_parallel.go.
+//
+//nolint:gochecknoglobals // retained compressor for the serial path; not a mutable global
+var flateSerial atomic.Pointer[flateState]
 
 // flateBytes compresses raw with zlib (RFC 1950). PDF /FlateDecode streams
 // require the zlib wrapper, not raw DEFLATE (RFC 1951); viewers reject the
-// latter and the page appears empty. The compressor is reused across page
-// streams; the returned copy owns its bytes before the state goes back to the
-// pool. Single-page documents and non-page streams (fonts, images, ICC) stay
-// on this serial path; multi-page documents use the retained worker set in
+// latter and the page appears empty. The compressor is reused across serial
+// calls; the returned copy owns its bytes before the state is retained again.
+// Single-page documents and non-page streams (fonts, images, ICC) stay on
+// this serial path; multi-page documents use the retained worker set in
 // flate_parallel.go.
-const maxPooledFlateBufferSize = 16 * 1024 * 1024 // 16 MiB max retention
+const maxRetainedFlateBufferSize = 16 * 1024 * 1024 // 16 MiB max retention
+
 func flateBytes(raw []byte) []byte {
-	state, _ := flatePool.Get().(*flateState)
+	state := flateSerial.Swap(nil)
 	if state == nil {
 		state = &flateState{} //nolint:exhaustruct // intentional zero-value fields
 		state.zw, _ = zlib.NewWriterLevel(&state.buf, zlib.DefaultCompression)
@@ -1709,8 +1795,8 @@ func flateBytes(raw []byte) []byte {
 
 	res := state.compress(raw)
 
-	if state.buf.Cap() <= maxPooledFlateBufferSize {
-		flatePool.Put(state)
+	if state.buf.Cap() <= maxRetainedFlateBufferSize {
+		flateSerial.CompareAndSwap(nil, state)
 	}
 
 	return res

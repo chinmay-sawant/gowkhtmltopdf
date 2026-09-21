@@ -1,0 +1,38 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Flex sizing with positive and negative free space</title>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .case { display: flex; width: 600px; height: 50px; position: relative; transform: translateY(56pt); }
+    .item { min-width: 0; height: 20px; background: #dbeafe; outline: 1px solid #2563eb; }
+    .pdf-label { position: absolute; top: 360pt; left: 12pt; color: #111827; font-size: 10pt; }
+    .grow { flex: 1 1 0; }
+    .grow.two { flex-grow: 2; }
+    .grow.three { flex-grow: 3; }
+    .shrink-a { flex: 1 1 300px; }
+    .shrink-b { flex: 2 3 300px; }
+    .shrink-c { flex: 0 0 200px; }
+  </style>
+</head>
+<body>
+  <!-- Source: third_party/blink/web_tests/css3/flexbox/flex-algorithm.html -->
+  <!-- Port status: completed. Static input reviewed and covered by the assigned layout test. -->
+  <!-- Expected: grow items are 75pt, 150pt, and 225pt; shrink items are 187.5pt, 112.5pt, and 150pt. -->
+  <div class="case" id="positive-grow">
+    <div class="item grow" id="basis-grow-a"></div>
+    <div class="item grow two" id="basis-grow-b"></div>
+    <div class="item grow three" id="basis-grow-c"></div>
+  </div>
+  <div class="case" id="negative-shrink">
+    <div class="item shrink-a" id="scaled-shrink-a"></div>
+    <div class="item shrink-b" id="scaled-shrink-b"></div>
+    <div class="item shrink-c" id="scaled-shrink-c"></div>
+  </div>
+  <div class="pdf-label">Flex algorithm: grow and shrink sizing</div>
+  <p class="case-description" style="position:absolute;top:12pt;left:12pt;margin:0;padding:6pt;border:1pt solid #64748b;background:#fff;color:#111827;font-size:9pt;line-height:12pt;width:560pt;">
+    <strong>Case 1 expected behavior:</strong> flex-grow distributes 600pt of positive free space in 1:2:3 proportions, while scaled flex-shrink produces 187.5pt, 112.5pt, and 150pt items.
+  </p>
+</body>
+</html>

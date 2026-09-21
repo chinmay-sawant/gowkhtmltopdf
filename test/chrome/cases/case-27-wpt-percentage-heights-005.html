@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Flexbox percentage height in a column item</title>
+  <style>
+    /* Print 1:1 with the Chromium reference: no smart shrinking. The 8pt
+       page margin keeps every edge inside the page, and the 550pt panel
+       still fits the remaining width. The 12pt content inset keeps the 5pt
+       outline overhang off the content-area edge, which Chromium clips. */
+    @page { margin: 8pt; }
+    html, body { margin: 0; padding: 0; }
+    .case { position: relative; transform: translateY(56pt); display: flex; flex-direction: column; padding-left: 12pt; }
+    .item { width: 100pt; height: 100pt; background: #dc2626; outline: 3pt dotted #2563eb; outline-offset: 2pt; }
+    .fill { width: 100%; height: 100%; background: #16a34a; position: relative; }
+    .fill-label { position: absolute; top: 8pt; left: 8pt; white-space: nowrap; color: white; font-size: 8pt; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <!-- Source: third_party/blink/web_tests/external/wpt/css/css-flexbox/percentage-heights-005.html -->
+  <!-- Fixture: case-27-wpt-percentage-heights-005 -->
+  <!-- Port status: completed. Source-faithful definite column child. -->
+  <!-- Expected: the green 100% child covers the item's red background without overflowing the column, so no red shows. -->
+  <p class="case-description" style="position:absolute;top:12pt;left:12pt;margin:0;padding:6pt;border:1pt solid #64748b;background:#fff;color:#111827;font-size:9pt;line-height:12pt;width:550pt;">
+    <strong>Case 27 expected behavior:</strong> the item's definite 100pt height resolves the 100% child, so the green fill covers the item's red background completely; no red should remain.
+  </p>
+  <div class="case" id="case-27"><div class="item" id="item-27"><div class="fill" id="fill-27"><span class="fill-label">HEIGHT 100%</span></div></div></div>
+</body>
+</html>

@@ -1,0 +1,34 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Flexbox replaced item automatic minimum</title>
+  <style>
+    /* Print 1:1 with the Chromium reference: no smart shrinking. The 8pt
+       page margin keeps every edge inside the page, and the 550pt panel
+       still fits the remaining width. */
+    @page { margin: 8pt; }
+    html, body { margin: 0; padding: 0; }
+    .case { position: relative; transform: translateY(56pt); display: flex; width: 225pt; height: 30pt; border: 1pt solid #111; margin-bottom: 5pt; }
+    .spacer { flex: 0 0 150pt; background: #d1d5db; }
+    input { appearance: none; border: 0; padding: 0; margin: 0; height: 30pt; background: #9ec5fe; }
+    .test1 { width: 100%; }
+    .test2 { width: calc(100%); }
+    .test3 { width: calc(105pt + 100%); }
+  </style>
+</head>
+<body>
+  <!-- Source: third_party/blink/web_tests/external/wpt/css/css-flexbox/flex-item-compressible-001.html -->
+  <!-- Fixture: case-33-wpt-flex-item-compressible -->
+  <!-- Port status: completed. Source-faithful replaced input variants. -->
+  <!-- Expected: specified-size suggestions are used while the row shrinks the input. -->
+  <p class="case-description" style="position:absolute;top:12pt;left:12pt;margin:0;padding:6pt;border:1pt solid #64748b;background:#fff;color:#111827;font-size:9pt;line-height:12pt;width:550pt;">
+    <strong>Case 33 expected behavior:</strong> the text, range, and button inputs settle at 75pt wide in the 225pt rows; calc widths follow the same rule.
+  </p>
+  <div class="case" id="case-33-text"><div class="spacer"></div><input class="test1" type="text"></div>
+  <div class="case" id="case-33-range"><div class="spacer"></div><input class="test1" type="range"></div>
+  <div class="case" id="case-33-button"><div class="spacer"></div><input class="test1" type="button" value="XXXXXXX"></div>
+  <div class="case" id="case-33-calc"><div class="spacer"></div><input class="test2" type="text"></div>
+  <div class="case" id="case-33-wide"><div class="spacer"></div><input class="test3" type="text"></div>
+</body>
+</html>

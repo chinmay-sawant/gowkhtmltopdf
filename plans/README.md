@@ -12,6 +12,7 @@ Implementation plans and roadmaps for `gowkhtmltopdf`, partitioned by release ve
 | [0.2.4/](0.2.4/README.md) | **v0.2.4** — idiomatic Document API + CLI rethink + external benches (phases 31–39) | Complete; [release notes](0.2.4/PR/release-v0.2.4.md) |
 | [0.2.5/](0.2.5/README.md) | **v0.2.5 Python cgo c-shared bindings and PyPI** — phases 40–47 (in-process, `CGO_ENABLED=0` pure-Go default kept); font track `font/` already complete | Complete (released 2026-08-26; `VERSION` 0.2.5) |
 | [0.2.6/](0.2.6/README.md) | **v0.2.6 CSS coverage and browser WASM** - catalog-driven print CSS (354 implemented / 0 partial / 464 unsupported), browser WASM output, warm-path recovery | Complete (released 2026-09-13; `VERSION` 0.2.6). [Release notes](0.2.6/PR/release-v0.2.6.md) |
+| [0.2.7/](0.2.7/README.md) | **v0.2.7 next-72 + next-100 CSS** - 72-property wave (fixture-64) closed; next-100 wave planned (88.1-88.9, fixture-66) | next-72 complete on `feature/027-next-72`; next-100 planned |
 
 ---
 
@@ -78,7 +79,23 @@ Implementation plans and roadmaps for `gowkhtmltopdf`, partitioned by release ve
 - [property-counts.md](0.2.6/property-counts.md) - Implemented / Partial / Unsupported / Ignored counts
 - [ignored-inventory.json](0.2.6/ignored-inventory.json) - Ownership map for the 247 Ignored names (phases 68-78)
 - [AGENTS.md](0.2.6/AGENTS.md) - Agent rules for this ledger
+
+## 0.2.7 (Next 72 CSS, then next 100)
+
+- [0.2.7 README](0.2.7/README.md)
+- [87-canonical-0.2.7-next-72.md](0.2.7/87-canonical-0.2.7-next-72.md) - Canonical execution ledger (batches 87.1-87.8)
+- [88-canonical-0.2.7-next-100.md](0.2.7/88-canonical-0.2.7-next-100.md) - Canonical execution ledger (batches 88.1-88.9)
+- [phases/](0.2.7/phases) - Per-batch checklists; **87.8 and 88.9 own `make test` / `make golden`**
+- [next-72-properties.json](0.2.7/next-72-properties.json) - 72-property inventory + Chrome BCD
+- [next-100-properties.json](0.2.7/next-100-properties.json) - 100-property inventory + Chrome BCD, zero overlap with the 72
+- [next-72-fixture-authoring.md](0.2.7/next-72-fixture-authoring.md) - fixture-64 authoring contract
+- [next-100-fixture-authoring.md](0.2.7/next-100-fixture-authoring.md) - fixture-66 authoring contract
+- [chrome-flex-interactions/](0.2.7/chrome-flex-interactions) - Chromium-backed Flexbox interaction inventory and Go conversion plan
 - [86-canonical-0.2.6-wasm.md](0.2.6/86-canonical-0.2.6-wasm.md) - Browser WASM conversion, PDF preview, and image output phases 86-93
 - [perf-improve/wave-2-50pct/](0.2.6/perf-improve/wave-2-50pct/) - Live ledger to cut remaining Snapshot M ns/op and B/op in half (library and CLI). Wave 1 Snapshot L checklist stays closed.
+
+## Performance (cross-version)
+
+- [performance/2026-09-21/](performance/2026-09-21/00-canonical-chrome-case-alloc-reduction.md) - Chrome 40-case allocation reductions: retained serial flate state (713.50 -> 485.98 MB total) and one shared cascade (485.98 -> 327.88 MB total); chunk-tail phase deferred by measurement (about 1% waste vs a 5% gate)
 
 Phases 57-67 closed Partials (174 Implemented / 0 Partial). Phases 68-78 reopen all 247 Ignored for browser-level print. Leftover CSS rows in `0.2.0/phases/pending-phase-items/` move here with `[~]` pointers. WOFF2 sidecar cited in KB is not in this worktree unless amended.

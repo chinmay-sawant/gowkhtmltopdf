@@ -220,6 +220,25 @@ func (e *engine) flowMulticolSpanner(boxNode *box, nodes []*html.Node, contentW,
 	return curY
 }
 
+// finalizeMulticolLineHeight keeps a Multicol-2 column-height row at the
+// authored size when content is short (empty space at the bottom of the row).
+func (e *engine) finalizeMulticolLineHeight(style ResolvedStyle, lineH, maxColH float64) float64 {
+	if style.ColumnHeight < 0 {
+		return lineH
+	}
+
+	fixed := e.scalePt(style.ColumnHeight)
+	if maxColH > 0 && maxColH < fixed {
+		fixed = maxColH
+	}
+
+	if lineH < fixed {
+		return fixed
+	}
+
+	return lineH
+}
+
 // clampMulticolHeight applies padding-bottom and min/max height constraints to
 // the accumulated content height of a multicol container. A definite height
 // both floors and caps the used height so oversized column strips cannot blow
@@ -367,6 +386,7 @@ func (e *engine) flowMulticolSegment(
 		lineH := e.placeMulticolAnonColumns(
 			parent, items[0], style, nCols, colW, gap, contentX, yPos, curY, maxColH, balance,
 		)
+		lineH = e.finalizeMulticolLineHeight(style, lineH, maxColH)
 		e.emitColumnRules(style, contentX, colW, gap, nCols, lineTop, lineH)
 
 		return curY + lineH
@@ -392,8 +412,15 @@ func (e *engine) flowMulticolSegment(
 		lineH := e.placeMulticolLine(
 			parent, batch, style, nCols, colW, gap, contentX, yPos, curY, maxColH, balance, totalH,
 		)
+		lineH = e.finalizeMulticolLineHeight(style, lineH, maxColH)
 		e.emitColumnRules(style, contentX, colW, gap, nCols, lineTop, lineH)
 		curY += lineH
+
+		// column-wrap:nowrap: one row only; remaining items are not packed
+		// into further block-direction rows (overflow columns unsupported).
+		if idx < len(items) && !columnWrapCreatesRows(style) && style.ColumnHeight >= 0 {
+			break
+		}
 	}
 
 	return curY
@@ -589,6 +616,12 @@ func (e *engine) multicolColumnHeight(
 		// Author height still wins in clampMulticolHeight (curY = h) and
 		// in placeMulticolAnonColumns for the fixture-61 blank-page case.
 		maxColH = clampMulticolRemainder(maxColH, definiteH-(curY-padTop))
+	}
+
+	// Multicol-2 column-height: clamp each column box before spilling into
+	// more columns / rows. scalePt matches other used lengths.
+	if style.ColumnHeight >= 0 {
+		maxColH = clampMulticolRemainder(maxColH, e.scalePt(style.ColumnHeight))
 	}
 
 	// Oversized atomic items snap to the next page when mid-page. Anonymous

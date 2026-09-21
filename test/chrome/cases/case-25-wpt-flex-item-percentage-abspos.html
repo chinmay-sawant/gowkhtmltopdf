@@ -1,0 +1,34 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Percentage absolute child in a flex item</title>
+  <style>
+    /* Print 1:1 with the Chromium reference: no smart shrinking. The 8pt
+       page margin keeps every edge inside the page, and the 550pt panel
+       still fits the remaining width. */
+    @page { margin: 8pt; }
+    html, body { margin: 0; padding: 0; }
+    .case { position: relative; transform: translateY(56pt); display: flex; }
+    .item { overflow: hidden; position: relative; }
+    .fill { width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
+    .marker { width: 100pt; height: 100pt; background: #16a34a; position: relative; }
+    .marker-label { position: absolute; top: 8pt; left: 8pt; color: white; font-size: 8pt; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <!-- Source: third_party/blink/web_tests/external/wpt/css/css-flexbox/flex-item-and-percentage-abspos.html -->
+  <!-- Fixture: case-25-wpt-flex-item-percentage-abspos -->
+  <!-- Port status: completed. Behavior-equivalent normalized WPT structure. -->
+  <!-- Expected: the green in-flow marker remains visible under the transparent percentage child. -->
+  <p class="case-description" style="position:absolute;top:12pt;left:12pt;margin:0;padding:6pt;border:1pt solid #64748b;background:#fff;color:#111827;font-size:9pt;line-height:12pt;width:550pt;">
+    <strong>Case 25 expected behavior:</strong> the 100pt marker stays visible under the 100pt percentage absolute fill, so the two overlap exactly.
+  </p>
+  <div class="case" id="case-25">
+    <div class="item" id="item-25">
+      <div class="fill" id="fill-25"></div>
+      <div class="marker" id="marker-25"><span class="marker-label">ABS 100%</span></div>
+    </div>
+  </div>
+</body>
+</html>

@@ -40,6 +40,10 @@ type floatState struct {
 	contentW    float64
 	hasLeft     bool
 	hasRight    bool
+	// Optional shape-outside contours. When set, exclusion uses the contour
+	// instead of the rectangular leftEdge/rightEdge for that side.
+	leftShape  *shapeExclusion
+	rightShape *shapeExclusion
 }
 
 func newFloatState(contentX, contentW float64) floatState {
@@ -83,6 +87,7 @@ func (f *floatState) clearLeft(need float64) float64 {
 	f.leftBottom = 0
 	f.leftTop = 0
 	f.leftEdge = f.contentX
+	f.leftShape = nil
 
 	return need
 }
@@ -97,6 +102,7 @@ func (f *floatState) clearRight(need float64) float64 {
 	f.rightBottom = 0
 	f.rightTop = 0
 	f.rightEdge = f.contentX + f.contentW
+	f.rightShape = nil
 
 	return need
 }
@@ -105,14 +111,17 @@ func (f *floatState) clearRight(need float64) float64 {
 // ml/mr are the floated box's horizontal margins (scaled pt); exclusion uses
 // the margin box so in-flow text clears the gap before the border (e.g.
 // float:right; margin-left:1em), instead of painting flush against the frame.
-func (f *floatState) place(side string, fbox *box, margL, margR float64) {
+// shape may be nil (rectangular exclusion) or a resolved shape-outside contour.
+func (f *floatState) place(side string, fbox *box, margL, margR float64, shape *shapeExclusion) {
 	bottom := fbox.y + fbox.height
 
 	switch side {
 	case floatLeft:
 		f.placeLeft(fbox, bottom, margR)
+		f.leftShape = shape
 	case floatRight:
 		f.placeRight(fbox, bottom, margL)
+		f.rightShape = shape
 	}
 }
 
@@ -154,13 +163,22 @@ func (f *floatState) placeRight(fbox *box, bottom, margL float64) {
 
 // exclusion returns the in-flow content origin and width at canvas y = y+cy
 // after subtracting active float intrusion from the caller's content box
-// (contentX/contentW). Float edges are canvas-absolute.
+// (contentX/contentW). Float edges are canvas-absolute. When a side has a
+// shape-outside contour, that contour's per-line interval replaces the
+// rectangular edge for that side.
+//
+//nolint:cyclop,nestif,wsl // float-side geometry intentionally handles both contours
 func (f *floatState) exclusion(contentX, contentW, y, cy float64) (float64, float64) {
 	outX, outW := contentX, contentW
 	top := y + cy
 
 	if f.hasLeft && f.leftBottom > top {
-		if f.leftEdge > outX {
+		if f.leftShape != nil {
+			if edge, ok := f.leftShape.rightEdgeAt(top); ok && edge > outX {
+				outW -= edge - outX
+				outX = edge
+			}
+		} else if f.leftEdge > outX {
 			outW -= f.leftEdge - outX
 			outX = f.leftEdge
 		}
@@ -168,6 +186,14 @@ func (f *floatState) exclusion(contentX, contentW, y, cy float64) (float64, floa
 
 	if f.hasRight && f.rightBottom > top {
 		limit := f.rightEdge
+		if f.rightShape != nil {
+			if edge, ok := f.rightShape.leftEdgeAt(top); ok {
+				limit = edge
+			} else {
+				limit = contentX + contentW // no intrusion at this y
+			}
+		}
+
 		if limit < outX+outW {
 			outW = limit - outX
 		}

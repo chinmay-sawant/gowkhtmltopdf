@@ -10,9 +10,10 @@ import (
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
 )
 
-// Image adjustment support group: image-orientation, image-resolution, and
-// object-view-box. The paint and sizing consumers live in layout_images.go;
-// the raster transforms and image metadata parsers live in image_exif.go.
+// Image adjustment support group: image-orientation, image-resolution,
+// object-view-box, object-fit, and object-position. Paint/sizing consumers
+// live in layout_images.go and object_fit.go; raster transforms live in
+// image_exif.go.
 //
 // Supported subset:
 //   - image-orientation: from-image | none | [ <angle> || flip ]. from-image
@@ -36,9 +37,9 @@ const (
 	objectViewBoxRectShape = "rect"
 )
 
-// applyImageAdjustProps owns image-orientation, image-resolution, and
-// object-view-box. Invalid values leave the previous value in place, matching
-// the other apply groups.
+// applyImageAdjustProps owns image-orientation, image-resolution,
+// object-view-box, object-fit, and object-position. Invalid values leave the
+// previous value in place, matching the other apply groups.
 func applyImageAdjustProps(
 	style *ResolvedStyle, prop, value string, _ float64, _ *styleContext, _ *ResolvedStyle, _ bool,
 ) bool {
@@ -57,11 +58,102 @@ func applyImageAdjustProps(
 		if canonical, ok := parseObjectViewBox(value); ok {
 			style.ObjectViewBox = canonical
 		}
+	case "object-fit":
+		if fit, ok := parseObjectFit(value); ok {
+			style.ObjectFit = fit
+		}
+	case "object-position":
+		if x, y, ok := parseObjectPosition(value); ok {
+			style.ObjectPositionX = x
+			style.ObjectPositionY = y
+		}
 	default:
 		return false
 	}
 
 	return true
+}
+
+func parseObjectFit(raw string) (string, bool) {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "fill", "contain", "cover", "none", "scale-down":
+		return strings.ToLower(strings.TrimSpace(raw)), true
+	default:
+		return "", false
+	}
+}
+
+func parseObjectPosition(raw string) (string, string, bool) {
+	value := normalizeCSSValue(raw)
+	if value == "" {
+		return "", "", false
+	}
+
+	parts := strings.Fields(value)
+	switch len(parts) {
+	case 1:
+		switch parts[0] {
+		case "left", "right", "center", "top", "bottom":
+			if parts[0] == "top" || parts[0] == "bottom" {
+				return "center", parts[0], true
+			}
+
+			return parts[0], "center", true
+		default:
+			if isObjectPositionLength(parts[0]) {
+				return parts[0], "center", true
+			}
+
+			return "", "", false
+		}
+	case 2:
+		if !isObjectPositionToken(parts[0]) || !isObjectPositionToken(parts[1]) {
+			return "", "", false
+		}
+		// Keyword pairs like "top left" swap into x/y slots.
+		x, y := parts[0], parts[1]
+		if isObjectPositionYKeyword(parts[0]) && isObjectPositionXKeyword(parts[1]) {
+			x, y = parts[1], parts[0]
+		}
+
+		return x, y, true
+	default:
+		return "", "", false
+	}
+}
+
+func isObjectPositionToken(tok string) bool {
+	return isObjectPositionXKeyword(tok) || isObjectPositionYKeyword(tok) || isObjectPositionLength(tok)
+}
+
+func isObjectPositionXKeyword(tok string) bool {
+	switch tok {
+	case "left", "right", "center":
+		return true
+	default:
+		return false
+	}
+}
+
+func isObjectPositionYKeyword(tok string) bool {
+	switch tok {
+	case "top", "bottom", "center":
+		return true
+	default:
+		return false
+	}
+}
+
+func isObjectPositionLength(tok string) bool {
+	if strings.HasSuffix(tok, "%") {
+		_, err := strconv.ParseFloat(strings.TrimSuffix(tok, "%"), 64)
+
+		return err == nil
+	}
+
+	_, _, ok := css.ParseLength(tok)
+
+	return ok
 }
 
 // parseImageOrientation parses from-image | none | [ <angle> || flip ].
@@ -263,7 +355,7 @@ func parseObjectViewBox(raw string) (string, bool) {
 		return canonicalInsetViewBox(args)
 	case "xywh", objectViewBoxRectShape:
 		return canonicalRectViewBox(name, args)
-	case "circle", "ellipse", "polygon":
+	case listStyleCircle, "ellipse", "polygon":
 		return name + "(" + args + ")", true
 	default:
 		return "", false

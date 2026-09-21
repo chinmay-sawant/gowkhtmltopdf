@@ -1,0 +1,94 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Logical auto margins in reverse flow</title>
+  <style>
+    html, body { margin: 0; padding: 0; font: 12px sans-serif; }
+    .container {
+      position: relative;
+      display: inline-block;
+      margin: 0 12px 12px 0;
+      background: pink;
+      outline: 1px solid black;
+    }
+    .flexbox {
+      display: flex;
+      width: 100px;
+      height: 100px;
+      background: grey;
+    }
+    .flexbox > * { flex: none; }
+    .title { margin-top: 1em; }
+    .title, .container { position: relative; transform: translateY(56pt); }
+    .ltr { direction: ltr; }
+    .rtl { direction: rtl; }
+    .horizontal-tb { writing-mode: horizontal-tb; }
+    .vertical-rl { writing-mode: vertical-rl; }
+    .vertical-lr { writing-mode: vertical-lr; }
+    .row { flex-flow: row; }
+    .row-reverse { flex-flow: row-reverse; }
+    .column { flex-flow: column; }
+    .column-reverse { flex-flow: column-reverse; }
+    .physical { margin: 10px 20px 30px 40px; }
+    .physical > div { margin: 13px auto 17px auto; }
+    .logical {
+      margin-block-start: 10px;
+      margin-block-end: 30px;
+      margin-inline-start: 40px;
+      margin-inline-end: 20px;
+    }
+    .logical > div {
+      margin-block-start: auto;
+      margin-block-end: 17px;
+      margin-inline-start: auto;
+      margin-inline-end: 2px;
+    }
+    .flexbox > :nth-child(1) { background: blue; }
+    .flexbox > :nth-child(2) { background: green; }
+  </style>
+</head>
+<body>
+  <!-- Source: third_party/blink/web_tests/css3/flexbox/flex-flow-auto-margins.html -->
+  <!-- Port status: completed fixture coverage; every branch renders in the PDF, including the vertical-rl marker. -->
+  <!-- Expected: auto margins split free space after fixed margins, and logical sides follow direction and writing mode. -->
+  <p class="case-description" style="position:absolute;top:12pt;left:12pt;margin:0;padding:6pt;border:1pt solid #64748b;background:#fff;color:#111827;font-size:9pt;line-height:12pt;width:560pt;">
+    <strong>Case 13 expected behavior:</strong> physical and logical auto margins should consume free space consistently across direction, writing mode, and reverse flow. The first four branches render visible blue markers, and the final vertical-rl, RTL, column-reverse branch renders its 20px marker too.
+  </p>
+
+  <div class="title">horizontal-tb ltr row physical</div>
+  <div class="container" data-case="physical-horizontal-ltr-row">
+    <div class="flexbox horizontal-tb ltr row physical" data-expected-x="40" data-expected-y="10">
+      <div style="height:20px;width:20px" data-expected-x="80" data-expected-y="23"></div>
+    </div>
+  </div>
+
+  <div class="title">horizontal-tb ltr row logical</div>
+  <div class="container" data-case="logical-horizontal-ltr-row">
+    <div class="flexbox horizontal-tb ltr row logical" data-expected-x="40" data-expected-y="10">
+      <div style="height:20px;width:20px" data-expected-x="118" data-expected-y="73"></div>
+    </div>
+  </div>
+
+  <div class="title">horizontal-tb rtl row logical</div>
+  <div class="container" data-case="logical-horizontal-rtl-row">
+    <div class="flexbox horizontal-tb rtl row logical" data-expected-x="20" data-expected-y="10">
+      <div style="height:20px;width:20px" data-expected-x="22" data-expected-y="73"></div>
+    </div>
+  </div>
+
+  <div class="title">vertical-lr ltr row logical</div>
+  <div class="container" data-case="logical-vertical-lr-ltr-row">
+    <div class="flexbox vertical-lr ltr row logical" data-expected-x="10" data-expected-y="40">
+      <div style="height:20px;width:20px" data-expected-x="73" data-expected-y="118"></div>
+    </div>
+  </div>
+
+  <div class="title">vertical-rl rtl column-reverse logical</div>
+  <div class="container" data-case="logical-vertical-rl-rtl-column-reverse">
+    <div class="flexbox vertical-rl rtl column-reverse logical" data-expected-x="30" data-expected-y="20">
+      <div style="height:20px;width:20px" data-expected-x="47" data-expected-y="22"></div>
+    </div>
+  </div>
+</body>
+</html>

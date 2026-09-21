@@ -15,19 +15,27 @@ func isCurrentColor(value string) bool {
 	return strings.EqualFold(strings.TrimSpace(value), currentColorKeyword)
 }
 
+// parseUsedColorAlpha maps a CSS color token onto 0..1 RGB plus its source
+// alpha. currentColor resolves opaque: inherited used colors carry no alpha.
+func parseUsedColorAlpha(value string, current [3]float64) ([3]float64, float64, bool) {
+	if isCurrentColor(value) {
+		return current, 1, true
+	}
+
+	r, g, b, a, ok := css.ParseColor(value)
+	if !ok {
+		return [3]float64{}, 0, false
+	}
+
+	return [3]float64{float64(r) / 255, float64(g) / 255, float64(b) / 255}, a, true
+}
+
 // parseUsedColor maps a CSS color token onto 0..1 RGB. currentColor uses the
 // element's used color (already inherited or applied).
 func parseUsedColor(value string, current [3]float64) ([3]float64, bool) {
-	if isCurrentColor(value) {
-		return current, true
-	}
+	color, _, ok := parseUsedColorAlpha(value, current)
 
-	r, g, b, _, ok := css.ParseColor(value)
-	if !ok {
-		return [3]float64{}, false
-	}
-
-	return [3]float64{float64(r) / 255, float64(g) / 255, float64(b) / 255}, true
+	return color, ok
 }
 
 func applyOutlineProps(style *ResolvedStyle, prop, value string, fsize float64) bool {
@@ -367,19 +375,13 @@ func firstCSSUrl(value string) (string, bool) {
 func applyGeneratedContentProps(style *ResolvedStyle, prop, value string) bool {
 	switch prop {
 	case "quotes":
-		style.QuotesRaw = value
-		if openQuote, closeQuote, parsed := parseQuotesPair(value); parsed {
-			style.QuotesOpen = openQuote
-			style.QuotesClose = closeQuote
-		}
+		applyQuotesValue(style, value)
 	case "counter-reset":
-		if trimmed := strings.TrimSpace(value); trimmed != "" {
-			style.CounterReset = trimmed
-		}
+		setTrimmedStyleValue(&style.CounterReset, value)
+	case "counter-set":
+		setTrimmedStyleValue(&style.CounterSet, value)
 	case "counter-increment":
-		if trimmed := strings.TrimSpace(value); trimmed != "" {
-			style.CounterIncrement = trimmed
-		}
+		setTrimmedStyleValue(&style.CounterIncrement, value)
 	case "list-style-image":
 		applyListStyleImageValue(style, value)
 	case propContent:
@@ -389,6 +391,20 @@ func applyGeneratedContentProps(style *ResolvedStyle, prop, value string) bool {
 	}
 
 	return true
+}
+
+func applyQuotesValue(style *ResolvedStyle, value string) {
+	style.QuotesRaw = value
+	if openQuote, closeQuote, parsed := parseQuotesPair(value); parsed {
+		style.QuotesOpen = openQuote
+		style.QuotesClose = closeQuote
+	}
+}
+
+func setTrimmedStyleValue(dst *string, value string) {
+	if trimmed := strings.TrimSpace(value); trimmed != "" {
+		*dst = trimmed
+	}
 }
 
 // applyListStyleImageValue stores the first url(...) from list-style-image or

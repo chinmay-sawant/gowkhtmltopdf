@@ -12,14 +12,25 @@ import (
 )
 
 func (e *engine) emitBorders(sty ResolvedStyle, posX, posY, boxW, boxH float64) {
-	e.emitBorderLine(posX, posY, boxW, 0, e.scalePt(borderPaint(sty.BorderTop)), sty.BorderTop.Style,
-		sty.BorderTop.Color[0], sty.BorderTop.Color[1], sty.BorderTop.Color[2])
-	e.emitBorderLine(posX+boxW, posY, 0, boxH, e.scalePt(borderPaint(sty.BorderRight)), sty.BorderRight.Style,
-		sty.BorderRight.Color[0], sty.BorderRight.Color[1], sty.BorderRight.Color[2])
-	e.emitBorderLine(posX, posY+boxH, boxW, 0, e.scalePt(borderPaint(sty.BorderBottom)), sty.BorderBottom.Style,
-		sty.BorderBottom.Color[0], sty.BorderBottom.Color[1], sty.BorderBottom.Color[2])
-	e.emitBorderLine(posX, posY, 0, boxH, e.scalePt(borderPaint(sty.BorderLeft)), sty.BorderLeft.Style,
-		sty.BorderLeft.Color[0], sty.BorderLeft.Color[1], sty.BorderLeft.Color[2])
+	if !sty.BorderTop.Transparent {
+		e.emitBorderLine(posX, posY, boxW, 0, e.scalePt(borderPaint(sty.BorderTop)), sty.BorderTop.Style,
+			sty.BorderTop.Color[0], sty.BorderTop.Color[1], sty.BorderTop.Color[2])
+	}
+
+	if !sty.BorderRight.Transparent {
+		e.emitBorderLine(posX+boxW, posY, 0, boxH, e.scalePt(borderPaint(sty.BorderRight)), sty.BorderRight.Style,
+			sty.BorderRight.Color[0], sty.BorderRight.Color[1], sty.BorderRight.Color[2])
+	}
+
+	if !sty.BorderBottom.Transparent {
+		e.emitBorderLine(posX, posY+boxH, boxW, 0, e.scalePt(borderPaint(sty.BorderBottom)), sty.BorderBottom.Style,
+			sty.BorderBottom.Color[0], sty.BorderBottom.Color[1], sty.BorderBottom.Color[2])
+	}
+
+	if !sty.BorderLeft.Transparent {
+		e.emitBorderLine(posX, posY, 0, boxH, e.scalePt(borderPaint(sty.BorderLeft)), sty.BorderLeft.Style,
+			sty.BorderLeft.Color[0], sty.BorderLeft.Color[1], sty.BorderLeft.Color[2])
+	}
 }
 
 // --- replaced elements ---
@@ -51,6 +62,8 @@ func (e *engine) imageContainingWidth() float64 {
 // finally max constraints while preserving the intrinsic aspect ratio for a
 // one-dimensional constraint. The same helper is used by block, inline,
 // float, and table intrinsic measurement paths.
+//
+//nolint:cyclop // image sizing applies ordered intrinsic, attribute, CSS, and max rules
 func (e *engine) usedImageSize(
 	node *html.Node, style ResolvedStyle, ref *imageRef,
 ) imageUsedSize {
@@ -93,6 +106,16 @@ func (e *engine) usedImageSize(
 	}
 
 	size = applyImageCSSRatio(size, cssW, cssH, ref)
+
+	if style.AspectRatio > 0 {
+		switch {
+		case cssW && !cssH:
+			size.h = size.w / style.AspectRatio
+		case cssH && !cssW:
+			size.w = size.h * style.AspectRatio
+		}
+	}
+
 	size = clampImageWidth(size, e.imageMaxWidth(style, cssW))
 	size = clampImageHeight(e, size, style)
 
@@ -445,12 +468,15 @@ func (e *engine) paintReplacedImage(
 		isJPEG = false
 	}
 
+	intrinsicW, intrinsicH := replacedIntrinsicPt(e, sty, boxNode.img)
+	fitX, fitY, fitW, fitH := applyObjectFitToPaint(sty, imgX, imgY, imgW, imgH, intrinsicW, intrinsicH)
+
 	e.add((Op{ //nolint:exhaustruct // intentional zero fields
 		Kind:   OpImage,
-		X:      imgX,
-		Y:      imgY,
-		W:      imgW,
-		H:      imgH,
+		X:      fitX,
+		Y:      fitY,
+		W:      fitW,
+		H:      fitH,
 		IsJPEG: isJPEG,
 	}).withImage(imgData, boxNode.img.w, boxNode.img.h, alt))
 
@@ -468,7 +494,7 @@ func (e *engine) paintReplacedImage(
 // figure frame; emitting them again doubles the rails.
 func (e *engine) emitThumbImageBottomSeparator(sty ResolvedStyle, posX, posY, width, height float64) {
 	bottom := sty.BorderBottom
-	if borderPaint(bottom) <= 0 || bottom.Style == cssDisplayNone {
+	if borderPaint(bottom) <= 0 || bottom.Style == cssDisplayNone || bottom.Transparent {
 		return
 	}
 

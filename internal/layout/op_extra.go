@@ -21,6 +21,14 @@ type opExtra struct {
 	StructElem    *pdf.StructElem
 	TextTransform string
 	TextLanguage  string
+	TextAutospace string
+	// FontFeatures is the canonical OpenType feature list string built from
+	// font-feature-settings / font-kerning / font-variant-* for the shaper.
+	FontFeatures string
+	NoFakeBold   bool
+	// IsOutline marks CSS outline operations, which paint above descendant
+	// content even though ordinary backgrounds and borders paint below it.
+	IsOutline bool
 	// BlendGroup is the owning CSS element group (mix-blend-mode or
 	// isolation: isolate). GroupMark flags begin/end boundary markers that
 	// carry the group without painting.
@@ -54,6 +62,14 @@ func (op *Op) bindEmptyExtra() {
 	if op.opExtra == nil {
 		op.opExtra = emptyExtra
 	}
+}
+
+func (op *Op) setOutline() {
+	op.detachExtra().IsOutline = true
+}
+
+func (op *Op) isOutline() bool {
+	return op != nil && op.opExtra != nil && op.opExtra.IsOutline
 }
 
 // BindEmptyExtra points a nil extra at the shared zero extra so readers in
@@ -103,6 +119,28 @@ func (op Op) TextLanguage() string {
 	}
 
 	return op.opExtra.TextLanguage
+}
+
+// SetFontFeatures writes the OpenType feature list string for shaping.
+func (op *Op) SetFontFeatures(value string) { op.setFontFeatures(value) }
+
+// FontFeatures returns the op's OpenType feature settings string, or "" when
+// the op carries none.
+func (op Op) FontFeatures() string {
+	if op.opExtra == nil {
+		return ""
+	}
+
+	return op.opExtra.FontFeatures
+}
+
+// TextAutospace returns the text-autospace value carried by a text op.
+func (op Op) TextAutospace() string {
+	if op.opExtra == nil {
+		return ""
+	}
+
+	return op.opExtra.TextAutospace
 }
 
 // SetPaintOpacity writes element opacity, allocating a unique extra if needed.
@@ -167,6 +205,20 @@ func (op *Op) setTextLanguage(value string) {
 	}
 
 	op.detachExtra().TextLanguage = value
+}
+
+func (op *Op) setFontFeatures(value string) {
+	if value == "" {
+		if op.opExtra == nil || op.opExtra == emptyExtra {
+			return
+		}
+
+		op.detachExtra().FontFeatures = ""
+
+		return
+	}
+
+	op.detachExtra().FontFeatures = value
 }
 
 func (op *Op) setPaintOpacity(value float64) {
@@ -258,6 +310,59 @@ func (op Op) withTextLanguage(value string) Op {
 	op.opExtra = extra
 
 	return op
+}
+
+func (op Op) withFontFeatures(value string) Op {
+	if value == "" {
+		return op
+	}
+
+	extra := op.detachedExtraCopy()
+	extra.FontFeatures = value
+	op.opExtra = extra
+
+	return op
+}
+
+func (op Op) withTextAutospace(value string) Op {
+	if value == "" || value == textAutospaceNone {
+		return op
+	}
+
+	extra := op.detachedExtraCopy()
+	extra.TextAutospace = value
+	op.opExtra = extra
+
+	return op
+}
+
+// decorateTextOp attaches language, OpenType features, and synthesis gates
+// shared by every OpText emit site.
+func decorateTextOp(paintOp Op, sty *ResolvedStyle) Op {
+	if sty == nil {
+		return paintOp
+	}
+
+	paintOp = paintOp.withTextTransform(sty.TextTransform).
+		withTextLanguage(fontShapingLanguage(sty)).
+		withFontFeatures(fontShapingFeatureSettings(sty)).
+		withTextAutospace(sty.TextAutospace)
+
+	if textOpDisablesFakeBold(sty) {
+		paintOp.detachExtra().NoFakeBold = true
+	}
+
+	if needsFakeOblique(sty, paintOp.Font) {
+		paintOp.FakeOblique = true
+	}
+
+	if r, g, b, ok := fontPaletteFill(sty, paintOp.Font); ok {
+		paintOp.R, paintOp.G, paintOp.B = r, g, b
+	} else if r, g, b, ok := fontVariantEmojiFill(sty, paintOp.Text); ok {
+		paintOp.R, paintOp.G, paintOp.B = r, g, b
+	}
+
+	return paintOp
 }
 
 func cloneOpExtra(src *opExtra) *opExtra {

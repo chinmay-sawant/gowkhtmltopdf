@@ -1,0 +1,45 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Wrapping across axes and directions</title>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .fixture-label { font-size: 1pt; line-height: 1pt; }
+    .flexbox {
+      position: relative;
+      transform: translateY(56pt);
+      display: flex;
+      width: 60pt;
+      flex-flow: row wrap-reverse;
+      align-content: flex-start;
+      direction: ltr;
+      writing-mode: horizontal-tb;
+      background: #ddd;
+    }
+    .flexbox > * { flex: 1 0 25pt; }
+    .child-1 { height: 5pt; background: #0f0; }
+    .child-2 { height: 10pt; background: #0d0; }
+    .child-3 { height: 5pt; background: #090; }
+    .child-4 { flex-basis: 70pt; height: 20pt; background: #060; }
+    .child-5 { flex-basis: 5pt; height: 10pt; background: #030; }
+  </style>
+</head>
+<body>
+  <!-- Source: chromium/third_party/blink/web_tests/css3/flexbox/multiline.html -->
+  <!-- Manifest source: third_party/blink/web_tests/css3/flexbox/multiline.html -->
+  <!-- Port status: completed. Row wrap-reverse geometry and overflow placement pass the focused layout assertions. -->
+  <!-- Expected: five children form four lines with cross sizes 10, 5, 20, and 10pt. -->
+  <p class="case-description" style="position:absolute;top:12pt;left:12pt;margin:0;padding:6pt;border:1pt solid #64748b;background:#fff;color:#111827;font-size:9pt;line-height:12pt;width:560pt;">
+    <strong>Case 11 expected behavior:</strong> wrap-reverse forms four lines with cross sizes 10pt, 5pt, 20pt, and 10pt. Cross-end placement and negative main-axis overflow match the focused layout assertions.
+  </p>
+  <div class="fixture-label">legacy-multiline</div>
+  <div class="flexbox" id="case-11">
+    <div class="child-1"></div>
+    <div class="child-2"></div>
+    <div class="child-3"></div>
+    <div class="child-4"></div>
+    <div class="child-5"></div>
+  </div>
+</body>
+</html>

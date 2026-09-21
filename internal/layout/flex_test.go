@@ -512,6 +512,45 @@ func TestFlexAlignSelf(t *testing.T) {
 	}
 }
 
+func TestFlexColumnAlignItemsCenterShrinksAutoItems(t *testing.T) {
+	t.Parallel()
+
+	cssSheet := sheet(t, `
+  #header-area {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+`)
+	res := layoutHTML(t, `<html><head><title>Test</title></head><body>
+  <div id="header-area">
+    <div id="header-title">Test Header</div>
+    <div id="header-subtitle">Test Subheader</div>
+  </div>
+</body></html>`, cssSheet)
+
+	header := findBox(t, res, "div")
+	if len(header.children) != 2 {
+		t.Fatalf("header children = %d, want 2", len(header.children))
+	}
+
+	for _, child := range header.children {
+		if child.x <= header.x+layoutEpsilon {
+			t.Fatalf("centered flex child x=%.1f, header x=%.1f, want child shifted right", child.x, header.x)
+		}
+
+		if child.w >= header.w-layoutEpsilon {
+			t.Fatalf("centered flex child width=%.1f, header width=%.1f, want auto-sized child", child.w, header.w)
+		}
+
+		wantX := header.x + (header.w-child.w)/2
+		if !near(child.x, wantX) {
+			t.Fatalf("centered flex child x=%.2f, want %.2f within header x=%.2f width=%.2f", child.x, wantX, header.x, header.w)
+		}
+	}
+}
+
 // TestFlexAlignItemsStretchRow matches fixture-33 definite row: container
 // height 36pt, items flex-basis 50% with auto height → stretch to line cross size.
 func TestFlexAlignItemsStretchRow(t *testing.T) { //nolint:cyclop

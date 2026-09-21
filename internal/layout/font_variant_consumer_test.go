@@ -4,6 +4,8 @@ package layout
 import (
 	"bytes"
 	"encoding/binary"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
@@ -87,17 +89,9 @@ func TestResolveFontVariantsStaticBundledFaces(t *testing.T) {
 	}
 }
 
-// TestResolveFontVariantsCapableFaceDoesNotFakeInstancing proves the
-// capability probe sees a variable/palette-capable face and that the consumer
-// still resolves to the default instance instead of pretending.
-//
-// Variable instancing is not reachable in this package version: go-text
-// v0.3.4 exposes font.Face.SetVariations, but pdf.Font embeds default-instance
-// glyf outlines, its advances come from the raw hmtx table, and nothing in
-// internal/pdf applies variation coordinates while shaping or subsetting.
-// Shaping with coordinates the emitted PDF does not embed would desync
-// glyphs from advances, so the default instance is the deliberate outcome and
-// the gap is reported instead.
+// TestResolveFontVariantsCapableFaceDoesNotFakeInstancing proves a directory
+// that only *looks* like fvar/COLR (renamed tags, no real payloads) still
+// resolves to the default face. Real instancing requires a parseable fvar.
 func TestResolveFontVariantsCapableFaceDoesNotFakeInstancing(t *testing.T) {
 	t.Parallel()
 
@@ -132,8 +126,144 @@ func TestResolveFontVariantsCapableFaceDoesNotFakeInstancing(t *testing.T) {
 	style.FontPalette = fontPaletteDark
 
 	if got := eng.lookupFaceFor(&style); got != capable {
-		t.Fatalf("capable face lookup = %p, want default instance %p", got, capable)
+		t.Fatalf("renamed-tag face lookup = %p, want default instance %p", got, capable)
 	}
+}
+
+func loadGowkVar(t *testing.T) *pdf.Font {
+	t.Helper()
+
+	path := filepath.Join("..", "..", "testdata", "fonts", "implemented-audit", "GowkVar-VF.ttf")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read GowkVar-VF: %v", err)
+	}
+
+	face, err := pdf.ParseTTF(data)
+	if err != nil {
+		t.Fatalf("ParseTTF GowkVar: %v", err)
+	}
+
+	return face
+}
+
+func gowkVarEngine(t *testing.T) (*engine, *pdf.Font) {
+	t.Helper()
+
+	face := loadGowkVar(t)
+	registry := pdf.NewRegistry()
+	registry.AddFamilyAlias("Gowk Var", face)
+
+	return &engine{font: face, registry: registry, scale: 1}, face
+}
+
+func TestVariationSettingsChangesAdvance(t *testing.T) {
+	t.Parallel()
+
+	eng, base := gowkVarEngine(t)
+	defAdv := base.Advance('A')
+
+	style := initialStyle()
+	style.FontFamily = []string{"Gowk Var"}
+	style.FontVariationSettings = `"wght" 900`
+	style.FontOpticalSizing = fontOpticalNone
+
+	got := eng.lookupFaceFor(&style)
+	if got == nil || got == base {
+		t.Fatal("wght 900 resolved to the default instance")
+	}
+
+	if adv := got.Advance('A'); adv <= defAdv {
+		t.Fatalf("wght 900 advance = %g, want > default %g", adv, defAdv)
+	}
+
+	if outlineWidth(got.GlyphContours('A')) <= outlineWidth(base.GlyphContours('A')) {
+		t.Fatal("wght 900 outline is not wider than the default instance")
+	}
+}
+
+func TestOpticalSizingAutoSetsOpsz(t *testing.T) {
+	t.Parallel()
+
+	eng, base := gowkVarEngine(t)
+	defAdv := base.Advance('A')
+
+	style := initialStyle()
+	style.FontFamily = []string{"Gowk Var"}
+	style.FontOpticalSizing = fontOpticalAuto
+	style.FontSize = 72
+	style.FontVariationSettings = fontVariantNormal
+
+	got := eng.lookupFaceFor(&style)
+	if got == nil || got == base {
+		t.Fatal("optical-sizing:auto at 72pt resolved to the default instance")
+	}
+
+	if adv := got.Advance('A'); adv <= defAdv {
+		t.Fatalf("opsz 72 advance = %g, want > default %g", adv, defAdv)
+	}
+}
+
+func TestOpticalSizingNoneKeepsDefaultOpsz(t *testing.T) {
+	t.Parallel()
+
+	eng, base := gowkVarEngine(t)
+
+	style := initialStyle()
+	style.FontFamily = []string{"Gowk Var"}
+	style.FontOpticalSizing = fontOpticalNone
+	style.FontSize = 72
+	style.FontVariationSettings = fontVariantNormal
+
+	if got := eng.lookupFaceFor(&style); got != base {
+		t.Fatalf("optical-sizing:none at 72pt = %p, want default %p", got, base)
+	}
+}
+
+func TestResolveFontVariantsInstancesAxes(t *testing.T) {
+	t.Parallel()
+
+	eng, base := gowkVarEngine(t)
+
+	style := initialStyle()
+	style.FontFamily = []string{"Gowk Var"}
+	style.FontVariationSettings = `"wght" 700, "wdth" 200`
+	style.FontOpticalSizing = fontOpticalNone
+
+	got := resolveFontVariants(&style, base)
+	if got == base {
+		t.Fatal("resolveFontVariants kept the default instance")
+	}
+
+	if got.Advance('A') <= base.Advance('A') {
+		t.Fatalf("instanced advance %g, want > default %g", got.Advance('A'), base.Advance('A'))
+	}
+
+	same := eng.lookupFaceFor(&style)
+	if same.Advance('A') != got.Advance('A') {
+		t.Fatalf("lookupFaceFor advance %g, want instanced %g", same.Advance('A'), got.Advance('A'))
+	}
+}
+
+func outlineWidth(contours [][]pdf.GlyphPoint) float64 {
+	if len(contours) == 0 || len(contours[0]) == 0 {
+		return 0
+	}
+
+	minX, maxX := contours[0][0].X, contours[0][0].X
+	for _, contour := range contours {
+		for _, p := range contour {
+			if p.X < minX {
+				minX = p.X
+			}
+
+			if p.X > maxX {
+				maxX = p.X
+			}
+		}
+	}
+
+	return maxX - minX
 }
 
 // renameSFNTTables rewrites matching table directory tags to the requested
