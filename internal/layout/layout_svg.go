@@ -214,19 +214,37 @@ func cssColorHex(c [3]float64) string {
 		bl = 255
 	}
 
-	return fmt.Sprintf("#%02x%02x%02x", r, g, bl)
+	var buf [7]byte
+
+	out := append(buf[:0], '#')
+	out = appendHexByte(out, byte(r))
+	out = appendHexByte(out, byte(g))
+	out = appendHexByte(out, byte(bl))
+
+	return string(out)
 }
 
-func escapeXML(s string) string {
-	replacer := strings.NewReplacer(
-		`&`, "&amp;",
-		`<`, "&lt;",
-		`>`, "&gt;",
-		`"`, "&quot;",
-		`'`, "&apos;",
-	)
+// appendHexByte appends b as a zero-padded 2-digit lowercase hex number.
+func appendHexByte(dst []byte, b byte) []byte {
+	const hexDigits = "0123456789abcdef"
 
-	return replacer.Replace(s)
+	return append(dst, hexDigits[b>>4], hexDigits[b&0x0F])
+}
+
+// xmlEscaper escapes the five predefined XML entities. It is package level
+// because escapeXML runs once per serialized SVG node.
+//
+//nolint:gochecknoglobals // immutable escaper, safe to share
+var xmlEscaper = strings.NewReplacer(
+	`&`, "&amp;",
+	`<`, "&lt;",
+	`>`, "&gt;",
+	`"`, "&quot;",
+	`'`, "&apos;",
+)
+
+func escapeXML(s string) string {
+	return xmlEscaper.Replace(s)
 }
 
 // collectInlineSVGItem flattens an inline <svg> into one replaced inline item.

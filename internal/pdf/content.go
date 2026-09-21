@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"maps"
-	"sort"
 	"strconv"
 	"strings"
 )
@@ -770,6 +769,13 @@ func appendHex4(dst []byte, rVal rune) []byte {
 	)
 }
 
+// appendHex2 appends b as a zero-padded 2-digit uppercase hex number.
+func appendHex2(dst []byte, b byte) []byte {
+	const hexDigits = "0123456789ABCDEF"
+
+	return append(dst, hexDigits[b>>nibbleShift], hexDigits[b&nibbleMask])
+}
+
 // textShowSimple appends str as a Latin-1 literal string, folding and
 // escaping in the same pass that records the used runes for subsetting.
 func (c *Content) textShowSimple(str string) {
@@ -903,39 +909,59 @@ func (c *Content) imageResources() map[string]string {
 	return c.imageUses
 }
 
+// extGStateHint is the starting capacity for one page's ExtGState dict.
+const extGStateHint = 64
+
 // extGState returns the ExtGState dict for the page resources ("" when none).
 //
 //nolint:wsl // resource sorting and serialization stay together for deterministic output
 func (c *Content) extGState() string {
-	entries := make([]string, 0, len(c.blendUses)+1)
-	if c.opacity > 0 {
-		entries = append(entries, fmt.Sprintf("/opacity << /CA %s /ca %s >>", num(c.opacity), num(c.opacity)))
-	}
-
-	resources := make([]string, 0, len(c.blendUses))
-	for resourceName := range c.blendUses {
-		resources = append(resources, resourceName)
-	}
-	sort.Strings(resources)
-	for _, resourceName := range resources {
-		entries = append(entries, fmt.Sprintf("/%s << /BM /%s >>", resourceName, c.blendUses[resourceName]))
-	}
-
-	alphaNames := make([]string, 0, len(c.alphaUses))
-	for resourceName := range c.alphaUses {
-		alphaNames = append(alphaNames, resourceName)
-	}
-	sort.Strings(alphaNames)
-	for _, resourceName := range alphaNames {
-		alpha := c.alphaUses[resourceName]
-		entries = append(entries, fmt.Sprintf("/%s << /CA %s /ca %s >>", resourceName, num(alpha), num(alpha)))
-	}
-
-	if len(entries) == 0 {
+	if c.opacity <= 0 && len(c.blendUses) == 0 && len(c.alphaUses) == 0 {
 		return ""
 	}
 
-	return "/ExtGState << " + strings.Join(entries, " ") + " >>"
+	out := make([]byte, 0, extGStateHint)
+	out = append(out, "/ExtGState << "...)
+	sep := ""
+
+	if c.opacity > 0 {
+		out = append(out, sep...)
+		sep = " "
+		out = append(out, "/opacity << /CA "...)
+		out = appendPDFNum(out, c.opacity)
+		out = append(out, " /ca "...)
+		out = appendPDFNum(out, c.opacity)
+		out = append(out, " >>"...)
+	}
+
+	resources := sortedStringKeys(c.blendUses)
+	for _, resourceName := range resources {
+		out = append(out, sep...)
+		sep = " "
+		out = append(out, '/')
+		out = append(out, resourceName...)
+		out = append(out, " << /BM /"...)
+		out = append(out, c.blendUses[resourceName]...)
+		out = append(out, " >>"...)
+	}
+
+	alphaNames := sortedStringKeys(c.alphaUses)
+	for _, resourceName := range alphaNames {
+		alpha := c.alphaUses[resourceName]
+		out = append(out, sep...)
+		sep = " "
+		out = append(out, '/')
+		out = append(out, resourceName...)
+		out = append(out, " << /CA "...)
+		out = appendPDFNum(out, alpha)
+		out = append(out, " /ca "...)
+		out = appendPDFNum(out, alpha)
+		out = append(out, " >>"...)
+	}
+
+	out = append(out, " >>"...)
+
+	return string(out)
 }
 
 // BeginMarkedContent begins a marked-content sequence with a structure tag and MCID.

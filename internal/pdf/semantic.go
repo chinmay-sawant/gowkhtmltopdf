@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 var (
@@ -23,6 +24,40 @@ var (
 		`(?s)(\((?:\\.|[^\\)])*\))\s*Tj|<([0-9A-Fa-f]*)>\s*Tj|/([A-Za-z][A-Za-z0-9_]*)\s+Do`,
 	)
 	semanticDestRE = regexp.MustCompile(`/Dest\s*\[\s*(\d+)\s+0\s+R`)
+)
+
+// dynamicRE caches a regexp compiled from a dictionary key plus a fixed
+// suffix. The semantic helpers see a small, stable vocabulary of keys but run
+// once per object per parse, so recompiling the pattern per call dominated.
+type dynamicRE struct {
+	suffix string
+	cache  sync.Map
+}
+
+func (d *dynamicRE) forKey(key string) (*regexp.Regexp, error) {
+	if cached, ok := d.cache.Load(key); ok {
+		compiled, _ := cached.(*regexp.Regexp)
+
+		return compiled, nil
+	}
+
+	compiled, err := regexp.Compile(regexp.QuoteMeta(key) + d.suffix)
+	if err != nil {
+		return nil, fmt.Errorf("compile dynamic pattern for %s: %w", key, err)
+	}
+
+	d.cache.Store(key, compiled)
+
+	return compiled, nil
+}
+
+//nolint:gochecknoglobals // read-mostly caches keyed by a bounded key vocabulary
+var (
+	refRE         = dynamicRE{suffix: `\s+(\d+)\s+0\s+R`, cache: sync.Map{}}
+	refArrayRE    = dynamicRE{suffix: `\s*\[([^\]]*)\]`, cache: sync.Map{}}
+	numberArrayRE = dynamicRE{suffix: `\s*\[([^\]]*)\]`, cache: sync.Map{}}
+	intRE         = dynamicRE{suffix: `\s+(\d+)`, cache: sync.Map{}}
+	literalRE     = dynamicRE{suffix: `\s+(\((?:\\.|[^\\)])*\))`, cache: sync.Map{}}
 )
 
 // SemanticDoc is a small, production-safe view of a PDF this package emits.
@@ -838,7 +873,7 @@ func requiredRef(dict, key string) (int, error) {
 }
 
 func optionalRef(dict, key string) (int, bool) {
-	pattern, err := regexp.Compile(regexp.QuoteMeta(key) + `\s+(\d+)\s+0\s+R`)
+	pattern, err := refRE.forKey(key)
 	if err != nil {
 		return 0, false
 	}
@@ -868,7 +903,7 @@ func requiredRefArray(dict, key string) ([]int, error) {
 }
 
 func optionalRefArray(dict, key string) ([]int, bool) {
-	pattern, err := regexp.Compile(regexp.QuoteMeta(key) + `\s*\[([^\]]*)\]`)
+	pattern, err := refArrayRE.forKey(key)
 	if err != nil {
 		return nil, false
 	}
@@ -894,7 +929,7 @@ func optionalRefArray(dict, key string) ([]int, bool) {
 }
 
 func requiredNumberArray(dict, key string, want int) ([]float64, error) {
-	pattern, err := regexp.Compile(regexp.QuoteMeta(key) + `\s*\[([^\]]*)\]`)
+	pattern, err := numberArrayRE.forKey(key)
 	if err != nil {
 		return nil, fmt.Errorf("compile pattern for %s: %w", key, err)
 	}
@@ -927,7 +962,7 @@ func requiredNumberArray(dict, key string, want int) ([]float64, error) {
 }
 
 func requiredInt(dict, key string) (int, error) {
-	pattern, err := regexp.Compile(regexp.QuoteMeta(key) + `\s+(\d+)`)
+	pattern, err := intRE.forKey(key)
 	if err != nil {
 		return 0, fmt.Errorf("compile pattern for %s: %w", key, err)
 	}
@@ -949,7 +984,7 @@ func requiredInt(dict, key string) (int, error) {
 }
 
 func optionalLiteral(dict, key string) (string, bool) {
-	pattern, err := regexp.Compile(regexp.QuoteMeta(key) + `\s+(\((?:\\.|[^\\)])*\))`)
+	pattern, err := literalRE.forKey(key)
 	if err != nil {
 		return "", false
 	}

@@ -171,7 +171,7 @@ func (d *Document) emitType0(fnt *Font, sub *subsetResult, pdfName string, _ obj
 	type0Ref := d.newObject()
 	mapRef := d.newObject()
 
-	cidMap, wParts := buildCIDMap(sub, fnt.UnitsPerEm())
+	cidMap, wArray := buildCIDMap(sub, fnt.UnitsPerEm())
 
 	mapRaw := cidMap // keep uncompressed; some viewers mishandle Flate CIDToGIDMap
 	d.setDict(mapRef, dict{}.add("/Length", strconv.Itoa(len(mapRaw))).String())
@@ -183,7 +183,7 @@ func (d *Document) emitType0(fnt *Font, sub *subsetResult, pdfName string, _ obj
 		add("/CIDSystemInfo", "<< /Registry (Adobe) /Ordering (Identity) /Supplement 0 >>").
 		add("/FontDescriptor", descRef.String()).
 		add("/DW", "500").
-		add("/W", "["+strings.Join(wParts, " ")+"]").
+		add("/W", "["+wArray+"]").
 		add("/CIDToGIDMap", mapRef.String()).String())
 
 	d.setDict(type0Ref, dict{}.add("/Type", "/Font").
@@ -196,8 +196,9 @@ func (d *Document) emitType0(fnt *Font, sub *subsetResult, pdfName string, _ obj
 	return type0Ref
 }
 
-// buildCIDMap renders the CIDToGIDMap bytes and the sorted /W width runs.
-func buildCIDMap(sub *subsetResult, unitsPerEm int16) ([]byte, []string) {
+// buildCIDMap renders the CIDToGIDMap bytes and the sorted /W width runs,
+// already space-joined so the caller does not rebuild the array string.
+func buildCIDMap(sub *subsetResult, unitsPerEm int16) ([]byte, string) {
 	// CIDToGIDMap: 2 bytes per CID from 0..maxCID.
 	maxCID := 0
 	for r := range sub.glyphIDs {
@@ -208,8 +209,6 @@ func buildCIDMap(sub *subsetResult, unitsPerEm int16) ([]byte, []string) {
 
 	cidMap := make([]byte, (maxCID+1)*cidBytesPerEntry)
 	wspace := widthsInEm(sub, unitsPerEm)
-
-	wParts := make([]string, 0, len(sub.glyphIDs))
 
 	type rw struct {
 		r rune
@@ -232,9 +231,21 @@ func buildCIDMap(sub *subsetResult, unitsPerEm int16) ([]byte, []string) {
 
 	sort.Slice(rows, func(i, j int) bool { return rows[i].r < rows[j].r })
 
-	for _, row := range rows {
-		wParts = append(wParts, fmt.Sprintf("%d [%s]", row.r, num(row.w)))
+	// wArrayRowHint covers one "<cid> [<width>]" row plus its separator.
+	const wArrayRowHint = 16
+
+	wArray := make([]byte, 0, len(rows)*wArrayRowHint)
+
+	for i, row := range rows {
+		if i > 0 {
+			wArray = append(wArray, ' ')
+		}
+
+		wArray = strconv.AppendInt(wArray, int64(row.r), pdfNumBase)
+		wArray = append(wArray, " ["...)
+		wArray = appendPDFNum(wArray, row.w)
+		wArray = append(wArray, ']')
 	}
 
-	return cidMap, wParts
+	return cidMap, string(wArray)
 }

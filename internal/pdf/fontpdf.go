@@ -98,38 +98,26 @@ func (d *Document) ensureToUnicode(sub *subsetResult, codeBytes int) objRef {
 	if codeBytes >= codeBytesTwo {
 		buf.WriteString("<0000> <FFFF>\n")
 	} else {
-		fmt.Fprintf(&buf, "<%02X> <%02X>\n", byte(0), byte(maxLatin1Code))
+		var rangeLine [16]byte
+
+		line := append(rangeLine[:0], '<')
+		line = appendHex2(line, 0)
+		line = append(line, '>', ' ', '<')
+		line = appendHex2(line, byte(maxLatin1Code))
+		line = append(line, '>', '\n')
+		buf.Write(line)
 	}
 
 	buf.WriteString("endcodespacerange\n")
-	// code → unicode (code == rune for both simple Latin-1 and Identity-H CIDs)
-	type m struct{ code, r rune }
 
-	maps := make([]m, 0, len(sub.glyphIDs))
+	// code → unicode (code == rune for both simple Latin-1 and Identity-H CIDs)
+	maps := make([]unicodeMapEntry, 0, len(sub.glyphIDs))
 	for r := range sub.glyphIDs {
-		maps = append(maps, m{code: r, r: r})
+		maps = append(maps, unicodeMapEntry{code: r, r: r})
 	}
 
 	sort.Slice(maps, func(a, b int) bool { return maps[a].code < maps[b].code })
-
-	for start := 0; start < len(maps); start += 100 {
-		end := start + cidToGIDChunk
-		if end > len(maps) {
-			end = len(maps)
-		}
-
-		fmt.Fprintf(&buf, "%d beginbfchar\n", end-start)
-
-		for _, mm := range maps[start:end] {
-			if codeBytes >= codeBytesTwo {
-				fmt.Fprintf(&buf, "<%04X> <%04X>\n", mm.code, mm.r)
-			} else {
-				fmt.Fprintf(&buf, "<%02X> <%04X>\n", mm.code, mm.r)
-			}
-		}
-
-		buf.WriteString("endbfchar\n")
-	}
+	buf.Write(appendBfcharSection(nil, maps, codeBytes))
 
 	buf.WriteString("endcmap\n")
 	buf.WriteString("/CMapName currentdict /CMap defineresource pop\n")
@@ -138,6 +126,48 @@ func (d *Document) ensureToUnicode(sub *subsetResult, codeBytes int) objRef {
 	d.setStream(ref, []byte(buf.String()))
 
 	return ref
+}
+
+// unicodeMapEntry is one code-to-Unicode mapping in the ToUnicode CMap.
+type unicodeMapEntry struct{ code, r rune }
+
+// bfcharLineMax bounds one "<0000> <0000>\n" mapping line; the chunk overhead
+// covers the "N beginbfchar\n" header and the "endbfchar\n" footer.
+const (
+	bfcharLineMax       = 14
+	bfcharChunkOverhead = 32
+)
+
+// appendBfcharSection appends the bfchar chunks for maps in code order.
+func appendBfcharSection(dst []byte, maps []unicodeMapEntry, codeBytes int) []byte {
+	for start := 0; start < len(maps); start += cidToGIDChunk {
+		end := start + cidToGIDChunk
+		if end > len(maps) {
+			end = len(maps)
+		}
+
+		chunk := make([]byte, 0, (end-start)*bfcharLineMax+bfcharChunkOverhead)
+		chunk = strconv.AppendInt(chunk, int64(end-start), pdfNumBase)
+		chunk = append(chunk, " beginbfchar\n"...)
+
+		for _, entry := range maps[start:end] {
+			chunk = append(chunk, '<')
+			if codeBytes >= codeBytesTwo {
+				chunk = appendHex4(chunk, entry.code)
+			} else {
+				chunk = appendHex2(chunk, byte(entry.code))
+			}
+
+			chunk = append(chunk, '>', ' ', '<')
+			chunk = appendHex4(chunk, entry.r)
+			chunk = append(chunk, '>', '\n')
+		}
+
+		chunk = append(chunk, "endbfchar\n"...)
+		dst = append(dst, chunk...)
+	}
+
+	return dst
 }
 
 // runesKey builds a stable cache key for a rune set. It sorts used in place;
