@@ -22,7 +22,7 @@ func calculateChromeInkBottom(res *Result, boxNode *box, oldBottom float64, owne
 		// shift can leave the rule away from the box edge, opOwnedBy then
 		// fails, and the rule would inflate the box height below its content.
 		if opOwnedBy(&operation, boxNode, opOwnerChrome) || operation.Positioned ||
-			ownFrameRuleShape(&operation, boxNode) {
+			ownFrameRuleShape(&operation, boxNode) || foreignFrameRail(&operation, boxNode) {
 			continue
 		}
 
@@ -73,9 +73,32 @@ func ownFrameRuleShape(operation *Op, boxNode *box) bool {
 	return topBorder || bottomBorder
 }
 
+// foreignFrameRail reports a vertical rail that runs on this box's own left or
+// right edge but lies wholly outside the box's vertical span. The rail cannot
+// be this box's content ink; it is another box's frame chrome that a widened
+// op range swept in (fixture-33: transformed rows splice their chrome early,
+// so unionChildOpRanges covers the later siblings' rails).
+func foreignFrameRail(operation *Op, boxNode *box) bool {
+	if operation == nil || boxNode == nil || !opIsVerticalSide(operation) || operation.H <= 0 {
+		return false
+	}
+
+	onLeft := nearLayout(operation.X, boxNode.x)
+	onRight := nearLayout(operation.X, boxNode.x+boxNode.w)
+	if !onLeft && !onRight {
+		return false
+	}
+
+	tol := opOwnerTolerance(opOwnerChrome)
+
+	return operation.Y > boxNode.y+boxNode.height+tol || operation.Y+operation.H < boxNode.y-tol
+}
+
 // frameRuleIndices returns the op indices of the box's full-width top and
 // bottom rules, if present. The highest rule is the top border, the lowest
-// the bottom border.
+// the bottom border. A rule outside the box's vertical span by more than the
+// bottom-match slack is another box's frame chrome in a widened op range,
+// never this box's own edge (fixture-33).
 func frameRuleIndices(ops []Op, boxNode *box, owners map[int]*box) (int, int) {
 	topIdx, bottomIdx := -1, -1
 	topY, bottomY := math.Inf(1), math.Inf(-1)
@@ -87,7 +110,9 @@ func frameRuleIndices(ops []Op, boxNode *box, owners map[int]*box) (int, int) {
 			continue
 		}
 
-		if !ownFrameRuleShape(&ops[idx], boxNode) {
+		if !ownFrameRuleShape(&ops[idx], boxNode) ||
+			ops[idx].Y < boxNode.y-boxBottomMatchSlack ||
+			ops[idx].Y > boxNode.y+boxNode.height+boxBottomMatchSlack {
 			continue
 		}
 
