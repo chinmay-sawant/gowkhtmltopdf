@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-quick test-serial test-race lint lint-frontend size-check build wasm wasm-test fmt golden golden-update samples samples-python screenshots weasyprint clean claim-scan bench bench-engine bench-lib bench-inprocess bench-cli-compare c-shared bindings-clean check-versions python-binding-test python-benchmarks python-api chrome-cases-pdf
+.PHONY: test test-unit test-quick test-serial test-race lint lint-frontend size-check build wasm wasm-test fmt golden golden-update samples samples-python screenshots weasyprint clean claim-scan bench bench-engine bench-lib bench-inprocess bench-cli-compare c-shared bindings-clean check-versions python-binding-test python-benchmarks python-api chrome-cases-pdf run reference-metrics
 # Pure-Go runtime: the standard library plus the allowlisted direct modules
 # below. No cgo, browser, or native converter process is required.
 # Direct third-party requires must stay ⊆ {
@@ -240,6 +240,25 @@ chrome-cases-pdf: build
 			-o "test/chrome/cases/pdf/$$name.pdf" "$$f" || exit 1; \
 	done
 	@echo "chrome cases: $$(ls test/chrome/cases/pdf/*.pdf | wc -l) PDFs written to test/chrome/cases/pdf/"
+
+# Wall-time smoke from skills/PR/PR_TEMPLATE.md: convert fixture-01 through
+# the built CLI and fail at or above 400ms. Soft ±50ms of a stored
+# reference is host noise on this WSL2 box (see skills/perf-patterns) and
+# is not a fail gate. The 400ms hard cap is the leftover goslop PR-template
+# number; fixture-01 is a 1-page invoice and sits far under it.
+RUN_HTML ?= testdata/golden/fixture-01-simple-invoice.html
+RUN_MAX_MS ?= 400
+run: build
+	bash scripts/run-walltime.sh "$(RUN_HTML)" "$(RUN_MAX_MS)" ./bin/gowkhtmltopdf
+
+# ParseSemantic hard metrics for the PR-template detector-surface row
+# (`make reference-metrics` / gopdfsuit hard metrics). Never existed in
+# this Makefile: the checklist was copied from goslop (commit 055afb7,
+# originally 33a329c). This target is the gowkhtmltopdf equivalent: page
+# envelope, /FontFile2, ordered needles, and logged font/image/URI counts
+# on fixture-01, fixture-29-wpt, and fixture-64.
+reference-metrics:
+	go test ./internal/convert -run '^TestReferenceMetrics$$' -count=1 -v
 
 # Regenerate the committed frontend showcase screenshots and WebP thumbnails
 # from the PDFs currently present in output/. Use `make samples` first when the

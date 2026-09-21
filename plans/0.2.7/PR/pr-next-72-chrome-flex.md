@@ -70,6 +70,7 @@ Measured on `BenchmarkChromeCasePDFs` (40 cases × 10 warm renders) at `e1ef59a`
 - `plans/0.2.7/` ledgers for next-72, next-100, and Chrome flex. `documentation/compatibility-matrix.md` gained next-72 rows and §5.5 Borders-4 deferrals.
 - Skills: `skills/chrome-debug-v2` (budgeted one-fixture Chrome-vs-Go PDF loop), `skills/perf-patterns` (measured Go hot-path catalog), `skills/chrome-flex-pdf-closure`, `skills/chrome-debug` kept as the long-form reference.
 - `make samples` regenerated `output/` including `output/fixture-64-next-72-props.pdf` and `output/fixture-29-wpt-break-nested-float-print.pdf` (`1c449b1`, `9fe9b51`, `1b6672d`).
+- `make run` and `make reference-metrics` added. The PR template listed both; they were never Makefile targets here. The rows were copied from goslop (`055afb7`). `make run` times fixture-01 through the CLI (hard < 400ms). `make reference-metrics` runs `TestReferenceMetrics` on fixture-01, fixture-29-wpt, and fixture-64.
 
 No `frontend/` or `docs/` files in the diff. No `go.mod` change. No Document / CLI / C ABI / Python stamp change.
 
@@ -122,7 +123,10 @@ Re-run on HEAD `1b6672d` (2026-09-21). Every listed gate exited 0.
 - [x] `go test ./internal/pdf -run 'TestFlateStateRetainedAcrossGC' -count=1` (exit 0, 0.007s)
 - [x] `go test ./internal/imageout -run TestRunRawHTMLColumnAlignItemsCenterPNG -count=1` (exit 0, 0.013s)
 
-`make run` wall-time and `make reference-metrics` were not part of this branch's gates and were not run.
+- [x] `make run` (exit 0, 12ms for fixture-01; hard cap 400ms)
+- [x] `make reference-metrics` (exit 0; added in this branch)
+
+`make run` and `make reference-metrics` were listed in `skills/PR/PR_TEMPLATE.md` but were never Makefile targets in this repo. The rows came from the goslop template (`055afb7`, originally `33a329c`). This branch adds the gowkhtmltopdf equivalents.
 
 ### Commands
 
@@ -132,6 +136,8 @@ make golden
 make lint
 make claim-scan
 make build
+make run
+make reference-metrics
 python3 scripts/css-catalog-map.py --check
 
 go test ./test/chrome -count=1
@@ -197,6 +203,11 @@ HEAD 1b6672d gates (2026-09-21, all exit 0):
   make test                          13s
   make golden                        7s (corpus PASS)
   make lint                          4s (golangci-lint v1.64.8 + size-check + frontend)
+  make run                           12ms fixture-01 (hard < 400ms)
+  make reference-metrics             PASS
+    fixture-01 pages=1 fonts=2 bytes=14098 needles=Invoice,234.40
+    fixture-29-wpt pages=3 fonts=1 bytes=4915 needle=Case 29 nested float fragmentation
+    fixture-64 pages=8 fonts=39 images=6 bytes=4125386 needle=NEXT-72-PROPS
 ```
 
 Inspect `output/fixture-64-next-72-props.pdf` and `output/fixture-29-wpt-break-nested-float-print.pdf`.
