@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <!--
   fixture-64-next-72-props
-  Proves: visual audit of the next 72 CSS properties targeted for v0.2.7
-  (implement / partial / unsupported honesty), each with a plain-language description and a live
-  Effect cell. Pattern matches fixture-60/61/62 implemented-props audits.
+  Proves: visual audit of 72 CSS properties, font-feature-settings through
+  counter-set, each with a plain-language description and a live Effect cell.
+  Pattern matches fixture-60/61/62 implemented-props audits.
   Meta line: kind · group · Chrome yes/no (MDN BCD). Chrome-unsupported rows
   note that no render is expected in Chrome.
   Fonts: Liberation Sans via --font-path testdata/fonts/implemented-audit (SIL OFL 1.1).
@@ -15,7 +15,7 @@
 
 <head>
   <meta charset="utf-8">
-  <title>Next 72 CSS audit (72 properties)</title>
+  <title>font-feature-settings to counter-set</title>
   <style>
     @page {
       size: A4;
@@ -189,14 +189,14 @@
       src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAIAAAACUFjqAAAAEklEQVR42mP4z8CABzGMSmNDALfKY53W1e90AAAAAElFTkSuQmCC"
       alt="pixel">
     <div class="titles">
-      <h1>Next 72 CSS audit</h1>
-      <p>72 target properties · font-family "Liberation Sans" · local images · Chrome support from MDN BCD</p>
+      <h1>font-feature-settings to counter-set</h1>
+      <p>Properties 1-72 · font-family "Liberation Sans" · local images · Chrome support from MDN BCD</p>
     </div>
   </header>
 
   <div class="needle">NEXT-72-PROPS</div>
   <p style="font-size:8.5pt;margin:0 0 10px 0;">
-    Each row names a v0.2.7 target property from the next-72 worklist. Implemented rows use
+    Each row names one property from font-feature-settings through counter-set. Implemented rows use
     side-by-side or precondition-rich Effect demos so the gowk PDF shows a visible change.
     The property meta line is <code>kind · group · Chrome yes/no</code> (MDN browser-compat-data).
     If Chrome says no, the Effect cell will often look unchanged in Chrome; that is expected.
