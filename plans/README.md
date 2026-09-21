@@ -94,4 +94,8 @@ Implementation plans and roadmaps for `gowkhtmltopdf`, partitioned by release ve
 - [86-canonical-0.2.6-wasm.md](0.2.6/86-canonical-0.2.6-wasm.md) - Browser WASM conversion, PDF preview, and image output phases 86-93
 - [perf-improve/wave-2-50pct/](0.2.6/perf-improve/wave-2-50pct/) - Live ledger to cut remaining Snapshot M ns/op and B/op in half (library and CLI). Wave 1 Snapshot L checklist stays closed.
 
+## Performance (cross-version)
+
+- [performance/2026-09-21/](performance/2026-09-21/00-canonical-chrome-case-alloc-reduction.md) - Chrome 40-case allocation reductions: retained serial flate state (713.50 -> 485.98 MB total) and one shared cascade (485.98 -> 327.88 MB total); chunk-tail phase deferred by measurement (about 1% waste vs a 5% gate)
+
 Phases 57-67 closed Partials (174 Implemented / 0 Partial). Phases 68-78 reopen all 247 Ignored for browser-level print. Leftover CSS rows in `0.2.0/phases/pending-phase-items/` move here with `[~]` pointers. WOFF2 sidecar cited in KB is not in this worktree unless amended.

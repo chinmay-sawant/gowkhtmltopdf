@@ -13,16 +13,11 @@ func renderIndependentBlocks(
 	ctx context.Context,
 	doc *pdf.Document,
 	state *objectState,
-	root *html.Node,
 	blocks []*html.Node,
+	styles map[*html.Node]*layout.ResolvedStyle,
 	render objectRenderContext,
 ) error {
 	opts := state.bodyLayoutOpts(render)
-	styles, err := layout.ResolveStyles(ctx, root, opts)
-
-	if err != nil {
-		return fmt.Errorf("independent block styles: %w", err)
-	}
 
 	start := doc.PageCount()
 	workspace := &layout.Workspace{}

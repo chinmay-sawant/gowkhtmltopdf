@@ -23,7 +23,6 @@ import (
 	"strings"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
-	"github.com/chinmay-sawant/gowkhtmltopdf/internal/errs"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
 )
@@ -1152,59 +1151,11 @@ func WithWorkspace(ctx context.Context, root *html.Node, opts Options, workspace
 	return layoutContext(ctx, root, opts, workspace)
 }
 
-//nolint:cyclop // layout preflight and staged style/container passes are explicit lifecycle gates.
 func layoutContext(
 	ctx context.Context,
 	root *html.Node, opts Options, workspace *Workspace,
 ) (*Result, error) {
-	if root == nil {
-		return nil, errors.New("layout: nil root") //nolint:err113 // static sentinel-free message matches legacy behavior
-	}
-
-	if err := opts.validate(); err != nil {
-		return nil, err
-	}
-
-	if ctx == nil {
-		return nil, errs.ErrNilContext
-	}
-
-	if err := ctx.Err(); err != nil {
-		return nil, fmt.Errorf("layout: context: %w", err)
-	}
-
-	faces, err := pdf.LoadDefaultFaces()
-	if err != nil {
-		return nil, fmt.Errorf("layout: load default faces: %w", err)
-	}
-
-	if opts.Faces != nil {
-		faces = opts.Faces
-	}
-
-	if err := ctx.Err(); err != nil {
-		return nil, fmt.Errorf("layout: context: %w", err)
-	}
-
-	font := opts.Font
-	if font == nil {
-		font = faces.Regular
-	}
-
-	styles, containers, err := resolveStylesForLayoutContext(ctx, root, opts)
-	if err != nil {
-		return nil, fmt.Errorf("layout: style resolution: %w", err)
-	}
-
-	var ops []Op
-
-	if workspace == nil || cap(workspace.ops) == 0 {
-		ops = make([]Op, 0, estimateOpCapacity(root))
-	} else {
-		ops = workspace.ops[:0]
-	}
-
-	return finalizeResult(newEngine(ctx, opts, faces, font, styles, containers, ops), root, opts)
+	return layoutContextWithStyles(ctx, root, opts, workspace, nil)
 }
 
 // newEngine constructs the layout engine state (extracted from LayoutContext

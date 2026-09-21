@@ -18,7 +18,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
+	"sync/atomic"
 	"time"
 	"unicode/utf16"
 )
@@ -1767,19 +1767,27 @@ func (s *flateState) compress(raw []byte) []byte {
 	return append([]byte(nil), s.buf.Bytes()...)
 }
 
-//nolint:gochecknoglobals // compressor reuse across page streams; not a mutable global
-var flatePool sync.Pool
+// flateSerial retains one flateState for the serial flate path across GC
+// cycles. A sync.Pool was measured to lose the state within two GC cycles
+// (overlay probe: first call 817,592 B, nine warm calls 2,016 B, after two
+// GCs 817,592 B again), so the 2026-09-21 Chrome corpus capture paid a fresh
+// deflate state per conversion (245 MB cum, 34% of all allocations). Parallel
+// page streams keep their own retained states in flate_parallel.go.
+//
+//nolint:gochecknoglobals // retained compressor for the serial path; not a mutable global
+var flateSerial atomic.Pointer[flateState]
 
 // flateBytes compresses raw with zlib (RFC 1950). PDF /FlateDecode streams
 // require the zlib wrapper, not raw DEFLATE (RFC 1951); viewers reject the
-// latter and the page appears empty. The compressor is reused across page
-// streams; the returned copy owns its bytes before the state goes back to the
-// pool. Single-page documents and non-page streams (fonts, images, ICC) stay
-// on this serial path; multi-page documents use the retained worker set in
+// latter and the page appears empty. The compressor is reused across serial
+// calls; the returned copy owns its bytes before the state is retained again.
+// Single-page documents and non-page streams (fonts, images, ICC) stay on
+// this serial path; multi-page documents use the retained worker set in
 // flate_parallel.go.
-const maxPooledFlateBufferSize = 16 * 1024 * 1024 // 16 MiB max retention
+const maxRetainedFlateBufferSize = 16 * 1024 * 1024 // 16 MiB max retention
+
 func flateBytes(raw []byte) []byte {
-	state, _ := flatePool.Get().(*flateState)
+	state := flateSerial.Swap(nil)
 	if state == nil {
 		state = &flateState{} //nolint:exhaustruct // intentional zero-value fields
 		state.zw, _ = zlib.NewWriterLevel(&state.buf, zlib.DefaultCompression)
@@ -1787,8 +1795,8 @@ func flateBytes(raw []byte) []byte {
 
 	res := state.compress(raw)
 
-	if state.buf.Cap() <= maxPooledFlateBufferSize {
-		flatePool.Put(state)
+	if state.buf.Cap() <= maxRetainedFlateBufferSize {
+		flateSerial.CompareAndSwap(nil, state)
 	}
 
 	return res

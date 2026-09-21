@@ -1,8 +1,6 @@
 package layout
 
 import (
-	"context"
-
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
 
@@ -14,21 +12,7 @@ const htmlRootName = "html"
 // avoid, or missing page-break-before (except the first) rejects the document.
 // It does not key on class names or HTML comments. contentH is the page
 // content height convert will paint at; the CSS detector does not layout.
-// IndependentBlocksForOptions resolves styles with opts then runs IndependentBlocks.
-func IndependentBlocksForOptions(ctx context.Context, root *html.Node, opts Options) ([]*html.Node, bool) {
-	if root == nil {
-		return nil, false
-	}
-
-	styles, err := ResolveStyles(ctx, root, opts)
-	if err != nil {
-		return nil, false
-	}
-
-	return IndependentBlocks(root, styles, opts.Height)
-}
-
-// IndependentBlocks is the fail-closed CSS detector. See IndependentBlocksForOptions.
+// styles must be the document cascade resolved for the same options.
 //
 //nolint:cyclop // fail-closed detector is a flat checklist of disqualifiers
 func IndependentBlocks(
