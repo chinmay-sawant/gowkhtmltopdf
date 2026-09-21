@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-quick test-serial test-race lint lint-frontend size-check build wasm wasm-test fmt golden golden-update samples samples-python screenshots weasyprint clean claim-scan bench bench-engine bench-lib bench-inprocess bench-cli-compare c-shared bindings-clean check-versions python-binding-test python-benchmarks python-api chrome-cases-pdf run reference-metrics
+.PHONY: test test-unit test-quick test-serial test-race lint lint-frontend size-check build wasm wasm-test fmt golden golden-update samples samples-python screenshots weasyprint clean claim-scan bench bench-engine bench-lib bench-inprocess bench-cli-compare c-shared bindings-clean check-versions python-binding-test python-benchmarks python-api chrome-cases-pdf run
 # Pure-Go runtime: the standard library plus the allowlisted direct modules
 # below. No cgo, browser, or native converter process is required.
 # Direct third-party requires must stay ⊆ {
@@ -250,15 +250,6 @@ RUN_HTML ?= testdata/golden/fixture-01-simple-invoice.html
 RUN_MAX_MS ?= 400
 run: build
 	bash scripts/run-walltime.sh "$(RUN_HTML)" "$(RUN_MAX_MS)" ./bin/gowkhtmltopdf
-
-# ParseSemantic hard metrics for the PR-template detector-surface row
-# (`make reference-metrics` / gopdfsuit hard metrics). Never existed in
-# this Makefile: the checklist was copied from goslop (commit 055afb7,
-# originally 33a329c). This target is the gowkhtmltopdf equivalent: page
-# envelope, /FontFile2, ordered needles, and logged font/image/URI counts
-# on fixture-01, fixture-29-wpt, and fixture-64.
-reference-metrics:
-	go test ./internal/convert -run '^TestReferenceMetrics$$' -count=1 -v
 
 # Regenerate the committed frontend showcase screenshots and WebP thumbnails
 # from the PDFs currently present in output/. Use `make samples` first when the
