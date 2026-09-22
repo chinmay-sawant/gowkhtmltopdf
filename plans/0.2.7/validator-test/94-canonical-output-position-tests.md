@@ -1,7 +1,7 @@
 # 94 - Canonical output checks: text, colors, borders, images (v0.2.7)
 
 > **Parent:** `plans/0.2.7/README.md`
-> **Status:** pilot complete on fixtures 01-02; rollout one fixture at a time
+> **Status:** fixtures 01-20 complete; rollout one fixture at a time
 > **Estimated effort:** L
 > **Owner:** `internal/pdf` for the page-op reader, then `internal/convert` for the fixture checks
 > **Depends on:** committed sample PDFs from `make samples`
@@ -82,7 +82,7 @@ Curves are approximated by their endpoint. A fill is recorded as the bounding
 box of its subpath. Both are exact for this writer's output, which paints
 axis-aligned rectangles and lines.
 
-## Pilot: fixtures 01-02 (complete)
+## Pilot: fixtures 01-10 (complete)
 
 Files:
 
@@ -90,6 +90,14 @@ Files:
 - `internal/convert/output_ops_test.go`
 - `internal/convert/output_fixture_01_test.go`
 - `internal/convert/output_fixture_02_test.go`
+- `internal/convert/output_fixture_03_multi_page_invoice_test.go`
+- `internal/convert/output_fixture_04_two_column_layout_test.go`
+- `internal/convert/output_fixture_05_linked_stylesheet_test.go`
+- `internal/convert/output_fixture_06_external_link_test.go`
+- `internal/convert/output_fixture_07_image_logo_test.go`
+- `internal/convert/output_fixture_08_forced_page_breaks_test.go`
+- `internal/convert/output_fixture_09_multi_section_doc_test.go`
+- `internal/convert/output_fixture_10_table_colspan_test.go`
 
 Test: `TestOutputFixture01SimpleInvoice`.
 
@@ -123,13 +131,55 @@ and a gray cell border.
 go test ./internal/convert -run 'TestOutputFixture02TableHeavyInvoice$' -count=1
 ```
 
+Fixtures 03-10 are also complete. Their measured records are:
+
+| Fixture | Pages | Text | Strokes | Fills | Images |
+|---------|------:|-----:|--------:|------:|-------:|
+| 03 multi-page invoice | 4 | 81 | 198 | 6 | 0 |
+| 04 two-column layout | 1 | 25 | 8 | 2 | 0 |
+| 05 linked stylesheet | 1 | 21 | 36 | 4 | 0 |
+| 06 external link | 1 | 23 | 34 | 2 | 0 |
+| 07 image logo | 1 | 9 | 2 | 0 | 2 |
+| 08 forced page breaks | 5 | 25 | 16 | 4 | 0 |
+| 09 multi-section document | 2 | 79 | 94 | 4 | 0 |
+| 10 table colspan | 1 | 39 | 345 | 7 | 0 |
+
+Each test uses anchors measured from its own PDF. The multi-page tests cover
+their first and later pages; fixture 08 covers all five section pages; fixture
+07 pins both image placements; fixture 06 leaves URI rectangles to the
+existing structural golden check.
+
+Fixtures 11-20 are complete. Their measured records from `pdf.ParsePageOps`
+are:
+
+| Fixture | Pages | Text ops | Strokes | Fills | Images |
+|---------|------:|---------:|--------:|------:|-------:|
+| 11 long text wrap | 3 | 1698 | 0 | 0 | 0 |
+| 12 lists | 1 | 50 | 0 | 0 | 0 |
+| 13 pre/code block | 1 | 39 | 12 | 3 | 0 |
+| 14 colorful report | 1 | 30 | 50 | 23 | 0 |
+| 15 bulleted requirements | 1 | 49 | 27 | 2 | 0 |
+| 16 invoice with CSS | 2 | 175 | 333 | 78 | 0 |
+| 17 cover and content | 2 | 21 | 3 | 0 | 0 |
+| 18 typography | 1 | 35 | 5 | 0 | 0 |
+| 19 margin and sizing | 1 | 24 | 42 | 4 | 0 |
+| 20 image grid | 1 | 8 | 16 | 1 | 4 |
+
+The tests are one file per fixture: `output_fixture_11_long_text_wrap_test.go`
+through `output_fixture_20_image_grid_test.go`. Fixture 11 deliberately
+records the 1698 low-level text operations emitted by the writer, while the
+independent inspector groups those operations into 102 visible text spans.
+Fixture 18 similarly records 35 low-level operations versus 29 grouped spans.
+The comparison is against a fresh conversion, so these counts detect changes
+in the writer's operation stream as well as visible geometry changes.
+
 ## Rollout
 
 | Phase | Scope | Status |
 |-------|-------|--------|
 | 94.0 | Page-op reader and synthetic proofs | complete (pilot) |
-| 94.1 | Fixture 01 pilot, then fixtures 02-10 | in progress (01-02 done) |
-| 94.2 | Fixtures 11-20 | pending |
+| 94.1 | Fixture 01 pilot, then fixtures 02-10 | complete (01-10 done) |
+| 94.2 | Fixtures 11-20 | complete |
 | 94.3 | Fixtures 21-28 plus both fixture 29 files | pending |
 | 94.4 | Fixtures 30-39, fixture 36 header and footer | pending |
 | 94.5 | Fixtures 40-49 | pending |

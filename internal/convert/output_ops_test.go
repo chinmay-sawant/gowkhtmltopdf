@@ -222,8 +222,6 @@ func opsBoxClose(want, got [4]float64) bool {
 
 // assertOpsTextRun pins one authored text feature measured with
 // scripts/inspect_pdf_ops.py. page is 1-based.
-//
-//nolint:unparam // multi-page fixture tests use non-1 page values
 func assertOpsTextRun(
 	t *testing.T, ops *pdf.PageOps, page int, text string, xPos, yPos, size float64, font string, color [3]float64,
 ) {
@@ -315,7 +313,7 @@ func assertOpsFillRect(
 
 // assertOpsImageBox pins one authored image placement. page is 1-based.
 //
-//nolint:unused // shared by later fixture tests that author images
+//nolint:unparam // later fixtures can place image anchors on any page
 func assertOpsImageBox(t *testing.T, ops *pdf.PageOps, page int, xPos, yPos, width, height float64) {
 	t.Helper()
 
