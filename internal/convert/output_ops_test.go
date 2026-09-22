@@ -312,8 +312,6 @@ func assertOpsFillRect(
 }
 
 // assertOpsImageBox pins one authored image placement. page is 1-based.
-//
-//nolint:unparam // later fixtures can place image anchors on any page
 func assertOpsImageBox(t *testing.T, ops *pdf.PageOps, page int, xPos, yPos, width, height float64) {
 	t.Helper()
 

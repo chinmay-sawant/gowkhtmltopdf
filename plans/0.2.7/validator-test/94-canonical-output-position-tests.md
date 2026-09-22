@@ -1,7 +1,7 @@
 # 94 - Canonical output checks: text, colors, borders, images (v0.2.7)
 
 > **Parent:** `plans/0.2.7/README.md`
-> **Status:** fixtures 01-20 complete; rollout one fixture at a time
+> **Status:** fixtures 01-55 and 57-63 complete; fixtures 56 and 64 remain open
 > **Estimated effort:** L
 > **Owner:** `internal/pdf` for the page-op reader, then `internal/convert` for the fixture checks
 > **Depends on:** committed sample PDFs from `make samples`
@@ -19,9 +19,10 @@ not enough for a sample a person opens.
 This ledger compares the full page-operation record of each committed sample
 with a fresh conversion, and pins the authored features measured with an
 independent tool. One fixture at a time: inspect, write the check, update this
-ledger, repeat. The phase files under this directory still carry the
-position-only breakdown. They get rewritten one at a time as each fixture
-lands, starting with 94.0 and 94.1.
+ledger, repeat. The current fixture tests use one file per PDF from fixture 21
+through fixture 64, including both fixture 29 PDFs. The tests for fixtures 56
+and 64 intentionally keep their committed versus fresh text differences
+visible.
 
 ## What one fixture check asserts
 
@@ -173,6 +174,15 @@ Fixture 18 similarly records 35 low-level operations versus 29 grouped spans.
 The comparison is against a fresh conversion, so these counts detect changes
 in the writer's operation stream as well as visible geometry changes.
 
+Fixtures 21 through 64 add 45 top-level PDF checks. Each check opens its exact
+`output/fixture-*.pdf`, resolves the exact matching body HTML, compares every
+page operation, and pins measured text or image anchors. Fixture 36 also
+resolves its header and footer companion HTML through `attachHFCompanions`.
+The passing checks cover fixtures 21-55 and 57-63. Fixture 56 differs in six
+text tokens, and fixture 64 differs in its text stream and fallback runs, so
+those two rows stay open until the committed samples and fresh conversions
+agree.
+
 ## Rollout
 
 | Phase | Scope | Status |
@@ -180,11 +190,11 @@ in the writer's operation stream as well as visible geometry changes.
 | 94.0 | Page-op reader and synthetic proofs | complete (pilot) |
 | 94.1 | Fixture 01 pilot, then fixtures 02-10 | complete (01-10 done) |
 | 94.2 | Fixtures 11-20 | complete |
-| 94.3 | Fixtures 21-28 plus both fixture 29 files | pending |
-| 94.4 | Fixtures 30-39, fixture 36 header and footer | pending |
-| 94.5 | Fixtures 40-49 | pending |
-| 94.6 | Fixtures 50-59, fixture 56 is 21 pages | pending |
-| 94.7 | Fixtures 60-64, font-path question | pending |
+| 94.3 | Fixtures 21-28 plus both fixture 29 files | complete |
+| 94.4 | Fixtures 30-39, fixture 36 header and footer | complete |
+| 94.5 | Fixtures 40-49 | complete |
+| 94.6 | Fixtures 50-59, fixture 56 is 21 pages | in progress |
+| 94.7 | Fixtures 60-64, font-path question | in progress |
 | 94.8 | Version and compliance renders, 8 PDFs | pending |
 | 94.9 | Closure: size-check, make test, make golden, knowledge-base | pending |
 
