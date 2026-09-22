@@ -62,7 +62,7 @@ ruler: PyMuPDF reports y downward from the top, and the script flips it.
 2. Read the matching `testdata/golden/*.html` to know which features are
    authored.
 3. Pin the authored features in the fixture test with the helpers in
-   `internal/convert/output_ops_test.go`: `assertOpsTextRun`,
+   `internal/convert/fixturetests/output_ops_test.go`: `assertOpsTextRun`,
    `assertOpsStrokeSegment`, `assertOpsFillRect`, `assertOpsImageBox`.
 4. Run the fixture test. The full op record must match and every pin must
    hold.
@@ -88,17 +88,17 @@ axis-aligned rectangles and lines.
 Files:
 
 - `internal/pdf/page_ops.go`, `internal/pdf/page_ops_test.go`
-- `internal/convert/output_ops_test.go`
-- `internal/convert/output_fixture_01_test.go`
-- `internal/convert/output_fixture_02_test.go`
-- `internal/convert/output_fixture_03_multi_page_invoice_test.go`
-- `internal/convert/output_fixture_04_two_column_layout_test.go`
-- `internal/convert/output_fixture_05_linked_stylesheet_test.go`
-- `internal/convert/output_fixture_06_external_link_test.go`
-- `internal/convert/output_fixture_07_image_logo_test.go`
-- `internal/convert/output_fixture_08_forced_page_breaks_test.go`
-- `internal/convert/output_fixture_09_multi_section_doc_test.go`
-- `internal/convert/output_fixture_10_table_colspan_test.go`
+- `internal/convert/fixturetests/output_ops_test.go`
+- `internal/convert/fixturetests/output_fixture_01_test.go`
+- `internal/convert/fixturetests/output_fixture_02_test.go`
+- `internal/convert/fixturetests/output_fixture_03_multi_page_invoice_test.go`
+- `internal/convert/fixturetests/output_fixture_04_two_column_layout_test.go`
+- `internal/convert/fixturetests/output_fixture_05_linked_stylesheet_test.go`
+- `internal/convert/fixturetests/output_fixture_06_external_link_test.go`
+- `internal/convert/fixturetests/output_fixture_07_image_logo_test.go`
+- `internal/convert/fixturetests/output_fixture_08_forced_page_breaks_test.go`
+- `internal/convert/fixturetests/output_fixture_09_multi_section_doc_test.go`
+- `internal/convert/fixturetests/output_fixture_10_table_colspan_test.go`
 
 Test: `TestOutputFixture01SimpleInvoice`.
 
@@ -119,7 +119,7 @@ Proof, both exit 0:
 
 ```bash
 go test ./internal/pdf -run 'TestPageOps' -count=1
-go test ./internal/convert -run 'TestOutputFixture01SimpleInvoice$' -count=1
+go test ./internal/convert/fixturetests -run 'TestOutputFixture01SimpleInvoice$' -count=1
 ```
 
 Fixture 02 adds a table-specific proof. The committed PDF and fresh
@@ -129,7 +129,7 @@ table item, the payment heading, a blue header cell, an alternating row cell,
 and a gray cell border.
 
 ```bash
-go test ./internal/convert -run 'TestOutputFixture02TableHeavyInvoice$' -count=1
+go test ./internal/convert/fixturetests -run 'TestOutputFixture02TableHeavyInvoice$' -count=1
 ```
 
 Fixtures 03-10 are also complete. Their measured records are:
@@ -166,8 +166,9 @@ are:
 | 19 margin and sizing | 1 | 24 | 42 | 4 | 0 |
 | 20 image grid | 1 | 8 | 16 | 1 | 4 |
 
-The tests are one file per fixture: `output_fixture_11_long_text_wrap_test.go`
-through `output_fixture_20_image_grid_test.go`. Fixture 11 deliberately
+The tests are one file per fixture under `internal/convert/fixturetests`:
+`output_fixture_11_long_text_wrap_test.go` through
+`output_fixture_20_image_grid_test.go`. Fixture 11 deliberately
 records the 1698 low-level text operations emitted by the writer, while the
 independent inspector groups those operations into 102 visible text spans.
 Fixture 18 similarly records 35 low-level operations versus 29 grouped spans.
@@ -182,6 +183,13 @@ The passing checks cover fixtures 21-55 and 57-63. Fixture 56 differs in six
 text tokens, and fixture 64 differs in its text stream and fallback runs, so
 those two rows stay open until the committed samples and fresh conversions
 agree.
+
+The fixture checks live in `internal/convert/fixturetests` as a separate
+integration-test package. The package uses the public `convert.NewPDFRequest`
+and `convert.Run` boundary, while keeping the PDF operation reader and
+assertions local to the test package. This keeps the main convert directory
+focused on production code and package-local tests without exporting helpers
+that exist only for this suite.
 
 ## Rollout
 
@@ -224,7 +232,7 @@ Mid-phase commands are single-package:
 
 ```bash
 go test ./internal/pdf -run 'TestPageOps' -count=1
-go test ./internal/convert -run 'TestOutputFixture' -count=1
+go test ./internal/convert/fixturetests -run 'TestOutputFixture' -count=1
 ```
 
 `make test` and `make golden` run only in phase 94.9. `make lint` is not part of

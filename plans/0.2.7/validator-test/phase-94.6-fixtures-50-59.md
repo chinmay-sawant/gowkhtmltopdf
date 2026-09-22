@@ -10,7 +10,7 @@
 
 ## Overview
 
-This phase uses one test file per PDF under `internal/convert`. The tests open
+This phase uses one test file per PDF under `internal/convert/fixturetests`. The tests open
 the exact top-level samples, convert their exact matching HTML fixtures, and
 compare every parsed page operation before checking measured anchors.
 
@@ -32,4 +32,4 @@ row stays open. No comparison normalization was added.
 - [x] 94.6.10 `output/fixture-59-apex-digital-landing.pdf`. `TestOutputFixture59ApexDigitalLanding` pins first-page and last-page text plus an image. Shape: 9 pages, 66 text runs, 57 strokes, 135 fills, 9 images.
 - [x] 94.6.11 All files are split per PDF and remain far below the 2,000-line limit. The six passing fixture rows were verified in the 50-59 batch; fixture 57-59 pass independently of the open fixture 56 row.
 
-Proof: `GOCACHE=/tmp/gowkhtmltopdf-fixture-test-cache-21-64 go test ./internal/convert -run '^TestOutputFixture(5[0-9])' -count=1` reaches the fixture 56 comparison and exits nonzero on the recorded differences.
+Proof: `GOCACHE=/tmp/gowkhtmltopdf-fixture-test-cache-21-64 go test ./internal/convert/fixturetests -run '^TestOutputFixture(5[0-9])' -count=1` reaches the fixture 56 comparison and exits nonzero on the recorded differences.

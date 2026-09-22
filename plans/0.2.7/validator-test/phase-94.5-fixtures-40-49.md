@@ -10,7 +10,7 @@
 
 ## Overview
 
-This phase uses one test file per PDF under `internal/convert`. Fixtures 43,
+This phase uses one test file per PDF under `internal/convert/fixturetests`. Fixtures 43,
 47, and 49 include image anchors. Fixture 43 spans five pages, so its test
 pins both the first-page and page-5 authored records.
 
@@ -28,4 +28,4 @@ pins both the first-page and page-5 authored records.
 - [x] 94.5.10 `output/fixture-49-night-train-poster.pdf`. `TestOutputFixture49NightTrainPoster` pins text and image records. Shape: 1 page, 7 text runs, 1 stroke, 3 fills, 1 image.
 - [x] 94.5.11 All ten targeted fixture tests passed in the 40-49 batch. The tests are split per PDF, so no generated test file approaches the 2,000-line limit.
 
-Proof: `GOCACHE=/tmp/gowkhtmltopdf-fixture-test-cache-21-64 go test ./internal/convert -run '^TestOutputFixture(4[0-9])' -count=1` exited 0.
+Proof: `GOCACHE=/tmp/gowkhtmltopdf-fixture-test-cache-21-64 go test ./internal/convert/fixturetests -run '^TestOutputFixture(4[0-9])' -count=1` exited 0.

@@ -10,7 +10,7 @@
 
 ## Overview
 
-This phase uses one test file per PDF under `internal/convert/`. There are ten
+This phase uses one test file per PDF under `internal/convert/fixturetests/`. There are ten
 PDFs because fixture 29 has two distinct body fixtures. Each test compares the
 full committed and fresh page-operation records, then pins inspected PDF-space
 anchors and the measured operation shape.
@@ -31,4 +31,4 @@ Layout tests already cover pieces of fixture 21, 23, and 28 in `internal/layout/
 - [x] 94.3.10 `output/fixture-29-wpt-break-nested-float-print.pdf`. `TestOutputFixture29WPTBreakNestedFloatPrint`. Shape: 3 pages, 1 text run, 0 strokes, 3 fills, 0 images.
 - [x] 94.3.11 All ten targeted fixture tests passed in the 21-29 batch. The tests are split per PDF, so no generated test file approaches the 2,000-line limit.
 
-Proof: `GOCACHE=/tmp/gowkhtmltopdf-fixture-test-cache-21-64 go test ./internal/convert -run '^TestOutputFixture(2[1-9])' -count=1` exited 0.
+Proof: `GOCACHE=/tmp/gowkhtmltopdf-fixture-test-cache-21-64 go test ./internal/convert/fixturetests -run '^TestOutputFixture(2[1-9])' -count=1` exited 0.

@@ -10,7 +10,7 @@
 
 ## Overview
 
-This phase uses one test file per PDF under `internal/convert`. The files open
+This phase uses one test file per PDF under `internal/convert/fixturetests`. The files open
 the exact PDF samples and resolve the matching HTML fixtures by exact
 basename. Four fixtures include local images, and every multi-page fixture
 pins a first-page, continuation-page, or final-page record selected from the
@@ -26,4 +26,4 @@ independent PDF inspection.
 - [ ] 94.7.5 `output/fixture-64-next-72-props.pdf`. `TestOutputFixture64Next72Props` pins three ASCII text records and one image, including `NEXT-72-PROPS`; it does not use the CJK `汉A汉A汉` string. Shape: 8 pages, 1,002 committed text runs, 2,206 strokes, 302 fills, 6 images. The fresh conversion currently has 1,003 text runs and reports 1,576 to 1,586 text-stream differences, including non-breaking-space, soft-hyphen, and fallback-run changes.
 - [x] 94.7.6 The five tests are split per PDF and remain far below the 2,000-line limit. Fixture tests 60-63 pass; fixture 64 remains open because the committed and fresh operation streams do not match.
 
-Proof: `GOCACHE=/tmp/gowkhtmltopdf-fixture-test-cache-21-64 go test ./internal/convert -run '^TestOutputFixture(60|61|62|63|64)' -count=1` reaches fixture 64 and exits nonzero on the recorded differences.
+Proof: `GOCACHE=/tmp/gowkhtmltopdf-fixture-test-cache-21-64 go test ./internal/convert/fixturetests -run '^TestOutputFixture(60|61|62|63|64)' -count=1` reaches fixture 64 and exits nonzero on the recorded differences.

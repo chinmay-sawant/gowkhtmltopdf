@@ -10,7 +10,7 @@
 
 ## Overview
 
-This phase uses one test file per PDF under `internal/convert`. Fixture 36
+This phase uses one test file per PDF under `internal/convert/fixturetests`. Fixture 36
 resolves `fixture-36-header.html` and `fixture-36-footer.html` through
 `requestForFixture` and `attachHFCompanions`; its test pins header, body,
 footer, and image evidence.
@@ -29,4 +29,4 @@ footer, and image evidence.
 - [x] 94.4.10 `output/fixture-39-multicol-article.pdf`. `TestOutputFixture39MulticolArticle`. Shape: 3 pages, 215 text runs, 0 strokes, 0 fills, 0 images.
 - [x] 94.4.11 All ten targeted fixture tests passed in the 30-39 batch. The tests are split per PDF, so no generated test file approaches the 2,000-line limit.
 
-Proof: `GOCACHE=/tmp/gowkhtmltopdf-fixture-test-cache-21-64 go test ./internal/convert -run '^TestOutputFixture(3[0-9])' -count=1` exited 0.
+Proof: `GOCACHE=/tmp/gowkhtmltopdf-fixture-test-cache-21-64 go test ./internal/convert/fixturetests -run '^TestOutputFixture(3[0-9])' -count=1` exited 0.
