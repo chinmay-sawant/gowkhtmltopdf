@@ -1,16 +1,25 @@
 # 94 - Canonical output checks: text, colors, borders, images (v0.2.7)
 
 > **Parent:** `plans/0.2.7/README.md`
-> **Status:** fixtures 01-55 and 57-63 complete; fixtures 56 and 64 remain open
+> **Status:** [~] Superseded by [phase 95](95-canonical-pixel-regression-tests.md). This suite covers fixtures 01-64, including both fixture 29 PDFs. Keep it until phase 95 covers all 65 PDFs, then retire it.
 > **Estimated effort:** L
 > **Owner:** `internal/pdf` for the page-op reader, then `internal/convert` for the fixture checks
 > **Depends on:** committed sample PDFs from `make samples`
 > **Unblocks:** a fast check that a sample still draws the same words, colors, rules, and images in the same places
 > **Number:** 94. Phases 86-93 belong to `plans/0.2.6/86-canonical-0.2.6-wasm.md`. Phase 89 there is the WASM preview. Do not reuse it.
 
+## Supersession (2026-09-23)
+
+This ledger records the page-operation suite built for fixtures 01-64. The
+user asked for full-page pixel comparison with manually approved reference
+PDFs. Phase 95 is now the canonical work list. All phase 94 checks, including
+the completed fixture groups, are superseded. Keep the operation tests until
+the pixel suite covers all 65 fixture PDFs, then remove the old suite and any
+reader code that has no remaining callers.
+
 ---
 
-## Direction (changed 2026-09-22)
+## Direction as of 2026-09-22 (superseded)
 
 The first draft of this ledger checked text origins only. It would stay green
 while a title lost its color, a table lost a border, or an image moved. That is
@@ -19,10 +28,9 @@ not enough for a sample a person opens.
 This ledger compares the full page-operation record of each committed sample
 with a fresh conversion, and pins the authored features measured with an
 independent tool. One fixture at a time: inspect, write the check, update this
-ledger, repeat. The current fixture tests use one file per PDF from fixture 21
-through fixture 64, including both fixture 29 PDFs. The tests for fixtures 56
-and 64 intentionally keep their committed versus fresh text differences
-visible.
+ledger, repeat. At supersession, fixture tests covered 01-64, including both
+fixture 29 PDFs. The tests for fixtures 56 and 64 intentionally kept their
+committed versus fresh text differences visible.
 
 ## What one fixture check asserts
 
@@ -195,16 +203,16 @@ that exist only for this suite.
 
 | Phase | Scope | Status |
 |-------|-------|--------|
-| 94.0 | Page-op reader and synthetic proofs | complete (pilot) |
-| 94.1 | Fixture 01 pilot, then fixtures 02-10 | complete (01-10 done) |
-| 94.2 | Fixtures 11-20 | complete |
-| 94.3 | Fixtures 21-28 plus both fixture 29 files | complete |
-| 94.4 | Fixtures 30-39, fixture 36 header and footer | complete |
-| 94.5 | Fixtures 40-49 | complete |
-| 94.6 | Fixtures 50-59, fixture 56 is 21 pages | in progress |
-| 94.7 | Fixtures 60-64, font-path question | in progress |
-| 94.8 | Version and compliance renders, 8 PDFs | pending |
-| 94.9 | Closure: size-check, make test, make golden, knowledge-base | pending |
+| 94.0 | Page-op reader and synthetic proofs | [~] Superseded by phase 95; retire after visual coverage |
+| 94.1 | Fixtures 01-10 | [~] Superseded by phase 95; replace with page-pixel checks |
+| 94.2 | Fixtures 11-20 | [~] Superseded by phase 95; replace with page-pixel checks |
+| 94.3 | Fixtures 21-28 plus both fixture 29 files | [~] Superseded by phase 95; replace with page-pixel checks |
+| 94.4 | Fixtures 30-39, fixture 36 header and footer | [~] Superseded by phase 95; replace with page-pixel checks |
+| 94.5 | Fixtures 40-49 | [~] Superseded by phase 95; replace with page-pixel checks |
+| 94.6 | Fixtures 50-59, fixture 56 is 21 pages | [~] Superseded by phase 95 |
+| 94.7 | Fixtures 60-64, font-path question | [~] Superseded by phase 95 |
+| 94.8 | Version and compliance renders, 8 PDFs | [~] Not carried into phase 95 scope |
+| 94.9 | Closure: size-check, make test, make golden, knowledge-base | [~] Superseded by phase 95.8 |
 
 ## Out of scope
 
@@ -218,7 +226,10 @@ that exist only for this suite.
 - Link rectangles. The writer stores `/Rect`, and `SemanticAnnot` drops it. A later ledger can add them.
 - Replacing the layout geometry tests in `internal/layout/requested_fixture_regression_test.go`. Those stay. They use the layout ruler. This suite uses the PDF ruler.
 
-## Dependencies
+## Historical dependencies (not active)
+
+These dependencies recorded the old operation-test rollout. Phase 95 owns the
+active work and the deletion gate.
 
 - 94.0 unblocks every fixture phase.
 - 94.7 waits on a written answer to the font-path question before any fixture 60 or 64 expectation is pinned.
@@ -226,7 +237,7 @@ that exist only for this suite.
 - 94.9 starts after 94.1 through 94.8 are checked.
 - `make samples` regenerates the committed samples. When a feature actually moves, regenerate the affected sample and update its pins in the same change. The committed file and the fresh conversion must agree before a row closes.
 
-## Gate policy
+## Historical gate policy (not active)
 
 Mid-phase commands are single-package:
 

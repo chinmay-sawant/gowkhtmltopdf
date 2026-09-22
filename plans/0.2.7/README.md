@@ -1,21 +1,22 @@
 # Plans 0.2.7 - Next 72 and next 100 CSS properties
 
 > **Branch:** `feature/027-next-72` (next-100 authored on `docs/027-next-100` then merged)
-> **Status:** next-72 complete (87.1-87.8 closed 2026-09-17); next-100 planned (88.1-88.9); output position-range tests planned (94.0-94.9, not started)
+> **Status:** next-72 complete (87.1-87.8 closed 2026-09-17); next-100 planned (88.1-88.9); pixel-level visual regression planned (95.0-95.8); phase 94 is superseded
 > **Baseline:** 354 Implemented / 0 Partial / 464 Unsupported (v0.2.6 catalog)
 > **After next-72 honest flips:** 407 Implemented / 0 Partial / 411 Unsupported of 818 (53 of 72 Implemented; 0 Partial; 19 Unsupported by choice)
 
 ## What this folder is
 
-Execution ledger for two CSS waves and the sample-PDF position checks:
+Execution ledger for two CSS waves and the sample-PDF visual checks:
 
 1. The next 72 print-relevant properties in `next-72-properties.json`, proven by
    `testdata/golden/fixture-64-next-72-props.html`.
 2. The next 100 after that, in `next-100-properties.json`. Zero overlap with the
    72. Fixture contract: `next-100-fixture-authoring.md` (fixture-66).
-3. Position ranges for the committed sample PDFs, in
-   [validator-test/](validator-test/94-canonical-output-position-tests.md).
-   Not started. Phases 94.0-94.9.
+3. Pixel-level comparison of approved reference PDFs and fresh conversions, in
+   [validator-test/](validator-test/95-canonical-pixel-regression-tests.md).
+   Planned. Phases 95.0-95.8. Phase 94's page-operation suite stays in place
+   until all visual references pass, then is retired.
 
 ## Start here
 
@@ -28,14 +29,14 @@ Execution ledger for two CSS waves and the sample-PDF position checks:
 | [next-100-properties.json](next-100-properties.json) | 100-property inventory + Chrome BCD labels |
 | [next-72-fixture-authoring.md](next-72-fixture-authoring.md) | Fixture-64 authoring contract |
 | [next-100-fixture-authoring.md](next-100-fixture-authoring.md) | Fixture-66 authoring contract |
-| [validator-test/](validator-test/94-canonical-output-position-tests.md) | Output PDF position ranges, phases 94.0-94.9, not started |
+| [validator-test/](validator-test/95-canonical-pixel-regression-tests.md) | Pixel-level PDF visual regression, phases 95.0-95.8; approved PDFs require manual promotion |
 
 ## Gate policy (this version only)
 
 | When | Allowed | Forbidden |
 |------|---------|-----------|
 | Mid-batch | `go test ./internal/<pkg> -run '…'` (and sibling package tests) | `make lint`, `make test`, bare `go test ./...` |
-| Final batch only (`phase-87.8`, `phase-88.9`, or `validator-test/phase-94.9-closure.md`) | `make test`, `make golden`, catalog `--check` when CSS arms changed, claim-scan if docs touched | Still no `make lint` (owner runs lint manually after) |
+| Final batch only (`phase-87.8`, `phase-88.9`, or `validator-test/phase-95.8`) | `make test`, `make golden`, `make visual-golden`, catalog `--check` when CSS arms changed, claim-scan if docs touched | Still no `make lint` (owner runs lint manually after) |
 
 ## Soft file-size rule
 

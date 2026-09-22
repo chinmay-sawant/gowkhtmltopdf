@@ -2,7 +2,13 @@
 
 Status lives in the canonical ledger. This file is only the folder index.
 
-- [94-canonical-output-position-tests.md](94-canonical-output-position-tests.md)
+## Current plan
+
+- [95-canonical-pixel-regression-tests.md](95-canonical-pixel-regression-tests.md) (current plan for fixtures 01-64)
+
+## Superseded phase 94 records
+
+- [94-canonical-output-position-tests.md](94-canonical-output-position-tests.md) (operation tests remain until phase 95 passes)
 - [phase-94.0-position-reader.md](phase-94.0-position-reader.md)
 - [phase-94.1-fixtures-01-10.md](phase-94.1-fixtures-01-10.md)
 - [phase-94.2-fixtures-11-20.md](phase-94.2-fixtures-11-20.md)
