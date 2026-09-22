@@ -6,7 +6,6 @@ import "testing"
 // and both local image placements.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture50LetterTemplate(t *testing.T) {
-	t.Parallel()
 
 	committed := readCommittedOps(t, "fixture-50-letter-template.pdf")
 	fresh := freshOps(t, "fixture-50-letter-template.html")

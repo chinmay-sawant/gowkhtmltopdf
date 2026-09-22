@@ -174,6 +174,33 @@ func TestShapeTextFontFallsBackWithoutFace(t *testing.T) {
 	}
 }
 
+func TestReverseCmapUsesDeterministicCanonicalTie(t *testing.T) {
+	t.Parallel()
+
+	fnt := &Font{cmap: map[uint32]uint16{
+		uint32('\u00AD'): 1,
+		uint32('-'):      1,
+		uint32('\u00A0'): 2,
+		uint32(' '):      2,
+		0xFE91:           3,
+		uint32('\u0628'): 3,
+	}}
+
+	got := fnt.reverseCmap()
+
+	if got[1] != '-' {
+		t.Errorf("glyph 1 = U+%04X, want ASCII hyphen", got[1])
+	}
+
+	if got[2] != ' ' {
+		t.Errorf("glyph 2 = U+%04X, want ASCII space", got[2])
+	}
+
+	if got[3] != 0xFE91 {
+		t.Errorf("glyph 3 = U+%04X, want Arabic presentation form", got[3])
+	}
+}
+
 func TestShapeTextFontLatinUnchanged(t *testing.T) {
 	t.Parallel()
 

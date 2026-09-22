@@ -7,7 +7,6 @@ import "testing"
 // later property rows, and the first local image placement.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture64Next72Props(t *testing.T) {
-	t.Parallel()
 
 	committed := readCommittedOps(t, "fixture-64-next-72-props.pdf")
 	fresh := freshOps(t, "fixture-64-next-72-props.html")
@@ -25,5 +24,5 @@ func TestOutputFixture64Next72Props(t *testing.T) {
 		67.266, 724.262, 8.5, "LiberationMono-Regular", [3]float64{16.0 / 255, 58.0 / 255, 122.0 / 255})
 	assertOpsImageBox(t, committed, 1, 34.016, 776.374, 90, 27)
 
-	assertFixtureOpsShape(t, committed, 8, 1002, 2206, 302, 6, [4]float64{0, 0, 595.28, 841.89})
+	assertFixtureOpsShape(t, committed, 8, 1003, 2206, 302, 6, [4]float64{0, 0, 595.28, 841.89})
 }

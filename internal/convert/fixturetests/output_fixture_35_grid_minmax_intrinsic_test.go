@@ -6,7 +6,6 @@ import "testing"
 // headings that bookend the intrinsic sizing demonstrations.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture35GridMinmaxIntrinsic(t *testing.T) {
-	t.Parallel()
 
 	committed := readCommittedOps(t, "fixture-35-grid-minmax-intrinsic.pdf")
 	fresh := freshOps(t, "fixture-35-grid-minmax-intrinsic.html")

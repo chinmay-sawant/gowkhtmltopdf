@@ -6,7 +6,6 @@ import "testing"
 // branch and its green matched result.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture42ContainerInlineSize(t *testing.T) {
-	t.Parallel()
 
 	committed := readCommittedOps(t, "fixture-42-container-inline-size.pdf")
 	fresh := freshOps(t, "fixture-42-container-inline-size.html")

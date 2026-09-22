@@ -15,7 +15,6 @@ import "testing"
 //	rule    page 1, #1a3d6d, 1.5pt, (35.096, 773.374) to (560.184, 773.374)
 //	4 pages, A4, 81 text runs, 198 strokes, 6 fills, no images
 func TestOutputFixture03MultiPageInvoice(t *testing.T) {
-	t.Parallel()
 
 	committed := readCommittedOps(t, "fixture-03-multi-page-invoice.pdf")
 	fresh := freshOps(t, "fixture-03-multi-page-invoice.html")

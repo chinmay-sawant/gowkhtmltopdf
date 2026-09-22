@@ -16,7 +16,6 @@ import "testing"
 //	rule     #999999, 1pt, (28.346, 772.744) to (71.433, 772.744)
 //	1 page, A4, 39 text runs, 345 strokes, 7 fills, no images
 func TestOutputFixture10TableColspan(t *testing.T) {
-	t.Parallel()
 
 	committed := readCommittedOps(t, "fixture-10-table-colspan.pdf")
 	fresh := freshOps(t, "fixture-10-table-colspan.html")

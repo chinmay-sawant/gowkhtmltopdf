@@ -16,7 +16,6 @@ import "testing"
 //	rule    #e5c46a, 0.75pt, (28.346, 759.144) to (566.934, 759.144)
 //	1 page, A4, 21 text runs, 36 strokes, 4 fills, no images
 func TestOutputFixture05LinkedStylesheet(t *testing.T) {
-	t.Parallel()
 
 	committed := readCommittedOps(t, "fixture-05-linked-stylesheet.pdf")
 	fresh := freshOps(t, "fixture-05-linked-stylesheet.html")

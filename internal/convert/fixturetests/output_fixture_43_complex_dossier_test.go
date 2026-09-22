@@ -6,7 +6,6 @@ import "testing"
 // fifth-page release decision, and a dossier image placement.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture43ComplexDossier(t *testing.T) {
-	t.Parallel()
 
 	committed := readCommittedOps(t, "fixture-43-complex-dossier.pdf")
 	fresh := freshOps(t, "fixture-43-complex-dossier.html")

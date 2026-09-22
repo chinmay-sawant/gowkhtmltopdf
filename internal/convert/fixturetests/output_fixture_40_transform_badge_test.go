@@ -6,7 +6,6 @@ import "testing"
 // label, and the sibling that remains in normal flow.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture40TransformBadge(t *testing.T) {
-	t.Parallel()
 
 	committed := readCommittedOps(t, "fixture-40-transform-badge.pdf")
 	fresh := freshOps(t, "fixture-40-transform-badge.html")

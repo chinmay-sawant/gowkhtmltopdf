@@ -14,7 +14,6 @@ import "testing"
 //	hr rule #0f3a5f, 1.5pt, (29.096, 505.694) to (566.184, 505.694)
 //	1 page, A4, 30 text runs, 50 strokes, 23 fills, no images
 func TestOutputFixture14ColorfulReport(t *testing.T) {
-	t.Parallel()
 
 	committed := readCommittedOps(t, "fixture-14-colorful-report.pdf")
 	fresh := freshOps(t, "fixture-14-colorful-report.html")

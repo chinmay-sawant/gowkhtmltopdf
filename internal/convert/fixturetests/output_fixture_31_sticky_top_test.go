@@ -6,7 +6,6 @@ import "testing"
 // and the non-repeated trailing content on page two.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture31StickyTop(t *testing.T) {
-	t.Parallel()
 
 	committed := readCommittedOps(t, "fixture-31-sticky-top.pdf")
 	fresh := freshOps(t, "fixture-31-sticky-top.html")

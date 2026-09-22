@@ -16,7 +16,6 @@ import "testing"
 //	(135.925, 611.944) 48x48, and (393.219, 617.944) 72x36
 //	1 page, A4, 8 text runs, 16 strokes, 1 fill, 4 images
 func TestOutputFixture20ImageGrid(t *testing.T) {
-	t.Parallel()
 
 	committed := readCommittedOps(t, "fixture-20-image-grid.pdf")
 	fresh := freshOps(t, "fixture-20-image-grid.html")

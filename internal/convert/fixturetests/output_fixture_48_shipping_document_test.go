@@ -6,7 +6,6 @@ import "testing"
 // final delivery instruction in the one-page shipping sample.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture48ShippingDocument(t *testing.T) {
-	t.Parallel()
 
 	committed := readCommittedOps(t, "fixture-48-shipping-document.pdf")
 	fresh := freshOps(t, "fixture-48-shipping-document.html")

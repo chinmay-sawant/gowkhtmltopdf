@@ -16,7 +16,6 @@ import "testing"
 //	rule page 2, #c5d5e8, 0.75pt, (28.346, 760.644) to (566.934, 760.644)
 //	5 pages, A4, 25 text runs, 16 strokes, 4 fills, no images
 func TestOutputFixture08ForcedPageBreaks(t *testing.T) {
-	t.Parallel()
 
 	committed := readCommittedOps(t, "fixture-08-forced-page-breaks.pdf")
 	fresh := freshOps(t, "fixture-08-forced-page-breaks.html")

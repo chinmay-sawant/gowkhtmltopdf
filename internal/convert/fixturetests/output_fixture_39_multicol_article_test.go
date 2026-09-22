@@ -6,7 +6,6 @@ import "testing"
 // column continuation, and the last continuation marker.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture39MulticolArticle(t *testing.T) {
-	t.Parallel()
 
 	committed := readCommittedOps(t, "fixture-39-multicol-article.pdf")
 	fresh := freshOps(t, "fixture-39-multicol-article.html")

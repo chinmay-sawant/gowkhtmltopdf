@@ -12,7 +12,6 @@ import "testing"
 //	ordered marker "1." #222222 at (37.507, 601.502), 10pt regular
 //	1 page, A4, 50 text runs, no strokes, no fills, no images
 func TestOutputFixture12Lists(t *testing.T) {
-	t.Parallel()
 
 	committed := readCommittedOps(t, "fixture-12-lists.pdf")
 	fresh := freshOps(t, "fixture-12-lists.html")

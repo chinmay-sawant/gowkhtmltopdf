@@ -6,7 +6,6 @@ import "testing"
 // title, issue metadata, and the full-page background image.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture47Certificate(t *testing.T) {
-	t.Parallel()
 
 	committed := readCommittedOps(t, "fixture-47-certificate.pdf")
 	fresh := freshOps(t, "fixture-47-certificate.html")

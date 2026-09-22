@@ -7,7 +7,6 @@ import "testing"
 // needle, two later property effects, and the first local image placement.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture62ImplementedPropsC(t *testing.T) {
-	t.Parallel()
 
 	committed := readCommittedOps(t, "fixture-62-implemented-props-c.pdf")
 	fresh := freshOps(t, "fixture-62-implemented-props-c.html")

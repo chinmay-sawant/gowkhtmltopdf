@@ -6,7 +6,6 @@ import "testing"
 // and bordered payment note in the one-page A4 sample.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture22FloatInvoiceChrome(t *testing.T) {
-	t.Parallel()
 
 	committed := readCommittedOps(t, "fixture-22-float-invoice-chrome.pdf")
 	fresh := freshOps(t, "fixture-22-float-invoice-chrome.html")

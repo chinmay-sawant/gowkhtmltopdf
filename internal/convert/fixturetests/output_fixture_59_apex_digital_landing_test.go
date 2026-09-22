@@ -6,7 +6,6 @@ import "testing"
 // pricing section, the final navigation item, and the hero image placement.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture59ApexDigitalLanding(t *testing.T) {
-	t.Parallel()
 
 	committed := readCommittedOps(t, "fixture-59-apex-digital-landing.pdf")
 	fresh := freshOps(t, "fixture-59-apex-digital-landing.html")

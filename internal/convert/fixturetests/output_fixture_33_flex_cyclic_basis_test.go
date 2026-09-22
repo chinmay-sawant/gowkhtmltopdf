@@ -6,7 +6,6 @@ import "testing"
 // the content-sized sibling in the indefinite column case.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture33FlexCyclicBasis(t *testing.T) {
-	t.Parallel()
 
 	committed := readCommittedOps(t, "fixture-33-flex-cyclic-basis.pdf")
 	fresh := freshOps(t, "fixture-33-flex-cyclic-basis.html")

@@ -510,7 +510,8 @@ func (f *Font) gotextFace() (*gtfont.Face, bool) {
 	return f.gotFace, f.gotFace != nil
 }
 
-// reverseCmap maps glyph id → preferred Unicode (presentation forms win).
+// reverseCmap maps glyph id → preferred Unicode (presentation forms win, and
+// equal-priority aliases choose the lowest code point).
 // The map is built once from f.cmap (immutable after parse) and cached on
 // the Font.
 func (f *Font) reverseCmap() map[uint16]rune {
@@ -526,7 +527,9 @@ func (f *Font) reverseCmap() map[uint16]rune {
 
 			rVal := rune(cp)
 			if prev, ok := out[gid]; ok {
-				if cmapRuneScore(rVal) <= cmapRuneScore(prev) {
+				rValScore := cmapRuneScore(rVal)
+				prevScore := cmapRuneScore(prev)
+				if rValScore < prevScore || (rValScore == prevScore && rVal >= prev) {
 					continue
 				}
 			}

@@ -6,7 +6,6 @@ import "testing"
 // forced continuation marker across the three-page sample.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture37OrphansCSS(t *testing.T) {
-	t.Parallel()
 
 	committed := readCommittedOps(t, "fixture-37-orphans-css.pdf")
 	fresh := freshOps(t, "fixture-37-orphans-css.html")

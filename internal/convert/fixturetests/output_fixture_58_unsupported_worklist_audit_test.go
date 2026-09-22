@@ -6,7 +6,6 @@ import "testing"
 // unsupported-property gallery headings across the nine-page sample.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture58UnsupportedWorklistAudit(t *testing.T) {
-	t.Parallel()
 
 	committed := readCommittedOps(t, "fixture-58-unsupported-worklist-audit.pdf")
 	fresh := freshOps(t, "fixture-58-unsupported-worklist-audit.html")

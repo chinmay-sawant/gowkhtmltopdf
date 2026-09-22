@@ -6,7 +6,6 @@ import "testing"
 // run resolved from the configured font paths.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture27CJKFontpath(t *testing.T) {
-	t.Parallel()
 
 	committed := readCommittedOps(t, "fixture-27-cjk-fontpath.pdf")
 	fresh := freshOps(t, "fixture-27-cjk-fontpath.html")

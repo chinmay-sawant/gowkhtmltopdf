@@ -15,7 +15,6 @@ import "testing"
 //	footer rule page 2, #aab7c4, 0.75pt, (28.721, 813.169) to (566.559, 813.169)
 //	2 pages, A4, 175 text runs, 333 strokes, 78 fills, no images
 func TestOutputFixture16InvoiceWithCSS(t *testing.T) {
-	t.Parallel()
 
 	committed := readCommittedOps(t, "fixture-16-invoice-with-css.pdf")
 	fresh := freshOps(t, "fixture-16-invoice-with-css.html")

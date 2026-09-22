@@ -6,7 +6,6 @@ import "testing"
 // second-page body while the fixed header remains present on both pages.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture28FlexWrapGridFixed(t *testing.T) {
-	t.Parallel()
 
 	committed := readCommittedOps(t, "fixture-28-flex-wrap-grid-fixed.pdf")
 	fresh := freshOps(t, "fixture-28-flex-wrap-grid-fixed.html")

@@ -7,7 +7,6 @@ import "testing"
 // needle, a code-property row, the final page gallery label, and one image.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture61ImplementedPropsB(t *testing.T) {
-	t.Parallel()
 
 	committed := readCommittedOps(t, "fixture-61-implemented-props-b.pdf")
 	fresh := freshOps(t, "fixture-61-implemented-props-b.html")

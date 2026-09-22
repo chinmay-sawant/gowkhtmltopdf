@@ -15,7 +15,6 @@ import "testing"
 //	rule   #c9d4de, 1pt, (28.346, 669.544) to (247.342, 669.544)
 //	1 page, A4, 23 text runs, 34 strokes, 2 fills, no images
 func TestOutputFixture06ExternalLink(t *testing.T) {
-	t.Parallel()
 
 	committed := readCommittedOps(t, "fixture-06-external-link.pdf")
 	fresh := freshOps(t, "fixture-06-external-link.html")

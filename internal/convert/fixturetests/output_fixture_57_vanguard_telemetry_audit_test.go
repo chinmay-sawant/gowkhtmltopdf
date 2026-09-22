@@ -6,7 +6,6 @@ import "testing"
 // implemented-property needle, and the final probe gallery heading.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture57VanguardTelemetryAudit(t *testing.T) {
-	t.Parallel()
 
 	committed := readCommittedOps(t, "fixture-57-vanguard-telemetry-audit.pdf")
 	fresh := freshOps(t, "fixture-57-vanguard-telemetry-audit.html")

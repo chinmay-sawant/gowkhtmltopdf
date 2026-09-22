@@ -6,7 +6,6 @@ import "testing"
 // delivery note, and the approval signature.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture45PurchaseOrder(t *testing.T) {
-	t.Parallel()
 
 	committed := readCommittedOps(t, "fixture-45-purchase-order.pdf")
 	fresh := freshOps(t, "fixture-45-purchase-order.html")

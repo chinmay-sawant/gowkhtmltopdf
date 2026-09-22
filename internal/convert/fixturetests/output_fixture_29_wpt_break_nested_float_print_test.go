@@ -6,7 +6,6 @@ import "testing"
 // the green float fragment on the three custom-sized pages.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture29WPTBreakNestedFloatPrint(t *testing.T) {
-	t.Parallel()
 
 	committed := readCommittedOps(t, "fixture-29-wpt-break-nested-float-print.pdf")
 	fresh := freshOps(t, "fixture-29-wpt-break-nested-float-print.html")

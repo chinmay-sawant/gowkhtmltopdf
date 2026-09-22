@@ -15,7 +15,6 @@ import "testing"
 //	table border #b9c6d2, 1pt, (28.346, 458.244) to (209.947, 458.244)
 //	1 page, A4, 49 text runs, 27 strokes, 2 fills, no images
 func TestOutputFixture15BulletedRequirements(t *testing.T) {
-	t.Parallel()
 
 	committed := readCommittedOps(t, "fixture-15-bulleted-requirements.pdf")
 	fresh := freshOps(t, "fixture-15-bulleted-requirements.html")

@@ -17,7 +17,6 @@ import "testing"
 //	rule   #cccccc 0.75pt from (28.721, 594.169) to (566.559, 594.169)
 //	no images, no filled boxes, A4 595.28 x 841.89
 func TestOutputFixture01SimpleInvoice(t *testing.T) {
-	t.Parallel()
 
 	committed := readCommittedOps(t, "fixture-01-simple-invoice.pdf")
 	fresh := freshOps(t, "fixture-01-simple-invoice.html")

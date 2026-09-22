@@ -6,7 +6,6 @@ import "testing"
 // both the first and continuation pages.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture23TheadRepeat(t *testing.T) {
-	t.Parallel()
 
 	committed := readCommittedOps(t, "fixture-23-thead-repeat.pdf")
 	fresh := freshOps(t, "fixture-23-thead-repeat.html")
