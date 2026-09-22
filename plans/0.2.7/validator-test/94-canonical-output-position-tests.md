@@ -1,7 +1,7 @@
 # 94 - Canonical output checks: text, colors, borders, images (v0.2.7)
 
 > **Parent:** `plans/0.2.7/README.md`
-> **Status:** pilot complete on fixture 01; rollout one fixture at a time
+> **Status:** pilot complete on fixtures 01-02; rollout one fixture at a time
 > **Estimated effort:** L
 > **Owner:** `internal/pdf` for the page-op reader, then `internal/convert` for the fixture checks
 > **Depends on:** committed sample PDFs from `make samples`
@@ -82,12 +82,14 @@ Curves are approximated by their endpoint. A fill is recorded as the bounding
 box of its subpath. Both are exact for this writer's output, which paints
 axis-aligned rectangles and lines.
 
-## Pilot: fixture 01 (complete)
+## Pilot: fixtures 01-02 (complete)
 
 Files:
 
 - `internal/pdf/page_ops.go`, `internal/pdf/page_ops_test.go`
-- `internal/convert/output_ops_test.go`, `internal/convert/output_fixture_01_test.go`
+- `internal/convert/output_ops_test.go`
+- `internal/convert/output_fixture_01_test.go`
+- `internal/convert/output_fixture_02_test.go`
 
 Test: `TestOutputFixture01SimpleInvoice`.
 
@@ -111,12 +113,22 @@ go test ./internal/pdf -run 'TestPageOps' -count=1
 go test ./internal/convert -run 'TestOutputFixture01SimpleInvoice$' -count=1
 ```
 
+Fixture 02 adds a table-specific proof. The committed PDF and fresh
+conversion are both one-page A4 documents with 101 text runs, 214 stroked
+segments, 48 filled cells, and no images. The test pins the title, a middle
+table item, the payment heading, a blue header cell, an alternating row cell,
+and a gray cell border.
+
+```bash
+go test ./internal/convert -run 'TestOutputFixture02TableHeavyInvoice$' -count=1
+```
+
 ## Rollout
 
 | Phase | Scope | Status |
 |-------|-------|--------|
 | 94.0 | Page-op reader and synthetic proofs | complete (pilot) |
-| 94.1 | Fixture 01 pilot, then fixtures 02-10 | in progress (01 done) |
+| 94.1 | Fixture 01 pilot, then fixtures 02-10 | in progress (01-02 done) |
 | 94.2 | Fixtures 11-20 | pending |
 | 94.3 | Fixtures 21-28 plus both fixture 29 files | pending |
 | 94.4 | Fixtures 30-39, fixture 36 header and footer | pending |

@@ -288,8 +288,6 @@ func assertOpsStrokeSegment(
 }
 
 // assertOpsFillRect pins one authored filled box. page is 1-based.
-//
-//nolint:unused // shared by later fixture tests that author filled boxes
 func assertOpsFillRect(
 	t *testing.T, ops *pdf.PageOps, page int,
 	xPos, yPos, width, height float64, color [3]float64,
