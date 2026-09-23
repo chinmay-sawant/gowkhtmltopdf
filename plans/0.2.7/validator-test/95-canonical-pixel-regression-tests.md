@@ -113,8 +113,8 @@ wkhtmltopdf comparison PDFs are outside this phase.
 - [x] Update `plans/0.2.7/README.md`, `plans/README.md`, and `output/README.md` with the approval flow, rendering settings, and current status.
 - [x] Run `GOCACHE=/tmp/gowkhtmltopdf-publish-cache make test` on the final Go tree. It passed on 2026-09-24, including the reference inventory check.
 - [x] Run `GOCACHE=/tmp/gowkhtmltopdf-publish-cache make golden` and confirm the structural fixture checks pass. It passed on 2026-09-24.
-- [ ] Run `make claim-scan` after the documentation updates.
-- [ ] Pass `make lint` before closing phase 95. The 2026-09-23 run exited 2 on existing `paralleltest` findings in `output_fixture_*.go` and one `wsl` finding in `internal/pdf/shape_gotext.go:532`. This session did not rerun lint.
+- [x] Run `make claim-scan` after the documentation updates. It passed on 2026-09-24.
+- [ ] Pass `make lint` before closing phase 95. The 2026-09-24 run exited 2 on `paralleltest` findings in the intentionally serial `output_fixture_*.go` tests. The new corpus test and deterministic font change pass targeted lint.
 
 ## Dependencies
 
