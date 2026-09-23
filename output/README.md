@@ -11,6 +11,62 @@ These are **not** golden byte baselines. CI uses `make golden` / structure
 assertions, not binary PDF equality against this folder. See
 [`documentation/samples.md`](../documentation/samples.md).
 
+## Validated visual references
+
+`validated/` holds manually approved PDF references for the visual fixture
+test. The test reads these files and never creates or replaces them. Reference
+names match their golden HTML fixture names. The lookup and missing-file check
+are in `internal/convert/fixturetests/pixel_regression_test.go:36-59`.
+
+To approve a reference, generate a candidate PDF under `output/` with the same
+fixture and font settings used by the test helper
+(`internal/convert/fixturetests/fixture_helpers_test.go:78-112`). The fixture
+01 candidate command on the project host is:
+
+```sh
+go run ./cmd/gowkhtmltopdf --allow-local-files \
+  --font-path /usr/share/fonts/truetype/droid \
+  --font-path testdata/fonts \
+  -o output/fixture-01-simple-invoice-candidate.pdf \
+  testdata/golden/fixture-01-simple-invoice.html
+```
+
+Render the candidate and reference with Ghostscript 10.08.0, `png16m`, 150
+dots per inch (DPI), and text and graphics smoothing level 4. Review the page
+and diff, then copy the accepted candidate into `validated/` by hand. The
+comparator checks page count and dimensions, then every RGB pixel. Mismatches
+report the fixture, page, changed-pixel count, largest channel difference,
+and diff path (`internal/convert/fixturetests/pixel_regression_test.go:77-100`,
+`internal/convert/fixturetests/pixel_regression_test.go:198-218`,
+`internal/convert/fixturetests/pixel_regression_test.go:221-290`).
+
+Run the fixture 01 equality and local mutation checks with a pinned Ghostscript
+binary:
+
+```sh
+GOWKHTMLTOPDF_VISUAL_GS=/path/to/gs \
+  go test ./internal/convert/fixturetests \
+  -run '^TestVisualGoldenFixture01' -count=1
+```
+
+The test converts the fixture unless you set
+`GOWKHTMLTOPDF_VISUAL_CANDIDATE`. Set it to a saved candidate PDF to compare
+that file with the approved reference
+(`internal/convert/fixturetests/pixel_regression_cases_test.go:103-128`,
+`internal/convert/fixturetests/pixel_regression_cases_test.go:195-216`).
+For the candidate generated above, run:
+
+```sh
+GOWKHTMLTOPDF_VISUAL_GS=/path/to/gs \
+  GOWKHTMLTOPDF_VISUAL_CANDIDATE=output/fixture-01-simple-invoice-candidate.pdf \
+  go test ./internal/convert/fixturetests \
+  -run '^TestVisualGoldenFixture01SimpleInvoice$' -count=1
+```
+
+The tests skip in ordinary `make test` runs unless `GOWKHTMLTOPDF_VISUAL_GS`
+is set. Set `GOWKHTMLTOPDF_VISUAL_DIFF_DIR` to keep the mutation diff for
+inspection after the test exits (`internal/convert/fixturetests/pixel_regression_cases_test.go:103-180`).
+
 `make samples` rewrites `fixture-*.pdf`, `fixture-*.png`,
 `showcase-*.pdf`, `architecture-diagram.pdf` (via
 `go run ./testdata/golden/api`), the four `pdf-1.7/` /

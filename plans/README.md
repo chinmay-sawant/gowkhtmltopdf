@@ -12,7 +12,7 @@ Implementation plans and roadmaps for `gowkhtmltopdf`, partitioned by release ve
 | [0.2.4/](0.2.4/README.md) | **v0.2.4** — idiomatic Document API + CLI rethink + external benches (phases 31–39) | Complete; [release notes](0.2.4/PR/release-v0.2.4.md) |
 | [0.2.5/](0.2.5/README.md) | **v0.2.5 Python cgo c-shared bindings and PyPI** — phases 40–47 (in-process, `CGO_ENABLED=0` pure-Go default kept); font track `font/` already complete | Complete (released 2026-08-26; `VERSION` 0.2.5) |
 | [0.2.6/](0.2.6/README.md) | **v0.2.6 CSS coverage and browser WASM** - catalog-driven print CSS (354 implemented / 0 partial / 464 unsupported), browser WASM output, warm-path recovery | Complete (released 2026-09-13; `VERSION` 0.2.6). [Release notes](0.2.6/PR/release-v0.2.6.md) |
-| [0.2.7/](0.2.7/README.md) | **v0.2.7 next-72 + next-100 CSS** - 72-property wave (fixture-64) closed; next-100 wave planned (88.1-88.9, fixture-66); pixel-level visual regression planned (95.0-95.8) | next-72 complete on `feature/027-next-72`; next-100 planned; phase 94 output-operation suite superseded by phase 95 |
+| [0.2.7/](0.2.7/README.md) | **v0.2.7 next-72 + next-100 CSS** - 72-property wave (fixture-64) closed. Next-100 is planned. The phase 95 visual pilot is in progress. | Next-72 is complete. Next-100 is planned. The fixture 01 pixel pilot passes (`0.2.7/validator-test/95-canonical-pixel-regression-tests.md:57-82`, `internal/convert/fixturetests/pixel_regression_cases_test.go:103-128`). Phase 94 stays active until full migration. |
 
 ---
 
@@ -91,7 +91,7 @@ Implementation plans and roadmaps for `gowkhtmltopdf`, partitioned by release ve
 - [next-72-fixture-authoring.md](0.2.7/next-72-fixture-authoring.md) - fixture-64 authoring contract
 - [next-100-fixture-authoring.md](0.2.7/next-100-fixture-authoring.md) - fixture-66 authoring contract
 - [chrome-flex-interactions/](0.2.7/chrome-flex-interactions) - Chromium-backed Flexbox interaction inventory and Go conversion plan
-- [validator-test/](0.2.7/validator-test/95-canonical-pixel-regression-tests.md) - Pixel-level comparison of 65 manually approved fixture PDFs and fresh conversions (phases 95.0-95.8); phase 94 stays until migration passes
+- [validator-test/](0.2.7/validator-test/95-canonical-pixel-regression-tests.md) - Pixel comparison pilot passes for fixture 01 (`internal/convert/fixturetests/pixel_regression_cases_test.go:103-128`). Approval of the other 64 references and CI remain open. Phase 94 stays active until full migration.
 - [86-canonical-0.2.6-wasm.md](0.2.6/86-canonical-0.2.6-wasm.md) - Browser WASM conversion, PDF preview, and image output phases 86-93
 - [perf-improve/wave-2-50pct/](0.2.6/perf-improve/wave-2-50pct/) - Live ledger to cut remaining Snapshot M ns/op and B/op in half (library and CLI). Wave 1 Snapshot L checklist stays closed.
 

@@ -1,7 +1,7 @@
 # 95 - Pixel-level PDF visual regression tests (v0.2.7)
 
 > **Parent:** `plans/0.2.7/README.md`
-> **Status:** proposed; this ledger contains plans only
+> **Status:** In progress. The fixture 01 Go comparator pilot passes.
 > **Estimated effort:** L
 > **Owner:** `internal/convert/fixturetests`, sample-output tooling, and CI
 > **Depends on:** one fixed PDF-to-image tool and manually approved fixture PDFs
@@ -56,29 +56,31 @@ wkhtmltopdf comparison PDFs are outside this phase.
 
 ### 95.0 Pin and prove PDF rasterization
 
-- [ ] Choose one Ghostscript version for local and CI use. Record the exact version and fixed PDF-to-PNG options in the test documentation. The official [Ghostscript FAQ](https://ghostscript.com/faq/) documents PDF page output with the `png16m` device and a fixed resolution. Existing CI runs `make test` without installing a PDF renderer (`.github/workflows/ci.yml:9-34`), so add this requirement only to the visual-test job.
-- [ ] Render the approved and fresh fixture 01 PDFs at the same resolution in dots per inch (DPI), color format, and edge-smoothing setting. Confirm equal page counts and image dimensions before comparing pixels.
-- [ ] Add a small comparator check that changes one pixel and one image dimension. Prove both cases fail and name the page in the error.
+- [x] Pin the local comparator to Ghostscript 10.08.0 and document `png16m`, 150 DPI, and text and graphics smoothing level 4 (`internal/convert/fixturetests/pixel_regression_test.go:16-20`, `internal/convert/fixturetests/pixel_regression_test.go:77-100`, `output/README.md:14-53`).
+- [ ] Install the pinned Ghostscript build in a separate CI visual-test job. Current CI has no renderer setup (`.github/workflows/ci.yml:9-34`).
+- [x] Render the approved and fresh fixture 01 PDFs with those settings. The opt-in comparison passed with equal page counts, image sizes, and RGB pixels (`GOWKHTMLTOPDF_VISUAL_GS=/tmp/gowkhtmltopdf-ghostscript-install/bin/gs GOCACHE=/tmp/gowkhtmltopdf-gocache go test ./internal/convert/fixturetests -run '^TestVisualGoldenFixture01' -count=1 -v`).
+- [x] Change one pixel and one page dimension in comparator tests. Both cases fail and name the fixture and page (`internal/convert/fixturetests/pixel_regression_cases_test.go:27-72`).
 
 ### 95.1 Establish the manual baseline rule
 
-- [ ] Create `output/validated/` as the only home for approved reference PDFs. Add a README entry that says tests only read this directory and no target creates or replaces its files.
-- [ ] Define the approval steps: regenerate a candidate under `output/`, inspect it beside the diff image, manually copy the accepted PDF to `output/validated/`, then rerun the visual check.
-- [ ] Make missing or extra fixture references fail. Never bootstrap, refresh, or delete a validated PDF from a test or Makefile target.
+- [x] Create `output/validated/` for approved references and document that tests only read it. The test fails when the requested PDF is missing (`internal/convert/fixturetests/pixel_regression_test.go:36-59`, `internal/convert/fixturetests/pixel_regression_cases_test.go:74-82`, `output/README.md:14-53`).
+- [x] Document the fixture 01 candidate command and manual review, copy, and rerun steps (`output/README.md:21-53`). The test itself does not write into `output/validated/` (`internal/convert/fixturetests/pixel_regression_test.go:48-59`, `internal/convert/fixturetests/pixel_regression_test.go:158-195`).
+- [ ] Compare the reference directory with the full expected 65-PDF fixture inventory so extra and missing entries fail. Only fixture 01 has an approved reference so far.
 
 ## Phase 2: Build and pilot the visual check
 
 ### 95.2 Implement the page raster comparator
 
-- [ ] Add a test helper that invokes the chosen Ghostscript build on a PDF and returns one RGB image per page. Keep page images in a temporary or ignored directory.
-- [ ] Compare every pixel exactly after checking page count and per-page dimensions. On mismatch, report the fixture, page, changed-pixel count, and largest color-channel difference; write a diff or overlay image for review.
-- [ ] Add unit coverage for identical images, one changed pixel, changed page dimensions, changed page count, a missing reference, and rasterizer failure.
+- [x] Add a helper that checks the pinned Ghostscript version, rasterizes every page to PNG, and decodes the images from temporary storage (`internal/convert/fixturetests/pixel_regression_test.go:62-147`).
+- [x] Compare page count and dimensions before exact RGB comparison. A mismatch reports the fixture, page, changed-pixel count, maximum channel difference, and saved diff path (`internal/convert/fixturetests/pixel_regression_test.go:198-290`, `internal/convert/fixturetests/pixel_regression_test.go:350-382`).
+- [x] Cover identical images, a changed pixel, dimensions, page count, missing reference, and Ghostscript failure (`internal/convert/fixturetests/pixel_regression_cases_test.go:27-101`). The focused package tests pass.
 
 ### 95.3 Prove fixture 01 end to end
 
-- [ ] Manually review and place the fixture 01 reference at `output/validated/fixture-01-simple-invoice.pdf`.
-- [ ] Convert `testdata/golden/fixture-01-simple-invoice.html` through the same request settings used for the existing sample (`internal/convert/fixturetests/fixture_helpers_test.go:78-112`), rasterize both PDFs, and pass on exact page-pixel equality.
-- [ ] Introduce a local-only visual change to a candidate, confirm the test fails, inspect the generated diff, then discard that candidate without changing the approved PDF.
+- [x] Review and place the fixture 01 reference at `output/validated/fixture-01-simple-invoice.pdf`. The current candidate at `output/fixture-01-simple-invoice-candidate.pdf` is a one-page PDF; its generation command is in `output/README.md:21-39`.
+- [x] Convert the fixture through the shared request settings, rasterize both PDFs, and pass on exact page-pixel equality (`internal/convert/fixturetests/pixel_regression_cases_test.go:103-128`). The command is recorded under 95.0.
+- [x] Read the saved CLI candidate from `output/fixture-01-simple-invoice-candidate.pdf` and compare it with the approved reference. It passes at exact pixel equality (`output/README.md:52-67`, `internal/convert/fixturetests/pixel_regression_cases_test.go:194-213`).
+- [x] Change the title color only in the test's temporary fixture copy. The comparator detects the mismatch and writes a diff, which was inspected at `/tmp/gowkhtmltopdf-visual-fixture01-mutation-diff/fixture-01-simple-invoice-page-01-diff.png` (`internal/convert/fixturetests/pixel_regression_cases_test.go:130-180`). The approved PDF remains unchanged.
 
 ## Phase 3: Cover all fixture PDFs
 
@@ -107,9 +109,12 @@ wkhtmltopdf comparison PDFs are outside this phase.
 
 ### 95.8 Add the CI gate and finish documentation
 
-- [ ] Add `make visual-golden` and a CI job with the pinned Ghostscript build. Run the visual gate separately from `make test` so ordinary Go tests do not silently gain an undeclared system dependency.
-- [ ] Update `plans/0.2.7/README.md`, `plans/README.md`, and the knowledge base with the manual approval flow, rendering settings, and current status.
-- [ ] Run `make test`, `make golden`, `make visual-golden`, `make claim-scan`, and `make lint`. Record the final results here before closing the ledger.
+- [ ] Add `make visual-golden` and a CI job with the pinned Ghostscript build. No `visual-golden` Make target exists yet. Keep it separate from `make test` so ordinary tests do not gain an undeclared system dependency.
+- [x] Update `plans/0.2.7/README.md`, `plans/README.md`, `output/README.md`, and the knowledge base with the approval flow, rendering settings, and current status.
+- [x] Rerun `GOCACHE=/tmp/gowkhtmltopdf-gocache make test` on the final Go tree. It exits 0, including `internal/convert/fixturetests`.
+- [x] Rerun `GOCACHE=/tmp/gowkhtmltopdf-gocache make golden`. It exits 0 and all structural fixture checks pass.
+- [x] Rerun `GOCACHE=/tmp/gowkhtmltopdf-gocache make claim-scan` after the documentation updates. It exits 0 with `claim-scan: clean`.
+- [ ] Pass `make lint` before closing phase 95. The 2026-09-23 run exits 2 on existing `paralleltest` findings in `output_fixture_*.go` and one `wsl` finding in `internal/pdf/shape_gotext.go:532`. The new pixel test files have no lint findings.
 
 ## Dependencies
 
@@ -126,6 +131,9 @@ wkhtmltopdf comparison PDFs are outside this phase.
 - The fixture helper uses the public conversion request and mirrors the sample settings, including font paths and header/footer companions (`internal/convert/fixturetests/fixture_helpers_test.go:57-112`).
 - `make samples` rewrites the top-level fixture samples, while `output/README.md` says they are viewer-smoke artifacts rather than byte baselines (`Makefile:181-200`, `output/README.md:3-18`).
 - The structural corpus checks PDF validity, page bounds, embedded fonts, images, URI annotations, and ordered text (`internal/convert/golden_test.go:484-545`).
+- The Go pilot fixes Ghostscript 10.08.0, the PNG device, resolution, and smoothing settings. The comparator checks page count and dimensions, then exact RGB values and writes a diff for mismatches (`internal/convert/fixturetests/pixel_regression_test.go:16-20`, `internal/convert/fixturetests/pixel_regression_test.go:77-100`, `internal/convert/fixturetests/pixel_regression_test.go:198-290`).
+- Fresh fixture conversion, the saved CLI candidate, and the temporary color-mutation check pass with pinned Ghostscript. The mutation writes an inspected diff. The approved directory has only fixture 01; no Make target or CI job exists yet (`internal/convert/fixturetests/pixel_regression_cases_test.go:103-180`, `internal/convert/fixturetests/pixel_regression_cases_test.go:194-213`, `output/validated/`).
+- Final local gates: `make test`, `make golden`, and `make claim-scan` pass. `make lint` exits 2 on existing `paralleltest` findings in `output_fixture_*.go` and one `wsl` finding in `internal/pdf/shape_gotext.go:532`. The two new pixel-test files report no lint findings.
 
 ## Out of scope
 

@@ -1,7 +1,7 @@
 # Plans 0.2.7 - Next 72 and next 100 CSS properties
 
 > **Branch:** `feature/027-next-72` (next-100 authored on `docs/027-next-100` then merged)
-> **Status:** next-72 complete (87.1-87.8 closed 2026-09-17); next-100 planned (88.1-88.9); pixel-level visual regression planned (95.0-95.8); phase 94 is superseded
+> **Status:** Next-72 complete. Next-100 planned. Phase 95 pilot in progress, and fixture 01 passes. Phase 94 stays active until all references pass.
 > **Baseline:** 354 Implemented / 0 Partial / 464 Unsupported (v0.2.6 catalog)
 > **After next-72 honest flips:** 407 Implemented / 0 Partial / 411 Unsupported of 818 (53 of 72 Implemented; 0 Partial; 19 Unsupported by choice)
 
@@ -15,8 +15,12 @@ Execution ledger for two CSS waves and the sample-PDF visual checks:
    72. Fixture contract: `next-100-fixture-authoring.md` (fixture-66).
 3. Pixel-level comparison of approved reference PDFs and fresh conversions, in
    [validator-test/](validator-test/95-canonical-pixel-regression-tests.md).
-   Planned. Phases 95.0-95.8. Phase 94's page-operation suite stays in place
-   until all visual references pass, then is retired.
+   The Go comparator and fixture 01 pilot pass
+   (`internal/convert/fixturetests/pixel_regression_test.go:16-20`,
+   `internal/convert/fixturetests/pixel_regression_cases_test.go:103-128`).
+   The remaining fixtures, CI target, and full gates stay open. Phase 94's
+   page-operation suite stays in place until all visual references pass, then is retired
+   (`validator-test/95-canonical-pixel-regression-tests.md:57-118`).
 
 ## Start here
 
@@ -29,7 +33,7 @@ Execution ledger for two CSS waves and the sample-PDF visual checks:
 | [next-100-properties.json](next-100-properties.json) | 100-property inventory + Chrome BCD labels |
 | [next-72-fixture-authoring.md](next-72-fixture-authoring.md) | Fixture-64 authoring contract |
 | [next-100-fixture-authoring.md](next-100-fixture-authoring.md) | Fixture-66 authoring contract |
-| [validator-test/](validator-test/95-canonical-pixel-regression-tests.md) | Pixel-level PDF visual regression, phases 95.0-95.8; approved PDFs require manual promotion |
+| [validator-test/](validator-test/95-canonical-pixel-regression-tests.md) | Pixel-level PDF visual regression; Go pilot passes for fixture 01, corpus migration and CI remain open |
 
 ## Gate policy (this version only)
 
