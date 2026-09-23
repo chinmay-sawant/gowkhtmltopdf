@@ -527,8 +527,7 @@ func (f *Font) reverseCmap() map[uint16]rune {
 
 			rVal := rune(cp)
 			if prev, ok := out[gid]; ok {
-				rValScore := cmapRuneScore(rVal)
-				prevScore := cmapRuneScore(prev)
+				rValScore, prevScore := cmapRuneScore(rVal), cmapRuneScore(prev)
 				if rValScore < prevScore || (rValScore == prevScore && rVal >= prev) {
 					continue
 				}

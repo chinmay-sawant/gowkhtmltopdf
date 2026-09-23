@@ -100,15 +100,27 @@ func TestGhostscriptHelperCommands(t *testing.T) {
 	requireComparisonError(t, err, nil, "raster failure")
 }
 
-func TestVisualGoldenFixture01SimpleInvoice(t *testing.T) {
+func TestVisualGoldenFixture01SavedCandidate(t *testing.T) {
 	t.Parallel()
 
 	executable := os.Getenv("GOWKHTMLTOPDF_VISUAL_GS")
 	if executable == "" {
-		t.Skip("set GOWKHTMLTOPDF_VISUAL_GS to run the pinned Ghostscript fixture comparison")
+		t.Skip("set GOWKHTMLTOPDF_VISUAL_GS to run the pinned Ghostscript candidate comparison")
 	}
 
-	freshPDF := fixture01CandidatePDF(t)
+	candidatePath := os.Getenv("GOWKHTMLTOPDF_VISUAL_CANDIDATE")
+	if candidatePath == "" {
+		t.Skip("set GOWKHTMLTOPDF_VISUAL_CANDIDATE to compare a saved fixture 01 PDF")
+	}
+
+	if !filepath.IsAbs(candidatePath) {
+		candidatePath = filepath.Join("..", "..", "..", candidatePath)
+	}
+
+	candidatePDF, err := os.ReadFile(candidatePath)
+	if err != nil {
+		t.Fatalf("read visual candidate %q: %v", candidatePath, err)
+	}
 
 	referencePath, err := validatedReferencePath("fixture-01-simple-invoice.html")
 	if err != nil {
@@ -119,10 +131,10 @@ func TestVisualGoldenFixture01SimpleInvoice(t *testing.T) {
 		executable:    executable,
 		fixture:       "fixture-01-simple-invoice",
 		referencePath: referencePath,
-		freshPDF:      freshPDF,
+		freshPDF:      candidatePDF,
 	})
 	if err != nil {
-		t.Fatalf("visual fixture comparison: %v", err)
+		t.Fatalf("saved candidate comparison: %v", err)
 	}
 }
 
@@ -189,27 +201,6 @@ func requireComparisonError(t *testing.T, err, target error, wantText string) {
 	if err == nil || !strings.Contains(err.Error(), wantText) {
 		t.Fatalf("error = %v, want text %q", err, wantText)
 	}
-}
-
-func fixture01CandidatePDF(t *testing.T) []byte {
-	t.Helper()
-
-	if candidatePath := os.Getenv("GOWKHTMLTOPDF_VISUAL_CANDIDATE"); candidatePath != "" {
-		if !filepath.IsAbs(candidatePath) {
-			candidatePath = filepath.Join("..", "..", "..", candidatePath)
-		}
-
-		freshPDF, err := os.ReadFile(candidatePath)
-		if err != nil {
-			t.Fatalf("read visual candidate %q: %v", candidatePath, err)
-		}
-
-		return freshPDF
-	}
-
-	request := requestForFixture(t, "fixture-01-simple-invoice.html")
-
-	return runPDF(t, request)
 }
 
 func solidRaster(width, height int, fill color.NRGBA) *image.NRGBA {

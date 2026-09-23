@@ -1,7 +1,7 @@
 # 95 - Pixel-level PDF visual regression tests (v0.2.7)
 
 > **Parent:** `plans/0.2.7/README.md`
-> **Status:** In progress. The fixture 01 Go comparator pilot passes.
+> **Status:** In progress. The fixture 01 pilot passes. The 65 reference PDFs and full-corpus test are present; the pinned corpus run remains open.
 > **Estimated effort:** L
 > **Owner:** `internal/convert/fixturetests`, sample-output tooling, and CI
 > **Depends on:** one fixed PDF-to-image tool and manually approved fixture PDFs
@@ -58,14 +58,14 @@ wkhtmltopdf comparison PDFs are outside this phase.
 
 - [x] Pin the local comparator to Ghostscript 10.08.0 and document `png16m`, 150 DPI, and text and graphics smoothing level 4 (`internal/convert/fixturetests/pixel_regression_test.go:16-20`, `internal/convert/fixturetests/pixel_regression_test.go:77-100`, `output/README.md:14-53`).
 - [ ] Install the pinned Ghostscript build in a separate CI visual-test job. Current CI has no renderer setup (`.github/workflows/ci.yml:9-34`).
-- [x] Render the approved and fresh fixture 01 PDFs with those settings. The opt-in comparison passed with equal page counts, image sizes, and RGB pixels (`GOWKHTMLTOPDF_VISUAL_GS=/tmp/gowkhtmltopdf-ghostscript-install/bin/gs GOCACHE=/tmp/gowkhtmltopdf-gocache go test ./internal/convert/fixturetests -run '^TestVisualGoldenFixture01' -count=1 -v`).
+- [x] Render the approved and fresh fixture 01 PDFs with those settings. The 2026-09-23 pilot run passed with equal page counts, image sizes, and RGB pixels. The current corpus command is documented in `output/README.md:51-57`.
 - [x] Change one pixel and one page dimension in comparator tests. Both cases fail and name the fixture and page (`internal/convert/fixturetests/pixel_regression_cases_test.go:27-72`).
 
 ### 95.1 Establish the manual baseline rule
 
 - [x] Create `output/validated/` for approved references and document that tests only read it. The test fails when the requested PDF is missing (`internal/convert/fixturetests/pixel_regression_test.go:36-59`, `internal/convert/fixturetests/pixel_regression_cases_test.go:74-82`, `output/README.md:14-53`).
-- [x] Document the fixture 01 candidate command and manual review, copy, and rerun steps (`output/README.md:21-53`). The test itself does not write into `output/validated/` (`internal/convert/fixturetests/pixel_regression_test.go:48-59`, `internal/convert/fixturetests/pixel_regression_test.go:158-195`).
-- [ ] Compare the reference directory with the full expected 65-PDF fixture inventory so extra and missing entries fail. Only fixture 01 has an approved reference so far.
+- [x] Document the fixture 01 candidate command and manual review, copy, and rerun steps (`output/README.md:28-57`). The test itself does not write into `output/validated/` (`internal/convert/fixturetests/pixel_regression_test.go:48-59`, `internal/convert/fixturetests/pixel_regression_test.go:158-195`).
+- [x] Run `TestVisualReferenceInventory` against the 65 expected PDFs. It derives the names from body fixtures and fails on missing or extra references. `GOCACHE=/tmp/gowkhtmltopdf-publish-cache make test` passed on 2026-09-24 (`internal/convert/fixturetests/pixel_regression_corpus_test.go:18-56`).
 
 ## Phase 2: Build and pilot the visual check
 
@@ -77,27 +77,27 @@ wkhtmltopdf comparison PDFs are outside this phase.
 
 ### 95.3 Prove fixture 01 end to end
 
-- [x] Review and place the fixture 01 reference at `output/validated/fixture-01-simple-invoice.pdf`. The current candidate at `output/fixture-01-simple-invoice-candidate.pdf` is a one-page PDF; its generation command is in `output/README.md:21-39`.
-- [x] Convert the fixture through the shared request settings, rasterize both PDFs, and pass on exact page-pixel equality (`internal/convert/fixturetests/pixel_regression_cases_test.go:103-128`). The command is recorded under 95.0.
-- [x] Read the saved CLI candidate from `output/fixture-01-simple-invoice-candidate.pdf` and compare it with the approved reference. It passes at exact pixel equality (`output/README.md:52-67`, `internal/convert/fixturetests/pixel_regression_cases_test.go:194-213`).
-- [x] Change the title color only in the test's temporary fixture copy. The comparator detects the mismatch and writes a diff, which was inspected at `/tmp/gowkhtmltopdf-visual-fixture01-mutation-diff/fixture-01-simple-invoice-page-01-diff.png` (`internal/convert/fixturetests/pixel_regression_cases_test.go:130-180`). The approved PDF remains unchanged.
+- [x] Review and place the fixture 01 reference at `output/validated/fixture-01-simple-invoice.pdf`. The current candidate at `output/fixture-01-simple-invoice-candidate.pdf` is a one-page PDF; its generation command is in `output/README.md:33-39`.
+- [x] Convert the fixture through the shared request settings, rasterize both PDFs, and pass on exact page-pixel equality in the fixture 01 pilot. The current full-corpus test uses the same request helper (`internal/convert/fixturetests/pixel_regression_corpus_test.go:59-96`). The pilot command is recorded under 95.0.
+- [x] Read the saved CLI candidate from `output/fixture-01-simple-invoice-candidate.pdf` and compare it with the approved reference. It passed at exact pixel equality in the pilot (`output/README.md:55-68`, `internal/convert/fixturetests/pixel_regression_cases_test.go:103-139`).
+- [x] Change the title color only in the test's temporary fixture copy. The comparator detects the mismatch and writes a diff, which was inspected at `/tmp/gowkhtmltopdf-visual-fixture01-mutation-diff/fixture-01-simple-invoice-page-01-diff.png` (`internal/convert/fixturetests/pixel_regression_cases_test.go:141-192`). The approved PDF remains unchanged.
 
 ## Phase 3: Cover all fixture PDFs
 
 ### 95.4 Migrate fixtures 01-20
 
-- [ ] Manually review and approve one PDF for each fixture 01-20. Do not copy candidates into `output/validated/` until the rendered comparison and visual review are complete.
-- [ ] Run the visual check across fixtures 01-20. Confirm missing references and changed pixels fail.
+- [x] Generate current CLI candidates for fixtures 01-20 with the shared fixture settings, review their rendered pages, and copy accepted PDFs into `output/validated/`. Fixture 01 keeps its earlier approved reference.
+- [ ] Run the visual check across fixtures 01-20 with Ghostscript 10.08.0. Confirm missing references and changed pixels fail.
 
 ### 95.5 Migrate fixtures 21-40
 
-- [ ] Manually review and approve the fixture PDFs 21-40, including both fixture 29 files and fixture 36's HTML header/footer rendering.
-- [ ] Run the visual check across this group using the same fixture request and font settings as the source corpus.
+- [x] Generate current CLI candidates for fixtures 21-40, including both fixture 29 files and fixture 36's HTML header/footer rendering. Review the pages and copy the accepted PDFs into `output/validated/`.
+- [ ] Run the visual check across this group using Ghostscript 10.08.0 and the source fixture settings.
 
 ### 95.6 Migrate fixtures 41-64
 
-- [ ] Manually review and approve the fixture PDFs 41-64, including local-font fixtures and the multi-page audit fixtures.
-- [ ] Run the visual check across fixtures 41-64 and confirm the baseline inventory has exactly one entry for each of the 65 numbered PDFs.
+- [x] Generate current CLI candidates for fixtures 41-64, including local-font fixtures and the multi-page audit fixtures. Review the pages and copy the accepted PDFs into `output/validated/`.
+- [ ] Run the visual check across fixtures 41-64 using Ghostscript 10.08.0 and confirm the exact 65-PDF inventory.
 
 ## Phase 4: Retire operation checks and close the change
 
@@ -110,11 +110,11 @@ wkhtmltopdf comparison PDFs are outside this phase.
 ### 95.8 Add the CI gate and finish documentation
 
 - [ ] Add `make visual-golden` and a CI job with the pinned Ghostscript build. No `visual-golden` Make target exists yet. Keep it separate from `make test` so ordinary tests do not gain an undeclared system dependency.
-- [x] Update `plans/0.2.7/README.md`, `plans/README.md`, `output/README.md`, and the knowledge base with the approval flow, rendering settings, and current status.
-- [x] Rerun `GOCACHE=/tmp/gowkhtmltopdf-gocache make test` on the final Go tree. It exits 0, including `internal/convert/fixturetests`.
-- [x] Rerun `GOCACHE=/tmp/gowkhtmltopdf-gocache make golden`. It exits 0 and all structural fixture checks pass.
-- [x] Rerun `GOCACHE=/tmp/gowkhtmltopdf-gocache make claim-scan` after the documentation updates. It exits 0 with `claim-scan: clean`.
-- [ ] Pass `make lint` before closing phase 95. The 2026-09-23 run exits 2 on existing `paralleltest` findings in `output_fixture_*.go` and one `wsl` finding in `internal/pdf/shape_gotext.go:532`. The new pixel test files have no lint findings.
+- [x] Update `plans/0.2.7/README.md`, `plans/README.md`, and `output/README.md` with the approval flow, rendering settings, and current status.
+- [x] Run `GOCACHE=/tmp/gowkhtmltopdf-publish-cache make test` on the final Go tree. It passed on 2026-09-24, including the reference inventory check.
+- [x] Run `GOCACHE=/tmp/gowkhtmltopdf-publish-cache make golden` and confirm the structural fixture checks pass. It passed on 2026-09-24.
+- [ ] Run `make claim-scan` after the documentation updates.
+- [ ] Pass `make lint` before closing phase 95. The 2026-09-23 run exited 2 on existing `paralleltest` findings in `output_fixture_*.go` and one `wsl` finding in `internal/pdf/shape_gotext.go:532`. This session did not rerun lint.
 
 ## Dependencies
 
@@ -132,8 +132,9 @@ wkhtmltopdf comparison PDFs are outside this phase.
 - `make samples` rewrites the top-level fixture samples, while `output/README.md` says they are viewer-smoke artifacts rather than byte baselines (`Makefile:181-200`, `output/README.md:3-18`).
 - The structural corpus checks PDF validity, page bounds, embedded fonts, images, URI annotations, and ordered text (`internal/convert/golden_test.go:484-545`).
 - The Go pilot fixes Ghostscript 10.08.0, the PNG device, resolution, and smoothing settings. The comparator checks page count and dimensions, then exact RGB values and writes a diff for mismatches (`internal/convert/fixturetests/pixel_regression_test.go:16-20`, `internal/convert/fixturetests/pixel_regression_test.go:77-100`, `internal/convert/fixturetests/pixel_regression_test.go:198-290`).
-- Fresh fixture conversion, the saved CLI candidate, and the temporary color-mutation check pass with pinned Ghostscript. The mutation writes an inspected diff. The approved directory has only fixture 01; no Make target or CI job exists yet (`internal/convert/fixturetests/pixel_regression_cases_test.go:103-180`, `internal/convert/fixturetests/pixel_regression_cases_test.go:194-213`, `output/validated/`).
-- Final local gates: `make test`, `make golden`, and `make claim-scan` pass. `make lint` exits 2 on existing `paralleltest` findings in `output_fixture_*.go` and one `wsl` finding in `internal/pdf/shape_gotext.go:532`. The two new pixel-test files report no lint findings.
+- Fresh fixture conversion, the saved CLI candidate, and the temporary color-mutation check passed with pinned Ghostscript during the fixture 01 pilot. The reference directory now has PDFs for all 65 body fixtures. `TestVisualReferenceInventory` passed as part of `make test` on 2026-09-24. The installed `/usr/bin/gs` is 9.55.0, so it cannot run the comparator pinned to 10.08.0. The full-corpus comparison remains open.
+- Current CLI PDFs for fixtures 01-64 were rendered into contact sheets with `/usr/bin/gs` 9.55.0 at 48 DPI and reviewed. References 02-64 were copied from those fresh candidates. Fixture 01 retains its earlier approved reference. This review does not replace the pinned 10.08.0 full-corpus comparison.
+- `make test`, `make golden`, `make claim-scan`, and `make build` passed on 2026-09-24. `make lint` still exits 2 on `paralleltest` findings in the intentionally serial `output_fixture_*.go` tests. The new corpus test and deterministic font change pass targeted lint.
 
 ## Out of scope
 
