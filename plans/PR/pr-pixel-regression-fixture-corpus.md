@@ -110,7 +110,7 @@ The 65 approved reference PDFs are under `output/validated/`. Candidates for fix
 | Extension | Files | Insertions | Deletions |
 | --- | ---: | ---: | ---: |
 | `.go` | 75 | 4977 | 2 |
-| `.md` | 19 | 1433 | 5 |
+| `.md` | 21 | 1478 | 5 |
 | `.pdf` | 68 | Binary | Binary |
 | `.py` | 1 | 116 | 0 |
-| **Total** | **163** | **6526** | **7** |
+| **Total** | **165** | **6571** | **7** |
