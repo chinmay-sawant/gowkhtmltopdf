@@ -1,6 +1,6 @@
 ## Summary
 
-Add PDF operation checks and pixel-level visual tests for the numbered fixture PDFs. The visual suite now has references for all 65 body fixtures and a serial comparison test. Phase 94 checks remain until the pinned comparison and closure gates pass.
+Add PDF operation checks and pixel-level visual tests for the numbered fixture PDFs. The visual suite now has references for all 65 body fixtures and a serial comparison test. Add a focused Ghostscript licensing page and link to it from the README. Phase 94 checks remain until the pinned comparison and closure gates pass.
 
 ## Motivation / context
 
@@ -26,6 +26,11 @@ Phase 94 and Phase 95 of `plans/0.2.7/validator-test/` track the PDF fixture che
 - Update the output guide, Phase 94 and Phase 95 checklists, and the v0.2.7 plan index with current evidence and open gates.
 - Add the fixture inspection script and fixture-test authoring guide in the branch history.
 
+### Ghostscript licensing
+
+- Add `documentation/ghostscript-licensing.md` with the repo's test-only Ghostscript use, MIT boundary, and separate distribution and server-use cases.
+- Keep the README note short and link it to the licensing page.
+
 ## Impact
 
 | Area | Impact |
@@ -47,7 +52,7 @@ Phase 94 and Phase 95 of `plans/0.2.7/validator-test/` track the PDF fixture che
 
 - [x] `GOCACHE=/tmp/gowkhtmltopdf-publish-cache make test` (passes, including `TestVisualReferenceInventory`)
 - [x] `GOCACHE=/tmp/gowkhtmltopdf-publish-cache make golden` (passes)
-- [x] `make claim-scan` (passes)
+- [x] `make claim-scan` (passes with the licensing page and README link)
 - [x] `GOCACHE=/tmp/gowkhtmltopdf-publish-cache make build` (passes)
 - [x] `make size-check` (passes)
 - [x] `golangci-lint run --new-from-rev=537df27 ./internal/convert/fixturetests ./internal/pdf` (passes for the new and edited Go code)

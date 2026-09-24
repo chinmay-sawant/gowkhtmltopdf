@@ -213,3 +213,9 @@ budget is `TestTenPageTableReportPerformance` in
 Bundled Liberation and DejaVu fonts are SIL OFL / Bitstream Vera; see
 [internal/pdf/assets/NOTICE](internal/pdf/assets/NOTICE).
 The Noto KR test subset ships [testdata/fonts/OFL.txt](testdata/fonts/OFL.txt).
+
+### Ghostscript for visual tests
+
+The optional visual fixture test uses a separately installed Ghostscript
+executable. See [Ghostscript licensing](documentation/ghostscript-licensing.md)
+for the test setup and licensing details.
