@@ -75,9 +75,8 @@ func attachHFCompanions(req *convert.Request, dir, file string) {
 	}
 }
 
-// requestForFixture builds the same public Request used by make samples:
-// A4, default margins, backgrounds, local file access, and explicit fixture
-// font paths.
+// requestForFixture uses A4, default margins, backgrounds, local file access,
+// and the repo's fixture fonts so host fonts cannot change the output checks.
 func requestForFixture(t *testing.T, file string) *convert.Request {
 	t.Helper()
 	dir := t.TempDir()
@@ -95,17 +94,14 @@ func requestForFixture(t *testing.T, file string) *convert.Request {
 	global.Margin = settings.DefaultMargins()
 	global.Background = true
 
-	fontDirs := []string{}
-	if _, err := os.Stat("/usr/share/fonts/truetype/droid"); err == nil {
-		fontDirs = append(fontDirs, "/usr/share/fonts/truetype/droid")
-	}
-
 	testFonts := filepath.Join("..", "..", "..", "testdata", "fonts")
-	if _, err := os.Stat(testFonts); err == nil {
-		fontDirs = append(fontDirs, testFonts)
+	global.FontPaths = []string{testFonts}
+
+	if file == "fixture-27-cjk-fontpath.html" {
+		global.FontPaths = append(global.FontPaths,
+			filepath.Join("..", "..", "..", "testdata", "fixture-27-fonts"))
 	}
 
-	global.FontPaths = fontDirs
 	req := convert.NewPDFRequest(global, []settings.PdfObject{obj}, nil, nil)
 	attachHFCompanions(req, dir, file)
 
