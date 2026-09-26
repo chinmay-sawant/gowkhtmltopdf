@@ -36,6 +36,12 @@ issues:
       linters:
         - testpackage
         - exhaustruct
+    # Output fixture comparisons run serially because PDF font/subset state is
+    # shared. Keep paralleltest active for every other test file.
+    - path: ^internal/convert/fixturetests/output_fixture_.*_test\.go$
+      text: missing the call to method parallel
+      linters:
+        - paralleltest
   # npm install drops a vendored Go file under flatted; never lint that tree.
   # bindings/c is cgo glue for the Python shared library (Phase 40); its C
   # interop, unsafe, and struct-mirroring patterns are validated via go vet

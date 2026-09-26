@@ -11,6 +11,68 @@ These are **not** golden byte baselines. CI uses `make golden` / structure
 assertions, not binary PDF equality against this folder. See
 [`documentation/samples.md`](../documentation/samples.md).
 
+## Validated visual references
+
+`validated/` holds one reference PDF for every numbered body fixture from 01
+through 64. There are 65 PDFs because fixture 29 has two body HTML files.
+Fixture 36's header and footer files belong to its single body PDF.
+
+`TestVisualReferenceInventory` checks that the directory has exactly these
+65 PDFs (`internal/convert/fixturetests/pixel_regression_corpus_test.go:18-56`).
+`TestVisualGoldenFixtureCorpus` converts each body fixture with the shared
+fixture settings and compares every rendered page
+(`internal/convert/fixturetests/pixel_regression_corpus_test.go:59-96`). The
+tests read `validated/` and never create or replace files there
+(`internal/convert/fixturetests/pixel_regression_test.go:36-59`).
+
+To approve a reference, generate a candidate PDF under `output/` or a temporary
+directory with the same fixture and font settings used by the test helper
+(`internal/convert/fixturetests/fixture_helpers_test.go:78-112`). The fixture
+01 candidate command is:
+
+```sh
+go run ./cmd/gowkhtmltopdf --allow-local-files \
+  --font-path /usr/share/fonts/truetype/droid \
+  --font-path testdata/fonts \
+  -o output/fixture-01-simple-invoice-candidate.pdf \
+  testdata/golden/fixture-01-simple-invoice.html
+```
+
+Render candidates with Ghostscript 10.08.0, `png16m`, 150 dots per inch
+(DPI), and text and graphics smoothing level 4. Review every page before
+copying an accepted candidate into `validated/`. Tests never approve or copy
+references. The comparator checks page count and dimensions, then every RGB
+pixel. Mismatches report the fixture, page, changed-pixel count, largest
+channel difference, and diff path
+(`internal/convert/fixturetests/pixel_regression_test.go:77-100`,
+`internal/convert/fixturetests/pixel_regression_test.go:198-218`,
+`internal/convert/fixturetests/pixel_regression_test.go:221-290`).
+
+Run the full fixture comparison with the pinned Ghostscript binary:
+
+```sh
+GOWKHTMLTOPDF_VISUAL_GS=/path/to/gs \
+  go test ./internal/convert/fixturetests \
+  -run '^TestVisualGoldenFixtureCorpus$' -count=1
+```
+
+The full comparison converts each fixture unless you run the separate fixture
+01 saved-candidate check. Set `GOWKHTMLTOPDF_VISUAL_CANDIDATE` to compare a
+saved candidate with the fixture 01 reference:
+
+```sh
+GOWKHTMLTOPDF_VISUAL_GS=/path/to/gs \
+  GOWKHTMLTOPDF_VISUAL_CANDIDATE=output/fixture-01-simple-invoice-candidate.pdf \
+  go test ./internal/convert/fixturetests \
+  -run '^TestVisualGoldenFixture01SavedCandidate$' -count=1
+```
+
+The full visual comparison and candidate checks skip in ordinary `make test`
+runs unless `GOWKHTMLTOPDF_VISUAL_GS` is set. The inventory check always runs.
+Set `GOWKHTMLTOPDF_VISUAL_DIFF_DIR` to keep the mutation diff for inspection
+after the test exits
+(`internal/convert/fixturetests/pixel_regression_cases_test.go:141-192`).
+
 `make samples` rewrites `fixture-*.pdf`, `fixture-*.png`,
 `showcase-*.pdf`, `architecture-diagram.pdf` (via
 `go run ./testdata/golden/api`), the four `pdf-1.7/` /
@@ -18,7 +80,7 @@ assertions, not binary PDF equality against this folder. See
 (fixture-21 and fixture-56), and (when the network works)
 `wiki-ana-de-armas.pdf`.
 
-## Fixture PDFs (`fixture-01` ... `fixture-58`)
+## Fixture PDFs (`fixture-01` ... `fixture-64`)
 
 Each file is `testdata/golden/<same-basename>.html` converted with
 `--enable-local-file-access`. Companion `*-header.html` / `*-footer.html`
@@ -55,6 +117,7 @@ files are skipped as bodies; fixture-36 attaches them as HTML header/footer.
 | `fixture-27-cjk-fontpath.pdf` | CJK / `--font-path` |
 | `fixture-28-flex-wrap-grid-fixed.pdf` | Flex-wrap + grid + fixed stamp |
 | `fixture-29-float-beside-table.pdf` | Float beside table |
+| `fixture-29-wpt-break-nested-float-print.pdf` | Nested float print break |
 | `fixture-30-orphans-heuristic.pdf` | Orphans heuristic |
 | `fixture-31-sticky-top.pdf` | Print-scoped sticky |
 | `fixture-32-flex-grid-full.pdf` | Flex/grid stage sample |
@@ -84,6 +147,12 @@ files are skipped as bodies; fixture-36 attaches them as HTML header/footer.
 | `fixture-56-architecture-diagram.pdf` | Architecture diagram (21 pages) |
 | `fixture-57-vanguard-telemetry-audit.pdf` | Vanguard Telemetry Audit (356 implemented CSS properties) |
 | `fixture-58-unsupported-worklist-audit.pdf` | Unsupported CSS worklist audit (462 unsupported CSS properties) |
+| `fixture-59-apex-digital-landing.pdf` | Apex Digital landing page |
+| `fixture-60-implemented-props-a.pdf` | Implemented CSS properties, group A |
+| `fixture-61-implemented-props-b.pdf` | Implemented CSS properties, group B |
+| `fixture-62-implemented-props-c.pdf` | Implemented CSS properties, group C |
+| `fixture-63-page-level-demos.pdf` | Page-level CSS demos |
+| `fixture-64-next-72-props.pdf` | Next-72 CSS properties |
 
 ## Image smokes
 

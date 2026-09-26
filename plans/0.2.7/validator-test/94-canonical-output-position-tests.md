@@ -1,0 +1,256 @@
+# 94 - Canonical output checks: text, colors, borders, images (v0.2.7)
+
+> **Parent:** `plans/0.2.7/README.md`
+> **Status:** [~] Superseded by [phase 95](95-canonical-pixel-regression-tests.md). This suite covers fixtures 01-64, including both fixture 29 PDFs. Keep it until phase 95 covers all 65 PDFs, then retire it.
+> **Estimated effort:** L
+> **Owner:** `internal/pdf` for the page-op reader, then `internal/convert` for the fixture checks
+> **Depends on:** committed sample PDFs from `make samples`
+> **Unblocks:** a fast check that a sample still draws the same words, colors, rules, and images in the same places
+> **Number:** 94. Phases 86-93 belong to `plans/0.2.6/86-canonical-0.2.6-wasm.md`. Phase 89 there is the WASM preview. Do not reuse it.
+
+## Supersession (2026-09-23)
+
+This ledger records the page-operation suite built for fixtures 01-64. The
+user asked for full-page pixel comparison with manually approved reference
+PDFs. Phase 95 is now the canonical work list. All phase 94 checks, including
+the completed fixture groups, are superseded. Keep the operation tests until
+the pixel suite covers all 65 fixture PDFs, then remove the old suite and any
+reader code that has no remaining callers.
+
+---
+
+## Direction as of 2026-09-22 (superseded)
+
+The first draft of this ledger checked text origins only. It would stay green
+while a title lost its color, a table lost a border, or an image moved. That is
+not enough for a sample a person opens.
+
+This ledger compares the full page-operation record of each committed sample
+with a fresh conversion, and pins the authored features measured with an
+independent tool. One fixture at a time: inspect, write the check, update this
+ledger, repeat. At supersession, fixture tests covered 01-64, including both
+fixture 29 PDFs. The tests for fixtures 56 and 64 intentionally kept their
+committed versus fresh text differences visible.
+
+## What one fixture check asserts
+
+| Feature | Fields |
+|---------|--------|
+| text | page, string, origin (x, y), font size, resolved BaseFont, fill color |
+| rules and borders | every stroked segment: endpoints, color, width |
+| filled boxes | page box, fill color |
+| images | placement box (lower-left, width, height) |
+| page | count, MediaBox |
+
+`pdf.ParsePageOps` (`internal/pdf/page_ops.go`) reads both PDFs. The committed
+sample is the reference. The fresh `requestForFixture` conversion must
+reproduce it. A mismatch prints the first 10 field diffs.
+
+Tolerances: 0.5 pt on positions, 0.05 pt on sizes and line widths, 0.01 per
+color channel, 0.05 pt on the MediaBox. Do not widen a tolerance to hide a
+miss. A move larger than tolerance is a finding, not noise.
+
+## Coordinate contract
+
+PDF user space. One unit is one point, 1/72 inch. The origin is the
+bottom-left corner of the page. Y grows up. A4 is 595.28 by 841.89, from
+`internal/settings/pagesize.go`. `scripts/inspect_pdf_ops.py` prints the same
+ruler: PyMuPDF reports y downward from the top, and the script flips it.
+
+## How a feature gets into a test
+
+1. Inspect the committed sample with the independent ruler:
+
+   ```bash
+   python3 scripts/inspect_pdf_ops.py output/fixture-NN-....pdf
+   ```
+
+   It prints text spans (origin, size, color, font), drawings (stroked lines,
+   filled rects, color, width), and image boxes.
+2. Read the matching `testdata/golden/*.html` to know which features are
+   authored.
+3. Pin the authored features in the fixture test with the helpers in
+   `internal/convert/fixturetests/output_ops_test.go`: `assertOpsTextRun`,
+   `assertOpsStrokeSegment`, `assertOpsFillRect`, `assertOpsImageBox`.
+4. Run the fixture test. The full op record must match and every pin must
+   hold.
+5. Record the tool output that justified each expectation in the fixture row.
+
+## Reader rules
+
+`internal/pdf/page_ops.go` exposes `ParsePageOps`. It inflates Flate streams,
+walks pages and Form XObjects, and tracks:
+
+- graphics state: `q`/`Q`, `cm`, `rg`, `RG`, `g`, `G`, `k`, `K`, `w`
+- text state: `Tf`, `Td`, `Tm`, `T*`, `TL`, `Tj`, `TJ`
+- paths: `m`, `l`, `c`, `v`, `y`, `re`, `h`, and paint ops `S`, `f`, `B` with
+  their variants
+- `Do`: image boxes and Form XObject recursion, transparency groups included
+
+Curves are approximated by their endpoint. A fill is recorded as the bounding
+box of its subpath. Both are exact for this writer's output, which paints
+axis-aligned rectangles and lines.
+
+## Pilot: fixtures 01-10 (complete)
+
+Files:
+
+- `internal/pdf/page_ops.go`, `internal/pdf/page_ops_test.go`
+- `internal/convert/fixturetests/output_ops_test.go`
+- `internal/convert/fixturetests/output_fixture_01_test.go`
+- `internal/convert/fixturetests/output_fixture_02_test.go`
+- `internal/convert/fixturetests/output_fixture_03_multi_page_invoice_test.go`
+- `internal/convert/fixturetests/output_fixture_04_two_column_layout_test.go`
+- `internal/convert/fixturetests/output_fixture_05_linked_stylesheet_test.go`
+- `internal/convert/fixturetests/output_fixture_06_external_link_test.go`
+- `internal/convert/fixturetests/output_fixture_07_image_logo_test.go`
+- `internal/convert/fixturetests/output_fixture_08_forced_page_breaks_test.go`
+- `internal/convert/fixturetests/output_fixture_09_multi_section_doc_test.go`
+- `internal/convert/fixturetests/output_fixture_10_table_colspan_test.go`
+
+Test: `TestOutputFixture01SimpleInvoice`.
+
+Ground truth from `scripts/inspect_pdf_ops.py` (PyMuPDF 1.27.1), all pinned in
+the test:
+
+| Feature | Value |
+|---------|-------|
+| title | `Acme Widgets GmbH`, #1a3d6d, (28.346, 796.503), 18pt LiberationSans-Bold |
+| meta | `Invoice No. 2024-0001`, #222222, (28.346, 752.677), 10pt bold |
+| body | `Widget A (standard)`, #222222, (29.096, 697.273), 10pt |
+| total | `Total: 234.40 EUR`, #222222, (482.461, 643.077), 10pt bold |
+| footer | `Generated by ...`, #888888, (28.346, 573.470), 8pt |
+| rule | #cccccc, 0.75pt, (28.721, 594.169) to (566.559, 594.169) |
+| page | 1 page, A4 595.28 x 841.89, 23 text runs, no images, no filled boxes |
+
+Proof, both exit 0:
+
+```bash
+go test ./internal/pdf -run 'TestPageOps' -count=1
+go test ./internal/convert/fixturetests -run 'TestOutputFixture01SimpleInvoice$' -count=1
+```
+
+Fixture 02 adds a table-specific proof. The committed PDF and fresh
+conversion are both one-page A4 documents with 101 text runs, 214 stroked
+segments, 48 filled cells, and no images. The test pins the title, a middle
+table item, the payment heading, a blue header cell, an alternating row cell,
+and a gray cell border.
+
+```bash
+go test ./internal/convert/fixturetests -run 'TestOutputFixture02TableHeavyInvoice$' -count=1
+```
+
+Fixtures 03-10 are also complete. Their measured records are:
+
+| Fixture | Pages | Text | Strokes | Fills | Images |
+|---------|------:|-----:|--------:|------:|-------:|
+| 03 multi-page invoice | 4 | 81 | 198 | 6 | 0 |
+| 04 two-column layout | 1 | 25 | 8 | 2 | 0 |
+| 05 linked stylesheet | 1 | 21 | 36 | 4 | 0 |
+| 06 external link | 1 | 23 | 34 | 2 | 0 |
+| 07 image logo | 1 | 9 | 2 | 0 | 2 |
+| 08 forced page breaks | 5 | 25 | 16 | 4 | 0 |
+| 09 multi-section document | 2 | 79 | 94 | 4 | 0 |
+| 10 table colspan | 1 | 39 | 345 | 7 | 0 |
+
+Each test uses anchors measured from its own PDF. The multi-page tests cover
+their first and later pages; fixture 08 covers all five section pages; fixture
+07 pins both image placements; fixture 06 leaves URI rectangles to the
+existing structural golden check.
+
+Fixtures 11-20 are complete. Their measured records from `pdf.ParsePageOps`
+are:
+
+| Fixture | Pages | Text ops | Strokes | Fills | Images |
+|---------|------:|---------:|--------:|------:|-------:|
+| 11 long text wrap | 3 | 1698 | 0 | 0 | 0 |
+| 12 lists | 1 | 50 | 0 | 0 | 0 |
+| 13 pre/code block | 1 | 39 | 12 | 3 | 0 |
+| 14 colorful report | 1 | 30 | 50 | 23 | 0 |
+| 15 bulleted requirements | 1 | 49 | 27 | 2 | 0 |
+| 16 invoice with CSS | 2 | 175 | 333 | 78 | 0 |
+| 17 cover and content | 2 | 21 | 3 | 0 | 0 |
+| 18 typography | 1 | 35 | 5 | 0 | 0 |
+| 19 margin and sizing | 1 | 24 | 42 | 4 | 0 |
+| 20 image grid | 1 | 8 | 16 | 1 | 4 |
+
+The tests are one file per fixture under `internal/convert/fixturetests`:
+`output_fixture_11_long_text_wrap_test.go` through
+`output_fixture_20_image_grid_test.go`. Fixture 11 deliberately
+records the 1698 low-level text operations emitted by the writer, while the
+independent inspector groups those operations into 102 visible text spans.
+Fixture 18 similarly records 35 low-level operations versus 29 grouped spans.
+The comparison is against a fresh conversion, so these counts detect changes
+in the writer's operation stream as well as visible geometry changes.
+
+Fixtures 21 through 64 add 45 top-level PDF checks. Each check opens its exact
+`output/fixture-*.pdf`, resolves the exact matching body HTML, compares every
+page operation, and pins measured text or image anchors. Fixture 36 also
+resolves its header and footer companion HTML through `attachHFCompanions`.
+The passing checks cover fixtures 21-55 and 57-63. Fixture 56 differs in six
+text tokens, and fixture 64 differs in its text stream and fallback runs, so
+those two rows stay open until the committed samples and fresh conversions
+agree.
+
+The fixture checks live in `internal/convert/fixturetests` as a separate
+integration-test package. The package uses the public `convert.NewPDFRequest`
+and `convert.Run` boundary, while keeping the PDF operation reader and
+assertions local to the test package. This keeps the main convert directory
+focused on production code and package-local tests without exporting helpers
+that exist only for this suite.
+
+## Rollout
+
+| Phase | Scope | Status |
+|-------|-------|--------|
+| 94.0 | Page-op reader and synthetic proofs | [~] Superseded by phase 95; retire after visual coverage |
+| 94.1 | Fixtures 01-10 | [~] Superseded by phase 95; replace with page-pixel checks |
+| 94.2 | Fixtures 11-20 | [~] Superseded by phase 95; replace with page-pixel checks |
+| 94.3 | Fixtures 21-28 plus both fixture 29 files | [~] Superseded by phase 95; replace with page-pixel checks |
+| 94.4 | Fixtures 30-39, fixture 36 header and footer | [~] Superseded by phase 95; replace with page-pixel checks |
+| 94.5 | Fixtures 40-49 | [~] Superseded by phase 95; replace with page-pixel checks |
+| 94.6 | Fixtures 50-59, fixture 56 is 21 pages | [~] Superseded by phase 95 |
+| 94.7 | Fixtures 60-64, font-path question | [~] Superseded by phase 95 |
+| 94.8 | Version and compliance renders, 8 PDFs | [~] Not carried into phase 95 scope |
+| 94.9 | Closure: size-check, make test, make golden, knowledge-base | [~] Superseded by phase 95.8 |
+
+## Out of scope
+
+- `output/python/`. Most fixture PDFs there are gitignored. The committed set is fixture 55, fixture 56, `architecture-diagram.pdf`, `invoice-inline.pdf`, and architecture diagrams in the four Python version dirs. Needs `CGO_ENABLED=1`. A later ledger can point here.
+- `output/wkhtmltopdf/`. Reference renders, not this engine.
+- `output/profiles/`. Bench logs, no PDFs.
+- `output/font-examples.pdf` and `output/chrome_ana.pdf`. `make samples` does not rewrite them.
+- `output/architecture-diagram.pdf`, `output/showcase-toc-hf-outline.pdf`, `output/wiki-ana-de-armas.pdf`. Real samples, different flags, not part of the 65 fixture bodies.
+- `testdata/golden/complex-css.html` and `testdata/golden/architecture-diagram.html`. The golden walker converts them. There is no matching `output/complex-css.pdf`, and the root `architecture-diagram.pdf` comes from `testdata/golden/api`, not from that HTML.
+- PNG samples. This suite reads PDF operations.
+- Link rectangles. The writer stores `/Rect`, and `SemanticAnnot` drops it. A later ledger can add them.
+- Replacing the layout geometry tests in `internal/layout/requested_fixture_regression_test.go`. Those stay. They use the layout ruler. This suite uses the PDF ruler.
+
+## Historical dependencies (not active)
+
+These dependencies recorded the old operation-test rollout. Phase 95 owns the
+active work and the deletion gate.
+
+- 94.0 unblocks every fixture phase.
+- 94.7 waits on a written answer to the font-path question before any fixture 60 or 64 expectation is pinned.
+- 94.8 reuses the fixture 21 and fixture 56 records and starts after those two land.
+- 94.9 starts after 94.1 through 94.8 are checked.
+- `make samples` regenerates the committed samples. When a feature actually moves, regenerate the affected sample and update its pins in the same change. The committed file and the fresh conversion must agree before a row closes.
+
+## Historical gate policy (not active)
+
+Mid-phase commands are single-package:
+
+```bash
+go test ./internal/pdf -run 'TestPageOps' -count=1
+go test ./internal/convert/fixturetests -run 'TestOutputFixture' -count=1
+```
+
+`make test` and `make golden` run only in phase 94.9. `make lint` is not part of
+this ledger. The owner runs it after. `make size-check` is allowed in 94.9
+because it is the 2000-line gate and it is not `make lint`.
+
+Never run bare `go test ./...`.
+
+Do not grow `internal/layout/layout.go`, `internal/layout/inline_paint.go`, or
+`internal/imageout/imageout.go`. They are already on the allowlist.

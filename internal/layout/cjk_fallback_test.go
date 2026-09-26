@@ -1,7 +1,6 @@
 package layout
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -10,20 +9,11 @@ import (
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
 )
 
-func TestCJKFontFamilyFallback(t *testing.T) { //nolint:cyclop,funlen
+func TestCJKFontFamilyFallback(t *testing.T) { //nolint:cyclop
 	t.Parallel()
 
 	notoPath := filepath.Join("..", "..", "testdata", "fonts")
-
-	droidPath := "/usr/share/fonts/truetype/droid"
-	if _, err := os.Stat(droidPath); err != nil {
-		t.Skip("droid fonts not installed")
-	}
-
-	if _, err := os.Stat(filepath.Join(notoPath, "NotoSansKR-HangulSubset.ttf")); err != nil {
-		t.Skip("testdata Noto subset missing")
-	}
-
+	droidPath := filepath.Join("..", "..", "testdata", "fixture-27-fonts")
 	reg := pdf.ScanFontDirs([]string{notoPath, droidPath})
 	cssSheet := sheet(t, `body { font-family: "Droid Sans Fallback", "Noto Sans KR", sans-serif; font-size: 14pt }`)
 	src := `<html><body>
