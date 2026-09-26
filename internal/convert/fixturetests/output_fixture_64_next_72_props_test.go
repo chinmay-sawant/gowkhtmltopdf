@@ -7,7 +7,6 @@ import "testing"
 // later property rows, and the first local image placement.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture64Next72Props(t *testing.T) {
-
 	committed := readCommittedOps(t, "fixture-64-next-72-props.pdf")
 	fresh := freshOps(t, "fixture-64-next-72-props.html")
 

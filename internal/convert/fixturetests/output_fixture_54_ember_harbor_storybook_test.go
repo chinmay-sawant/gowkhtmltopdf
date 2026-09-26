@@ -6,7 +6,6 @@ import "testing"
 // the final-page illustration note, and all three illustration placements.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture54EmberHarborStorybook(t *testing.T) {
-
 	committed := readCommittedOps(t, "fixture-54-ember-harbor-storybook.pdf")
 	fresh := freshOps(t, "fixture-54-ember-harbor-storybook.html")
 

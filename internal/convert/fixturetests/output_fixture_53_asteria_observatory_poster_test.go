@@ -6,7 +6,6 @@ import "testing"
 // year, and the local illustration placement.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture53AsteriaObservatoryPoster(t *testing.T) {
-
 	committed := readCommittedOps(t, "fixture-53-asteria-observatory-poster.pdf")
 	fresh := freshOps(t, "fixture-53-asteria-observatory-poster.html")
 

@@ -6,7 +6,6 @@ import "testing"
 // the final continuation marker across the three-page sample.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture30OrphansHeuristic(t *testing.T) {
-
 	committed := readCommittedOps(t, "fixture-30-orphans-heuristic.pdf")
 	fresh := freshOps(t, "fixture-30-orphans-heuristic.html")
 

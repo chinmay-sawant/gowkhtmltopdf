@@ -6,7 +6,6 @@ import "testing"
 // and the full-width local illustration.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture49NightTrainPoster(t *testing.T) {
-
 	committed := readCommittedOps(t, "fixture-49-night-train-poster.pdf")
 	fresh := freshOps(t, "fixture-49-night-train-poster.html")
 

@@ -15,7 +15,6 @@ import "testing"
 //	rule   #c5d5e8, 0.75pt, (35.846, 762.694) to (293.890, 762.694)
 //	1 page, A4, 25 text runs, 8 strokes, 2 fills, no images
 func TestOutputFixture04TwoColumnLayout(t *testing.T) {
-
 	committed := readCommittedOps(t, "fixture-04-two-column-layout.pdf")
 	fresh := freshOps(t, "fixture-04-two-column-layout.html")
 

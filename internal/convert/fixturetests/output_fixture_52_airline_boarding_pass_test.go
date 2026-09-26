@@ -6,7 +6,6 @@ import "testing"
 // section heading, and the final travel note.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture52AirlineBoardingPass(t *testing.T) {
-
 	committed := readCommittedOps(t, "fixture-52-airline-boarding-pass.pdf")
 	fresh := freshOps(t, "fixture-52-airline-boarding-pass.html")
 

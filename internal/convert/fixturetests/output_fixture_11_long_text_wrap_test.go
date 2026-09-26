@@ -11,7 +11,6 @@ import "testing"
 //	final page 3, low-level run "exists " #1c1c1c at (28.346, 598.180), 10pt regular
 //	3 pages, A4, 1698 low-level text runs, no strokes, no fills, no images
 func TestOutputFixture11LongTextWrap(t *testing.T) {
-
 	committed := readCommittedOps(t, "fixture-11-long-text-wrap.pdf")
 	fresh := freshOps(t, "fixture-11-long-text-wrap.html")
 

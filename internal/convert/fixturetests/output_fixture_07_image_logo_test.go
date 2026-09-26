@@ -14,7 +14,6 @@ import "testing"
 //	signature rule #999999, 0.75pt, (28.721, 610.369) to (566.559, 610.369)
 //	1 page, A4, 9 text runs, 2 strokes, no fills, 2 images
 func TestOutputFixture07ImageLogo(t *testing.T) {
-
 	committed := readCommittedOps(t, "fixture-07-image-logo.pdf")
 	fresh := freshOps(t, "fixture-07-image-logo.html")
 

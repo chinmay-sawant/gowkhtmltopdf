@@ -6,7 +6,6 @@ import "testing"
 // needle, and the split-box text on the later page.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture63PageLevelDemos(t *testing.T) {
-
 	committed := readCommittedOps(t, "fixture-63-page-level-demos.pdf")
 	fresh := freshOps(t, "fixture-63-page-level-demos.html")
 

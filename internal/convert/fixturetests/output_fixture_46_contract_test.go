@@ -6,7 +6,6 @@ import "testing"
 // and the two signature labels.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture46Contract(t *testing.T) {
-
 	committed := readCommittedOps(t, "fixture-46-contract.pdf")
 	fresh := freshOps(t, "fixture-46-contract.html")
 

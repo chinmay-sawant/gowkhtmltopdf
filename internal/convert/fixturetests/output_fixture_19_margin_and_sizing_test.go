@@ -12,7 +12,6 @@ import "testing"
 //	border-box rule #1a3d6d, 2.25pt, (28.346, 579.044) to (193.346, 579.044)
 //	1 page, A4, 24 text runs, 42 strokes, 4 fills, no images
 func TestOutputFixture19MarginAndSizing(t *testing.T) {
-
 	committed := readCommittedOps(t, "fixture-19-margin-and-sizing.pdf")
 	fresh := freshOps(t, "fixture-19-margin-and-sizing.html")
 

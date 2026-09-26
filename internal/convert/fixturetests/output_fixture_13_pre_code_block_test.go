@@ -14,7 +14,6 @@ import "testing"
 //	first pre border #d8d8d4, 0.75pt, (28.346, 756.238) to (566.934, 756.238)
 //	1 page, A4, 39 text runs, 12 strokes, 3 fills, no images
 func TestOutputFixture13PreCodeBlock(t *testing.T) {
-
 	committed := readCommittedOps(t, "fixture-13-pre-code-block.pdf")
 	fresh := freshOps(t, "fixture-13-pre-code-block.html")
 

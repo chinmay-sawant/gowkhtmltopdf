@@ -16,7 +16,6 @@ import "testing"
 //	rule    #999999, 1pt, (34.346, 720.434) to (76.473, 720.434)
 //	1 page, A4 595.28 x 841.89, 101 text runs, 214 strokes, 48 fills, no images
 func TestOutputFixture02TableHeavyInvoice(t *testing.T) {
-
 	committed := readCommittedOps(t, "fixture-02-table-heavy-invoice.pdf")
 	fresh := freshOps(t, "fixture-02-table-heavy-invoice.html")
 

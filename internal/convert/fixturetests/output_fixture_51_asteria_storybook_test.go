@@ -6,7 +6,6 @@ import "testing"
 // final-page asset note, and all three illustration placements.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture51AsteriaStorybook(t *testing.T) {
-
 	committed := readCommittedOps(t, "fixture-51-asteria-storybook.pdf")
 	fresh := freshOps(t, "fixture-51-asteria-storybook.html")
 

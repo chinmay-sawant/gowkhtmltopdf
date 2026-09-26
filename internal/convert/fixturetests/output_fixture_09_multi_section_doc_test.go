@@ -17,7 +17,6 @@ import "testing"
 //	rule page 1, #c9d4de, 1pt, (28.346, 685.344) to (132.847, 685.344)
 //	2 pages, A4, 79 text runs, 94 strokes, 4 fills, no images
 func TestOutputFixture09MultiSectionDoc(t *testing.T) {
-
 	committed := readCommittedOps(t, "fixture-09-multi-section-doc.pdf")
 	fresh := freshOps(t, "fixture-09-multi-section-doc.html")
 

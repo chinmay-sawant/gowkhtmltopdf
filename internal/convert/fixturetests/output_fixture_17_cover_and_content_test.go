@@ -12,7 +12,6 @@ import "testing"
 //	cover rule #1a3d6d, 3pt, (191.423, 630.244) to (403.857, 630.244)
 //	2 pages, A4, 21 text runs, 3 strokes, no fills, no images
 func TestOutputFixture17CoverAndContent(t *testing.T) {
-
 	committed := readCommittedOps(t, "fixture-17-cover-and-content.pdf")
 	fresh := freshOps(t, "fixture-17-cover-and-content.html")
 

@@ -6,7 +6,6 @@ import "testing"
 // post-clear row, and the table header fill.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture29FloatBesideTable(t *testing.T) {
-
 	committed := readCommittedOps(t, "fixture-29-float-beside-table.pdf")
 	fresh := freshOps(t, "fixture-29-float-beside-table.html")
 

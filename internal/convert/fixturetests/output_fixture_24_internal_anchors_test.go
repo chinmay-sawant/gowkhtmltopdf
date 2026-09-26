@@ -6,7 +6,6 @@ import "testing"
 // destination heading reached by the internal fragment links.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture24InternalAnchors(t *testing.T) {
-
 	committed := readCommittedOps(t, "fixture-24-internal-anchors.pdf")
 	fresh := freshOps(t, "fixture-24-internal-anchors.html")
 

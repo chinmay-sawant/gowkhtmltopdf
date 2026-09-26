@@ -13,7 +13,6 @@ import "testing"
 //	blockquote border #1a3d6d, 2.25pt, (29.471, 546.713) to (29.471, 573.463)
 //	1 page, A4, 35 low-level text runs, 5 strokes, no fills, no images
 func TestOutputFixture18Typography(t *testing.T) {
-
 	committed := readCommittedOps(t, "fixture-18-typography.pdf")
 	fresh := freshOps(t, "fixture-18-typography.html")
 

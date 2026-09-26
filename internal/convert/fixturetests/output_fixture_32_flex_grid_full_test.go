@@ -6,7 +6,6 @@ import "testing"
 // and the grid's final cell.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture32FlexGridFull(t *testing.T) {
-
 	committed := readCommittedOps(t, "fixture-32-flex-grid-full.pdf")
 	fresh := freshOps(t, "fixture-32-flex-grid-full.html")
 

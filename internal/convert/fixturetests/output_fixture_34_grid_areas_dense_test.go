@@ -6,7 +6,6 @@ import "testing"
 // auto-flow headings in the one-page sample.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture34GridAreasDense(t *testing.T) {
-
 	committed := readCommittedOps(t, "fixture-34-grid-areas-dense.pdf")
 	fresh := freshOps(t, "fixture-34-grid-areas-dense.html")
 

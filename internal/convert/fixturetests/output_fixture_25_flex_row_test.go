@@ -6,7 +6,6 @@ import "testing"
 // the three-item row.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture25FlexRow(t *testing.T) {
-
 	committed := readCommittedOps(t, "fixture-25-flex-row.pdf")
 	fresh := freshOps(t, "fixture-25-flex-row.html")
 

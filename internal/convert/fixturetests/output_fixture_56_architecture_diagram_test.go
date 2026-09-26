@@ -6,7 +6,6 @@ import "testing"
 // a middle-page dependency heading, and the page-21 security heading.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture56ArchitectureDiagram(t *testing.T) {
-
 	committed := readCommittedOps(t, "fixture-56-architecture-diagram.pdf")
 	fresh := freshOps(t, "fixture-56-architecture-diagram.html")
 

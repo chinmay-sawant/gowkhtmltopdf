@@ -6,7 +6,6 @@ import "testing"
 // needle, the final page gallery label, and the first local image placement.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture60ImplementedPropsA(t *testing.T) {
-
 	committed := readCommittedOps(t, "fixture-60-implemented-props-a.pdf")
 	fresh := freshOps(t, "fixture-60-implemented-props-a.html")
 

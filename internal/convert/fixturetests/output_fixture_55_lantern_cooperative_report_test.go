@@ -6,7 +6,6 @@ import "testing"
 // final-page route-sheet callout, and the final page counter.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture55LanternCooperativeReport(t *testing.T) {
-
 	committed := readCommittedOps(t, "fixture-55-lantern-cooperative-report.pdf")
 	fresh := freshOps(t, "fixture-55-lantern-cooperative-report.html")
 

@@ -6,7 +6,6 @@ import "testing"
 // and the final requirements section across the four-page A4 sample.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture21DetailedReport(t *testing.T) {
-
 	committed := readCommittedOps(t, "fixture-21-detailed-report.pdf")
 	fresh := freshOps(t, "fixture-21-detailed-report.html")
 

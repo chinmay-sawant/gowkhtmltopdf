@@ -6,7 +6,6 @@ import "testing"
 // overlay positions in the one-page sample.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture26PositionLite(t *testing.T) {
-
 	committed := readCommittedOps(t, "fixture-26-position-lite.pdf")
 	fresh := freshOps(t, "fixture-26-position-lite.html")
 

@@ -6,7 +6,6 @@ import "testing"
 // footer, and header logo. requestForFixture attaches both companions.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture36HFNestedFlex(t *testing.T) {
-
 	committed := readCommittedOps(t, "fixture-36-hf-nested-flex.pdf")
 	fresh := freshOps(t, "fixture-36-hf-nested-flex.html")
 

@@ -6,7 +6,6 @@ import "testing"
 // row selected by the relational selector.
 // Measurements came from scripts/inspect_pdf_ops.py.
 func TestOutputFixture41HasSelector(t *testing.T) {
-
 	committed := readCommittedOps(t, "fixture-41-has-selector.pdf")
 	fresh := freshOps(t, "fixture-41-has-selector.html")
 
