@@ -206,48 +206,9 @@ func Render(root *html.Node, opts RenderOptions) (image.Image, error) {
 // retained as the source-compatible background-context adapter. It rejects
 // nil contexts at the cancellation-aware boundary.
 func RenderContext(ctx context.Context, root *html.Node, opts RenderOptions) (image.Image, error) {
-	if root == nil {
-		return nil, errNilRoot
-	}
+	img, _, err := RenderLayout(ctx, root, opts)
 
-	if err := opts.Validate(); err != nil {
-		return nil, err
-	}
-
-	if ctx == nil {
-		return nil, errNilContext
-	}
-
-	if err := ctx.Err(); err != nil {
-		return nil, fmt.Errorf("imageout: context: %w", err)
-	}
-
-	font := opts.Font
-	if font == nil {
-		var err error
-
-		font, err = pdf.DefaultFont()
-		if err != nil {
-			return nil, fmt.Errorf("imageout: default font: %w", err)
-		}
-	}
-
-	res, err := layoutResult(ctx, root, opts, font)
-	if err != nil {
-		return nil, err
-	}
-
-	img, err := rasterizeContext(ctx, res, maxHeight(res, opts), opts.Transparent, opts.Padding, opts.Zoom)
-	if err != nil {
-		return nil, err
-	}
-
-	out, err := applyCrop(img, opts.Crop)
-	if err != nil {
-		return nil, err
-	}
-
-	return out, nil
+	return img, err
 }
 
 // layoutResult lays out root at the SmartWidth-grown or fixed viewport.
