@@ -3,7 +3,7 @@
 Module path: `github.com/chinmay-sawant/gowkhtmltopdf`.
 
 The public API is `Document` / `ImageDocument`, shipped in 0.2.4 and current
-at `VERSION` 0.2.6. `api.go` does not export the v0.2.3 symbols. The
+at `VERSION` 0.2.7. `api.go` does not export the v0.2.3 symbols. The
 old-to-new table is [MIGRATION-0.2.4.md](MIGRATION-0.2.4.md).
 
 A document is data. Conversion is one call:

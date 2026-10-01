@@ -1,7 +1,7 @@
 # Plans 0.2.7 - Next 72 and next 100 CSS properties
 
 > **Branch:** `feature/027-next-72` (next-100 authored on `docs/027-next-100` then merged)
-> **Status:** Next-72 complete. Next-100 planned. Phase 95 has 65 reference PDFs and a corpus comparator. The pinned corpus run and CI job remain open. Phase 94 stays active until all references pass.
+> **Status:** Released 2026-10-01 (`VERSION` 0.2.7). Next-72 shipped. Next-100 is planned. Phase 95 has 65 reference PDFs and a corpus comparator. The pinned corpus run and CI job remain open. Phase 94 stays active until all references pass. [Release notes](PR/release-v0.2.7.md).
 > **Baseline:** 354 Implemented / 0 Partial / 464 Unsupported (v0.2.6 catalog)
 > **After next-72 honest flips:** 407 Implemented / 0 Partial / 411 Unsupported of 818 (53 of 72 Implemented; 0 Partial; 19 Unsupported by choice)
 

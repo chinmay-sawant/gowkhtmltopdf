@@ -1,7 +1,7 @@
 # Command-line interface
 
 `gowkhtmltopdf` and `gowkhtmltoimage` share one document model with the Go
-library. `VERSION` is 0.2.6. The flags below are what the binaries accept.
+library. `VERSION` is 0.2.7. The flags below are what the binaries accept.
 There is no legacy `page` / `cover` / `toc` object grammar.
 
 The CLI and library describe the same model:

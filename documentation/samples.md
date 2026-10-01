@@ -91,7 +91,7 @@ only — it does not rewrite the corpus fixture above or write a PDF under
 | Business documents | 43–48 | Dossier, receipt, PO, contract, certificate, shipping |
 | Illustrated print | 49–54 | Poster, letter, storybooks, boarding pass, observatory poster, Ember Harbor |
 | Long-form | 55–56 | Operations brief, 21-page architecture diagram |
-| Catalog audits | 57–64 | Implemented/unsupported property galleries; fixture-64 is the v0.2.7 next-72 audit |
+| Catalog audits | 57–64 | Implemented/unsupported property galleries; fixture-64 is the 0.2.7 next-72 audit |
 
 ### Fixture inventory
 

@@ -21,11 +21,11 @@ Pin the tagged release (Go 1.26+). Binaries land on `GOBIN` or
 `$(go env GOPATH)/bin`:
 
 ```sh
-go install github.com/chinmay-sawant/gowkhtmltopdf/cmd/gowkhtmltopdf@v0.2.6
-go install github.com/chinmay-sawant/gowkhtmltopdf/cmd/gowkhtmltoimage@v0.2.6
+go install github.com/chinmay-sawant/gowkhtmltopdf/cmd/gowkhtmltopdf@v0.2.7
+go install github.com/chinmay-sawant/gowkhtmltopdf/cmd/gowkhtmltoimage@v0.2.7
 gowkhtmltopdf --version
 # Name: gowkhtmltopdf
-# Version: 0.2.6
+# Version: 0.2.7
 ```
 
 ## Install prebuilt binaries
@@ -64,10 +64,10 @@ Check the stamp:
 ```sh
 ./bin/gowkhtmltopdf --version
 # Name: gowkhtmltopdf
-# Version: 0.2.6
+# Version: 0.2.7
 ```
 
-`VERSION` (currently `0.2.6`) is the project release. The library constant
+`VERSION` (currently `0.2.7`) is the project release. The library constant
 `LibraryVersion` (`0.12.7-dev`) is a **wkhtmltopdf settings-surface**
 compatibility id, not the release number. See [library-api.md](library-api.md#versioning).
 
@@ -187,7 +187,7 @@ not from the HTML `<title>` (`<title>` feeds `[doctitle]` only).
 
 Module path is `github.com/chinmay-sawant/gowkhtmltopdf`. The public types
 are `Document` and `ImageDocument` (shipped in 0.2.4, current at `VERSION`
-0.2.6).
+0.2.7).
 
 > **Python user?** The same engine runs in-process from Python through an
 > opt-in shared library (`pip install gowkhtmltopdf`). Install steps,

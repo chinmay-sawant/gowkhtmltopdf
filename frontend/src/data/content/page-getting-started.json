@@ -21,13 +21,13 @@
    "type": "code",
    "heading": "Install with Go",
    "language": "sh",
-   "code": "go install github.com/chinmay-sawant/gowkhtmltopdf/cmd/gowkhtmltopdf@v0.2.6\ngo install github.com/chinmay-sawant/gowkhtmltopdf/cmd/gowkhtmltoimage@v0.2.6\ngowkhtmltopdf --version   # Name: gowkhtmltopdf / Version: 0.2.6"
+   "code": "go install github.com/chinmay-sawant/gowkhtmltopdf/cmd/gowkhtmltopdf@v0.2.7\ngo install github.com/chinmay-sawant/gowkhtmltopdf/cmd/gowkhtmltoimage@v0.2.7\ngowkhtmltopdf --version   # Name: gowkhtmltopdf / Version: 0.2.7"
   },
   {
    "type": "code",
    "heading": "Build",
    "language": "sh",
-   "code": "# stamps VERSION into bin/gowkhtmltopdf and bin/gowkhtmltoimage\n# export CGO_ENABLED=0 first for the static release link; make build\n# does not set that variable itself\nmake build\n\n# equivalent, explicit:\nCGO_ENABLED=0 go build -ldflags \"-X github.com/chinmay-sawant/gowkhtmltopdf/internal/cli.Version=$(cat VERSION)\" \\\n  -o bin/gowkhtmltopdf ./cmd/gowkhtmltopdf\nCGO_ENABLED=0 go build -ldflags \"-X github.com/chinmay-sawant/gowkhtmltopdf/internal/cli.Version=$(cat VERSION)\" \\\n  -o bin/gowkhtmltoimage ./cmd/gowkhtmltoimage\n\n./bin/gowkhtmltopdf --version   # Name: gowkhtmltopdf / Version: 0.2.6\n# VERSION is the project release. LibraryVersion (0.12.7-dev) is the\n# wkhtmltopdf settings-surface id, not the release number."
+   "code": "# stamps VERSION into bin/gowkhtmltopdf and bin/gowkhtmltoimage\n# export CGO_ENABLED=0 first for the static release link; make build\n# does not set that variable itself\nmake build\n\n# equivalent, explicit:\nCGO_ENABLED=0 go build -ldflags \"-X github.com/chinmay-sawant/gowkhtmltopdf/internal/cli.Version=$(cat VERSION)\" \\\n  -o bin/gowkhtmltopdf ./cmd/gowkhtmltopdf\nCGO_ENABLED=0 go build -ldflags \"-X github.com/chinmay-sawant/gowkhtmltopdf/internal/cli.Version=$(cat VERSION)\" \\\n  -o bin/gowkhtmltoimage ./cmd/gowkhtmltoimage\n\n./bin/gowkhtmltopdf --version   # Name: gowkhtmltopdf / Version: 0.2.7\n# VERSION is the project release. LibraryVersion (0.12.7-dev) is the\n# wkhtmltopdf settings-surface id, not the release number."
   },
   {
    "type": "callout",

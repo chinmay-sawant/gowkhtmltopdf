@@ -8,7 +8,8 @@ make samples
 ```
 
 These are **not** golden byte baselines. CI uses `make golden` / structure
-assertions, not binary PDF equality against this folder. See
+assertions, not binary PDF equality against this folder. The copies committed
+on this branch ship with 0.2.7 as viewer smoke. See
 [`documentation/samples.md`](../documentation/samples.md).
 
 ## Validated visual references

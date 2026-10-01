@@ -4,6 +4,79 @@ All notable changes to gowkhtmltopdf are recorded here. This project follows
 semantic versioning; `VERSION` holds the current release and is stamped into
 binaries at build time (see README "Versioning").
 
+## Unreleased
+
+## 0.2.7 (2026-10-01)
+
+Print CSS and public layout release after [0.2.6](#026-2026-09-13).
+The catalog is **407 implemented / 0 partial / 411 unsupported** of 818
+webref properties. 53 of the 72 next-72 names are implemented. Callers can
+parse, style, and lay out HTML without writing a PDF.
+
+Default output remains **unclaimed PDF 1.4**. `--pdf-version` /
+`Document.PDFVersion` is a version header, **not** a conformance claim.
+The claim is `--pdf-profile` / `Document.PDFProfile`.
+
+PRs: [#74](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/74),
+[#76](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/76),
+[#77](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/77),
+[#78](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/78),
+[#79](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/79),
+[#81](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/81).
+Compare:
+[v0.2.6...v0.2.7](https://github.com/chinmay-sawant/gowkhtmltopdf/compare/v0.2.6...v0.2.7).
+Release body: [plans/0.2.7/PR/release-v0.2.7.md](plans/0.2.7/PR/release-v0.2.7.md).
+
+### Added
+
+- **Next-72 print CSS ([#76](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/76)):**
+  53 properties with an apply arm and a layout or paint consumer.
+  Font features and variants, including `font-optical-sizing`,
+  `font-palette`, and `font-variation-settings` on faces that carry the
+  tables. Text box trim, autospace, spacing, hanging punctuation, hyphenate
+  limits, and `initial-letter`. Grid gap aliases, `grid-auto-columns` /
+  `grid-auto-rows`, `column-height`, `column-wrap`, `aspect-ratio`,
+  `object-fit`, `object-position`, logical overflow, `shape-outside`,
+  `shape-margin`, `counter-set`. Fixture-64 (`NEXT-72-PROPS`) is the audit.
+- **Public layout entry ([#81](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/81)):**
+  `html.Parse`, `css.Apply`, and `layout.Lay`. `screen.Render` is those
+  three steps plus a PNG and element rectangles. `markup.Parse` returns a
+  detached tree. Linked stylesheets and images are not fetched. Pagination
+  and PDF writing stay on `Document`.
+- **Chrome flex cases 1-40 ([#76](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/76)):**
+  source-shaped HTML under `test/chrome/` with box checks or PDF checks.
+- **Fixture checks ([#79](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/79)):**
+  PDF operation checks for the numbered fixtures, and 65 visual reference
+  PDFs under `output/validated/`. The pixel test skips unless
+  `GOWKHTMLTOPDF_VISUAL_GS` is set. The pinned corpus run and CI job stay open.
+- **Ghostscript licensing page ([#79](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/79)):**
+  `documentation/ghostscript-licensing.md`. The engine does not start Ghostscript.
+- **Site ([#77](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/77), [#78](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/78)):**
+  showcase lists fixtures 59-64 and the nested-float sample. The compatibility
+  page names all 72 next-72 properties.
+
+### Changed
+
+- Warm allocated bytes for one pass of the 40 flex cases fell from 64.3 MB
+  to 28.0 MB. The 2026-09-13 500-page snapshot was not remeasured.
+- Equal-priority Unicode aliases in the font cmap pick the lowest code point.
+
+### Fixed
+
+- **Links ([#74](https://github.com/chinmay-sawant/gowkhtmltopdf/pull/74)):**
+  `text-decoration: none` is honored. A forced underline is only the opt-in
+  `--print-link-underline` flag.
+- Flex and table paint from the Chrome cases: centered auto-width column
+  items, definite stretched cross sizes, container chrome in the intrinsic
+  width, continuation-page `thead` bands, transparent borders skipped,
+  dashed and dotted fragments centered, range thumb and input button label.
+
+### Still unsupported
+
+- 19 next-72 names: 14 Borders-4 / Round Display drafts, plus `text-fit`,
+  `shape-inside`, `shape-padding`, `shape-image-threshold`, and `float-defer`.
+- Next-100 (`plans/0.2.7/88-canonical-0.2.7-next-100.md`) is planned only.
+
 ## 0.2.6 (2026-09-13)
 
 ### Added

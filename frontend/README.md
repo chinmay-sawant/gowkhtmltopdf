@@ -28,7 +28,7 @@ What the site ships:
   The sample picker loads five curated templates from `public/wasm/samples/`
   and, when GitHub is reachable, the golden fixture corpus from the repository.
   The WASM adapter ships in 0.2.6
-  (`plans/0.2.6/86-canonical-0.2.6-wasm.md`); `VERSION` in this tree is 0.2.6.
+  (`plans/0.2.6/86-canonical-0.2.6-wasm.md`); `VERSION` in this tree is 0.2.7.
 - **Issue dossier** (`/dossier`): all 1,329 open `wkhtmltopdf/wkhtmltopdf`
   issues classified 469 implemented / 298 partial / 562 not implemented, with
   cited evidence on every row. The 100 newest rows carry hand-written

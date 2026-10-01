@@ -9,8 +9,10 @@ This guide is the product-facing fidelity story. The normative per-feature
 contract is the [compatibility matrix](compatibility-matrix.md). Post-MVP work
 is tracked in
 [`plans/0.2.0/10-canonical-post-mvp-roadmap.md`](../plans/0.2.0/10-canonical-post-mvp-roadmap.md).
-Print CSS coverage (phases 48-56) lives in
+Print CSS coverage for 0.2.6 (phases 48-56) lives in
 [`plans/0.2.6/48-canonical-0.2.6-css-coverage.md`](../plans/0.2.6/48-canonical-0.2.6-css-coverage.md).
+The 0.2.7 next-72 wave (53 of 72 names implemented) lives in
+[`plans/0.2.7/87-canonical-0.2.7-next-72.md`](../plans/0.2.7/87-canonical-0.2.7-next-72.md).
 
 ---
 
@@ -245,5 +247,6 @@ after Phase 21 acceptance against vendored fixtures.
 | [deferred.md](deferred.md) | Deferred features and workload priority |
 | [performance.md](performance.md) | Benchmarks and how to measure |
 | [../plans/0.2.0/10-canonical-post-mvp-roadmap.md](../plans/0.2.0/10-canonical-post-mvp-roadmap.md) | Post-MVP (0.2.0) ledger |
-| [../plans/0.2.6/48-canonical-0.2.6-css-coverage.md](../plans/0.2.6/48-canonical-0.2.6-css-coverage.md) | Active print CSS coverage ledger (phases 48-56) |
+| [../plans/0.2.6/48-canonical-0.2.6-css-coverage.md](../plans/0.2.6/48-canonical-0.2.6-css-coverage.md) | 0.2.6 print CSS coverage ledger (phases 48-56) |
+| [../plans/0.2.7/87-canonical-0.2.7-next-72.md](../plans/0.2.7/87-canonical-0.2.7-next-72.md) | 0.2.7 next-72 wave, shipped (53 of 72 implemented) |
 | [../README.md](../README.md#deferred--not-planned) | Deferred table |

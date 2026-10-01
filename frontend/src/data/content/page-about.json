@@ -12,8 +12,8 @@
    "heading": "Status at a glance",
    "items": [
     {
-     "title": "v0.2.6",
-     "body": "The current release stamp (`VERSION`) is 0.2.6. The tree on this branch catalogs 818 webref properties at 407 Implemented, 0 Partial, and 411 Unsupported after the v0.2.7 next-72 wave (53 of 72 names Implemented). 0.2.6 shipped extended CSS coverage and the opt-in browser WASM adapter for inline HTML PDF, PNG, and JPEG previews. 0.2.5 shipped the in-process Python bindings on PyPI and the frozen C ABI v1 they run on (`bindings/c`, exported by an opt-in `make c-shared` build; native Go builds stay `CGO_ENABLED=0`). Default output is unclaimed PDF 1.4 with opt-in `--pdf-version` 1.7 / 2.0 and `--pdf-profile` (PDF/A-3a, PDF/A-4, PDF/UA-1, PDF/UA-2)."
+     "title": "v0.2.7",
+     "body": "The current release stamp (`VERSION`) is 0.2.7. The catalog is 818 webref properties at 407 Implemented, 0 Partial, and 411 Unsupported. 53 of the 72 next-72 names are Implemented. 0.2.6 shipped the earlier CSS coverage wave and the opt-in browser WASM adapter for inline HTML PDF, PNG, and JPEG previews. 0.2.5 shipped the in-process Python bindings on PyPI and the frozen C ABI v1 they run on (`bindings/c`, exported by an opt-in `make c-shared` build; native Go builds stay `CGO_ENABLED=0`). Default output is unclaimed PDF 1.4. `--pdf-version` 1.7 / 2.0 is a version header. `--pdf-profile` is the PDF/A and PDF/UA claim."
     },
     {
      "title": "Repeatable layout",
