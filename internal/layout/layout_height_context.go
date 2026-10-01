@@ -1,5 +1,18 @@
 package layout
 
+// seedInitialContainingBlock installs a positive Options.Height as the
+// in-flow containing-block height. The root element resolves percentage
+// heights against that viewport. A non-positive height leaves the block
+// indefinite, so a percentage stays auto.
+func (e *engine) seedInitialContainingBlock() {
+	if e.opts.Height <= 0 {
+		return
+	}
+
+	e.initialCBHeight = e.opts.Height
+	e.flowCBHeight = &e.initialCBHeight
+}
+
 // containingBlockHeight returns the current in-flow containing-block height.
 // Percent heights are intentionally unresolved when the pointer is nil.
 func (e *engine) containingBlockHeight() float64 {

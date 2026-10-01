@@ -619,7 +619,10 @@ type engine struct {
 	// absCBHeights carries the containing-block height to deferred absolute
 	// children after their in-flow parent has finished determining its size.
 	absCBHeights map[*html.Node]float64
-	flowCBHeight *float64 // nil means the in-flow containing-block height is indefinite
+	// initialCBHeight is Options.Height while that viewport is the percentage
+	// basis for the root element. flowCBHeight points at it for that element.
+	initialCBHeight float64
+	flowCBHeight    *float64 // nil means the in-flow containing-block height is indefinite
 	// inlineItemPool recycles temporary inline-item backing arrays. The pool is
 	// engine-local because layout is single-threaded and nested inline layout
 	// must retain each active caller's slice.
@@ -1180,6 +1183,7 @@ func newEngine(
 // finalizeResult builds the display list and Result from the constructed
 // engine (extracted from LayoutContext for clarity).
 func finalizeResult(eng *engine, root *html.Node, opts Options) (*Result, error) {
+	eng.seedInitialContainingBlock()
 	boxNode := eng.build(root, opts.Width, 0, 0)
 
 	if eng.err != nil {
@@ -1696,6 +1700,12 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 	}
 
 	previousCB, _ := e.setFlowCB(style)
+	// The synthetic document box has an auto height, so setFlowCB drops the
+	// viewport. The html element's containing block is that viewport.
+	if node.Name == "#document" && e.flowCBHeight == nil {
+		e.seedInitialContainingBlock()
+	}
+
 	curY = e.flowChildren(boxNode, children, style, contentW, contentX, posY, curY)
 	e.flowCBHeight = previousCB
 	if widget && style.Height < 0 {
