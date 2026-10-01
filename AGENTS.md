@@ -252,9 +252,11 @@ that fails if `docs/` goes dirty.
 
 ## Code structure
 
-- **File size soft limit: ~2,000 lines.** Three files exceed it today:
-  `internal/layout/layout.go` (2,497), `internal/layout/style_properties.go`
-  (2,171), and `internal/imageout/imageout.go` (2,058). Do not grow them
+- **File size soft limit: ~2,000 lines.** Two files exceed it today:
+  `internal/layout/layout.go` (2,362) and
+  `internal/layout/inline_paint.go` (2,021). `internal/imageout/imageout.go`
+  is under the limit after `RenderContext` moved its body into
+  `internal/imageout/frame.go`. Do not grow the two over-limit files
   further; extract a cohesive piece into a same-package file whenever you
   touch them.
   No new file crosses the limit without a written reason. `make size-check`

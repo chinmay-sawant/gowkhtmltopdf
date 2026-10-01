@@ -23,6 +23,15 @@ ImageDocument.Validate → ImageDocument.toImageRequest → imageout.RunRequest
 and again at the mapper boundary; `Base` is legal only for HTML. Empty or
 ambiguous sources fail before files, URLs, or output sinks are opened.
 
+## HTML, CSS, and layout
+
+Packages `html`, `css`, and `layout` are the public parse, style, and
+placement path. `html.Parse` keeps the engine tree. `css.Apply` collects
+that document's `<style>` elements. `layout.Lay` returns CSS-pixel boxes
+and the painted image. They do not paginate and they do not write a PDF.
+`screen.Render` encodes that image as a PNG. `markup.Parse` is a detached
+tree and is not the value `css.Apply` accepts.
+
 ## PDF model
 
 ```go
