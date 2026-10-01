@@ -95,8 +95,11 @@ Issue templates: [`skills/PR/ISSUE_TEMPLATE.md`](skills/PR/ISSUE_TEMPLATE.md).
 | Image mode | `internal/imageout` |
 | End-to-end convert | `internal/convert` |
 | Public library API | root `gowkhtmltopdf` (`api.go`) |
+| Public HTML, CSS, layout | `html`, `css`, `layout` (no PDF write) |
 
 Pipeline: **load → parse → style → layout → paginate/paint → PDF write**.
+The public `html`, `css`, and `layout` packages stop after layout and paint.
+They do not paginate and they do not write a PDF.
 
 ---
 

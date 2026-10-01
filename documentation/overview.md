@@ -107,6 +107,9 @@ Orchestration for PDF lives in `internal/convert` (`RenderObjects` →
 `Assemble` → `Finalize`). The public library wraps that in `Document` /
 `ImageDocument`. Image mode shares load → parse → style → layout, then
 rasterizes one canvas (no pagination, TOC, outline, copies, or headers).
+Packages `html`, `css`, and `layout` expose that same parse, style, and
+layout path to another module. They do not paginate and they do not write
+a PDF. `screen.Render` is the one-call PNG form of those three packages.
 
 One-page package map: [architecture.md](architecture.md).
 Domain deep-dives: [architecture/](architecture/).
@@ -118,6 +121,7 @@ Domain deep-dives: [architecture/](architecture/).
 | PDF CLI | `cmd/gowkhtmltopdf` → `gowkhtmltopdf` | PDF (unclaimed 1.4 default; 1.7 / 2.0 and PDF/A+UA profiles opt-in) |
 | Image CLI | `cmd/gowkhtmltoimage` → `gowkhtmltoimage` | PNG or JPEG |
 | Go API | module root package `gowkhtmltopdf` | PDF (same version/profile rules) or image in memory / `io.Writer` |
+| HTML layout API | packages `html`, `css`, `layout` | Element boxes and one painted image. No PDF |
 
 Both CLIs share `internal/cli` and `internal/settings`. The library never
 imports `internal/cli`. `cmd/` never imports the root package.

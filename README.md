@@ -105,6 +105,10 @@ doc := gowkhtmltopdf.Document{
 pdfBytes, err := doc.PDF(ctx)
 ```
 
+To place HTML and CSS without writing a PDF, call the `html`, `css`, and
+`layout` packages. `screen.Render` is those three steps plus a PNG encode.
+Details and a full example: [documentation/library-api.md](documentation/library-api.md).
+
 Local files, TOC/cover fields, network policy, and the migration table:
 [documentation/library-api.md](documentation/library-api.md),
 [documentation/MIGRATION-0.2.4.md](documentation/MIGRATION-0.2.4.md).

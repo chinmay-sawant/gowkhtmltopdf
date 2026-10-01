@@ -277,6 +277,47 @@ pngBytes, err := imageDoc.Image(ctx)
 `WriteImage` is the writer-first form. Image mode rejects empty or multi-source
 content and has no pages, cover, TOC, outline, or copies.
 
+## HTML, CSS, and layout
+
+`Document` and `ImageDocument` write a PDF or a finished image. A program that
+needs the stages themselves uses three packages. None of them writes a PDF.
+
+| Package | Call | Result |
+|---------|------|--------|
+| `html` | `Parse` | The document tree. `Find` looks up an element by id. |
+| `css` | `Parse`, `Apply` | One stylesheet, or that document plus its `<style>` elements. |
+| `layout` | `Lay` | Element boxes in CSS pixels, and the painted image. |
+
+```go
+import (
+    "github.com/chinmay-sawant/gowkhtmltopdf/css"
+    "github.com/chinmay-sawant/gowkhtmltopdf/html"
+    "github.com/chinmay-sawant/gowkhtmltopdf/layout"
+)
+
+doc, err := html.Parse([]byte(page))
+styled, err := css.Apply(ctx, doc, css.Options{
+    WidthPx:  480,
+    HeightPx: 640,
+    Media:    "screen",
+})
+placed, err := layout.Lay(ctx, styled)
+boxes := placed.Boxes()
+img := placed.Image()
+```
+
+`css.Apply` reads the tree from `html.Parse`. Pass extra sheets in
+`Options.Extra`. An empty `Media` means `screen`. `layout.Lay` places that
+same tree and paints `Image` from the placement. `Boxes` use CSS pixels, y
+down, origin at the top left of the image.
+
+`screen.Render` is those three calls plus a PNG encode. `markup.Parse` returns
+a detached copy of the tree for inspection. `css.Apply` does not accept that
+copy.
+
+Linked style sheets and images are not fetched. A `<style>` element in the
+document is applied. The `value` attribute of a text input is not painted.
+
 ## Validation and errors
 
 Call `Validate` when a caller needs to report configuration errors before

@@ -128,6 +128,18 @@ func (r ResourceContext) CollectSheets(ctx context.Context, root *html.Node, opt
 	return sheets
 }
 
+// CollectTreeSheets collects stylesheets from an already parsed root.
+// CollectSheets logs a collector error and drops it. This returns that error.
+func CollectTreeSheets(
+	ctx context.Context,
+	resources ResourceContext,
+	root *html.Node,
+	opts SheetOptions,
+	log io.Writer,
+) ([]*css.Stylesheet, error) {
+	return resources.collectSheets(ctx, root, opts, log)
+}
+
 // MergeFontFaces loads @font-face resources through this document's policy.
 //
 //nolint:wsl,lll // resource validation flow

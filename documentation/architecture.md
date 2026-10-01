@@ -15,6 +15,11 @@ Deep-dives with `file:line` references live under
 | Package | Responsibility |
 |---------|----------------|
 | `gowkhtmltopdf` (root `document.go`) | Public library: `Document` / `ImageDocument`, explicit `Content`, validation, writer-first conversion |
+| `html` | Public parser. `Parse` keeps the tree that `css.Apply` reads |
+| `css` | Public stylesheets. `Parse` reads one sheet. `Apply` collects `<style>` onto an `html.Document` |
+| `layout` | Public placement. `Lay` returns CSS-pixel boxes and the painted image. No PDF pagination |
+| `screen` | `Render` runs `html.Parse`, `css.Apply`, and `layout.Lay`, then encodes a PNG |
+| `markup` | Detached HTML tree for inspection. Not the document `css.Apply` accepts |
 | `cmd/gowkhtmltopdf` | PDF CLI (`internal/app` + `internal/cli` only) |
 | `cmd/gowkhtmltoimage` | Image CLI |
 | `bindings/wasm` | Browser adapter: inline HTML request, browser-safe policy, JavaScript bridge |

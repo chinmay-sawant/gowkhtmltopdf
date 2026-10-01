@@ -6,21 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"image/png"
-	"io"
 	"strings"
 
-	"github.com/chinmay-sawant/gowkhtmltopdf/internal/convert/prepare"
-	"github.com/chinmay-sawant/gowkhtmltopdf/internal/imageout"
-	"github.com/chinmay-sawant/gowkhtmltopdf/internal/layout"
-	"github.com/chinmay-sawant/gowkhtmltopdf/internal/load"
-	"github.com/chinmay-sawant/gowkhtmltopdf/internal/settings"
-)
-
-const (
-	// cssPxToPt matches imageout: 1 CSS pixel is 0.75 points at 96 dpi.
-	cssPxToPt = 0.75
-	// ptToPx converts a layout point to one PNG pixel at zoom 1.
-	ptToPx = 96.0 / 72.0
+	"github.com/chinmay-sawant/gowkhtmltopdf/css"
+	"github.com/chinmay-sawant/gowkhtmltopdf/html"
+	"github.com/chinmay-sawant/gowkhtmltopdf/layout"
 )
 
 // Sentinel errors for caller mistakes. Engine failures are wrapped errors
@@ -29,22 +19,11 @@ var (
 	ErrNilContext = errors.New("screen: nil context")
 	ErrEmptyHTML  = errors.New("screen: empty html")
 	ErrBadSize    = errors.New("screen: width and height must be positive")
-
-	errEmptyDocument = errors.New("screen: empty document")
 )
 
-// Box is one element the host can hit-test. X, Y, W, H are CSS pixels.
-// Action is the data-action attribute. Text is the element's descendant text.
-type Box struct {
-	ID     string
-	Tag    string
-	Action string
-	Text   string
-	X      float64
-	Y      float64
-	W      float64
-	H      float64
-}
+// Box is one element the host can hit-test.
+// It is the layout package's box, in CSS pixels.
+type Box = layout.Box
 
 // Frame is one laid-out HTML document.
 type Frame struct {
@@ -54,10 +33,10 @@ type Frame struct {
 	Height int
 }
 
-// Render parses source, applies its style sheets, and returns a PNG plus
-// element rectangles from that same layout. widthPx and heightPx are the
-// viewport in CSS pixels. The PNG is at least that size. Linked style sheets
-// and images are not fetched. A style element in the document is applied.
+// Render parses source, applies its style sheets, lays the document out,
+// and returns a PNG plus the element rectangles from that layout.
+// widthPx and heightPx are the viewport in CSS pixels.
+// Linked style sheets and images are not fetched.
 func Render(ctx context.Context, source []byte, widthPx, heightPx int) (*Frame, error) {
 	if ctx == nil {
 		return nil, ErrNilContext
@@ -75,93 +54,37 @@ func Render(ctx context.Context, source []byte, widthPx, heightPx int) (*Frame, 
 		return nil, ErrBadSize
 	}
 
-	prep, err := prepareSource(ctx, source, widthPx, heightPx)
+	doc, err := html.Parse(source)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("screen: parse: %w", err)
 	}
 
-	return rasterFrame(ctx, prep, widthPx, heightPx)
-}
-
-func prepareSource(ctx context.Context, source []byte, widthPx, heightPx int) (
-	*prepare.Prepared, error,
-) {
-	global := settings.DefaultPdfGlobal()
-	global.Web.MediaType = settings.MediaScreen
-
-	loader, err := load.NewLoaderWithError(global.Load)
+	styled, err := css.Apply(ctx, doc, css.Options{
+		WidthPx:  widthPx,
+		HeightPx: heightPx,
+		Media:    "screen",
+		Extra:    nil,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("screen: loader: %w", err)
+		return nil, fmt.Errorf("screen: css: %w", err)
 	}
 
-	//nolint:exhaustruct // inline HTML is the only load input this entry uses
-	pageLoad := settings.LoadPage{
-		InlineHTML: source,
-		MediaType:  settings.MediaScreen,
-	}
-
-	widthPt := float64(widthPx) * cssPxToPt
-	heightPt := float64(heightPx) * cssPxToPt
-	opts := prepare.BuildOptions(widthPt, heightPt, "screen", 0, global.Web)
-
-	prep, err := prepare.Document(ctx, loader, "inline", pageLoad, nil, opts, io.Discard)
+	placed, err := layout.Lay(ctx, styled)
 	if err != nil {
-		return nil, fmt.Errorf("screen: prepare: %w", err)
-	}
-
-	if prep == nil || prep.Root == nil {
-		return nil, fmt.Errorf("screen: prepare: %w", errEmptyDocument)
-	}
-
-	return prep, nil
-}
-
-func rasterFrame(ctx context.Context, prep *prepare.Prepared, widthPx, heightPx int) (*Frame, error) {
-	//nolint:exhaustruct // fixed viewport, screen media, backgrounds on, no crop
-	opts := imageout.RenderOptions{
-		Width:      widthPx,
-		Height:     heightPx,
-		Sheets:     prep.Sheets,
-		Media:      "screen",
-		Background: true,
-		Registry:   prep.Registry,
-	}
-
-	img, res, err := imageout.RenderLayout(ctx, prep.Root, opts)
-	if err != nil {
-		return nil, fmt.Errorf("screen: render: %w", err)
+		return nil, fmt.Errorf("screen: layout: %w", err)
 	}
 
 	var buf bytes.Buffer
-	if err := png.Encode(&buf, img); err != nil {
+	if err := png.Encode(&buf, placed.Image()); err != nil {
 		return nil, fmt.Errorf("screen: png: %w", err)
 	}
 
-	bounds := img.Bounds()
+	width, height := placed.Size()
 
 	return &Frame{
 		PNG:    buf.Bytes(),
-		Boxes:  boxesFrom(layout.PlacedElements(res)),
-		Width:  bounds.Dx(),
-		Height: bounds.Dy(),
+		Boxes:  placed.Boxes(),
+		Width:  width,
+		Height: height,
 	}, nil
-}
-
-func boxesFrom(placed []layout.PlacedElement) []Box {
-	boxes := make([]Box, len(placed))
-
-	for i, item := range placed {
-		boxes[i] = Box{
-			ID:     item.ID,
-			Tag:    item.Tag,
-			Action: item.Action,
-			Text:   item.Text,
-			X:      item.X * ptToPx,
-			Y:      item.Y * ptToPx,
-			W:      item.W * ptToPx,
-			H:      item.H * ptToPx,
-		}
-	}
-
-	return boxes
 }
