@@ -1482,6 +1482,7 @@ var styleGroups = [...]styleGroupFn{ //nolint:gochecknoglobals // static dispatc
 	applyInitialLetterProps,
 	applyShapeProps,
 	applyFloatPageProps,
+	applyClipPathProps,
 }
 
 //nolint:cyclop,goconst,funlen // vendor prefix lookup map

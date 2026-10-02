@@ -300,6 +300,7 @@ func styleInternEqual(a, b *ResolvedStyle) bool {
 		a.BackgroundClip == b.BackgroundClip &&
 		a.BackgroundOrigin == b.BackgroundOrigin &&
 		a.BackgroundAttachment == b.BackgroundAttachment &&
+		a.ClipPath == b.ClipPath &&
 		a.BorderImageSource == b.BorderImageSource &&
 		a.BorderImageSlice == b.BorderImageSlice &&
 		a.BorderImageWidth == b.BorderImageWidth &&
@@ -631,6 +632,7 @@ func styleInternFingerprint(s *ResolvedStyle) uint64 {
 	h = styleInternHashString(h, s.BackgroundClip)
 	h = styleInternHashString(h, s.BackgroundOrigin)
 	h = styleInternHashString(h, s.BackgroundAttachment)
+	h = styleInternHashString(h, s.ClipPath)
 	h = styleInternHashString(h, s.BorderImageSource)
 	h = styleInternHashString(h, s.BorderImageSlice)
 	h = styleInternHashString(h, s.BorderImageWidth)
@@ -956,6 +958,7 @@ func styleInternFields() []string {
 		"BackgroundClip",
 		"BackgroundOrigin",
 		"BackgroundAttachment",
+		"ClipPath",
 		"BorderImageSource",
 		"BorderImageSlice",
 		"BorderImageWidth",
@@ -1083,6 +1086,7 @@ func styleInternHashBorder(h uint64, v border) uint64 {
 	for _, e := range v.Color {
 		h = styleInternHashFloat64(h, e)
 	}
+	h = styleInternHashBool(h, v.Transparent)
 
 	return h
 }

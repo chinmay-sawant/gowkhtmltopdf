@@ -327,11 +327,14 @@ type ResolvedStyle struct {
 	BackgroundClip         string
 	BackgroundOrigin       string
 	BackgroundAttachment   string
-	BorderImageSource      string
-	BorderImageSlice       string
-	BorderImageWidth       string
-	BorderImageOutset      string
-	BorderImageRepeat      string
+	// ClipPath is the canonical clip-path value: inset() | circle() | ellipse()
+	// | polygon(). Empty means no clip (none / unsupported / invalid).
+	ClipPath          string
+	BorderImageSource string
+	BorderImageSlice  string
+	BorderImageWidth  string
+	BorderImageOutset string
+	BorderImageRepeat string
 	// ListStylePosition is "inside" or "outside"; empty means outside.
 	ListStylePosition        string
 	QuotesRaw                string
