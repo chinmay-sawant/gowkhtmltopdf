@@ -1137,19 +1137,10 @@ func expandBoxShorthand(prop, value string) ([4]string, bool) {
 	return values, true
 }
 
-// supportedDeclaration rejects modern value functions that this lite renderer
-// cannot compute. Excluding them from the cascade preserves an earlier valid
-// fallback declaration, matching the fixture's fallback-first contract
-// (e.g. color-mix() stays out so a prior plain color wins).
-func supportedDeclaration(value string) bool {
-	value = strings.ToLower(value)
-
-	for _, unsupported := range []string{"color-mix(", "light-dark(", "oklch("} {
-		if strings.Contains(value, unsupported) {
-			return false
-		}
-	}
-
+// supportedDeclaration reports whether a declaration value can be computed.
+// The modern color functions (oklch, oklab, color-mix, light-dark) resolve
+// through ParseColor now, so nothing is rejected here.
+func supportedDeclaration(string) bool {
 	return true
 }
 

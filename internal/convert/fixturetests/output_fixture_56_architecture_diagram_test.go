@@ -19,5 +19,5 @@ func TestOutputFixture56ArchitectureDiagram(t *testing.T) {
 	assertOpsTextRun(t, committed, 21, "Security architecture ",
 		50.766, 783.251, 14, "LiberationSerif-Bold", ink)
 
-	assertFixtureOpsShape(t, committed, 21, 1920, 2206, 10834, 9, [4]float64{0, 0, 595.28, 841.89})
+	assertFixtureOpsShape(t, committed, 21, 1918, 2208, 10834, 9, [4]float64{0, 0, 595.28, 841.89})
 }
