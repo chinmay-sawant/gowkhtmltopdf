@@ -384,9 +384,9 @@ func (loc ElementLocation) Bounds() (float64, float64, float64, float64) {
 type OpKind uint8
 
 const (
-	// OpUnknown is the zero value of OpKind. Layout never emits it; a zero
-	// Op must not silently paint as OpFillRect, so the unknown sentinel leads
-	// the enum and painters treat it as inert (no painter matches it).
+	// OpUnknown is the zero value of OpKind. Layout emits it only as the
+	// boundary marker of a blend or isolation group, which carries no paint,
+	// and painters treat it as inert so a zero Op cannot paint as OpFillRect.
 	OpUnknown OpKind = iota
 	OpFillRect
 	OpStrokeRect

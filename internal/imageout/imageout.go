@@ -383,9 +383,16 @@ func contentWidthPx(res *layout.Result) float64 {
 	return maxW * ptToPx
 }
 
-// maxHeight resolves the canvas height: the larger of the laid-out content
-// height and the requested minimum (--height). layout.Result.Height reports
-// the content height only, so the minimum must be applied here.
+// CanvasHeight resolves the canvas height in points for a placement: the
+// larger of the laid-out content height and the requested minimum
+// (--height). layout.Result.Height reports the content height only, so the
+// minimum must be applied by the caller. A display-list consumer needs this
+// because it must reproduce the same canvas that RenderLayout would have
+// produced, without rasterizing.
+func CanvasHeight(res *layout.Result, opts RenderOptions) float64 {
+	return maxHeight(res, opts)
+}
+
 func maxHeight(res *layout.Result, opts RenderOptions) float64 {
 	h := res.Height
 	if hp := float64(opts.Height) * cssPxToPt; hp > h {
@@ -894,7 +901,7 @@ func paint(img *image.NRGBA, paintOp *layout.Op, pxPerPt float64, atlas *glyphAt
 	case layout.OpImage:
 		paintImage(img, &opCopy, pxPerPt, imageCache)
 
-	case layout.OpLinkURI, layout.OpUnknown: // annotations and zero-value ops do not paint
+	case layout.OpLinkURI, layout.OpUnknown, layout.OpKindNoop: // these ops do not paint
 	}
 }
 

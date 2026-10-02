@@ -542,6 +542,21 @@ func (f *Font) parseCmap12(state []byte) error {
 	return nil
 }
 
+// Bytes returns the raw SFNT face bytes this font was loaded from. It exists
+// so a display-list consumer can hand the face to an independent shaper (for
+// example text.NewGoTextFaceSource) without re-reading the asset or the
+// system. The returned slice aliases the font's own buffer: read it, never
+// write it, and treat it as valid only for the life of this Font.
+func (f *Font) Bytes() []byte {
+	if f == nil {
+		return nil
+	}
+
+	f.ensureParsed()
+
+	return f.data
+}
+
 // UnitsPerEm returns the font's design size.
 func (f *Font) UnitsPerEm() int16 {
 	f.ensureParsed()

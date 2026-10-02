@@ -4,6 +4,27 @@ All notable changes to gowkhtmltopdf are recorded here. This project follows
 semantic versioning; `VERSION` holds the current release and is stamped into
 binaries at build time (see README "Versioning").
 
+## Unreleased
+
+### Added
+
+- **Display-list export:** `layout.DisplayList` returns the retained display
+  list of vector operations for a document instead of a flattened bitmap, so a
+  caller can replay the placement on its own canvas and keep text as glyphs
+  rather than pixels. Additive and backward compatible: `layout.Lay` is
+  unchanged and stays the way to get a picture. The new public surface is
+  `Display`, `DisplayOp`, `DisplayGroup`, `DisplayKind`, `DisplayOrder`,
+  `DisplayFakeBold`, `DisplayTransformText`, the `DisplayOp*` kind constants
+  including `DisplayOpNoop`, and the nil-safe accessors on an operation
+  (`LinkURI`, `ImageBytes`, `ImageAlt`, `Transform`, `BlendModeName`,
+  `Opacity`, `Outline`, `TextTransformValue`, and `NoFakeBoldValue`).
+  `op.Font.Bytes()` hands the raw SFNT face to an independent shaper. Both
+  entries share one placement, so boxes and geometry agree. The canvas height is
+  converted from points rather than read off a picture, so it can sit one pixel
+  under the height `Lay` reports. `DisplayList` also skips the raster budget, so
+  a canvas too large to rasterize still returns a display list. `screen.Render`
+  still goes through `Lay`.
+
 ## 0.2.6 (2026-09-13)
 
 ### Added
