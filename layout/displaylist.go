@@ -97,6 +97,11 @@ type Display struct {
 	// Order indexes Ops in paint order, ready to iterate.
 	Order []int
 
+	// Boxes are the element border boxes from the same placement, in document
+	// order, in CSS pixels. They match the boxes Lay returns, so a replaying
+	// caller gets hit testing without rasterizing.
+	Boxes []Box
+
 	// Width and Height are the canvas size in CSS pixels, taken from the same
 	// placement Lay builds, and Height applies the same requested minimum.
 	// Height is converted straight from points while Lay reads the size back
@@ -157,6 +162,7 @@ func DisplayList(ctx context.Context, doc *css.Document) (*Display, error) {
 	return &Display{
 		Ops:            res.Ops,
 		Order:          ilayout.PaintOrder(res.Ops),
+		Boxes:          boxesFrom(ilayout.PlacedElements(res)),
 		Width:          int(res.Width * ptToPx),
 		Height:         int(heightPt * ptToPx),
 		PointsPerPixel: ptToPx,
