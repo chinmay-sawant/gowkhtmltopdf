@@ -1066,11 +1066,11 @@ func expandBoxShorthand(prop, value string) ([4]string, bool) {
 // supportedDeclaration rejects modern value functions that this lite renderer
 // cannot compute. Excluding them from the cascade preserves an earlier valid
 // fallback declaration, matching the fixture's fallback-first contract
-// (e.g. width:100%; width:clamp(...) must keep 100% while clampLength is gated).
+// (e.g. color-mix() stays out so a prior plain color wins).
 func supportedDeclaration(value string) bool {
 	value = strings.ToLower(value)
 
-	for _, unsupported := range []string{"clamp(", "color-mix(", "light-dark(", "oklch("} {
+	for _, unsupported := range []string{"color-mix(", "light-dark(", "oklch("} {
 		if strings.Contains(value, unsupported) {
 			return false
 		}

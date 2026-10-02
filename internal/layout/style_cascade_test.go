@@ -121,12 +121,10 @@ section.d03 { border-top: 3px solid #2563eb }
 	}
 }
 
-// TestCascadeClampFallbackKeepsEarlierWidth: while clampLength is gated off,
-// clamp() must stay out of the cascade so width:100% survives (fixture-56
-// .d01-exit). Wave2 left clamp allowed in supportedDeclaration but made
-// clampLength always fail, which discarded the fallback and shrink-wrapped
-// the exit-code table.
-func TestCascadeClampFallbackKeepsEarlierWidth(t *testing.T) {
+// TestCascadeClampWinsAndResolves: clamp() is now evaluated by the math
+// parser, so it wins the cascade and resolves to 70% of the 500pt viewport,
+// between 24rem (288pt) and 46rem (552pt).
+func TestCascadeClampWinsAndResolves(t *testing.T) {
 	t.Parallel()
 
 	root, err := html.Parse(`<html><body><table class="d01-exit"><tr><td>x</td></tr></table></body></html>`)
@@ -144,12 +142,12 @@ table.d01-exit {
 	tbl := findElementByName(root, "table")
 	sty := styles[tbl]
 
-	if sty.WidthPercent < 99.5 || sty.WidthPercent > 100.5 {
-		t.Fatalf("WidthPercent = %.2f, want 100 (clamp must not win cascade)", sty.WidthPercent)
+	if !near(sty.Width, 350) {
+		t.Fatalf("Width = %.2fpt, want 350 (70%% of 500pt viewport)", sty.Width)
 	}
 
-	if sty.Width > 0 {
-		t.Fatalf("Width = %.2fpt set from clamp path, want percent-only fallback", sty.Width)
+	if sty.WidthPercent >= 0 {
+		t.Fatalf("WidthPercent = %.2f, want unset when clamp resolves absolutely", sty.WidthPercent)
 	}
 }
 

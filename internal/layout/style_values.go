@@ -768,6 +768,10 @@ func lengthBoxResolved(value string, fsize, containing float64) (float64, bool) 
 }
 
 func lengthBoxFromUnit(value string, fsize, containing float64) (float64, bool) {
+	if pt, ok := viewportHeightUnitPt(value, containing); ok {
+		return pt, true
+	}
+
 	val, unit, parsed := css.ParseLength(value)
 	if !parsed {
 		return 0, false
@@ -790,6 +794,27 @@ func lengthBoxFromUnit(value string, fsize, containing float64) (float64, bool) 
 
 		return point, true
 	}
+}
+
+// viewportHeightUnitPt resolves dvh/svh/lvh like vh: a percentage of the
+// containing block dimension available at this phase.
+func viewportHeightUnitPt(value string, containing float64) (float64, bool) {
+	lower := strings.ToLower(strings.TrimSpace(value))
+
+	for _, unit := range []string{"dvh", "svh", "lvh"} {
+		if !strings.HasSuffix(lower, unit) {
+			continue
+		}
+
+		number, err := strconv.ParseFloat(strings.TrimSpace(lower[:len(lower)-len(unit)]), 64)
+		if err != nil {
+			return 0, false
+		}
+
+		return containing * number / 100, true
+	}
+
+	return 0, false
 }
 
 // marginLenAuto parses a horizontal margin; auto yields (0, true).
@@ -848,13 +873,10 @@ func marginLenFromUnit(value string, fsize, ctxW float64) float64 {
 	return 0
 }
 
-const clampPrefix = "clamp(" //nolint:unused
-
-// clampLength is gated off. Keep "clamp(" in supportedDeclaration's reject
-// list so an earlier fallback (e.g. width:100%) wins the cascade; otherwise
-// clamp wins as a string, fails here, and the fallback is already gone.
+// clampLength evaluates min(), max(), and clamp() over lengths and
+// percentages. Unsupported expressions stay invalid and keep the fallback.
 func clampLength(value string, fsize, containing float64) (float64, bool) {
-	return 0, false
+	return mathLength(value, fsize, containing)
 }
 
 func splitCommaArgs(value string) []string { //nolint:unused
@@ -899,50 +921,32 @@ func resolvedLength(value string, fsize, containing float64) (float64, bool) { /
 	}
 }
 
-// calcLength evaluates the small arithmetic subset needed by the print CSS:
-// one length plus/minus another length, or one length multiplied by a number.
-// Unsupported calc expressions remain invalid and keep the existing fallback.
-//
-//nolint:cyclop // compact calc operator grammar
+// calcLength evaluates calc() over lengths and percentages. The expression
+// may nest min()/max()/clamp(), use parentheses, and mix units.
 func calcLength(value string, fsize, containing float64) (float64, bool) {
-	value = strings.TrimSpace(value)
-	if len(value) < len("calc()") || !strings.EqualFold(value[:5], "calc(") || value[len(value)-1] != ')' {
-		return 0, false
+	return mathLength(value, fsize, containing)
+}
+
+// mathLength evaluates a CSS math function in layout points. The containing
+// dimension doubles as the viewport base at this phase, matching how plain
+// vw/vh already resolve through lengthBox.
+func mathLength(value string, fsize, containing float64) (float64, bool) {
+	env := css.MathEnv{
+		FontSizePx: ptToPx(fsize),
+		PercentPx:  ptToPx(containing),
+		ViewportW:  ptToPx(containing),
+		ViewportH:  ptToPx(containing),
 	}
 
-	parts := strings.Fields(value[5 : len(value)-1])
-	if len(parts) != calcParts {
-		return 0, false
-	}
-
-	left, ok := plainLength(parts[0], fsize, containing)
+	px, ok := css.EvalMath(value, env)
 	if !ok {
 		return 0, false
 	}
 
-	switch parts[1] {
-	case "*":
-		factor, err := strconv.ParseFloat(parts[2], 64)
-		if err != nil {
-			return 0, false
-		}
-
-		return left * factor, true
-	case "+", "-":
-		right, rightOK := plainLength(parts[2], fsize, containing)
-		if !rightOK {
-			return 0, false
-		}
-
-		if parts[1] == "-" {
-			return left - right, true
-		}
-
-		return left + right, true
-	default:
-		return 0, false
-	}
+	return pxToPt(px), true
 }
+
+func ptToPx(pt float64) float64 { return pt / pxToPt(1) }
 
 func plainLength(value string, fsize, containing float64) (float64, bool) {
 	val, unit, ok := css.ParseLength(value)
