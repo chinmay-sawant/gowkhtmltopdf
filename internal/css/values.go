@@ -177,8 +177,10 @@ func ParseNumber(val string) (float64, bool) {
 }
 
 // ParseColor parses #rgb, #rrggbb, #rrggbbaa, rgb()/rgba() with integer,
-// float or percentage channels, hsl()/hsla(), and a named-color subset. It
-// returns RGB in 0..255 and alpha in 0..1; ok=false for anything unrecognized.
+// float or percentage channels, hsl()/hsla(), the full CSS Color 4 named-color
+// list, and the modern functions oklab(), oklch(), color-mix(in srgb, ...) and
+// light-dark(). It returns RGB in 0..255 and alpha in 0..1; ok=false for
+// anything unrecognized.
 //
 //nolint:cyclop // linear dispatch across color forms; extraction would obscure it
 func ParseColor(val string) (int, int, int, float64, bool) {
@@ -228,7 +230,7 @@ func ParseColor(val string) (int, int, int, float64, bool) {
 		return parseHSLColor(val, low)
 	}
 
-	return 0, 0, 0, 0, false
+	return parseModernColor(val, low)
 }
 
 // parseHexColor parses #rgb, #rgba, #rrggbb and #rrggbbaa forms (hex is the
@@ -820,30 +822,4 @@ func ParseFontFamily(value string) []string {
 	return out
 }
 
-// namedColorTable is the CSS2 system colors plus greys/orange and common web
-// names used by fixtures and layout tests (ponytail: not the full CSS Color 4
-// list). Cached at package level so color parsing does not allocate a new map
-// on every call; callers must treat the map as read-only.
-var namedColorTable = map[string][3]int{ //nolint:gochecknoglobals // read-only cache; avoids per-call allocation
-	// CSS2 core
-	"black": {0, 0, 0}, "silver": {192, 192, 192}, "gray": {128, 128, 128},
-	"grey": {128, 128, 128}, "white": {255, 255, 255}, "maroon": {128, 0, 0},
-	"red": {255, 0, 0}, "purple": {128, 0, 128}, "fuchsia": {255, 0, 255},
-	"green": {0, 128, 0}, "lime": {0, 255, 0}, "olive": {128, 128, 0},
-	"yellow": {255, 255, 0}, "navy": {0, 0, 128}, "blue": {0, 0, 255},
-	"teal": {0, 128, 128}, "aqua": {0, 255, 255},
-	// Common aliases / CSS3 extras used in sheets
-	"cyan": {0, 255, 255}, "magenta": {255, 0, 255}, "orange": {255, 165, 0},
-	"brown": {165, 42, 42}, "pink": {255, 192, 203}, "gold": {255, 215, 0},
-	"darkgray": {169, 169, 169}, "darkgrey": {169, 169, 169},
-	"lightgray": {211, 211, 211}, "lightgrey": {211, 211, 211},
-	"darkgreen": {0, 100, 0}, "darkblue": {0, 0, 139}, "darkred": {139, 0, 0},
-	"darkorange": {255, 140, 0}, "lightblue": {173, 216, 230},
-	"lightgreen": {144, 238, 144}, "lightyellow": {255, 255, 224},
-	"coral": {255, 127, 80}, "crimson": {220, 20, 60}, "indigo": {75, 0, 130},
-	"khaki": {240, 230, 140}, "lavender": {230, 230, 250}, "violet": {238, 130, 238},
-	"tan": {210, 180, 140}, "salmon": {250, 128, 114}, "seagreen": {46, 139, 87},
-	"steelblue": {70, 130, 180}, "turquoise": {64, 224, 208}, "wheat": {245, 222, 179},
-	"orangered": {255, 69, 0}, "tomato": {255, 99, 71}, "whitesmoke": {245, 245, 245},
-	"gainsboro": {220, 220, 220}, "rebeccapurple": {102, 51, 153},
-}
+// The full named-color table lives in color_names.go.
