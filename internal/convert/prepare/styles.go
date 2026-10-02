@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/fonts"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/line"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/load"
@@ -465,13 +466,10 @@ func mergeFontFace(ctx context.Context, resources load.ResourceContext, registry
 //nolint:wsl,nlreturn,lll // font-face collection flow
 func fetchFontFace(ctx context.Context, resources load.ResourceContext, uri string, idx int, log io.Writer) (*pdf.Font, bool) {
 	lower := strings.ToLower(uri)
-	if strings.HasSuffix(lower, ".woff2") || strings.HasSuffix(lower, ".eot") {
+	isData := strings.HasPrefix(lower, "data:")
+	if !isData && (strings.HasSuffix(lower, ".woff2") || strings.HasSuffix(lower, ".eot")) {
 		line.Emit(log, line.Warn,
 			"object %d: @font-face src %q skipped (WOFF2/EOT unsupported; WOFF1/TTF/OTF only)", idx, uri)
-		return nil, false
-	}
-	if strings.HasPrefix(lower, "data:") {
-		line.Emit(log, line.Warn, "object %d: @font-face data: src skipped", idx, uri)
 		return nil, false
 	}
 
@@ -480,7 +478,14 @@ func fetchFontFace(ctx context.Context, resources load.ResourceContext, uri stri
 		line.Emit(log, line.Warn, "object %d: @font-face src %q: %v", idx, uri, err)
 		return nil, false
 	}
-	font, err := pdf.ParseFontBytes(resource.Body)
+
+	body, err := fonts.Decode(resource.Body)
+	if err != nil {
+		line.Emit(log, line.Warn, "object %d: @font-face src %q: %v", idx, uri, err)
+		return nil, false
+	}
+
+	font, err := pdf.ParseFontBytes(body)
 	if err != nil {
 		line.Emit(log, line.Warn, "object %d: @font-face src %q: %v", idx, uri, err)
 		return nil, false
