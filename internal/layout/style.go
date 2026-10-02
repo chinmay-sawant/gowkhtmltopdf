@@ -634,6 +634,9 @@ type styleContext struct {
 	// properties holds @property registrations from sheets for custom-property
 	// initial values and inheritance.
 	properties map[string]css.PropertyRule
+	// state carries the focused, hovered, and pressed ids for stateful
+	// pseudo-classes.
+	state css.MatchState
 	// remBase is the used font-size of the root element for rem units (pt).
 	// 0 means the CSS initial medium size (16px → 12pt).
 	remBase float64
@@ -723,6 +726,7 @@ func resolveStylesWithContext(
 		viewportH:          opts.Height,
 		printLinkUnderline: opts.PrintLinkUnderline,
 		containers:         containers,
+		state:              opts.State,
 	})
 }
 

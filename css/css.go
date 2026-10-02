@@ -33,6 +33,7 @@ func registerStyled() {
 			Media:    styled.media,
 			WidthPx:  styled.widthPx,
 			HeightPx: styled.heightPx,
+			State:    styled.state,
 		}, true
 	})
 }
@@ -50,6 +51,7 @@ type Document struct {
 	media    string
 	widthPx  int
 	heightPx int
+	state    icss.MatchState
 }
 
 // Options selects the viewport and any stylesheets beyond the document.
@@ -61,6 +63,11 @@ type Options struct {
 	HeightPx int
 	Media    string
 	Extra    []*Sheet
+	// Focus, Hover, and Active carry the ids of the focused, hovered, and
+	// pressed elements for the stateful pseudo-classes. Empty means none.
+	Focus  string
+	Hover  string
+	Active string
 }
 
 // Parse parses one stylesheet.
@@ -121,6 +128,7 @@ func Apply(ctx context.Context, doc *html.Document, opts Options) (*Document, er
 		media:    kind,
 		widthPx:  opts.WidthPx,
 		heightPx: opts.HeightPx,
+		state:    icss.MatchState{Focus: opts.Focus, Hover: opts.Hover, Active: opts.Active},
 	}, nil
 }
 

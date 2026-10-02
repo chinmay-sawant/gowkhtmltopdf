@@ -58,6 +58,7 @@ func Lay(ctx context.Context, doc *css.Document) (*Result, error) {
 		Media:      styled.Media,
 		Background: true,
 		Registry:   styled.Registry,
+		State:      styled.State,
 	}
 
 	img, res, err := imageout.RenderLayout(ctx, styled.Root, opts)
