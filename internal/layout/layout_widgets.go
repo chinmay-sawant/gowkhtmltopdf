@@ -320,8 +320,8 @@ func (e *engine) paintButtonWidget(node *html.Node, style ResolvedStyle, leftX, 
 	})
 }
 
-// paintWidgetControl paints the native control face for value, range, button
-// and checkbox widgets after the box height is final.
+// paintWidgetControl paints the native control face for value, range, button,
+// text-like, and checkbox widgets after the box height is final.
 func (e *engine) paintWidgetControl(
 	node *html.Node, style ResolvedStyle, boxNode *box, widget, chkWidget bool, posY float64,
 ) {
@@ -334,5 +334,7 @@ func (e *engine) paintWidgetControl(
 		e.paintRangeWidget(style, boxNode.x, posY, boxNode.w, boxNode.height)
 	case isInputButton(node):
 		e.paintButtonWidget(node, style, boxNode.x, posY, boxNode.w, boxNode.height)
+	case isTextInput(node):
+		e.paintTextInputWidget(node, style, boxNode.x, posY, boxNode.w, boxNode.height)
 	}
 }
