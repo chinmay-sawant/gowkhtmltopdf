@@ -33,6 +33,7 @@ func TestNestedPercentageHeightStaysContentSized(t *testing.T) {
 	`)
 	res := layoutHTMLAtViewport(t, `<html><body><div id="card"><p>Hi</p></div></body></html>`, 400, 600, cssSheet)
 	card := findBoxByID(res.root, "card")
+
 	if card == nil {
 		t.Fatal("no #card box")
 	}
@@ -59,12 +60,14 @@ func TestFlexCentersACardInTheViewport(t *testing.T) {
 	`)
 	res := layoutHTMLAtViewport(t, `<html><body><div id="card">Hi</div></body></html>`, viewportW, viewportH, cssSheet)
 	card := findBoxByID(res.root, "card")
+
 	if card == nil {
 		t.Fatal("no #card box")
 	}
 
 	wantX := (viewportW - cardW) / 2
 	wantY := (viewportH - cardH) / 2
+
 	if !near(card.x, wantX) || !near(card.y, wantY) {
 		t.Fatalf("card origin = %.2f, %.2f, want %.2f, %.2f", card.x, card.y, wantX, wantY)
 	}
@@ -83,9 +86,11 @@ func TestFlexCenterMovesDescendantBoxes(t *testing.T) {
 		#card { width: 100pt; height: 80pt; }
 		#field { width: 40pt; height: 20pt; }
 	`)
-	res := layoutHTMLAtViewport(t, `<html><body><div id="card"><div id="field"></div></div></body></html>`, 400, 600, cssSheet)
+	res := layoutHTMLAtViewport(t,
+		`<html><body><div id="card"><div id="field"></div></div></body></html>`, 400, 600, cssSheet)
 	card := findBoxByID(res.root, "card")
 	field := findBoxByID(res.root, "field")
+
 	if card == nil || field == nil {
 		t.Fatal("missing card or field")
 	}
