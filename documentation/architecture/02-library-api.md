@@ -28,9 +28,11 @@ ambiguous sources fail before files, URLs, or output sinks are opened.
 Packages `html`, `css`, and `layout` are the public parse, style, and
 placement path. `html.Parse` keeps the engine tree. `css.Apply` collects
 that document's `<style>` elements. `layout.Lay` returns CSS-pixel boxes
-and the painted image. They do not paginate and they do not write a PDF.
-`screen.Render` encodes that image as a PNG. `markup.Parse` is a detached
-tree and is not the value `css.Apply` accepts.
+and the painted image. `layout.DisplayList` is a second entry over the same
+placement: it returns the display list of vector operations and no image,
+so a caller can replay it on its own canvas. They do not paginate and they
+do not write a PDF. `screen.Render` encodes the `Lay` image as a PNG.
+`markup.Parse` is a detached tree and is not the value `css.Apply` accepts.
 
 ## PDF model
 

@@ -1211,6 +1211,11 @@ func scaleToInnerWidth(colW, colMin []float64, innerAvail, innerMax float64, def
 // not be removed.
 const opKindNoop OpKind = 255
 
+// OpKindNoop is opKindNoop under an exported name. A display-list consumer
+// outside this module sees deactivated operations in Ops and needs a name for
+// the sentinel in order to skip them.
+const OpKindNoop OpKind = opKindNoop
+
 func DeactivateOp(paintOp *Op) {
 	if paintOp == nil {
 		return

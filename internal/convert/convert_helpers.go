@@ -263,8 +263,9 @@ func measuredWidth(res *layout.Result) float64 {
 			if ext := op.X + op.W; ext > width {
 				width = ext
 			}
-		case layout.OpLine, layout.OpGridRun, layout.OpText, layout.OpLinkURI, layout.OpBullet, layout.OpUnknown:
-			// Text, link, and grid-run ops never force a page wider; ignore.
+		case layout.OpLine, layout.OpGridRun, layout.OpText, layout.OpLinkURI, layout.OpBullet, layout.OpUnknown,
+			layout.OpKindNoop:
+			// Text, link, grid-run, and deactivated ops never force a page wider; ignore.
 			continue
 		}
 	}

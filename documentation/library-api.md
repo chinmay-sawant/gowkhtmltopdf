@@ -287,6 +287,7 @@ needs the stages themselves uses three packages. None of them writes a PDF.
 | `html` | `Parse` | The document tree. `Find` looks up an element by id. |
 | `css` | `Parse`, `Apply` | One stylesheet, or that document plus its `<style>` elements. |
 | `layout` | `Lay` | Element boxes in CSS pixels, and the painted image. |
+| `layout` | `DisplayList` | The same placement as vector operations, and no image. |
 
 ```go
 import (
@@ -310,6 +311,60 @@ img := placed.Image()
 `Options.Extra`. An empty `Media` means `screen`. `layout.Lay` places that
 same tree and paints `Image` from the placement. `Boxes` use CSS pixels, y
 down, origin at the top left of the image.
+
+`layout.DisplayList` is the second entry over that same placement. It returns
+the display list instead of a picture, so a caller can replay the operations
+onto its own canvas and keep text as glyphs:
+
+~~~go
+display, err := layout.DisplayList(ctx, styled)
+for _, index := range display.Order {
+    op := display.Ops[index]
+    // op.Kind is layout.DisplayOpFillRect, layout.DisplayOpText, and so on.
+}
+~~~
+
+`Display.Ops` is in source order. `Display.Order` holds the indices in paint
+order, which is the order to iterate, so z-index and the outline paint layer
+are honored. `Display.Width` and `Display.Height` are the canvas in CSS pixels.
+They come from the same placement `Lay` builds, and the height applies the
+same requested minimum that `Lay` applies. The canvas height is converted
+straight from points while `Lay` reads it back off the painted picture, so the
+two can differ by one pixel. `PointsPerPixel` and `PixelPerPoint` convert
+between the op coordinate space and that canvas.
+
+Op coordinates are points with y down. For `DisplayOpText` and `DisplayOpBullet`
+the `Y` field is the baseline, not the top of the line box. The kinds are
+`DisplayOpFillRect`, `DisplayOpStrokeRect`, `DisplayOpLine`, `DisplayOpText`,
+`DisplayOpImage`, `DisplayOpLinkURI`, `DisplayOpBullet`, `DisplayOpGridRun`,
+`DisplayOpUnknown`, and `DisplayOpNoop`, all of type `DisplayKind`. A table
+row's collapsed grid arrives as one `DisplayOpGridRun` whose `Grid.Segs` are
+replayed in order.
+
+Two kinds paint nothing and must be skipped. `DisplayOpNoop` is written when
+overflow clipping deactivates an operation, which it does rather than removing
+it, because the box tree stores operation indices that cannot shift.
+`DisplayOpUnknown` is the zero kind, and layout emits it only as the boundary
+marker of a blend or isolation group. Treat any kind outside the list as inert,
+so a kind added later cannot be mistaken for a fill.
+
+`DisplayOp` is the engine's own operation type under a public name, so read a
+rare payload through its accessor methods: `LinkURI`, `ImageBytes`, `ImageAlt`,
+`Transform`, `BlendModeName`, `Opacity`, `Outline`, `FontFeatures`,
+`TextLanguage`, `TextAutospace`, `TextTransformValue`, and
+`NoFakeBoldValue`. Every operation the engine emits today carries its payload,
+but that payload sits behind an embedded pointer a caller outside the module
+cannot build or inspect, so the nil-safe accessors are the supported read
+path. A blend group is read through `Group`, `GroupBoundary`, `IsGroupBegin`,
+and `IsGroupEnd`, or as the `DisplayGroup` alias. `DisplayOrder`,
+`DisplayFakeBold`, and `DisplayTransformText` cover the painter decisions a
+replay would otherwise have to re-derive, and `op.Font.Bytes()` hands the raw
+SFNT face to an independent shaper.
+
+`DisplayList` does not rasterize. It returns no image, so a caller that still
+wants a bitmap keeps calling `Lay`. Because it skips the raster step, it also
+skips the raster budget, so a canvas too large to rasterize still returns a
+display list. `screen.Render` still goes through `Lay`.
 
 `screen.Render` is those three calls plus a PNG encode. `markup.Parse` returns
 a detached copy of the tree for inspection. `css.Apply` does not accept that
