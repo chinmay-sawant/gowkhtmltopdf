@@ -35,8 +35,22 @@ type Result struct {
 	height int
 }
 
+// Options carries the optional inputs a placement can use beyond the styled
+// document itself.
+type Options struct {
+	// Images returns encoded image bytes (PNG, JPEG, or SVG) for one source,
+	// such as an <img src> value or a CSS background-image url(...) target.
+	// Nil means no source resolves, so image paint is skipped.
+	Images func(src string) ([]byte, error)
+}
+
 // Lay places doc and paints the picture from that same placement.
 func Lay(ctx context.Context, doc *css.Document) (*Result, error) {
+	return LayOptions(ctx, doc, Options{Images: nil})
+}
+
+// LayOptions is Lay with the optional image resolver.
+func LayOptions(ctx context.Context, doc *css.Document, options Options) (*Result, error) {
 	if ctx == nil {
 		return nil, ErrNilContext
 	}
@@ -59,6 +73,7 @@ func Lay(ctx context.Context, doc *css.Document) (*Result, error) {
 		Background: true,
 		Registry:   styled.Registry,
 		State:      styled.State,
+		Images:     options.Images,
 	}
 
 	img, res, err := imageout.RenderLayout(ctx, styled.Root, opts)

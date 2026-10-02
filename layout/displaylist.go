@@ -127,6 +127,11 @@ type Display struct {
 // error. DisplayList never rasterizes, so it returns that canvas instead. A
 // caller that hands the result to a GPU should apply its own size limit.
 func DisplayList(ctx context.Context, doc *css.Document) (*Display, error) {
+	return DisplayListOptions(ctx, doc, Options{Images: nil})
+}
+
+// DisplayListOptions is DisplayList with the optional image resolver.
+func DisplayListOptions(ctx context.Context, doc *css.Document, options Options) (*Display, error) {
 	if ctx == nil {
 		return nil, ErrNilContext
 	}
@@ -149,6 +154,7 @@ func DisplayList(ctx context.Context, doc *css.Document) (*Display, error) {
 		Background: true,
 		Registry:   styled.Registry,
 		State:      styled.State,
+		Images:     options.Images,
 	}
 
 	res, err := imageout.LayoutResult(ctx, styled.Root, opts)
