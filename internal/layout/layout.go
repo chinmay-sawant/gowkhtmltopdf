@@ -1672,7 +1672,7 @@ func useBlockForTableDisplay(node *html.Node) bool {
 
 // buildBlock lays out a block-level box.
 //
-//nolint:cyclop,wsl // block layout owns ordered CSS flow phases
+//nolint:cyclop // block layout owns ordered CSS flow phases
 func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, posY float64) *box {
 	boxNode := &box{ //nolint:exhaustruct // intentional zero fields
 		node: node, style: e.stylePtr(node), kind: boxKindBlock, x: posX, y: posY,
@@ -1708,17 +1708,7 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 
 	curY = e.flowChildren(boxNode, children, style, contentW, contentX, posY, curY)
 	e.flowCBHeight = previousCB
-	if widget && style.Height < 0 {
-		// Native value controls use their intrinsic font-sized control height
-		// when auto-sized. Treating them as ordinary text blocks adds the
-		// line-height and authored padding a second time, producing the
-		// oversized meter/progress tracks in fixture-56.
-		curY = e.nativeWidgetAutoContentBottom(style)
-	}
-
-	if node.Name == "textarea" && style.Height < 0 && style.HeightPercent < 0 {
-		curY = e.textareaAutoContentBottom(style, node, boxStyle, curY)
-	}
+	curY = e.autoSizedControlContentBottom(node, boxStyle, widget, curY)
 
 	if enclose && e.bfcFloats != nil {
 		curY = e.bfcFloats.extentCy(posY, curY)
