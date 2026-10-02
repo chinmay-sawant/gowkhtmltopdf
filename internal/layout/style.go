@@ -628,6 +628,9 @@ type styleContext struct {
 	media     string
 	viewportW float64 // containing-block width for % of margins/padding/width
 	viewportH float64 // for % of height
+	// properties holds @property registrations from sheets for custom-property
+	// initial values and inheritance.
+	properties map[string]css.PropertyRule
 	// remBase is the used font-size of the root element for rem units (pt).
 	// 0 means the CSS initial medium size (16px → 12pt).
 	remBase float64
@@ -711,6 +714,7 @@ func resolveStylesWithContext(
 	return resolveStylesCtx(root, &styleContext{ //nolint:exhaustruct // intentional zero fields
 		ctx:                ctx,
 		sheets:             opts.Sheets,
+		properties:         registeredProperties(opts.Sheets),
 		media:              opts.Media,
 		viewportW:          opts.Width,
 		viewportH:          opts.Height,
@@ -914,7 +918,12 @@ func applyRawToUsed(
 		parentProps = parent.CustomProps
 	}
 
-	sty.CustomProps = mergeCustomProps(parentProps, raw)
+	var registered map[string]css.PropertyRule
+	if ctx != nil {
+		registered = ctx.properties
+	}
+
+	sty.CustomProps = mergeCustomProps(parentProps, raw, registered)
 	raw = resolveRawVars(raw, sty.CustomProps)
 
 	parentSize := sty.FontSize
