@@ -471,6 +471,15 @@ func (e *engine) paintReplacedImage(
 	intrinsicW, intrinsicH := replacedIntrinsicPt(e, sty, boxNode.img)
 	fitX, fitY, fitW, fitH := applyObjectFitToPaint(sty, imgX, imgY, imgW, imgH, intrinsicW, intrinsicH)
 
+	if clipShape, ok := parseClipPathShape(sty.ClipPath, sty.FontSize); ok {
+		if masked := maskImageWithClipPath(
+			imgData, clipShape, fitX, fitY, fitW, fitH, posX, posY, boxNode.w, boxNode.height,
+		); masked != nil {
+			imgData = masked
+			isJPEG = false
+		}
+	}
+
 	e.add((Op{ //nolint:exhaustruct // intentional zero fields
 		Kind:   OpImage,
 		X:      fitX,

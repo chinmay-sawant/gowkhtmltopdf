@@ -186,6 +186,15 @@ func (e *engine) emitInlineImage(
 		intrinsicW, intrinsicH := replacedIntrinsicPt(e, sty, item.imgRef)
 		fitX, fitY, fitW, fitH := applyObjectFitToPaint(sty, imgX, imgY, imgW, imgH, intrinsicW, intrinsicH)
 
+		if clipShape, ok := parseClipPathShape(sty.ClipPath, sty.FontSize); ok {
+			if masked := maskImageWithClipPath(
+				imgData, clipShape, fitX, fitY, fitW, fitH, leftX, top, item.w, item.h,
+			); masked != nil {
+				imgData = masked
+				isJPEG = false
+			}
+		}
+
 		e.add((Op{ //nolint:exhaustruct // intentional zero fields
 			Kind: OpImage, X: fitX, Y: fitY, W: fitW, H: fitH, IsJPEG: isJPEG,
 		}).withImage(imgData, item.imgRef.w, item.imgRef.h, item.alt))

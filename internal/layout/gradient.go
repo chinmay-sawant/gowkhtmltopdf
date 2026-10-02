@@ -33,12 +33,21 @@ type radialGradientSpec struct {
 	repeating bool
 }
 
+type conicGradientSpec struct {
+	fromDeg   float64 // 0 = pointing up; clockwise
+	cx, cy    float64
+	stops     []gradientStop
+	repeating bool
+}
+
 func isGradientFunc(val string) bool {
 	low := strings.ToLower(strings.TrimSpace(val))
 	return strings.HasPrefix(low, "linear-gradient(") ||
 		strings.HasPrefix(low, "repeating-linear-gradient(") ||
 		strings.HasPrefix(low, "radial-gradient(") ||
-		strings.HasPrefix(low, "repeating-radial-gradient(")
+		strings.HasPrefix(low, "repeating-radial-gradient(") ||
+		strings.HasPrefix(low, "conic-gradient(") ||
+		strings.HasPrefix(low, "repeating-conic-gradient(")
 }
 
 func parseGradientStops(parts []string, current [3]float64) []gradientStop {
@@ -264,6 +273,74 @@ func parseRadialGradient(raw string, current [3]float64) (*radialGradientSpec, b
 	}, true
 }
 
+func parseConicGradient(raw string, current [3]float64) (*conicGradientSpec, bool) {
+	raw = strings.TrimSpace(raw)
+	low := strings.ToLower(raw)
+	repeating := false
+	var args string
+
+	if strings.HasPrefix(low, "repeating-conic-gradient(") {
+		repeating = true
+		args = raw[len("repeating-conic-gradient(") : len(raw)-1]
+	} else if strings.HasPrefix(low, "conic-gradient(") {
+		args = raw[len("conic-gradient(") : len(raw)-1]
+	} else {
+		return nil, false
+	}
+
+	parts := splitFunctionArgs(args)
+	if len(parts) == 0 {
+		return nil, false
+	}
+
+	fromDeg := 0.0
+	cx, cy := 0.5, 0.5
+	stopParts := parts
+
+	firstPart := strings.TrimSpace(parts[0])
+	firstLow := strings.ToLower(firstPart)
+
+	if strings.HasPrefix(firstLow, "from ") || strings.HasPrefix(firstLow, "at ") {
+		stopParts = parts[1:]
+		prelude := firstLow
+
+		if strings.HasPrefix(prelude, "from ") {
+			anglePart := strings.TrimSpace(prelude[len("from "):])
+			if atIdx := strings.Index(anglePart, " at "); atIdx >= 0 {
+				if deg, ok := parseAngleDeg(strings.TrimSpace(anglePart[:atIdx])); ok {
+					fromDeg = deg
+				}
+				prelude = "at " + strings.TrimSpace(anglePart[atIdx+4:])
+			} else {
+				if deg, ok := parseAngleDeg(anglePart); ok {
+					fromDeg = deg
+				}
+				prelude = ""
+			}
+		}
+
+		if strings.HasPrefix(prelude, "at ") {
+			posParts := strings.Fields(strings.TrimSpace(prelude[len("at "):]))
+			if len(posParts) >= 1 {
+				cx = parseGradientPosComponent(posParts[0])
+			}
+			if len(posParts) >= 2 {
+				cy = parseGradientPosComponent(posParts[1])
+			}
+		}
+	}
+
+	stops := parseGradientStops(stopParts, current)
+	if len(stops) < 2 {
+		return nil, false
+	}
+
+	return &conicGradientSpec{
+		fromDeg: fromDeg, cx: cx, cy: cy,
+		stops: stops, repeating: repeating,
+	}, true
+}
+
 func parseGradientPosComponent(tok string) float64 {
 	switch tok {
 	case "left", "top":
@@ -273,6 +350,7 @@ func parseGradientPosComponent(tok string) float64 {
 	case "right", "bottom":
 		return 1.0
 	}
+
 	if strings.HasSuffix(tok, "%") {
 		if v, err := strconv.ParseFloat(strings.TrimSuffix(tok, "%"), 64); err == nil {
 			return v / 100.0
@@ -346,6 +424,10 @@ func renderGradientPNG(raw string, width, height float64, current [3]float64) ([
 
 	if rad, ok := parseRadialGradient(raw, current); ok {
 		return rasterizeRadialGradient(rad, imgW, imgH)
+	}
+
+	if con, ok := parseConicGradient(raw, current); ok {
+		return rasterizeConicGradient(con, imgW, imgH)
 	}
 
 	return nil, 0, 0, false
@@ -459,6 +541,61 @@ func rasterizeRadialGradient(rad *radialGradientSpec, imgW, imgH int) ([]byte, i
 			}
 
 			cr, cg, cb, ca := sampleStops(rad.stops, t)
+			img.SetNRGBA(x, y, color.NRGBA{
+				R: uint8(math.Round(clamp01(cr) * maxRGBFloat)),
+				G: uint8(math.Round(clamp01(cg) * maxRGBFloat)),
+				B: uint8(math.Round(clamp01(cb) * maxRGBFloat)),
+				A: uint8(math.Round(clamp01(ca) * maxRGBFloat)),
+			})
+		}
+	}
+
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		return nil, 0, 0, false
+	}
+
+	return buf.Bytes(), imgW, imgH, true
+}
+
+func rasterizeConicGradient(con *conicGradientSpec, imgW, imgH int) ([]byte, int, int, bool) {
+	img := image.NewNRGBA(image.Rect(0, 0, imgW, imgH))
+	wF := float64(imgW)
+	hF := float64(imgH)
+	centerX := wF * con.cx
+	centerY := hF * con.cy
+
+	firstPos := con.stops[0].pos
+	lastPos := con.stops[len(con.stops)-1].pos
+	period := lastPos - firstPos
+
+	if period <= 0 {
+		period = 1
+	}
+
+	for y := range imgH {
+		dy := (float64(y) + halfPixel) - centerY
+
+		for x := range imgW {
+			dx := (float64(x) + halfPixel) - centerX
+			angleDeg := math.Atan2(dx, -dy) * degToRadFactor / math.Pi
+			t := (angleDeg - con.fromDeg) / fullTurnDegrees
+			t = math.Mod(t, 1)
+
+			if t < 0 {
+				t += 1
+			}
+
+			if con.repeating {
+				t = math.Mod(t-firstPos, period)
+				if t < 0 {
+					t += period
+				}
+
+				t += firstPos
+			}
+
+			cr, cg, cb, ca := sampleStops(con.stops, t)
 			img.SetNRGBA(x, y, color.NRGBA{
 				R: uint8(math.Round(clamp01(cr) * maxRGBFloat)),
 				G: uint8(math.Round(clamp01(cg) * maxRGBFloat)),

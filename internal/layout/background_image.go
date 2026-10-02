@@ -153,6 +153,12 @@ func (e *engine) appendBackgroundImage(
 	// Clip every layer (including no-repeat / cover overflow) to background-clip.
 	clipOpsSlice(dst[layerStart:], clip)
 
+	// clip-path basic shapes mask the raster layers of this element. Unsupported
+	// or invalid values parse to no shape and leave the ops untouched.
+	if clipShape, ok := parseClipPathShape(sty.ClipPath, sty.FontSize); ok {
+		maskClipPathOps(dst[layerStart:], clipShape, posX, posY, width, height)
+	}
+
 	return dst
 }
 
