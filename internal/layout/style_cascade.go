@@ -62,7 +62,10 @@ func internalCustomPropWriters(raw map[string]string) bool {
 
 // mergeCustomProps inherits parent custom properties and overlays any --*
 // declarations from raw, resolving var() chains via css.ResolveCustomProps.
-func mergeCustomProps(parentProps map[string]string, raw map[string]string) map[string]string {
+// registered holds @property registrations: a property not declared here
+// takes its initial value unless it inherits and the parent supplied one,
+// and a non-inherited registered property never inherits the parent's value.
+func mergeCustomProps(parentProps, raw map[string]string, registered map[string]css.PropertyRule) map[string]string {
 	var declared map[string]string
 
 	for prop, value := range raw {
@@ -75,7 +78,7 @@ func mergeCustomProps(parentProps map[string]string, raw map[string]string) map[
 		}
 	}
 
-	if len(declared) == 0 {
+	if len(declared) == 0 && len(registered) == 0 {
 		if len(parentProps) > 0 && internalCustomPropWriters(raw) {
 			return maps.Clone(parentProps)
 		}
@@ -83,7 +86,72 @@ func mergeCustomProps(parentProps map[string]string, raw map[string]string) map[
 		return parentProps
 	}
 
-	return css.ResolveCustomProps(declared, parentProps)
+	if len(declared) == 0 {
+		out := make(map[string]string, len(parentProps)+len(registered))
+		for name, value := range parentProps {
+			out[name] = value
+		}
+
+		applyRegisteredProps(out, registered, nil)
+
+		return out
+	}
+
+	resolved := css.ResolveCustomProps(declared, parentProps)
+	if len(registered) > 0 {
+		applyRegisteredProps(resolved, registered, declared)
+	}
+
+	return resolved
+}
+
+// applyRegisteredProps folds @property registrations into a custom-property
+// map. declared lists the properties declared on this element: a declared
+// value wins. A registered property that is not declared takes its initial
+// value unless it inherits and an inherited value is present; a
+// non-inherited registration drops the inherited value first.
+func applyRegisteredProps(
+	props map[string]string, registered map[string]css.PropertyRule, declared map[string]string,
+) {
+	for name, reg := range registered {
+		if _, ok := declared[name]; ok {
+			continue
+		}
+
+		if reg.Inherits {
+			if value, ok := props[name]; ok && strings.TrimSpace(value) != "" {
+				continue
+			}
+		}
+
+		if reg.Initial != "" {
+			props[name] = reg.Initial
+		} else {
+			delete(props, name)
+		}
+	}
+}
+
+// registeredProperties merges @property registrations from every sheet. A
+// later registration of the same name replaces an earlier one.
+func registeredProperties(sheets []*css.Stylesheet) map[string]css.PropertyRule {
+	var out map[string]css.PropertyRule
+
+	for _, sheet := range sheets {
+		if sheet == nil {
+			continue
+		}
+
+		for _, reg := range sheet.Properties {
+			if out == nil {
+				out = make(map[string]css.PropertyRule)
+			}
+
+			out[reg.Name] = reg
+		}
+	}
+
+	return out
 }
 
 // resolveRawVars expands var() in cascaded property values using customProps.
@@ -464,6 +532,10 @@ func (ctx *styleContext) appendSheetRuleHits(
 			continue
 		}
 
+		if rule.Supports != nil && !css.SupportsMatches(rule.Supports, engineSupportsProperty) {
+			continue
+		}
+
 		hits = ctx.appendRuleSelectorHits(hits, rule, node, pseudoElem)
 	}
 
@@ -523,11 +595,13 @@ const cascadeWinHint = 8
 
 // cascadeWin is the winning cascaded declaration for one property: value plus
 // the specificity/order bits needed to compare later candidates. important is
-// a separate cascade layer (any !important beats any normal).
+// a separate cascade layer (any !important beats any normal); layer is the
+// @layer rank (0 = unlayered, which beats every ranked layer).
 type cascadeWin struct {
 	value               string
 	ids, classes, types int
 	order               int
+	layer               int
 	important           bool
 }
 
@@ -556,7 +630,7 @@ func cascadeRaw( //nolint:funlen // cascade tiers are deliberately visible in on
 
 	// UA sheet (lowest priority; specificity 0, order -1)
 	for _, d := range uaRules(node.Name) {
-		applyCascadeWin(wins, d.Prop, d.Value, 0, 0, 0, -1, false)
+		applyCascadeWin(wins, d.Prop, d.Value, 0, 0, 0, -1, 0, false)
 	}
 
 	// author sheets in source order (shared matchedRules walk)
@@ -566,7 +640,7 @@ func cascadeRaw( //nolint:funlen // cascade tiers are deliberately visible in on
 				continue
 			}
 
-			applyCascadeDeclaration(wins, d.Prop, d.Value, hit.a, hit.b, hit.c, hit.rule.Order, d.Important)
+			applyCascadeDeclaration(wins, d.Prop, d.Value, hit.a, hit.b, hit.c, hit.rule.Order, hit.rule.Layer, d.Important)
 		}
 	}
 
@@ -577,7 +651,7 @@ func cascadeRaw( //nolint:funlen // cascade tiers are deliberately visible in on
 			continue
 		}
 
-		applyCascadeDeclaration(wins, d.Prop, d.Value, inlineStylePriority, 0, 0, inlineStylePriority, d.Important)
+		applyCascadeDeclaration(wins, d.Prop, d.Value, inlineStylePriority, 0, 0, inlineStylePriority, 0, d.Important)
 	}
 
 	if len(wins) == 0 {
@@ -631,7 +705,7 @@ func cascadePseudoRaw(ctx *styleContext, node *html.Node, pseudoElem string) map
 				continue
 			}
 
-			applyCascadeDeclaration(wins, d.Prop, d.Value, hit.a, hit.b, hit.c, hit.rule.Order, d.Important)
+			applyCascadeDeclaration(wins, d.Prop, d.Value, hit.a, hit.b, hit.c, hit.rule.Order, hit.rule.Layer, d.Important)
 		}
 	}
 
@@ -655,12 +729,12 @@ func cascadePseudoRaw(ctx *styleContext, node *html.Node, pseudoElem string) map
 func applyCascadeDeclaration(
 	wins map[string]cascadeWin,
 	prop, value string,
-	ids, classes, types, order int,
+	ids, classes, types, order, layer int,
 	important bool,
 ) {
 	if expanded, ok := expandFontDeclaration(prop, value); ok {
 		for _, item := range expanded {
-			applyCascadeWin(wins, item.prop, item.val, ids, classes, types, order, important)
+			applyCascadeWin(wins, item.prop, item.val, ids, classes, types, order, layer, important)
 		}
 
 		return
@@ -668,7 +742,7 @@ func applyCascadeDeclaration(
 
 	if expanded, ok := expandListStyleDeclaration(prop, value); ok {
 		for _, item := range expanded {
-			applyCascadeWin(wins, item.prop, item.val, ids, classes, types, order, important)
+			applyCascadeWin(wins, item.prop, item.val, ids, classes, types, order, layer, important)
 		}
 
 		return
@@ -676,7 +750,7 @@ func applyCascadeDeclaration(
 
 	if expanded, ok := expandLogicalBoxDeclaration(prop, value); ok {
 		for _, item := range expanded {
-			applyCascadeDeclaration(wins, item.prop, item.val, ids, classes, types, order, important)
+			applyCascadeDeclaration(wins, item.prop, item.val, ids, classes, types, order, layer, important)
 		}
 
 		return
@@ -684,7 +758,7 @@ func applyCascadeDeclaration(
 
 	values, ok := expandBoxShorthand(prop, value)
 	if !ok {
-		applyCascadeWin(wins, prop, value, ids, classes, types, order, important)
+		applyCascadeWin(wins, prop, value, ids, classes, types, order, layer, important)
 
 		return
 	}
@@ -693,7 +767,7 @@ func applyCascadeDeclaration(
 	// used to allocate a fresh property string for every side of every
 	// shorthand declaration (6.4 MB per 500-page conversion in the profile).
 	for idx, longhand := range boxShorthandLonghands(prop) {
-		applyCascadeWin(wins, longhand, values[idx], ids, classes, types, order, important)
+		applyCascadeWin(wins, longhand, values[idx], ids, classes, types, order, layer, important)
 	}
 }
 
@@ -1083,7 +1157,7 @@ func supportedDeclaration(value string) bool {
 // specificity, or source order beats the current winner.
 func applyCascadeWin(
 	wins map[string]cascadeWin,
-	prop, value string, ids, classes, types, order int, important bool,
+	prop, value string, ids, classes, types, order, layer int, important bool,
 ) {
 	// prop is already lowercase: sheet and inline declarations are folded by
 	// css.parseDeclarations and the UA table is hard-coded lowercase.
@@ -1091,7 +1165,7 @@ func applyCascadeWin(
 	if !ok {
 		wins[prop] = cascadeWin{
 			value: value, ids: ids, classes: classes, types: types,
-			order: order, important: important,
+			order: order, layer: layer, important: important,
 		}
 
 		return
@@ -1105,7 +1179,22 @@ func applyCascadeWin(
 
 		wins[prop] = cascadeWin{
 			value: value, ids: ids, classes: classes, types: types,
-			order: order, important: true,
+			order: order, layer: layer, important: true,
+		}
+
+		return
+	}
+
+	// Layer order: unlayered (0) beats every ranked layer; among ranked
+	// layers, the later-declared (higher rank) beats the earlier.
+	if layer != cur.layer {
+		if !layerBeats(layer, cur.layer) {
+			return
+		}
+
+		wins[prop] = cascadeWin{
+			value: value, ids: ids, classes: classes, types: types,
+			order: order, layer: layer, important: important,
 		}
 
 		return
@@ -1114,9 +1203,28 @@ func applyCascadeWin(
 	if specificityBeats([4]int{cur.ids, cur.classes, cur.types, 0}, ids, classes, types, order, cur.order) {
 		wins[prop] = cascadeWin{
 			value: value, ids: ids, classes: classes, types: types,
-			order: order, important: important,
+			order: order, layer: layer, important: important,
 		}
 	}
+}
+
+// layerBeats reports whether the candidate @layer rank outranks the current
+// one. Rank 0 is unlayered and beats every ranked layer; among ranked layers,
+// later-declared (higher rank) beats earlier.
+func layerBeats(candidate, current int) bool {
+	if candidate == current {
+		return false
+	}
+
+	if candidate == 0 {
+		return true
+	}
+
+	if current == 0 {
+		return false
+	}
+
+	return candidate > current
 }
 
 // specificityBeats reports whether (ids, classes, types) with the given source
@@ -1464,6 +1572,29 @@ func applyStyleProp(
 	}
 
 	applyIgnoredGroup(style, prop, value)
+}
+
+// engineSupportsProperty reports whether the engine has an apply arm for the
+// property: the @supports probe runs the same dispatch table as applyStyleProp
+// on a scratch style. Unknown properties are claimed by no group and report
+// false. The value participates because some groups gate on it before
+// claiming the property.
+func engineSupportsProperty(prop, value string) bool {
+	effectiveProp := normalizeVendorPrefix(prop)
+	effectiveValue := value
+	if effectiveProp != prop {
+		effectiveValue = remapWebkitValue(prop, value)
+	}
+
+	var scratch ResolvedStyle
+
+	for _, group := range styleGroups {
+		if group(&scratch, effectiveProp, effectiveValue, 0, &styleContext{}, nil, false) {
+			return true
+		}
+	}
+
+	return false
 }
 
 //nolint:cyclop,goconst,wsl,nlreturn,funlen // 2009 box value remaps

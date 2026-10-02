@@ -70,6 +70,15 @@ type Stylesheet struct {
 	// Imports are @import url/media pairs in source order. Parse fills this;
 	// convert.prepare fetches each under the same ACL as <link rel=stylesheet>.
 	Imports []ImportRule
+	// Properties holds @property registrations in source order. Layout applies
+	// initial values and the inherits flag when resolving custom properties.
+	Properties []PropertyRule
+	// Layers lists named @layer names in declaration order (first use).
+	Layers []string
+	// layerRanks maps a layer name to its 1-based cascade rank; layerCount is
+	// the highest rank assigned so far. Rules outside any layer keep Layer 0.
+	layerRanks map[string]int `exhaustruct:"optional"`
+	layerCount int            `exhaustruct:"optional"`
 }
 
 // ImportRule is one @import. URL is the raw url("...") or unquoted path.
@@ -114,6 +123,13 @@ type Rule struct {
 	// Container is non-nil for rules nested under @container. The rule applies
 	// only when the query matches the nearest eligible ancestor container.
 	Container *ContainerQuery
+	// Supports is non-nil for rules nested under @supports. The rule applies
+	// only when the condition matches (layout supplies the engine's property
+	// support predicate).
+	Supports *SupportsCondition
+	// Layer is the rule's cascade layer rank: 0 for unlayered rules (highest
+	// priority), 1..N for the Nth declared layer (later layers win).
+	Layer int
 }
 
 // Selector is a chain of compound parts linked by combinators.
@@ -246,6 +262,12 @@ func parseAtRule(src string, str *Stylesheet, order *int) (string, error) {
 		return parseMediaRule(src, str, order)
 	case hasFoldPrefix(src, "@container"):
 		return parseContainerRule(src, str, order)
+	case hasFoldPrefix(src, "@supports"):
+		return parseSupportsRule(src, str, order)
+	case hasFoldPrefix(src, "@layer"):
+		return parseLayerRule(src, str, order)
+	case hasFoldPrefix(src, "@property"):
+		return parsePropertyRule(src, str)
 	case hasFoldPrefix(src, "@page"):
 		return parsePageRule(src, str)
 	case hasFoldPrefix(src, "@keyframes"), hasFoldPrefix(src, "@-webkit-keyframes"):
@@ -395,7 +417,7 @@ func parseMediaRule(src string, str *Stylesheet, order *int) (string, error) {
 		return "", err
 	}
 
-	rules, err := parseRuleList(media, nil, block, order, 0)
+	rules, err := parseRuleList(str, media, nil, block, order, 0)
 	if err != nil {
 		return "", err
 	}
@@ -423,7 +445,7 @@ func parseContainerRule(src string, str *Stylesheet, order *int) (string, error)
 		return rest, nil
 	}
 
-	rules, err := parseRuleList("all", &contQ, block, order, 0)
+	rules, err := parseRuleList(str, "all", &contQ, block, order, 0)
 	if err != nil {
 		return "", err
 	}
@@ -596,7 +618,7 @@ func FontFaceURLs(src string) []string {
 // depth is the block nesting level (0 for the outermost @media/@container
 // body); at maxParseDepth the block is skipped so hostile nesting cannot
 // recurse without bound.
-func parseRuleList(media string, contQ *ContainerQuery, block string, orderPtr *int, depth int) ([]Rule, error) {
+func parseRuleList(str *Stylesheet, media string, contQ *ContainerQuery, block string, orderPtr *int, depth int) ([]Rule, error) {
 	if depth >= maxParseDepth {
 		return nil, nil
 	}
@@ -608,9 +630,10 @@ func parseRuleList(media string, contQ *ContainerQuery, block string, orderPtr *
 		if block == "" {
 			break
 		}
-		// Nested @container inside @media (or another @container): flatten.
+		// Nested @container/@supports/@layer inside @media (or another block):
+		// flatten into this rule list.
 		if strings.HasPrefix(block, "@") {
-			rest, nested, err := parseNestedAtRule(block, media, orderPtr, depth)
+			rest, nested, err := parseNestedAtRule(str, block, media, contQ, orderPtr, depth)
 			if err != nil {
 				return nil, err
 			}
@@ -661,9 +684,19 @@ func skipGarbagePrelude(block string) string {
 
 // parseNestedAtRule consumes an at-rule inside a @media/@container body.
 // Nested @container rules are flattened into the media context (the nested
-// query replaces, not combines, the outer query); other at-rules are skipped.
-func parseNestedAtRule(block, media string, orderPtr *int, depth int) (string, []Rule, error) {
-	if !hasFoldPrefix(block, "@container") {
+// query replaces, not combines, the outer query); @supports gates the rules
+// it contains and @layer stamps its rank; other at-rules are skipped.
+func parseNestedAtRule(
+	str *Stylesheet, block, media string, contQ *ContainerQuery, orderPtr *int, depth int,
+) (string, []Rule, error) {
+	switch {
+	case hasFoldPrefix(block, "@container"):
+		return parseNestedContainerRule(str, block, media, orderPtr, depth)
+	case hasFoldPrefix(block, "@supports"):
+		return parseNestedSupportsRule(str, block, media, contQ, orderPtr, depth)
+	case hasFoldPrefix(block, "@layer"):
+		return parseLayerBlockRules(block, str, orderPtr, media, contQ, depth)
+	default:
 		rest, err := skipAtRule(block)
 		if err != nil {
 			return "", nil, err
@@ -671,7 +704,13 @@ func parseNestedAtRule(block, media string, orderPtr *int, depth int) (string, [
 
 		return rest, nil, nil
 	}
+}
 
+// parseNestedContainerRule handles @container inside @media/@container. The
+// nested query replaces (does not combine) the outer query.
+func parseNestedContainerRule(
+	str *Stylesheet, block, media string, orderPtr *int, depth int,
+) (string, []Rule, error) {
 	open := strings.IndexByte(block, '{')
 	if open < 0 {
 		return "", nil, errUnbalanced
@@ -688,13 +727,46 @@ func parseNestedAtRule(block, media string, orderPtr *int, depth int) (string, [
 	if !found {
 		return rem, nil, nil
 	}
-	// Nested @container replaces (does not combine) the query.
+
 	use := &innerCQ
 
-	nested, err := parseRuleList(media, use, innerBlock, orderPtr, depth+1)
+	nested, err := parseRuleList(str, media, use, innerBlock, orderPtr, depth+1)
 	if err != nil {
 		return "", nil, err
 	}
+
+	return rem, nested, nil
+}
+
+// parseNestedSupportsRule handles @supports inside @media/@container. The
+// media and container gates of the enclosing block stay on the rules; the
+// supports condition combines with any nested @supports gate.
+func parseNestedSupportsRule(
+	str *Stylesheet, block, media string, contQ *ContainerQuery, orderPtr *int, depth int,
+) (string, []Rule, error) {
+	open := strings.IndexByte(block, '{')
+	if open < 0 {
+		return "", nil, errUnbalanced
+	}
+
+	prelude := strings.TrimSpace(block[len("@supports"):open])
+	cond, ok := parseSupportsPrelude(prelude)
+
+	innerBlock, rem, err := takeBlock(block, open)
+	if err != nil {
+		return "", nil, err
+	}
+
+	if !ok {
+		return rem, nil, nil
+	}
+
+	nested, err := parseRuleList(str, media, contQ, innerBlock, orderPtr, depth+1)
+	if err != nil {
+		return "", nil, err
+	}
+
+	gateRulesSupports(nested, cond)
 
 	return rem, nested, nil
 }
