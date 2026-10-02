@@ -552,7 +552,7 @@ func (ctx *styleContext) appendRuleSelectorHits(
 		if ctx.pollContext() {
 			return hits
 		}
-		if !selectorMatches(sel, node, pseudoElem) {
+		if !ctx.selectorMatches(sel, node, pseudoElem) {
 			continue
 		}
 
@@ -564,13 +564,13 @@ func (ctx *styleContext) appendRuleSelectorHits(
 }
 
 // selectorMatches reports whether sel matches node, using the pseudo-shape
-// matcher when pe is non-empty.
-func selectorMatches(sel css.Selector, node *html.Node, pe string) bool {
+// matcher when pe is non-empty and the cascade's runtime state.
+func (ctx *styleContext) selectorMatches(sel css.Selector, node *html.Node, pe string) bool {
 	if pe != "" {
-		return css.MatchPseudo(sel, node, pe)
+		return ctx.state.MatchesPseudo(sel, node, pe)
 	}
 
-	return css.Match(sel, node)
+	return ctx.state.Matches(sel, node)
 }
 
 // containerGateMatches checks the rule's @container query against the nearest

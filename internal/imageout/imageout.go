@@ -132,6 +132,7 @@ type RenderOptions struct {
 	Registry    *pdf.Registry // optional --font-path / system faces (CJK)
 	Sheets      []*css.Stylesheet
 	Media       string // "screen" (default), "print" or ""
+	State       css.MatchState
 	Images      func(src string) ([]byte, error)
 	Background  bool // paint background colors
 	Transparent bool // PNG background: alpha 0 instead of white
@@ -274,6 +275,7 @@ func layoutOptions(opts RenderOptions, font *pdf.Font, viewportPx float64) layou
 		Registry:           opts.Registry,
 		Sheets:             opts.Sheets,
 		Media:              opts.Media,
+		State:              opts.State,
 		Images:             opts.Images,
 		Background:         opts.Background,
 		PrintLinkUnderline: opts.PrintLinkUnderline,

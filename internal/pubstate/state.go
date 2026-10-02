@@ -18,6 +18,7 @@ type Styled struct {
 	Media    string
 	WidthPx  int
 	HeightPx int
+	State    css.MatchState
 }
 
 // The readers are package state because html, css, and layout cannot share

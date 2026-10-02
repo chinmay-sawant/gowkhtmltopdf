@@ -148,6 +148,7 @@ func DisplayList(ctx context.Context, doc *css.Document) (*Display, error) {
 		Media:      styled.Media,
 		Background: true,
 		Registry:   styled.Registry,
+		State:      styled.State,
 	}
 
 	res, err := imageout.LayoutResult(ctx, styled.Root, opts)
