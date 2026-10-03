@@ -732,23 +732,7 @@ func applyCascadeDeclaration(
 	ids, classes, types, order, layer int,
 	important bool,
 ) {
-	if expanded, ok := expandFontDeclaration(prop, value); ok {
-		for _, item := range expanded {
-			applyCascadeWin(wins, item.prop, item.val, ids, classes, types, order, layer, important)
-		}
-
-		return
-	}
-
-	if expanded, ok := expandListStyleDeclaration(prop, value); ok {
-		for _, item := range expanded {
-			applyCascadeWin(wins, item.prop, item.val, ids, classes, types, order, layer, important)
-		}
-
-		return
-	}
-
-	if expanded, ok := expandLogicalBoxDeclaration(prop, value); ok {
+	if expanded, ok := expandShorthandDeclaration(prop, value); ok {
 		for _, item := range expanded {
 			applyCascadeDeclaration(wins, item.prop, item.val, ids, classes, types, order, layer, important)
 		}
@@ -769,6 +753,26 @@ func applyCascadeDeclaration(
 	for idx, longhand := range boxShorthandLonghands(prop) {
 		applyCascadeWin(wins, longhand, values[idx], ids, classes, types, order, layer, important)
 	}
+}
+
+// expandShorthandDeclaration decodes the winning side of one shorthand into
+// the longhand declarations that carry its origin and specificity. Each
+// expansion returns false for a prop it does not own or a value it cannot
+// read, so the raw key keeps the post-cascade fallback path.
+func expandShorthandDeclaration(prop, value string) ([]logicalPropDecl, bool) {
+	if expanded, ok := expandFontDeclaration(prop, value); ok {
+		return expanded, true
+	}
+
+	if expanded, ok := expandListStyleDeclaration(prop, value); ok {
+		return expanded, true
+	}
+
+	if expanded, ok := expandBackgroundDeclaration(prop, value); ok {
+		return expanded, true
+	}
+
+	return expandLogicalBoxDeclaration(prop, value)
 }
 
 // boxShorthandLonghands returns the four physical longhand names for a box
@@ -835,6 +839,46 @@ func expandListStyleDeclaration(prop, value string) ([]logicalPropDecl, bool) {
 	}
 
 	return out, true
+}
+
+// expandBackgroundDeclaration expands the background shorthand into the color
+// and image longhands the painter reads, so the shorthand and a longhand
+// compete per property with each declaration's own origin, specificity, and
+// source order. Without this, the UA background-color on a button, select, or
+// textarea coexists with an author background shorthand as a separate raw key,
+// and the later-applied longhand wins regardless of origin.
+func expandBackgroundDeclaration(prop, value string) ([]logicalPropDecl, bool) {
+	if prop != "background" {
+		return nil, false
+	}
+
+	var out []logicalPropDecl
+
+	if tok, ok := firstBackgroundColorToken(value); ok {
+		out = append(out, logicalPropDecl{prop: "background-color", val: tok})
+	}
+
+	if hasBackgroundImage(value) {
+		out = append(out, logicalPropDecl{prop: "background-image", val: value})
+	}
+
+	if len(out) == 0 {
+		return nil, false
+	}
+
+	return out, true
+}
+
+// hasBackgroundImage reports whether a background shorthand carries an image
+// the painter can resolve: a url(), a gradient, or none.
+func hasBackgroundImage(value string) bool {
+	if _, ok := firstCSSUrl(value); ok {
+		return true
+	}
+
+	trimmed := strings.TrimSpace(value)
+
+	return isGradientFunc(trimmed) || strings.EqualFold(trimmed, "none")
 }
 
 // expandFontDeclaration expands the font shorthand into its size,

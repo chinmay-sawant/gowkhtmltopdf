@@ -18,5 +18,5 @@ func TestOutputFixture57VanguardTelemetryAudit(t *testing.T) {
 	assertOpsTextRun(t, committed, 9, "Implemented CSS probe gallery 6/6 (356 properties)",
 		34.016, 795.089, 11.77, "LiberationSans", [3]float64{25.0 / 255, 44.0 / 255, 87.0 / 255})
 
-	assertFixtureOpsShape(t, committed, 9, 922, 3198, 949, 413, [4]float64{0, 0, 595.28, 841.89})
+	assertFixtureOpsShape(t, committed, 9, 922, 3198, 950, 413, [4]float64{0, 0, 595.28, 841.89})
 }

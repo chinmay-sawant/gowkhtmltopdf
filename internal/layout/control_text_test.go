@@ -249,6 +249,20 @@ func TestAuthorOverridesButtonUADefaults(t *testing.T) {
 	}
 }
 
+func TestAuthorBackgroundShorthandOverridesButtonUA(t *testing.T) {
+	t.Parallel()
+
+	res := layoutHTML(t,
+		`<html><body><button>Go</button></body></html>`,
+		sheet(t, `button { background: #123456; }`),
+	)
+	sty := findBox(t, res, "button").style
+
+	if !near(sty.BGColor[0], 0x12/255.0) || !near(sty.BGColor[2], 0x56/255.0) {
+		t.Fatalf("author background shorthand lost: %v", sty.BGColor)
+	}
+}
+
 func TestSelectAndTextareaUAFaces(t *testing.T) {
 	t.Parallel()
 

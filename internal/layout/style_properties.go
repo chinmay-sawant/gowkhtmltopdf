@@ -1302,12 +1302,22 @@ func applyColorBackgroundProps(style *ResolvedStyle, prop, value string) bool {
 }
 
 // firstBackgroundColor returns the first parseable color field in a
-// background shorthand without materializing strings.Fields. The full-value
-// fast path covers the common single-color shorthand; the scanner preserves
-// the previous field-by-field fallback for image/repeat tokens.
+// background shorthand.
 func firstBackgroundColor(value string) (int, int, int, float64, bool) {
-	if r, g, b, a, ok := css.ParseColor(value); ok {
-		return r, g, b, a, true
+	tok, ok := firstBackgroundColorToken(value)
+	if !ok {
+		return 0, 0, 0, 0, false
+	}
+
+	return css.ParseColor(tok)
+}
+
+// firstBackgroundColorToken returns the first color field in a background
+// shorthand as written. The whole value is tried first so a color carrying
+// internal spaces, such as rgb(0, 0, 0), survives the field scan.
+func firstBackgroundColorToken(value string) (string, bool) {
+	if _, _, _, _, ok := css.ParseColor(value); ok {
+		return strings.TrimSpace(value), true
 	}
 
 	for start := 0; start < len(value); {
@@ -1331,15 +1341,15 @@ func firstBackgroundColor(value string) (int, int, int, float64, bool) {
 		}
 
 		if start < end {
-			if r, g, b, a, ok := css.ParseColor(value[start:end]); ok {
-				return r, g, b, a, true
+			if _, _, _, _, ok := css.ParseColor(value[start:end]); ok {
+				return value[start:end], true
 			}
 		}
 
 		start = end
 	}
 
-	return 0, 0, 0, 0, false
+	return "", false
 }
 
 // applyTextGroup handles typography and list props.
