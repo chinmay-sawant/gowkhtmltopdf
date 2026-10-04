@@ -1380,6 +1380,18 @@ func paintLine(img *image.NRGBA, paintOp *layout.Op, paintStyle layout.PaintStyl
 	}
 	lineWidth := strokeWidthScale(paintStyle.StrokeWidth, pxPerPt)
 	opX, opY, opW, opH, _ := paintOp.PaintLineGeometry()
+
+	// A diagonal segment (the checked checkbox tick) cannot use the
+	// axis-aligned rectangle below; stroke the true centerline instead.
+	if opW != 0 && opH != 0 {
+		paintStrokeSegment(img,
+			rasterPoint{X: opX * pxPerPt, Y: opY * pxPerPt},
+			rasterPoint{X: (opX + opW) * pxPerPt, Y: (opY + opH) * pxPerPt},
+			col, lineWidth)
+
+		return
+	}
+
 	// Centre the stroke on the line: half its width, in points. Extend past
 	// each endpoint by that same half (square-cap equivalent) so meeting
 	// axis-aligned borders fill the outer corner instead of leaving a notch.
