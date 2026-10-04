@@ -52,6 +52,12 @@ type Document struct {
 	widthPx  int
 	heightPx int
 	state    icss.MatchState
+	// extra keeps the caller's sheets so Relayout can re-append them without
+	// re-parsing.
+	extra []*Sheet
+	// cache keeps the parsed <style>, <link>, and @import sheets so Relayout
+	// can skip parsing and fetching.
+	cache *prepare.SheetCache
 }
 
 // Options selects the viewport and any stylesheets beyond the document.
@@ -116,7 +122,9 @@ func Apply(ctx context.Context, doc *html.Document, opts Options) (*Document, er
 		return nil, errUnreadable
 	}
 
-	sheets, registry, err := collect(ctx, root, opts, kind, media)
+	cache := prepare.NewSheetCache()
+
+	sheets, registry, err := collect(ctx, root, opts, kind, media, cache, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -129,6 +137,8 @@ func Apply(ctx context.Context, doc *html.Document, opts Options) (*Document, er
 		widthPx:  opts.WidthPx,
 		heightPx: opts.HeightPx,
 		state:    icss.MatchState{Focus: opts.Focus, Hover: opts.Hover, Active: opts.Active},
+		extra:    opts.Extra,
+		cache:    cache,
 	}, nil
 }
 
@@ -149,6 +159,8 @@ func collect(
 	opts Options,
 	kind string,
 	media settings.MediaType,
+	cache *prepare.SheetCache,
+	prev *Document,
 ) ([]*icss.Stylesheet, *pdf.Registry, error) {
 	global := settings.DefaultPdfGlobal()
 	global.Web.MediaType = media
@@ -167,6 +179,7 @@ func collect(
 		MediaType:       kind,
 		ObjectIndex:     0,
 		PageBoxViewport: nil,
+		Cache:           cache,
 	}
 
 	sheets, err := prepare.CollectTreeSheets(ctx, resources, root, sheetOpts, io.Discard)
@@ -177,6 +190,10 @@ func collect(
 	sheets, err = appendExtra(sheets, opts.Extra)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	if prev != nil && sameSheets(sheets, prev.sheets) {
+		return sheets, prev.registry, nil
 	}
 
 	registry := resources.MergeFontFaces(ctx, nil, sheets, 0, io.Discard)
