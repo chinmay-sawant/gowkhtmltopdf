@@ -20,7 +20,9 @@ func relayout(t *testing.T, styled *css.Document, width, height int, focus, hove
 }
 
 // relayoutDisplay relayouts styled and lays the result out.
-func relayoutDisplay(t *testing.T, styled *css.Document, width, height int, focus, hover, active string) *layout.Display {
+func relayoutDisplay(
+	t *testing.T, styled *css.Document, width, height int, focus, hover, active string,
+) *layout.Display {
 	t.Helper()
 
 	return layOf(t, relayout(t, styled, width, height, focus, hover, active))

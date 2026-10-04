@@ -12,9 +12,9 @@ import (
 
 // relayoutBenchPage builds a 140-row list with a stylesheet to collect.
 func relayoutBenchPage() string {
-	var b strings.Builder
+	var page strings.Builder
 
-	b.WriteString(`<style>
+	page.WriteString(`<style>
 		body { margin: 0; font-size: 12pt }
 		.grid { padding: 8px }
 		.row { border-bottom: 1px solid #ddd; padding: 4px 2px }
@@ -25,14 +25,14 @@ func relayoutBenchPage() string {
 	</style><div class="grid">`)
 
 	for i := range 140 {
-		fmt.Fprintf(&b,
+		fmt.Fprintf(&page,
 			`<div class="row"><span class="name">Item %d</span><span class="amount">$%d.00</span></div>`,
 			i, i)
 	}
 
-	b.WriteString(`</div>`)
+	page.WriteString(`</div>`)
 
-	return b.String()
+	return page.String()
 }
 
 // BenchmarkRelayoutMedium compares full Apply plus DisplayList with Relayout

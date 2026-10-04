@@ -42,31 +42,31 @@ func Relayout(
 		return nil, errUnreadable
 	}
 
-	mt, media, err := mediaType(doc.media)
+	media, kind, err := mediaType(doc.media)
 	if err != nil {
 		return nil, err
 	}
 
-	opts := Options{ //nolint:exhaustruct // viewport and state are the inputs
+	opts := Options{
 		WidthPx:  width,
 		HeightPx: height,
-		Media:    media,
+		Media:    kind,
 		Extra:    doc.extra,
 		Focus:    focus,
 		Hover:    hover,
 		Active:   active,
 	}
 
-	sheets, registry, err := collect(ctx, doc.root, opts, media, mt, doc.cache, doc)
+	sheets, registry, err := collect(ctx, doc.root, opts, kind, media, doc.cache, doc)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Document{ //nolint:exhaustruct // tree, extras, and cache are shared
+	return &Document{
 		root:     doc.root,
 		sheets:   sheets,
 		registry: registry,
-		media:    media,
+		media:    kind,
 		widthPx:  width,
 		heightPx: height,
 		state:    icss.MatchState{Focus: focus, Hover: hover, Active: active},

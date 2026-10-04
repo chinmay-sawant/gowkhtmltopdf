@@ -22,21 +22,21 @@ func TestRelayoutAppliesStatePseudoClasses(t *testing.T) {
 	styled := applyAt(t, stateSource, 320, 240, "", "", "")
 
 	plain := layOf(t, styled)
-	assertTextColor(t, plain, "state probe", 0x11, 0x11, 0x11)
+	assertTextColor(t, plain, 0x11, 0x11, 0x11)
 
 	if hasFill(plain, 0, 0, 0xff) || hasFill(plain, 0, 0xff, 0) {
 		t.Fatal("plain layout carries a state background")
 	}
 
 	hovered := relayoutDisplay(t, styled, 320, 240, "", "b", "")
-	assertTextColor(t, hovered, "state probe", 0xff, 0, 0)
+	assertTextColor(t, hovered, 0xff, 0, 0)
 
 	if hasFill(hovered, 0, 0, 0xff) {
 		t.Fatal("hover alone painted the active background")
 	}
 
 	pressed := relayoutDisplay(t, styled, 320, 240, "b", "b", "b")
-	assertTextColor(t, pressed, "state probe", 0xff, 0, 0)
+	assertTextColor(t, pressed, 0xff, 0, 0)
 
 	if !hasFill(pressed, 0, 0, 0xff) {
 		t.Fatal("active id did not paint the active background")
@@ -47,19 +47,21 @@ func TestRelayoutAppliesStatePseudoClasses(t *testing.T) {
 	}
 
 	cleared := relayoutDisplay(t, styled, 320, 240, "", "", "")
-	assertTextColor(t, cleared, "state probe", 0x11, 0x11, 0x11)
+	assertTextColor(t, cleared, 0x11, 0x11, 0x11)
 
 	if hasFill(cleared, 0, 0, 0xff) || hasFill(cleared, 0, 0xff, 0) {
 		t.Fatal("state background leaked into a state-free relayout")
 	}
 }
 
-func assertTextColor(t *testing.T, display *layout.Display, needle string, r, g, b uint8) {
+func assertTextColor(t *testing.T, display *layout.Display, wantR, wantG, wantB uint8) {
 	t.Helper()
 
+	const needle = "state probe"
+
 	gotR, gotG, gotB, ok := textColor(display, needle)
-	if !ok || gotR != r || gotG != g || gotB != b {
+	if !ok || gotR != wantR || gotG != wantG || gotB != wantB {
 		t.Fatalf("text %q color %02x%02x%02x ok=%v, want %02x%02x%02x",
-			needle, gotR, gotG, gotB, ok, r, g, b)
+			needle, gotR, gotG, gotB, ok, wantR, wantG, wantB)
 	}
 }

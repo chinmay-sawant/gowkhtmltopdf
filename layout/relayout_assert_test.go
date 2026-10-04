@@ -8,16 +8,19 @@ import (
 	"github.com/chinmay-sawant/gowkhtmltopdf/layout"
 )
 
-func boxByID(t *testing.T, display *layout.Display, id string) layout.Box {
+// boxByID returns the border box for one element id.
+//
+//nolint:unparam // one lookup helper shared by the relayout fixtures
+func boxByID(t *testing.T, display *layout.Display, elementID string) layout.Box {
 	t.Helper()
 
 	for _, box := range display.Boxes {
-		if box.ID == id {
+		if box.ID == elementID {
 			return box
 		}
 	}
 
-	t.Fatalf("no box for #%s", id)
+	t.Fatalf("no box for #%s", elementID)
 
 	return layout.Box{}
 }

@@ -18,7 +18,9 @@ func sheetCount(t *testing.T, doc *css.Document) int {
 	return len(got.Sheets)
 }
 
-func sheetAt(t *testing.T, doc *css.Document, index int) any {
+// firstSheet returns the first parsed sheet. Callers check sheetCount first,
+// so the index is safe.
+func firstSheet(t *testing.T, doc *css.Document) any {
 	t.Helper()
 
 	got, ok := pubstate.StyledOf(doc)
@@ -26,5 +28,5 @@ func sheetAt(t *testing.T, doc *css.Document, index int) any {
 		t.Fatal("not a styled document")
 	}
 
-	return got.Sheets[index]
+	return got.Sheets[0]
 }

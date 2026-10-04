@@ -55,7 +55,7 @@ func TestRelayoutRegatesLinkedSheets(t *testing.T) {
 		t.Fatalf("sheets at 800px again = %d, want 1", got)
 	}
 
-	if first, second := sheetAt(t, wide, 0), sheetAt(t, again, 0); first != second {
+	if first, second := firstSheet(t, wide), firstSheet(t, again); first != second {
 		t.Fatal("the re-gated link was fetched and parsed again; pointer changed")
 	}
 }

@@ -50,7 +50,7 @@ func TestRelayoutRegatesImportedSheets(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if first, second := sheetAt(t, wide, 0), sheetAt(t, again, 0); first != second {
+	if first, second := firstSheet(t, wide), firstSheet(t, again); first != second {
 		t.Fatal("the re-gated import was fetched and parsed again; pointer changed")
 	}
 }

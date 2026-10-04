@@ -157,6 +157,7 @@ func (collector *sheetCollector) collectStyle(ctx context.Context, node *html.No
 	if sheet == nil {
 		sheet = collector.opts.Cache.inlineSheet(node)
 	}
+
 	if sheet == nil {
 		parsed, err := css.Parse(styleText(node))
 		if err != nil {
@@ -309,7 +310,9 @@ func (collector *sheetCollector) prepareImportRef(rule css.ImportRule, base stri
 	return ref
 }
 
-func (collector *sheetCollector) loadImportedSheet(ctx context.Context, base, ref string) (*css.Stylesheet, string, string) {
+func (collector *sheetCollector) loadImportedSheet(
+	ctx context.Context, base, ref string,
+) (*css.Stylesheet, string, string) {
 	resource, err := collector.fetchRef(ctx, base, ref)
 	if err != nil {
 		collector.warn("skipping @import %q: %v", ref, err)
