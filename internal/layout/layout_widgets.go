@@ -48,6 +48,29 @@ func applyCheckboxAutoSize(eng *engine, style ResolvedStyle, boxNode *box, curY 
 	return curY
 }
 
+// autoSizedControlContentBottom advances curY for an auto-sized native
+// control after flow: meter and progress tracks take their intrinsic
+// font-sized height, and textareas take rows * line-height. The caller has
+// already added top padding and border to curY and adds bottom padding after
+// this call.
+func (e *engine) autoSizedControlContentBottom(
+	node *html.Node, boxStyle *ResolvedStyle, widget bool, curY float64,
+) float64 {
+	if widget && boxStyle.Height < 0 {
+		// Native value controls use their intrinsic font-sized control height
+		// when auto-sized. Treating them as ordinary text blocks adds the
+		// line-height and authored padding a second time, producing the
+		// oversized meter/progress tracks in fixture-56.
+		curY = e.nativeWidgetAutoContentBottom(*boxStyle)
+	}
+
+	if node.Name == "textarea" && boxStyle.Height < 0 && boxStyle.HeightPercent < 0 {
+		curY = e.textareaAutoContentBottom(*boxStyle, node, boxStyle, curY)
+	}
+
+	return curY
+}
+
 // checkboxGeometry holds the scaled dimensions used when painting a checkbox or radio.
 type checkboxGeometry struct {
 	boxX, boxY, size, radius float64

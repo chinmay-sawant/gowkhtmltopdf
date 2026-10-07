@@ -1711,7 +1711,7 @@ func (e *engine) buildBlock(node *html.Node, style ResolvedStyle, availW, posX, 
 
 	curY = e.flowChildren(boxNode, children, style, contentW, contentX, posY, curY)
 	e.flowCBHeight = previousCB
-	curY = e.applyAutoContentBottom(node, style, boxStyle, widget, curY)
+	curY = e.autoSizedControlContentBottom(node, boxStyle, widget, curY)
 
 	if enclose && e.bfcFloats != nil {
 		curY = e.bfcFloats.extentCy(posY, curY)
