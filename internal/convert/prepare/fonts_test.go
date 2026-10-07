@@ -5,12 +5,12 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/andybalholm/brotli"
-
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/load"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/pdf"
@@ -51,7 +51,7 @@ func TestMergeFontFacesDataURLTTF(t *testing.T) {
 	t.Parallel()
 
 	uri := dataURL("font/ttf", readFontAsset(t))
-	sheet := &css.Stylesheet{ //nolint:exhaustruct // font-face-only sheet
+	sheet := &css.Stylesheet{ // font-face-only sheet
 		FontFaces: []css.FontFace{{Family: "InlineFace", Src: "url(" + uri + ")"}},
 	}
 
@@ -68,7 +68,7 @@ func TestMergeFontFacesDataURLWOFF2(t *testing.T) {
 
 	woff2 := buildWOFF2(t, readFontAsset(t), false)
 	uri := dataURL("font/woff2", woff2)
-	sheet := &css.Stylesheet{ //nolint:exhaustruct // font-face-only sheet
+	sheet := &css.Stylesheet{ // font-face-only sheet
 		FontFaces: []css.FontFace{{Family: "InlineWoff2", Src: "url(" + uri + ")"}},
 	}
 
@@ -127,36 +127,22 @@ var knownTagIndex = map[string]byte{ //nolint:gochecknoglobals // test vocabular
 func buildWOFF2(t *testing.T, sfnt []byte, transformGlyf bool) []byte {
 	t.Helper()
 
-	numTables := int(binary.BigEndian.Uint16(sfnt[4:6]))
+	numTables := binary.BigEndian.Uint16(sfnt[4:6])
 	flavor := binary.BigEndian.Uint32(sfnt[0:4])
 
 	var raw bytes.Buffer
 
 	var dir bytes.Buffer
 
-	for i := range numTables {
+	for i := range int(numTables) {
 		rec := sfnt[12+16*i:]
 		tag := string(rec[0:4])
 		off := int(binary.BigEndian.Uint32(rec[8:12]))
-		length := int(binary.BigEndian.Uint32(rec[12:16]))
+		length := binary.BigEndian.Uint32(rec[12:16])
 
-		raw.Write(sfnt[off : off+length])
+		raw.Write(sfnt[off : off+int(length)])
 
-		version := byte(0)
-		transformLen := uint32(0)
-		transformed := false
-
-		switch {
-		case tag == "glyf" && transformGlyf:
-			version = 0
-			transformLen = uint32(length)
-			transformed = true
-		case tag == "loca" && transformGlyf:
-			version = 0
-			transformed = true
-		case tag == "glyf", tag == "loca":
-			version = 3
-		}
+		version, transformLen, transformed := woff2TransformVersion(tag, length, transformGlyf)
 
 		if idx, known := knownTagIndex[tag]; known {
 			dir.WriteByte(idx | version<<6)
@@ -165,7 +151,7 @@ func buildWOFF2(t *testing.T, sfnt []byte, transformGlyf bool) []byte {
 			dir.WriteString(tag)
 		}
 
-		dir.Write(uIntBase128(uint32(length)))
+		dir.Write(uIntBase128(length))
 
 		if transformed {
 			dir.Write(uIntBase128(transformLen))
@@ -183,32 +169,77 @@ func buildWOFF2(t *testing.T, sfnt []byte, transformGlyf bool) []byte {
 		t.Fatalf("brotli close: %v", err)
 	}
 
-	out := make([]byte, 48)
-	copy(out[0:4], "wOF2")
-	binary.BigEndian.PutUint32(out[4:8], flavor)
-	binary.BigEndian.PutUint32(out[8:12], uint32(48+dir.Len()+compressed.Len()))
-	binary.BigEndian.PutUint16(out[12:14], uint16(numTables))
-	binary.BigEndian.PutUint32(out[16:20], uint32(len(sfnt)))
-	binary.BigEndian.PutUint32(out[20:24], uint32(compressed.Len()))
-	binary.BigEndian.PutUint16(out[24:26], 1)
+	dirLen := dir.Len()
+	compressedLen := compressed.Len()
+	header := woff2Header(t, flavor, numTables, len(sfnt), dirLen, compressedLen)
 
+	out := make([]byte, 0, len(header)+dirLen+compressedLen)
+	out = append(out, header...)
 	out = append(out, dir.Bytes()...)
 	out = append(out, compressed.Bytes()...)
 
 	return out
 }
 
+// woff2TransformVersion returns the transform version byte, transformLength,
+// and transformed flag for one table tag. glyf and loca under transformGlyf
+// take version 0 so the decoder exercises its rejection path; otherwise they
+// take the null transform version 3.
+func woff2TransformVersion(tag string, length uint32, transformGlyf bool) (byte, uint32, bool) {
+	switch {
+	case tag == "glyf" && transformGlyf:
+		return 0, length, true
+	case tag == "loca" && transformGlyf:
+		return 0, 0, true
+	case tag == "glyf", tag == "loca":
+		return 3, 0, false
+	}
+
+	return 0, 0, false
+}
+
+// woff2Header builds the 48-byte WOFF2 header. Every size field is bounds
+// checked against its encoded width before the conversion, so an oversized
+// value fails the test instead of silently truncating the field.
+func woff2Header(t *testing.T, flavor uint32, numTables uint16, sfntLen, dirLen, compressedLen int) []byte {
+	t.Helper()
+
+	total := 48 + dirLen + compressedLen
+	if total < 0 || total > math.MaxUint32 {
+		t.Fatalf("woff2 total size out of range: %d", total)
+	}
+
+	if sfntLen < 0 || sfntLen > math.MaxUint32 {
+		t.Fatalf("sfnt size out of range: %d", sfntLen)
+	}
+
+	if compressedLen < 0 || compressedLen > math.MaxUint32 {
+		t.Fatalf("compressed size out of range: %d", compressedLen)
+	}
+
+	header := make([]byte, 48)
+	copy(header[0:4], "wOF2")
+	binary.BigEndian.PutUint32(header[4:8], flavor)
+	binary.BigEndian.PutUint32(header[8:12], uint32(total)) //nolint:gosec // bounded by the math.MaxUint32 check above
+	binary.BigEndian.PutUint16(header[12:14], numTables)
+	binary.BigEndian.PutUint32(header[16:20], uint32(sfntLen)) //nolint:gosec // bounded by the math.MaxUint32 check above
+	binary.BigEndian.PutUint32(header[20:24], uint32(compressedLen))
+	binary.BigEndian.PutUint16(header[24:26], 1)
+
+	return header
+}
+
 // uIntBase128 encodes a WOFF2 variable-length unsigned integer.
 func uIntBase128(value uint32) []byte {
 	var buf [5]byte
 
-	i := len(buf) - 1
-	buf[i] = byte(value & 0x7f)
+	pos := len(buf) - 1
+	buf[pos] = byte(value & 0x7f)
 
 	for value >>= 7; value > 0; value >>= 7 {
-		i--
-		buf[i] = byte(value&0x7f) | 0x80
+		pos--
+		buf[pos] = byte(value&0x7f) | 0x80
 	}
 
-	return buf[i:]
+	return buf[pos:]
 }

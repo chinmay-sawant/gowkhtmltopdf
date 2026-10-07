@@ -38,21 +38,21 @@ func TestTextInputPaintsValueInsideBorderBox(t *testing.T) {
 	)
 	inputBox := findBox(t, res, htmlInput)
 
-	op := textOpWith(res, "hello")
-	if op == nil {
+	valueOp := textOpWith(res, "hello")
+	if valueOp == nil {
 		t.Fatal("text input value not painted")
 	}
 
-	if !near(op.Size, formControlFontSizePt) {
-		t.Fatalf("value size %.2fpt, want %.2fpt", op.Size, float64(formControlFontSizePt))
+	if !near(valueOp.Size, formControlFontSizePt) {
+		t.Fatalf("value size %.2fpt, want %.2fpt", valueOp.Size, float64(formControlFontSizePt))
 	}
 
-	if op.X < inputBox.x-0.01 || op.X+op.W > inputBox.x+inputBox.w+0.01 {
+	if valueOp.X < inputBox.x-0.01 || valueOp.X+valueOp.W > inputBox.x+inputBox.w+0.01 {
 		t.Fatalf("value spans %.2f..%.2f outside box %.2f..%.2f",
-			op.X, op.X+op.W, inputBox.x, inputBox.x+inputBox.w)
+			valueOp.X, valueOp.X+valueOp.W, inputBox.x, inputBox.x+inputBox.w)
 	}
 
-	centerY := op.Y - op.H/two + op.InkDescent
+	centerY := valueOp.Y - valueOp.H/two + valueOp.InkDescent
 	if !near(centerY, inputBox.y+inputBox.height/two) {
 		t.Fatalf("value center y %.2f, want %.2f", centerY, inputBox.y+inputBox.height/two)
 	}
@@ -115,26 +115,26 @@ func TestTextInputTruncatesValueToContentBox(t *testing.T) {
 	)
 	inputBox := findBox(t, res, htmlInput)
 
-	op := textOpWith(res, value)
-	if op == nil {
-		op = firstTextOp(res)
+	valueOp := textOpWith(res, value)
+	if valueOp == nil {
+		valueOp = firstTextOp(res)
 	}
 
-	if op == nil {
+	if valueOp == nil {
 		t.Fatal("truncated input value not painted")
 	}
 
-	if op.Text == value {
+	if valueOp.Text == value {
 		t.Fatal("long value was not truncated")
 	}
 
-	if !strings.HasPrefix(value, op.Text) {
-		t.Fatalf("truncated value %q is not a prefix of %q", op.Text, value)
+	if !strings.HasPrefix(value, valueOp.Text) {
+		t.Fatalf("truncated value %q is not a prefix of %q", valueOp.Text, value)
 	}
 
-	if op.X+op.W > inputBox.x+inputBox.w+0.01 {
+	if valueOp.X+valueOp.W > inputBox.x+inputBox.w+0.01 {
 		t.Fatalf("truncated value ends at %.2f past box right edge %.2f",
-			op.X+op.W, inputBox.x+inputBox.w)
+			valueOp.X+valueOp.W, inputBox.x+inputBox.w)
 	}
 }
 
@@ -166,14 +166,14 @@ func TestIsTextInputTypes(t *testing.T) {
 		{"submit", false}, {"reset", false}, {"file", false}, {"hidden", false},
 	}
 
-	for _, tc := range cases {
-		node := &html.Node{Type: html.ElementNode, Name: htmlInput} //nolint:exhaustruct // only name and type matter
-		if tc.typ != "" {
-			node.Attrs = map[string]string{"type": tc.typ}
+	for _, testCase := range cases {
+		node := &html.Node{Type: html.ElementNode, Name: htmlInput}
+		if testCase.typ != "" {
+			node.Attrs = map[string]string{"type": testCase.typ}
 		}
 
-		if got := isTextInput(node); got != tc.want {
-			t.Errorf("isTextInput(type=%q) = %v, want %v", tc.typ, got, tc.want)
+		if got := isTextInput(node); got != testCase.want {
+			t.Errorf("isTextInput(type=%q) = %v, want %v", testCase.typ, got, testCase.want)
 		}
 	}
 }
@@ -263,6 +263,28 @@ func TestAuthorBackgroundShorthandOverridesButtonUA(t *testing.T) {
 	}
 }
 
+// assertControlUAInlineBlockFace checks the shared UA face of a native
+// control box: inline-block display, padding, a 1pt border, and background.
+func assertControlUAInlineBlockFace(
+	t *testing.T, res *Result, element string, padT, padL, bg0 float64,
+) {
+	t.Helper()
+
+	box := findBox(t, res, element)
+	if box.style.Display != cssDisplayInlineBlock {
+		t.Fatalf("%s display = %q, want inline-block", element, box.style.Display)
+	}
+
+	if !near(box.style.PaddingTop, padT) || !near(box.style.PaddingLeft, padL) {
+		t.Fatalf("%s padding = T %.2f L %.2f, want %.2f/%.2f",
+			element, box.style.PaddingTop, box.style.PaddingLeft, padT, padL)
+	}
+
+	if !near(box.style.BorderTop.Width, 1) || !near(box.style.BGColor[0], bg0) {
+		t.Fatalf("%s face = border %.2f bg %v", element, box.style.BorderTop.Width, box.style.BGColor)
+	}
+}
+
 func TestSelectAndTextareaUAFaces(t *testing.T) {
 	t.Parallel()
 
@@ -271,33 +293,6 @@ func TestSelectAndTextareaUAFaces(t *testing.T) {
 		nil,
 	)
 
-	selectBox := findBox(t, res, "select")
-	if selectBox.style.Display != cssDisplayInlineBlock {
-		t.Fatalf("select display = %q, want inline-block", selectBox.style.Display)
-	}
-
-	if !near(selectBox.style.PaddingTop, pxToPt(1)) || !near(selectBox.style.PaddingLeft, pxToPt(2)) {
-		t.Fatalf("select padding = T %.2f L %.2f, want 1px/2px",
-			selectBox.style.PaddingTop, selectBox.style.PaddingLeft)
-	}
-
-	if !near(selectBox.style.BorderTop.Width, 1) || !near(selectBox.style.BGColor[0], 0xef/255.0) {
-		t.Fatalf("select face = border %.2f bg %v, want 1px #efefef",
-			selectBox.style.BorderTop.Width, selectBox.style.BGColor)
-	}
-
-	textareaBox := findBox(t, res, "textarea")
-	if textareaBox.style.Display != cssDisplayInlineBlock {
-		t.Fatalf("textarea display = %q, want inline-block", textareaBox.style.Display)
-	}
-
-	if !near(textareaBox.style.PaddingTop, pxToPt(2)) || !near(textareaBox.style.PaddingLeft, pxToPt(2)) {
-		t.Fatalf("textarea padding = T %.2f L %.2f, want 2px/2px",
-			textareaBox.style.PaddingTop, textareaBox.style.PaddingLeft)
-	}
-
-	if !near(textareaBox.style.BorderTop.Width, 1) || !near(textareaBox.style.BGColor[0], 1) {
-		t.Fatalf("textarea face = border %.2f bg %v, want 1px #ffffff",
-			textareaBox.style.BorderTop.Width, textareaBox.style.BGColor)
-	}
+	assertControlUAInlineBlockFace(t, res, "select", pxToPt(1), pxToPt(2), 0xef/255.0)
+	assertControlUAInlineBlockFace(t, res, "textarea", pxToPt(2), pxToPt(2), 1)
 }

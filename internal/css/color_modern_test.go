@@ -5,17 +5,7 @@ import "testing"
 func TestNamedColorTableComplete(t *testing.T) {
 	t.Parallel()
 
-	if got := len(namedColorTable); got != 148 {
-		t.Fatalf("namedColorTable has %d entries, want the 148 CSS Color 4 names", got)
-	}
-
-	for name, rgb := range namedColorTable {
-		for _, ch := range rgb {
-			if ch < 0 || ch > maxRGBChannel {
-				t.Errorf("named color %q has channel %d outside 0..%d", name, ch, maxRGBChannel)
-			}
-		}
-	}
+	checkNamedColorTable(t)
 
 	cases := []struct {
 		name    string
@@ -35,6 +25,24 @@ func TestNamedColorTableComplete(t *testing.T) {
 		if !ok || r != tc.r || g != tc.g || b != tc.b || a != 1 {
 			t.Errorf("ParseColor(%q) = (%d,%d,%d,%v,%v), want (%d,%d,%d,1,true)",
 				tc.name, r, g, b, a, ok, tc.r, tc.g, tc.b)
+		}
+	}
+}
+
+// checkNamedColorTable validates the cached named-color table: complete for
+// CSS Color 4 and every channel inside the byte range.
+func checkNamedColorTable(t *testing.T) {
+	t.Helper()
+
+	if got := len(namedColorTable); got != 148 {
+		t.Fatalf("namedColorTable has %d entries, want the 148 CSS Color 4 names", got)
+	}
+
+	for name, rgb := range namedColorTable {
+		for _, ch := range rgb {
+			if ch < 0 || ch > maxRGBChannel {
+				t.Errorf("named color %q has channel %d outside 0..%d", name, ch, maxRGBChannel)
+			}
 		}
 	}
 }

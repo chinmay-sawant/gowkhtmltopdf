@@ -471,14 +471,9 @@ func (e *engine) paintReplacedImage(
 	intrinsicW, intrinsicH := replacedIntrinsicPt(e, sty, boxNode.img)
 	fitX, fitY, fitW, fitH := applyObjectFitToPaint(sty, imgX, imgY, imgW, imgH, intrinsicW, intrinsicH)
 
-	if clipShape, ok := parseClipPathShape(sty.ClipPath, sty.FontSize); ok {
-		if masked := maskImageWithClipPath(
-			imgData, clipShape, fitX, fitY, fitW, fitH, posX, posY, boxNode.w, boxNode.height,
-		); masked != nil {
-			imgData = masked
-			isJPEG = false
-		}
-	}
+	imgData, isJPEG = applyPaintClipPathMask(
+		sty, imgData, isJPEG, fitX, fitY, fitW, fitH, posX, posY, boxNode.w, boxNode.height,
+	)
 
 	e.add((Op{ //nolint:exhaustruct // intentional zero fields
 		Kind:   OpImage,
@@ -496,6 +491,28 @@ func (e *engine) paintReplacedImage(
 	}
 
 	e.prependChrome(len(e.ops)-1, boxNode, sty, posX, posY, boxNode.w, boxNode.height)
+}
+
+// applyPaintClipPathMask masks paint bytes with sty's clip-path shape when one
+// parses and the mask succeeds. Unsupported or invalid values and mask
+// failures return the bytes unchanged.
+func applyPaintClipPathMask(
+	sty ResolvedStyle, imgData []byte, isJPEG bool,
+	fitX, fitY, fitW, fitH, refX, refY, refW, refH float64,
+) ([]byte, bool) {
+	clipShape, ok := parseClipPathShape(sty.ClipPath, sty.FontSize)
+	if !ok {
+		return imgData, isJPEG
+	}
+
+	masked := maskImageWithClipPath(
+		imgData, clipShape, fitX, fitY, fitW, fitH, refX, refY, refW, refH,
+	)
+	if masked == nil {
+		return imgData, isJPEG
+	}
+
+	return masked, false
 }
 
 // emitThumbImageBottomSeparator paints the single bottom rule between a

@@ -48,6 +48,9 @@ const (
 	pseudoClassHas      = "has"
 	pseudoClassIs       = "is"
 	pseudoClassWhere    = "where"
+	pseudoClassFocus    = "focus"
+	pseudoClassHover    = "hover"
+	pseudoClassActive   = "active"
 	pseudoElemBefore    = "before"
 	pseudoElemAfter     = "after"
 	nthChildPseudo      = "nth-child"
@@ -266,6 +269,15 @@ func parseAtRule(src string, str *Stylesheet, order *int) (string, error) {
 		return parseSupportsRule(src, str, order)
 	case hasFoldPrefix(src, "@layer"):
 		return parseLayerRule(src, str, order)
+	default:
+		return parseNonConditionalAtRule(src, str)
+	}
+}
+
+// parseNonConditionalAtRule handles the at-rules that do not open a nested
+// rule list: @property, @page, @keyframes, @font-face, and @import.
+func parseNonConditionalAtRule(src string, str *Stylesheet) (string, error) {
+	switch {
 	case hasFoldPrefix(src, "@property"):
 		return parsePropertyRule(src, str)
 	case hasFoldPrefix(src, "@page"):
@@ -618,7 +630,9 @@ func FontFaceURLs(src string) []string {
 // depth is the block nesting level (0 for the outermost @media/@container
 // body); at maxParseDepth the block is skipped so hostile nesting cannot
 // recurse without bound.
-func parseRuleList(str *Stylesheet, media string, contQ *ContainerQuery, block string, orderPtr *int, depth int) ([]Rule, error) {
+func parseRuleList(
+	str *Stylesheet, media string, contQ *ContainerQuery, block string, orderPtr *int, depth int,
+) ([]Rule, error) {
 	if depth >= maxParseDepth {
 		return nil, nil
 	}
@@ -750,14 +764,14 @@ func parseNestedSupportsRule(
 	}
 
 	prelude := strings.TrimSpace(block[len("@supports"):open])
-	cond, ok := parseSupportsPrelude(prelude)
+	cond, parsed := parseSupportsPrelude(prelude)
 
 	innerBlock, rem, err := takeBlock(block, open)
 	if err != nil {
 		return "", nil, err
 	}
 
-	if !ok {
+	if !parsed {
 		return rem, nil, nil
 	}
 

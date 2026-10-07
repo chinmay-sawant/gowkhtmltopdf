@@ -583,7 +583,7 @@ func rasterizeConicGradient(con *conicGradientSpec, imgW, imgH int) ([]byte, int
 			t = math.Mod(t, 1)
 
 			if t < 0 {
-				t += 1
+				t++
 			}
 
 			if con.repeating {

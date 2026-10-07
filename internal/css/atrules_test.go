@@ -1,12 +1,17 @@
 package css_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/layout"
+)
+
+// Property names repeated across the @supports fixtures.
+const (
+	displayProp = "display"
+	colorProp   = "color"
 )
 
 func parseSheet(t *testing.T, src string) *css.Stylesheet {
@@ -20,7 +25,8 @@ func parseSheet(t *testing.T, src string) *css.Stylesheet {
 	return s
 }
 
-func resolveStyles(t *testing.T, src string, sheets ...*css.Stylesheet) (*html.Node, map[*html.Node]*layout.ResolvedStyle) {
+func resolveStyles(t *testing.T, src string, sheets ...*css.Stylesheet,
+) (*html.Node, map[*html.Node]*layout.ResolvedStyle) {
 	t.Helper()
 
 	root, err := html.Parse(src)
@@ -28,7 +34,7 @@ func resolveStyles(t *testing.T, src string, sheets ...*css.Stylesheet) (*html.N
 		t.Fatalf("html.Parse(%q): %v", src, err)
 	}
 
-	styles, err := layout.ResolveStyles(context.Background(), root, layout.Options{
+	styles, err := layout.ResolveStyles(t.Context(), root, layout.Options{
 		Width: 600, Height: 800, Sheets: sheets,
 	})
 	if err != nil {
@@ -52,12 +58,24 @@ func findNode(n *html.Node, name string) *html.Node {
 	return nil
 }
 
-var (
-	red   = [3]float64{1, 0, 0}
-	blue  = [3]float64{0, 0, 1}
-	green = [3]float64{0, 1, 0}
-	black = [3]float64{0, 0, 0}
-)
+// testColors holds the primary colors the layout tests compare against.
+type testColors struct {
+	red   [3]float64
+	blue  [3]float64
+	green [3]float64
+	black [3]float64
+}
+
+// testPalette returns freshly initialized colors so parallel tests share no
+// mutable global state.
+func testPalette() testColors {
+	return testColors{
+		red:   [3]float64{1, 0, 0},
+		blue:  [3]float64{0, 0, 1},
+		green: [3]float64{0, 1, 0},
+		black: [3]float64{0, 0, 0},
+	}
+}
 
 func colorOf(t *testing.T, root *html.Node, styles map[*html.Node]*layout.ResolvedStyle, tag string) [3]float64 {
 	t.Helper()
@@ -78,21 +96,23 @@ func colorOf(t *testing.T, root *html.Node, styles map[*html.Node]*layout.Resolv
 func supportsCond(t *testing.T, cond string) *css.SupportsCondition {
 	t.Helper()
 
-	s := parseSheet(t, "@supports "+cond+" { p { color: #f00 } }")
-	if len(s.Rules) != 1 {
-		t.Fatalf("@supports %s: got %d rules, want 1", cond, len(s.Rules))
+	sheet := parseSheet(t, "@supports "+cond+" { p { color: #f00 } }")
+	if len(sheet.Rules) != 1 {
+		t.Fatalf("@supports %s: got %d rules, want 1", cond, len(sheet.Rules))
 	}
 
-	if s.Rules[0].Supports == nil {
+	if sheet.Rules[0].Supports == nil {
 		t.Fatalf("@supports %s: nil Supports condition", cond)
 	}
 
-	return s.Rules[0].Supports
+	return sheet.Rules[0].Supports
 }
 
 func TestSupportsConditionMatching(t *testing.T) {
-	supported := func(prop, value string) bool {
-		return prop == "display" || prop == "color"
+	t.Parallel()
+
+	supported := func(prop, _ string) bool {
+		return prop == displayProp || prop == colorProp
 	}
 
 	cases := []struct {
@@ -120,32 +140,36 @@ func TestSupportsConditionMatching(t *testing.T) {
 }
 
 func TestSupportsInvalidPreludeDropsBlock(t *testing.T) {
-	s := parseSheet(t, "@supports display: grid { p { color: #f00 } }")
+	t.Parallel()
 
-	if len(s.Rules) != 0 {
-		t.Fatalf("invalid @supports kept %d rules, want 0", len(s.Rules))
+	sheet := parseSheet(t, "@supports display: grid { p { color: #f00 } }")
+
+	if len(sheet.Rules) != 0 {
+		t.Fatalf("invalid @supports kept %d rules, want 0", len(sheet.Rules))
 	}
 }
 
 func TestSupportsNestedConditionCombines(t *testing.T) {
-	s := parseSheet(t, `
+	t.Parallel()
+
+	sheet := parseSheet(t, `
 		@supports (display: grid) {
 			@supports (color: #f00) {
 				p { color: #f00 }
 			}
 		}`)
-	if len(s.Rules) != 1 {
-		t.Fatalf("nested @supports: got %d rules, want 1", len(s.Rules))
+	if len(sheet.Rules) != 1 {
+		t.Fatalf("nested @supports: got %d rules, want 1", len(sheet.Rules))
 	}
 
-	cond := s.Rules[0].Supports
-	supported := func(prop, value string) bool { return prop == "display" }
+	cond := sheet.Rules[0].Supports
+	supported := func(prop, _ string) bool { return prop == displayProp }
 
 	if css.SupportsMatches(cond, supported) {
 		t.Fatal("nested @supports matched with color unsupported, want false")
 	}
 
-	supported = func(prop, value string) bool { return prop == "display" || prop == "color" }
+	supported = func(prop, _ string) bool { return prop == displayProp || prop == colorProp }
 
 	if !css.SupportsMatches(cond, supported) {
 		t.Fatal("nested @supports did not match with both supported, want true")
@@ -153,22 +177,28 @@ func TestSupportsNestedConditionCombines(t *testing.T) {
 }
 
 func TestSupportsGatesRulesInLayout(t *testing.T) {
+	t.Parallel()
+
+	colors := testPalette()
 	sheet := parseSheet(t, `
 		@supports (display: grid) { p { color: #f00 } }
 		@supports (unknown-prop: 1) { h1 { color: #f00 } }`)
 
 	root, styles := resolveStyles(t, "<p>x</p><h1>y</h1>", sheet)
 
-	if got := colorOf(t, root, styles, "p"); got != red {
+	if got := colorOf(t, root, styles, "p"); got != colors.red {
 		t.Fatalf("supported @supports rule: p color = %v, want red", got)
 	}
 
-	if got := colorOf(t, root, styles, "h1"); got != black {
+	if got := colorOf(t, root, styles, "h1"); got != colors.black {
 		t.Fatalf("unsupported @supports rule: h1 color = %v, want black", got)
 	}
 }
 
 func TestSupportsInsideMedia(t *testing.T) {
+	t.Parallel()
+
+	colors := testPalette()
 	sheet := parseSheet(t, `
 		@media all {
 			@supports (unknown-prop: 1) { p { color: #f00 } }
@@ -177,17 +207,19 @@ func TestSupportsInsideMedia(t *testing.T) {
 
 	root, styles := resolveStyles(t, "<p>x</p><h1>y</h1>", sheet)
 
-	if got := colorOf(t, root, styles, "p"); got != black {
+	if got := colorOf(t, root, styles, "p"); got != colors.black {
 		t.Fatalf("unsupported nested @supports: p color = %v, want black", got)
 	}
 
-	if got := colorOf(t, root, styles, "h1"); got != red {
+	if got := colorOf(t, root, styles, "h1"); got != colors.red {
 		t.Fatalf("supported nested @supports: h1 color = %v, want red", got)
 	}
 }
 
 func TestLayerRanksAndOrder(t *testing.T) {
-	s := parseSheet(t, `
+	t.Parallel()
+
+	sheet := parseSheet(t, `
 		@layer base, theme;
 		@layer theme { p { color: #00f } }
 		@layer base { p { color: #f00 } }
@@ -195,8 +227,8 @@ func TestLayerRanksAndOrder(t *testing.T) {
 
 	ranks := map[string]int{}
 
-	for _, r := range s.Rules {
-		if len(r.Decls) == 1 && r.Decls[0].Prop == "color" {
+	for _, r := range sheet.Rules {
+		if len(r.Decls) == 1 && r.Decls[0].Prop == colorProp {
 			ranks[r.Decls[0].Value] = r.Layer
 		}
 	}
@@ -205,12 +237,16 @@ func TestLayerRanksAndOrder(t *testing.T) {
 		t.Fatalf("layer ranks = %v, want base 1, theme 2, unlayered 0", ranks)
 	}
 
-	if len(s.Layers) != 2 || s.Layers[0] != "base" || s.Layers[1] != "theme" {
-		t.Fatalf("Layers = %v, want [base theme]", s.Layers)
+	if len(sheet.Layers) != 2 || sheet.Layers[0] != "base" || sheet.Layers[1] != "theme" {
+		t.Fatalf("Layers = %v, want [base theme]", sheet.Layers)
 	}
 }
 
 func TestLayerCascadeOrder(t *testing.T) {
+	t.Parallel()
+
+	colors := testPalette()
+
 	cases := []struct {
 		name  string
 		sheet string
@@ -219,107 +255,125 @@ func TestLayerCascadeOrder(t *testing.T) {
 		{
 			name:  "unlayered beats layered",
 			sheet: `@layer a { p { color: #00f } } p { color: #0f0 }`,
-			want:  green,
+			want:  colors.green,
 		},
 		{
 			name:  "later layer beats earlier",
 			sheet: `@layer a, b; @layer a { p { color: #f00 } } @layer b { p { color: #00f } }`,
-			want:  blue,
+			want:  colors.blue,
 		},
 		{
 			name:  "anonymous layers follow order",
 			sheet: `@layer { p { color: #f00 } } @layer { p { color: #00f } }`,
-			want:  blue,
+			want:  colors.blue,
 		},
 	}
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			root, styles := resolveStyles(t, "<p>x</p>", parseSheet(t, tc.sheet))
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 
-			if got := colorOf(t, root, styles, "p"); got != tc.want {
-				t.Fatalf("color = %v, want %v", got, tc.want)
+			root, styles := resolveStyles(t, "<p>x</p>", parseSheet(t, testCase.sheet))
+
+			if got := colorOf(t, root, styles, "p"); got != testCase.want {
+				t.Fatalf("color = %v, want %v", got, testCase.want)
 			}
 		})
 	}
 }
 
 func TestPropertyRegistrationParse(t *testing.T) {
-	s := parseSheet(t, `
+	t.Parallel()
+
+	sheet := parseSheet(t, `
 		@property --brand {
 			syntax: "<color>";
 			initial-value: #f00;
 			inherits: false;
 		}`)
 
-	if len(s.Properties) != 1 {
-		t.Fatalf("got %d @property registrations, want 1", len(s.Properties))
+	if len(sheet.Properties) != 1 {
+		t.Fatalf("got %d @property registrations, want 1", len(sheet.Properties))
 	}
 
-	p := s.Properties[0]
-	if p.Name != "--brand" || p.Syntax != "<color>" || p.Initial != "#f00" {
-		t.Fatalf("@property = %+v, want --brand <color> #f00", p)
+	prop := sheet.Properties[0]
+	if prop.Name != "--brand" || prop.Syntax != "<color>" || prop.Initial != "#f00" {
+		t.Fatalf("@property = %+v, want --brand <color> #f00", prop)
 	}
 
-	if p.Inherits || !p.InheritsSet {
-		t.Fatalf("inherits = %v set = %v, want false set", p.Inherits, p.InheritsSet)
+	if prop.Inherits || !prop.InheritsSet {
+		t.Fatalf("inherits = %v set = %v, want false set", prop.Inherits, prop.InheritsSet)
 	}
 }
 
 func TestPropertyInitialValueUsedByVar(t *testing.T) {
+	t.Parallel()
+
+	colors := testPalette()
 	sheet := parseSheet(t, `
 		@property --brand { syntax: "<color>"; initial-value: #f00; inherits: false; }
 		p { color: var(--brand) }`)
 
 	root, styles := resolveStyles(t, "<p>x</p>", sheet)
 
-	if got := colorOf(t, root, styles, "p"); got != red {
+	if got := colorOf(t, root, styles, "p"); got != colors.red {
 		t.Fatalf("var(--brand) color = %v, want initial red", got)
 	}
 }
 
 func TestPropertyVarFallbackWithoutInitial(t *testing.T) {
+	t.Parallel()
+
+	colors := testPalette()
 	sheet := parseSheet(t, `
 		@property --brand { syntax: "*"; inherits: false; }
 		p { color: var(--brand, #0f0) }`)
 
 	root, styles := resolveStyles(t, "<p>x</p>", sheet)
 
-	if got := colorOf(t, root, styles, "p"); got != green {
+	if got := colorOf(t, root, styles, "p"); got != colors.green {
 		t.Fatalf("var(--brand, #0f0) color = %v, want fallback green", got)
 	}
 }
 
 func TestPropertyInheritsFlag(t *testing.T) {
+	t.Parallel()
+
+	colors := testPalette()
+
 	cases := []struct {
 		name     string
 		inherits string
 		want     [3]float64
 	}{
-		{name: "inherits true", inherits: "true", want: blue},
-		{name: "inherits false", inherits: "false", want: red},
+		{name: "inherits true", inherits: "true", want: colors.blue},
+		{name: "inherits false", inherits: "false", want: colors.red},
 	}
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
 			sheet := parseSheet(t, `
-				@property --brand { syntax: "<color>"; initial-value: #f00; inherits: `+tc.inherits+`; }
+				@property --brand { syntax: "<color>"; initial-value: #f00; inherits: `+testCase.inherits+`; }
 				div { --brand: #00f }
 				p { color: var(--brand) }`)
 
 			root, styles := resolveStyles(t, "<div><p>x</p></div>", sheet)
 
-			if got := colorOf(t, root, styles, "p"); got != tc.want {
-				t.Fatalf("child color = %v, want %v", got, tc.want)
+			if got := colorOf(t, root, styles, "p"); got != testCase.want {
+				t.Fatalf("child color = %v, want %v", got, testCase.want)
 			}
 		})
 	}
 }
 
 func TestUnknownAtRulesStillSkipped(t *testing.T) {
-	s := parseSheet(t, "@unknown foo { p { color: #f00 } } p { color: #0f0 }")
+	t.Parallel()
 
-	if len(s.Rules) != 1 || s.Rules[0].Decls[0].Value != "#0f0" {
-		t.Fatalf("unknown at-rule changed rule list: %+v", s.Rules)
+	sheet := parseSheet(t, "@unknown foo { p { color: #f00 } } p { color: #0f0 }")
+
+	if len(sheet.Rules) != 1 || sheet.Rules[0].Decls[0].Value != "#0f0" {
+		t.Fatalf("unknown at-rule changed rule list: %+v", sheet.Rules)
 	}
 }

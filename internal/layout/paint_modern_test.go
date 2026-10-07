@@ -30,11 +30,11 @@ func decodeNRGBA(t *testing.T, data []byte) *image.NRGBA {
 func TestConicGradientRasterPixels(t *testing.T) {
 	t.Parallel()
 
-	pngData, width, height, ok := renderGradientPNG(
+	pngData, width, height, rendered := renderGradientPNG(
 		"conic-gradient(from 0deg, red, blue)", 64, 64, [3]float64{},
 	)
-	if !ok || width != 64 || height != 64 {
-		t.Fatalf("conic render ok=%v size=%dx%d", ok, width, height)
+	if !rendered || width != 64 || height != 64 {
+		t.Fatalf("conic render ok=%v size=%dx%d", rendered, width, height)
 	}
 
 	img := decodeNRGBA(t, pngData)
@@ -50,10 +50,10 @@ func TestConicGradientRasterPixels(t *testing.T) {
 		t.Errorf("left pixel = %+v, want blue at 270deg clockwise", left)
 	}
 
-	rotated, _, _, ok := renderGradientPNG(
+	rotated, _, _, rotatedOK := renderGradientPNG(
 		"conic-gradient(from 90deg, red, blue)", 64, 64, [3]float64{},
 	)
-	if !ok {
+	if !rotatedOK {
 		t.Fatal("from 90deg conic render failed")
 	}
 
@@ -65,10 +65,10 @@ func TestConicGradientRasterPixels(t *testing.T) {
 func TestRepeatingConicGradientWraps(t *testing.T) {
 	t.Parallel()
 
-	pngData, _, _, ok := renderGradientPNG(
+	pngData, _, _, repeatOK := renderGradientPNG(
 		"repeating-conic-gradient(from 0deg, red 0%, blue 25%)", 64, 64, [3]float64{},
 	)
-	if !ok {
+	if !repeatOK {
 		t.Fatal("repeating conic render failed")
 	}
 
@@ -85,9 +85,21 @@ func TestRepeatingConicGradientWraps(t *testing.T) {
 func TestParseClipPathShapes(t *testing.T) {
 	t.Parallel()
 
-	inset, ok := parseClipPathShape("inset(10px 20px 30px 40px)", 12)
-	if !ok || inset.kind != clipPathInset {
-		t.Fatalf("inset parse ok=%v kind=%v", ok, inset.kind)
+	assertClipPathInsetShape(t)
+	assertClipPathCircleShape(t)
+	assertClipPathEllipseShape(t)
+	assertClipPathPolygonShape(t)
+	assertClipPathInvalidValues(t)
+}
+
+// assertClipPathInsetShape pins inset() parsing, resolved lengths, and
+// containment.
+func assertClipPathInsetShape(t *testing.T) {
+	t.Helper()
+
+	inset, insetOK := parseClipPathShape("inset(10px 20px 30px 40px)", 12)
+	if !insetOK || inset.kind != clipPathInset {
+		t.Fatalf("inset parse ok=%v kind=%v", insetOK, inset.kind)
 	}
 
 	if !near(inset.top.value, 7.5) || !near(inset.right.value, 15) ||
@@ -98,44 +110,66 @@ func TestParseClipPathShapes(t *testing.T) {
 	if !inset.contains(50, 50, 100, 100) || inset.contains(5, 5, 100, 100) {
 		t.Error("inset containment wrong")
 	}
+}
 
-	circle, ok := parseClipPathShape("circle(30% at 50% 50%)", 12)
-	if !ok || circle.kind != clipPathCircle {
-		t.Fatalf("circle parse ok=%v kind=%v", ok, circle.kind)
+// assertClipPathCircleShape pins circle() parsing and containment.
+func assertClipPathCircleShape(t *testing.T) {
+	t.Helper()
+
+	circle, circleOK := parseClipPathShape("circle(30% at 50% 50%)", 12)
+	if !circleOK || circle.kind != clipPathCircle {
+		t.Fatalf("circle parse ok=%v kind=%v", circleOK, circle.kind)
 	}
 
 	if !circle.contains(50, 50, 100, 100) || circle.contains(95, 50, 100, 100) {
 		t.Error("circle containment wrong")
 	}
+}
 
-	ellipse, ok := parseClipPathShape("ellipse(25% 10% at 50% 50%)", 12)
-	if !ok || ellipse.kind != clipPathEllipse {
-		t.Fatalf("ellipse parse ok=%v kind=%v", ok, ellipse.kind)
+// assertClipPathEllipseShape pins ellipse() parsing and containment.
+func assertClipPathEllipseShape(t *testing.T) {
+	t.Helper()
+
+	ellipse, ellipseOK := parseClipPathShape("ellipse(25% 10% at 50% 50%)", 12)
+	if !ellipseOK || ellipse.kind != clipPathEllipse {
+		t.Fatalf("ellipse parse ok=%v kind=%v", ellipseOK, ellipse.kind)
 	}
 
 	if !ellipse.contains(60, 55, 100, 100) || ellipse.contains(80, 50, 100, 100) {
 		t.Error("ellipse containment wrong")
 	}
+}
 
-	poly, ok := parseClipPathShape("polygon(50% 0%, 100% 100%, 0% 100%)", 12)
-	if !ok || poly.kind != clipPathPolygon {
-		t.Fatalf("polygon parse ok=%v kind=%v", ok, poly.kind)
+// assertClipPathPolygonShape pins polygon() parsing, containment, and the
+// evenodd fill rule.
+func assertClipPathPolygonShape(t *testing.T) {
+	t.Helper()
+
+	poly, polyOK := parseClipPathShape("polygon(50% 0%, 100% 100%, 0% 100%)", 12)
+	if !polyOK || poly.kind != clipPathPolygon {
+		t.Fatalf("polygon parse ok=%v kind=%v", polyOK, poly.kind)
 	}
 
 	if !poly.contains(50, 80, 100, 100) || poly.contains(5, 5, 100, 100) {
 		t.Error("polygon containment wrong")
 	}
 
-	evenOdd, ok := parseClipPathShape("polygon(evenodd, 50% 0%, 100% 100%, 0% 100%)", 12)
-	if !ok || evenOdd.fillRule != clipPathEvenOdd || !evenOdd.contains(50, 80, 100, 100) {
+	evenOdd, evenOddOK := parseClipPathShape("polygon(evenodd, 50% 0%, 100% 100%, 0% 100%)", 12)
+	if !evenOddOK || evenOdd.fillRule != clipPathEvenOdd || !evenOdd.contains(50, 80, 100, 100) {
 		t.Error("polygon evenodd parse wrong")
 	}
+}
+
+// assertClipPathInvalidValues pins that unsupported and malformed values
+// parse to no shape.
+func assertClipPathInvalidValues(t *testing.T) {
+	t.Helper()
 
 	for _, invalid := range []string{
 		"url(#c)", "path('M0 0')", "shape(from 0 0, line to 10 10)",
 		"inset(10px", "polygon(0 0, 10 10)", "circle(10px 20px)", "",
 	} {
-		if _, ok := parseClipPathShape(invalid, 12); ok {
+		if _, invalidOK := parseClipPathShape(invalid, 12); invalidOK {
 			t.Errorf("parseClipPathShape(%q) accepted invalid/unsupported value", invalid)
 		}
 	}

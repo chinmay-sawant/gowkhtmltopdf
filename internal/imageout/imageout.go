@@ -1678,6 +1678,7 @@ func (p *imagePipeline) RenderObjects(ctx context.Context) error {
 		Registry:           p.registry,
 		Sheets:             sheets,
 		Media:              media,
+		State:              css.MatchState{Focus: "", Hover: "", Active: ""},
 		Images:             imagesFn,
 		Background:         p.req.Global.Background,
 		Transparent:        imgSet.Transparent,

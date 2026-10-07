@@ -16,6 +16,7 @@ const (
 
 	woff2TagMask      = 0x3f
 	woff2TagEscape    = 0x3f
+	woff2TagSize      = 4 // explicit tag length in the table directory
 	woff2VersionShift = 6
 	// For glyf and loca, transform version 3 is the null transform; for every
 	// other table version 0 is null. hmtx defines transform version 1.
@@ -23,6 +24,8 @@ const (
 	woff2HmtxTransformVersion = 1
 	woff2MaxBase128Bytes      = 5
 	woff2Base128HighBits      = 0xfe000000
+	woff2Base128Mask          = 0x7f
+	woff2Base128Shift         = 7
 )
 
 var (
@@ -58,35 +61,44 @@ type woff2Table struct {
 	origLength uint32
 }
 
+// decodeWOFF2Header validates the fixed WOFF2 header and returns the flavor,
+// table count, and compressed data size.
+func decodeWOFF2Header(data []byte) (uint32, int, uint32, error) {
+	if len(data) < woff2HeaderSize {
+		return 0, 0, 0, errWOFF2TooShort
+	}
+
+	if string(data[0:4]) != woff2Signature {
+		return 0, 0, 0, errWOFF2BadSignature
+	}
+
+	flavor := binary.BigEndian.Uint32(data[4:8])
+	if flavor == ottoFlavor {
+		return 0, 0, 0, errWOFF2CFF
+	}
+
+	numTables := int(binary.BigEndian.Uint16(data[12:14]))
+	if numTables <= 0 || numTables > maxTables {
+		return 0, 0, 0, errWOFF2TooManyTables
+	}
+
+	totalSFNT := binary.BigEndian.Uint32(data[16:20])
+	if totalSFNT == 0 || totalSFNT > maxSFNTSize {
+		return 0, 0, 0, errWOFF2SFNTTooLarge
+	}
+
+	return flavor, numTables, binary.BigEndian.Uint32(data[20:24]), nil
+}
+
 // DecodeWOFF2 reconstructs a WOFF2 file into SFNT bytes. The glyf/loca/hmtx
 // transforms are not implemented: files whose glyf, loca, or hmtx table
 // carries a transform are rejected with errWOFF2Transform, so only
 // null-transform fonts decode. CFF/OTTO flavor is rejected like the WOFF1 path.
 func DecodeWOFF2(data []byte) ([]byte, error) {
-	if len(data) < woff2HeaderSize {
-		return nil, errWOFF2TooShort
+	flavor, numTables, compressedSize, err := decodeWOFF2Header(data)
+	if err != nil {
+		return nil, err
 	}
-
-	if string(data[0:4]) != woff2Signature {
-		return nil, errWOFF2BadSignature
-	}
-
-	flavor := binary.BigEndian.Uint32(data[4:8])
-	if flavor == ottoFlavor {
-		return nil, errWOFF2CFF
-	}
-
-	numTables := int(binary.BigEndian.Uint16(data[12:14]))
-	if numTables <= 0 || numTables > maxTables {
-		return nil, errWOFF2TooManyTables
-	}
-
-	totalSFNT := binary.BigEndian.Uint32(data[16:20])
-	if totalSFNT == 0 || totalSFNT > maxSFNTSize {
-		return nil, errWOFF2SFNTTooLarge
-	}
-
-	compressedSize := binary.BigEndian.Uint32(data[20:24])
 
 	tables, dataOff, transformed, err := parseWOFF2Directory(data, numTables)
 	if err != nil {
@@ -97,7 +109,8 @@ func DecodeWOFF2(data []byte) ([]byte, error) {
 		return nil, errWOFF2Transform
 	}
 
-	if uint64(dataOff)+uint64(compressedSize) > uint64(len(data)) {
+	compressedLen := int(compressedSize)
+	if compressedLen > len(data)-dataOff {
 		return nil, errWOFF2TooShort
 	}
 
@@ -106,7 +119,7 @@ func DecodeWOFF2(data []byte) ([]byte, error) {
 		want += uint64(table.origLength)
 	}
 
-	compressed := data[dataOff : dataOff+int(compressedSize)] //nolint:gosec // bounded by the file length check above
+	compressed := data[dataOff : dataOff+compressedLen]
 
 	plain, err := decompressWOFF2(compressed, want)
 	if err != nil {
@@ -124,6 +137,7 @@ func parseWOFF2Directory(data []byte, numTables int) ([]woff2Table, int, bool, e
 	tables := make([]woff2Table, 0, numTables)
 	transformed := false
 	off := woff2HeaderSize
+
 	var total uint64
 
 	for range numTables {
@@ -169,22 +183,9 @@ func parseWOFF2Entry(data []byte, off int) (woff2Table, int, bool, error) {
 		return woff2Table{}, 0, false, errWOFF2BadTable
 	}
 
-	version := flags >> woff2VersionShift
-	transformed := false
-
-	switch tag {
-	case "glyf", "loca":
-		transformed = version != woff2NullTransformVersion
-	case "hmtx":
-		if version != 0 && version != woff2HmtxTransformVersion {
-			return woff2Table{}, 0, false, errWOFF2BadDirectory
-		}
-
-		transformed = version != 0
-	default:
-		if version != 0 {
-			return woff2Table{}, 0, false, errWOFF2BadDirectory
-		}
+	transformed, err := woff2TableTransform(tag, flags>>woff2VersionShift)
+	if err != nil {
+		return woff2Table{}, 0, false, err
 	}
 
 	if transformed {
@@ -199,6 +200,28 @@ func parseWOFF2Entry(data []byte, off int) (woff2Table, int, bool, error) {
 	return woff2Table{tag: tag, origLength: orig}, off, transformed, nil
 }
 
+// woff2TableTransform reports whether the table's version selects a transform.
+// glyf and loca use version 3 as the null transform, hmtx uses version 1, and
+// every other table must use version 0.
+func woff2TableTransform(tag string, version byte) (bool, error) {
+	switch tag {
+	case "glyf", "loca":
+		return version != woff2NullTransformVersion, nil
+	case "hmtx":
+		if version != 0 && version != woff2HmtxTransformVersion {
+			return false, errWOFF2BadDirectory
+		}
+
+		return version != 0, nil
+	default:
+		if version != 0 {
+			return false, errWOFF2BadDirectory
+		}
+
+		return false, nil
+	}
+}
+
 // woff2Tag resolves the known-tag index or reads the explicit 4-byte tag.
 func woff2Tag(data []byte, flags byte, off int) (string, int, error) {
 	idx := flags & woff2TagMask
@@ -206,24 +229,24 @@ func woff2Tag(data []byte, flags byte, off int) (string, int, error) {
 		return woff2KnownTags[idx], off, nil
 	}
 
-	if off+4 > len(data) {
+	if off+woff2TagSize > len(data) {
 		return "", 0, errWOFF2TooShort
 	}
 
-	return string(data[off : off+4]), off + 4, nil
+	return string(data[off : off+woff2TagSize]), off + woff2TagSize, nil
 }
 
 // readUIntBase128 decodes the WOFF2 variable-length unsigned integer.
 func readUIntBase128(data []byte, off int) (uint32, int, error) {
 	var value uint32
 
-	for i := range woff2MaxBase128Bytes {
-		if off+i >= len(data) {
+	for idx := range woff2MaxBase128Bytes {
+		if off+idx >= len(data) {
 			return 0, 0, errWOFF2TooShort
 		}
 
-		b := data[off+i]
-		if i == 0 && b == 0x80 {
+		current := data[off+idx]
+		if idx == 0 && current == 0x80 {
 			return 0, 0, errWOFF2BadDirectory
 		}
 
@@ -231,10 +254,10 @@ func readUIntBase128(data []byte, off int) (uint32, int, error) {
 			return 0, 0, errWOFF2BadDirectory
 		}
 
-		value = value<<7 | uint32(b&0x7f)
+		value = value<<woff2Base128Shift | uint32(current&woff2Base128Mask)
 
-		if b&0x80 == 0 {
-			return value, off + i + 1, nil
+		if current&0x80 == 0 {
+			return value, off + idx + 1, nil
 		}
 	}
 

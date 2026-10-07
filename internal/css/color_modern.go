@@ -14,6 +14,38 @@ const (
 	oklabPercentABScale = 0.4 // 100% = 0.4 for oklab a/b and oklch C
 	oklabHueDeg         = 360
 	oklabHalfTurn       = 2
+	oklabChannelCount   = 3
+	lightDarkArgCount   = 2
+	colorMixEvenSplit   = 0.5
+)
+
+// Ottosson's Oklab -> linear sRGB matrices. The comments show the formula
+// coefficient each constant stands for in oklabToRGB.
+const (
+	oklabLFromA     = 0.3963377774 // l = L + a*oklabLFromA + b*oklabLFromB
+	oklabLFromB     = 0.2158037573
+	oklabMFromA     = 0.1055613458 // m = L - a*oklabMFromA - b*oklabMFromB
+	oklabMFromB     = 0.0638541728
+	oklabSFromA     = 0.0894841775 // s = L - a*oklabSFromA - b*oklabSFromB
+	oklabSFromB     = 1.2914855480
+	oklabRedFromL   = 4.0767416621 // r = l*oklabRedFromL - m*oklabRedFromM + s*oklabRedFromS
+	oklabRedFromM   = 3.3077115913
+	oklabRedFromS   = 0.2309699292
+	oklabGreenFromL = 1.2684380046 // g = -l*oklabGreenFromL + m*oklabGreenFromM - s*oklabGreenFromS
+	oklabGreenFromM = 2.6097574011
+	oklabGreenFromS = 0.3413193965
+	oklabBlueFromL  = 0.0041960863 // b = -l*oklabBlueFromL - m*oklabBlueFromM + s*oklabBlueFromS
+	oklabBlueFromM  = 0.7034186147
+	oklabBlueFromS  = 1.7076147010
+)
+
+// sRGB transfer function constants (linear <-> gamma encoding).
+const (
+	srgbLinearThreshold = 0.0031308
+	srgbLinearSlope     = 12.92
+	srgbGammaScale      = 1.055
+	srgbGammaExponent   = 2.4
+	srgbGammaOffset     = 0.055
 )
 
 // parseModernColor dispatches the modern color functions. low is the
@@ -50,15 +82,15 @@ func colorFunctionBody(val string) (string, bool) {
 func splitColorAlpha(body string) (string, string, bool) {
 	depth := 0
 
-	for i := range len(body) {
-		switch body[i] {
+	for index := range len(body) {
+		switch body[index] {
 		case '(':
 			depth++
 		case ')':
 			depth--
 		case '/':
 			if depth == 0 {
-				return strings.TrimSpace(body[:i]), strings.TrimSpace(body[i+1:]), true
+				return strings.TrimSpace(body[:index]), strings.TrimSpace(body[index+1:]), true
 			}
 		}
 	}
@@ -66,60 +98,60 @@ func splitColorAlpha(body string) (string, string, bool) {
 	return body, "", false
 }
 
-// splitTopLevelCommas splits s on commas outside parentheses.
-func splitTopLevelCommas(s string) []string {
+// splitTopLevelCommas splits text on commas outside parentheses.
+func splitTopLevelCommas(text string) []string {
 	var parts []string
 
 	depth, start := 0, 0
 
-	for i := range len(s) {
-		switch s[i] {
+	for index := range len(text) {
+		switch text[index] {
 		case '(':
 			depth++
 		case ')':
 			depth--
 		case ',':
 			if depth == 0 {
-				parts = append(parts, strings.TrimSpace(s[start:i]))
+				parts = append(parts, strings.TrimSpace(text[start:index]))
 
-				start = i + 1
+				start = index + 1
 			}
 		}
 	}
 
-	return append(parts, strings.TrimSpace(s[start:]))
+	return append(parts, strings.TrimSpace(text[start:]))
 }
 
 func parseOKLabColor(val string) (int, int, int, float64, bool) {
-	body, ok := colorFunctionBody(val)
-	if !ok {
+	body, found := colorFunctionBody(val)
+	if !found {
 		return 0, 0, 0, 0, false
 	}
 
 	channels, alphaRaw, hasAlpha := splitColorAlpha(body)
 	fields := strings.Fields(channels)
 
-	if len(fields) != 3 {
+	if len(fields) != oklabChannelCount {
 		return 0, 0, 0, 0, false
 	}
 
-	light, ok := parseOKLabLight(fields[0])
-	if !ok {
+	light, found := parseOKLabLight(fields[0])
+	if !found {
 		return 0, 0, 0, 0, false
 	}
 
-	aComp, ok := parseOKLabAxis(fields[1])
-	if !ok {
+	aComp, found := parseOKLabAxis(fields[1])
+	if !found {
 		return 0, 0, 0, 0, false
 	}
 
-	bComp, ok := parseOKLabAxis(fields[2])
-	if !ok {
+	bComp, found := parseOKLabAxis(fields[2])
+	if !found {
 		return 0, 0, 0, 0, false
 	}
 
-	alpha, ok := parseModernAlpha(alphaRaw, hasAlpha)
-	if !ok {
+	alpha, found := parseModernAlpha(alphaRaw, hasAlpha)
+	if !found {
 		return 0, 0, 0, 0, false
 	}
 
@@ -129,25 +161,25 @@ func parseOKLabColor(val string) (int, int, int, float64, bool) {
 }
 
 func parseOKLCHColor(val string) (int, int, int, float64, bool) {
-	body, ok := colorFunctionBody(val)
-	if !ok {
+	body, found := colorFunctionBody(val)
+	if !found {
 		return 0, 0, 0, 0, false
 	}
 
 	channels, alphaRaw, hasAlpha := splitColorAlpha(body)
 	fields := strings.Fields(channels)
 
-	if len(fields) != 3 {
+	if len(fields) != oklabChannelCount {
 		return 0, 0, 0, 0, false
 	}
 
-	light, ok := parseOKLabLight(fields[0])
-	if !ok {
+	light, found := parseOKLabLight(fields[0])
+	if !found {
 		return 0, 0, 0, 0, false
 	}
 
-	chroma, ok := parseOKLabAxis(fields[1])
-	if !ok {
+	chroma, found := parseOKLabAxis(fields[1])
+	if !found {
 		return 0, 0, 0, 0, false
 	}
 
@@ -155,13 +187,13 @@ func parseOKLCHColor(val string) (int, int, int, float64, bool) {
 		chroma = 0
 	}
 
-	hue, ok := parseHueChannel(fields[2])
-	if !ok {
+	hue, found := parseHueChannel(fields[2])
+	if !found {
 		return 0, 0, 0, 0, false
 	}
 
-	alpha, ok := parseModernAlpha(alphaRaw, hasAlpha)
-	if !ok {
+	alpha, found := parseModernAlpha(alphaRaw, hasAlpha)
+	if !found {
 		return 0, 0, 0, 0, false
 	}
 
@@ -249,17 +281,17 @@ func parseModernAlpha(raw string, hasAlpha bool) (float64, bool) {
 // oklabToRGB converts an Oklab triplet to sRGB bytes (Ottosson's matrices),
 // clamping out-of-gamut results.
 func oklabToRGB(light, aComp, bComp float64) (int, int, int) {
-	l := light + 0.3963377774*aComp + 0.2158037573*bComp
-	m := light - 0.1055613458*aComp - 0.0638541728*bComp
-	s := light - 0.0894841775*aComp - 1.2914855480*bComp
+	lmsL := light + oklabLFromA*aComp + oklabLFromB*bComp
+	lmsM := light - oklabMFromA*aComp - oklabMFromB*bComp
+	lmsS := light - oklabSFromA*aComp - oklabSFromB*bComp
 
-	l = l * l * l
-	m = m * m * m
-	s = s * s * s
+	lmsL = lmsL * lmsL * lmsL
+	lmsM = lmsM * lmsM * lmsM
+	lmsS = lmsS * lmsS * lmsS
 
-	red := linearToSRGB(4.0767416621*l - 3.3077115913*m + 0.2309699292*s)
-	green := linearToSRGB(-1.2684380046*l + 2.6097574011*m - 0.3413193965*s)
-	blue := linearToSRGB(-0.0041960863*l - 0.7034186147*m + 1.7076147010*s)
+	red := linearToSRGB(oklabRedFromL*lmsL - oklabRedFromM*lmsM + oklabRedFromS*lmsS)
+	green := linearToSRGB(-oklabGreenFromL*lmsL + oklabGreenFromM*lmsM - oklabGreenFromS*lmsS)
+	blue := linearToSRGB(-oklabBlueFromL*lmsL - oklabBlueFromM*lmsM + oklabBlueFromS*lmsS)
 
 	return clampByte(red * maxRGBChannel),
 		clampByte(green * maxRGBChannel),
@@ -267,11 +299,11 @@ func oklabToRGB(light, aComp, bComp float64) (int, int, int) {
 }
 
 func linearToSRGB(channel float64) float64 {
-	if channel <= 0.0031308 {
-		return 12.92 * channel
+	if channel <= srgbLinearThreshold {
+		return srgbLinearSlope * channel
 	}
 
-	return 1.055*math.Pow(channel, 1.0/2.4) - 0.055
+	return srgbGammaScale*math.Pow(channel, 1.0/srgbGammaExponent) - srgbGammaOffset
 }
 
 type colorMixStop struct {
@@ -279,6 +311,18 @@ type colorMixStop struct {
 	alpha            float64
 	percent          float64
 	hasPercent       bool
+}
+
+// zeroColorMixStop is the all-zero stop: no channels and no percentage.
+func zeroColorMixStop() colorMixStop {
+	return colorMixStop{
+		red:        0,
+		green:      0,
+		blue:       0,
+		alpha:      0,
+		percent:    0,
+		hasPercent: false,
+	}
 }
 
 func parseColorMix(val string) (int, int, int, float64, bool) {
@@ -309,17 +353,17 @@ func parseColorMix(val string) (int, int, int, float64, bool) {
 // parseColorMixStop parses '<color> <percentage>?'.
 func parseColorMixStop(raw string) (colorMixStop, bool) {
 	raw = strings.TrimSpace(raw)
-	stop := colorMixStop{}
+	stop := zeroColorMixStop()
 
 	if strings.HasSuffix(raw, "%") {
 		space := strings.LastIndexByte(raw, ' ')
 		if space < 0 {
-			return colorMixStop{}, false
+			return zeroColorMixStop(), false
 		}
 
 		f, err := strconv.ParseFloat(strings.TrimSpace(raw[space+1:len(raw)-1]), 64)
 		if err != nil {
-			return colorMixStop{}, false
+			return zeroColorMixStop(), false
 		}
 
 		stop.percent = clampPercent(f)
@@ -330,7 +374,7 @@ func parseColorMixStop(raw string) (colorMixStop, bool) {
 
 	red, green, blue, alpha, ok := ParseColor(raw)
 	if !ok {
-		return colorMixStop{}, false
+		return zeroColorMixStop(), false
 	}
 
 	stop.red, stop.green, stop.blue, stop.alpha = red, green, blue, alpha
@@ -358,33 +402,33 @@ func colorMixWeights(first, second colorMixStop) (float64, float64) {
 
 		return 1 - w, w
 	default:
-		return 0.5, 0.5
+		return colorMixEvenSplit, colorMixEvenSplit
 	}
 }
 
-func clampPercent(f float64) float64 {
-	if f < 0 {
+func clampPercent(percent float64) float64 {
+	if percent < 0 {
 		return 0
 	}
 
-	if f > percentScale {
+	if percent > percentScale {
 		return percentScale
 	}
 
-	return f
+	return percent
 }
 
 // mixPremultiplied blends two sRGB colors with premultiplied alpha, per the
 // color-mix interpolation rules.
-func mixPremultiplied(first, second colorMixStop, w1, w2 float64) (int, int, int, float64) {
-	outAlpha := first.alpha*w1 + second.alpha*w2
+func mixPremultiplied(first, second colorMixStop, weightFirst, weightSecond float64) (int, int, int, float64) {
+	outAlpha := first.alpha*weightFirst + second.alpha*weightSecond
 	if outAlpha == 0 {
 		return 0, 0, 0, 0
 	}
 
-	red := (float64(first.red)*first.alpha*w1 + float64(second.red)*second.alpha*w2) / outAlpha
-	green := (float64(first.green)*first.alpha*w1 + float64(second.green)*second.alpha*w2) / outAlpha
-	blue := (float64(first.blue)*first.alpha*w1 + float64(second.blue)*second.alpha*w2) / outAlpha
+	red := (float64(first.red)*first.alpha*weightFirst + float64(second.red)*second.alpha*weightSecond) / outAlpha
+	green := (float64(first.green)*first.alpha*weightFirst + float64(second.green)*second.alpha*weightSecond) / outAlpha
+	blue := (float64(first.blue)*first.alpha*weightFirst + float64(second.blue)*second.alpha*weightSecond) / outAlpha
 
 	return clampByte(red), clampByte(green), clampByte(blue), clampAlpha(outAlpha)
 }
@@ -397,16 +441,23 @@ func parseLightDark(val string) (int, int, int, float64, bool) {
 	}
 
 	parts := splitTopLevelCommas(body)
-	if len(parts) != 2 {
+	if len(parts) != lightDarkArgCount {
 		return 0, 0, 0, 0, false
 	}
 
 	lightR, lightG, lightB, lightA, okLight := ParseColor(parts[0])
-	_, _, _, _, okDark := ParseColor(parts[1])
+	darkR, darkG, darkB, darkA, okDark := ParseColor(parts[1])
 
 	if !okLight || !okDark {
 		return 0, 0, 0, 0, false
 	}
+
+	// The engine always renders the light scheme; the dark channels are
+	// parsed only to reject a malformed pair.
+	_ = darkR
+	_ = darkG
+	_ = darkB
+	_ = darkA
 
 	return lightR, lightG, lightB, lightA, true
 }

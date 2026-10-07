@@ -208,7 +208,7 @@ func parseRelativeSelector(str string) (RelativeSelector, bool) {
 }
 
 // matchRelative reports whether relative selector rel matches when anchored at subject.
-func matchRelative(st MatchState, rel RelativeSelector, subject *html.Node) bool {
+func matchRelative(state MatchState, rel RelativeSelector, subject *html.Node) bool {
 	if subject == nil || len(rel.Parts) == 0 {
 		return false
 	}
@@ -222,32 +222,32 @@ func matchRelative(st MatchState, rel RelativeSelector, subject *html.Node) bool
 			return false
 		}
 
-		return matchRelativeFrom(st, sel, sib)
+		return matchRelativeFrom(state, sel, sib)
 	case "~":
 		for sib := nextElementSibling(subject); sib != nil; sib = nextElementSibling(sib) {
-			if matchRelativeFrom(st, sel, sib) {
+			if matchRelativeFrom(state, sel, sib) {
 				return true
 			}
 		}
 
 		return false
 	case ">":
-		return matchRelativeDescendant(st, sel, subject, true)
+		return matchRelativeDescendant(state, sel, subject, true)
 	default: // descendant
-		return matchRelativeDescendant(st, sel, subject, false)
+		return matchRelativeDescendant(state, sel, subject, false)
 	}
 }
 
 // matchRelativeDescendant reports whether some descendant d of subject matches
 // sel with its leftmost-match element anchored at subject (directly when
 // direct is true, or anywhere beneath it otherwise).
-func matchRelativeDescendant(st MatchState, sel Selector, subject *html.Node, direct bool) bool {
+func matchRelativeDescendant(state MatchState, sel Selector, subject *html.Node, direct bool) bool {
 	for d := range elementDescendants(subject) {
-		if !st.Matches(sel, d) {
+		if !state.Matches(sel, d) {
 			continue
 		}
 
-		left := leftmostMatch(st, sel, d)
+		left := leftmostMatch(state, sel, d)
 		if left == nil {
 			continue
 		}
@@ -262,22 +262,22 @@ func matchRelativeDescendant(st MatchState, sel Selector, subject *html.Node, di
 
 // matchRelativeFrom checks whether sel matches with its leftmost compound equal
 // to anchor (the element reached via + / ~ from the subject).
-func matchRelativeFrom(st MatchState, sel Selector, anchor *html.Node) bool {
+func matchRelativeFrom(state MatchState, sel Selector, anchor *html.Node) bool {
 	if len(sel.Parts) == 1 {
-		return st.Matches(sel, anchor)
+		return state.Matches(sel, anchor)
 	}
 
-	if !matchPart(st, sel.Parts[0], anchor) {
+	if !matchPart(state, sel.Parts[0], anchor) {
 		return false
 	}
 
 	// The anchor itself is a candidate before any of its descendants.
-	if st.Matches(sel, anchor) && leftmostMatch(st, sel, anchor) == anchor {
+	if state.Matches(sel, anchor) && leftmostMatch(state, sel, anchor) == anchor {
 		return true
 	}
 
 	for d := range elementDescendants(anchor) {
-		if st.Matches(sel, d) && leftmostMatch(st, sel, d) == anchor {
+		if state.Matches(sel, d) && leftmostMatch(state, sel, d) == anchor {
 			return true
 		}
 	}

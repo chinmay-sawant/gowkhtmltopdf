@@ -6,13 +6,13 @@ import (
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 )
 
-func findID(n *html.Node, id string) *html.Node {
-	if n.Attribute("id") == id {
+func findID(n *html.Node, targetID string) *html.Node {
+	if n.Attribute("id") == targetID {
 		return n
 	}
 
 	for _, c := range n.Children {
-		if got := findID(c, id); got != nil {
+		if got := findID(c, targetID); got != nil {
 			return got
 		}
 	}
@@ -20,7 +20,7 @@ func findID(n *html.Node, id string) *html.Node {
 	return nil
 }
 
-func stateNode(t *testing.T, src, id string) *html.Node {
+func stateNode(t *testing.T, src, targetID string) *html.Node {
 	t.Helper()
 
 	root, err := html.Parse(src)
@@ -28,9 +28,9 @@ func stateNode(t *testing.T, src, id string) *html.Node {
 		t.Fatalf("parse: %v", err)
 	}
 
-	node := findID(root, id)
+	node := findID(root, targetID)
 	if node == nil {
-		t.Fatalf("no node id %q", id)
+		t.Fatalf("no node id %q", targetID)
 	}
 
 	return node
@@ -48,6 +48,8 @@ func mustSelector(t *testing.T, src string) Selector {
 }
 
 func TestMatchStateFocusHoverActive(t *testing.T) {
+	t.Parallel()
+
 	node := stateNode(t, `<div id="e"></div>`, "e")
 
 	focus := mustSelector(t, "#e:focus")
@@ -76,6 +78,8 @@ func TestMatchStateFocusHoverActive(t *testing.T) {
 }
 
 func TestMatchChecked(t *testing.T) {
+	t.Parallel()
+
 	sel := mustSelector(t, "input:checked")
 
 	checked := stateNode(t, `<input id="c" type="checkbox" checked>`, "c")

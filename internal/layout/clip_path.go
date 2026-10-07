@@ -1,4 +1,4 @@
-//nolint:varnamelen,mnd,cyclop,gocognit,goconst // clip-path parsing and raster mask
+//nolint:varnamelen,mnd,cyclop,goconst // clip-path parsing and raster mask
 package layout
 
 import (
@@ -118,12 +118,14 @@ func parseClipPathShape(raw string, fsize float64) (clipPathShape, bool) {
 
 func parseClipPathInset(args string, fsize float64) (clipPathShape, bool) {
 	main, _ := splitViewBoxRound(args) // round radii are accepted and ignored
+
 	fields := strings.Fields(main)
 	if len(fields) < 1 || len(fields) > 4 {
 		return clipPathShape{}, false //nolint:exhaustruct // invalid inset
 	}
 
 	lengths := make([]clipPathLength, 4)
+
 	for i, field := range fields {
 		length, ok := parseClipPathLength(field, fsize)
 		if !ok {
@@ -155,11 +157,11 @@ func parseClipPathInset(args string, fsize float64) (clipPathShape, bool) {
 
 func parseClipPathCircle(args string, fsize float64) (clipPathShape, bool) {
 	radiusPart, position := splitClipPathAt(args)
-	radius := clipPathLength{keyword: "closest-side"}
+	radius := clipPathLength{value: 0, percent: false, keyword: "closest-side"}
 
 	if radiusPart != "" {
 		if radiusPart == "closest-side" || radiusPart == "farthest-side" {
-			radius = clipPathLength{keyword: radiusPart}
+			radius = clipPathLength{value: 0, percent: false, keyword: radiusPart}
 		} else {
 			parsed, ok := parseClipPathLength(radiusPart, fsize)
 			if !ok {
@@ -182,8 +184,8 @@ func parseClipPathCircle(args string, fsize float64) (clipPathShape, bool) {
 
 func parseClipPathEllipse(args string, fsize float64) (clipPathShape, bool) {
 	radiiPart, position := splitClipPathAt(args)
-	radiusX := clipPathLength{keyword: "closest-side"}
-	radiusY := clipPathLength{keyword: "closest-side"}
+	radiusX := clipPathLength{value: 0, percent: false, keyword: "closest-side"}
+	radiusY := clipPathLength{value: 0, percent: false, keyword: "closest-side"}
 
 	if radiiPart != "" {
 		fields := strings.Fields(radiiPart)
@@ -193,6 +195,7 @@ func parseClipPathEllipse(args string, fsize float64) (clipPathShape, bool) {
 
 		parsedX, okX := parseClipPathRadius(fields[0], fsize)
 		parsedY, okY := parseClipPathRadius(fields[1], fsize)
+
 		if !okX || !okY {
 			return clipPathShape{}, false //nolint:exhaustruct // invalid radius
 		}
@@ -212,6 +215,7 @@ func parseClipPathEllipse(args string, fsize float64) (clipPathShape, bool) {
 
 func parseClipPathPolygon(args string, fsize float64) (clipPathShape, bool) {
 	fillRule := ""
+
 	if idx := strings.IndexByte(args, ','); idx >= 0 {
 		first := strings.TrimSpace(args[:idx])
 		if first == clipPathEvenOdd || first == clipPathNonZero {
@@ -220,9 +224,10 @@ func parseClipPathPolygon(args string, fsize float64) (clipPathShape, bool) {
 		}
 	}
 
-	var points []clipPathPoint
+	layers := splitCommaLayers(args)
+	points := make([]clipPathPoint, 0, len(layers))
 
-	for _, part := range splitCommaLayers(args) {
+	for _, part := range layers {
 		fields := strings.Fields(part)
 		if len(fields) != 2 {
 			return clipPathShape{}, false //nolint:exhaustruct // invalid vertex
@@ -230,6 +235,7 @@ func parseClipPathPolygon(args string, fsize float64) (clipPathShape, bool) {
 
 		x, okX := parseClipPathCoord(fields[0], true, fsize)
 		y, okY := parseClipPathCoord(fields[1], false, fsize)
+
 		if !okX || !okY {
 			return clipPathShape{}, false //nolint:exhaustruct // invalid vertex
 		}
@@ -262,7 +268,7 @@ func splitClipPathAt(args string) (string, string) {
 
 func parseClipPathRadius(token string, fsize float64) (clipPathLength, bool) {
 	if token == "closest-side" || token == "farthest-side" {
-		return clipPathLength{keyword: token}, true
+		return clipPathLength{value: 0, percent: false, keyword: token}, true
 	}
 
 	return parseClipPathLength(token, fsize)
@@ -271,7 +277,7 @@ func parseClipPathRadius(token string, fsize float64) (clipPathLength, bool) {
 // parseClipPathPosition parses 0-2 position tokens: keywords plus lengths or
 // percentages. An empty position is center.
 func parseClipPathPosition(position string, fsize float64) (clipPathLength, clipPathLength, bool) {
-	half := clipPathLength{value: 0.5, percent: true}
+	half := clipPathLength{value: 0.5, percent: true, keyword: ""}
 	centerX, centerY := half, half
 	fields := strings.Fields(position)
 
@@ -313,18 +319,18 @@ func parseClipPathPosition(position string, fsize float64) (clipPathLength, clip
 func clipPathKeyword(token string) clipPathLength {
 	switch token {
 	case "left", "top":
-		return clipPathLength{value: 0}
+		return clipPathLength{value: 0, percent: false, keyword: ""}
 	case "right", "bottom":
-		return clipPathLength{value: 1, percent: true}
+		return clipPathLength{value: 1, percent: true, keyword: ""}
 	default:
-		return clipPathLength{value: 0.5, percent: true}
+		return clipPathLength{value: 0.5, percent: true, keyword: ""}
 	}
 }
 
 func parseClipPathCoord(token string, horizontal bool, fsize float64) (clipPathLength, bool) {
 	switch token {
 	case "center":
-		return clipPathLength{value: 0.5, percent: true}, true
+		return clipPathLength{value: 0.5, percent: true, keyword: ""}, true
 	case "left", "right":
 		if horizontal {
 			return clipPathKeyword(token), true
@@ -351,7 +357,7 @@ func parseClipPathLength(token string, fsize float64) (clipPathLength, bool) {
 			return clipPathLength{}, false //nolint:exhaustruct // invalid percentage
 		}
 
-		return clipPathLength{value: value / 100.0, percent: true}, true
+		return clipPathLength{value: value / 100.0, percent: true, keyword: ""}, true
 	}
 
 	value, unit, ok := css.ParseLength(token)
@@ -364,7 +370,7 @@ func parseClipPathLength(token string, fsize float64) (clipPathLength, bool) {
 		return clipPathLength{}, false //nolint:exhaustruct // unsupported unit
 	}
 
-	return clipPathLength{value: pt}, true
+	return clipPathLength{value: pt, percent: false, keyword: ""}, true
 }
 
 // contains reports whether a point in reference-box coordinates lies inside
@@ -376,6 +382,7 @@ func (s clipPathShape) contains(x, y, w, h float64) bool {
 			y >= s.top.resolve(h) && y <= h-s.bottom.resolve(h)
 	case clipPathCircle:
 		cx, cy := s.centerX.resolve(w), s.centerY.resolve(h)
+
 		radius := resolveCircleRadius(s.radius, cx, cy, w, h)
 		if radius <= 0 {
 			return false
@@ -386,6 +393,7 @@ func (s clipPathShape) contains(x, y, w, h float64) bool {
 		return dx*dx+dy*dy <= radius*radius
 	case clipPathEllipse:
 		cx, cy := s.centerX.resolve(w), s.centerY.resolve(h)
+
 		rx, ry := resolveEllipseRadii(s.radiusX, s.radiusY, cx, cy, w, h)
 		if rx <= 0 || ry <= 0 {
 			return false
@@ -507,9 +515,11 @@ func maskImageWithClipPath(
 			}
 
 			coverage := 0
+
 			for subY := range 2 {
 				for subX := range 2 {
 					px := drawnX + (float64(x)+(float64(subX)+0.5)/2)*drawnW/float64(w) - refX
+
 					py := drawnY + (float64(y)+(float64(subY)+0.5)/2)*drawnH/float64(h) - refY
 					if shape.contains(px, py, refW, refH) {
 						coverage++

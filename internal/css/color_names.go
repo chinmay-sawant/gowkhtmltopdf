@@ -6,7 +6,7 @@ package css
 // level so color parsing does not allocate a new table on every call;
 // callers must treat it as read-only.
 //
-//nolint:gochecknoglobals,mnd // read-only spec table; avoids per-call allocation
+//nolint:gochecknoglobals // read-only spec table; avoids per-call allocation
 var namedColorTable = map[string][3]int{
 	"aliceblue":            {0xf0, 0xf8, 0xff},
 	"antiquewhite":         {0xfa, 0xeb, 0xd7},

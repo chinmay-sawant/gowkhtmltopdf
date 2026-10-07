@@ -34,14 +34,14 @@ func parseSupportsRule(src string, str *Stylesheet, order *int) (string, error) 
 	}
 
 	prelude := strings.TrimSpace(src[len("@supports"):open])
-	cond, ok := parseSupportsPrelude(prelude)
+	cond, parsed := parseSupportsPrelude(prelude)
 
 	block, rest, err := takeBlock(src, open)
 	if err != nil {
 		return "", err
 	}
 
-	if !ok {
+	if !parsed {
 		return rest, nil
 	}
 
@@ -59,16 +59,19 @@ func parseSupportsRule(src string, str *Stylesheet, order *int) (string, error) 
 // gateRulesSupports sets cond on rules that carry no @supports gate and
 // combines nested gates with and.
 func gateRulesSupports(rules []Rule, cond *SupportsCondition) {
-	for i := range rules {
-		if rules[i].Supports == nil {
-			rules[i].Supports = cond
+	for ruleIndex := range rules {
+		if rules[ruleIndex].Supports == nil {
+			rules[ruleIndex].Supports = cond
 
 			continue
 		}
 
-		rules[i].Supports = &SupportsCondition{
+		rules[ruleIndex].Supports = &SupportsCondition{
 			Kind:     supportsAnd,
-			Children: []SupportsCondition{*rules[i].Supports, *cond},
+			Prop:     "",
+			Value:    "",
+			Children: []SupportsCondition{*rules[ruleIndex].Supports, *cond},
+			Inner:    nil,
 		}
 	}
 }
@@ -94,20 +97,32 @@ func parseSupportsCond(src string, depth int) (SupportsCondition, string, bool) 
 	}
 
 	if hasFoldPrefix(src, "not") && supportsBoundary(src, len("not")) {
-		inner, rest, ok := parseSupportsInParens(strings.TrimSpace(src[len("not"):]), depth+1)
-		if !ok {
+		inner, rest, parsed := parseSupportsInParens(strings.TrimSpace(src[len("not"):]), depth+1)
+		if !parsed {
 			return SupportsCondition{}, "", false //nolint:exhaustruct // parse failure sentinel
 		}
 
-		return SupportsCondition{Kind: supportsNot, Inner: &inner}, rest, true
+		return SupportsCondition{
+			Kind:     supportsNot,
+			Prop:     "",
+			Value:    "",
+			Children: nil,
+			Inner:    &inner,
+		}, rest, true
 	}
 
-	first, rest, ok := parseSupportsInParens(src, depth+1)
-	if !ok {
+	first, rest, matched := parseSupportsInParens(src, depth+1)
+	if !matched {
 		return SupportsCondition{}, "", false //nolint:exhaustruct // parse failure sentinel
 	}
 
-	op := ""
+	return parseSupportsChain(first, rest, depth)
+}
+
+// parseSupportsChain parses the and/or continuation after a condition's first
+// operand. Mixing the two operators rejects the whole condition.
+func parseSupportsChain(first SupportsCondition, rest string, depth int) (SupportsCondition, string, bool) {
+	operator := ""
 	children := []SupportsCondition{first}
 
 	for {
@@ -116,14 +131,14 @@ func parseSupportsCond(src string, depth int) (SupportsCondition, string, bool) 
 			break
 		}
 
-		if op != "" && word != op {
+		if operator != "" && word != operator {
 			return SupportsCondition{}, "", false //nolint:exhaustruct // and/or cannot mix
 		}
 
-		op = word
+		operator = word
 
-		next, tail, ok := parseSupportsInParens(strings.TrimSpace(after), depth+1)
-		if !ok {
+		next, tail, matched := parseSupportsInParens(strings.TrimSpace(after), depth+1)
+		if !matched {
 			return SupportsCondition{}, "", false //nolint:exhaustruct // parse failure sentinel
 		}
 
@@ -131,11 +146,17 @@ func parseSupportsCond(src string, depth int) (SupportsCondition, string, bool) 
 		rest = tail
 	}
 
-	if op == "" {
+	if operator == "" {
 		return first, rest, true
 	}
 
-	return SupportsCondition{Kind: op, Children: children}, rest, true
+	return SupportsCondition{
+		Kind:     operator,
+		Prop:     "",
+		Value:    "",
+		Children: children,
+		Inner:    nil,
+	}, rest, true
 }
 
 // parseSupportsInParens parses `( <condition> )`, `( <declaration> )`, or a
@@ -148,31 +169,43 @@ func parseSupportsInParens(src string, depth int) (SupportsCondition, string, bo
 	}
 
 	if src[0] == '(' {
-		close := matchingSupportsParen(src)
-		if close < 0 {
+		closeIdx := matchingSupportsParen(src)
+		if closeIdx < 0 {
 			return SupportsCondition{}, "", false //nolint:exhaustruct // parse failure sentinel
 		}
 
-		inner := strings.TrimSpace(src[1:close])
-		rest := src[close+1:]
+		inner := strings.TrimSpace(src[1:closeIdx])
+		rest := src[closeIdx+1:]
 
-		if decl, ok := parseSupportsDeclaration(inner); ok {
+		if decl, matched := parseSupportsDeclaration(inner); matched {
 			return decl, rest, true
 		}
 
-		if cond, tail, ok := parseSupportsCond(inner, depth+1); ok && strings.TrimSpace(tail) == "" {
+		if cond, tail, matched := parseSupportsCond(inner, depth+1); matched && strings.TrimSpace(tail) == "" {
 			return cond, rest, true
 		}
 
-		return SupportsCondition{Kind: supportsFalse}, rest, true
+		return SupportsCondition{
+			Kind:     supportsFalse,
+			Prop:     "",
+			Value:    "",
+			Children: nil,
+			Inner:    nil,
+		}, rest, true
 	}
 
-	close := matchingFunctionParen(src)
-	if close < 0 {
+	closeIdx := matchingFunctionParen(src)
+	if closeIdx < 0 {
 		return SupportsCondition{}, "", false //nolint:exhaustruct // parse failure sentinel
 	}
 
-	return SupportsCondition{Kind: supportsFalse}, src[close+1:], true
+	return SupportsCondition{
+		Kind:     supportsFalse,
+		Prop:     "",
+		Value:    "",
+		Children: nil,
+		Inner:    nil,
+	}, src[closeIdx+1:], true
 }
 
 // parseSupportsDeclaration parses `prop: value`. The property name is
@@ -185,11 +218,18 @@ func parseSupportsDeclaration(inner string) (SupportsCondition, bool) {
 
 	prop := strings.ToLower(strings.TrimSpace(inner[:colon]))
 	value := strings.TrimSpace(inner[colon+1:])
+
 	if !validPropName(prop) || value == "" {
 		return SupportsCondition{}, false //nolint:exhaustruct // not a declaration
 	}
 
-	return SupportsCondition{Kind: supportsDecl, Prop: prop, Value: value}, true
+	return SupportsCondition{
+		Kind:     supportsDecl,
+		Prop:     prop,
+		Value:    value,
+		Children: nil,
+		Inner:    nil,
+	}, true
 }
 
 // SupportsMatches reports whether cond holds. supported decides one
@@ -204,21 +244,9 @@ func SupportsMatches(cond *SupportsCondition, supported func(prop, value string)
 	case supportsDecl:
 		return supported(cond.Prop, cond.Value)
 	case supportsAnd:
-		for i := range cond.Children {
-			if !SupportsMatches(&cond.Children[i], supported) {
-				return false
-			}
-		}
-
-		return true
+		return supportsAll(cond.Children, supported)
 	case supportsOr:
-		for i := range cond.Children {
-			if SupportsMatches(&cond.Children[i], supported) {
-				return true
-			}
-		}
-
-		return false
+		return supportsAny(cond.Children, supported)
 	case supportsNot:
 		return !SupportsMatches(cond.Inner, supported)
 	default:
@@ -226,9 +254,31 @@ func SupportsMatches(cond *SupportsCondition, supported func(prop, value string)
 	}
 }
 
+// supportsAll reports whether supported holds for every child condition.
+func supportsAll(children []SupportsCondition, supported func(prop, value string) bool) bool {
+	for index := range children {
+		if !SupportsMatches(&children[index], supported) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// supportsAny reports whether supported holds for at least one child condition.
+func supportsAny(children []SupportsCondition, supported func(prop, value string) bool) bool {
+	for index := range children {
+		if SupportsMatches(&children[index], supported) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // supportsOperator reads a leading and/or token. The operator must be
 // followed by whitespace or '(' so `(a)orange` is not read as `or`.
-func supportsOperator(src string) (word, rest string, ok bool) {
+func supportsOperator(src string) (string, string, bool) {
 	switch {
 	case hasFoldPrefix(src, "and") && supportsBoundary(src, len("and")):
 		return supportsAnd, src[len("and"):], true
@@ -259,14 +309,14 @@ func supportsBoundary(src string, end int) bool {
 func matchingSupportsParen(src string) int {
 	depth := 0
 
-	for i := range len(src) {
-		switch src[i] {
+	for index := range len(src) {
+		switch src[index] {
 		case '(':
 			depth++
 		case ')':
 			depth--
 			if depth == 0 {
-				return i
+				return index
 			}
 		}
 	}
@@ -288,27 +338,27 @@ func matchingFunctionParen(src string) int {
 		}
 	}
 
-	close := matchingSupportsParen(src[open:])
-	if close < 0 {
+	closeIdx := matchingSupportsParen(src[open:])
+	if closeIdx < 0 {
 		return -1
 	}
 
-	return open + close
+	return open + closeIdx
 }
 
 // supportsTopLevelColon returns the first ':' at paren depth zero, or -1.
 func supportsTopLevelColon(src string) int {
 	depth := 0
 
-	for i := range len(src) {
-		switch src[i] {
+	for index := range len(src) {
+		switch src[index] {
 		case '(':
 			depth++
 		case ')':
 			depth--
 		case ':':
 			if depth == 0 {
-				return i
+				return index
 			}
 		}
 	}

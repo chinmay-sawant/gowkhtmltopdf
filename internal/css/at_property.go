@@ -32,25 +32,37 @@ func parsePropertyRule(src string, str *Stylesheet) (string, error) {
 		return "", err
 	}
 
-	prop := PropertyRule{Name: name}
+	prop := PropertyRule{
+		Name:        name,
+		Syntax:      "",
+		Initial:     "",
+		Inherits:    false,
+		InheritsSet: false,
+	}
 
-	for _, d := range parseDeclarations(block) {
-		switch d.Prop {
-		case "syntax":
-			prop.Syntax = strings.Trim(d.Value, `"'`)
-		case "initial-value":
-			prop.Initial = d.Value
-		case "inherits":
-			switch strings.ToLower(strings.TrimSpace(d.Value)) {
-			case "true":
-				prop.Inherits, prop.InheritsSet = true, true
-			case "false":
-				prop.Inherits, prop.InheritsSet = false, true
-			}
-		}
+	for _, declaration := range parseDeclarations(block) {
+		applyPropertyDeclaration(&prop, declaration)
 	}
 
 	str.Properties = append(str.Properties, prop)
 
 	return rest, nil
+}
+
+// applyPropertyDeclaration copies one declaration of an @property block into
+// its registration, ignoring descriptors the engine does not track.
+func applyPropertyDeclaration(prop *PropertyRule, decl Declaration) {
+	switch decl.Prop {
+	case "syntax":
+		prop.Syntax = strings.Trim(decl.Value, `"'`)
+	case "initial-value":
+		prop.Initial = decl.Value
+	case "inherits":
+		switch strings.ToLower(strings.TrimSpace(decl.Value)) {
+		case "true":
+			prop.Inherits, prop.InheritsSet = true, true
+		case "false":
+			prop.Inherits, prop.InheritsSet = false, true
+		}
+	}
 }

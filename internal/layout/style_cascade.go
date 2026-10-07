@@ -66,17 +66,7 @@ func internalCustomPropWriters(raw map[string]string) bool {
 // takes its initial value unless it inherits and the parent supplied one,
 // and a non-inherited registered property never inherits the parent's value.
 func mergeCustomProps(parentProps, raw map[string]string, registered map[string]css.PropertyRule) map[string]string {
-	var declared map[string]string
-
-	for prop, value := range raw {
-		if strings.HasPrefix(prop, "--") {
-			if declared == nil {
-				declared = make(map[string]string)
-			}
-
-			declared[prop] = value
-		}
-	}
+	declared := declaredCustomProps(raw)
 
 	if len(declared) == 0 && len(registered) == 0 {
 		if len(parentProps) > 0 && internalCustomPropWriters(raw) {
@@ -103,6 +93,24 @@ func mergeCustomProps(parentProps, raw map[string]string, registered map[string]
 	}
 
 	return resolved
+}
+
+// declaredCustomProps collects the --* declarations from raw. It returns nil
+// when raw declares none.
+func declaredCustomProps(raw map[string]string) map[string]string {
+	var declared map[string]string
+
+	for prop, value := range raw {
+		if strings.HasPrefix(prop, "--") {
+			if declared == nil {
+				declared = make(map[string]string)
+			}
+
+			declared[prop] = value
+		}
+	}
+
+	return declared
 }
 
 // applyRegisteredProps folds @property registrations into a custom-property
@@ -1617,6 +1625,7 @@ func applyStyleProp(
 // claiming the property.
 func engineSupportsProperty(prop, value string) bool {
 	effectiveProp := normalizeVendorPrefix(prop)
+
 	effectiveValue := value
 	if effectiveProp != prop {
 		effectiveValue = remapWebkitValue(prop, value)
@@ -1624,8 +1633,10 @@ func engineSupportsProperty(prop, value string) bool {
 
 	var scratch ResolvedStyle
 
+	scratchCtx := styleContext{} //nolint:exhaustruct // zero values model the @supports probe context
+
 	for _, group := range styleGroups {
-		if group(&scratch, effectiveProp, effectiveValue, 0, &styleContext{}, nil, false) {
+		if group(&scratch, effectiveProp, effectiveValue, 0, &scratchCtx, nil, false) {
 			return true
 		}
 	}

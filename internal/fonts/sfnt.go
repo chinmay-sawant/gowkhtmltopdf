@@ -6,6 +6,7 @@ const (
 	sfntHeaderSize = 12
 	sfntRecordSize = 16
 	sfntSearchMul  = 16
+	sfntWordSize   = 4
 	sfntPadMask    = 3
 	ottoFlavor     = 0x4F54544F // 'OTTO'
 )
@@ -17,10 +18,10 @@ func assembleWOFF2SFNT(flavor uint32, tables []woff2Table, data [][]byte) ([]byt
 	numTables := len(tables)
 	headerSize := sfntHeaderSize + sfntRecordSize*numTables
 
-	total := uint64(headerSize)
+	total := headerSize
 
 	for _, table := range data {
-		total += uint64(paddedLen(len(table)))
+		total += paddedLen(len(table))
 	}
 
 	if total > maxSFNTSize {
@@ -39,20 +40,22 @@ func assembleWOFF2SFNT(flavor uint32, tables []woff2Table, data [][]byte) ([]byt
 		entrySelector++
 	}
 
-	binary.BigEndian.PutUint16(out[6:8], uint16(searchRange*sfntSearchMul))                           //nolint:gosec // bounded by maxTables
-	binary.BigEndian.PutUint16(out[8:10], uint16(entrySelector))                                      //nolint:gosec // bounded by maxTables
-	binary.BigEndian.PutUint16(out[10:12], uint16(numTables*sfntSearchMul-searchRange*sfntSearchMul)) //nolint:gosec // bounded by maxTables
+	rangeShift := numTables*sfntSearchMul - searchRange*sfntSearchMul
+
+	binary.BigEndian.PutUint16(out[6:8], uint16(searchRange*sfntSearchMul)) //nolint:gosec // bounded by maxTables
+	binary.BigEndian.PutUint16(out[8:10], uint16(entrySelector))            //nolint:gosec // bounded by maxTables
+	binary.BigEndian.PutUint16(out[10:12], uint16(rangeShift))              //nolint:gosec // bounded by maxTables
 
 	offset := uint32(headerSize) //nolint:gosec // bounded by maxSFNTSize
 
-	for i, table := range tables {
-		rec := out[sfntHeaderSize+sfntRecordSize*i:]
+	for idx, table := range tables {
+		rec := out[sfntHeaderSize+sfntRecordSize*idx:]
 		copy(rec[0:4], table.tag)
-		binary.BigEndian.PutUint32(rec[4:8], sfntChecksum(data[i]))
+		binary.BigEndian.PutUint32(rec[4:8], sfntChecksum(data[idx]))
 		binary.BigEndian.PutUint32(rec[8:12], offset)
-		binary.BigEndian.PutUint32(rec[12:16], uint32(len(data[i]))) //nolint:gosec // bounded by maxTableLen
-		copy(out[offset:], data[i])
-		offset += uint32(paddedLen(len(data[i]))) //nolint:gosec // bounded by maxTableLen
+		binary.BigEndian.PutUint32(rec[12:16], uint32(len(data[idx]))) //nolint:gosec // bounded by maxTableLen
+		copy(out[offset:], data[idx])
+		offset += uint32(paddedLen(len(data[idx]))) //nolint:gosec // bounded by maxTableLen
 	}
 
 	return out, nil
@@ -68,15 +71,15 @@ func paddedLen(n int) int {
 func sfntChecksum(table []byte) uint32 {
 	var sum uint32
 
-	for i := 0; i < len(table); i += 4 {
-		var word [4]byte
+	for pos := 0; pos < len(table); pos += sfntWordSize {
+		var word [sfntWordSize]byte
 
-		end := i + 4
+		end := pos + sfntWordSize
 		if end > len(table) {
 			end = len(table)
 		}
 
-		copy(word[:], table[i:end])
+		copy(word[:], table[pos:end])
 		sum += binary.BigEndian.Uint32(word[:])
 	}
 

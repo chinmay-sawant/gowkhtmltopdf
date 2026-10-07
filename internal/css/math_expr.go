@@ -32,7 +32,7 @@ func EvalMath(value string, env MathEnv) (float64, bool) {
 		return 0, false
 	}
 
-	parser := mathParser{src: src, env: env}
+	parser := mathParser{src: src, pos: 0, env: env}
 
 	result, ok := parser.parseExpr()
 	if !ok || parser.pos != len(parser.src) {
@@ -56,12 +56,13 @@ func (p *mathParser) parseExpr() (float64, bool) {
 
 	for {
 		p.skipSpace()
+
 		if p.pos >= len(p.src) {
 			return left, true
 		}
 
-		op := p.src[p.pos]
-		if op != '+' && op != '-' {
+		operator := p.src[p.pos]
+		if operator != '+' && operator != '-' {
 			return left, true
 		}
 
@@ -72,7 +73,7 @@ func (p *mathParser) parseExpr() (float64, bool) {
 			return 0, false
 		}
 
-		if op == '+' {
+		if operator == '+' {
 			left += right
 		} else {
 			left -= right
@@ -88,12 +89,13 @@ func (p *mathParser) parseTerm() (float64, bool) {
 
 	for {
 		p.skipSpace()
+
 		if p.pos >= len(p.src) {
 			return left, true
 		}
 
-		op := p.src[p.pos]
-		if op != '*' && op != '/' {
+		operator := p.src[p.pos]
+		if operator != '*' && operator != '/' {
 			return left, true
 		}
 
@@ -104,7 +106,7 @@ func (p *mathParser) parseTerm() (float64, bool) {
 			return 0, false
 		}
 
-		if op == '*' {
+		if operator == '*' {
 			left *= right
 		} else {
 			if right == 0 {
@@ -118,6 +120,7 @@ func (p *mathParser) parseTerm() (float64, bool) {
 
 func (p *mathParser) parseUnary() (float64, bool) {
 	p.skipSpace()
+
 	if p.pos >= len(p.src) {
 		return 0, false
 	}
@@ -140,6 +143,7 @@ func (p *mathParser) parseUnary() (float64, bool) {
 
 func (p *mathParser) parsePrimary() (float64, bool) {
 	p.skipSpace()
+
 	if p.pos >= len(p.src) {
 		return 0, false
 	}
@@ -163,23 +167,20 @@ func (p *mathParser) parsePrimary() (float64, bool) {
 
 func (p *mathParser) parseFunc() (float64, bool) {
 	start := p.pos
+
 	for p.pos < len(p.src) && isMathLetter(p.src[p.pos]) {
 		p.pos++
 	}
 
 	name := strings.ToLower(p.src[start:p.pos])
+
 	if !p.consume('(') {
 		return 0, false
 	}
 
 	switch name {
 	case "calc":
-		value, ok := p.parseExpr()
-		if !ok || !p.consume(')') {
-			return 0, false
-		}
-
-		return value, true
+		return p.parseCalc()
 	case "min":
 		return p.parseMinMax(false)
 	case "max":
@@ -189,6 +190,16 @@ func (p *mathParser) parseFunc() (float64, bool) {
 	default:
 		return 0, false
 	}
+}
+
+// parseCalc parses the body of calc(): one expression plus the closing ')'.
+func (p *mathParser) parseCalc() (float64, bool) {
+	value, ok := p.parseExpr()
+	if !ok || !p.consume(')') {
+		return 0, false
+	}
+
+	return value, true
 }
 
 func (p *mathParser) parseMinMax(wantMax bool) (float64, bool) {
@@ -218,18 +229,18 @@ func (p *mathParser) parseMinMax(wantMax bool) (float64, bool) {
 }
 
 func (p *mathParser) parseClamp() (float64, bool) {
-	low, ok := p.parseArg()
-	if !ok || !p.consume(',') {
+	low, found := p.parseArg()
+	if !found || !p.consume(',') {
 		return 0, false
 	}
 
-	value, ok := p.parseArg()
-	if !ok || !p.consume(',') {
+	value, found := p.parseArg()
+	if !found || !p.consume(',') {
 		return 0, false
 	}
 
-	high, ok := p.parseArg()
-	if !ok || !p.consume(')') {
+	high, found := p.parseArg()
+	if !found || !p.consume(')') {
 		return 0, false
 	}
 
@@ -265,6 +276,7 @@ func (p *mathParser) parseLengthToken() (float64, bool) {
 	}
 
 	unitStart := p.pos
+
 	for p.pos < len(p.src) && (isMathLetter(p.src[p.pos]) || p.src[p.pos] == '%') {
 		p.pos++
 	}
@@ -277,6 +289,20 @@ func mathUnitPx(number float64, unit string, env MathEnv) (float64, bool) {
 	switch unit {
 	case "", "px":
 		return number, true
+	case "em":
+		return number * env.FontSizePx, true
+	case unitRem:
+		return number * rootFontSizePx, true
+	case "ex", "ch":
+		return number * env.FontSizePx * exChToEmFactor, true
+	default:
+		return mathAbsolutePx(number, unit, env)
+	}
+}
+
+// mathAbsolutePx converts the absolute length units pt, pc, in, cm, and mm.
+func mathAbsolutePx(number float64, unit string, env MathEnv) (float64, bool) {
+	switch unit {
 	case "pt":
 		return number * mathPxPerInch / pointsPerInch, true
 	case "pc":
@@ -287,22 +313,25 @@ func mathUnitPx(number float64, unit string, env MathEnv) (float64, bool) {
 		return number * mathPxPerInch / cmPerInch, true
 	case "mm":
 		return number * mathPxPerInch / mmPerInch, true
-	case "em":
-		return number * env.FontSizePx, true
-	case unitRem:
-		return number * rootFontSizePx, true
-	case "ex", "ch":
-		return number * env.FontSizePx * exChToEmFactor, true
+	default:
+		return mathViewportPx(number, unit, env)
+	}
+}
+
+// mathViewportPx converts the viewport-relative units vw, vh, dvh, svh, lvh,
+// vmin, and vmax, plus percentages.
+func mathViewportPx(number float64, unit string, env MathEnv) (float64, bool) {
+	switch unit {
 	case "%":
-		return number * env.PercentPx / 100, true
+		return number * env.PercentPx / percentScale, true
 	case "vw":
-		return number * env.ViewportW / 100, true
+		return number * env.ViewportW / percentScale, true
 	case "vh", "dvh", "svh", "lvh":
-		return number * env.ViewportH / 100, true
+		return number * env.ViewportH / percentScale, true
 	case "vmin":
-		return number * math.Min(env.ViewportW, env.ViewportH) / 100, true
+		return number * math.Min(env.ViewportW, env.ViewportH) / percentScale, true
 	case "vmax":
-		return number * math.Max(env.ViewportW, env.ViewportH) / 100, true
+		return number * math.Max(env.ViewportW, env.ViewportH) / percentScale, true
 	default:
 		return 0, false
 	}
@@ -321,6 +350,7 @@ func (p *mathParser) skipSpace() {
 
 func (p *mathParser) consume(ch byte) bool {
 	p.skipSpace()
+
 	if p.pos < len(p.src) && p.src[p.pos] == ch {
 		p.pos++
 
