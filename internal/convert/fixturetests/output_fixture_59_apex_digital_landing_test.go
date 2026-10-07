@@ -20,5 +20,5 @@ func TestOutputFixture59ApexDigitalLanding(t *testing.T) {
 		162.611, 744.751, 12, "LiberationSans-Regular", [3]float64{148.0 / 255, 163.0 / 255, 184.0 / 255})
 	assertOpsImageBox(t, committed, 1, 28.346, 36.044, 538.587, 717.700)
 
-	assertFixtureOpsShape(t, committed, 9, 66, 57, 135, 9, [4]float64{0, 0, 595.28, 841.89})
+	assertFixtureOpsShape(t, committed, 9, 68, 57, 136, 9, [4]float64{0, 0, 595.28, 841.89})
 }

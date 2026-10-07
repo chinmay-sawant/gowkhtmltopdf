@@ -32,6 +32,7 @@ func TestNestedPercentageHeightStaysContentSized(t *testing.T) {
 		p { margin: 0; }
 	`)
 	res := layoutHTMLAtViewport(t, `<html><body><div id="card"><p>Hi</p></div></body></html>`, 400, 600, cssSheet)
+
 	card := findBoxByID(res.root, "card")
 
 	if card == nil {
@@ -59,6 +60,7 @@ func TestFlexCentersACardInTheViewport(t *testing.T) {
 		#card { width: 100pt; height: 80pt; }
 	`)
 	res := layoutHTMLAtViewport(t, `<html><body><div id="card">Hi</div></body></html>`, viewportW, viewportH, cssSheet)
+
 	card := findBoxByID(res.root, "card")
 
 	if card == nil {
@@ -66,6 +68,7 @@ func TestFlexCentersACardInTheViewport(t *testing.T) {
 	}
 
 	wantX := (viewportW - cardW) / 2
+
 	wantY := (viewportH - cardH) / 2
 
 	if !near(card.x, wantX) || !near(card.y, wantY) {

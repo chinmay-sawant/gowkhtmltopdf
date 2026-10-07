@@ -419,7 +419,7 @@ func appendSimplePseudo(part SelectorPart, name, arg string) (SelectorPart, bool
 	case "link", "visited":
 		// Print semantics: both mean "a[href]" (no browsing history).
 		part.Pseudos = append(part.Pseudos, pseudoClass(name, "", nil, nil))
-	case "hover", "active", "focus", "target":
+	case pseudoClassHover, pseudoClassActive, pseudoClassFocus, "target":
 		// Accepted for parse/cascade structure but never match in print
 		// (static PDF has no pointer/focus/:target fragment state).
 		// Keeping them on the compound prevents li:target from

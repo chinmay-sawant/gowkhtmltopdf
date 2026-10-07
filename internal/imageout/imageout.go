@@ -132,6 +132,7 @@ type RenderOptions struct {
 	Registry    *pdf.Registry // optional --font-path / system faces (CJK)
 	Sheets      []*css.Stylesheet
 	Media       string // "screen" (default), "print" or ""
+	State       css.MatchState
 	Images      func(src string) ([]byte, error)
 	Background  bool // paint background colors
 	Transparent bool // PNG background: alpha 0 instead of white
@@ -274,6 +275,7 @@ func layoutOptions(opts RenderOptions, font *pdf.Font, viewportPx float64) layou
 		Registry:           opts.Registry,
 		Sheets:             opts.Sheets,
 		Media:              opts.Media,
+		State:              opts.State,
 		Images:             opts.Images,
 		Background:         opts.Background,
 		PrintLinkUnderline: opts.PrintLinkUnderline,
@@ -1378,6 +1380,18 @@ func paintLine(img *image.NRGBA, paintOp *layout.Op, paintStyle layout.PaintStyl
 	}
 	lineWidth := strokeWidthScale(paintStyle.StrokeWidth, pxPerPt)
 	opX, opY, opW, opH, _ := paintOp.PaintLineGeometry()
+
+	// A diagonal segment (the checked checkbox tick) cannot use the
+	// axis-aligned rectangle below; stroke the true centerline instead.
+	if opW != 0 && opH != 0 {
+		paintStrokeSegment(img,
+			rasterPoint{X: opX * pxPerPt, Y: opY * pxPerPt},
+			rasterPoint{X: (opX + opW) * pxPerPt, Y: (opY + opH) * pxPerPt},
+			col, lineWidth)
+
+		return
+	}
+
 	// Centre the stroke on the line: half its width, in points. Extend past
 	// each endpoint by that same half (square-cap equivalent) so meeting
 	// axis-aligned borders fill the outer corner instead of leaving a notch.
@@ -1664,6 +1678,7 @@ func (p *imagePipeline) RenderObjects(ctx context.Context) error {
 		Registry:           p.registry,
 		Sheets:             sheets,
 		Media:              media,
+		State:              css.MatchState{Focus: "", Hover: "", Active: ""},
 		Images:             imagesFn,
 		Background:         p.req.Global.Background,
 		Transparent:        imgSet.Transparent,

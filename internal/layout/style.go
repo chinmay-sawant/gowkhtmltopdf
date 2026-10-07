@@ -327,11 +327,14 @@ type ResolvedStyle struct {
 	BackgroundClip         string
 	BackgroundOrigin       string
 	BackgroundAttachment   string
-	BorderImageSource      string
-	BorderImageSlice       string
-	BorderImageWidth       string
-	BorderImageOutset      string
-	BorderImageRepeat      string
+	// ClipPath is the canonical clip-path value: inset() | circle() | ellipse()
+	// | polygon(). Empty means no clip (none / unsupported / invalid).
+	ClipPath          string
+	BorderImageSource string
+	BorderImageSlice  string
+	BorderImageWidth  string
+	BorderImageOutset string
+	BorderImageRepeat string
 	// ListStylePosition is "inside" or "outside"; empty means outside.
 	ListStylePosition        string
 	QuotesRaw                string
@@ -628,6 +631,12 @@ type styleContext struct {
 	media     string
 	viewportW float64 // containing-block width for % of margins/padding/width
 	viewportH float64 // for % of height
+	// properties holds @property registrations from sheets for custom-property
+	// initial values and inheritance.
+	properties map[string]css.PropertyRule
+	// state carries the focused, hovered, and pressed ids for stateful
+	// pseudo-classes.
+	state css.MatchState
 	// remBase is the used font-size of the root element for rem units (pt).
 	// 0 means the CSS initial medium size (16px → 12pt).
 	remBase float64
@@ -711,11 +720,13 @@ func resolveStylesWithContext(
 	return resolveStylesCtx(root, &styleContext{ //nolint:exhaustruct // intentional zero fields
 		ctx:                ctx,
 		sheets:             opts.Sheets,
+		properties:         registeredProperties(opts.Sheets),
 		media:              opts.Media,
 		viewportW:          opts.Width,
 		viewportH:          opts.Height,
 		printLinkUnderline: opts.PrintLinkUnderline,
 		containers:         containers,
+		state:              opts.State,
 	})
 }
 
@@ -914,7 +925,12 @@ func applyRawToUsed(
 		parentProps = parent.CustomProps
 	}
 
-	sty.CustomProps = mergeCustomProps(parentProps, raw)
+	var registered map[string]css.PropertyRule
+	if ctx != nil {
+		registered = ctx.properties
+	}
+
+	sty.CustomProps = mergeCustomProps(parentProps, raw, registered)
 	raw = resolveRawVars(raw, sty.CustomProps)
 
 	parentSize := sty.FontSize

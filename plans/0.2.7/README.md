@@ -28,6 +28,7 @@ Execution ledger for two CSS waves and the sample-PDF visual checks:
 |------|------|
 | [87-canonical-0.2.7-next-72.md](87-canonical-0.2.7-next-72.md) | Next-72 parent: batches 87.1-87.8 |
 | [88-canonical-0.2.7-next-100.md](88-canonical-0.2.7-next-100.md) | Next-100 parent: batches 88.1-88.9 |
+| [89-canonical-0.2.7-selectors-functions-atrules.md](89-canonical-0.2.7-selectors-functions-atrules.md) | Selector, function, and at-rule ledger: batches 89.1-89.8; starts with a recount because those catalog counts are stale |
 | [phases/](phases/) | Per-batch atomic checklists (87.1-87.8 and 88.1-88.9) |
 | [next-72-properties.json](next-72-properties.json) | 72-property inventory + Chrome BCD labels |
 | [next-100-properties.json](next-100-properties.json) | 100-property inventory + Chrome BCD labels |

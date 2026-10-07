@@ -110,6 +110,36 @@ func TestDisplayAgreesWithLayOnSize(t *testing.T) {
 	}
 }
 
+func TestDisplayAgreesWithLayOnBoxes(t *testing.T) {
+	t.Parallel()
+
+	const source = `<h1>Heading</h1><p data-action="go">Body <span>copy</span>.</p>`
+
+	styled := styledOf(t, source)
+
+	display, err := layout.DisplayList(t.Context(), styled)
+	if err != nil {
+		t.Fatalf("display: %v", err)
+	}
+
+	placed, err := layout.Lay(t.Context(), styled)
+	if err != nil {
+		t.Fatalf("lay: %v", err)
+	}
+
+	want := placed.Boxes()
+
+	if len(display.Boxes) != len(want) {
+		t.Fatalf("Display has %d boxes, Lay has %d", len(display.Boxes), len(want))
+	}
+
+	for index, box := range want {
+		if display.Boxes[index] != box {
+			t.Fatalf("box %d: Display %+v, Lay %+v", index, display.Boxes[index], box)
+		}
+	}
+}
+
 func TestDisplayOrderIsAPermutation(t *testing.T) {
 	t.Parallel()
 

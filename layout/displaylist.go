@@ -97,6 +97,11 @@ type Display struct {
 	// Order indexes Ops in paint order, ready to iterate.
 	Order []int
 
+	// Boxes are the element border boxes from the same placement, in document
+	// order, in CSS pixels. They match the boxes Lay returns, so a replaying
+	// caller gets hit testing without rasterizing.
+	Boxes []Box
+
 	// Width and Height are the canvas size in CSS pixels, taken from the same
 	// placement Lay builds, and Height applies the same requested minimum.
 	// Height is converted straight from points while Lay reads the size back
@@ -122,6 +127,11 @@ type Display struct {
 // error. DisplayList never rasterizes, so it returns that canvas instead. A
 // caller that hands the result to a GPU should apply its own size limit.
 func DisplayList(ctx context.Context, doc *css.Document) (*Display, error) {
+	return DisplayListOptions(ctx, doc, Options{Images: nil})
+}
+
+// DisplayListOptions is DisplayList with the optional image resolver.
+func DisplayListOptions(ctx context.Context, doc *css.Document, options Options) (*Display, error) {
 	if ctx == nil {
 		return nil, ErrNilContext
 	}
@@ -143,6 +153,8 @@ func DisplayList(ctx context.Context, doc *css.Document) (*Display, error) {
 		Media:      styled.Media,
 		Background: true,
 		Registry:   styled.Registry,
+		State:      styled.State,
+		Images:     options.Images,
 	}
 
 	res, err := imageout.LayoutResult(ctx, styled.Root, opts)
@@ -157,6 +169,7 @@ func DisplayList(ctx context.Context, doc *css.Document) (*Display, error) {
 	return &Display{
 		Ops:            res.Ops,
 		Order:          ilayout.PaintOrder(res.Ops),
+		Boxes:          boxesFrom(ilayout.PlacedElements(res)),
 		Width:          int(res.Width * ptToPx),
 		Height:         int(heightPt * ptToPx),
 		PointsPerPixel: ptToPx,

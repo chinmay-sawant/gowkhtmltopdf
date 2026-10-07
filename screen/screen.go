@@ -64,6 +64,9 @@ func Render(ctx context.Context, source []byte, widthPx, heightPx int) (*Frame, 
 		HeightPx: heightPx,
 		Media:    "screen",
 		Extra:    nil,
+		Focus:    "",
+		Hover:    "",
+		Active:   "",
 	})
 	if err != nil {
 		return nil, fmt.Errorf("screen: css: %w", err)

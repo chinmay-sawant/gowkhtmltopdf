@@ -81,17 +81,34 @@ func getSiblingInfo(node *html.Node) siblingInfo {
 	return info
 }
 
-// Match reports whether the selector matches the element node. Matching runs
-// right to left: the last part must match n, earlier parts must match
-// ancestors/siblings per their combinators. Implemented via leftmostMatch
-// (same combinator walk; Match only needs success/failure).
+// MatchState carries the runtime state stateful pseudo-classes need: the ids
+// of the focused, hovered, and pressed elements. An empty id never matches.
+type MatchState struct {
+	Focus  string
+	Hover  string
+	Active string
+}
+
+// Match reports whether the selector matches the element node with no state.
+// Matching runs right to left: the last part must match n, earlier parts must
+// match ancestors/siblings per their combinators.
 func Match(s Selector, n *html.Node) bool {
-	return leftmostMatch(s, n) != nil
+	return MatchState{Focus: "", Hover: "", Active: ""}.Matches(s, n)
+}
+
+// Matches is Match with pseudo-class state.
+func (st MatchState) Matches(s Selector, n *html.Node) bool {
+	return leftmostMatch(st, s, n) != nil
 }
 
 // MatchPseudo reports whether s selects the ::before or ::after pseudo-element
-// of n (pe is "before" or "after").
+// of n (pe is "before" or "after") with no state.
 func MatchPseudo(sel Selector, count *html.Node, pseudo string) bool {
+	return MatchState{Focus: "", Hover: "", Active: ""}.MatchesPseudo(sel, count, pseudo)
+}
+
+// MatchesPseudo is MatchPseudo with pseudo-class state.
+func (st MatchState) MatchesPseudo(sel Selector, count *html.Node, pseudo string) bool {
 	if count == nil || pseudo == "" || len(sel.Parts) == 0 {
 		return false
 	}
@@ -100,13 +117,13 @@ func MatchPseudo(sel Selector, count *html.Node, pseudo string) bool {
 		return false
 	}
 
-	return matchPseudoWalk(sel, count)
+	return matchPseudoWalk(st, sel, count)
 }
 
 // matchPseudoWalk mirrors leftmostMatch with the final part's PseudoElement
 // treated as cleared, without copying the parts slice (the host element must
 // match the pseudo's compound, not the pseudo itself).
-func matchPseudoWalk(sel Selector, node *html.Node) bool {
+func matchPseudoWalk(state MatchState, sel Selector, node *html.Node) bool {
 	if node == nil || node.Type != html.ElementNode || len(sel.Parts) == 0 {
 		return false
 	}
@@ -114,7 +131,7 @@ func matchPseudoWalk(sel Selector, node *html.Node) bool {
 	last := sel.Parts[len(sel.Parts)-1]
 	last.PseudoElement = ""
 
-	if !matchPart(last, node) {
+	if !matchPart(state, last, node) {
 		return false
 	}
 
@@ -123,7 +140,7 @@ func matchPseudoWalk(sel Selector, node *html.Node) bool {
 	const prevPartOffset = 2 // walk left: last part is host, start at len-2
 
 	for i := len(sel.Parts) - prevPartOffset; i >= 0; i-- {
-		next := leftmostStep(sel.Parts[i+1].Combinator, sel.Parts[i], cur)
+		next := leftmostStep(state, sel.Parts[i+1].Combinator, sel.Parts[i], cur)
 		if next == nil {
 			return false
 		}
@@ -137,12 +154,12 @@ func matchPseudoWalk(sel Selector, node *html.Node) bool {
 // leftmostMatch walks the selector combinator chain right-to-left (same walk
 // as Match) and returns the element that matched the leftmost compound, or nil
 // if the selector does not match node.
-func leftmostMatch(sel Selector, node *html.Node) *html.Node {
+func leftmostMatch(state MatchState, sel Selector, node *html.Node) *html.Node {
 	if node == nil || node.Type != html.ElementNode || len(sel.Parts) == 0 {
 		return nil
 	}
 
-	if !matchPart(sel.Parts[len(sel.Parts)-1], node) {
+	if !matchPart(state, sel.Parts[len(sel.Parts)-1], node) {
 		return nil
 	}
 
@@ -152,7 +169,7 @@ func leftmostMatch(sel Selector, node *html.Node) *html.Node {
 	const prevPartOffset = 2 // walk left: last part is host, start at len-2
 
 	for i := len(sel.Parts) - prevPartOffset; i >= 0; i-- {
-		next := leftmostStep(sel.Parts[i+1].Combinator, sel.Parts[i], cur)
+		next := leftmostStep(state, sel.Parts[i+1].Combinator, sel.Parts[i], cur)
 		if next == nil {
 			return nil
 		}
@@ -165,23 +182,23 @@ func leftmostMatch(sel Selector, node *html.Node) *html.Node {
 
 // leftmostStep advances cur one step left through the combinator chain: it
 // returns the element that must match part, or nil when none exists.
-func leftmostStep(combinator string, part SelectorPart, cur *html.Node) *html.Node {
+func leftmostStep(state MatchState, combinator string, part SelectorPart, cur *html.Node) *html.Node {
 	switch combinator {
 	case ">":
-		return matchLeftChild(part, cur)
+		return matchLeftChild(state, part, cur)
 	case "+":
-		return matchLeftAdjacent(part, cur)
+		return matchLeftAdjacent(state, part, cur)
 	case "~":
-		return matchLeftSibling(part, cur)
+		return matchLeftSibling(state, part, cur)
 	default: // descendant
-		return matchLeftAncestor(part, cur)
+		return matchLeftAncestor(state, part, cur)
 	}
 }
 
 // matchLeftChild returns cur's element parent when it matches part, else nil.
-func matchLeftChild(part SelectorPart, cur *html.Node) *html.Node {
+func matchLeftChild(st MatchState, part SelectorPart, cur *html.Node) *html.Node {
 	cur = cur.Parent
-	if cur == nil || cur.Type != html.ElementNode || !matchPart(part, cur) {
+	if cur == nil || cur.Type != html.ElementNode || !matchPart(st, part, cur) {
 		return nil
 	}
 
@@ -190,9 +207,9 @@ func matchLeftChild(part SelectorPart, cur *html.Node) *html.Node {
 
 // matchLeftAdjacent returns cur's previous element sibling when it matches
 // part, else nil.
-func matchLeftAdjacent(part SelectorPart, cur *html.Node) *html.Node {
+func matchLeftAdjacent(st MatchState, part SelectorPart, cur *html.Node) *html.Node {
 	prev := previousElementSibling(cur)
-	if prev == nil || !matchPart(part, prev) {
+	if prev == nil || !matchPart(st, part, prev) {
 		return nil
 	}
 
@@ -201,9 +218,9 @@ func matchLeftAdjacent(part SelectorPart, cur *html.Node) *html.Node {
 
 // matchLeftSibling returns the nearest previous element sibling of cur that
 // matches part, else nil.
-func matchLeftSibling(part SelectorPart, cur *html.Node) *html.Node {
+func matchLeftSibling(st MatchState, part SelectorPart, cur *html.Node) *html.Node {
 	for sib := previousElementSibling(cur); sib != nil; sib = previousElementSibling(sib) {
-		if matchPart(part, sib) {
+		if matchPart(st, part, sib) {
 			return sib
 		}
 	}
@@ -213,9 +230,9 @@ func matchLeftSibling(part SelectorPart, cur *html.Node) *html.Node {
 
 // matchLeftAncestor returns the nearest element ancestor of cur that matches
 // part, else nil.
-func matchLeftAncestor(part SelectorPart, cur *html.Node) *html.Node {
+func matchLeftAncestor(st MatchState, part SelectorPart, cur *html.Node) *html.Node {
 	cur = cur.Parent
-	for cur != nil && (cur.Type != html.ElementNode || !matchPart(part, cur)) {
+	for cur != nil && (cur.Type != html.ElementNode || !matchPart(st, part, cur)) {
 		cur = cur.Parent
 	}
 
@@ -223,7 +240,7 @@ func matchLeftAncestor(part SelectorPart, cur *html.Node) *html.Node {
 }
 
 // matchPart matches one compound against an element.
-func matchPart(part SelectorPart, node *html.Node) bool {
+func matchPart(state MatchState, part SelectorPart, node *html.Node) bool {
 	if node.Type != html.ElementNode {
 		return false
 	}
@@ -249,13 +266,13 @@ func matchPart(part SelectorPart, node *html.Node) bool {
 		return false
 	}
 
-	return matchPseudos(part.Pseudos, node)
+	return matchPseudos(state, part.Pseudos, node)
 }
 
 // matchPseudos reports whether every pseudo-class of the part matches node.
-func matchPseudos(pseudos []PseudoClass, node *html.Node) bool {
+func matchPseudos(st MatchState, pseudos []PseudoClass, node *html.Node) bool {
 	for _, pseudo := range pseudos {
-		if !matchPseudo(pseudo, node) {
+		if !matchPseudo(st, pseudo, node) {
 			return false
 		}
 	}
@@ -375,26 +392,71 @@ func containsWord(val, want string) bool {
 	return hasClassToken(val, want)
 }
 
-func matchPseudo(pseudo PseudoClass, node *html.Node) bool {
+func matchPseudo(state MatchState, pseudo PseudoClass, node *html.Node) bool {
 	switch pseudo.Name {
 	case firstChildPseudo, lastChildPseudo, nthChildPseudo, "root",
 		firstOfTypePseudo, lastOfTypePseudo, nthOfTypePseudo, nthLastOfTypePseudo:
 		return matchTreePseudo(pseudo, node)
 	case pseudoClassHas:
-		return matchAnyRelative(pseudo.Has, node)
+		return matchAnyRelative(state, pseudo.Has, node)
 	case condKindNot:
-		return matchNone(pseudo.Not, node)
+		return matchNone(state, pseudo.Not, node)
 	case pseudoClassIs, pseudoClassWhere:
-		return matchAnySelector(pseudo.Is, node)
+		return matchAnySelector(state, pseudo.Is, node)
 	case "link", "visited":
 		// Print has no link history, so both match any anchor with an href.
 		return isLinkAnchor(node)
+	case pseudoClassFocus, "focus-visible", pseudoClassHover, pseudoClassActive:
+		return matchStatePseudo(state, pseudo.Name, node)
+	case "checked":
+		return matchChecked(node)
 	default:
-		// :hover/:active/:focus/:target never match in print. Unknown
-		// pseudo-classes never match either (kept on the compound so
+		// Unknown pseudo-classes never match (kept on the compound so
 		// selectors do not degrade to the host).
 		return false
 	}
+}
+
+// matchStatePseudo evaluates the runtime-state pseudo-classes against the
+// focused, hovered, and pressed element ids.
+func matchStatePseudo(state MatchState, name string, node *html.Node) bool {
+	switch name {
+	case pseudoClassFocus, "focus-visible":
+		return matchStateID(state.Focus, node)
+	case pseudoClassHover:
+		return matchStateID(state.Hover, node)
+	case pseudoClassActive:
+		return matchStateID(state.Active, node)
+	default:
+		return false
+	}
+}
+
+// matchStateID reports whether node carries the given runtime-state id.
+func matchStateID(id string, node *html.Node) bool {
+	return id != "" && node.Attribute("id") == id
+}
+
+// matchChecked reports whether node is a checked checkbox or radio, or a
+// selected option.
+func matchChecked(node *html.Node) bool {
+	switch strings.ToLower(node.Name) {
+	case "input":
+		t := strings.ToLower(node.Attribute("type"))
+		if t != "checkbox" && t != "radio" {
+			return false
+		}
+
+		_, ok := node.Attrs["checked"]
+
+		return ok
+	case "option":
+		_, ok := node.Attrs["selected"]
+
+		return ok
+	}
+
+	return false
 }
 
 // matchTreePseudo handles tree-structural pseudo-classes.
@@ -414,9 +476,9 @@ func matchTreePseudo(pseudo PseudoClass, node *html.Node) bool {
 }
 
 // matchAnyRelative reports whether any relative selector applies to node.
-func matchAnyRelative(rels []RelativeSelector, node *html.Node) bool {
+func matchAnyRelative(st MatchState, rels []RelativeSelector, node *html.Node) bool {
 	for _, rs := range rels {
-		if matchRelative(rs, node) {
+		if matchRelative(st, rs, node) {
 			return true
 		}
 	}
@@ -425,7 +487,7 @@ func matchAnyRelative(rels []RelativeSelector, node *html.Node) bool {
 }
 
 // matchNone reports whether no selector of the list matches node.
-func matchNone(sels []Selector, node *html.Node) bool {
+func matchNone(_ MatchState, sels []Selector, node *html.Node) bool {
 	for _, sel := range sels {
 		if Match(sel, node) {
 			return false
@@ -436,7 +498,7 @@ func matchNone(sels []Selector, node *html.Node) bool {
 }
 
 // matchAnySelector reports whether any selector of the list matches node.
-func matchAnySelector(sels []Selector, node *html.Node) bool {
+func matchAnySelector(_ MatchState, sels []Selector, node *html.Node) bool {
 	for _, sel := range sels {
 		if Match(sel, node) {
 			return true

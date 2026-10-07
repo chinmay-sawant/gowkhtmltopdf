@@ -66,34 +66,10 @@ func (e *engine) appendBackgroundImage(
 		}
 
 		if isGradientFunc(layer) {
-			sizeSpec := backgroundSizeForLayer(sty.BackgroundSize, i)
-			destW, destH := resolveBackgroundSize(sizeSpec, originW, originH, originW, originH)
-			if sizeSpec == "" || strings.EqualFold(sizeSpec, "auto") {
-				destW, destH = originW, originH
-			}
-			destX, destY := resolveBackgroundPosition(
-				sty.BackgroundPosX, sty.BackgroundPosY, originX, originY, originW, originH, destW, destH,
+			dst = e.appendGradientLayer(
+				dst, sty, layer, i, originX, originY, originW, originH, repeatX, repeatY, clip,
 			)
-			if pngData, imgW, imgH, ok := renderGradientPNG(layer, destW, destH, sty.Color); ok {
-				baseOp := (Op{ //nolint:exhaustruct // intentional zero fields
-					Kind:         OpImage,
-					X:            destX,
-					Y:            destY,
-					W:            destW,
-					H:            destH,
-					IsJPEG:       false,
-					IsBackground: true,
-				}).withImage(pngData, imgW, imgH, "").withBlendMode(
-					backgroundBlendModeForLayer(sty.BackgroundBlendMode, i),
-				)
-				if sty.Filter != "" {
-					filters := parseFilterList(sty.Filter, sty.Color, sty.FontSize)
-					baseOp.setImage(applyImageFilterToImage(baseOp.Image, filters), imgW, imgH, "")
-				}
-				dst = tileBackgroundRepeat(
-					dst, baseOp, repeatX, repeatY, clip, destX, destY, destW, destH,
-				)
-			}
+
 			continue
 		}
 
@@ -153,7 +129,53 @@ func (e *engine) appendBackgroundImage(
 	// Clip every layer (including no-repeat / cover overflow) to background-clip.
 	clipOpsSlice(dst[layerStart:], clip)
 
+	// clip-path basic shapes mask the raster layers of this element. Unsupported
+	// or invalid values parse to no shape and leave the ops untouched.
+	if clipShape, ok := parseClipPathShape(sty.ClipPath, sty.FontSize); ok {
+		maskClipPathOps(dst[layerStart:], clipShape, posX, posY, width, height)
+	}
+
 	return dst
+}
+
+// appendGradientLayer renders one gradient background layer, applies the
+// element filter, and tiles it across the clip box.
+func (e *engine) appendGradientLayer(
+	dst []Op, sty ResolvedStyle, layer string, layerIndex int,
+	originX, originY, originW, originH float64,
+	repeatX, repeatY string, clip clipRect,
+) []Op {
+	sizeSpec := backgroundSizeForLayer(sty.BackgroundSize, layerIndex)
+	destW, destH := resolveBackgroundSize(sizeSpec, originW, originH, originW, originH)
+	if sizeSpec == "" || strings.EqualFold(sizeSpec, "auto") {
+		destW, destH = originW, originH
+	}
+
+	destX, destY := resolveBackgroundPosition(
+		sty.BackgroundPosX, sty.BackgroundPosY, originX, originY, originW, originH, destW, destH,
+	)
+	pngData, imgW, imgH, ok := renderGradientPNG(layer, destW, destH, sty.Color)
+	if !ok {
+		return dst
+	}
+
+	baseOp := (Op{ //nolint:exhaustruct // intentional zero fields
+		Kind:         OpImage,
+		X:            destX,
+		Y:            destY,
+		W:            destW,
+		H:            destH,
+		IsJPEG:       false,
+		IsBackground: true,
+	}).withImage(pngData, imgW, imgH, "").withBlendMode(
+		backgroundBlendModeForLayer(sty.BackgroundBlendMode, layerIndex),
+	)
+	if sty.Filter != "" {
+		filters := parseFilterList(sty.Filter, sty.Color, sty.FontSize)
+		baseOp.setImage(applyImageFilterToImage(baseOp.Image, filters), imgW, imgH, "")
+	}
+
+	return tileBackgroundRepeat(dst, baseOp, repeatX, repeatY, clip, destX, destY, destW, destH)
 }
 
 // backgroundSizeForLayer picks the comma-separated background-size token for

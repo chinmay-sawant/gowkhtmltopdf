@@ -102,6 +102,9 @@ type Options struct {
 	Registry *pdf.Registry // optional discovered fonts (--font-path)
 	Sheets   []*css.Stylesheet
 	Media    string // "print" or "screen"; "" = apply "all" rules only
+	// State carries the ids of the focused, hovered, and pressed elements for
+	// the stateful pseudo-classes. An empty state matches none of them.
+	State css.MatchState
 	// ImagesContext is the cancellation-aware image resolver. When set, it
 	// takes precedence over Images.
 	ImagesContext func(ctx context.Context, src string) ([]byte, error)

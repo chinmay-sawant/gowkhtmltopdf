@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/css"
+	"github.com/chinmay-sawant/gowkhtmltopdf/internal/fonts"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/html"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/line"
 	"github.com/chinmay-sawant/gowkhtmltopdf/internal/load"
@@ -32,6 +33,9 @@ type SheetOptions struct {
 	// before linked and imported media queries are gated, so size features
 	// see the final page box the cascade will use. nil keeps ViewportW/H.
 	PageBoxViewport func(inline []*css.Stylesheet) (width, height float64)
+	// Cache, when non-nil, reuses sheets parsed by an earlier collection of
+	// the same tree. Nil parses and fetches everything again.
+	Cache *SheetCache `exhaustruct:"optional"`
 }
 
 type sheetCollector struct {
@@ -127,9 +131,15 @@ func (collector *sheetCollector) preparseInlineStyles(ctx context.Context, root 
 			}
 		}
 
-		sheet, err := css.Parse(styleText(node))
-		if err != nil {
-			return
+		sheet := collector.opts.Cache.inlineSheet(node)
+		if sheet == nil {
+			parsed, err := css.Parse(styleText(node))
+			if err != nil {
+				return
+			}
+
+			sheet = parsed
+			collector.opts.Cache.noteInline(node, sheet)
 		}
 
 		collector.inlineByNode[node] = sheet
@@ -145,6 +155,10 @@ func (collector *sheetCollector) collectStyle(ctx context.Context, node *html.No
 
 	sheet := collector.inlineByNode[node]
 	if sheet == nil {
+		sheet = collector.opts.Cache.inlineSheet(node)
+	}
+
+	if sheet == nil {
 		parsed, err := css.Parse(styleText(node))
 		if err != nil {
 			collector.warn("skipping <style>: %v", err)
@@ -152,6 +166,7 @@ func (collector *sheetCollector) collectStyle(ctx context.Context, node *html.No
 		}
 
 		sheet = parsed
+		collector.opts.Cache.noteInline(node, sheet)
 	}
 
 	collector.addWithImports(ctx, sheet, collector.resources.Base(), 0)
@@ -172,6 +187,13 @@ func (collector *sheetCollector) collectLink(ctx context.Context, node *html.Nod
 		return
 	}
 
+	if cached := collector.opts.Cache.linkSheet(node); cached.sheet != nil {
+		collector.noteSeen(cached.seen)
+		collector.addWithImports(ctx, cached.sheet, cached.base, 0)
+
+		return
+	}
+
 	// Fetch is bounded per request by the loader's timeout policy
 	// (LoadPage.Timeout, or load.DefaultResponseTimeout when unset); ctx
 	// carries the caller's overall deadline and cancellation.
@@ -187,6 +209,11 @@ func (collector *sheetCollector) collectLink(ctx context.Context, node *html.Nod
 		return
 	}
 	collector.noteSeen(resource.URL)
+	collector.opts.Cache.noteLink(node, cachedSheet{
+		sheet: sheet,
+		base:  resourceBase(resource),
+		seen:  resource.URL,
+	})
 	collector.addWithImports(ctx, sheet, resourceBase(resource), 0)
 }
 
@@ -214,12 +241,14 @@ func (collector *sheetCollector) fetchImports(ctx context.Context, sheet *css.St
 		collector.warn("skipping nested @import: depth exceeds %d", maxImportDepth)
 		return
 	}
-	for _, rule := range sheet.Imports {
-		collector.fetchOneImport(ctx, rule, base, depth)
+	for index := range sheet.Imports {
+		collector.fetchOneImport(ctx, sheet, index, base, depth)
 	}
 }
 
-func (collector *sheetCollector) fetchOneImport(ctx context.Context, rule css.ImportRule, base string, depth int) {
+func (collector *sheetCollector) fetchOneImport(
+	ctx context.Context, sheet *css.Stylesheet, index int, base string, depth int,
+) {
 	if collector.err != nil {
 		return
 	}
@@ -230,17 +259,30 @@ func (collector *sheetCollector) fetchOneImport(ctx context.Context, rule css.Im
 		return
 	}
 
-	ref := collector.prepareImportRef(rule, base)
+	ref := collector.prepareImportRef(sheet.Imports[index], base)
 	if ref == "" {
 		return
 	}
 
-	sheet, sheetBase := collector.loadImportedSheet(ctx, base, ref)
-	if sheet == nil {
+	key := importKey{sheet: sheet, index: index}
+	if cached := collector.opts.Cache.importSheet(key); cached.sheet != nil {
+		collector.noteSeen(cached.seen)
+		collector.addWithImports(ctx, cached.sheet, cached.base, depth+1)
+
 		return
 	}
 
-	collector.addWithImports(ctx, sheet, sheetBase, depth+1)
+	imported, sheetBase, seen := collector.loadImportedSheet(ctx, base, ref)
+	if imported == nil {
+		return
+	}
+
+	collector.opts.Cache.noteImport(key, cachedSheet{
+		sheet: imported,
+		base:  sheetBase,
+		seen:  seen,
+	})
+	collector.addWithImports(ctx, imported, sheetBase, depth+1)
 }
 
 func (collector *sheetCollector) prepareImportRef(rule css.ImportRule, base string) string {
@@ -268,18 +310,20 @@ func (collector *sheetCollector) prepareImportRef(rule css.ImportRule, base stri
 	return ref
 }
 
-func (collector *sheetCollector) loadImportedSheet(ctx context.Context, base, ref string) (*css.Stylesheet, string) {
+func (collector *sheetCollector) loadImportedSheet(
+	ctx context.Context, base, ref string,
+) (*css.Stylesheet, string, string) {
 	resource, err := collector.fetchRef(ctx, base, ref)
 	if err != nil {
 		collector.warn("skipping @import %q: %v", ref, err)
 
-		return nil, ""
+		return nil, "", ""
 	}
 
 	if resource == nil || resource.Skip {
 		collector.warn("skipping @import %q: resource skipped", ref)
 
-		return nil, ""
+		return nil, "", ""
 	}
 
 	collector.noteSeen(resource.URL)
@@ -288,10 +332,10 @@ func (collector *sheetCollector) loadImportedSheet(ctx context.Context, base, re
 	if err != nil {
 		collector.warn("skipping @import %q: %v", ref, err)
 
-		return nil, ""
+		return nil, "", ""
 	}
 
-	return sheet, resourceBase(resource)
+	return sheet, resourceBase(resource), resource.URL
 }
 
 // fetchRef loads ref with the same ACL as <link rel=stylesheet>. Relative
@@ -465,13 +509,10 @@ func mergeFontFace(ctx context.Context, resources load.ResourceContext, registry
 //nolint:wsl,nlreturn,lll // font-face collection flow
 func fetchFontFace(ctx context.Context, resources load.ResourceContext, uri string, idx int, log io.Writer) (*pdf.Font, bool) {
 	lower := strings.ToLower(uri)
-	if strings.HasSuffix(lower, ".woff2") || strings.HasSuffix(lower, ".eot") {
+	isData := strings.HasPrefix(lower, "data:")
+	if !isData && (strings.HasSuffix(lower, ".woff2") || strings.HasSuffix(lower, ".eot")) {
 		line.Emit(log, line.Warn,
 			"object %d: @font-face src %q skipped (WOFF2/EOT unsupported; WOFF1/TTF/OTF only)", idx, uri)
-		return nil, false
-	}
-	if strings.HasPrefix(lower, "data:") {
-		line.Emit(log, line.Warn, "object %d: @font-face data: src skipped", idx, uri)
 		return nil, false
 	}
 
@@ -480,7 +521,14 @@ func fetchFontFace(ctx context.Context, resources load.ResourceContext, uri stri
 		line.Emit(log, line.Warn, "object %d: @font-face src %q: %v", idx, uri, err)
 		return nil, false
 	}
-	font, err := pdf.ParseFontBytes(resource.Body)
+
+	body, err := fonts.Decode(resource.Body)
+	if err != nil {
+		line.Emit(log, line.Warn, "object %d: @font-face src %q: %v", idx, uri, err)
+		return nil, false
+	}
+
+	font, err := pdf.ParseFontBytes(body)
 	if err != nil {
 		line.Emit(log, line.Warn, "object %d: @font-face src %q: %v", idx, uri, err)
 		return nil, false
