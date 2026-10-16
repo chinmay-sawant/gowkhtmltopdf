@@ -754,36 +754,36 @@
         </td>
       </tr>
 
-      <!-- Section: Row Rules (partial) -->
+      <!-- Section: Row Rules -->
       <tr>
         <td class="idx">24</td>
         <td class="prop"><code>row-rule-break</code>
-          <div class="meta">longhand (partial) · CSS Gap Rules · Chrome experimental</div>
-          <span class="chrome-badge chrome-partial">Partial support</span>
+          <div class="meta">longhand · CSS Gap Rules · Chrome experimental</div>
+          <span class="chrome-badge chrome-exp">Chrome experimental</span>
         </td>
         <td class="desc">Configures break behavior (e.g. <code>intersection</code>) where row rules intersect crossing column gaps.</td>
         <td class="effect">
-          <div class="fx-grid-demo" style="row-rule-break: intersection; row-rule: 2px solid #ef4444; column-gap:16px;">
+          <div class="fx-grid-demo" style="row-rule-break: intersection; row-rule: 2px solid #ef4444; column-rule: 2px solid #ef4444; column-gap:16px;">
             <div class="fx-grid-item">1</div><div class="fx-grid-item">2</div>
-            <div class="fx-grid-item" style="border-top:2px solid #ef4444;">3</div>
-            <div class="fx-grid-item" style="border-top:2px solid #ef4444;">4</div>
+            <div class="fx-grid-item">3</div>
+            <div class="fx-grid-item">4</div>
           </div>
-          <div style="font-size:7pt;color:#64748b;margin-top:2px;">break across column gap</div>
+          <div style="font-size:7pt;color:#64748b;margin-top:2px;">break across column gap, crossing column rule painted</div>
         </td>
       </tr>
 
       <tr>
         <td class="idx">25</td>
         <td class="prop"><code>row-rule-inset</code>
-          <div class="meta">shorthand / longhand (partial) · CSS Gap Rules · Chrome experimental</div>
-          <span class="chrome-badge chrome-partial">Partial support</span>
+          <div class="meta">shorthand / longhand · CSS Gap Rules · Chrome experimental</div>
+          <span class="chrome-badge chrome-exp">Chrome experimental</span>
         </td>
         <td class="desc">Sets start and end insets simultaneously for row rules.</td>
         <td class="effect">
           <div class="fx-grid-demo" style="row-rule: 2px solid #f97316; row-rule-inset: 12px;">
             <div class="fx-grid-item">1</div><div class="fx-grid-item">2</div>
-            <div class="fx-grid-item" style="border-top:2px solid #f97316; margin-left:8px;">3</div>
-            <div class="fx-grid-item" style="border-top:2px solid #f97316; margin-right:8px;">4</div>
+            <div class="fx-grid-item">3</div>
+            <div class="fx-grid-item">4</div>
           </div>
         </td>
       </tr>
@@ -791,12 +791,12 @@
       <tr>
         <td class="idx">26</td>
         <td class="prop"><code>row-rule-inset-junction</code>
-          <div class="meta">shorthand (partial) · CSS Gap Rules · Chrome experimental</div>
-          <span class="chrome-badge chrome-partial">Partial support</span>
+          <div class="meta">shorthand · CSS Gap Rules · Chrome experimental</div>
+          <span class="chrome-badge chrome-exp">Chrome experimental</span>
         </td>
         <td class="desc">Sets insets around intersection junctions where row and column rules cross.</td>
         <td class="effect">
-          <div class="fx-grid-demo" style="row-rule-inset-junction: 8px; row-rule: 2px solid #64748b;">
+          <div class="fx-grid-demo" style="row-rule-break: intersection; row-rule: 2px solid #64748b; row-rule-inset-junction: 8px; column-rule: 2px solid #64748b;">
             <div class="fx-grid-item">TL</div><div class="fx-grid-item">TR</div>
             <div class="fx-grid-item">BL</div><div class="fx-grid-item">BR</div>
           </div>
@@ -806,12 +806,12 @@
       <tr>
         <td class="idx">27</td>
         <td class="prop"><code>row-rule-inset-junction-start</code>
-          <div class="meta">longhand (partial) · CSS Gap Rules · Chrome experimental</div>
-          <span class="chrome-badge chrome-partial">Partial support</span>
+          <div class="meta">longhand · CSS Gap Rules · Chrome experimental</div>
+          <span class="chrome-badge chrome-exp">Chrome experimental</span>
         </td>
         <td class="desc">Sets start gap offset around intersection junctions along row rules.</td>
         <td class="effect">
-          <div class="fx-grid-demo" style="row-rule-inset-junction-start: 6px;">
+          <div class="fx-grid-demo" style="row-rule-break: intersection; row-rule: 2px solid #64748b; row-rule-inset-junction-start: 6px; column-rule: 2px solid #64748b;">
             <div class="fx-grid-item">A</div><div class="fx-grid-item">B</div>
             <div class="fx-grid-item">C</div><div class="fx-grid-item">D</div>
           </div>
@@ -821,12 +821,12 @@
       <tr>
         <td class="idx">28</td>
         <td class="prop"><code>row-rule-inset-junction-end</code>
-          <div class="meta">longhand (partial) · CSS Gap Rules · Chrome experimental</div>
-          <span class="chrome-badge chrome-partial">Partial support</span>
+          <div class="meta">longhand · CSS Gap Rules · Chrome experimental</div>
+          <span class="chrome-badge chrome-exp">Chrome experimental</span>
         </td>
         <td class="desc">Sets end gap offset around intersection junctions along row rules.</td>
         <td class="effect">
-          <div class="fx-grid-demo" style="row-rule-inset-junction-end: 6px;">
+          <div class="fx-grid-demo" style="row-rule-break: intersection; row-rule: 2px solid #64748b; row-rule-inset-junction-end: 6px; column-rule: 2px solid #64748b;">
             <div class="fx-grid-item">A</div><div class="fx-grid-item">B</div>
             <div class="fx-grid-item">C</div><div class="fx-grid-item">D</div>
           </div>
@@ -987,8 +987,8 @@
       <tr>
         <td class="idx">38</td>
         <td class="prop"><code>rule-break</code>
-          <div class="meta">shorthand (partial) · CSS Gap Rules · Chrome experimental</div>
-          <span class="chrome-badge chrome-partial">Partial support</span>
+          <div class="meta">shorthand · CSS Gap Rules · Chrome experimental</div>
+          <span class="chrome-badge chrome-exp">Chrome experimental</span>
         </td>
         <td class="desc">Sets break modes for both row rules and column rules at gap intersections.</td>
         <td class="effect">
@@ -1002,8 +1002,8 @@
       <tr>
         <td class="idx">39</td>
         <td class="prop"><code>rule-inset</code>
-          <div class="meta">shorthand (partial) · CSS Gap Rules · Chrome experimental</div>
-          <span class="chrome-badge chrome-partial">Partial support</span>
+          <div class="meta">shorthand · CSS Gap Rules · Chrome experimental</div>
+          <span class="chrome-badge chrome-exp">Chrome experimental</span>
         </td>
         <td class="desc">Sets universal insets across start and end of all rules.</td>
         <td class="effect">
@@ -1017,12 +1017,12 @@
       <tr>
         <td class="idx">40</td>
         <td class="prop"><code>rule-inset-junction</code>
-          <div class="meta">shorthand (partial) · CSS Gap Rules · Chrome experimental</div>
-          <span class="chrome-badge chrome-partial">Partial support</span>
+          <div class="meta">shorthand · CSS Gap Rules · Chrome experimental</div>
+          <span class="chrome-badge chrome-exp">Chrome experimental</span>
         </td>
         <td class="desc">Sets junction insets across all rule intersections in both directions.</td>
         <td class="effect">
-          <div class="fx-grid-demo" style="rule-inset-junction: 8px; rule: 2px solid #374151;">
+          <div class="fx-grid-demo" style="rule-break: intersection; rule: 2px solid #374151; rule-inset-junction: 8px;">
             <div class="fx-grid-item">1</div><div class="fx-grid-item">2</div>
             <div class="fx-grid-item">3</div><div class="fx-grid-item">4</div>
           </div>
