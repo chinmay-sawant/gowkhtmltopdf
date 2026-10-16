@@ -138,8 +138,10 @@ func Layout(ctx context.Context, source []byte, opts Options) (*ilayout.Result, 
 	}
 
 	return &ilayout.Result{ //nolint:exhaustruct // exported display fields only; the box tree is nil by design
-		Ops:    ops,
-		Width:  opts.WidthPt,
-		Height: float64(display.Height) * display.PointsPerPixel,
+		Ops:          ops,
+		Width:        opts.WidthPt,
+		Height:       float64(display.Height) * display.PointsPerPixel,
+		ForcedBreaks: append([]float64(nil), display.ForcedBreaks...),
+		KeepTogether: append([][2]float64(nil), display.KeepTogether...),
 	}, nil
 }

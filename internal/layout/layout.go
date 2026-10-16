@@ -220,6 +220,13 @@ type Result struct {
 	// Those results already start a new PDF page, so page-break-before:always
 	// on the block itself would insert a blank page.
 	skipInitialBeforeAlways bool
+
+	// ForcedBreaks holds canvas-point Y where a new page must start.
+	// Set only on boxless (blink) results; native results use the box tree.
+	ForcedBreaks []float64
+	// KeepTogether holds canvas-point [start,end] ranges kept on one page.
+	// Set only on boxless (blink) results; native results use the box tree.
+	KeepTogether [][2]float64
 }
 
 // CloneResult returns an independent pagination result. Display-list image
@@ -235,6 +242,8 @@ func CloneResult(res *Result) *Result {
 	clone.Ops = cloneOps(res.Ops)
 	clone.Pages = cloneIndexPages(res.Pages)
 	clone.Locations = append([]ElementLocation(nil), res.Locations...)
+	clone.ForcedBreaks = append([]float64(nil), res.ForcedBreaks...)
+	clone.KeepTogether = append([][2]float64(nil), res.KeepTogether...)
 	clone.flowPages = cloneIndexPages(res.flowPages)
 	clone.flowPageOf = append([]int(nil), res.flowPageOf...)
 	clone.flowPos = append([]int(nil), res.flowPos...)

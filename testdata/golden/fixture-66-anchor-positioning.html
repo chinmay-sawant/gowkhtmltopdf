@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<!--
+  fixture-66-anchor-positioning
+  Proves: visual audit of CSS anchor positioning one-canvas subset.
+  Covers:
+  - anchor-name (none plus dashed-ident list, none clears, invalid keeps previous)
+  - anchor-scope (none, all, name list, lookup only, no containing block)
+  - position-anchor (auto single-anchor rule, explicit name, unknown keeps previous)
+  - position-area (top placement, none keeps offsets, static keeps flow)
+  - position-try-fallbacks and position-try-order (normal order, most-inline-size picks wide)
+  - position-try shorthand and @position-try dashed-ident fallback
+  - try-tactic flip-block (flipped Y opposite side)
+  - position-visibility (always keeps base, anchor-valid falls back, no-overflow viewport, anchor-visible equals anchor-valid)
+  Meta line: kind * group * Chrome support
+  Fonts: Liberation Sans via --font-path testdata/fonts/implemented-audit (SIL OFL 1.1).
+  Images: logo.png + assets/asteria-lake.png + inline data URI.
+-->
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <title>Fixture 66: Anchor Positioning (one-canvas subset)</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 12mm;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: "Liberation Sans", "Liberation Serif", "Liberation Mono", sans-serif;
+      font-size: 9.5pt;
+      line-height: 1.35;
+      color: #1a1f24;
+      margin: 0;
+      padding: 0;
+    }
+
+    header.masthead {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 3px solid #1f4b99;
+      padding-bottom: 8px;
+      margin-bottom: 12px;
+    }
+
+    header.masthead img.logo {
+      height: 36px;
+    }
+
+    header.masthead img.hero {
+      height: 48px;
+      border-radius: 4px;
+    }
+
+    header.masthead .titles h1 {
+      font-size: 16pt;
+      margin: 0 0 2px 0;
+      color: #1f4b99;
+    }
+
+    header.masthead .titles p {
+      margin: 0;
+      font-size: 8.5pt;
+      color: #445;
+    }
+
+    .needle {
+      display: inline-block;
+      background: #1f4b99;
+      color: #fff;
+      font-weight: normal;
+      padding: 2px 8px;
+      border-radius: 3px;
+      letter-spacing: 0.04em;
+      margin: 8px 0 12px;
+    }
+
+    table.audit {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    table.audit th,
+    table.audit td {
+      border: 1px solid #b8c0cc;
+      vertical-align: top;
+      padding: 6px 7px;
+    }
+
+    table.audit th {
+      background: #e8eef8;
+      font-size: 8.5pt;
+      text-align: left;
+    }
+
+    table.audit tr:nth-child(even) td {
+      background: #f7f9fc;
+    }
+
+    td.idx,
+    th.idx {
+      width: 36px;
+      text-align: right;
+      color: #667;
+      font-size: 8pt;
+      padding: 6px 4px;
+    }
+
+    td.prop {
+      width: 26%;
+    }
+
+    td.prop code {
+      font-family: "Liberation Mono", monospace;
+      font-size: 8.5pt;
+      color: #103a7a;
+      font-weight: normal;
+    }
+
+    td.prop .meta {
+      font-size: 7.5pt;
+      color: #667;
+      margin-top: 2px;
+    }
+
+    td.desc {
+      width: 38%;
+      font-size: 8.5pt;
+    }
+
+    td.effect {
+      width: 36%;
+    }
+
+    .chrome-badge {
+      margin-top: 4px;
+      font-size: 7.5pt;
+      padding: 1px 5px;
+      border-radius: 3px;
+      display: inline-block;
+    }
+
+    .chrome-yes {
+      background: #dcfce7;
+      color: #166534;
+      border: 1px solid #bbf7d0;
+    }
+
+    .chrome-partial {
+      background: #ffedd5;
+      color: #9a3412;
+      border: 1px solid #fed7aa;
+    }
+
+    .chrome-exp {
+      background: #e0f2fe;
+      color: #0369a1;
+      border: 1px solid #bae6fd;
+    }
+
+    footer.note {
+      margin-top: 14px;
+      font-size: 8pt;
+      color: #556;
+      border-top: 1px solid #ccd;
+      padding-top: 6px;
+    }
+
+    .section {
+      page-break-before: always;
+    }
+
+    /* Anchor demo helpers */
+    .anchor-stage {
+      position: relative;
+      width: 150px;
+      height: 110px;
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      padding: 0;
+      overflow: visible;
+      font-size: 7pt;
+    }
+
+    .anchor-box {
+      position: absolute;
+      left: 45px;
+      top: 55px;
+      width: 60px;
+      height: 28px;
+      background: #1f4b99;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 2px;
+    }
+
+    .anchor-tip {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 64px;
+      height: 20px;
+      background: #059669;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 2px;
+      font-size: 7pt;
+    }
+
+    .anchor-note {
+      font-size: 7pt;
+      color: #64748b;
+      margin-top: 2px;
+    }
+
+    .fx-pair {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      font-size: 8pt;
+    }
+
+    .fx-cell-box {
+      border: 1px solid #99a;
+      background: #fff;
+      padding: 4px 6px;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+
+<body>
+  <header class="masthead">
+    <img class="logo" src="logo.png" alt="logo">
+    <img class="hero" src="assets/asteria-lake.png" alt="sample">
+    <div class="titles">
+      <h1>Fixture 66: Anchor Positioning (one-canvas subset)</h1>
+      <p>CSS Anchor Positioning one-canvas subset &middot; absolute and fixed targets place against an in-scope anchor &middot; font-family "Liberation Sans"</p>
+    </div>
+  </header>
+
+  <div class="needle">ANCHOR-POSITIONING</div>
+  <p style="font-size:8.5pt;margin:0 0 10px 0;">
+    Audit of the eight anchor positioning properties plus <code>@position-try</code>.
+    Each row states the contract and shows a live Effect demo with a real anchor and an
+    absolutely positioned tip. The blinkless engine moves the tip against the anchor;
+    engines without anchor support keep the ordinary absolute offsets.
+    Scroll hiding is out of scope: <code>anchor-visible</code> matches
+    <code>anchor-valid</code> on this canvas.
+  </p>
+
+  <table class="audit">
+    <thead>
+      <tr>
+        <th class="idx">#</th>
+        <th>Property</th>
+        <th>What it should do</th>
+        <th>Effect (live)</th>
+      </tr>
+    </thead>
+    <tbody>
+
+      <!-- Section: names and scope -->
+      <tr>
+        <td class="idx">1</td>
+        <td class="prop"><code>anchor-name</code>
+          <div class="meta">longhand &middot; CSS Anchor Positioning &middot; Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc">Stores <code>none</code> or one or more dashed idents. Two boxes can carry different names and <code>none</code> clears the list. Invalid keeps the previous value.</td>
+        <td class="effect">
+          <div class="anchor-stage">
+            <div class="anchor-box" style="anchor-name: --a; left: 10px; top: 60px; width: 52px;">--a</div>
+            <div class="anchor-box" style="anchor-name: --b; left: 88px; top: 60px; width: 52px; background: #0d9488;">--b</div>
+            <div class="anchor-tip" style="position-anchor: --a; position-area: top;">tip --a</div>
+          </div>
+          <div class="anchor-note">Tip names --a, so it sits above the left anchor. The --b anchor stays put.</div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">2</td>
+        <td class="prop"><code>anchor-scope: all</code>
+          <div class="meta">longhand &middot; CSS Anchor Positioning &middot; Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc"><code>all</code> hides every name on that element from descendants outside it. A target outside the scope behaves as if the anchor were missing.</td>
+        <td class="effect">
+          <div class="anchor-stage" style="anchor-scope: all;">
+            <div class="anchor-box" style="anchor-name: --inner;">in</div>
+          </div>
+          <div class="anchor-stage" style="margin-top: 4px; height: 40px;">
+            <div class="anchor-tip" style="position-anchor: --inner; position-area: top; left: 45px; top: 5px;">outside</div>
+          </div>
+          <div class="anchor-note">Tip is outside the scope, so it keeps its left/top offsets instead of moving.</div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">3</td>
+        <td class="prop"><code>anchor-scope: list</code>
+          <div class="meta">longhand &middot; CSS Anchor Positioning &middot; Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc">A name list hides only those names. Other names on the same element stay visible. Lookup only, no containing block.</td>
+        <td class="effect">
+          <div class="anchor-stage" style="anchor-scope: --hidden;">
+            <div class="anchor-box" style="anchor-name: --hidden --shown; font-size: 6pt;">2 names</div>
+            <div class="anchor-tip" style="position-anchor: --shown; position-area: top;">shown</div>
+          </div>
+          <div class="anchor-note">--hidden is scoped out, --shown still moves the tip above the anchor.</div>
+        </td>
+      </tr>
+
+      <!-- Section: anchor reference and placement -->
+      <tr>
+        <td class="idx">4</td>
+        <td class="prop"><code>position-anchor</code>
+          <div class="meta">longhand &middot; CSS Anchor Positioning &middot; Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc">Names one dashed ident. Unknown names keep the earlier valid value. An out-of-scope name behaves like a missing name.</td>
+        <td class="effect">
+          <div class="anchor-stage">
+            <div class="anchor-box" style="anchor-name: --menu;">menu</div>
+            <div class="anchor-tip" style="position-anchor: --menu; position-area: bottom;">below</div>
+          </div>
+          <div class="anchor-note">Tip sits below the menu anchor, start-edge aligned. Anchor does not move.</div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">5</td>
+        <td class="prop"><code>position-anchor: auto (single)</code>
+          <div class="meta">longhand &middot; CSS Anchor Positioning &middot; Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc"><code>auto</code> uses the anchor only when exactly one in-scope name exists. One anchor plus <code>auto</code> moves the tip.</td>
+        <td class="effect">
+          <div class="anchor-stage">
+            <div class="anchor-box" style="anchor-name: --only;">only</div>
+            <div class="anchor-tip" style="position-anchor: auto; position-area: top;">auto</div>
+          </div>
+          <div class="anchor-note">Exactly one name in scope, so auto resolves to it and the tip goes above.</div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">6</td>
+        <td class="prop"><code>position-anchor: auto (ambiguous)</code>
+          <div class="meta">longhand &middot; CSS Anchor Positioning &middot; Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc">With several in-scope names, <code>auto</code> does not guess. The box keeps its ordinary absolute offsets until an explicit name is given.</td>
+        <td class="effect">
+          <div class="anchor-stage">
+            <div class="anchor-box" style="anchor-name: --one; left: 8px;">one</div>
+            <div class="anchor-box" style="anchor-name: --two; left: 82px; background: #0d9488;">two</div>
+            <div class="anchor-tip" style="position-anchor: auto; position-area: top; left: 43px; top: 80px;">stays</div>
+          </div>
+          <div class="anchor-note">Two names in scope, so auto keeps the left/top fallback near the bottom.</div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">7</td>
+        <td class="prop"><code>position-area: top</code>
+          <div class="meta">longhand &middot; CSS Anchor Positioning &middot; Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc">Places the absolute tip in the cell above the anchor: smaller Y than the anchor, X aligned to the anchor start edge. Paint ops move with the box.</td>
+        <td class="effect">
+          <div class="anchor-stage">
+            <div class="anchor-box" style="anchor-name: --core;">core</div>
+            <div class="anchor-tip" style="position-anchor: --core; position-area: top;">above</div>
+          </div>
+          <div class="anchor-note">Core proof: tip Y above anchor Y, same start X. Anchor unmoved.</div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">8</td>
+        <td class="prop"><code>position-area: none, static</code>
+          <div class="meta">longhand &middot; CSS Anchor Positioning &middot; Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc"><code>none</code> keeps <code>left</code> and <code>top</code> offsets. A static box with <code>position-area</code> keeps its flow position and never moves.</td>
+        <td class="effect">
+          <div class="fx-pair">
+            <div class="anchor-stage" style="height: 60px;">
+              <div class="anchor-tip" style="position-anchor: --ghost; position-area: none; left: 40px; top: 25px;">none</div>
+            </div>
+            <div class="fx-cell-box" style="position: static; position-area: top; font-size: 7pt;">static<br>stays in flow</div>
+          </div>
+          <div class="anchor-note">Dangling name plus none keeps offsets; static box ignores the property.</div>
+        </td>
+      </tr>
+
+      <!-- Section: fallbacks and order -->
+      <tr>
+        <td class="idx">9</td>
+        <td class="prop"><code>position-try-fallbacks, order normal</code>
+          <div class="meta">longhands &middot; CSS Anchor Positioning &middot; Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc">First fallback runs only when the base fails visibility. With <code>always</code> the base wins. With <code>normal</code> the document order wins.</td>
+        <td class="effect">
+          <div class="anchor-stage" style="height: 70px;">
+            <div class="anchor-box" style="anchor-name: --fb; top: 8px;">top-edge</div>
+            <div class="anchor-tip" style="position-anchor: --fb; position-area: top; position-try-fallbacks: right; position-try-order: normal; position-visibility: no-overflow; left: 0; top: 0;">falls right</div>
+          </div>
+          <div class="anchor-note">Top spills above the stage and right spills past it, so no-overflow hides the tip in both engines.</div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">10</td>
+        <td class="prop"><code>position-try-order: most-inline-size</code>
+          <div class="meta">longhand &middot; CSS Anchor Positioning &middot; Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc">Size keywords pick the largest passing <code>no-overflow</code> candidate on that axis. A wide candidate wins over a narrow one when both fit.</td>
+        <td class="effect">
+          <div class="anchor-stage">
+            <div class="anchor-box" style="anchor-name: --wide; left: 55px;">mid</div>
+            <div class="anchor-tip" style="position-anchor: --wide; position-area: left; position-try-fallbacks: left, right; position-try-order: most-inline-size; position-visibility: no-overflow; width: 44px;">wide wins</div>
+          </div>
+          <div class="anchor-note">Both sides fit, so the wider geometry wins on the inline axis.</div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">11</td>
+        <td class="prop"><code>position-try, @position-try</code>
+          <div class="meta">shorthand plus at-rule &middot; CSS Anchor Positioning &middot; Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc">Shorthand expands to order plus fallbacks. A dashed ident reads the area stored on <code>@position-try --above</code>. Unknown idents are skipped.</td>
+        <td class="effect">
+          <style>
+            @position-try --above { position-area: top; }
+          </style>
+          <div class="anchor-stage">
+            <div class="anchor-box" style="anchor-name: --at;">at</div>
+            <div class="anchor-tip" style="position-anchor: --at; position-try: --above;">at-rule</div>
+          </div>
+          <div class="anchor-note">Fallback --above resolves to the stored top area above the anchor.</div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">12</td>
+        <td class="prop"><code>try-tactic flip-block</code>
+          <div class="meta">fallback tactic &middot; CSS Anchor Positioning &middot; Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc">A tactic flips the chosen area across its axis after the area is known and before the final shift. Flipped Y lands on the opposite side.</td>
+        <td class="effect">
+          <div class="fx-pair">
+            <div class="anchor-stage" style="width: 70px;">
+              <div class="anchor-box" style="anchor-name: --fl; left: 5px;">fl</div>
+              <div class="anchor-tip" style="position-anchor: --fl; position-area: bottom; width: 60px;">below</div>
+            </div>
+            <div class="anchor-stage" style="width: 70px;">
+              <div class="anchor-box" style="anchor-name: --fl2; left: 5px; top: 75px;">fl</div>
+              <div class="anchor-tip" style="position-anchor: --fl2; position-area: bottom; position-try-fallbacks: flip-block; position-visibility: no-overflow; left: 0; top: 0; width: 60px;">flipped</div>
+            </div>
+          </div>
+          <div class="anchor-note">Plain bottom sits below; with the anchor near the bottom the base spills, so flip-block mirrors it above the anchor.</div>
+        </td>
+      </tr>
+
+    </tbody>
+  </table>
+
+  <div class="section">
+  <table class="audit" style="break-inside: avoid;">
+    <thead>
+      <tr>
+        <th class="idx">#</th>
+        <th>Property</th>
+        <th>What it should do</th>
+        <th>Effect (live)</th>
+      </tr>
+    </thead>
+    <tbody>
+
+      <!-- Section: visibility -->
+      <tr>
+        <td class="idx">13</td>
+        <td class="prop"><code>position-visibility: always, anchor-valid</code>
+          <div class="meta">longhand &middot; CSS Anchor Positioning &middot; Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc"><code>always</code> keeps the base even off canvas with ops intact. <code>anchor-valid</code> with a dangling name keeps ordinary absolute placement and still paints.</td>
+        <td class="effect">
+          <div class="fx-pair">
+            <div class="anchor-stage" style="height: 60px;">
+              <div class="anchor-box" style="anchor-name: --edge; top: 5px;">edge</div>
+              <div class="anchor-tip" style="position-anchor: --edge; position-area: top; position-visibility: always; left: 0; top: 0;">always</div>
+            </div>
+            <div class="anchor-stage" style="height: 60px;">
+              <div class="anchor-tip" style="position-anchor: --ghost; position-area: top; position-visibility: anchor-valid; left: 43px; top: 30px;">dangling</div>
+            </div>
+          </div>
+          <div class="anchor-note">Always keeps paint intact; with explicit offsets the base is the fallback overlap. Dangling name falls back to left/top and paints.</div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">14</td>
+        <td class="prop"><code>position-visibility: no-overflow, anchor-visible</code>
+          <div class="meta">longhand &middot; CSS Anchor Positioning &middot; Chrome partial</div>
+          <span class="chrome-badge chrome-partial">Chrome partial: scroll hiding</span>
+        </td>
+        <td class="desc"><code>no-overflow</code> rejects candidates outside the viewport. <code>anchor-visible</code> is stored but equals <code>anchor-valid</code> here: no scroll offset exists, so no scrollport hiding.</td>
+        <td class="effect">
+          <div class="anchor-stage" style="height: 70px;">
+            <div class="anchor-box" style="anchor-name: --vis; top: 8px;">vis</div>
+            <div class="anchor-tip" style="position-anchor: --vis; position-area: top; position-try-fallbacks: bottom; position-visibility: anchor-visible;">visible</div>
+          </div>
+          <div class="anchor-note">Same geometry as anchor-valid on this canvas. Scroll-linked hiding waits on host scroll work.</div>
+        </td>
+      </tr>
+
+    </tbody>
+  </table>
+  </div>
+
+  <footer class="note">
+    Source: blinkless anchor positioning one-canvas subset (8 properties plus @position-try) &middot; Pattern: fixture-65 &middot;
+    14 demonstrated rows &middot;
+    Needle: ANCHOR-POSITIONING &middot; font-family "Liberation Sans"
+  </footer>
+</body>
+
+</html>

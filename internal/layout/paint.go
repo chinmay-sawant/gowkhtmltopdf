@@ -334,6 +334,7 @@ func PaintContext(ctx context.Context, doc *pdf.Document, res *Result, opts Pain
 	}
 
 	applyNamedPageBreaks(res)
+	applyBoxlessBreaks(res, contentH)
 
 	if err := paginateOps(ctx, res, contentH); err != nil {
 		return err
