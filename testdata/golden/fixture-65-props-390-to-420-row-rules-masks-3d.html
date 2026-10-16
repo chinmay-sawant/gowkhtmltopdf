@@ -218,6 +218,95 @@
       padding: 6px;
       width: 140px;
       font-size: 7pt;
+      position: relative;
+    }
+
+    .fx-row-rule-reference {
+      position: absolute;
+      display: block;
+      height: 2px;
+      top: 50%;
+      transform: translateY(-50%);
+      pointer-events: none;
+    }
+
+    .fx-row-rule-reference--blue-gap {
+      left: 6px;
+      right: 6px;
+      background: #3b82f6;
+    }
+
+    .fx-row-rule-reference--navy-gap {
+      left: 6px;
+      right: 6px;
+      height: 3px;
+      background: #1f4b99;
+    }
+
+    .fx-row-rule-reference--red-gap {
+      left: 6px;
+      right: 6px;
+      height: 3px;
+      background: #dc2626;
+    }
+
+    .fx-row-rule-reference--dashed-blue-gap {
+      left: 6px;
+      right: 6px;
+      height: 0;
+      border-top: 2px dashed #2563eb;
+      background: none;
+    }
+
+    .fx-row-rule-reference--green-gap {
+      left: 6px;
+      right: 6px;
+      height: 5px;
+      background: #059669;
+    }
+
+    .fx-row-rule-reference--all-top {
+      top: 6px;
+      left: 6px;
+      right: 6px;
+      transform: none;
+      background: #3b82f6;
+    }
+
+    .fx-row-rule-reference--all-bottom {
+      top: auto;
+      bottom: 5px;
+      left: 6px;
+      right: 6px;
+      transform: none;
+      background: #3b82f6;
+    }
+
+    .fx-row-rule-reference--start {
+      left: 30px;
+      right: 6px;
+      height: 3px;
+      background: #8b5cf6;
+    }
+
+    .fx-row-rule-reference--end {
+      left: 6px;
+      right: 30px;
+      height: 3px;
+      background: #8b5cf6;
+    }
+
+    .fx-row-rule-reference--cap {
+      left: 22px;
+      right: 22px;
+      height: 3px;
+      background: #0284c7;
+    }
+
+    @supports (row-rule: 2px solid red) {
+      .fx-row-rule-reference {
+        display: none;
+      }
     }
 
     .fx-grid-item {
@@ -265,7 +354,7 @@
           <div class="meta">legacy-vendor-alias · CSS Transforms · Chrome yes</div>
           <span class="chrome-badge chrome-yes">Chrome supported</span>
         </td>
-        <td class="desc">Maps to <code>backface-visibility</code>. When rotated 180deg about Y with <code>hidden</code>, the back side of the element is not painted.</td>
+        <td class="desc">Maps to <code>backface-visibility</code>. Chrome culls the rotated back face on screen but paints it in print-to-PDF.</td>
         <td class="effect">
           <div class="fx-pair">
             <div class="fx-persp-container">
@@ -275,7 +364,7 @@
               <div class="fx-card" style="transform: rotateY(180deg); -webkit-transform: rotateY(180deg); backface-visibility: hidden; -webkit-backface-visibility: hidden; background: #dc2626;">hidden</div>
             </div>
           </div>
-          <div style="font-size:7pt;color:#64748b;margin-top:2px;">visible shows flipped red card; hidden culls card</div>
+          <div style="font-size:7pt;color:#64748b;margin-top:2px;">Chrome print shows both cards; screen culls the hidden back face</div>
         </td>
       </tr>
 
@@ -328,18 +417,18 @@
         <td class="desc">Maps to <code>transform-style</code>. <code>preserve-3d</code> preserves shared 3D space across nested elements without 2D flattening.</td>
         <td class="effect">
           <div class="fx-pair">
-            <div class="fx-persp-container" style="perspective:200px; -webkit-perspective:200px;">
-              <div style="transform: rotateY(45deg); -webkit-transform: rotateY(45deg); transform-style: flat; -webkit-transform-style: flat; background:#f59e0b; padding:3px; border-radius:2px;">
-                <div style="transform: rotateY(-30deg) translateZ(18px); -webkit-transform: rotateY(-30deg) translateZ(18px); background:#b45309; color:#fff; font-size:6pt; padding:2px;">flat</div>
+            <div class="fx-persp-container" style="perspective:130px; -webkit-perspective:130px;">
+              <div style="width:54px; height:36px; display:flex; align-items:center; justify-content:center; transform: rotateY(55deg); -webkit-transform: rotateY(55deg); transform-style: flat; -webkit-transform-style: flat; background:#f59e0b; padding:3px; border-radius:2px;">
+                <div style="width:38px; height:24px; display:flex; align-items:center; justify-content:center; transform: rotateY(-20deg) translateZ(26px); -webkit-transform: rotateY(-20deg) translateZ(26px); background:#b45309; color:#fff; font-size:6pt; padding:2px;">flat</div>
               </div>
             </div>
-            <div class="fx-persp-container" style="perspective:200px; -webkit-perspective:200px;">
-              <div style="transform: rotateY(45deg); -webkit-transform: rotateY(45deg); transform-style: preserve-3d; -webkit-transform-style: preserve-3d; background:#10b981; padding:3px; border-radius:2px;">
-                <div style="transform: rotateY(-30deg) translateZ(18px); -webkit-transform: rotateY(-30deg) translateZ(18px); background:#047857; color:#fff; font-size:6pt; padding:2px;">p3d</div>
+            <div class="fx-persp-container" style="perspective:130px; -webkit-perspective:130px;">
+              <div style="width:54px; height:36px; display:flex; align-items:center; justify-content:center; transform: rotateY(55deg); -webkit-transform: rotateY(55deg); transform-style: preserve-3d; -webkit-transform-style: preserve-3d; background:#10b981; padding:3px; border-radius:2px;">
+                <div style="width:38px; height:24px; display:flex; align-items:center; justify-content:center; transform: rotateY(-20deg) translateZ(26px); -webkit-transform: rotateY(-20deg) translateZ(26px); background:#047857; color:#fff; font-size:6pt; padding:2px;">p3d</div>
               </div>
             </div>
           </div>
-          <div style="font-size:7pt;color:#64748b;margin-top:2px;">flat intermediate vs preserve-3d shared space</div>
+          <div style="font-size:7pt;color:#64748b;margin-top:2px;">flat intermediate vs tilted preserve-3d shared space</div>
         </td>
       </tr>
 
@@ -459,8 +548,8 @@
         </td>
         <td class="desc">Accepts <code>image-set(...)</code> candidate lists in mask layers, resolving the standard 1x candidate.</td>
         <td class="effect">
-          <div style="width:130px; height:36px; background:#d97706; mask-image: image-set(url(logo.png) 1x); -webkit-mask-image: image-set(url(logo.png) 1x); mask-repeat: no-repeat; -webkit-mask-repeat: no-repeat; mask-size: contain; -webkit-mask-size: contain; color:#fff; font-size:7pt; padding:4px;">
-            image-set
+          <div style="position:relative; width:130px; height:36px; padding:0; background:#d97706; mask-image: image-set(linear-gradient(to right, black 20%, transparent 95%) 1x); -webkit-mask-image: image-set(linear-gradient(to right, black 20%, transparent 95%) 1x); mask-repeat: no-repeat; -webkit-mask-repeat: no-repeat; mask-size: 100% 100%; -webkit-mask-size: 100% 100%;">
+            <span style="position:absolute; left:4px; top:4px; color:#fff; font-size:7pt;">image-set</span>
           </div>
         </td>
       </tr>
@@ -491,8 +580,9 @@
           <div class="fx-grid-demo" style="row-rule: 3px solid #1f4b99; -webkit-row-rule: 3px solid #1f4b99; border-bottom: 3px solid #1f4b99;">
             <div class="fx-grid-item">R1 C1</div>
             <div class="fx-grid-item">R1 C2</div>
-            <div class="fx-grid-item" style="border-top:3px solid #1f4b99;">R2 C1</div>
-            <div class="fx-grid-item" style="border-top:3px solid #1f4b99;">R2 C2</div>
+            <div class="fx-grid-item" style="border-top-color:transparent;">R2 C1</div>
+            <div class="fx-grid-item" style="border-top-color:transparent;">R2 C2</div>
+            <span class="fx-row-rule-reference fx-row-rule-reference--navy-gap" aria-hidden="true"></span>
           </div>
         </td>
       </tr>
@@ -508,8 +598,9 @@
           <div class="fx-grid-demo" style="row-rule-width: 3px; row-rule-style: solid; row-rule-color: #dc2626;">
             <div class="fx-grid-item">Row 1</div>
             <div class="fx-grid-item">Row 1</div>
-            <div class="fx-grid-item" style="border-top:3px solid #dc2626;">Row 2</div>
-            <div class="fx-grid-item" style="border-top:3px solid #dc2626;">Row 2</div>
+            <div class="fx-grid-item" style="border-top-color:transparent;">Row 2</div>
+            <div class="fx-grid-item" style="border-top-color:transparent;">Row 2</div>
+            <span class="fx-row-rule-reference fx-row-rule-reference--red-gap" aria-hidden="true"></span>
           </div>
         </td>
       </tr>
@@ -525,8 +616,9 @@
           <div class="fx-grid-demo" style="row-rule-width: 2px; row-rule-style: dashed; row-rule-color: #2563eb;">
             <div class="fx-grid-item">Item A</div>
             <div class="fx-grid-item">Item B</div>
-            <div class="fx-grid-item" style="border-top:2px dashed #2563eb;">Item C</div>
-            <div class="fx-grid-item" style="border-top:2px dashed #2563eb;">Item D</div>
+            <div class="fx-grid-item" style="border-top-color:transparent;">Item C</div>
+            <div class="fx-grid-item" style="border-top-color:transparent;">Item D</div>
+            <span class="fx-row-rule-reference fx-row-rule-reference--dashed-blue-gap" aria-hidden="true"></span>
           </div>
         </td>
       </tr>
@@ -542,8 +634,9 @@
           <div class="fx-grid-demo" style="row-rule-width: 5px; row-rule-style: solid; row-rule-color: #059669;">
             <div class="fx-grid-item">Top A</div>
             <div class="fx-grid-item">Top B</div>
-            <div class="fx-grid-item" style="border-top:5px solid #059669;">Bottom A</div>
-            <div class="fx-grid-item" style="border-top:5px solid #059669;">Bottom B</div>
+            <div class="fx-grid-item" style="border-top-color:transparent;">Bottom A</div>
+            <div class="fx-grid-item" style="border-top-color:transparent;">Bottom B</div>
+            <span class="fx-row-rule-reference fx-row-rule-reference--green-gap" aria-hidden="true"></span>
           </div>
         </td>
       </tr>
@@ -554,19 +647,27 @@
           <div class="meta">longhand · CSS Gap Rules · Chrome experimental</div>
           <span class="chrome-badge chrome-exp">Chrome experimental</span>
         </td>
-        <td class="desc">Controls whether row rules paint strictly between items (<code>between</code>) or also at outer boundaries (<code>all</code>, <code>around</code>).</td>
+        <td class="desc">Controls whether row rules paint only between grid rows (<code>between</code>) or also at outer edges (<code>all</code>, <code>around</code>).</td>
         <td class="effect">
           <div class="fx-pair">
             <div class="fx-grid-demo" style="width:70px; row-rule: 2px solid #3b82f6; row-rule-visibility-items: between;">
-              <div class="fx-grid-item">1</div>
-              <div class="fx-grid-item" style="border-top:2px solid #3b82f6;">2</div>
+              <div class="fx-grid-item">A1</div>
+              <div class="fx-grid-item">B1</div>
+              <div class="fx-grid-item">A2</div>
+              <div class="fx-grid-item">B2</div>
+              <span class="fx-row-rule-reference fx-row-rule-reference--blue-gap" aria-hidden="true"></span>
             </div>
-            <div class="fx-grid-demo" style="width:70px; row-rule: 2px solid #3b82f6; row-rule-visibility-items: all; border-top:2px solid #3b82f6; border-bottom:2px solid #3b82f6;">
-              <div class="fx-grid-item">1</div>
-              <div class="fx-grid-item" style="border-top:2px solid #3b82f6;">2</div>
+            <div class="fx-grid-demo" style="width:70px; row-rule: 2px solid #3b82f6; row-rule-visibility-items: all;">
+              <div class="fx-grid-item">A1</div>
+              <div class="fx-grid-item">B1</div>
+              <div class="fx-grid-item">A2</div>
+              <div class="fx-grid-item">B2</div>
+              <span class="fx-row-rule-reference fx-row-rule-reference--blue-gap" aria-hidden="true"></span>
+              <span class="fx-row-rule-reference fx-row-rule-reference--all-top" aria-hidden="true"></span>
+              <span class="fx-row-rule-reference fx-row-rule-reference--all-bottom" aria-hidden="true"></span>
             </div>
           </div>
-          <div style="font-size:7pt;color:#64748b;margin-top:2px;">between vs all items</div>
+          <div style="font-size:7pt;color:#64748b;margin-top:2px;">between: interior line; all: outer edges too</div>
         </td>
       </tr>
 
@@ -580,11 +681,8 @@
         <td class="effect">
           <div class="fx-grid-demo" style="row-rule: 3px solid #8b5cf6; row-rule-inset-start: 24px;">
             <div class="fx-grid-item">L1</div><div class="fx-grid-item">R1</div>
-            <div class="fx-grid-item" style="position:relative; margin-top:4px;">
-              <div style="position:absolute; top:-8px; left:20px; right:-75px; height:3px; background:#8b5cf6;"></div>
-              L2
-            </div>
-            <div class="fx-grid-item" style="margin-top:4px;">R2</div>
+            <div class="fx-grid-item">L2</div><div class="fx-grid-item">R2</div>
+            <span class="fx-row-rule-reference fx-row-rule-reference--start" aria-hidden="true"></span>
           </div>
           <div style="font-size:7pt;color:#64748b;margin-top:2px;">line indented 24px from left</div>
         </td>
@@ -600,11 +698,8 @@
         <td class="effect">
           <div class="fx-grid-demo" style="row-rule: 3px solid #8b5cf6; row-rule-inset-end: 24px;">
             <div class="fx-grid-item">L1</div><div class="fx-grid-item">R1</div>
-            <div class="fx-grid-item" style="position:relative; margin-top:4px;">
-              <div style="position:absolute; top:-8px; left:0; right:20px; height:3px; background:#8b5cf6;"></div>
-              L2
-            </div>
-            <div class="fx-grid-item" style="margin-top:4px;">R2</div>
+            <div class="fx-grid-item">L2</div><div class="fx-grid-item">R2</div>
+            <span class="fx-row-rule-reference fx-row-rule-reference--end" aria-hidden="true"></span>
           </div>
           <div style="font-size:7pt;color:#64748b;margin-top:2px;">line stops 24px before right edge</div>
         </td>
@@ -620,11 +715,8 @@
         <td class="effect">
           <div class="fx-grid-demo" style="row-rule: 3px solid #0284c7; row-rule-inset-cap: 16px;">
             <div class="fx-grid-item">L1</div><div class="fx-grid-item">R1</div>
-            <div class="fx-grid-item" style="position:relative; margin-top:4px;">
-              <div style="position:absolute; top:-8px; left:16px; right:16px; width:95px; height:3px; background:#0284c7;"></div>
-              L2
-            </div>
-            <div class="fx-grid-item" style="margin-top:4px;">R2</div>
+            <div class="fx-grid-item">L2</div><div class="fx-grid-item">R2</div>
+            <span class="fx-row-rule-reference fx-row-rule-reference--cap" aria-hidden="true"></span>
           </div>
           <div style="font-size:7pt;color:#64748b;margin-top:2px;">16px cap inset on both ends</div>
         </td>
