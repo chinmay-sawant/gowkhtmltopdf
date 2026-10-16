@@ -41,7 +41,7 @@ transform CTM (CSS wraps the op; glyph RotateDeg still applies in text space).
 
 - [x] Confirm no CSS `transform` in `applyRestProps` (pre-change; now handled)
 - [x] Cite `Op.RotateDeg` / vertical path as existing CTM hint (`layout.go` / `paint.go` `drawText`)
-- [x] Decide PDF emission: content-stream `cm` / Q-q wrappers (vector CTM via `pdfCTMFromCSS`)
+- [x] Decide PDF emission: content-stream `cm` / Q-q wrappers (vector CTM via `pdfCTMFromDisplayMatrix`)
 
 ### 1.2 Side effects checklist
 

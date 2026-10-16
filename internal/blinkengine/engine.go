@@ -15,10 +15,11 @@
 // Known limits against the native engine, stated rather than papered over:
 // a blinkless result carries no element box tree, so page outline headings
 // and table-of-contents entries stay empty; smart shrinking and @page margin
-// boxes do not apply; a blend group's mask layers are dropped, because this
-// module's BlendGroup has no mask slot; and caller-supplied link sheets apply
-// after the document's own <style> blocks regardless of source order,
-// because blinkless applies document sheets itself.
+// boxes do not apply; mask groups currently use only Blinkless's first
+// resolved layer; perspective image operations fail because they cannot be
+// represented by the current vector display-list geometry. Caller-supplied
+// link sheets apply after the document's own <style> blocks regardless of
+// source order, because blinkless applies document sheets itself.
 package blinkengine
 
 import (

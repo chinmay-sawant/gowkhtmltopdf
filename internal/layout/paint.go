@@ -539,6 +539,7 @@ func paintPages(
 		page = doc.AddPage(opts.PageWidth, opts.PageHeight)
 		child = page.Content()
 		child.Grow(contentSizeHint(res.Ops, idxs, fixedOrder))
+		pageOpts := opts.forPage(pageIdx)
 
 		// Names are page-local: a cleared map makes the first use on each page
 		// re-register the face on that page's content stream.
@@ -552,7 +553,10 @@ func paintPages(
 
 		var groups groupStack
 		if hasGroups {
-			groups = newGroupStack(page)
+			pointMap := func(x, y float64) (float64, float64) {
+				return canvasToPDF(x, y, pageIdx, contentH, pageOpts, page.Height())
+			}
+			groups = newGroupStack(page, pointMap)
 			groups.prepare(res.Ops, pageOrder, fixedOrder)
 		}
 
@@ -562,7 +566,7 @@ func paintPages(
 			pageN:       pageIdx,
 			contentH:    contentH,
 			pageH:       page.Height(),
-			opts:        opts.forPage(pageIdx),
+			opts:        pageOpts,
 			fontNames:   fontNames,
 			fontContent: fontContent,
 			nextFont:    0,
@@ -705,7 +709,7 @@ func (p *pagePainter) paintOp(paintOp *Op) {
 	}
 
 	if paintOp.XformSet {
-		a, b, cc, d, e, f := pdfCTMFromCSS(paintOp.Xform, p.pageN, p.contentH, p.opts, p.page.Height())
+		a, b, cc, d, e, f := pdfCTMFromDisplayMatrix(paintOp.Xform, p.pageN, p.contentH, p.opts, p.page.Height())
 		target.Transform(a, b, cc, d, e, f)
 	}
 
@@ -983,7 +987,10 @@ func paintBandOps(
 	var groups groupStack
 
 	if hasGroups {
-		groups = newGroupStack(page)
+		pointMap := func(x, y float64) (float64, float64) {
+			return canvasToPDF(x, y, 0, contentH, margins, pageH)
+		}
+		groups = newGroupStack(page, pointMap)
 		groups.prepare(ops, ordered)
 	}
 
@@ -1039,7 +1046,7 @@ func paintBandOp(
 	}
 
 	if paintOp.XformSet {
-		a, b, cc, d, e, f := pdfCTMFromCSS(paintOp.Xform, 0, contentH, margins, pageH)
+		a, b, cc, d, e, f := pdfCTMFromDisplayMatrix(paintOp.Xform, 0, contentH, margins, pageH)
 		chld.Transform(a, b, cc, d, e, f)
 	}
 
@@ -1160,12 +1167,38 @@ func canvasToPDF(opX, opY float64, pageIdx int, contentH float64, opts PaintOpti
 	return x, y
 }
 
+func drawDisplayPath(
+	c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintOptions, pageH float64,
+) bool {
+	path, ok := op.PathValue()
+	if !ok || len(path.Points) == 0 {
+		return false
+	}
+
+	firstX, firstY := canvasToPDF(path.Points[0].X, path.Points[0].Y, pageIdx, contentH, opts, pageH)
+	c.MoveTo(firstX, firstY)
+	for _, point := range path.Points[1:] {
+		x, y := canvasToPDF(point.X, point.Y, pageIdx, contentH, opts, pageH)
+		c.LineTo(x, y)
+	}
+	if path.Closed {
+		c.LineTo(firstX, firstY)
+	}
+
+	return true
+}
+
 //nolint:varnamelen,wsl // PDF path helpers use compact graphics-state names
 func drawFill(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintOptions, pageH float64) {
-	x, y := canvasToPDF(op.X, op.Y+op.H, pageIdx, contentH, opts, pageH)
 	ps := StyleOf(op)
 	fillR, fillG, fillB := sRGBRangeLimit(ps.FillR, ps.FillG, ps.FillB, opts.colorAdjust.rangeLimit)
 	c.SetFillColor(fillR, fillG, fillB)
+	if drawDisplayPath(c, op, pageIdx, contentH, opts, pageH) {
+		c.Fill()
+		return
+	}
+
+	x, y := canvasToPDF(op.X, op.Y+op.H, pageIdx, contentH, opts, pageH)
 	if op.Radius > 0 || opHasRoundedCorners(op) {
 		rx, ry := OpRadiiXY(op)
 		roundedRectPathCorners(c, x, y, op.W, op.H, rx, ry)
@@ -1198,7 +1231,6 @@ func drawMaskedStroke(c *pdf.Content, op *Op, x, y, width float64) {
 
 //nolint:varnamelen,wsl // PDF path helpers use compact graphics-state names
 func drawStroke(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintOptions, pageH float64) {
-	x, y := canvasToPDF(op.X, op.Y+op.H, pageIdx, contentH, opts, pageH)
 	strokeR, strokeG, strokeB := sRGBRangeLimit(op.R, op.G, op.B, opts.colorAdjust.rangeLimit)
 	c.SetStrokeColor(strokeR, strokeG, strokeB)
 	width := op.Width
@@ -1206,6 +1238,12 @@ func drawStroke(c *pdf.Content, op *Op, pageIdx int, contentH float64, opts Pain
 		width = 1
 	}
 	c.SetLineWidth(width)
+	if drawDisplayPath(c, op, pageIdx, contentH, opts, pageH) {
+		c.Stroke()
+		return
+	}
+
+	x, y := canvasToPDF(op.X, op.Y+op.H, pageIdx, contentH, opts, pageH)
 	if op.StrokeMask != 0 {
 		// Partial / open multi-page frames: paint each selected side.
 		drawMaskedStroke(c, op, x, y, width)
@@ -1552,7 +1590,9 @@ func drawText( //nolint:cyclop
 		skew = synthObliqueSkew
 	}
 
-	if paintOp.RotateDeg == 90 || paintOp.RotateDeg == -90 {
+	if glyphBasis, ok := paintOp.GlyphBasisValue(); ok {
+		chld.TextMatrix(glyphBasis.A, -glyphBasis.B, -glyphBasis.C, glyphBasis.D, posX, posY)
+	} else if paintOp.RotateDeg == 90 || paintOp.RotateDeg == -90 {
 		if paintOp.RotateDeg < 0 {
 			chld.TextMatrix(0, -1, 1, 0, posX, posY)
 		} else {

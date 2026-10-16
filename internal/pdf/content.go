@@ -24,21 +24,23 @@ type fontState struct {
 // Content builds a page content stream. Every emitted operator is recorded
 // as a string; fonts and images used are registered for the page /Resources.
 type Content struct {
-	buf         bytes.Buffer
-	fontUses    map[string]string // resource name -> font object ref (allocated at finalize)
-	fontFiles   map[string]*Font  // resource name -> parsed font (embedded)
-	curFont     string            // active font from last SetFont
-	curSize     float64           // active font size from last SetFont
-	fontStack   []fontState       // active font before each open Save
-	imageUses   map[string]string // resource name -> image or form XObject ref
-	imageRefs   map[string]*imageResource
-	imageDedup  map[imageDedupKey]*imageResource
-	opacity     float64            // 0 disables the shared /opacity state
-	alphaUses   map[string]float64 // group-buffer resource name -> /CA //ca value
-	blendUses   map[string]string  // resource name -> PDF blend mode name
-	markedDepth int                // tracks nesting of BDC/EMC blocks
-	formSeq     int                // next Fm form resource suffix
-	doc         *Document
+	buf          bytes.Buffer
+	fontUses     map[string]string // resource name -> font object ref (allocated at finalize)
+	fontFiles    map[string]*Font  // resource name -> parsed font (embedded)
+	curFont      string            // active font from last SetFont
+	curSize      float64           // active font size from last SetFont
+	fontStack    []fontState       // active font before each open Save
+	imageUses    map[string]string // resource name -> image or form XObject ref
+	imageRefs    map[string]*imageResource
+	imageDedup   map[imageDedupKey]*imageResource
+	opacity      float64            // 0 disables the shared /opacity state
+	alphaUses    map[string]float64 // group-buffer resource name -> /CA //ca value
+	blendUses    map[string]string  // resource name -> PDF blend mode name
+	softMaskUses map[string]string  // resource name -> transparency form reference
+	markedDepth  int                // tracks nesting of BDC/EMC blocks
+	formSeq      int                // next Fm form resource suffix
+	softMaskSeq  int                // next soft-mask graphics state suffix
+	doc          *Document
 }
 
 type imageResource struct {
@@ -75,12 +77,13 @@ const fontRuneInitialCapacity = 32
 // NewContent creates an empty content stream builder.
 func NewContent() *Content {
 	return &Content{ //nolint:exhaustruct // intentional zero-value fields
-		fontUses:   map[string]string{},
-		fontFiles:  map[string]*Font{},
-		imageUses:  map[string]string{},
-		imageRefs:  map[string]*imageResource{},
-		imageDedup: map[imageDedupKey]*imageResource{},
-		blendUses:  map[string]string{},
+		fontUses:     map[string]string{},
+		fontFiles:    map[string]*Font{},
+		imageUses:    map[string]string{},
+		imageRefs:    map[string]*imageResource{},
+		imageDedup:   map[imageDedupKey]*imageResource{},
+		blendUses:    map[string]string{},
+		softMaskUses: map[string]string{},
 	}
 }
 
@@ -167,20 +170,22 @@ func (c *Content) writePDFNums(suffix string, count int, num1, num2, num3, num4,
 func cloneContent(cur *Content) *Content {
 	imageRefs := cloneImageMap(cur.imageRefs)
 	ncVal := &Content{ //nolint:exhaustruct // intentional zero-value fields
-		fontUses:    cloneStringMap(cur.fontUses),
-		fontFiles:   cloneFontMap(cur.fontFiles),
-		curFont:     cur.curFont,
-		curSize:     cur.curSize,
-		fontStack:   append([]fontState(nil), cur.fontStack...),
-		imageUses:   cloneStringMap(cur.imageUses),
-		imageRefs:   imageRefs,
-		imageDedup:  cloneImageDedupMap(cur.imageDedup, imageRefs),
-		opacity:     cur.opacity,
-		alphaUses:   maps.Clone(cur.alphaUses),
-		blendUses:   cloneStringMap(cur.blendUses),
-		markedDepth: cur.markedDepth,
-		formSeq:     cur.formSeq,
-		doc:         cur.doc,
+		fontUses:     cloneStringMap(cur.fontUses),
+		fontFiles:    cloneFontMap(cur.fontFiles),
+		curFont:      cur.curFont,
+		curSize:      cur.curSize,
+		fontStack:    append([]fontState(nil), cur.fontStack...),
+		imageUses:    cloneStringMap(cur.imageUses),
+		imageRefs:    imageRefs,
+		imageDedup:   cloneImageDedupMap(cur.imageDedup, imageRefs),
+		opacity:      cur.opacity,
+		alphaUses:    maps.Clone(cur.alphaUses),
+		blendUses:    cloneStringMap(cur.blendUses),
+		softMaskUses: cloneStringMap(cur.softMaskUses),
+		markedDepth:  cur.markedDepth,
+		formSeq:      cur.formSeq,
+		softMaskSeq:  cur.softMaskSeq,
+		doc:          cur.doc,
 	}
 	ncVal.buf.Write(cur.buf.Bytes())
 
@@ -374,6 +379,58 @@ func (c *Content) BeginTransparencyGroup() *Content {
 // the fonts, images, nested forms, and ExtGStates the buffered operators
 // actually used.
 func (c *Content) EndTransparencyGroup(group *Content, blendMode string, bbox [4]float64) error {
+	return c.endTransparencyGroup(group, blendMode, bbox)
+}
+
+// EndMaskedTransparencyGroup composites a buffered group through the alpha
+// channel of a PNG soft mask.
+func (c *Content) EndMaskedTransparencyGroup(
+	group *Content, blendMode string, bbox [4]float64, mask SoftMaskImage,
+) error {
+	if c == nil || group == nil || len(mask.Bytes) == 0 {
+		return nil
+	}
+	if c.doc == nil {
+		return errContentNoDocument
+	}
+
+	maskContent := NewContent()
+	maskContent.doc = c.doc
+	if err := maskContent.AddPNGImage("Mask", mask.X, mask.Y, mask.W, mask.H, mask.Bytes); err != nil {
+		return fmt.Errorf("pdf: embed soft mask: %w", err)
+	}
+
+	maskRef := c.doc.newObject()
+	c.doc.pendingForms = append(c.doc.pendingForms, pendingForm{ref: maskRef, content: maskContent, bbox: bbox})
+
+	c.Save()
+	c.setSoftMask(maskRef.String())
+	err := c.EndTransparencyGroup(group, blendMode, bbox)
+	c.Restore()
+
+	return err
+}
+
+// SoftMaskImage places a PNG alpha image in page coordinates.
+type SoftMaskImage struct {
+	Bytes      []byte
+	X, Y, W, H float64
+}
+
+func (c *Content) setSoftMask(ref string) {
+	if c.softMaskUses == nil {
+		c.softMaskUses = map[string]string{}
+	}
+
+	name := "smask" + strconv.Itoa(c.softMaskSeq)
+	c.softMaskSeq++
+	c.softMaskUses[name] = ref
+	c.buf.WriteByte('/')
+	c.buf.WriteString(name)
+	c.buf.WriteString(" gs\n")
+}
+
+func (c *Content) endTransparencyGroup(group *Content, blendMode string, bbox [4]float64) error {
 	if c == nil || group == nil {
 		return nil
 	}
@@ -389,12 +446,10 @@ func (c *Content) EndTransparencyGroup(group *Content, blendMode string, bbox [4
 	c.imageUses[name] = ref.String()
 
 	c.Save()
-
 	if pdfName, ok := pdfBlendModes[strings.ToLower(strings.TrimSpace(blendMode))]; ok && pdfName != "Normal" {
 		c.SetBlendMode(blendMode)
 	}
-
-	c.buf.WriteString("/")
+	c.buf.WriteByte('/')
 	c.buf.WriteString(name)
 	c.buf.WriteString(" Do\n")
 	c.Restore()
@@ -916,7 +971,7 @@ const extGStateHint = 64
 //
 //nolint:wsl // resource sorting and serialization stay together for deterministic output
 func (c *Content) extGState() string {
-	if c.opacity <= 0 && len(c.blendUses) == 0 && len(c.alphaUses) == 0 {
+	if c.opacity <= 0 && len(c.blendUses) == 0 && len(c.alphaUses) == 0 && len(c.softMaskUses) == 0 {
 		return ""
 	}
 
@@ -957,6 +1012,17 @@ func (c *Content) extGState() string {
 		out = append(out, " /ca "...)
 		out = appendPDFNum(out, alpha)
 		out = append(out, " >>"...)
+	}
+
+	softMaskNames := sortedStringKeys(c.softMaskUses)
+	for _, resourceName := range softMaskNames {
+		out = append(out, sep...)
+		sep = " "
+		out = append(out, '/')
+		out = append(out, resourceName...)
+		out = append(out, " << /SMask << /S /Alpha /G "...)
+		out = append(out, c.softMaskUses[resourceName]...)
+		out = append(out, " >> >>"...)
 	}
 
 	out = append(out, " >>"...)

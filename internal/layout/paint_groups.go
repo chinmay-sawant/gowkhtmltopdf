@@ -12,6 +12,11 @@ type groupFrame struct {
 	content *pdf.Content
 }
 
+type paintBounds struct {
+	left, top, right, bottom float64
+	set                      bool
+}
+
 // groupStack tracks CSS element groups across the paint of one page or header
 // band. Operations carry their group pointer, so page splits and paint-order
 // reordering cannot detach a fragment from its group: each page fragment is
@@ -25,11 +30,14 @@ type groupStack struct {
 	bbox      [4]float64
 	remaining map[*BlendGroup]int
 	frames    []groupFrame
+	bounds    map[*BlendGroup]paintBounds
+	pointMap  func(float64, float64) (float64, float64)
 }
 
-func newGroupStack(page *pdf.Page) groupStack {
+func newGroupStack(page *pdf.Page, pointMap func(float64, float64) (float64, float64)) groupStack {
 	stack := groupStack{ //nolint:exhaustruct // remaining and frames fill during painting
-		page: page,
+		page:     page,
+		pointMap: pointMap,
 	}
 	if page != nil {
 		// The form content paints in page coordinates, so the page box is a
@@ -81,6 +89,7 @@ func (s *groupStack) prepare(ops []Op, orders ...[]int) {
 				}
 
 				s.remaining[group]++
+				s.includeBounds(group, &ops[idx])
 			}
 		}
 	}
@@ -183,10 +192,71 @@ func (s *groupStack) closeReady(fallback *pdf.Content) error {
 			parent = content
 		}
 
-		if err := parent.EndTransparencyGroup(frame.content, frame.group.Mode, s.bbox); err != nil {
+		mask, masked := s.softMaskImage(frame.group)
+		var err error
+		if masked {
+			err = parent.EndMaskedTransparencyGroup(frame.content, frame.group.Mode, s.bbox, mask)
+		} else {
+			err = parent.EndTransparencyGroup(frame.content, frame.group.Mode, s.bbox)
+		}
+		if err != nil {
 			return fmt.Errorf("layout: transparency group: %w", err)
 		}
 	}
+}
+
+func (s *groupStack) includeBounds(group *BlendGroup, op *Op) {
+	if s.bounds == nil {
+		s.bounds = map[*BlendGroup]paintBounds{}
+	}
+
+	left, right := op.X, op.X+op.W
+	top, bottom := op.Y, op.Y+op.H
+	if left > right {
+		left, right = right, left
+	}
+	if top > bottom {
+		top, bottom = bottom, top
+	}
+
+	current := s.bounds[group]
+	if !current.set {
+		current = paintBounds{left: left, top: top, right: right, bottom: bottom, set: true}
+	} else {
+		current.left = min(current.left, left)
+		current.top = min(current.top, top)
+		current.right = max(current.right, right)
+		current.bottom = max(current.bottom, bottom)
+	}
+	s.bounds[group] = current
+}
+
+func (s *groupStack) softMaskImage(group *BlendGroup) (pdf.SoftMaskImage, bool) {
+	if group == nil || group.Mask == nil || len(group.Mask.PNGBytes) == 0 || s.pointMap == nil {
+		return pdf.SoftMaskImage{}, false
+	}
+
+	box := s.bounds[group]
+	if !box.set || box.right <= box.left || box.bottom <= box.top {
+		return pdf.SoftMaskImage{}, false
+	}
+
+	left, top := s.pointMap(box.left, box.top)
+	right, bottom := s.pointMap(box.right, box.bottom)
+	if right < left {
+		left, right = right, left
+	}
+	if top < bottom {
+		top, bottom = bottom, top
+	}
+
+	return pdf.SoftMaskImage{
+		Bytes: group.Mask.PNGBytes,
+		X:     left,
+		Y:     bottom,
+		W:     right - left,
+		H:     top - bottom,
+	}, true
 }
 
 // groupChain returns group's ancestors, root first.

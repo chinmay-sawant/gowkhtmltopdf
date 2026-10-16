@@ -16,6 +16,10 @@ type opExtra struct {
 	ImgW, ImgH    int
 	Alt           string
 	Xform         Matrix2D
+	Path          PathGeometry
+	PathSet       bool
+	GlyphBasis    Matrix2D
+	GlyphBasisSet bool
 	BlendMode     string
 	PaintOpacity  float64
 	StructElem    *pdf.StructElem
@@ -34,6 +38,17 @@ type opExtra struct {
 	// carry the group without painting.
 	BlendGroup *BlendGroup
 	GroupMark  uint8
+}
+
+// PathPoint is one canvas-space point in a display-list path.
+type PathPoint struct {
+	X, Y float64
+}
+
+// PathGeometry is straight-edged drawing geometry supplied by Blinkless.
+type PathGeometry struct {
+	Points []PathPoint
+	Closed bool
 }
 
 func (op *Op) detachExtra() *opExtra {
@@ -102,6 +117,38 @@ func (op *Op) SetBlendMode(mode string) { op.setBlendMode(mode) }
 func (op *Op) SetXform(matrix Matrix2D) {
 	op.setXform(matrix)
 	op.XformSet = true
+}
+
+// SetPath stores final path geometry from the Blinkless display list.
+func (op *Op) SetPath(path PathGeometry) {
+	extra := op.detachExtra()
+	extra.Path = path
+	extra.PathSet = len(path.Points) > 0
+}
+
+// PathValue returns final path geometry supplied by the display list.
+func (op Op) PathValue() (PathGeometry, bool) {
+	if op.opExtra == nil || !op.opExtra.PathSet {
+		return PathGeometry{}, false
+	}
+
+	return op.opExtra.Path, true
+}
+
+// SetGlyphBasis writes the final local basis of projected display-list text.
+func (op *Op) SetGlyphBasis(matrix Matrix2D) {
+	extra := op.detachExtra()
+	extra.GlyphBasis = matrix
+	extra.GlyphBasisSet = true
+}
+
+// GlyphBasisValue returns the final local basis of projected text, if set.
+func (op Op) GlyphBasisValue() (Matrix2D, bool) {
+	if op.opExtra == nil || !op.opExtra.GlyphBasisSet {
+		return Matrix2D{}, false
+	}
+
+	return op.opExtra.GlyphBasis, true
 }
 
 // SetTextTransform writes the CSS text-transform, allocating a unique extra if needed.

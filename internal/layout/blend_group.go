@@ -32,6 +32,15 @@ type BlendGroup struct {
 	Isolate bool
 	// Parent is the enclosing group, nil at the page root.
 	Parent *BlendGroup
+	// Mask is the resolved raster carried by the Blinkless display-list group.
+	Mask *MaskDescriptor
+}
+
+// MaskDescriptor holds the ready-to-paint raster from Blinkless for one group.
+type MaskDescriptor struct {
+	PNGBytes    []byte
+	PixelWidth  int
+	PixelHeight int
 }
 
 // IsGroupBegin reports whether the operation opens a blend group.

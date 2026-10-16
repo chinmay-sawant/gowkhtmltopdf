@@ -140,8 +140,23 @@ func (m *opMapper) payload(src *blayout.DisplayOp, dst *layout.Op) {
 	}
 
 	if src.XformSet {
+		// Copy Blinkless's affine display transform; the PDF painter only
+		// changes it to the PDF coordinate basis when writing the cm operator.
 		mx := src.Transform()
 		dst.SetXform(layout.Matrix2D{A: mx.A, B: mx.B, C: mx.C, D: mx.D, E: mx.E, F: mx.F})
+	}
+
+	if path, ok := src.PathValue(); ok {
+		points := make([]layout.PathPoint, len(path.Points))
+		for idx, point := range path.Points {
+			points[idx] = layout.PathPoint{X: point.X, Y: point.Y}
+		}
+
+		dst.SetPath(layout.PathGeometry{Points: points, Closed: path.Closed})
+	}
+
+	if basis, ok := src.GlyphBasisValue(); ok {
+		dst.SetGlyphBasis(layout.Matrix2D{A: basis.A, B: basis.B, C: basis.C, D: basis.D})
 	}
 
 	if opacity := rawOpacity(src); opacity > 0 && opacity < 1 {
@@ -303,6 +318,15 @@ func (m *opMapper) group(src *blayout.DisplayGroup) *layout.BlendGroup {
 		Mode:    src.Mode,
 		Isolate: src.Isolate,
 		Parent:  m.group(src.Parent),
+	}
+	if src.Mask != nil {
+		if raster := src.Mask.Raster; raster != nil {
+			group.Mask = &layout.MaskDescriptor{
+				PNGBytes:    append([]byte(nil), raster.ImageBytes...),
+				PixelWidth:  raster.PixelWidth,
+				PixelHeight: raster.PixelHeight,
+			}
+		}
 	}
 	m.groups[src] = group
 

@@ -1178,11 +1178,11 @@ func stampCoveredOpacityOps(boxNode *box, ops []Op, covered []bool) {
 	}
 }
 
-// pdfCTMFromCSS returns the PDF cm matrix equivalent to applying cssXform in
-// canvas space (y-down) given canvas→PDF map C(x,y)=(ml+x, K-y).
+// pdfCTMFromDisplayMatrix converts a display-list affine matrix from canvas
+// space (y-down) to PDF coordinates using C(x,y)=(ml+x, K-y).
 //
-//	CTM = C ∘ cssXform ∘ C⁻¹
-func pdfCTMFromCSS(
+//	CTM = C ∘ matrix ∘ C⁻¹
+func pdfCTMFromDisplayMatrix(
 	matrix Matrix2D, pageIdx int, contentH float64, opts PaintOptions, pageH float64,
 ) (float64, float64, float64, float64, float64, float64) {
 	margL := opts.MarginLeft
