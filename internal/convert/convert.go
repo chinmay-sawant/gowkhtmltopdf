@@ -135,6 +135,10 @@ func (r *Request) Validate() error {
 		return fmt.Errorf("copies: %w", err)
 	}
 
+	if _, err := settings.ParseEngine(r.Global.Engine); err != nil {
+		return err //nolint:wrapcheck // settings sentinel passes through unwrapped by contract
+	}
+
 	if r.Global.DumpOutline && r.OutlineOutput == nil {
 		return ErrMissingOutlineOutput
 	}
@@ -576,6 +580,24 @@ func (run *runContext) renderObject(ctx context.Context, obj *settings.PdfObject
 		if l := docLang(root); l != "" {
 			run.doc.SetLanguage(l)
 		}
+	}
+
+	// Blinkless engine: the load/parse phase above still owns resource policy,
+	// the raw HTML body, and the linked stylesheets. Placement, cascade, and
+	// the display list come from blinkless. Everything after this branch
+	// (assembly, headers/footers, links, page plan, writer) is shared with the
+	// native path.
+	if run.req.Global.Engine == settings.EngineBlinkless {
+		render := objectRenderContext{ //nolint:exhaustruct // body policy fields only
+			global: run.req.Global,
+			obj:    obj,
+		}
+
+		if err := run.paintBlinklessBody(ctx, state, render, prep); err != nil {
+			return nil, fmt.Errorf("object %d (%s): %w", idx+1, obj.Page, err)
+		}
+
+		return state, nil
 	}
 
 	reg, err := effectiveMargins(ctx, run.loader, run.font, run.req.Global, state, run.log)

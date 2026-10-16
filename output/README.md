@@ -14,11 +14,11 @@ assertions, not binary PDF equality against this folder. See
 ## Validated visual references
 
 `validated/` holds one reference PDF for every numbered body fixture from 01
-through 64. There are 65 PDFs because fixture 29 has two body HTML files.
+through 65. There are 66 PDFs because fixture 29 has two body HTML files.
 Fixture 36's header and footer files belong to its single body PDF.
 
 `TestVisualReferenceInventory` checks that the directory has exactly these
-65 PDFs (`internal/convert/fixturetests/pixel_regression_corpus_test.go:18-56`).
+66 PDFs (`internal/convert/fixturetests/pixel_regression_corpus_test.go:18-56`).
 `TestVisualGoldenFixtureCorpus` converts each body fixture with the shared
 fixture settings and compares every rendered page
 (`internal/convert/fixturetests/pixel_regression_corpus_test.go:59-96`). The
@@ -80,7 +80,7 @@ after the test exits
 (fixture-21 and fixture-56), and (when the network works)
 `wiki-ana-de-armas.pdf`.
 
-## Fixture PDFs (`fixture-01` ... `fixture-64`)
+## Fixture PDFs (`fixture-01` ... `fixture-65`)
 
 Each file is `testdata/golden/<same-basename>.html` converted with
 `--enable-local-file-access`. Companion `*-header.html` / `*-footer.html`
@@ -153,6 +153,7 @@ files are skipped as bodies; fixture-36 attaches them as HTML header/footer.
 | `fixture-62-implemented-props-c.pdf` | Implemented CSS properties, group C |
 | `fixture-63-page-level-demos.pdf` | Page-level CSS demos |
 | `fixture-64-next-72-props.pdf` | Next-72 CSS properties |
+| `fixture-65-props-390-to-420-row-rules-masks-3d.pdf` | Properties 390-420: 3D transforms, gradient masks, row rules |
 
 ## Image smokes
 

@@ -216,6 +216,9 @@ func TestDirectModuleAllowlist(t *testing.T) {
 	// third-party requires (transitive graph is allowed).
 	//   - go-text/typesetting: OpenType shaping
 	//   - tdewolff/canvas: SVG-as-image rasterization (wiki logos, etc.)
+	//   - chinmay-sawant/blinkless: alternative layout engine for
+	//     --engine blinkless (drawing-list producer), pinned by a local
+	//     replace directive in go.mod.
 	// Also documents CGO HarfBuzz rejection: no harfbuzz CGO module allowed.
 	cmd := exec.Command("go", "list", "-m", "-f", "{{if and (not .Main) (not .Indirect)}}{{.Path}}{{end}}", "all")
 	cmd.Dir = "../.."
@@ -226,8 +229,9 @@ func TestDirectModuleAllowlist(t *testing.T) {
 	}
 
 	allowed := map[string]bool{
-		"github.com/go-text/typesetting": true,
-		"github.com/tdewolff/canvas":     true,
+		"github.com/go-text/typesetting":      true,
+		"github.com/tdewolff/canvas":          true,
+		"github.com/chinmay-sawant/blinkless": true,
 	}
 
 	for _, line := range strings.Split(string(out), "\n") {
@@ -237,7 +241,10 @@ func TestDirectModuleAllowlist(t *testing.T) {
 		}
 
 		if !allowed[line] {
-			t.Errorf("unexpected direct module %q (allowlist: typesetting + tdewolff/canvas; CGO HarfBuzz rejected)", line)
+			t.Errorf(
+				"unexpected direct module %q (allowlist: typesetting + tdewolff/canvas + blinkless; CGO HarfBuzz rejected)",
+				line,
+			)
 		}
 
 		if strings.Contains(strings.ToLower(line), "harfbuzz") {

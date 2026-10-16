@@ -2,8 +2,10 @@
 # Pure-Go runtime: the standard library plus the allowlisted direct modules
 # below. No cgo, browser, or native converter process is required.
 # Direct third-party requires must stay ⊆ {
-#   github.com/go-text/typesetting,  # OpenType shaping
-#   github.com/tdewolff/canvas,      # SVG-as-image rasterization
+#   github.com/go-text/typesetting,    # OpenType shaping
+#   github.com/tdewolff/canvas,        # SVG-as-image rasterization
+#   github.com/chinmay-sawant/blinkless, # --engine blinkless (sibling checkout
+#                                       # via go.mod replace)
 # }
 # (enforced by internal/pdf.TestDirectModuleAllowlist).
 

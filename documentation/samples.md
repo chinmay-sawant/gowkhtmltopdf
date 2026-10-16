@@ -54,7 +54,7 @@ make golden-update GOLDEN_FIXTURE=fixture-01-simple-invoice.html GOLDEN_APPROVE=
 
 ## Golden HTML corpus (`testdata/golden/`)
 
-**Body fixtures:** `fixture-01` … `fixture-64`. Companion files matching
+**Body fixtures:** `fixture-01` … `fixture-65`. Companion files matching
 `*-header.html` / `*-footer.html` are **not** converted as bodies.
 
 When `fixture-NN-header.html` and/or `fixture-NN-footer.html` sit beside a
@@ -91,7 +91,7 @@ only — it does not rewrite the corpus fixture above or write a PDF under
 | Business documents | 43–48 | Dossier, receipt, PO, contract, certificate, shipping |
 | Illustrated print | 49–54 | Poster, letter, storybooks, boarding pass, observatory poster, Ember Harbor |
 | Long-form | 55–56 | Operations brief, 21-page architecture diagram |
-| Catalog audits | 57–64 | Implemented/unsupported property galleries; fixture-64 is the v0.2.7 next-72 audit |
+| Catalog audits | 57–65 | Implemented/unsupported property galleries; fixture-64 is the v0.2.7 next-72 audit, fixture-65 the post-389 properties 390-420 audit |
 
 ### Fixture inventory
 
@@ -161,6 +161,7 @@ fixture header comments and [`testdata/golden/README.md`](../testdata/golden/REA
 | 58 | Unsupported worklist audit (needle `UNSUPPORTED-WORKLIST-AUDIT`) | 9 |
 | 60–62 | Implemented property audit slices A/B/C | 8 each |
 | 64 | Next-72 CSS audit (`NEXT-72-PROPS`); 53 Implemented / 19 Unsupported by choice | 5–8 |
+| 65 | Properties 390-420 audit: 3D transforms, gradient masks, row rules (needle `PROPS-390-TO-420`) | 3–5 |
 
 Supporting assets in the same directory: `logo.png`, `certificate-background.jpg`,
 `style-05.css`, `theme-print-stories.css`, `fixture-56-architecture-diagram.css`,

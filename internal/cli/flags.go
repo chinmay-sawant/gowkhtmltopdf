@@ -137,6 +137,10 @@ func addGlobalFlags(add flagAdder) {
 	add("pdf-profile", ModePDF, flagValue, func(c *Command, _ *objectCtx, vals []string) error {
 		return c.Global.Set("pdfprofile", vals[0])
 	})
+	// Body layout engine: native (default) or blinkless. See settings.ParseEngine.
+	add("engine", ModePDF, flagValue, func(c *Command, _ *objectCtx, vals []string) error {
+		return c.Global.Set("engine", vals[0])
+	})
 	// Smart-shrinking: enable/disable pair only (no bare --smart-shrinking).
 	add("enable-smart-shrinking", ModePDF, flagBool, func(c *Command, _ *objectCtx, _ []string) error {
 		return c.Global.Set("smartshrinking", "true")

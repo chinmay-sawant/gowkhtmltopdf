@@ -146,6 +146,24 @@ func (op Op) TextAutospace() string {
 // SetPaintOpacity writes element opacity, allocating a unique extra if needed.
 func (op *Op) SetPaintOpacity(value float64) { op.setPaintOpacity(value) }
 
+// SetImage writes the encoded image payload with its pixel bounds and alt
+// text, allocating a unique extra if needed. The data slice is retained, not
+// copied; hand a throwaway buffer if the caller may mutate it later.
+func (op *Op) SetImage(data []byte, width, height int, alt string) {
+	op.setImage(data, width, height, alt)
+}
+
+// SetTextAutospace writes the CSS text-autospace value, allocating a unique
+// extra if needed.
+func (op *Op) SetTextAutospace(value string) { op.detachExtra().TextAutospace = value }
+
+// SetNoFakeBold records that the op forbids synthesized bold weight.
+func (op *Op) SetNoFakeBold() { op.detachExtra().NoFakeBold = true }
+
+// SetOutline marks the op as a CSS outline operation. Outlines paint above
+// descendant content, unlike ordinary backgrounds and borders.
+func (op *Op) SetOutline() { op.setOutline() }
+
 // Clone returns a copy whose extra payload does not alias op.
 func (op Op) Clone() Op {
 	op.opExtra = op.detachedExtraCopy()

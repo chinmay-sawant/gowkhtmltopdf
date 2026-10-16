@@ -114,6 +114,9 @@ type Document struct {
 	Title       string
 	PDFVersion  string
 	PDFProfile  string
+	// Engine selects the body layout engine: "native" (default) or
+	// "blinkless" (github.com/chinmay-sawant/blinkless). Empty means native.
+	Engine string
 
 	Copies             int
 	Collate            *bool
@@ -385,6 +388,9 @@ func (d *Document) pdfGlobal(dumpOutline bool) settings.PdfGlobal {
 		if p, err := settings.ParsePDFProfile(d.PDFProfile); err == nil {
 			global.PdfProfile = p
 		}
+	}
+	if engine, err := settings.ParseEngine(d.Engine); err == nil {
+		global.Engine = engine
 	}
 	if d.Copies != 0 {
 		global.Copies = d.Copies

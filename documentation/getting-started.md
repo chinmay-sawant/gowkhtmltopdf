@@ -8,9 +8,12 @@ Related: [CLI reference](cli.md) · [Library API](library-api.md) ·
 ## Requirements
 
 - Go **1.26+** (the module pins `toolchain go1.26.4`)
-- The first build may download the two allowlisted direct modules in
-  [`go.mod`](../go.mod) (`go-text/typesetting`, `tdewolff/canvas`) and their
-  transitive graph. After that, builds can run offline from the module cache.
+- The first build resolves the allowlisted direct modules: `go-text/typesetting`
+  and `tdewolff/canvas` from the module proxy, and
+  `github.com/chinmay-sawant/blinkless` from the sibling checkout at
+  `../blinkless` (a local `replace` in [`go.mod`](../go.mod) backs the opt-in
+  `--engine blinkless` path; check out the blinkless repository next to this
+  one). After the proxy modules are cached, builds can run offline.
 - Native CLI builds require no browser process, native converter, Qt, or cgo
   toolchain. The optional browser preview uses the WASM build in
   [wasm.md](wasm.md).

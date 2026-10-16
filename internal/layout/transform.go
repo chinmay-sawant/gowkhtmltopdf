@@ -989,7 +989,15 @@ func stampBoxTransforms(boxNode *box, parentAccum Matrix2D, ops []Op) {
 // another flow pass has moved the owning boxes. The transform origin is stored
 // in document coordinates, so retaining the old matrix would move transformed
 // inline chrome away from its box when that box crosses a page boundary.
+//
+// A hand-built Result has no box tree to re-stamp from; clearing and
+// re-stamping would only destroy transforms its builder supplied, so the pass
+// leaves those operations untouched.
 func restampBoxTransforms(boxNode *box, ops []Op) {
+	if boxNode == nil {
+		return
+	}
+
 	needsStamp := false
 
 	for idx := range ops {

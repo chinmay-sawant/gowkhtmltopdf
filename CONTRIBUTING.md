@@ -13,8 +13,8 @@ Product design, fidelity tiers, and the support matrix live under
 
 1. **Pure Go, no CGO** for the main path. Direct third-party modules stay on the
    allowlist enforced by `internal/pdf.TestDirectModuleAllowlist`
-   (currently OpenType shaping + SVG raster via allowlisted deps — see
-   `Makefile` / `go.mod`).
+   (currently OpenType shaping, SVG raster, and the opt-in blinkless engine via
+   allowlisted deps — see `Makefile` / `go.mod`).
 2. **Generic engine fixes** — prefer CSS/print semantics over site-specific
    (e.g. MediaWiki class) hacks. Operator policy belongs in CLI flags, not
    cascade overrides for one skin.

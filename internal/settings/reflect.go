@@ -582,6 +582,25 @@ func registerGlobalDocumentKeys(keys keyTable[PdfGlobal]) {
 		func(dst *PdfGlobal, raw string) error { return setString(&dst.Title)(raw) },
 		func(dst *PdfGlobal) (string, bool) { return dst.Title, true },
 	)
+	regGlobal("engine",
+		func(dst *PdfGlobal, raw string) error {
+			engine, err := ParseEngine(raw)
+			if err != nil {
+				return err
+			}
+
+			dst.Engine = engine
+
+			return nil
+		},
+		func(dst *PdfGlobal) (string, bool) {
+			if dst.Engine == "" {
+				return EngineNative, true
+			}
+
+			return dst.Engine, true
+		},
+	)
 	registerGlobalVersionProfileKeys(keys)
 	regGlobal("smartshrinking",
 		func(dst *PdfGlobal, raw string) error { return setBool(&dst.SmartShrinking)(raw) },

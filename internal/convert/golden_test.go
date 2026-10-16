@@ -457,6 +457,10 @@ var fixturePageBounds = map[string]fixtureBounds{ //nolint:gochecknoglobals // i
 		minPages: 5, maxPages: 8, images: true,
 		needles: []string{"NEXT-72-PROPS"},
 	},
+	"fixture-65-props-390-to-420-row-rules-masks-3d.html": {
+		minPages: 3, maxPages: 5, images: true,
+		needles: []string{"PROPS-390-TO-420"},
+	},
 }
 
 // fixtureHeaderOK enforces the corpus hygiene rule: every fixture starts

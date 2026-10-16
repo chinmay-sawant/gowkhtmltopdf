@@ -8,6 +8,23 @@ binaries at build time (see README "Versioning").
 
 ### Added
 
+- **Blinkless engine (`--engine blinkless`):** body objects can be laid out
+  by the sibling blinkless layout engine instead of the built-in pipeline.
+  Blinkless parses the HTML, applies its stylesheets, and returns a drawing
+  list; `internal/blinkengine` adapts that list onto this engine's
+  display-list operations, so pagination, the PDF painter, headers/footers,
+  links, and the writer are shared and unchanged. The native engine stays the
+  default; select blinkless per request with `settings.PdfGlobal.Engine`,
+  `Document.Engine`, or `--engine blinkless`. Linked stylesheets are fetched
+  by the bridge with this module's loader policy (media-filtered, `@import`s
+  expanded) and handed to blinkless, which applies them after the document's
+  own `<style>` blocks. Known limits of the blinkless path: outline and TOC
+  headings stay empty, smart shrinking and `@page` margin boxes do not apply,
+  blend-group mask layers are not replayed, and `--font-path` faces are not
+  visible to blinkless (it uses its own font registry).
+  `github.com/chinmay-sawant/blinkless` joins the direct-module allowlist,
+  pinned by a local `replace` to `../blinkless`; CI images must check out the
+  sibling repository at that path.
 - **Display-list export:** `layout.DisplayList` returns the retained display
   list of vector operations for a document instead of a flattened bitmap, so a
   caller can replay the placement on its own canvas and keep text as glyphs

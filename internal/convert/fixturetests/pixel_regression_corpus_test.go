@@ -17,15 +17,15 @@ var (
 	errReferenceInventoryDiffers = errors.New("approved reference inventory differs")
 	errInvalidVisualFixtureName  = errors.New("invalid numbered fixture name")
 	errInvalidVisualFixtureID    = errors.New("invalid fixture ID in name")
-	errVisualFixtureOutOfRange   = errors.New("fixture is outside the expected range 01-64")
+	errVisualFixtureOutOfRange   = errors.New("fixture is outside the expected range 01-65")
 	errVisualFixturePrefix       = errors.New("fixture must use a two-digit prefix")
 	errVisualFixtureCount        = errors.New("unexpected number of body HTML files for fixture")
 	errVisualFixturePDFCount     = errors.New("unexpected number of numbered fixture PDFs")
 )
 
 const (
-	visualFixtureLastID = 64
-	visualFixturePDFs   = 65
+	visualFixtureLastID = 65
+	visualFixturePDFs   = 66
 )
 
 // TestVisualReferenceInventory keeps the approved PDF set aligned with the

@@ -24,6 +24,13 @@ linters:
     # path gowkhtmltopdf* via the stdlib prefix "go". Not worth //nolint noise.
     - depguard
 
+linters-settings:
+  gomoddirectives:
+    # The blinkless engine is a sibling checkout (../blinkless) selected by
+    # go.mod replace by explicit product decision; pinning a published version
+    # is a later step. See AGENTS.md "Dependency policy".
+    allow-local-replacements: true
+
 issues:
   # Report every finding (default caps hide most of an enable-all run).
   max-issues-per-linter: 0

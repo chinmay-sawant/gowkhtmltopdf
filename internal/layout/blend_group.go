@@ -92,3 +92,16 @@ func (op *Op) setGroupMark(group *BlendGroup, mark uint8) {
 	extra.BlendGroup = group
 	extra.GroupMark = mark
 }
+
+// SetGroupBoundary marks the operation as the begin or end boundary of a
+// blend group. Boundary operations carry no paint; painters test
+// GroupBoundary rather than the kind, because a later pass can deactivate the
+// kind while the mark survives.
+func (op *Op) SetGroupBoundary(group *BlendGroup, begin bool) {
+	mark := groupMarkEnd
+	if begin {
+		mark = groupMarkBegin
+	}
+
+	op.setGroupMark(group, mark)
+}

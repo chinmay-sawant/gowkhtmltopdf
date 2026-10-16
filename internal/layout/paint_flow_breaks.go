@@ -33,7 +33,18 @@ func isAvoidInsideBreak(style *ResolvedStyle) bool {
 // avoidInside walks post-order and moves page-break-inside:avoid boxes wholly
 // to the next page when they span multiple pages but fit one content height.
 // Aside callouts are lifted earlier by keepImplicitAsides (before text snap).
+// boxTreeReady reports whether a Result carries the box tree a box-walking
+// pagination pass needs. Hand-built display lists have none, so those passes
+// do nothing for them.
+func boxTreeReady(res *Result, contentH float64) bool {
+	return res != nil && res.root != nil && contentH > 0
+}
+
 func avoidInside(res *Result, contentH float64) bool {
+	if !boxTreeReady(res, contentH) {
+		return false
+	}
+
 	var walk func(b *box, inTable bool) bool
 	walk = func(boxNode *box, inTable bool) bool {
 		changed := false

@@ -7,8 +7,13 @@ import (
 )
 
 // rowsIntact keeps each table row on a single page: a row spanning multiple
-// pages moves wholly to the next.
+// pages moves wholly to the next. A hand-built Result has no box tree, so
+// there are no rows to move and the pass does nothing.
 func rowsIntact(res *Result, contentH float64) bool {
+	if res == nil || res.root == nil {
+		return false
+	}
+
 	var walk func(b *box) bool
 	walk = func(boxNode *box) bool {
 		changed := false

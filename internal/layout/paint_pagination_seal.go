@@ -613,7 +613,9 @@ func pageTopStubBounds(
 // the text but leave the previous row's trailing fill / the snapped row's
 // background behind, which reads as empty rows (fixture-31 after Row 27).
 func stripOrphanRowChrome(res *Result, contentH float64) {
-	if res == nil || contentH <= 0 || len(res.Ops) == 0 {
+	// Row chrome ownership comes from the box tree; a hand-built display list
+	// has none, so there is no orphan shell to identify.
+	if res == nil || res.root == nil || contentH <= 0 || len(res.Ops) == 0 {
 		return
 	}
 

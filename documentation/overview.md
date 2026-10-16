@@ -29,7 +29,7 @@ print) are goals, not shipped feature claims — see [fidelity.md](fidelity.md).
 | Principle | Meaning |
 |-----------|---------|
 | **From scratch** | The converter pipeline is implemented in this repo |
-| **Pure Go** | Build with `CGO_ENABLED=0`; two allowlisted Go modules provide shaping and SVG raster |
+| **Pure Go** | Build with `CGO_ENABLED=0`; allowlisted Go modules provide shaping, SVG raster, and the opt-in blinkless engine |
 | **No browser** | No Chrome, WebKit, Qt, or headless browser process |
 | **No cgo** | Static binaries; no native converter library |
 | **No SaaS APIs** | No remote HTML→PDF services or SDKs |

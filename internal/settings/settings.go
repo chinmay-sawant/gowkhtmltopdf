@@ -68,6 +68,34 @@ func ParsePDFVersion(value string) (string, error) {
 	}
 }
 
+// Engine names the HTML layout engine a request uses.
+const (
+	// EngineNative is the built-in load -> parse -> cascade -> layout
+	// pipeline. It is the default.
+	EngineNative = "native"
+	// EngineBlinkless routes body HTML through the blinkless layout engine
+	// (github.com/chinmay-sawant/blinkless) and converts its display list
+	// into the engine's own painter and PDF writer.
+	EngineBlinkless = "blinkless"
+)
+
+// ErrInvalidEngine reports an unknown layout engine name.
+var ErrInvalidEngine = errors.New("settings: invalid engine (allowed: native|blinkless)")
+
+// ParseEngine validates and normalizes an engine name.
+// Accepted values: "", "native", "blinkless". "" and "native" normalize to
+// EngineNative. Other values return an error wrapping ErrInvalidEngine.
+func ParseEngine(value string) (string, error) {
+	switch normalize(strings.TrimSpace(value)) {
+	case "", EngineNative:
+		return EngineNative, nil
+	case EngineBlinkless:
+		return EngineBlinkless, nil
+	default:
+		return "", fmt.Errorf("%w: %q", ErrInvalidEngine, value)
+	}
+}
+
 // ParsePDFProfile validates and normalizes a PDF conformance profile string.
 // Accepted values map to canonical constants: ProfilePDFA3aPDFUA1,
 // ProfilePDFA3a, ProfilePDFUA1, ProfilePDFA4PDFUA2, ProfilePDFA4,
@@ -438,6 +466,9 @@ type PdfGlobal struct {
 	// PdfProfile is the PDF conformance profile to emit (e.g. "a3a-ua1", "PDF/A-3a+PDF/UA-1", "a3a", "ua1").
 	// Empty string indicates standard unconstrained (unclaimed) PDF.
 	PdfProfile string
+	// Engine selects the body layout engine (settings.EngineNative,
+	// settings.EngineBlinkless). ParseEngine validates and normalizes it.
+	Engine string
 	// Grayscale is the sole color control convert reads (doc.SetGrayscale).
 	// Set("colormode") / Set("grayscale") both write this field.
 	Grayscale    bool
@@ -480,6 +511,7 @@ func DefaultPdfGlobal() PdfGlobal {
 		Orientation:    OrientationPortrait,
 		PdfVersion:     "",
 		PdfProfile:     "",
+		Engine:         EngineNative,
 		Copies:         1,
 		Collate:        true,
 		Outline:        true,

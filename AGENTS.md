@@ -314,11 +314,13 @@ PR bodies live in `plans/PR/`. Phase checklist format comes from
 
 ## Dependency policy
 
-Exactly two direct dependencies are allowed (`go-text/typesetting` for text
-shaping, `tdewolff/canvas` for SVG rasterization), and the allowlist is
-enforced by a test. Any dependency addition is a project-policy change:
-announce its purpose, amend the Makefile allowlist, update the affected
-plan, and get explicit user sign-off. No silent additions.
+Exactly three direct dependencies are allowed (`go-text/typesetting` for text
+shaping, `tdewolff/canvas` for SVG rasterization, `chinmay-sawant/blinkless`
+for `--engine blinkless`, pinned by a local `replace` to `../blinkless`), and
+the allowlist is enforced by a test. Any dependency addition is a
+project-policy change: announce its purpose, amend the Makefile allowlist,
+update the affected plan, and get explicit user sign-off. No silent
+additions.
 
 ---
 

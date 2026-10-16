@@ -5,18 +5,25 @@ go 1.26
 toolchain go1.26.4
 
 require (
+	github.com/chinmay-sawant/blinkless v0.0.0-00010101000000-000000000000
 	github.com/go-text/typesetting v0.3.4
 	github.com/tdewolff/canvas v0.0.0-20260803134256-8e86b9abb917
 )
 
+// Local sibling checkout: the blinkless layout engine is developed next to
+// this repository and is not required from the module proxy. CI images must
+// check out blinkless at this relative path, or drop this replace and pin a
+// published version.
+replace github.com/chinmay-sawant/blinkless => ../blinkless
+
 require (
+	github.com/andybalholm/brotli v1.2.1 // indirect
 	codeberg.org/go-pdf/fpdf v0.11.1 // indirect
 	github.com/BurntSushi/freetype-go v0.0.0-20160129220410-b763ddbfe298 // indirect
 	github.com/BurntSushi/graphics-go v0.0.0-20160129215708-b43f31a4a966 // indirect
 	github.com/BurntSushi/xgb v0.0.0-20210121224620-deaf085860bc // indirect
 	github.com/BurntSushi/xgbutil v0.0.0-20190907113008-ad855c713046 // indirect
 	github.com/ByteArena/poly2tri-go v0.0.0-20170716161910-d102ad91854f // indirect
-	github.com/andybalholm/brotli v1.2.1 // indirect
 	github.com/benoitkugler/textlayout v0.3.2 // indirect
 	github.com/benoitkugler/textprocessing v0.0.6 // indirect
 	github.com/go-fonts/latin-modern v0.3.3 // indirect

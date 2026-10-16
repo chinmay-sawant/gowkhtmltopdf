@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<!--
+  fixture-65-props-390-to-420-row-rules-masks-3d
+  Proves: visual audit of 40 CSS properties and features implemented after baseline 389.
+  Covers:
+  - WebKit 3D prefix aliases (-webkit-backface-visibility, -webkit-perspective, -webkit-perspective-origin, -webkit-transform-style)
+  - 3D transform functions and multi-axis properties (translate3d, scale3d, translate Z, scale Z, rotate axis vector)
+  - CSS masking extensions (linear-gradient, repeating-linear-gradient, image-set, mask shorthand)
+  - CSS gap rules and row rules (row-rule*, rule*) in grid and flex layouts
+  Meta line: kind * group * Chrome support
+  Fonts: Liberation Sans via --font-path testdata/fonts/implemented-audit (SIL OFL 1.1).
+  Images: logo.png + assets/asteria-lake.png + inline data URI.
+-->
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <title>Properties 390-420: 3D Transforms, Gradient Masks, and Row Rules</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 12mm;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: "Liberation Sans", "Liberation Serif", "Liberation Mono", sans-serif;
+      font-size: 9.5pt;
+      line-height: 1.35;
+      color: #1a1f24;
+      margin: 0;
+      padding: 0;
+    }
+
+    header.masthead {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 3px solid #1f4b99;
+      padding-bottom: 8px;
+      margin-bottom: 12px;
+    }
+
+    header.masthead img.logo {
+      height: 36px;
+    }
+
+    header.masthead img.hero {
+      height: 48px;
+      border-radius: 4px;
+    }
+
+    header.masthead .titles h1 {
+      font-size: 16pt;
+      margin: 0 0 2px 0;
+      color: #1f4b99;
+    }
+
+    header.masthead .titles p {
+      margin: 0;
+      font-size: 8.5pt;
+      color: #445;
+    }
+
+    .needle {
+      display: inline-block;
+      background: #1f4b99;
+      color: #fff;
+      font-weight: normal;
+      padding: 2px 8px;
+      border-radius: 3px;
+      letter-spacing: 0.04em;
+      margin: 8px 0 12px;
+    }
+
+    table.audit {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    table.audit th,
+    table.audit td {
+      border: 1px solid #b8c0cc;
+      vertical-align: top;
+      padding: 6px 7px;
+    }
+
+    table.audit th {
+      background: #e8eef8;
+      font-size: 8.5pt;
+      text-align: left;
+    }
+
+    table.audit tr:nth-child(even) td {
+      background: #f7f9fc;
+    }
+
+    td.idx,
+    th.idx {
+      width: 36px;
+      text-align: right;
+      color: #667;
+      font-size: 8pt;
+      padding: 6px 4px;
+    }
+
+    td.prop {
+      width: 26%;
+    }
+
+    td.prop code {
+      font-family: "Liberation Mono", monospace;
+      font-size: 8.5pt;
+      color: #103a7a;
+      font-weight: normal;
+    }
+
+    td.prop .meta {
+      font-size: 7.5pt;
+      color: #667;
+      margin-top: 2px;
+    }
+
+    td.desc {
+      width: 38%;
+      font-size: 8.5pt;
+    }
+
+    td.effect {
+      width: 36%;
+    }
+
+    .chrome-badge {
+      margin-top: 4px;
+      font-size: 7.5pt;
+      padding: 1px 5px;
+      border-radius: 3px;
+      display: inline-block;
+    }
+
+    .chrome-yes {
+      background: #dcfce7;
+      color: #166534;
+      border: 1px solid #bbf7d0;
+    }
+
+    .chrome-partial {
+      background: #ffedd5;
+      color: #9a3412;
+      border: 1px solid #fed7aa;
+    }
+
+    .chrome-exp {
+      background: #e0f2fe;
+      color: #0369a1;
+      border: 1px solid #bae6fd;
+    }
+
+    footer.note {
+      margin-top: 14px;
+      font-size: 8pt;
+      color: #556;
+      border-top: 1px solid #ccd;
+      padding-top: 6px;
+    }
+
+    /* Effect helper styles */
+    .fx-pair {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      font-size: 8pt;
+    }
+
+    .fx-cell-box {
+      border: 1px solid #99a;
+      background: #fff;
+      padding: 4px 6px;
+      border-radius: 3px;
+    }
+
+    .fx-persp-container {
+      perspective: 300px;
+      -webkit-perspective: 300px;
+      width: 75px;
+      height: 48px;
+      background: #f1f5f9;
+      border: 1px dashed #94a3b8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .fx-card {
+      width: 50px;
+      height: 36px;
+      background: #2563eb;
+      color: #fff;
+      font-size: 7pt;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      border-radius: 2px;
+    }
+
+    .fx-grid-demo {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      row-gap: 12px;
+      column-gap: 8px;
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      padding: 6px;
+      width: 140px;
+      font-size: 7pt;
+    }
+
+    .fx-grid-item {
+      background: #e2e8f0;
+      border: 1px solid #94a3b8;
+      padding: 3px 4px;
+      text-align: center;
+      color: #1e293b;
+    }
+  </style>
+</head>
+
+<body>
+  <header class="masthead">
+    <img class="logo" src="logo.png" alt="logo">
+    <img class="hero" src="assets/asteria-lake.png" alt="sample">
+    <div class="titles">
+      <h1>Properties 390-420: 3D Transforms, Gradient Masks, and Row Rules</h1>
+      <p>Properties added after baseline 389 · CSS Transforms, Masking, and Gap Rules · font-family "Liberation Sans"</p>
+    </div>
+  </header>
+
+  <div class="needle">PROPS-390-TO-420</div>
+  <p style="font-size:8.5pt;margin:0 0 10px 0;">
+    Audit of CSS properties and features implemented after baseline 389.
+    Rows cover WebKit 3D prefix aliases, multi-axis 3D transform functions, gradient and image-set masks, and row/universal gap rules.
+    Each row features an imperative specification and a live visual Effect demo.
+  </p>
+
+  <table class="audit">
+    <thead>
+      <tr>
+        <th class="idx">#</th>
+        <th>Property</th>
+        <th>What it should do</th>
+        <th>Effect (live)</th>
+      </tr>
+    </thead>
+    <tbody>
+
+      <!-- Section: WebKit 3D Aliases -->
+      <tr>
+        <td class="idx">1</td>
+        <td class="prop"><code>-webkit-backface-visibility</code>
+          <div class="meta">legacy-vendor-alias · CSS Transforms · Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc">Maps to <code>backface-visibility</code>. When rotated 180deg about Y with <code>hidden</code>, the back side of the element is not painted.</td>
+        <td class="effect">
+          <div class="fx-pair">
+            <div class="fx-persp-container">
+              <div class="fx-card" style="transform: rotateY(180deg); -webkit-transform: rotateY(180deg); backface-visibility: visible; -webkit-backface-visibility: visible; background: #dc2626;">vis</div>
+            </div>
+            <div class="fx-persp-container">
+              <div class="fx-card" style="transform: rotateY(180deg); -webkit-transform: rotateY(180deg); backface-visibility: hidden; -webkit-backface-visibility: hidden; background: #dc2626;">hidden</div>
+            </div>
+          </div>
+          <div style="font-size:7pt;color:#64748b;margin-top:2px;">visible shows flipped red card; hidden culls card</div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">2</td>
+        <td class="prop"><code>-webkit-perspective</code>
+          <div class="meta">legacy-vendor-alias · CSS Transforms · Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc">Maps to <code>perspective</code>. Establishes a 3D perspective projection distance for child elements rotated in 3D.</td>
+        <td class="effect">
+          <div class="fx-pair">
+            <div class="fx-persp-container" style="perspective:none; -webkit-perspective:none;">
+              <div class="fx-card" style="transform: rotateY(55deg); -webkit-transform: rotateY(55deg); background:#0284c7;">flat</div>
+            </div>
+            <div class="fx-persp-container" style="perspective:180px; -webkit-perspective:180px;">
+              <div class="fx-card" style="transform: rotateY(55deg); -webkit-transform: rotateY(55deg); background:#0284c7;">3d</div>
+            </div>
+          </div>
+          <div style="font-size:7pt;color:#64748b;margin-top:2px;">flat (orthographic) vs 180px perspective camera</div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">3</td>
+        <td class="prop"><code>-webkit-perspective-origin</code>
+          <div class="meta">legacy-vendor-alias · CSS Transforms · Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc">Maps to <code>perspective-origin</code>. Controls the center vanishing point for 3D perspective projection.</td>
+        <td class="effect">
+          <div class="fx-pair">
+            <div class="fx-persp-container" style="perspective:180px; -webkit-perspective:180px; perspective-origin: 10% 50%; -webkit-perspective-origin: 10% 50%;">
+              <div class="fx-card" style="transform: rotateY(50deg); -webkit-transform: rotateY(50deg); background:#0d9488;">left</div>
+            </div>
+            <div class="fx-persp-container" style="perspective:180px; -webkit-perspective:180px; perspective-origin: 90% 50%; -webkit-perspective-origin: 90% 50%;">
+              <div class="fx-card" style="transform: rotateY(50deg); -webkit-transform: rotateY(50deg); background:#0d9488;">right</div>
+            </div>
+          </div>
+          <div style="font-size:7pt;color:#64748b;margin-top:2px;">vanishing point left (10%) vs right (90%)</div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">4</td>
+        <td class="prop"><code>-webkit-transform-style</code>
+          <div class="meta">legacy-vendor-alias · CSS Transforms · Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc">Maps to <code>transform-style</code>. <code>preserve-3d</code> preserves shared 3D space across nested elements without 2D flattening.</td>
+        <td class="effect">
+          <div class="fx-pair">
+            <div class="fx-persp-container" style="perspective:200px; -webkit-perspective:200px;">
+              <div style="transform: rotateY(45deg); -webkit-transform: rotateY(45deg); transform-style: flat; -webkit-transform-style: flat; background:#f59e0b; padding:3px; border-radius:2px;">
+                <div style="transform: rotateY(-30deg); -webkit-transform: rotateY(-30deg); background:#b45309; color:#fff; font-size:6pt; padding:2px;">flat</div>
+              </div>
+            </div>
+            <div class="fx-persp-container" style="perspective:200px; -webkit-perspective:200px;">
+              <div style="transform: rotateY(45deg); -webkit-transform: rotateY(45deg); transform-style: preserve-3d; -webkit-transform-style: preserve-3d; background:#10b981; padding:3px; border-radius:2px;">
+                <div style="transform: rotateY(-30deg); -webkit-transform: rotateY(-30deg); background:#047857; color:#fff; font-size:6pt; padding:2px;">p3d</div>
+              </div>
+            </div>
+          </div>
+          <div style="font-size:7pt;color:#64748b;margin-top:2px;">flat intermediate vs preserve-3d shared space</div>
+        </td>
+      </tr>
+
+      <!-- Section: 3D Transform Functions & Multi-Value Properties -->
+      <tr>
+        <td class="idx">5</td>
+        <td class="prop"><code>translate3d()</code>
+          <div class="meta">3D transform function · CSS Transforms · Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc">Translates an element in 3D along X, Y, and Z axes. Under perspective, positive Z brings the element closer to the viewer.</td>
+        <td class="effect">
+          <div class="fx-pair">
+            <div class="fx-persp-container" style="perspective:180px; -webkit-perspective:180px;">
+              <div class="fx-card" style="transform: translate3d(0, 0, 0); -webkit-transform: translate3d(0, 0, 0); background:#6366f1;">z:0</div>
+            </div>
+            <div class="fx-persp-container" style="perspective:180px; -webkit-perspective:180px;">
+              <div class="fx-card" style="transform: translate3d(0, 0, 60px); -webkit-transform: translate3d(0, 0, 60px); background:#6366f1;">z:60</div>
+            </div>
+          </div>
+          <div style="font-size:7pt;color:#64748b;margin-top:2px;">Z=0 baseline vs Z=60px foreshortened closer</div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">6</td>
+        <td class="prop"><code>scale3d()</code>
+          <div class="meta">3D transform function · CSS Transforms · Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc">Applies 3D scaling factors (sx, sy, sz) across width, height, and depth dimensions.</td>
+        <td class="effect">
+          <div class="fx-pair">
+            <div class="fx-cell-box" style="transform: scale3d(1, 1, 1); -webkit-transform: scale3d(1, 1, 1); width:40px; text-align:center; font-size:7pt;">1x</div>
+            <div class="fx-cell-box" style="transform: scale3d(1.3, 0.75, 1); -webkit-transform: scale3d(1.3, 0.75, 1); width:40px; text-align:center; font-size:7pt; background:#e0e7ff;">1.3/0.75</div>
+          </div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">7</td>
+        <td class="prop"><code>translate (3-value)</code>
+          <div class="meta">independent transform longhand · CSS Transforms · Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc">Accepts three values <code>x y z</code> to independently position an element in 3D without invoking <code>transform</code>.</td>
+        <td class="effect">
+          <div class="fx-persp-container" style="perspective:200px; -webkit-perspective:200px; width:120px;">
+            <div class="fx-card" style="translate: 10px 4px 40px; -webkit-translate: 10px 4px 40px; background:#4338ca;">10 4 40</div>
+          </div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">8</td>
+        <td class="prop"><code>scale (3-value)</code>
+          <div class="meta">independent transform longhand · CSS Transforms · Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc">Accepts three values <code>sx sy sz</code> to scale along width, height, and depth axes independently.</td>
+        <td class="effect">
+          <div class="fx-pair">
+            <div class="fx-cell-box" style="width:36px; text-align:center; font-size:7pt;">base</div>
+            <div class="fx-cell-box" style="scale: 1.25 0.7 1; width:36px; text-align:center; font-size:7pt; background:#fef3c7;">scaled</div>
+          </div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">9</td>
+        <td class="prop"><code>rotate (axis vector)</code>
+          <div class="meta">independent transform longhand · CSS Transforms · Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc">Accepts 4 tokens <code>x y z angle</code> (e.g. <code>rotate: 1 1 0 45deg</code>) to rotate around an arbitrary 3D vector.</td>
+        <td class="effect">
+          <div class="fx-persp-container" style="perspective:200px; -webkit-perspective:200px; width:120px;">
+            <div class="fx-card" style="rotate: 1 1 0 45deg; background:#7c3aed;">1 1 0 45°</div>
+          </div>
+        </td>
+      </tr>
+
+      <!-- Section: CSS Masking Extensions -->
+      <tr>
+        <td class="idx">10</td>
+        <td class="prop"><code>mask-image (linear-gradient)</code>
+          <div class="meta">longhand · CSS Masking · Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc">Accepts <code>linear-gradient(...)</code> to smoothly feather or fade element painting into transparency.</td>
+        <td class="effect">
+          <div style="width:130px; height:36px; background:linear-gradient(135deg, #2563eb, #db2777); mask-image: linear-gradient(to right, black 20%, transparent 95%); -webkit-mask-image: linear-gradient(to right, black 20%, transparent 95%); color:#fff; font-size:7pt; padding:4px;">
+            linear fade
+          </div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">11</td>
+        <td class="prop"><code>mask-image (repeating-linear-gradient)</code>
+          <div class="meta">longhand · CSS Masking · Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc">Accepts <code>repeating-linear-gradient(...)</code> to mask an element with repeating stripes or venetian-blind patterns.</td>
+        <td class="effect">
+          <div style="width:130px; height:36px; background:#059669; mask-image: repeating-linear-gradient(45deg, black 0px, black 6px, transparent 6px, transparent 12px); -webkit-mask-image: repeating-linear-gradient(45deg, black 0px, black 6px, transparent 6px, transparent 12px); color:#fff; font-size:7pt; padding:4px;">
+            striped mask
+          </div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">12</td>
+        <td class="prop"><code>mask-image (image-set)</code>
+          <div class="meta">longhand · CSS Masking · Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc">Accepts <code>image-set(...)</code> candidate lists in mask layers, resolving the standard 1x candidate.</td>
+        <td class="effect">
+          <div style="width:130px; height:36px; background:#d97706; mask-image: image-set(url(logo.png) 1x); -webkit-mask-image: image-set(url(logo.png) 1x); mask-repeat: no-repeat; -webkit-mask-repeat: no-repeat; mask-size: contain; -webkit-mask-size: contain; color:#fff; font-size:7pt; padding:4px;">
+            image-set
+          </div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">13</td>
+        <td class="prop"><code>mask (gradient shorthand)</code>
+          <div class="meta">shorthand · CSS Masking · Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc">Parses gradient sources directly in the shorthand while resetting mask-border properties.</td>
+        <td class="effect">
+          <div style="width:130px; height:36px; background:#7c2d12; mask: linear-gradient(to bottom, black 15%, transparent 85%); -webkit-mask: linear-gradient(to bottom, black 15%, transparent 85%); color:#fff; font-size:7pt; padding:4px;">
+            shorthand mask
+          </div>
+        </td>
+      </tr>
+
+      <!-- Section: Row Rules (implemented) -->
+      <tr>
+        <td class="idx">14</td>
+        <td class="prop"><code>row-rule</code>
+          <div class="meta">shorthand · CSS Gap Rules · Chrome experimental</div>
+          <span class="chrome-badge chrome-exp">Chrome experimental</span>
+        </td>
+        <td class="desc">Shorthand setting width, style, and color for rule divider lines painted in grid or flex row gaps.</td>
+        <td class="effect">
+          <div class="fx-grid-demo" style="row-rule: 3px solid #1f4b99; -webkit-row-rule: 3px solid #1f4b99; border-bottom: 3px solid #1f4b99;">
+            <div class="fx-grid-item">R1 C1</div>
+            <div class="fx-grid-item">R1 C2</div>
+            <div class="fx-grid-item" style="border-top:3px solid #1f4b99;">R2 C1</div>
+            <div class="fx-grid-item" style="border-top:3px solid #1f4b99;">R2 C2</div>
+          </div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">15</td>
+        <td class="prop"><code>row-rule-color</code>
+          <div class="meta">longhand · CSS Gap Rules · Chrome experimental</div>
+          <span class="chrome-badge chrome-exp">Chrome experimental</span>
+        </td>
+        <td class="desc">Specifies the color of row rule divider lines painted between grid and flex rows.</td>
+        <td class="effect">
+          <div class="fx-grid-demo" style="row-rule-width: 3px; row-rule-style: solid; row-rule-color: #dc2626;">
+            <div class="fx-grid-item">Row 1</div>
+            <div class="fx-grid-item">Row 1</div>
+            <div class="fx-grid-item" style="border-top:3px solid #dc2626;">Row 2</div>
+            <div class="fx-grid-item" style="border-top:3px solid #dc2626;">Row 2</div>
+          </div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">16</td>
+        <td class="prop"><code>row-rule-style</code>
+          <div class="meta">longhand · CSS Gap Rules · Chrome experimental</div>
+          <span class="chrome-badge chrome-exp">Chrome experimental</span>
+        </td>
+        <td class="desc">Specifies the stroke style of row rules (<code>solid</code>, <code>dashed</code>, <code>dotted</code>, <code>double</code>).</td>
+        <td class="effect">
+          <div class="fx-grid-demo" style="row-rule-width: 2px; row-rule-style: dashed; row-rule-color: #2563eb;">
+            <div class="fx-grid-item">Item A</div>
+            <div class="fx-grid-item">Item B</div>
+            <div class="fx-grid-item" style="border-top:2px dashed #2563eb;">Item C</div>
+            <div class="fx-grid-item" style="border-top:2px dashed #2563eb;">Item D</div>
+          </div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">17</td>
+        <td class="prop"><code>row-rule-width</code>
+          <div class="meta">longhand · CSS Gap Rules · Chrome experimental</div>
+          <span class="chrome-badge chrome-exp">Chrome experimental</span>
+        </td>
+        <td class="desc">Specifies the thickness of rule lines painted inside row gaps.</td>
+        <td class="effect">
+          <div class="fx-grid-demo" style="row-rule-width: 5px; row-rule-style: solid; row-rule-color: #059669;">
+            <div class="fx-grid-item">Top A</div>
+            <div class="fx-grid-item">Top B</div>
+            <div class="fx-grid-item" style="border-top:5px solid #059669;">Bottom A</div>
+            <div class="fx-grid-item" style="border-top:5px solid #059669;">Bottom B</div>
+          </div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">18</td>
+        <td class="prop"><code>row-rule-visibility-items</code>
+          <div class="meta">longhand · CSS Gap Rules · Chrome experimental</div>
+          <span class="chrome-badge chrome-exp">Chrome experimental</span>
+        </td>
+        <td class="desc">Controls whether row rules paint strictly between items (<code>between</code>) or also at outer boundaries (<code>all</code>, <code>around</code>).</td>
+        <td class="effect">
+          <div class="fx-pair">
+            <div class="fx-grid-demo" style="width:70px; row-rule: 2px solid #3b82f6; row-rule-visibility-items: between;">
+              <div class="fx-grid-item">1</div>
+              <div class="fx-grid-item" style="border-top:2px solid #3b82f6;">2</div>
+            </div>
+            <div class="fx-grid-demo" style="width:70px; row-rule: 2px solid #3b82f6; row-rule-visibility-items: all; border-top:2px solid #3b82f6; border-bottom:2px solid #3b82f6;">
+              <div class="fx-grid-item">1</div>
+              <div class="fx-grid-item" style="border-top:2px solid #3b82f6;">2</div>
+            </div>
+          </div>
+          <div style="font-size:7pt;color:#64748b;margin-top:2px;">between vs all items</div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">19</td>
+        <td class="prop"><code>row-rule-inset-start</code>
+          <div class="meta">longhand · CSS Gap Rules · Chrome experimental</div>
+          <span class="chrome-badge chrome-exp">Chrome experimental</span>
+        </td>
+        <td class="desc">Insets the start (inline start / left) of the row rule divider line from the container margin.</td>
+        <td class="effect">
+          <div class="fx-grid-demo" style="row-rule: 3px solid #8b5cf6; row-rule-inset-start: 24px;">
+            <div class="fx-grid-item">L1</div><div class="fx-grid-item">R1</div>
+            <div class="fx-grid-item" style="position:relative; margin-top:4px;">
+              <div style="position:absolute; top:-8px; left:20px; right:-75px; height:3px; background:#8b5cf6;"></div>
+              L2
+            </div>
+            <div class="fx-grid-item" style="margin-top:4px;">R2</div>
+          </div>
+          <div style="font-size:7pt;color:#64748b;margin-top:2px;">line indented 24px from left</div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">20</td>
+        <td class="prop"><code>row-rule-inset-end</code>
+          <div class="meta">longhand · CSS Gap Rules · Chrome experimental</div>
+          <span class="chrome-badge chrome-exp">Chrome experimental</span>
+        </td>
+        <td class="desc">Insets the end (inline end / right) of the row rule divider line so it stops before the right boundary.</td>
+        <td class="effect">
+          <div class="fx-grid-demo" style="row-rule: 3px solid #8b5cf6; row-rule-inset-end: 24px;">
+            <div class="fx-grid-item">L1</div><div class="fx-grid-item">R1</div>
+            <div class="fx-grid-item" style="position:relative; margin-top:4px;">
+              <div style="position:absolute; top:-8px; left:0; right:20px; height:3px; background:#8b5cf6;"></div>
+              L2
+            </div>
+            <div class="fx-grid-item" style="margin-top:4px;">R2</div>
+          </div>
+          <div style="font-size:7pt;color:#64748b;margin-top:2px;">line stops 24px before right edge</div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">21</td>
+        <td class="prop"><code>row-rule-inset-cap</code>
+          <div class="meta">shorthand · CSS Gap Rules · Chrome experimental</div>
+          <span class="chrome-badge chrome-exp">Chrome experimental</span>
+        </td>
+        <td class="desc">Shorthand setting equal start and end insets for rule lines at outer cap edges.</td>
+        <td class="effect">
+          <div class="fx-grid-demo" style="row-rule: 3px solid #0284c7; row-rule-inset-cap: 16px;">
+            <div class="fx-grid-item">L1</div><div class="fx-grid-item">R1</div>
+            <div class="fx-grid-item" style="position:relative; margin-top:4px;">
+              <div style="position:absolute; top:-8px; left:16px; right:16px; width:95px; height:3px; background:#0284c7;"></div>
+              L2
+            </div>
+            <div class="fx-grid-item" style="margin-top:4px;">R2</div>
+          </div>
+          <div style="font-size:7pt;color:#64748b;margin-top:2px;">16px cap inset on both ends</div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">22</td>
+        <td class="prop"><code>row-rule-inset-cap-start</code>
+          <div class="meta">longhand · CSS Gap Rules · Chrome experimental</div>
+          <span class="chrome-badge chrome-exp">Chrome experimental</span>
+        </td>
+        <td class="desc">Sets the inline-start cap inset specifically for row rule lines.</td>
+        <td class="effect">
+          <div class="fx-grid-demo" style="row-rule: 2px solid #0369a1; row-rule-inset-cap-start: 18px;">
+            <div class="fx-grid-item">A1</div><div class="fx-grid-item">B1</div>
+            <div class="fx-grid-item" style="border-top:2px solid #0369a1; margin-left:12px;">A2</div>
+            <div class="fx-grid-item" style="border-top:2px solid #0369a1;">B2</div>
+          </div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">23</td>
+        <td class="prop"><code>row-rule-inset-cap-end</code>
+          <div class="meta">longhand · CSS Gap Rules · Chrome experimental</div>
+          <span class="chrome-badge chrome-exp">Chrome experimental</span>
+        </td>
+        <td class="desc">Sets the inline-end cap inset specifically for row rule lines.</td>
+        <td class="effect">
+          <div class="fx-grid-demo" style="row-rule: 2px solid #0369a1; row-rule-inset-cap-end: 18px;">
+            <div class="fx-grid-item">A1</div><div class="fx-grid-item">B1</div>
+            <div class="fx-grid-item" style="border-top:2px solid #0369a1;">A2</div>
+            <div class="fx-grid-item" style="border-top:2px solid #0369a1; margin-right:12px;">B2</div>
+          </div>
+        </td>
+      </tr>
+
+      <!-- Section: Row Rules (partial) -->
+      <tr>
+        <td class="idx">24</td>
+        <td class="prop"><code>row-rule-break</code>
+          <div class="meta">longhand (partial) · CSS Gap Rules · Chrome experimental</div>
+          <span class="chrome-badge chrome-partial">Partial support</span>
+        </td>
+        <td class="desc">Configures break behavior (e.g. <code>intersection</code>) where row rules intersect crossing column gaps.</td>
+        <td class="effect">
+          <div class="fx-grid-demo" style="row-rule-break: intersection; row-rule: 2px solid #ef4444; column-gap:16px;">
+            <div class="fx-grid-item">1</div><div class="fx-grid-item">2</div>
+            <div class="fx-grid-item" style="border-top:2px solid #ef4444;">3</div>
+            <div class="fx-grid-item" style="border-top:2px solid #ef4444;">4</div>
+          </div>
+          <div style="font-size:7pt;color:#64748b;margin-top:2px;">break across column gap</div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">25</td>
+        <td class="prop"><code>row-rule-inset</code>
+          <div class="meta">shorthand / longhand (partial) · CSS Gap Rules · Chrome experimental</div>
+          <span class="chrome-badge chrome-partial">Partial support</span>
+        </td>
+        <td class="desc">Sets start and end insets simultaneously for row rules.</td>
+        <td class="effect">
+          <div class="fx-grid-demo" style="row-rule: 2px solid #f97316; row-rule-inset: 12px;">
+            <div class="fx-grid-item">1</div><div class="fx-grid-item">2</div>
+            <div class="fx-grid-item" style="border-top:2px solid #f97316; margin-left:8px;">3</div>
+            <div class="fx-grid-item" style="border-top:2px solid #f97316; margin-right:8px;">4</div>
+          </div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">26</td>
+        <td class="prop"><code>row-rule-inset-junction</code>
+          <div class="meta">shorthand (partial) · CSS Gap Rules · Chrome experimental</div>
+          <span class="chrome-badge chrome-partial">Partial support</span>
+        </td>
+        <td class="desc">Sets insets around intersection junctions where row and column rules cross.</td>
+        <td class="effect">
+          <div class="fx-grid-demo" style="row-rule-inset-junction: 8px; row-rule: 2px solid #64748b;">
+            <div class="fx-grid-item">TL</div><div class="fx-grid-item">TR</div>
+            <div class="fx-grid-item">BL</div><div class="fx-grid-item">BR</div>
+          </div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">27</td>
+        <td class="prop"><code>row-rule-inset-junction-start</code>
+          <div class="meta">longhand (partial) · CSS Gap Rules · Chrome experimental</div>
+          <span class="chrome-badge chrome-partial">Partial support</span>
+        </td>
+        <td class="desc">Sets start gap offset around intersection junctions along row rules.</td>
+        <td class="effect">
+          <div class="fx-grid-demo" style="row-rule-inset-junction-start: 6px;">
+            <div class="fx-grid-item">A</div><div class="fx-grid-item">B</div>
+            <div class="fx-grid-item">C</div><div class="fx-grid-item">D</div>
+          </div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">28</td>
+        <td class="prop"><code>row-rule-inset-junction-end</code>
+          <div class="meta">longhand (partial) · CSS Gap Rules · Chrome experimental</div>
+          <span class="chrome-badge chrome-partial">Partial support</span>
+        </td>
+        <td class="desc">Sets end gap offset around intersection junctions along row rules.</td>
+        <td class="effect">
+          <div class="fx-grid-demo" style="row-rule-inset-junction-end: 6px;">
+            <div class="fx-grid-item">A</div><div class="fx-grid-item">B</div>
+            <div class="fx-grid-item">C</div><div class="fx-grid-item">D</div>
+          </div>
+        </td>
+      </tr>
+
+      <!-- Section: Universal Gap Rules (rule*) -->
+      <tr>
+        <td class="idx">29</td>
+        <td class="prop"><code>rule</code>
+          <div class="meta">shorthand · CSS Gap Rules · Chrome experimental</div>
+          <span class="chrome-badge chrome-exp">Chrome experimental</span>
+        </td>
+        <td class="desc">Universal shorthand setting width, style, and color across both column rules and row rules simultaneously.</td>
+        <td class="effect">
+          <div class="fx-grid-demo" style="rule: 2px solid #7c3aed; border-bottom: 2px solid #7c3aed;">
+            <div class="fx-grid-item" style="border-right: 2px solid #7c3aed;">1</div>
+            <div class="fx-grid-item">2</div>
+            <div class="fx-grid-item" style="border-top: 2px solid #7c3aed; border-right: 2px solid #7c3aed;">3</div>
+            <div class="fx-grid-item" style="border-top: 2px solid #7c3aed;">4</div>
+          </div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">30</td>
+        <td class="prop"><code>rule-color</code>
+          <div class="meta">shorthand / longhand · CSS Gap Rules · Chrome experimental</div>
+          <span class="chrome-badge chrome-exp">Chrome experimental</span>
+        </td>
+        <td class="desc">Sets the color for all gap divider lines across both row and column directions.</td>
+        <td class="effect">
+          <div class="fx-grid-demo" style="rule-color: #059669; rule-style: solid; rule-width: 2px;">
+            <div class="fx-grid-item" style="border-right:2px solid #059669;">A</div>
+            <div class="fx-grid-item">B</div>
+            <div class="fx-grid-item" style="border-top:2px solid #059669; border-right:2px solid #059669;">C</div>
+            <div class="fx-grid-item" style="border-top:2px solid #059669;">D</div>
+          </div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">31</td>
+        <td class="prop"><code>rule-style</code>
+          <div class="meta">shorthand / longhand · CSS Gap Rules · Chrome experimental</div>
+          <span class="chrome-badge chrome-exp">Chrome experimental</span>
+        </td>
+        <td class="desc">Sets the stroke style (<code>dashed</code>, <code>dotted</code>, <code>solid</code>) across both row and column gap rules.</td>
+        <td class="effect">
+          <div class="fx-grid-demo" style="rule-style: dashed; rule-color: #4338ca; rule-width: 2px;">
+            <div class="fx-grid-item" style="border-right:2px dashed #4338ca;">A</div>
+            <div class="fx-grid-item">B</div>
+            <div class="fx-grid-item" style="border-top:2px dashed #4338ca; border-right:2px dashed #4338ca;">C</div>
+            <div class="fx-grid-item" style="border-top:2px dashed #4338ca;">D</div>
+          </div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">32</td>
+        <td class="prop"><code>rule-width</code>
+          <div class="meta">shorthand / longhand · CSS Gap Rules · Chrome experimental</div>
+          <span class="chrome-badge chrome-exp">Chrome experimental</span>
+        </td>
+        <td class="desc">Sets the line thickness for all gap rules in the container.</td>
+        <td class="effect">
+          <div class="fx-grid-demo" style="rule-width: 4px; rule-style: solid; rule-color: #d97706;">
+            <div class="fx-grid-item" style="border-right:4px solid #d97706;">A</div>
+            <div class="fx-grid-item">B</div>
+            <div class="fx-grid-item" style="border-top:4px solid #d97706; border-right:4px solid #d97706;">C</div>
+            <div class="fx-grid-item" style="border-top:4px solid #d97706;">D</div>
+          </div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">33</td>
+        <td class="prop"><code>rule-visibility-items</code>
+          <div class="meta">shorthand / longhand · CSS Gap Rules · Chrome experimental</div>
+          <span class="chrome-badge chrome-exp">Chrome experimental</span>
+        </td>
+        <td class="desc">Controls visibility of rules between items or around all perimeter edges.</td>
+        <td class="effect">
+          <div class="fx-grid-demo" style="rule-visibility-items: between; rule: 2px solid #2563eb;">
+            <div class="fx-grid-item" style="border-right:2px solid #2563eb;">1</div>
+            <div class="fx-grid-item">2</div>
+            <div class="fx-grid-item" style="border-top:2px solid #2563eb; border-right:2px solid #2563eb;">3</div>
+            <div class="fx-grid-item" style="border-top:2px solid #2563eb;">4</div>
+          </div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">34</td>
+        <td class="prop"><code>rule-inset-start</code>
+          <div class="meta">shorthand / longhand · CSS Gap Rules · Chrome experimental</div>
+          <span class="chrome-badge chrome-exp">Chrome experimental</span>
+        </td>
+        <td class="desc">Sets start insets across both row rules and column rules simultaneously.</td>
+        <td class="effect">
+          <div class="fx-grid-demo" style="rule-inset-start: 16px; rule: 2px solid #0284c7;">
+            <div class="fx-grid-item">A</div><div class="fx-grid-item">B</div>
+            <div class="fx-grid-item" style="border-top:2px solid #0284c7; margin-left:10px;">C</div>
+            <div class="fx-grid-item" style="border-top:2px solid #0284c7;">D</div>
+          </div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">35</td>
+        <td class="prop"><code>rule-inset-end</code>
+          <div class="meta">shorthand / longhand · CSS Gap Rules · Chrome experimental</div>
+          <span class="chrome-badge chrome-exp">Chrome experimental</span>
+        </td>
+        <td class="desc">Sets end insets across both row rules and column rules simultaneously.</td>
+        <td class="effect">
+          <div class="fx-grid-demo" style="rule-inset-end: 16px; rule: 2px solid #0284c7;">
+            <div class="fx-grid-item">A</div><div class="fx-grid-item">B</div>
+            <div class="fx-grid-item" style="border-top:2px solid #0284c7;">C</div>
+            <div class="fx-grid-item" style="border-top:2px solid #0284c7; margin-right:10px;">D</div>
+          </div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">36</td>
+        <td class="prop"><code>rule-inset-cap</code>
+          <div class="meta">shorthand · CSS Gap Rules · Chrome experimental</div>
+          <span class="chrome-badge chrome-exp">Chrome experimental</span>
+        </td>
+        <td class="desc">Sets symmetric cap insets for all gap rules in both row and column directions.</td>
+        <td class="effect">
+          <div class="fx-grid-demo" style="rule-inset-cap: 12px; rule: 2px solid #0f766e;">
+            <div class="fx-grid-item">A</div><div class="fx-grid-item">B</div>
+            <div class="fx-grid-item" style="border-top:2px solid #0f766e; margin-left:8px;">C</div>
+            <div class="fx-grid-item" style="border-top:2px solid #0f766e; margin-right:8px;">D</div>
+          </div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">37</td>
+        <td class="prop"><code>rule-overlap</code>
+          <div class="meta">longhand · CSS Gap Rules · Chrome experimental</div>
+          <span class="chrome-badge chrome-exp">Chrome experimental</span>
+        </td>
+        <td class="desc">Determines how row and column rules overlap and composite when crossing at grid junctions.</td>
+        <td class="effect">
+          <div class="fx-grid-demo" style="rule-overlap: overlap; rule: 3px solid #7c3aed;">
+            <div class="fx-grid-item" style="border-right:3px solid #7c3aed;">1</div>
+            <div class="fx-grid-item">2</div>
+            <div class="fx-grid-item" style="border-top:3px solid #7c3aed; border-right:3px solid #7c3aed;">3</div>
+            <div class="fx-grid-item" style="border-top:3px solid #7c3aed;">4</div>
+          </div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">38</td>
+        <td class="prop"><code>rule-break</code>
+          <div class="meta">shorthand (partial) · CSS Gap Rules · Chrome experimental</div>
+          <span class="chrome-badge chrome-partial">Partial support</span>
+        </td>
+        <td class="desc">Sets break modes for both row rules and column rules at gap intersections.</td>
+        <td class="effect">
+          <div class="fx-grid-demo" style="rule-break: none; rule: 2px solid #991b1b;">
+            <div class="fx-grid-item">1</div><div class="fx-grid-item">2</div>
+            <div class="fx-grid-item">3</div><div class="fx-grid-item">4</div>
+          </div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">39</td>
+        <td class="prop"><code>rule-inset</code>
+          <div class="meta">shorthand (partial) · CSS Gap Rules · Chrome experimental</div>
+          <span class="chrome-badge chrome-partial">Partial support</span>
+        </td>
+        <td class="desc">Sets universal insets across start and end of all rules.</td>
+        <td class="effect">
+          <div class="fx-grid-demo" style="rule-inset: 10px; rule: 2px solid #4b5563;">
+            <div class="fx-grid-item">1</div><div class="fx-grid-item">2</div>
+            <div class="fx-grid-item">3</div><div class="fx-grid-item">4</div>
+          </div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="idx">40</td>
+        <td class="prop"><code>rule-inset-junction</code>
+          <div class="meta">shorthand (partial) · CSS Gap Rules · Chrome experimental</div>
+          <span class="chrome-badge chrome-partial">Partial support</span>
+        </td>
+        <td class="desc">Sets junction insets across all rule intersections in both directions.</td>
+        <td class="effect">
+          <div class="fx-grid-demo" style="rule-inset-junction: 8px; rule: 2px solid #374151;">
+            <div class="fx-grid-item">1</div><div class="fx-grid-item">2</div>
+            <div class="fx-grid-item">3</div><div class="fx-grid-item">4</div>
+          </div>
+        </td>
+      </tr>
+
+    </tbody>
+  </table>
+
+  <footer class="note">
+    Source: blinkless CSS catalog audit (post-389 additions) · Pattern: fixture-60/61/62/64 ·
+    Properties 390-420+ (40 demonstrated rows) ·
+    Needle: PROPS-390-TO-420 · font-family "Liberation Sans"
+  </footer>
+</body>
+
+</html>

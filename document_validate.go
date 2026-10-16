@@ -154,6 +154,10 @@ func validatePDFOptions(document *Document) error {
 		}
 	}
 
+	if _, err := settings.ParseEngine(document.Engine); err != nil {
+		return fmt.Errorf("engine: %w", err)
+	}
+
 	return validateDocumentCopies(document.Copies)
 }
 
