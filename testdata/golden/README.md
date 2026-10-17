@@ -120,6 +120,9 @@ proves. Page envelopes are pinned in `internal/convert/golden_test.go`
 | 61 | Implemented CSS props audit slice B (~1/3): same pattern; needle `IMPLEMENTED-PROPS-B`. | 8 |
 | 62 | Implemented CSS props audit slice C (~1/3): same pattern; needle `IMPLEMENTED-PROPS-C`. | 8 |
 | 64 | Next 72 CSS props target audit for v0.2.7 (`plans/0.2.7/next-72-properties.json`); property/description/effect gallery; needle `NEXT-72-PROPS`. | 5–8 |
+| 65 | Props 390-420 audit: row rules, masks, 3D transforms (phase-9.1 slice); needle `PROPS-390-TO-420`. | 3–5 |
+| 66 | Anchor positioning one-canvas subset: the eight anchor properties plus `@position-try`, live anchor/tip pairs; needle `ANCHOR-POSITIONING`. Renders the placement only under `--engine blinkless`. | 3–5 |
+| 67 | Coordinate shapes: all 34 `corner*` properties (8 single-corner shape longhands, 8 pair longhands, `corner-shape`, 17 radius-plus-shape shorthands) with one live box per property plus a keyword legend; needle `COORDINATE-SHAPES`. Renders the shapes only under `--engine blinkless`. | 5–7 |
 | font-examples | Font showcase: 1,125 free Google Fonts (fonts.google.com Feeling/Calligraphy filters + top-trending modern/display/script/handwriting) - randomized sampler: every font appears exactly once, each line in a random text style (regular, bold, italic, bold-italic, underline, strikethrough, underline+strikethrough, bold+underline, bold-italic+underline+strikethrough, letter-spaced, uppercase), rows span 100% width in a single column; inline `<style>`; fonts intentionally NOT bundled - render with `--font-path <dir>` or `Global().Set("fontpath", dir)`; falls back to Liberation Sans without font flags | 25 (with fonts, single column, number+name inline, overflow-wrap) |
 
 ## Pass criteria

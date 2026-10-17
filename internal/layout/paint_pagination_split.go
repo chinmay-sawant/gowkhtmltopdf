@@ -2,6 +2,13 @@
 package layout
 
 func isSplittable(op *Op) bool {
+	if _, ok := op.PathValue(); ok {
+		// Path-carried geometry is not a rectangle: the fragment rewrite only
+		// adjusts X/Y/W/H, which would repeat the full outline in every
+		// fragment. Path ops stay whole on their starting page.
+		return false
+	}
+
 	return op.Kind == OpFillRect || op.Kind == OpStrokeRect || op.Kind == OpLine
 }
 

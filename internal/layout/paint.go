@@ -1168,6 +1168,9 @@ func canvasToPDF(opX, opY float64, pageIdx int, contentH float64, opts PaintOpti
 	return x, y
 }
 
+// drawDisplayPath strokes or fills the op's attached path geometry. Points
+// are local to the op's canvas box, so the box origin is added back before
+// the page conversion; a pagination shift moves the box and the path with it.
 func drawDisplayPath(
 	c *pdf.Content, op *Op, pageIdx int, contentH float64, opts PaintOptions, pageH float64,
 ) bool {
@@ -1176,10 +1179,10 @@ func drawDisplayPath(
 		return false
 	}
 
-	firstX, firstY := canvasToPDF(path.Points[0].X, path.Points[0].Y, pageIdx, contentH, opts, pageH)
+	firstX, firstY := canvasToPDF(op.X+path.Points[0].X, op.Y+path.Points[0].Y, pageIdx, contentH, opts, pageH)
 	c.MoveTo(firstX, firstY)
 	for _, point := range path.Points[1:] {
-		x, y := canvasToPDF(point.X, point.Y, pageIdx, contentH, opts, pageH)
+		x, y := canvasToPDF(op.X+point.X, op.Y+point.Y, pageIdx, contentH, opts, pageH)
 		c.LineTo(x, y)
 	}
 	if path.Closed {

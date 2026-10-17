@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<!--
+  fixture-67-coordinate-shapes
+  Proves: visual audit of the 34 corner-shape properties (the corner-shape
+  family; superellipse corners drawn inside the used border radius), plus a
+  Chrome 155 support badge per row, mirroring fixture 66.
+  Covers:
+  - 8 single-corner shape longhands: corner-top-left-shape, corner-top-right-shape,
+    corner-bottom-right-shape, corner-bottom-left-shape, corner-start-start-shape,
+    corner-start-end-shape, corner-end-start-shape, corner-end-end-shape
+  - 8 pair shape longhands: corner-top-shape, corner-bottom-shape, corner-left-shape,
+    corner-right-shape, corner-block-start-shape, corner-block-end-shape,
+    corner-inline-start-shape, corner-inline-end-shape
+  - corner-shape (1 to 4 values, border-radius corner order) and the 17
+    radius-plus-shape shorthands: corner, the four physical sides, the four
+    logical sides, the four physical single corners, the four logical single
+    corners (draft-only in Chrome 155, badged)
+  Corner expansion captured from Chrome 155.0.8059.84 on 2026-10-17:
+  corner-shape: scoop bevel notch squircle resolves TL=scoop, TR=bevel,
+  BR=notch, BL=squircle, and 2/3 values copy like border-radius.
+  Keyword map (CSS Borders 4): round, scoop, bevel, notch, square, squircle,
+  superellipse(<number> | infinity | -infinity).
+  Wave limits named: a non-round corner with a dashed border paints a solid
+  path; background-clip and overflow clip keep their boxes; box-shadow keeps
+  its radii.
+  Fonts: Liberation Sans via --font-path testdata/fonts (SIL OFL 1.1).
+-->
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <title>Fixture 67: Coordinate Shapes (corner-shape family)</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 12mm;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: "Liberation Sans", "Liberation Serif", "Liberation Mono", sans-serif;
+      font-size: 9.5pt;
+      line-height: 1.35;
+      color: #1a1f24;
+      margin: 0;
+      padding: 0;
+    }
+
+    header.masthead {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 3px solid #1f4b99;
+      padding-bottom: 8px;
+      margin-bottom: 12px;
+    }
+
+    header.masthead img.logo {
+      height: 36px;
+    }
+
+    header.masthead .titles h1 {
+      font-size: 16pt;
+      margin: 0 0 2px 0;
+      color: #1f4b99;
+    }
+
+    header.masthead .titles p {
+      margin: 0;
+      font-size: 8.5pt;
+      color: #445;
+    }
+
+    .needle {
+      display: inline-block;
+      background: #1f4b99;
+      color: #fff;
+      font-weight: normal;
+      padding: 2px 8px;
+      border-radius: 3px;
+      letter-spacing: 0.04em;
+      margin: 8px 0 12px;
+    }
+
+    h2.section {
+      font-size: 12pt;
+      color: #1f4b99;
+      border-bottom: 1px solid #b8c0cc;
+      padding-bottom: 3px;
+      margin: 14px 0 6px;
+      page-break-before: always;
+    }
+
+    h2.section.first {
+      page-break-before: auto;
+    }
+
+    p.lead {
+      font-size: 8.5pt;
+      color: #445;
+      margin: 0 0 8px;
+    }
+
+    .legend {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin: 6px 0 12px;
+    }
+
+    .chip {
+      text-align: center;
+    }
+
+    .shape-chip {
+      width: 64px;
+      height: 48px;
+      background: #eef3fb;
+      border: 2px solid #1f4b99;
+      margin: 0 auto;
+    }
+
+    .chip-label {
+      font-size: 7pt;
+      color: #445;
+      margin-top: 2px;
+    }
+
+    table.audit {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    table.audit th,
+    table.audit td {
+      border: 1px solid #b8c0cc;
+      vertical-align: top;
+      padding: 6px 7px;
+    }
+
+    table.audit th {
+      background: #e8eef8;
+      font-size: 8.5pt;
+      text-align: left;
+    }
+
+    table.audit tr:nth-child(even) td {
+      background: #f7f9fc;
+    }
+
+    td.idx,
+    th.idx {
+      width: 30px;
+      text-align: right;
+      color: #667;
+      font-size: 8pt;
+      padding: 6px 4px;
+    }
+
+    td.prop {
+      width: 27%;
+    }
+
+    td.prop code {
+      font-family: "Liberation Mono", monospace;
+      font-size: 8.5pt;
+      color: #103a7a;
+      font-weight: normal;
+    }
+
+    td.prop .meta {
+      font-size: 7.5pt;
+      color: #667;
+      margin-top: 2px;
+    }
+
+    td.desc {
+      width: 39%;
+      font-size: 8.5pt;
+    }
+
+    td.effect {
+      width: 34%;
+    }
+
+    .chrome-badge {
+      margin-top: 4px;
+      font-size: 7.5pt;
+      padding: 1px 5px;
+      border-radius: 3px;
+      display: inline-block;
+    }
+
+    .chrome-yes {
+      background: #dcfce7;
+      color: #166534;
+      border: 1px solid #bbf7d0;
+    }
+
+    .chrome-no {
+      background: #fee2e2;
+      color: #991b1b;
+      border: 1px solid #fecaca;
+    }
+
+    .shape-stage {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .shape-box {
+      width: 132px;
+      height: 64px;
+      background: #e8eef8;
+      border: 2px solid #1f4b99;
+    }
+
+    .shape-note {
+      font-size: 7pt;
+      color: #64748b;
+      margin-top: 3px;
+    }
+
+    footer.note {
+      margin-top: 14px;
+      font-size: 8pt;
+      color: #556;
+      border-top: 1px solid #ccd;
+      padding-top: 6px;
+    }
+  </style>
+</head>
+
+<body>
+  <header class="masthead">
+    <img class="logo" src="logo.png" alt="logo">
+    <div class="titles">
+      <h1>Fixture 67: Coordinate Shapes (corner-shape family)</h1>
+      <p>The 34 corner-shape properties &middot; superellipse corners drawn inside the used border radius &middot; Chrome 155 support badge per row &middot; font-family "Liberation Sans"</p>
+    </div>
+  </header>
+
+  <div class="needle">COORDINATE-SHAPES</div>
+  <p style="font-size:8.5pt;margin:0 0 10px 0;">
+    One live example per property. Each box keeps a 24px corner box, and the
+    corner curve inside that box follows the CSS Borders 4 superellipse map.
+    Rows 1-8 shape a single physical or logical corner on a 24px radius
+    baseline; rows 9-16 shape a two-corner pair; row 17 uses the four-value
+    <code>corner-shape</code> shorthand; rows 18-34 use the shorthands that
+    set a radius and a shape together on a radiusless box. The engine turns
+    each non-round corner into one outline path, so the fill and the solid
+    border follow the same curve. The badge marks whether Chrome 155 ships
+    the property: green means yes, red means the shorthand is in the draft
+    but not implemented in Chrome yet.
+  </p>
+
+  <div class="legend">
+      <div class="chip">
+        <div class="shape-chip" style="border-radius: 20px; corner-shape: round;"></div>
+        <div class="chip-label">round (K=1, initial)</div>
+      </div>
+      <div class="chip">
+        <div class="shape-chip" style="border-radius: 20px; corner-shape: scoop;"></div>
+        <div class="chip-label">scoop (K=-1)</div>
+      </div>
+      <div class="chip">
+        <div class="shape-chip" style="border-radius: 20px; corner-shape: bevel;"></div>
+        <div class="chip-label">bevel (K=0)</div>
+      </div>
+      <div class="chip">
+        <div class="shape-chip" style="border-radius: 20px; corner-shape: notch;"></div>
+        <div class="chip-label">notch (K=-infinity)</div>
+      </div>
+      <div class="chip">
+        <div class="shape-chip" style="border-radius: 20px; corner-shape: square;"></div>
+        <div class="chip-label">square (K=+infinity)</div>
+      </div>
+      <div class="chip">
+        <div class="shape-chip" style="border-radius: 20px; corner-shape: squircle;"></div>
+        <div class="chip-label">squircle (K=2)</div>
+      </div>
+      <div class="chip">
+        <div class="shape-chip" style="border-radius: 20px; corner-shape: superellipse(2.5);"></div>
+        <div class="chip-label">superellipse(2.5)</div>
+      </div>
+  </div>
+
+  <h2 class="section first">Shape longhands: one corner</h2>
+  <p class="lead">Rows 1-8. Physical names and the logical twins on the fixed left-to-right map.</p>
+  <table class="audit">
+    <thead>
+      <tr>
+        <th class="idx">#</th>
+        <th>Property / value</th>
+        <th>What it does</th>
+        <th>Effect (live)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="idx">1</td>
+        <td class="prop"><code>corner-top-left-shape</code>
+          <div class="meta">shape longhand &middot; physical corner &middot; Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc">Chamfers only the top-left corner box; the other three keep the round quarter-ellipse.</td>
+        <td class="effect">
+          <div class="shape-stage">
+            <div class="shape-box" style="border-radius: 24px; corner-top-left-shape: bevel;"></div>
+          </div>
+          <div class="shape-note">bevel: straight chamfer (K=0)</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">2</td>
+        <td class="prop"><code>corner-top-right-shape</code>
+          <div class="meta">shape longhand &middot; physical corner &middot; Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc">Scoops only the top-right corner box into a concave arc.</td>
+        <td class="effect">
+          <div class="shape-stage">
+            <div class="shape-box" style="border-radius: 24px; corner-top-right-shape: scoop;"></div>
+          </div>
+          <div class="shape-note">scoop: concave arc (K=-1)</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">3</td>
+        <td class="prop"><code>corner-bottom-right-shape</code>
+          <div class="meta">shape longhand &middot; physical corner &middot; Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc">Cuts the bottom-right corner box inward as a notch.</td>
+        <td class="effect">
+          <div class="shape-stage">
+            <div class="shape-box" style="border-radius: 24px; corner-bottom-right-shape: notch;"></div>
+          </div>
+          <div class="shape-note">notch: concave V to the inner corner (K=-infinity)</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">4</td>
+        <td class="prop"><code>corner-bottom-left-shape</code>
+          <div class="meta">shape longhand &middot; physical corner &middot; Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc">Rounds the bottom-left corner box toward a squircle (flatter sides than a quarter-ellipse).</td>
+        <td class="effect">
+          <div class="shape-stage">
+            <div class="shape-box" style="border-radius: 24px; corner-bottom-left-shape: squircle;"></div>
+          </div>
+          <div class="shape-note">squircle: squared superellipse (K=2)</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">5</td>
+        <td class="prop"><code>corner-start-start-shape</code>
+          <div class="meta">shape longhand &middot; logical, fixed LTR map &middot; Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc">Logical start-start is top-left in horizontal left-to-right flow; same shape as row 1.</td>
+        <td class="effect">
+          <div class="shape-stage">
+            <div class="shape-box" style="border-radius: 24px; corner-start-start-shape: bevel;"></div>
+          </div>
+          <div class="shape-note">start-start = top-left</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">6</td>
+        <td class="prop"><code>corner-start-end-shape</code>
+          <div class="meta">shape longhand &middot; logical, fixed LTR map &middot; Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc">Logical start-end is top-right; same shape as row 2.</td>
+        <td class="effect">
+          <div class="shape-stage">
+            <div class="shape-box" style="border-radius: 24px; corner-start-end-shape: scoop;"></div>
+          </div>
+          <div class="shape-note">start-end = top-right</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">7</td>
+        <td class="prop"><code>corner-end-start-shape</code>
+          <div class="meta">shape longhand &middot; logical, fixed LTR map &middot; Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc">Logical end-start is bottom-left; same shape as row 4 shifted to the left edge.</td>
+        <td class="effect">
+          <div class="shape-stage">
+            <div class="shape-box" style="border-radius: 24px; corner-end-start-shape: notch;"></div>
+          </div>
+          <div class="shape-note">end-start = bottom-left</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">8</td>
+        <td class="prop"><code>corner-end-end-shape</code>
+          <div class="meta">shape longhand &middot; logical, fixed LTR map &middot; Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc">Logical end-end is bottom-right; same shape as row 4.</td>
+        <td class="effect">
+          <div class="shape-stage">
+            <div class="shape-box" style="border-radius: 24px; corner-end-end-shape: squircle;"></div>
+          </div>
+          <div class="shape-note">end-end = bottom-right</div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 class="section">Shape longhands: a two-corner pair</h2>
+  <p class="lead">Rows 9-16. One value sets both corners of the pair; two values run left then right (top and bottom sides) or top then bottom (left and right sides).</p>
+  <table class="audit">
+    <thead>
+      <tr>
+        <th class="idx">#</th>
+        <th>Property / value</th>
+        <th>What it does</th>
+        <th>Effect (live)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="idx">9</td>
+        <td class="prop"><code>corner-top-shape</code>
+          <div class="meta">pair longhand &middot; left then right &middot; Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc">Two values shape the top-left then the top-right corner; the bottom corners stay round.</td>
+        <td class="effect">
+          <div class="shape-stage">
+            <div class="shape-box" style="border-radius: 24px; corner-top-shape: bevel scoop;"></div>
+          </div>
+          <div class="shape-note">bevel (left) then scoop (right)</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">10</td>
+        <td class="prop"><code>corner-bottom-shape</code>
+          <div class="meta">pair longhand &middot; left then right &middot; Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc">Two values shape the bottom-left then the bottom-right corner.</td>
+        <td class="effect">
+          <div class="shape-stage">
+            <div class="shape-box" style="border-radius: 24px; corner-bottom-shape: scoop bevel;"></div>
+          </div>
+          <div class="shape-note">scoop (left) then bevel (right)</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">11</td>
+        <td class="prop"><code>corner-left-shape</code>
+          <div class="meta">pair longhand &middot; top then bottom &middot; Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc">Two values shape the top-left then the bottom-left corner.</td>
+        <td class="effect">
+          <div class="shape-stage">
+            <div class="shape-box" style="border-radius: 24px; corner-left-shape: notch scoop;"></div>
+          </div>
+          <div class="shape-note">notch (top) then scoop (bottom)</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">12</td>
+        <td class="prop"><code>corner-right-shape</code>
+          <div class="meta">pair longhand &middot; top then bottom &middot; Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc">Two values shape the top-right then the bottom-right corner.</td>
+        <td class="effect">
+          <div class="shape-stage">
+            <div class="shape-box" style="border-radius: 24px; corner-right-shape: squircle square;"></div>
+          </div>
+          <div class="shape-note">squircle (top) then square (bottom)</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">13</td>
+        <td class="prop"><code>corner-block-start-shape</code>
+          <div class="meta">pair longhand &middot; logical, fixed LTR map &middot; Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc">Start then end on the inline axis: start-start then start-end, which is both top corners.</td>
+        <td class="effect">
+          <div class="shape-stage">
+            <div class="shape-box" style="border-radius: 24px; corner-block-start-shape: notch;"></div>
+          </div>
+          <div class="shape-note">one value: both top corners notched</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">14</td>
+        <td class="prop"><code>corner-block-end-shape</code>
+          <div class="meta">pair longhand &middot; logical, fixed LTR map &middot; Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc">Start then end on the block-end side: both bottom corners.</td>
+        <td class="effect">
+          <div class="shape-stage">
+            <div class="shape-box" style="border-radius: 24px; corner-block-end-shape: notch;"></div>
+          </div>
+          <div class="shape-note">one value: both bottom corners notched</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">15</td>
+        <td class="prop"><code>corner-inline-start-shape</code>
+          <div class="meta">pair longhand &middot; logical, fixed LTR map &middot; Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc">Start then end on the block axis: start-start then end-start, which is both left corners.</td>
+        <td class="effect">
+          <div class="shape-stage">
+            <div class="shape-box" style="border-radius: 24px; corner-inline-start-shape: notch;"></div>
+          </div>
+          <div class="shape-note">one value: both left corners notched</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">16</td>
+        <td class="prop"><code>corner-inline-end-shape</code>
+          <div class="meta">pair longhand &middot; logical, fixed LTR map &middot; Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc">Start then end on the inline-end side: both right corners.</td>
+        <td class="effect">
+          <div class="shape-stage">
+            <div class="shape-box" style="border-radius: 24px; corner-inline-end-shape: notch;"></div>
+          </div>
+          <div class="shape-note">one value: both right corners notched</div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 class="section">corner-shape: the four-value shorthand</h2>
+  <p class="lead">Row 17. Values shape the top-left, top-right, bottom-right, and bottom-left corners in border-radius order; missing values copy per border-radius.</p>
+  <table class="audit">
+    <thead>
+      <tr>
+        <th class="idx">#</th>
+        <th>Property / value</th>
+        <th>What it does</th>
+        <th>Effect (live)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="idx">17</td>
+        <td class="prop"><code>corner-shape</code>
+          <div class="meta">shorthand &middot; 1 to 4 values &middot; Chrome yes</div>
+          <span class="chrome-badge chrome-yes">Chrome supported</span>
+        </td>
+        <td class="desc">The four values shape the top-left, top-right, bottom-right, and bottom-left corners in that order, the border-radius path order; a missing bottom copies top, a missing right copies top, and a missing left copies right. Chrome 155 resolves the same declaration to the same four corner shapes.</td>
+        <td class="effect">
+          <div class="shape-stage">
+            <div class="shape-box" style="border-radius: 24px; corner-shape: scoop bevel notch squircle;"></div>
+          </div>
+          <div class="shape-note">top-left scoop, top-right bevel, bottom-right notch, bottom-left squircle</div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 class="section">Radius-plus-shape shorthands</h2>
+  <p class="lead">Rows 18-34. Each shorthand sets the corner radius and the shape together; a missing piece resets to its initial value. Chrome 155 does not implement these yet, so its column shows plain 0 or 24px radius corners for these rows.</p>
+  <table class="audit">
+    <thead>
+      <tr>
+        <th class="idx">#</th>
+        <th>Property / value</th>
+        <th>What it does</th>
+        <th>Effect (live)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="idx">18</td>
+        <td class="prop"><code>corner</code>
+          <div class="meta">shorthand &middot; radius piece and shape piece &middot; Chrome no</div>
+          <span class="chrome-badge chrome-no">Chrome not implemented</span>
+        </td>
+        <td class="desc">Sets all four radii and all four shapes in one declaration. Chrome does not implement this shorthand yet.</td>
+        <td class="effect">
+          <div class="shape-stage">
+            <div class="shape-box" style="corner: 24px bevel;"></div>
+          </div>
+          <div class="shape-note">24px radius, all corners bevelled</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">19</td>
+        <td class="prop"><code>corner-top</code>
+          <div class="meta">side shorthand &middot; radius piece and shape piece &middot; Chrome no</div>
+          <span class="chrome-badge chrome-no">Chrome not implemented</span>
+        </td>
+        <td class="desc">Sets the top radius and the top shape pair; the bottom corners stay at 0 radius and round. Not implemented in Chrome 155.</td>
+        <td class="effect">
+          <div class="shape-stage">
+            <div class="shape-box" style="corner-top: 24px scoop;"></div>
+          </div>
+          <div class="shape-note">top corners scooped</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">20</td>
+        <td class="prop"><code>corner-right</code>
+          <div class="meta">side shorthand &middot; radius piece and shape piece &middot; Chrome no</div>
+          <span class="chrome-badge chrome-no">Chrome not implemented</span>
+        </td>
+        <td class="desc">Sets the right radius and the right shape pair. Not implemented in Chrome 155.</td>
+        <td class="effect">
+          <div class="shape-stage">
+            <div class="shape-box" style="corner-right: 24px scoop;"></div>
+          </div>
+          <div class="shape-note">right corners scooped</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">21</td>
+        <td class="prop"><code>corner-bottom</code>
+          <div class="meta">side shorthand &middot; radius piece and shape piece &middot; Chrome no</div>
+          <span class="chrome-badge chrome-no">Chrome not implemented</span>
+        </td>
+        <td class="desc">Sets the bottom radius and the bottom shape pair. Not implemented in Chrome 155.</td>
+        <td class="effect">
+          <div class="shape-stage">
+            <div class="shape-box" style="corner-bottom: 24px scoop;"></div>
+          </div>
+          <div class="shape-note">bottom corners scooped</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">22</td>
+        <td class="prop"><code>corner-left</code>
+          <div class="meta">side shorthand &middot; radius piece and shape piece &middot; Chrome no</div>
+          <span class="chrome-badge chrome-no">Chrome not implemented</span>
+        </td>
+        <td class="desc">Sets the left radius and the left shape pair. Not implemented in Chrome 155.</td>
+        <td class="effect">
+          <div class="shape-stage">
+            <div class="shape-box" style="corner-left: 24px scoop;"></div>
+          </div>
+          <div class="shape-note">left corners scooped</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">23</td>
+        <td class="prop"><code>corner-block-start</code>
+          <div class="meta">side shorthand &middot; logical, fixed LTR map &middot; Chrome no</div>
+          <span class="chrome-badge chrome-no">Chrome not implemented</span>
+        </td>
+        <td class="desc">Block-start is the top side on the fixed map. Not implemented in Chrome 155.</td>
+        <td class="effect">
+          <div class="shape-stage">
+            <div class="shape-box" style="corner-block-start: 24px bevel;"></div>
+          </div>
+          <div class="shape-note">top corners bevelled</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">24</td>
+        <td class="prop"><code>corner-block-end</code>
+          <div class="meta">side shorthand &middot; logical, fixed LTR map &middot; Chrome no</div>
+          <span class="chrome-badge chrome-no">Chrome not implemented</span>
+        </td>
+        <td class="desc">Block-end is the bottom side on the fixed map. Not implemented in Chrome 155.</td>
+        <td class="effect">
+          <div class="shape-stage">
+            <div class="shape-box" style="corner-block-end: 24px bevel;"></div>
+          </div>
+          <div class="shape-note">bottom corners bevelled</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">25</td>
+        <td class="prop"><code>corner-inline-start</code>
+          <div class="meta">side shorthand &middot; logical, fixed LTR map &middot; Chrome no</div>
+          <span class="chrome-badge chrome-no">Chrome not implemented</span>
+        </td>
+        <td class="desc">Inline-start is the left side on the fixed map. Not implemented in Chrome 155.</td>
+        <td class="effect">
+          <div class="shape-stage">
+            <div class="shape-box" style="corner-inline-start: 24px bevel;"></div>
+          </div>
+          <div class="shape-note">left corners bevelled</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">26</td>
+        <td class="prop"><code>corner-inline-end</code>
+          <div class="meta">side shorthand &middot; logical, fixed LTR map &middot; Chrome no</div>
+          <span class="chrome-badge chrome-no">Chrome not implemented</span>
+        </td>
+        <td class="desc">Inline-end is the right side on the fixed map. Not implemented in Chrome 155.</td>
+        <td class="effect">
+          <div class="shape-stage">
+            <div class="shape-box" style="corner-inline-end: 24px bevel;"></div>
+          </div>
+          <div class="shape-note">right corners bevelled</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">27</td>
+        <td class="prop"><code>corner-top-left</code>
+          <div class="meta">single-corner shorthand &middot; physical corner &middot; Chrome no</div>
+          <span class="chrome-badge chrome-no">Chrome not implemented</span>
+        </td>
+        <td class="desc">Sets only the top-left radius and the top-left shape. Not implemented in Chrome 155.</td>
+        <td class="effect">
+          <div class="shape-stage">
+            <div class="shape-box" style="corner-top-left: 24px notch;"></div>
+          </div>
+          <div class="shape-note">only the top-left corner changes</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">28</td>
+        <td class="prop"><code>corner-top-right</code>
+          <div class="meta">single-corner shorthand &middot; physical corner &middot; Chrome no</div>
+          <span class="chrome-badge chrome-no">Chrome not implemented</span>
+        </td>
+        <td class="desc">Sets only the top-right radius and the top-right shape. Not implemented in Chrome 155.</td>
+        <td class="effect">
+          <div class="shape-stage">
+            <div class="shape-box" style="corner-top-right: 24px notch;"></div>
+          </div>
+          <div class="shape-note">only the top-right corner changes</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">29</td>
+        <td class="prop"><code>corner-bottom-right</code>
+          <div class="meta">single-corner shorthand &middot; physical corner &middot; Chrome no</div>
+          <span class="chrome-badge chrome-no">Chrome not implemented</span>
+        </td>
+        <td class="desc">Sets only the bottom-right radius and the bottom-right shape. Not implemented in Chrome 155.</td>
+        <td class="effect">
+          <div class="shape-stage">
+            <div class="shape-box" style="corner-bottom-right: 24px notch;"></div>
+          </div>
+          <div class="shape-note">only the bottom-right corner changes</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">30</td>
+        <td class="prop"><code>corner-bottom-left</code>
+          <div class="meta">single-corner shorthand &middot; physical corner &middot; Chrome no</div>
+          <span class="chrome-badge chrome-no">Chrome not implemented</span>
+        </td>
+        <td class="desc">Sets only the bottom-left radius and the bottom-left shape. Not implemented in Chrome 155.</td>
+        <td class="effect">
+          <div class="shape-stage">
+            <div class="shape-box" style="corner-bottom-left: 24px notch;"></div>
+          </div>
+          <div class="shape-note">only the bottom-left corner changes</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">31</td>
+        <td class="prop"><code>corner-start-start</code>
+          <div class="meta">single-corner shorthand &middot; logical, fixed LTR map &middot; Chrome no</div>
+          <span class="chrome-badge chrome-no">Chrome not implemented</span>
+        </td>
+        <td class="desc">Logical start-start resolves to top-left through the same fixed map as the radius longhands. Not implemented in Chrome 155.</td>
+        <td class="effect">
+          <div class="shape-stage">
+            <div class="shape-box" style="corner-start-start: 24px squircle;"></div>
+          </div>
+          <div class="shape-note">start-start = top-left</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">32</td>
+        <td class="prop"><code>corner-start-end</code>
+          <div class="meta">single-corner shorthand &middot; logical, fixed LTR map &middot; Chrome no</div>
+          <span class="chrome-badge chrome-no">Chrome not implemented</span>
+        </td>
+        <td class="desc">Logical start-end resolves to top-right. Not implemented in Chrome 155.</td>
+        <td class="effect">
+          <div class="shape-stage">
+            <div class="shape-box" style="corner-start-end: 24px squircle;"></div>
+          </div>
+          <div class="shape-note">start-end = top-right</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">33</td>
+        <td class="prop"><code>corner-end-start</code>
+          <div class="meta">single-corner shorthand &middot; logical, fixed LTR map &middot; Chrome no</div>
+          <span class="chrome-badge chrome-no">Chrome not implemented</span>
+        </td>
+        <td class="desc">Logical end-start resolves to bottom-left. Not implemented in Chrome 155.</td>
+        <td class="effect">
+          <div class="shape-stage">
+            <div class="shape-box" style="corner-end-start: 24px squircle;"></div>
+          </div>
+          <div class="shape-note">end-start = bottom-left</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">34</td>
+        <td class="prop"><code>corner-end-end</code>
+          <div class="meta">single-corner shorthand &middot; logical, fixed LTR map &middot; Chrome no</div>
+          <span class="chrome-badge chrome-no">Chrome not implemented</span>
+        </td>
+        <td class="desc">Logical end-end resolves to bottom-right. Not implemented in Chrome 155.</td>
+        <td class="effect">
+          <div class="shape-stage">
+            <div class="shape-box" style="corner-end-end: 24px squircle;"></div>
+          </div>
+          <div class="shape-note">end-end = bottom-right</div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <footer class="note">
+    Chrome badges captured 2026-10-17 against Chrome 155.0.8059.84 with
+    CSS.supports per property: the 16 shape longhands and corner-shape are
+    supported with every keyword and both superellipse infinity forms; the 17
+    corner and corner-* shorthands are not implemented. Row 17's four-corner
+    resolution was captured from the same build with getComputedStyle
+    (corners resolve in border-radius order; missing values copy like
+    border-radius). Named wave limits on the engine side: a non-round corner
+    with a dashed or dotted border paints a solid path, border sides that
+    differ in width or color keep the rounded stroke-rect geometry,
+    background-clip and overflow clip keep their existing boxes instead of
+    following the shaped outer path, and box-shadow keeps today's radii.
+    Logical names use the fixed horizontal left-to-right map (no vertical
+    writing-mode table yet).
+  </footer>
+</body>
+
+</html>

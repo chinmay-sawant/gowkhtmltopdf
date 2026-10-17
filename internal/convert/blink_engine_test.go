@@ -54,6 +54,49 @@ func TestBlinklessEngineFixture01(t *testing.T) {
 	}
 }
 
+// TestBlinklessEngineFixture67CornerShapes converts fixture 67 through the
+// blinkless engine and asserts its contract: PDF structure, the pinned page
+// count, an embedded subset, and the audit needles. The shaped geometry
+// itself is proven in internal/blinkengine (TestLayoutMapsCornerShapePath);
+// this run proves the whole 34-example fixture converts end to end.
+func TestBlinklessEngineFixture67CornerShapes(t *testing.T) {
+	t.Parallel()
+
+	req := requestForFixture(t, "fixture-67-coordinate-shapes.html")
+	req.Global.Engine = settings.EngineBlinkless
+
+	data := runPDFWithLog(t, req, io.Discard)
+
+	if !bytes.HasPrefix(data, []byte("%PDF-")) {
+		t.Fatalf("PDF prefix = %q", data[:min(len(data), 8)])
+	}
+
+	if !bytes.Contains(data, []byte("%%EOF")) {
+		t.Fatal("PDF is missing its EOF marker")
+	}
+
+	if got := pageCount(data); got != 6 {
+		t.Errorf("pages = %d, want 6", got)
+	}
+
+	if !bytes.Contains(data, []byte("/FontFile2")) {
+		t.Error("no embedded TrueType subset (/FontFile2)")
+	}
+
+	semantic, err := pdf.ParseSemantic(data)
+	if err != nil {
+		t.Fatalf("ParseSemantic: %v", err)
+	}
+
+	text := semantic.DocumentText()
+
+	for _, needle := range []string{"COORDINATE-SHAPES", "corner-top-left-shape", "end-end = bottom-right"} {
+		if !strings.Contains(text, needle) {
+			t.Errorf("document text missing %q", needle)
+		}
+	}
+}
+
 // TestBlinklessEngineAppliesLinkedStylesheet proves the bridge fetches a
 // <link rel=stylesheet> with this module's loader and hands the CSS to
 // blinkless: the external sheet hides the heading, so the rendered text must

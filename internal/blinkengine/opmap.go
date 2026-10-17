@@ -149,10 +149,18 @@ func (m *opMapper) payload(src *blayout.DisplayOp, dst *layout.Op) {
 	if path, ok := src.PathValue(); ok {
 		points := make([]layout.PathPoint, len(path.Points))
 		for idx, point := range path.Points {
-			points[idx] = layout.PathPoint{X: point.X, Y: point.Y}
+			// Path geometry is stored local to the op's canvas box so the
+			// pagination passes that shift X/Y carry it (see PathGeometry).
+			points[idx] = layout.PathPoint{X: point.X - src.X, Y: point.Y - src.Y}
 		}
 
 		dst.SetPath(layout.PathGeometry{Points: points, Closed: path.Closed})
+	}
+
+	if corner, ok := src.CornerPathValue(); ok {
+		if points := cornerPathPoints(corner, src.X, src.Y); len(points) > 0 {
+			dst.SetPath(layout.PathGeometry{Points: points, Closed: true})
+		}
 	}
 
 	if basis, ok := src.GlyphBasisValue(); ok {
@@ -224,9 +232,54 @@ func mapKind(src *blayout.DisplayOp) (layout.OpKind, bool) {
 		return layout.OpBullet, true
 	case blayout.DisplayOpGridRun:
 		return layout.OpGridRun, true
+	case blayout.DisplayOpPath:
+		return mapCornerPathKind(src)
 	default:
 		return 0, false
 	}
+}
+
+// mapCornerPathKind maps a blinkless corner-shape path onto the fill or
+// stroke kind whose painters read path geometry. The command list is checked
+// here because a path with no commands paints nothing.
+func mapCornerPathKind(src *blayout.DisplayOp) (layout.OpKind, bool) {
+	corner, ok := src.CornerPathValue()
+	if !ok || len(corner.Cmds) == 0 {
+		return 0, false
+	}
+
+	if corner.Stroke {
+		return layout.OpStrokeRect, true
+	}
+
+	return layout.OpFillRect, true
+}
+
+// cornerPathPoints flattens a blinkless corner-path command list into the
+// straight-edged geometry this module's painters consume, rebased to the op's
+// canvas box (originX, originY). The engine's corner painter emits moveTo,
+// lineTo, and close; a curve verb contributes its end point so a future
+// curve-bearing path still lands as a polygon instead of being dropped.
+func cornerPathPoints(corner *blayout.CornerPath, originX, originY float64) []layout.PathPoint {
+	points := make([]layout.PathPoint, 0, len(corner.Cmds))
+
+	for idx := range corner.Cmds {
+		command := &corner.Cmds[idx]
+
+		switch command.Verb {
+		case blayout.PathMoveTo, blayout.PathLineTo:
+			points = append(points, layout.PathPoint{X: command.Pts[0].X - originX, Y: command.Pts[0].Y - originY})
+		case blayout.PathQuadTo:
+			points = append(points, layout.PathPoint{X: command.Pts[1].X - originX, Y: command.Pts[1].Y - originY})
+		case blayout.PathCubicTo:
+			points = append(points, layout.PathPoint{X: command.Pts[2].X - originX, Y: command.Pts[2].Y - originY})
+		case blayout.PathClose:
+			// Close has no point of its own; Closed carries it.
+			continue
+		}
+	}
+
+	return points
 }
 
 // mapGridRun copies one table row's collapsed border segments. The segment

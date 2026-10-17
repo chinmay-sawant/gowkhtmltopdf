@@ -45,7 +45,9 @@ type PathPoint struct {
 	X, Y float64
 }
 
-// PathGeometry is straight-edged drawing geometry supplied by Blinkless.
+// PathGeometry is straight-edged drawing geometry supplied by Blinkless. The
+// points are local to the op's canvas box (op.X, op.Y), so the pagination
+// passes that shift a box carry its path with it.
 type PathGeometry struct {
 	Points []PathPoint
 	Closed bool
