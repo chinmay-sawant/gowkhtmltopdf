@@ -469,6 +469,10 @@ var fixturePageBounds = map[string]fixtureBounds{ //nolint:gochecknoglobals // i
 		minPages: 5, maxPages: 7, images: true,
 		needles: []string{"COORDINATE-SHAPES", "corner-top-left-shape", "end-end = bottom-right"},
 	},
+	"fixture-68-mask-border-regions-shapes.html": {
+		minPages: 3, maxPages: 5, images: true,
+		needles: []string{"MASK-BORDER-REGIONS-SHAPES", "mask-border-source", "flow-into", "wrap-inside", "shape-inside", "shape-padding", "shape-image-threshold", "float-defer"},
+	},
 }
 
 // fixtureHeaderOK enforces the corpus hygiene rule: every fixture starts

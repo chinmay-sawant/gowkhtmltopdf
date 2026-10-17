@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<!--
+  fixture-68-mask-border-regions-shapes
+  Proves: audit gallery for the 26 properties landed by the blinkless
+  v0.0.3 mask-border, regions, and shapes ledgers, mirroring fixtures 66/67.
+  Covers:
+  - 13 mask-border names: mask-border, mask-border-source, mask-border-slice,
+    mask-border-width, mask-border-outset, mask-border-repeat, mask-border-mode,
+    and the six -webkit-mask-box-image* aliases. The descriptor rides the
+    element's blend group; this host does not replay the mask pixels, so the
+    effect cell shows the declaration only (no frame is painted).
+  - 9 regions/exclusions names: flow-into, flow-from, region-fragment,
+    flow-tolerance, wrap-flow, wrap-through, wrap-before, wrap-after,
+    wrap-inside. Named flows and exclusions move ops on the one canvas; the
+    engine never allocates pages for them.
+  - 4 shapes names: shape-inside and shape-padding render live line insets;
+    shape-image-threshold and float-defer are decision-gated no-ops (stored
+    initial behavior only), shown for completeness.
+  Renders the regions and shapes effects only under --engine blinkless; the
+  default engine parses the declarations and ignores them with graceful
+  degrade.
+  Fonts: Liberation Sans via --font-path testdata/fonts (SIL OFL 1.1).
+-->
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <title>Fixture 68: Mask Border, Regions, and Shapes Inside</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 12mm;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: "Liberation Sans", "Liberation Serif", "Liberation Mono", sans-serif;
+      font-size: 9.5pt;
+      line-height: 1.35;
+      color: #1a1f24;
+      margin: 0;
+      padding: 0;
+    }
+
+    header.masthead {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 3px solid #1f4b99;
+      padding-bottom: 8px;
+      margin-bottom: 12px;
+    }
+
+    header.masthead img.logo {
+      height: 36px;
+    }
+
+    header.masthead .titles h1 {
+      font-size: 16pt;
+      margin: 0 0 2px 0;
+      color: #1f4b99;
+    }
+
+    header.masthead .titles p {
+      margin: 0;
+      font-size: 8.5pt;
+      color: #445;
+    }
+
+    .needle {
+      display: inline-block;
+      background: #1f4b99;
+      color: #fff;
+      font-weight: normal;
+      padding: 2px 8px;
+      border-radius: 3px;
+      letter-spacing: 0.04em;
+      margin: 8px 0 12px;
+    }
+
+    h2.section {
+      font-size: 12pt;
+      color: #1f4b99;
+      border-bottom: 1px solid #b8c0cc;
+      padding-bottom: 3px;
+      margin: 14px 0 6px;
+      page-break-before: always;
+    }
+
+    h2.section.first {
+      page-break-before: auto;
+    }
+
+    p.lead {
+      font-size: 8.5pt;
+      color: #445;
+      margin: 0 0 8px;
+    }
+
+    table.audit {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    table.audit th,
+    table.audit td {
+      border: 1px solid #b8c0cc;
+      vertical-align: top;
+      padding: 6px 7px;
+    }
+
+    table.audit th {
+      background: #e8eef8;
+      font-size: 8.5pt;
+      text-align: left;
+    }
+
+    table.audit tr:nth-child(even) td {
+      background: #f7f9fc;
+    }
+
+    td.idx,
+    th.idx {
+      width: 30px;
+      text-align: right;
+      color: #667;
+      font-size: 8pt;
+      padding: 6px 4px;
+    }
+
+    td.prop {
+      width: 27%;
+    }
+
+    td.prop code {
+      font-family: "Liberation Mono", monospace;
+      font-size: 8.5pt;
+      color: #103a7a;
+      font-weight: normal;
+    }
+
+    td.prop .meta {
+      font-size: 7.5pt;
+      color: #667;
+      margin-top: 2px;
+    }
+
+    td.desc {
+      width: 39%;
+      font-size: 8.5pt;
+    }
+
+    td.effect {
+      width: 34%;
+    }
+
+    .status-badge {
+      margin-top: 4px;
+      font-size: 7.5pt;
+      padding: 1px 5px;
+      border-radius: 3px;
+      display: inline-block;
+    }
+
+    .status-partial {
+      background: #fef3c7;
+      color: #92400e;
+      border: 1px solid #fde68a;
+    }
+
+    .status-live {
+      background: #dcfce7;
+      color: #166534;
+      border: 1px solid #bbf7d0;
+    }
+
+    .status-noop {
+      background: #e5e7eb;
+      color: #374151;
+      border: 1px solid #d1d5db;
+    }
+
+    .effect-note {
+      font-size: 7pt;
+      color: #64748b;
+      margin-top: 3px;
+    }
+
+    .frame-box {
+      mask-border-source: url(frame-mask.png);
+      mask-border-slice: 16 fill;
+      mask-border-width: 12px;
+      mask-border-repeat: stretch;
+      -webkit-mask-box-image-source: url(frame-mask.png);
+      -webkit-mask-box-image-slice: 16 fill;
+      -webkit-mask-box-image-width: 12px;
+      -webkit-mask-box-image-repeat: stretch;
+      width: 96px;
+      height: 64px;
+      background: #1f4b99;
+      border: 2px solid #b91c1c;
+      padding: 6px;
+      color: #fff;
+      font-size: 7pt;
+      color: #445;
+    }
+
+    .region-stage {
+      display: flex;
+      gap: 8px;
+    }
+
+    .region-box {
+      flex: 1;
+      height: 64px;
+      border: 1px dashed #1f4b99;
+      background: #f2f6fd;
+      padding: 4px;
+      font-size: 7.5pt;
+      overflow: hidden;
+    }
+
+    .region-box .rb-label {
+      font-size: 6.5pt;
+      color: #667;
+      margin-bottom: 2px;
+    }
+
+    .exc-box {
+      width: 72px;
+      height: 40px;
+      background: #e8eef8;
+      border: 2px solid #1f4b99;
+      font-size: 7pt;
+      padding: 3px;
+    }
+
+    .exc-note {
+      font-size: 7pt;
+      color: #64748b;
+      margin-top: 3px;
+    }
+
+    .shape-stage-box {
+      width: 100%;
+      height: 84px;
+      border: 1px solid #b8c0cc;
+      padding: 4px;
+      font-size: 7.5pt;
+      overflow: hidden;
+    }
+
+    .masonry-stage {
+      display: grid;
+      grid-template-rows: masonry;
+      grid-template-columns: 64px 64px;
+      column-gap: 6px;
+      width: 134px;
+    }
+
+    .masonry-stage div {
+      font-size: 6.5pt;
+      color: #fff;
+      text-align: center;
+    }
+
+    .masonry-a {
+      height: 22px;
+      background: #1f4b99;
+    }
+
+    .masonry-b {
+      height: 40px;
+      background: #5b8bd4;
+    }
+
+    footer.note {
+      margin-top: 14px;
+      font-size: 8pt;
+      color: #556;
+      border-top: 1px solid #ccd;
+      padding-top: 6px;
+    }
+  </style>
+</head>
+
+<body>
+  <header class="masthead">
+    <img class="logo" src="logo.png" alt="logo">
+    <div class="titles">
+      <h1>Fixture 68: Mask Border, Regions, and Shapes Inside</h1>
+      <p>The 26 properties of the v0.0.3 mask-border, regions, and shapes ledgers &middot; descriptor, flow, and line-inset effects &middot; font-family "Liberation Sans"</p>
+    </div>
+  </header>
+
+  <div class="needle">MASK-BORDER-REGIONS-SHAPES</div>
+  <p style="font-size:8.5pt;margin:0 0 10px 0;">
+    One row per property, in three sections. The mask-border section records the
+    frame on the element's blend group and paints no pixels here (the host applies
+    the mask), so its effect cells show the declaration and the resolved shape of
+    the data. The regions and shapes sections render live under
+    <code>--engine blinkless</code>: named flows move content between boxes on the
+    one canvas, exclusions reshape the lines beside a box, and shape-inside
+    narrows the element's own lines. The default engine parses every declaration
+    and ignores it with graceful degrade. No property in this fixture allocates a
+    page; paged fragmentation stays a non-goal.
+  </p>
+
+  <h2 class="section first">Mask border: descriptor on the blend group</h2>
+  <p class="lead">Rows 1-13. The frame data (source bytes, slice, width, outset, repeat, mode) rides the group and composes into a frame raster the host applies as a soft mask; the frame box shows the masked frame. The unprefixed rows render under --engine blinkless; Chrome renders the -webkit-mask-box-image family (rows 8-13, plus the shared alias longhands the class rule carries).</p>
+  <table class="audit">
+    <thead>
+      <tr>
+        <th class="idx">#</th>
+        <th>Property / value</th>
+        <th>What it does</th>
+        <th>Effect</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="idx">1</td>
+        <td class="prop"><code>mask-border</code>
+          <div class="meta">shorthand &middot; source slice / width / outset repeat mode</div>
+          <span class="status-badge status-partial">Partial: descriptor only</span>
+        </td>
+        <td class="desc">Expands into the six longhands. The used frame records on the element's blend group; no border-image cells are painted.</td>
+        <td class="effect">
+          <div class="frame-box" style="mask-border: url(frame-mask.png) 16 fill / 12px / 4px stretch;">frame data recorded</div>
+          <div class="effect-note">host applies the mask; nothing painted here</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">2</td>
+        <td class="prop"><code>mask-border-source</code>
+          <div class="meta">none | url() | image-set() choosing url()</div>
+          <span class="status-badge status-partial">Partial: descriptor only</span>
+        </td>
+        <td class="desc">Resolves the source bytes through the same resolver the first-wave mask uses. A gradient source stays rejected until the mask-source ledger lands.</td>
+        <td class="effect">
+          <div class="frame-box" style="mask-border-source: url(frame-mask.png);">source bytes on the group</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">3</td>
+        <td class="prop"><code>mask-border-slice</code>
+          <div class="meta">1-4 numbers or percentages, optional fill</div>
+          <span class="status-badge status-partial">Partial: descriptor only</span>
+        </td>
+        <td class="desc">Cuts the source into the nine-slice grid; the fill keyword also records the center cell. Insets stay in source pixels.</td>
+        <td class="effect">
+          <div class="frame-box" style="mask-border-slice: 16 fill;">slice 16 with fill</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">4</td>
+        <td class="prop"><code>mask-border-width</code>
+          <div class="meta">auto | 1-4 lengths or numbers</div>
+          <span class="status-badge status-partial">Partial: descriptor only</span>
+        </td>
+        <td class="desc">Frame thickness in points on the descriptor. Percentage widths are rejected because the descriptor is written before the element box exists.</td>
+        <td class="effect">
+          <div class="frame-box" style="mask-border-width: 14px;">width 14px = 10.5pt</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">5</td>
+        <td class="prop"><code>mask-border-outset</code>
+          <div class="meta">1-4 lengths or numbers</div>
+          <span class="status-badge status-partial">Partial: descriptor only</span>
+        </td>
+        <td class="desc">Expands the frame outward from the border box; recorded in points, like the border-image arithmetic it copies.</td>
+        <td class="effect">
+          <div class="frame-box" style="mask-border-outset: 0px;">outset 0 (frame at the border box)</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">6</td>
+        <td class="prop"><code>mask-border-repeat</code>
+          <div class="meta">stretch | repeat | round | space, 1-2 values</div>
+          <span class="status-badge status-partial">Partial: descriptor only</span>
+        </td>
+        <td class="desc">Stores the repeat pair as a token; the host decides how to tile the frame.</td>
+        <td class="effect">
+          <div class="frame-box" style="mask-border-repeat: repeat;">repeat tiles the frame band</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">7</td>
+        <td class="prop"><code>mask-border-mode</code>
+          <div class="meta">alpha | luminance, initial alpha</div>
+          <span class="status-badge status-partial">Partial: descriptor only</span>
+        </td>
+        <td class="desc">Stores the mode token; it is not baked into the bytes unless the first-wave SVG mask path already preprocessed them.</td>
+        <td class="effect">
+          <div class="frame-box" style="mask-border-mode: alpha;">mode alpha</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">8</td>
+        <td class="prop"><code>-webkit-mask-box-image</code>
+          <div class="meta">alias of mask-border</div>
+          <span class="status-badge status-partial">Partial: descriptor only</span>
+        </td>
+        <td class="desc">Normalizes onto the standard shorthand; source order against the standard name follows the cascade.</td>
+        <td class="effect">
+          <div class="frame-box" style="-webkit-mask-box-image: url(frame-mask.png) 16 fill / 12px;">alias reaches the group</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">9</td>
+        <td class="prop"><code>-webkit-mask-box-image-source</code>
+          <div class="meta">alias of mask-border-source</div>
+          <span class="status-badge status-partial">Partial: descriptor only</span>
+        </td>
+        <td class="desc">Same accept path as the standard source longhand.</td>
+        <td class="effect">
+          <div class="frame-box" style="-webkit-mask-box-image-source: url(frame-mask.png);">source alias</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">10</td>
+        <td class="prop"><code>-webkit-mask-box-image-slice</code>
+          <div class="meta">alias of mask-border-slice</div>
+          <span class="status-badge status-partial">Partial: descriptor only</span>
+        </td>
+        <td class="desc">Same slice parsing, fill flag included.</td>
+        <td class="effect">
+          <div class="frame-box" style="-webkit-mask-box-image-slice: 16 fill;">slice alias with fill</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">11</td>
+        <td class="prop"><code>-webkit-mask-box-image-width</code>
+          <div class="meta">alias of mask-border-width</div>
+          <span class="status-badge status-partial">Partial: descriptor only</span>
+        </td>
+        <td class="desc">Same width rules, including the percentage rejection.</td>
+        <td class="effect">
+          <div class="frame-box" style="-webkit-mask-box-image-width: 14px;">width alias</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">12</td>
+        <td class="prop"><code>-webkit-mask-box-image-outset</code>
+          <div class="meta">alias of mask-border-outset</div>
+          <span class="status-badge status-partial">Partial: descriptor only</span>
+        </td>
+        <td class="desc">Same outset rules.</td>
+        <td class="effect">
+          <div class="frame-box" style="-webkit-mask-box-image-outset: 0px;">outset alias</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">13</td>
+        <td class="prop"><code>-webkit-mask-box-image-repeat</code>
+          <div class="meta">alias of mask-border-repeat</div>
+          <span class="status-badge status-partial">Partial: descriptor only</span>
+        </td>
+        <td class="desc">Same repeat token storage.</td>
+        <td class="effect">
+          <div class="frame-box" style="-webkit-mask-box-image-repeat: repeat;">repeat alias</div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 class="section">Regions: named flow, tolerance, and wrap breaks</h2>
+  <p class="lead">Rows 14-22. Named flows move content between boxes on the one canvas; exclusions reshape later lines; wrap breaks move line and flex geometry. No row allocates a page.</p>
+  <table class="audit">
+    <thead>
+      <tr>
+        <th class="idx">#</th>
+        <th>Property / value</th>
+        <th>What it does</th>
+        <th>Effect (live)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="idx">14</td>
+        <td class="prop"><code>flow-into</code>
+          <div class="meta">none | &lt;custom-ident&gt; [element | content]</div>
+          <span class="status-badge status-live">Implemented: one canvas</span>
+        </td>
+        <td class="desc">Names the element's content (or the element itself with the element keyword). The children leave normal flow and wait for a region.</td>
+        <td class="effect">
+          <div class="region-stage">
+            <div class="region-box">
+              <div class="rb-label">source, flow-into: article content</div>
+              <div style="flow-into: article content;">named flow words</div>
+            </div>
+            <div class="region-box">
+              <div class="rb-label">region, flow-from: article</div>
+              <div style="flow-from: article;"></div>
+            </div>
+          </div>
+          <div class="effect-note">the words paint inside the right box</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">15</td>
+        <td class="prop"><code>flow-from</code>
+          <div class="meta">none | &lt;custom-ident&gt;</div>
+          <span class="status-badge status-live">Implemented: one canvas</span>
+        </td>
+        <td class="desc">Makes the element a region box that adopts the named flow's content and does not paint its own children.</td>
+        <td class="effect">
+          <div class="region-stage">
+            <div class="region-box">
+              <div class="rb-label">source</div>
+              <div style="flow-into: story content;">adopted words</div>
+            </div>
+            <div class="region-box">
+              <div class="rb-label">region, flow-from: story</div>
+              <div style="flow-from: story;"></div>
+            </div>
+          </div>
+          <div class="effect-note">source box stays empty; region carries the words</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">16</td>
+        <td class="prop"><code>region-fragment</code>
+          <div class="meta">auto | break</div>
+          <span class="status-badge status-live">Implemented: one canvas</span>
+        </td>
+        <td class="desc">auto lets one child start in a region and continue in the next; break moves the whole child to the next region when it does not fit.</td>
+        <td class="effect">
+          <div class="region-stage">
+            <div class="region-box">
+              <div class="rb-label">region 1</div>
+              <div style="flow-from: chain; region-fragment: break;"></div>
+            </div>
+            <div class="region-box">
+              <div class="rb-label">region 2, same flow</div>
+              <div style="flow-from: chain;"></div>
+            </div>
+          </div>
+          <div class="effect-note">break keeps a whole child on one region box</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">17</td>
+        <td class="prop"><code>flow-tolerance</code>
+          <div class="meta">normal | &lt;length&gt; | infinite, initial normal</div>
+          <span class="status-badge status-live">Implemented: masonry only</span>
+        </td>
+        <td class="desc">Masonry packing slack: normal is one em, a length is points, infinite keeps the shortest-column choice. Non-masonry grids ignore it.</td>
+        <td class="effect">
+          <div class="masonry-stage" style="flow-tolerance: infinite;">
+            <div class="masonry-a">a</div>
+            <div class="masonry-b">b</div>
+          </div>
+          <div class="effect-note">infinite: b packs under a in column 1</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">18</td>
+        <td class="prop"><code>wrap-flow</code>
+          <div class="meta">auto | both | start | end | minimum | maximum | clear</div>
+          <span class="status-badge status-live">Implemented: one canvas</span>
+        </td>
+        <td class="desc">Turns a sized box into an exclusion that pushes later lines aside; auto means no exclusion.</td>
+        <td class="effect">
+          <div class="exc-box" style="wrap-flow: both;">exclusion box</div>
+          <div class="exc-note">following lines shorten on both sides</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">19</td>
+        <td class="prop"><code>wrap-through</code>
+          <div class="meta">wrap | none, initial wrap</div>
+          <span class="status-badge status-live">Implemented: one canvas</span>
+        </td>
+        <td class="desc">none lets an element's lines use the full content width even when an earlier exclusion overlaps them.</td>
+        <td class="effect">
+          <div class="exc-box" style="wrap-flow: end;">exclusion</div>
+          <div class="exc-note">wrap-through: none ignores this exclusion</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">20</td>
+        <td class="prop"><code>wrap-before</code>
+          <div class="meta">auto | line | avoid | avoid-line | flex | avoid-flex</div>
+          <span class="status-badge status-live">Implemented: line/flex</span>
+        </td>
+        <td class="desc">line forces a break before the element; avoid skips a soft wrap within one em of slack; flex starts a new flex line.</td>
+        <td class="effect">
+          <div style="font-size:7.5pt;">line one <span style="wrap-before: line; background:#e8eef8;">forced next line</span></div>
+          <div class="effect-note">the span starts below, not inline</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">21</td>
+        <td class="prop"><code>wrap-after</code>
+          <div class="meta">auto | line | avoid | avoid-line | flex | avoid-flex</div>
+          <span class="status-badge status-live">Implemented: line/flex</span>
+        </td>
+        <td class="desc">line forces the following text onto the next line; avoid-line glues the next word across a soft wrap within slack.</td>
+        <td class="effect">
+          <div style="font-size:7.5pt;"><span style="wrap-after: line; background:#e8eef8;">ends here</span> text after</div>
+          <div class="effect-note">following text starts on the next line</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">22</td>
+        <td class="prop"><code>wrap-inside</code>
+          <div class="meta">auto | avoid | avoid-line | flex | avoid-flex</div>
+          <span class="status-badge status-live">Implemented: line/flex</span>
+        </td>
+        <td class="desc">avoid keeps the element's text on one line when the group fits the content width; a group that fits but not the remainder moves whole to the next line.</td>
+        <td class="effect">
+          <div style="font-size:7.5pt; width:120px;"><span style="wrap-inside: avoid; background:#e8eef8;">kept together when it fits</span> tail</div>
+          <div class="effect-note">the group moves as a unit, never splits mid-group</div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 class="section">Shapes inside: line insets</h2>
+  <p class="lead">Rows 23-26. shape-inside narrows the element's own lines before float exclusion runs; shape-padding shrinks that contour. The two decision-gated rows are stored no-ops.</p>
+  <table class="audit">
+    <thead>
+      <tr>
+        <th class="idx">#</th>
+        <th>Property / value</th>
+        <th>What it does</th>
+        <th>Effect (live)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="idx">23</td>
+        <td class="prop"><code>shape-inside</code>
+          <div class="meta">auto | outside-shape | circle() | ellipse() | inset() [ || shape-box]</div>
+          <span class="status-badge status-live">Implemented: lite subset</span>
+        </td>
+        <td class="desc">Tapers the element's own lines inside a circle, ellipse, or inset. Needs a definite content height; auto-height boxes stay full width.</td>
+        <td class="effect">
+          <div class="shape-stage-box" style="height:84px; shape-inside: circle(45% at 50% 40%);">
+            inside lines narrow toward the middle of the box and widen again at the bottom, following the circle contour declared on this element.
+          </div>
+          <div class="effect-note">middle lines are shorter than the first line</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">24</td>
+        <td class="prop"><code>shape-padding</code>
+          <div class="meta">&lt;length-percentage&gt;, non-negative</div>
+          <span class="status-badge status-live">Implemented: with shape-inside</span>
+        </td>
+        <td class="desc">Shrinks the inside contour before it narrows the lines; a padding larger than the shape yields zero-width lines, never a page break.</td>
+        <td class="effect">
+          <div class="shape-stage-box" style="height:84px; shape-inside: circle(45% at 50% 40%); shape-padding: 10px;">
+            the same circle with 10px of shape padding cuts the lines earlier, so each middle line is shorter than the same box without padding.
+          </div>
+          <div class="effect-note">padding 10px versus the row above</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">25</td>
+        <td class="prop"><code>shape-image-threshold</code>
+          <div class="meta">decision gate: no url() image shapes</div>
+          <span class="status-badge status-noop">Stored no-op</span>
+        </td>
+        <td class="desc">Kept unsupported: the shape-outside subset rejects url(), so there is no image contour to threshold. The recorded decision is not to add image shapes here.</td>
+        <td class="effect">
+          <div class="shape-stage-box" style="height:56px; shape-image-threshold: 0.5;">
+            this element declares the threshold; lines stay full width because no image shape exists in this engine.
+          </div>
+          <div class="effect-note">declared and ignored, no crash</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="idx">26</td>
+        <td class="prop"><code>float-defer</code>
+          <div class="meta">&lt;integer&gt; | last | none, decision gate</div>
+          <span class="status-badge status-noop">Stored no-op</span>
+        </td>
+        <td class="desc">Kept unsupported beyond the initial none: there is no page-float model, and the recorded decision is not to invent page boxes for it.</td>
+        <td class="effect">
+          <div class="shape-stage-box" style="height:56px; float-defer: 2;">
+            this element declares float-defer; the float behavior stays the initial none because the decision kept integer and last unsupported.
+          </div>
+          <div class="effect-note">declared and ignored, no crash</div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <footer class="note">
+    v0.0.3 ledgers: plans/v0.0.3/mask-border, plans/v0.0.3/regions, plans/v0.0.3/shapes.
+    The mask-border rows are Partial by design (the host applies the frame); the
+    regions and shapes rows are the one-canvas contract. Paged fragmentation
+    stays a non-goal in every row.
+  </footer>
+</body>
+
+</html>

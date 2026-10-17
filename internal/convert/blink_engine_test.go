@@ -97,6 +97,61 @@ func TestBlinklessEngineFixture67CornerShapes(t *testing.T) {
 	}
 }
 
+// TestBlinklessEngineFixture68MaskBorderRegionsShapes converts fixture 68
+// through the blinkless engine and asserts its contract: PDF structure, the
+// pinned page count, an embedded subset, and the audit needles. The live
+// regions and shapes effects are proven by the fixture's conversion plus the
+// layout probes in internal/blinkengine; this run proves the whole 26-example
+// fixture converts end to end. The mask-border rows are descriptor-only by
+// design (this host does not replay mask pixels), so their presence is a text
+// needle, not a painted frame.
+func TestBlinklessEngineFixture68MaskBorderRegionsShapes(t *testing.T) {
+	t.Parallel()
+
+	req := requestForFixture(t, "fixture-68-mask-border-regions-shapes.html")
+	req.Global.Engine = settings.EngineBlinkless
+
+	data := runPDFWithLog(t, req, io.Discard)
+
+	if !bytes.HasPrefix(data, []byte("%PDF-")) {
+		t.Fatalf("PDF prefix = %q", data[:min(len(data), 8)])
+	}
+
+	if !bytes.Contains(data, []byte("%%EOF")) {
+		t.Fatal("PDF is missing its EOF marker")
+	}
+
+	if got := pageCount(data); got != 4 {
+		t.Errorf("pages = %d, want 4", got)
+	}
+
+	if !bytes.Contains(data, []byte("/FontFile2")) {
+		t.Error("no embedded TrueType subset (/FontFile2)")
+	}
+
+	semantic, err := pdf.ParseSemantic(data)
+	if err != nil {
+		t.Fatalf("ParseSemantic: %v", err)
+	}
+
+	text := semantic.DocumentText()
+
+	for _, needle := range []string{
+		"MASK-BORDER-REGIONS-SHAPES",
+		"mask-border-source",
+		"flow-into",
+		"wrap-inside",
+		"shape-inside",
+		"shape-padding",
+		"shape-image-threshold",
+		"float-defer",
+	} {
+		if !strings.Contains(text, needle) {
+			t.Errorf("document text missing %q", needle)
+		}
+	}
+}
+
 // TestBlinklessEngineAppliesLinkedStylesheet proves the bridge fetches a
 // <link rel=stylesheet> with this module's loader and hands the CSS to
 // blinkless: the external sheet hides the heading, so the rendered text must
